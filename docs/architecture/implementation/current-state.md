@@ -642,3 +642,8 @@ access uses its own publication TTL and explicit expired-serving option. Bounded
 history reconciliation preserves active work, read leases and immutable provenance;
 provider-qualified retirement can remain pending. See
 [ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).
+
+Standalone startup always opens the listener after storage initialization and before
+phased Bootstrap. Readiness and execution remain fenced until initialization
+completes; `InitialBootstrapEnabled` controls only initial profile application.
+See [ADR-0243](../../decisions/0243-standalone-startup-always-runs-in-phases.md).

@@ -9,7 +9,6 @@ public static class BootstrapEnrollmentConfiguration
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var root in new[]
         {
-            "Agentstration:Bootstrap:PhasedStartupEnabled",
             "Agentstration:Bootstrap:ExtensionDependencyTimeout",
             "Agentstration:Bootstrap:ModelDependencyTimeout",
             "Agentstration:Bootstrap:InitialApplications",

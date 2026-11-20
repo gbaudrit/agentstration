@@ -51,7 +51,6 @@ def main():
         "Agentstration__InstanceId": "bootstrap-smoke",
         "Agentstration__Bootstrap__Path": str(repo / "deploy/bootstrap/profiles"),
         "Agentstration__Bootstrap__InitialBootstrapEnabled": "true",
-        "Agentstration__Bootstrap__PhasedStartupEnabled": "true",
         "Agentstration__Bootstrap__ExtensionDependencyTimeout": "00:02:00",
         "Agentstration__Bootstrap__InitialProfiles__0": "development",
         "Agentstration__Bootstrap__InitialProfiles__1": "bootstrap-openapi",
@@ -181,7 +180,7 @@ def main():
                         ("instanceId", "targetScopeRef", "registrationName", "state")}
                 elif kind == "ExtensionRegistration" or (name.startswith("bootstrap-") and kind not in ("InstanceInitialization", "Model", "ModelProviderDiscovery")):
                     result[kind + "/" + name] = (uid, etag)
-                elif args.example == "ollama" and name in ("ollama-chat", "ollama-assistant"):
+                elif args.example == "ollama" and name in ("ollama-chat", "ollama-assistant", "ollama-assistant--000001"):
                     result[kind + "/" + name] = (uid, etag, json.loads(payload)["scopeRef"])
             if args.example == "ollama":
                 expected_targets = {
@@ -218,6 +217,7 @@ def main():
             assert "ModelProvider/bootstrap-ollama" in before
             assert before["ModelProfile/ollama-chat"][2].startswith("/tenants/")
             assert before["Agent/ollama-assistant"][2].startswith("/workspaces/")
+            assert before["AgentRevision/ollama-assistant--000001"][2] == before["Agent/ollama-assistant"][2]
         else:
             assert "ToolSet/bootstrap-openapi-tools" in before
             assert "DataSource/bootstrap-openapi-source" in before

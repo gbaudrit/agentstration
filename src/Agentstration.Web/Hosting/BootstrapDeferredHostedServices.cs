@@ -7,6 +7,7 @@ internal sealed class BootstrapDeferredHostedServices(
     IReadOnlyList<IHostedService> services) : BackgroundService
 {
     private int startedCount;
+    internal IReadOnlyList<IHostedService> Workers => services;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

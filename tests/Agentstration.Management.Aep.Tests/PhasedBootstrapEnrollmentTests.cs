@@ -124,14 +124,13 @@ public sealed partial class AepEnrollmentTests
     }
 
     private static WebApplicationFactory<Program> PhasedFactory(string root, FailFirstBootstrapProvisioner provisioner, string timeout = "00:01:30") =>
-        EnrollmentFactory().WithWebHostBuilder(builder =>
+        EnrollmentFactory(observeStartup: true).WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Agentstration:Authentication:Mode", "Local");
             builder.UseSetting("Agentstration:Extensions:DiscoverOnStartup", "false");
             builder.UseSetting("Agentstration:Bootstrap:Path", root);
             builder.UseSetting("Agentstration:Bootstrap:InitialBootstrapEnabled", "true");
             builder.UseSetting("Agentstration:Bootstrap:InitialProfiles:0", "base");
-            builder.UseSetting("Agentstration:Bootstrap:PhasedStartupEnabled", "true");
             builder.UseSetting("Agentstration:Bootstrap:InitialApplications:0:Profiles:0", "tenant-resources");
             builder.UseSetting("Agentstration:Bootstrap:InitialApplications:0:TargetLevel", "/tenants/bootstrap");
             builder.UseSetting("Agentstration:Bootstrap:InitialApplications:1:Profiles:0", "workspace-resources");

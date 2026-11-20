@@ -27,6 +27,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Crawl4AiDataSourceProfileBundle = crawl4ai::Agentstration.Extensions.Crawl4AI.Crawl4AiDataSourceProfileBundle;
 
 namespace Agentstration.Management.Tests;
@@ -34,15 +35,30 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed partial class AepEnrollmentTests
 {
-    private static WebApplicationFactory<Program> EnrollmentFactory() => new AepEnrollmentTestFactory();
+    private static WebApplicationFactory<Program> EnrollmentFactory(bool observeStartup = false) => new AepEnrollmentTestFactory(observeStartup);
 
     private static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
         factory.Services
             .GetRequiredService<ILocalEnvironmentBootstrapper>()
             .EnsureInitializedAsync(default);
 
-    private sealed class AepEnrollmentTestFactory : WebApplicationFactory<Program>
+    private sealed class AepEnrollmentTestFactory(bool observeStartup) : WebApplicationFactory<Program>
     {
+        protected override IHost CreateHost(IHostBuilder builder)
+        {
+            if (!observeStartup) return base.CreateHost(builder);
+            var host = builder.Build();
+            var starting = host.StartAsync();
+            var startup = host.Services.GetRequiredService<Agentstration.Infrastructure.BootstrapStartupState>();
+            if (!SpinWait.SpinUntil(() => startup.AdministrationReady || starting.IsCompleted, TimeSpan.FromSeconds(45)))
+            {
+                host.Dispose();
+                throw new TimeoutException("The enrollment test host did not reach Bootstrap administration.");
+            }
+            if (starting.IsCompleted) starting.GetAwaiter().GetResult();
+            return host;
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");

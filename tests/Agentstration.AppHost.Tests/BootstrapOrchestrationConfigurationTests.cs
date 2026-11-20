@@ -15,7 +15,7 @@ public sealed class BootstrapOrchestrationConfigurationTests
             ["Agentstration:Bootstrap:Path"] = "../../deploy/bootstrap/profiles",
             ["Agentstration:Bootstrap:InitialBootstrapEnabled"] = "false",
             ["Agentstration:Bootstrap:Secrets:AdminPassword"] = "public-disposable-test-value",
-            ["Agentstration:Bootstrap:PhasedStartupEnabled"] = "true",
+            ["Agentstration:Bootstrap:PhasedStartupEnabled"] = "false",
             ["Agentstration:Bootstrap:ExtensionDependencyTimeout"] = "00:02:00",
             ["Agentstration:Bootstrap:InitialApplications:0:Profiles:0"] = "workspace-profile",
             ["Agentstration:Bootstrap:InitialApplications:0:TargetLevel"] = "/tenants/dev/workspaces/default",
@@ -27,7 +27,7 @@ public sealed class BootstrapOrchestrationConfigurationTests
             ["Agentstration:Extensions:example.custom:SharedKeyFile:Value"] = "not-a-supported-setting"
         }).Build();
         var environment = BootstrapEnrollmentConfiguration.CreateEnvironment(configuration);
-        Assert.AreEqual("true", environment["Agentstration__Bootstrap__PhasedStartupEnabled"]);
+        Assert.IsFalse(environment.ContainsKey("Agentstration__Bootstrap__PhasedStartupEnabled"));
         Assert.AreEqual("workspace-profile", environment["Agentstration__Bootstrap__InitialApplications__0__Profiles__0"]);
         Assert.AreEqual("/tenants/dev/workspaces/default", environment["Agentstration__Bootstrap__InitialApplications__0__TargetLevel"]);
         Assert.AreEqual("/instance", environment["Agentstration__Aep__Enrollment__AutoEnrollmentLevel"]);

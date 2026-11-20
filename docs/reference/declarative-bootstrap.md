@@ -199,8 +199,8 @@ An invalid or duplicate profile name, a missing selected profile, malformed YAML
 
 ### Staged initial startup
 
-Enable phased startup when selected resources depend on extension announcements
-or on contributions that do not exist yet:
+Startup always proceeds in phases, so extension announcements and late contributions
+can be accepted while dependent resources are prepared. No activation option is required:
 
 ```json
 {
@@ -208,7 +208,6 @@ or on contributions that do not exist yet:
     "Bootstrap": {
       "Path": "./bootstrap/profiles",
       "InitialBootstrapEnabled": true,
-      "PhasedStartupEnabled": true,
       "ExtensionDependencyTimeout": "00:10:00",
       "InitialProfiles": ["base"],
       "InitialApplications": [
@@ -230,7 +229,7 @@ or on contributions that do not exist yet:
 `InitialProfiles` target the instance. Each additional application selects profiles
 of one scope and an explicit target resolved after topology creation. Scoped
 applications use an existing global Platform administrator; the initial topology
-may create it first. `InitialApplications` require `PhasedStartupEnabled`.
+may create it first. `InitialApplications` use the same startup sequence as instance profiles.
 
 The sequence is storage, structural preparation, topology, enrollment policies,
 required contributions, resolved references, dependent resources, then readiness.
@@ -458,7 +457,7 @@ existing `https` and `https-NoBootstrap` profiles retain their PairingCode/manua
 settings. For a separately managed external extension, configure trust explicitly
 and select SharedKeyFile mode rather than relying on those default profiles.
 
-AppHost forwards phased-startup settings, ordered scoped `InitialApplications`,
+AppHost forwards dependency timeouts, ordered scoped `InitialApplications`,
 effective enrollment mode gates, `AutoEnrollmentLevel`, and external extension
 trust metadata. Its launch profile still owns catalog path resolution and initial
 activation, and its generated key files remain authoritative for bundled
@@ -469,7 +468,6 @@ variables use double underscores in place of colons):
 {
   "Agentstration": {
     "Bootstrap": {
-      "PhasedStartupEnabled": true,
       "ExtensionDependencyTimeout": "00:10:00",
       "InitialProfiles": ["development", "bootstrap-openapi"],
       "InitialApplications": [{
@@ -505,12 +503,12 @@ set `Aep:SharedKeyFile:AllowInsecureHttp=true`. Use stable externally advertised
 ports when retaining an installation across orchestration restarts. Start AppHost
 with a Bootstrap-enabled profile and override the ordinary profile's PairingCode
 mode with `-- --Agentstration:Aep:EnrollmentMode SharedKeyFile`. `https-NoBootstrap` continues to
-skip initial application, even when phased settings are configured.
+skip initial application while retaining the same phased host lifecycle.
 
 Existing manually assigned PairingCode and SharedKeyFile installations remain
-valid. Keep automatic enrollment unset to preserve manual assignment; enable the
-phased startup flag only for initial catalogs that must wait for external
-contributions. Existing installations are not moved when a default or manifest
+valid. Keep automatic enrollment unset to preserve manual assignment. Startup
+always uses the phased lifecycle, waiting only for contributions selected by the
+enabled initial applications. Existing installations are not moved when a default or manifest
 policy changes.
 
 ### Migrating legacy endpoint discovery
@@ -662,7 +660,6 @@ this option. For example:
 {
   "Agentstration": {
     "Bootstrap": {
-      "PhasedStartupEnabled": true,
       "ModelDependencyTimeout": "00:02:00"
     }
   }

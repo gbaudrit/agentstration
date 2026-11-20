@@ -433,7 +433,6 @@ public sealed class DeclarativeBootstrapOptions
     public string? Path { get; set; }
     public bool InitialBootstrapEnabled { get; set; }
     public List<string> InitialProfiles { get; set; } = [];
-    public bool PhasedStartupEnabled { get; set; }
     public TimeSpan ExtensionDependencyTimeout { get; set; } = TimeSpan.FromMinutes(10);
     public TimeSpan ModelDependencyTimeout { get; set; } = TimeSpan.FromMinutes(2);
     public List<BootstrapInitialApplication> InitialApplications { get; set; } = [];
