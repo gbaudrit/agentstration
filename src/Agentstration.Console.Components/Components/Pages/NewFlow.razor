@@ -5,10 +5,11 @@
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NewFlowStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> FlowLabels
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <UnsavedNavigationGuard IsDirty="@IsDirty" HasUnsavedChanges="@(() => IsDirty)" />
-<PageHeader ScopeRef="selectedScope" Title="@T("Title")" Description="@T("Description")"><Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)">@T("Cancel")</a></Actions></PageHeader>
+<PageHeader ScopeRef="selectedScope" Title="@T("Title")" Description="@T("Description")" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/flows", Services)" CollectionLabel="@FlowLabels["Flows"]" />
 @if (!CanCreate && (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current is not null) { <ResourceReadOnlyNotice Reason="ResourceReadOnlyReason.InsufficientPermissions" /> }
 <EditForm EditContext="formContext" OnSubmit="SubmitAsync" class="resource-form" data-testid="flow-create-form" data-interactive="@interactive.ToString().ToLowerInvariant()" novalidate>
     <FormDraftMonitor InvalidInputChanged="value => invalidInput = value" />
