@@ -42,7 +42,7 @@ The classification below identifies inspection boundaries; specialized exception
 | `PackComposer.razor` | Creation migrated; local verification below | Pack-manifest identity, retained catalogue/dependency composition and actual request scope; generated Project Resource identity stays server-owned | Yes |
 | `PackProjectDetails.razor` | Persisted host migrated; local verification below | Actual saved Resource identity, shared form and independently retained metadata/source/installation drafts; immutable build history and public YAML | Yes |
 | `ParameterEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
-| `ResourcePlanDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
+| `ResourcePlanDetails.razor` | Operational review reconciled; verification below | Actual Plan DTO/revision, retained binding review with ETags, six operational sections and exact owner-qualified choices | Not applicable |
 | `RuntimeProfileEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 | `RuntimeWorkerDetails.razor` | Reviewed operational inspection; shared state adoption and verification below | Worker/process and bounded assignment projections, not a persisted Resource definition | Not applicable |
 | `SchemaEditor.razor` | Reviewed | Console template, retained native definition and independent YAML, scoped immutable version inspection/publication | Yes |
@@ -443,3 +443,13 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 - New duplicate Designer journey **Not applicable**; #1236 stays deferred. Protected Agent source/styles/translations unchanged, no CI remediation and no full solution lanes.
 
 - Current reconciliation: **46/51** components verified; 5 remaining. The Agent reference is protected.
+
+### ResourcePlanDetails — operational review and exact binding choices
+
+- Uses the shared operational frame with its six retained family sections, actual revision/known metrics before saved Identity and wrapping Configuration. The Plan DTO has no Core Resource UID/namespace/tags/generic policy/enablement/YAML write contract, so none is fabricated. Physical Workspace remains explicit business context.
+- Existing proposal/validation/application/activity components, auto-saved binding ETags and exact profile/runtime/tool references remain. Failed binding/preview state survives navigation and refresh; changed saved snapshots require explicit discard. A persisted binding draft is distinguished from uncommitted input. Typed load/refresh/retry/private-loss states and exact identity/context/disposal guards retain recoverable work.
+- Choice labels expose localized owner type, complete authorized ScopeRef and readable shared context names without per-row queries. Values and selection semantics remain unchanged. The existing take=200 window is labelled as bounded rather than an invented total.
+- All 33 targeted Plan/Source cases and warning-free Release builds pass. Native EN/dark desktop and FR/light true-touch review, real binding ETag conflict, retention/discard and strict bounds pass: [20 real captures and exact hashes](evidence/resource-screen-foundation/resource-plan/README.md). No existing ResourcePlan browser journey was found; the temporary probes are not a reusable scenario. #1236 stays deferred.
+- Existing metric-grid proportions/global mobile footer are preserved. No shared component or protected Agent change, CI remediation or full solution lane.
+
+- Current reconciliation: **47/51** components verified; 4 remaining. The Agent reference is protected.
