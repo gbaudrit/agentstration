@@ -203,6 +203,7 @@ export class SchemaDrivenSourcesPage {
   private async createKnowledgeSource(consoleUrl: string, scopeRef: string, dataSourceName: string, knowledgeSourceName: string,
     transformationFlow: string, projectionFlow: string): Promise<void> {
     await this.open(`${consoleUrl}/knowledge-sources/new`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+    await this.page.locator('[data-wizard-step=configuration]').click();
     await selectContaining(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), projectionFlow);
     const binding = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).first();
     await binding.getByRole('textbox').first().fill('origin');
@@ -239,7 +240,7 @@ export class SchemaDrivenSourcesPage {
   }
 
   private async verifyKnowledgeEdit(consoleUrl: string, knowledgeSourceName: string): Promise<void> {
-    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}/edit?namespace=default`,
+    await this.open(`${consoleUrl}/knowledge-sources/${knowledgeSourceName}/edit?namespace=default#definition/configuration`,
       TestIds.schemaDrivenSources.knowledgeSourceEditor);
     const configuration = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceTransformationConfiguration);
     await expect(field(configuration, '$.prefix').locator('input')).toHaveValue('docs');

@@ -229,7 +229,7 @@ export class SourcePoliciesPage {
   }
   public async openKnowledge(base: string, name: string): Promise<void> {
     await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance&view=definition`);
-    await expect(this.definition).toHaveAttribute('data-interactive', 'true');
+    await expect(this.definition).toBeEnabled();
   }
   public async saveDataset(base: string, name: string, fixtures: SourcePolicyFixtures): Promise<void> {
     const before = (await fixtures.api('GET', `/api/datasources/${name}?scopeRef=%2Finstance`)).value.generation;

@@ -243,7 +243,8 @@ export class SourceLifecyclePage {
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).fill(f.knowledge);
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceDisplayName).blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceName)).toHaveValue(f.knowledge);
-    await this.page.getByRole('checkbox', { name: text.enabled, exact: false }).check();
+    await this.page.locator('[data-wizard-step=configuration]').click();
+    await this.page.getByRole('switch', { name: text.enabled, exact: false }).check();
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), f.projectionFlow);
     await choose(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceRetrievalFlow), 'knowledge-retrieval-builtin');
     await this.configureBinding(0, f.sources[0], 'primary');
@@ -432,7 +433,7 @@ export class SourceLifecyclePage {
     await choose(binding.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource), source);
   }
   private async saveKnowledge(): Promise<void> {
-    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toHaveAttribute('data-interactive', 'true');
+    await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceFields)).toBeEnabled();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave)).toBeEnabled();
     await this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceSave).click();
     await expect(this.page).toHaveURL(new RegExp(`/knowledge-sources/${this.fixture.knowledge}(?:\\?|$)`));
@@ -458,7 +459,7 @@ export class SourceLifecyclePage {
   }
 
   private async editKnowledge(consoleUrl: string): Promise<void> {
-    await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+    await this.open(consoleUrl, `/knowledge-sources/${this.fixture.knowledge}/edit#definition/configuration`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
   }
   private async runProjection(consoleUrl: string): Promise<Projection> {
     const before = await this.read<Projection[]>(consoleUrl, this.knowledgeApi() + '/projections');
@@ -600,7 +601,7 @@ export class SourceLifecyclePage {
       await this.post(consoleUrl, '/api/knowledgesources', {
         name: `${f.knowledge}-ancestor`, scopeRef: f.scope, properties: this.knowledgeProperties(ancestorName, '/instance'),
       }, 201);
-      await this.open(consoleUrl, `/knowledge-sources/${f.knowledge}-ancestor/edit`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
+      await this.open(consoleUrl, `/knowledge-sources/${f.knowledge}-ancestor/edit#definition/configuration`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
       await expect(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBindingDataSource).locator('option:checked')).toContainText(ancestorName);
     }
     if (knowledge) {
