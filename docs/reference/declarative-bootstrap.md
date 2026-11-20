@@ -644,6 +644,14 @@ restarts both processes with retained identities. It uses a local deterministic 
 
 ### Required models and responsive administration
 
+The extension's transport credential remains private to its registration scope.
+A Tenant or Workspace using a shared instance Model Provider does not need a
+discover/use grant on that credential. The AEP adapter resolves it in a narrow
+infrastructure context, retaining the Secret's explicit registration consumer,
+ancestry and use-policy checks, then restores the caller before sending HTTP.
+This does not grant infrastructure access to provider Value Bindings or to the
+rest of inference. Missing or unauthorized credentials still fail before transport.
+
 Staged startup queues Model Provider discovery before applying dependent Model Profiles.
 Each Model Profile requires its exact external model identifier, including its tag;
 a different installed model does not satisfy the dependency. Existing create-only
