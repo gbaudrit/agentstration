@@ -99,9 +99,11 @@ export class OperationalTriggersPage {
   public async openCreate(consoleUrl: string, fixture: OperationalTriggerFixture): Promise<void> {
     await this.selectContext(consoleUrl, fixture.execution.scopes.instance);
     await this.open(`${consoleUrl}/triggers/new`, TestIds.resourceAdministration.triggerEditor);
+    await this.selectCreationStep('target');
     await expect(this.page.getByTestId(TestIds.triggers.flow).locator('option', {
       hasText: fixture.execution.flowName,
     })).toHaveCount(1);
+    await this.selectCreationStep('identity');
   }
 
   public async createDisabled(consoleUrl: string, fixture: OperationalTriggerFixture): Promise<TriggerWire> {
@@ -113,9 +115,11 @@ export class OperationalTriggersPage {
       await expect(name).toHaveValue(fixture.triggerName);
       await expect(displayName).toHaveValue(fixture.triggerDisplayName);
     }).toPass();
+    await this.selectCreationStep('target');
     await this.page.getByTestId(TestIds.triggers.flow).selectOption(
       `${fixture.execution.scopes.instance}|default|${fixture.execution.flowName}`,
     );
+    await this.selectCreationStep('review');
     await Promise.all([
       this.page.waitForURL(new RegExp(`/triggers/${fixture.triggerName}(?:\\?.*)?$`), { timeout: 30_000 }),
       this.page.getByTestId(TestIds.triggers.create).click(),
@@ -275,6 +279,13 @@ export class OperationalTriggersPage {
     }
   }
 
+  private async selectCreationStep(step: 'identity' | 'target' | 'schedule' | 'input' | 'review'): Promise<void> {
+    const form = this.page.getByTestId(TestIds.triggers.form);
+    await expect(form).toBeVisible();
+    await form.locator(`[data-wizard-step="${step}"]`).click();
+    await expect(form.locator(`[data-step-id="${step}"]`)).toBeVisible();
+  }
+
   private async openEnableDialog(): Promise<void> {
     const enable = this.page.getByTestId(TestIds.triggers.enable);
     const dialog = this.page.getByTestId(TestIds.triggers.enableDialog);
@@ -313,9 +324,11 @@ export class OperationalTriggersPage {
   ): Promise<void> {
     await this.selectContext(consoleUrl, scopeRef);
     await this.open(`${consoleUrl}/triggers/new`, TestIds.resourceAdministration.triggerEditor);
+    await this.selectCreationStep('target');
     await expect(this.page.getByTestId(TestIds.triggers.flow).locator('option', {
       hasText: fixture.execution.flowName,
     })).toHaveCount(1);
+    await this.selectCreationStep('identity');
   }
 
   private async fillEditor(
@@ -331,9 +344,11 @@ export class OperationalTriggersPage {
       await expect(name).toHaveValue(nameValue);
       await expect(displayName).toHaveValue(displayNameValue);
     }).toPass();
+    await this.selectCreationStep('target');
     await this.page.getByTestId(TestIds.triggers.flow).selectOption(
       `${fixture.execution.scopes.instance}|default|${fixture.execution.flowName}`,
     );
+    await this.selectCreationStep('review');
   }
 
   private async resolveFlowIdentity(

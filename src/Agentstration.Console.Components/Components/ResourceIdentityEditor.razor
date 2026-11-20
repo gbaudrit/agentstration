@@ -10,7 +10,8 @@
                                         TechnicalName="@TechnicalName" TechnicalNameChanged="TechnicalNameChanged" TechnicalNameExpression="TechnicalNameExpression"
                                         IsNew="IsNew" Policy="NamePolicy" DisplayNameTestId="@DisplayNameTestId" TechnicalNameTestId="@TechnicalNameTestId" />
                 <FormField Label="@Shared["Namespace"]"><ChildContent><ClearableText UpdateOnInput="NamespaceUpdateOnInput" Value="@Namespace" ValueChanged="NamespaceChanged" ValueExpression="NamespaceExpression" Disabled="@(!IsNew || !NamespaceEditable || ReadOnly)" data-testid="@NamespaceTestId" /></ChildContent><Validation><ValidationMessage For="NamespaceExpression" /></Validation></FormField>
-                <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" Targets="ScopeTargets" Validation="ScopeValidation" />
+                @if (ScopeContent is not null) { <FormField Label="@Shared["Scope"]" Validation="ScopeValidation">@ScopeContent</FormField> }
+                else { <ResourceScopeFormField ResourceKind="@ResourceKind" Value="ScopeRef" ValueChanged="ScopeRefChanged" Disabled="@(!IsNew || ReadOnly)" Targets="ScopeTargets" Validation="ScopeValidation" /> }
                 <FormField Optional="true" Label="@Shared["Description"]" Class="form-span-2"><ChildContent><ClearableText Multiline Value="@Description" ValueChanged="DescriptionChanged" ValueExpression="DescriptionExpression" ReadOnly="DescriptionReadOnly" maxlength="@DescriptionMaxLength" rows="3" data-testid="@DescriptionTestId" /></ChildContent><Validation><ValidationMessage For="DescriptionExpression" /></Validation></FormField>
                 <FormField Label="@Shared["Labels"]" Class="form-span-2"><LabelsEditor Value="@Labels" ValueChanged="LabelsChanged" ValueExpression="LabelsExpression" ReadOnly="@(ReadOnly || LabelsReadOnly)" /></FormField>
             </FormGrid>
@@ -44,6 +45,7 @@
     [Parameter] public bool LabelsReadOnly { get; set; }
     [Parameter] public bool DescriptionReadOnly { get; set; }
     [Parameter] public int? DescriptionMaxLength { get; set; }
+    [Parameter] public RenderFragment? ScopeContent { get; set; }
     [Parameter] public RenderFragment? ScopeValidation { get; set; }
     [Parameter] public IReadOnlyList<ResourceScopeTargetResponse>? ScopeTargets { get; set; }
     [Parameter] public bool IsNew { get; set; }

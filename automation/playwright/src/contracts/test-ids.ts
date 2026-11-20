@@ -214,6 +214,9 @@ export const TestIds = {
     triggerEditor: 'resource-trigger-editor',
   },
   triggers: {
+    form: 'trigger-form',
+    identity: 'trigger-identity-editor',
+    save: 'trigger-save',
     displayName: 'trigger-display-name',
     name: 'trigger-name',
     flow: 'trigger-flow',
