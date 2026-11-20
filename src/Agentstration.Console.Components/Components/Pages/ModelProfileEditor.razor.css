@@ -228,3 +228,6 @@
 
 .model-profile-usage-card { padding: .75rem 1rem; border: 1px solid var(--border); border-radius: .7rem; background: var(--surface-2); min-width: 0; }
 .model-profile-usage-card ::deep .collection-identity { width: 100%; }
+
+/* Keep the shared switch and its label aligned inside the legacy form grid. */
+.resource-enabled-toggle { display: inline-flex; align-items: center; gap: var(--space-2); }

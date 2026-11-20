@@ -457,7 +457,7 @@ public sealed partial class ModelProviderNavigationTests
     }
 
     [TestMethod]
-    public void ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
+    public async Task ExistingModelProfileShowsTheSameCrossScopeImpactAndUsageList()
     {
         using var culture = new TestCultureScope("en-US");
         using var context = CreateContext(out var providers);
@@ -475,10 +475,11 @@ public sealed partial class ModelProviderNavigationTests
             Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-impact-banner']"));
             Assert.IsTrue(rendered.Markup.Contains("Review these dependencies", StringComparison.Ordinal));
         });
-        Assert.AreEqual("true", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
-        rendered.Find("[data-testid='model-profile-edit-tab']").Click();
-        Assert.AreEqual("true", rendered.Find("#model-profile-page-edit").GetAttribute("aria-selected"));
-        Assert.AreEqual("false", rendered.Find("#model-profile-page-overview").GetAttribute("aria-selected"));
+        Assert.AreEqual("page", rendered.Find("[data-resource-section='overview']").GetAttribute("aria-current"));
+        await rendered.InvokeAsync(() => context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0] + "#definition/identity"));
+        Assert.AreEqual("page", rendered.Find("[data-resource-section='definition/identity']").GetAttribute("aria-current"));
+        Assert.IsNull(rendered.Find("[data-resource-section='overview']").GetAttribute("aria-current"));
         rendered.Find("[data-testid='model-profile-review-usages']").Click();
 
         rendered.WaitForAssertion(() =>
@@ -501,7 +502,7 @@ public sealed partial class ModelProviderNavigationTests
             Assert.AreEqual(ResourceScopeRef.Instance, profiles.RequestedResolutionContextScope);
             var workspaceLink = rendered.FindAll("[data-testid='model-profile-usage'] a")
                 .Single(value => value.TextContent.Contains("Workspace assistant", StringComparison.Ordinal));
-            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance&tab=usages";
+            var returnUrl = "/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context=%2Finstance#usages";
             Assert.AreEqual(
                 $"/agents/workspace-assistant?scopeRef={Uri.EscapeDataString(WorkspaceScope.Value)}&context={Uri.EscapeDataString(WorkspaceScope.Value)}&returnUrl={Uri.EscapeDataString(returnUrl)}",
                 workspaceLink.GetAttribute("href"));
@@ -515,7 +516,7 @@ public sealed partial class ModelProviderNavigationTests
         using var context = CreateContext(out var providers);
         context.Services.AddSingleton<IModelProfilesClient>(new ExistingModelProfilesClient());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(
-            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}&tab=edit");
+            $"/modelprofiles/shared-reasoning?scopeRef=%2Finstance&context={Uri.EscapeDataString(WorkspaceScope.Value)}#definition/identity");
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
@@ -532,16 +533,16 @@ public sealed partial class ModelProviderNavigationTests
             Assert.IsEmpty(rendered.FindAll(".form-alert-warning"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-delete']"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-save']"));
-            Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-access-tab']"));
+            Assert.IsEmpty(rendered.FindAll("[data-resource-section='access']"));
             Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-impact-banner']"));
             Assert.IsTrue(rendered.Find("[data-testid='model-profile-definition-fields']")
                 .HasAttribute("disabled"));
-            Assert.HasCount(1, rendered.FindAll("[data-testid='model-profile-usages-tab']"));
+            Assert.HasCount(1, rendered.FindAll("[data-resource-section='usages']"));
         });
     }
 
     [TestMethod]
-    public void ExistingModelProfileShowsLocalizedEmptyUsages()
+    public async Task ExistingModelProfileShowsLocalizedEmptyUsages()
     {
         using var culture = new TestCultureScope("fr-FR");
         using var context = CreateContext(out _);
@@ -551,7 +552,8 @@ public sealed partial class ModelProviderNavigationTests
 
         var rendered = context.Render<ModelProfileEditor>(parameters => parameters
             .Add(value => value.Name, "shared-reasoning"));
-        rendered.Find("[data-testid='model-profile-usages-tab']").Click();
+        await rendered.InvokeAsync(() => context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0] + "#usages"));
 
         rendered.WaitForAssertion(() =>
         {
@@ -838,15 +840,21 @@ public sealed partial class ModelProviderNavigationTests
 
     private sealed class ExistingModelProfilesClient(bool hasUsages = true) : IModelProfilesClient
     {
+        public string ReadEtag { get; set; } = "\"profile-etag\"";
+        public AgentstrationApiException? ReadFailure { get; set; }
+        public PutModelProfileRequest? UpdatedRequest { get; private set; }
+        public string? UpdateEtag { get; private set; }
+        public ModelProfileUsagesResponse? UsagesOverride { get; set; }
         public Task<ModelProfileUsagesResponse>? PendingUsages { get; init; }
         public ResourceScopeRef? RequestedProfileContextScope { get; private set; }
         public ResourceScopeRef? RequestedUsageContextScope { get; private set; }
         public ResourceScopeRef? RequestedResolutionContextScope { get; private set; }
 
-        private static readonly ModelProfileResource Profile = new()
+        public ModelProfileResource Profile { get; set; } = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ModelResourceKinds.ModelProfile,
+            Uid = Guid.Parse("eab7e957-a397-4bc0-ab45-8db6cc283005"),
             Metadata = new ResourceMetadata { Name = "shared-reasoning" },
             ScopeRef = ResourceScopeRef.Instance,
             Definition = new ModelProfileProperties
@@ -867,7 +875,7 @@ public sealed partial class ModelProviderNavigationTests
         public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
             string profileName,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, "\"profile-etag\""));
+            ReadFailure is { } exception ? Task.FromException<ResourceSnapshot<ModelProfileResource>>(exception) : Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, ReadEtag));
 
         public Task<ResourceSnapshot<ModelProfileResource>> GetModelProfileAsync(
             ResourceNamespace @namespace,
@@ -882,9 +890,9 @@ public sealed partial class ModelProviderNavigationTests
 
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             string profileName,
-            CancellationToken cancellationToken) => PendingUsages ?? Task.FromResult(hasUsages
+            CancellationToken cancellationToken) => PendingUsages ?? Task.FromResult(UsagesOverride ?? (hasUsages
                 ? Usages
-                : new ModelProfileUsagesResponse([], 0));
+                : new ModelProfileUsagesResponse([], 0)));
 
         public Task<ModelProfileUsagesResponse> GetModelProfileUsagesAsync(
             ResourceNamespace @namespace,
@@ -922,7 +930,13 @@ public sealed partial class ModelProviderNavigationTests
 
         public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> CreateModelProfileAsync(CreateModelProfileRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<ModelProfileResource>> UpdateModelProfileAsync(string profileName, PutModelProfileRequest request, string etag, CancellationToken cancellationToken)
+        {
+            UpdatedRequest = request; UpdateEtag = etag;
+            Profile = Profile with { Definition = request.Properties, Generation = Profile.Generation + 1 };
+            ReadEtag = "\"profile-saved\"";
+            return Task.FromResult(new ResourceSnapshot<ModelProfileResource>(Profile, ReadEtag));
+        }
         public Task DeleteModelProfileAsync(string profileName, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>> PreviewOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ModelProfileResource>> ApplyOptionMigrationAsync(ResourceNamespace @namespace, string profileName, string targetVersion, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

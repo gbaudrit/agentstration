@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { selectResourceSection } from './resource-sections.js';
 import { fillAndCommit } from './controls.js';
 import { AgentEditorPage } from './agent-editor.page.js';
 import { TestIds } from '../contracts/test-ids.js';
@@ -109,7 +110,7 @@ export class InheritedResourceReadOnlyPage {
     if (typeof ownerScope === 'string') expect(context).toBe(ownerScope);
     else expect(context).toMatch(ownerScope);
 
-    const tabs = await this.page.getByTestId('agent-sections').count() ? this.page.locator('.resource-details-content') : this.page.locator('.resource-tabs').first();
+    const tabs = this.page.locator('.resource-details-content');
     await expect(tabs).toBeVisible();
     expect(await this.notice.evaluate((notice, tabsElement) =>
       Boolean(notice.compareDocumentPosition(tabsElement) & Node.DOCUMENT_POSITION_FOLLOWING),
@@ -126,7 +127,7 @@ export class InheritedResourceReadOnlyPage {
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName)).toBeDisabled();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileSave)).toHaveCount(0);
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDelete)).toHaveCount(0);
-    await expect(this.page.getByTestId(TestIds.modelAdministration.profileAccessTab)).toHaveCount(0);
+    await expect(this.page.locator('[data-resource-section=access]')).toHaveCount(0);
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileImpactBanner)).toHaveCount(0);
   }
 
@@ -143,9 +144,17 @@ export class InheritedResourceReadOnlyPage {
     await expect(this.notice).toHaveCount(0);
     await this.openModelProfileDefinition();
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName)).toBeEnabled();
+    const displayName = this.page.getByTestId(TestIds.modelAdministration.profileDisplayName);
+    const savedName = await displayName.inputValue();
+    await fillAndCommit(displayName, `${savedName} draft`);
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileSave)).toBeVisible();
+    await this.page.locator('.unsaved-changes-bar button[type=button]').click();
+    await expect(displayName).toHaveValue(savedName);
+    await expect(this.page.getByTestId(TestIds.modelAdministration.profileSave)).toHaveCount(0);
     await expect(this.page.getByTestId(TestIds.modelAdministration.profileDelete)).toBeVisible();
-    await expect(this.page.getByTestId(TestIds.modelAdministration.profileAccessTab)).toBeVisible();
+    await selectResourceSection(this.page, 'access');
+    await expect(this.page.getByTestId(TestIds.resourceAccess.panel)).toBeVisible();
+    await selectResourceSection(this.page, 'definition/identity');
   }
 
   public async changeToOwnerScope(): Promise<void> {
@@ -241,12 +250,8 @@ export class InheritedResourceReadOnlyPage {
   }
 
   private async openModelProfileDefinition(): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.modelAdministration.profileEditTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 2_000 });
-      await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toHaveAttribute('data-interactive', 'true', { timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'definition/identity');
+    await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toHaveAttribute('data-interactive', 'true');
   }
 
   private async expectContext(scopeRef: string): Promise<void> {

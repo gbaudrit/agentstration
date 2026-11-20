@@ -85,8 +85,10 @@ export class ModelAdministrationPage {
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileName), definition.profileName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName), definition.profileDisplayName);
     await this.page.getByTestId(TestIds.secretGrants.scopePicker).selectOption(scopeRef);
+    await this.page.getByTestId(TestIds.modelAdministration.profileWizard).locator('[data-wizard-step="model"]').click();
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.profileProvider), definition.providerName);
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
+    await this.page.getByTestId(TestIds.modelAdministration.profileWizard).locator('[data-wizard-step="review"]').click();
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();
     await this.page.waitForURL(url => url.pathname === `/modelprofiles/${definition.profileName}`);
     await this.openProfileEdit();
@@ -115,6 +117,7 @@ export class ModelAdministrationPage {
   }
 
   public async updateProfileDisplayName(value: string): Promise<void> {
+    await selectResourceSection(this.page, 'definition/identity');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.profileDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.profileSave),
@@ -160,7 +163,7 @@ export class ModelAdministrationPage {
     );
     await this.openProfileEdit();
     await this.waitForPersisted(TestIds.modelAdministration.profileForm);
-    await this.page.getByTestId(TestIds.modelAdministration.profileAccessTab).click();
+    await selectResourceSection(this.page, 'access');
     await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
   }
 
@@ -178,12 +181,8 @@ export class ModelAdministrationPage {
   }
 
   private async openProfileEdit(): Promise<void> {
-    const tab = this.page.getByTestId(TestIds.modelAdministration.profileEditTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
-      await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toBeVisible();
-    }).toPass();
+    await selectResourceSection(this.page, 'definition/identity');
+    await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toBeVisible();
   }
 
   private async waitForInteractive(testId: string): Promise<void> {
