@@ -62,7 +62,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `KnowledgeSources.razor` | `/knowledge-sources` | Adopted |
 | `ModelProfiles.razor` | `/modelprofiles` | Adopted |
 | `ModelProviders.razor` | `/modelproviders` | Adopted |
-| `OrganizationAccess.razor` | `/settings/organization/access` | Remaining; requires individual contract review |
+| `OrganizationAccess.razor` | `/settings/organization/access` | Adopted; complete organization assignments, exact local pages and authorization/read gate. [Evidence](evidence/list-layout/organization-access/README.md) |
 | `OrganizationMembers.razor` | `/settings/organization/members` | Remaining; requires individual contract review |
 | `OrganizationSecurityAudit.razor` | `/settings/organization/security-audit` | Adopted |
 | `Packs.razor` | `/packs` | Remaining; requires individual contract review |

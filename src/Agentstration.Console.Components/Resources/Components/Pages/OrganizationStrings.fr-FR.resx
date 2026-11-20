@@ -178,4 +178,6 @@
   <data name="SecurityAudit.SnapshotHelp"><value>Affiche les événements de sécurité les plus récents (200 au maximum). Les événements antérieurs ne sont pas inclus.</value></data>
   <data name="AuditAction.Unknown"><value>Action enregistrée</value></data>
   <data name="AuditOutcome.Unknown"><value>Inconnu</value></data>
+  <data name="Access.EmptyTitle"><value>Aucune attribution de rôle</value></data>
+  <data name="Access.EmptyMessage"><value>Les attributions de rôle s’affichent ici quand les membres de l’organisation reçoivent un accès.</value></data>
 </root>

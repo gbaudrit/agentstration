@@ -1952,18 +1952,19 @@
     {
       "id": "organization-access-access-row",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",
-      "line": 12,
+      "line": 10,
       "host": "console",
       "routes": [
         "/settings/organization/access"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "AccessRow",
       "identityLabel": "Principal",
       "scope": true,
       "state": false,
       "actions": false,
       "informationKeys": [
+        "Scope",
         "Role",
         "Inheritance"
       ],
@@ -2030,6 +2031,15 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "75df26675ed2aae0308bf4439f88487c72a0979e"
+      },
+      "pageComposition": {
+        "issue": 1241,
+        "template": "ResourceCollectionTemplate",
+        "dataContract": "Existing complete authorized organization membership/role arrays flattened to assignment rows without additional business requests. Name/exact principal ID search; exact role-ID, assignment-scope and existing inheritance predicates; exact assignment totals and local 20/50/100 pages.",
+        "identity": "Principal name and complete copyable ID link to the existing member destination with navigation context. Scope remains an assignment fact, separate from principal identity; existing Tenant-inherited versus explicit presentation retained. Role metadata is not replaced by display-name guesses.",
+        "states": "AuthorizationRead matches the API permission; resource/read is not invented. Compatible refresh retains rows, retry/clamp, true no-assignment versus no-match states, cancellation and stale response protection. Key includes user/logical scope/Tenant/Workspace; every role/context notification clears cached identity metadata before reauthorization.",
+        "actions": "Existing Organization navigation retained. No role, account or membership mutation or redundant Open-only command added.",
+        "validation": "OrganizationAccessCollectionTests and real populated desktop/mobile metadata smoke; ledger records limits."
       }
     },
     {
