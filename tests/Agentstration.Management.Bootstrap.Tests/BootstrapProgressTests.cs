@@ -10,7 +10,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace Agentstration.Management.Tests;
 
@@ -179,24 +178,30 @@ public sealed partial class DeclarativeBootstrapTests
     [TestMethod]
     public async Task NewProcessRecoversQueuedApplicationAsInterruptedWithoutReexecutingIt()
     {
-        await using var factory = LoadTestFactory(disableWorker: true);
+        await using var factory = LoadTestFactory();
         using var client = factory.CreateClient();
         var context = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
-        await using var scope = factory.Services.CreateAsyncScope();
-        var service = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
-        var request = new ApplyBootstrapProfilesRequest(["load-test"], "digest", new(context.TenantId), RequestId: Guid.NewGuid());
-        var application = await service.StartAsync(request, context.PrincipalId, default);
-        var restarted = ActivatorUtilities.CreateInstance<BootstrapProfileManagementService>(scope.ServiceProvider, new BootstrapApplicationLock());
-        var recovered = await restarted.GetApplicationAsync(application.Metadata.Name, context.PrincipalId, default);
-        Assert.AreEqual(BootstrapApplicationStatus.Interrupted, recovered?.Definition.Status);
-        Assert.IsNotNull(recovered?.Definition.CompletedAt);
-        var same = await restarted.StartAsync(request, context.PrincipalId, default);
-        Assert.AreEqual(application.Metadata.Name, same.Metadata.Name);
-        Assert.AreEqual(BootstrapApplicationStatus.Interrupted, same.Definition.Status);
-        Assert.IsFalse(await restarted.ProcessNextAsync(default));
+        var execution = factory.Services.GetRequiredService<BootstrapApplicationLock>().Execution;
+        await execution.WaitAsync();
+        try
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            var service = scope.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+            var request = new ApplyBootstrapProfilesRequest(["load-test"], "digest", new(context.TenantId), RequestId: Guid.NewGuid());
+            var application = await service.StartAsync(request, context.PrincipalId, default);
+            var restarted = ActivatorUtilities.CreateInstance<BootstrapProfileManagementService>(scope.ServiceProvider, new BootstrapApplicationLock());
+            var recovered = await restarted.GetApplicationAsync(application.Metadata.Name, context.PrincipalId, default);
+            Assert.AreEqual(BootstrapApplicationStatus.Interrupted, recovered?.Definition.Status);
+            Assert.IsNotNull(recovered?.Definition.CompletedAt);
+            var same = await restarted.StartAsync(request, context.PrincipalId, default);
+            Assert.AreEqual(application.Metadata.Name, same.Metadata.Name);
+            Assert.AreEqual(BootstrapApplicationStatus.Interrupted, same.Definition.Status);
+            Assert.IsFalse(await restarted.ProcessNextAsync(default));
+        }
+        finally { execution.Release(); }
     }
 
-    private static WebApplicationFactory<Program> LoadTestFactory(LoadTestGate? gate = null, bool disableWorker = false) =>
+    private static WebApplicationFactory<Program> LoadTestFactory(LoadTestGate? gate = null) =>
         new BootstrapApiOnlyWebApplicationFactory().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Agentstration:Authentication:Mode", "Development");
@@ -212,9 +217,6 @@ public sealed partial class DeclarativeBootstrapTests
                     services.AddScoped<IBootstrapResourceHandler>(provider => new GatedParameterHandler(
                         ActivatorUtilities.CreateInstance<ParameterBootstrapResourceHandler>(provider), gate));
                 }
-                if (disableWorker)
-                    foreach (var descriptor in services.Where(value => value.ServiceType == typeof(IHostedService)
-                                 && value.ImplementationType == typeof(BootstrapApplicationWorker)).ToArray()) services.Remove(descriptor);
             });
         });
 

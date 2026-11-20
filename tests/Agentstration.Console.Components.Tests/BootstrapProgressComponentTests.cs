@@ -94,6 +94,7 @@ public sealed class BootstrapProgressComponentTests
     private static BunitContext Context(StubClient client)
     {
         var context = new BunitContext();
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IBootstrapProfilesApiClient>(client);
         return context;

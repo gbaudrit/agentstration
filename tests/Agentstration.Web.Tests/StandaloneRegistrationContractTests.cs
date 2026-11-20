@@ -82,6 +82,10 @@ public sealed class StandaloneRegistrationContractTests
                 ValidateOnBuild = true,
                 ValidateScopes = true
             });
+            var hostedServices = provider.GetServices<IHostedService>().ToArray();
+            var deferred = hostedServices.OfType<BootstrapDeferredHostedServices>().Single();
+            Assert.HasCount(1, deferred.Workers.OfType<BootstrapApplicationWorker>());
+            Assert.IsFalse(hostedServices.Any(service => service is BootstrapApplicationWorker));
             Assert.IsInstanceOfType<ModelProfileManagementService>(provider.GetRequiredService<IModelProfileReferenceValidator>());
             Assert.AreEqual(aiProvider == "Managed" ? typeof(ChatClientResolver) : typeof(SingleChatClientResolver),
                 provider.GetRequiredService<IChatClientResolver>().GetType());

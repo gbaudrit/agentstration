@@ -770,7 +770,7 @@ requires no model provider, Secret, network, Docker or cloud account, and no
 standard launch profile applies it automatically. Preview is read-only; subsequent
 applications skip existing addresses and preserve changes. Builds do not generate
 its manifests. See [the fixture notes](https://github.com/gbaudrit/agentstration/blob/main/deploy/bootstrap/profiles/load-test/README.md)
-and [ADR-0238](../decisions/0238-bootstrap-applications-run-independently-of-http.md).
+and [ADR-0246](../decisions/0246-bootstrap-applications-run-independently-of-http.md).
 
 Duration depends on storage and hardware. The regression test holds a local handler
 for 16 seconds (beyond the ordinary 15-second request budget), closes the initiating
