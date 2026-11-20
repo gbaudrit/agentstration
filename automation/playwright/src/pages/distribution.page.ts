@@ -248,8 +248,12 @@ export class DistributionPage {
     await expect(this.page.getByTestId(TestIds.distribution.packProjectName)).toHaveValue(project.name);
     const add = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${project.resourceName ?? 'system-direct-agent-dotnet-expert'}"]`)
       .getByTestId(TestIds.distribution.packProjectAddResource);
+    await this.page.locator('[data-wizard-step=resources]').click();
+    await expect(this.page.locator('[data-step-id=resources]')).toBeVisible();
     await add.waitFor({ state: 'visible' });
     await add.click();
+    await this.page.locator('[data-wizard-step=review]').click();
+    await expect(this.page.locator('[data-step-id=review]')).toBeVisible();
     const create = this.page.getByTestId(TestIds.distribution.packProjectCreate);
     await expect(create).toBeEnabled();
     await Promise.all([
@@ -257,7 +261,7 @@ export class DistributionPage {
       create.click(),
     ]);
     await this.page.getByTestId(TestIds.distribution.packProjectDetails).waitFor({ state: 'visible' });
-    return this.page.url().split('/').at(-1)!;
+    return new URL(this.page.url()).pathname.split('/').at(-1)!;
   }
 
   public async openSourceDetailsFromList(publisher: string, name: string): Promise<void> {

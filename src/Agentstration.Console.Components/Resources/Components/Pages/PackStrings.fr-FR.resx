@@ -33,4 +33,7 @@
   <data name="OpenSource" xml:space="preserve"><value>Ouvrir la Source</value></data>
 <data name="Binding.Parameter"><value>Paramètre</value></data>
   <data name="TargetArchiveVersion" xml:space="preserve"><value>Version cible de l’archive</value></data>
+<data name="Composer.IdentityHelp" xml:space="preserve"><value>Ces coordonnées identifient le manifeste du Pack. Le serveur attribue l’identifiant du projet lors de sa création dans le périmètre de la requête actuelle.</value></data>
+<data name="Composer.ReviewHelp" xml:space="preserve"><value>Vérifiez les métadonnées du Pack, les dépendances incluses et les liaisons externes. La création recalcule la composition et conserve un instantané source immuable.</value></data>
+<data name="Composer.OperationUnconfirmed" xml:space="preserve"><value>La création du projet n’a pas pu être confirmée. Votre saisie est conservée ; consultez la liste des projets avant de réessayer.</value></data>
 </root>

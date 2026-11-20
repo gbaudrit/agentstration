@@ -33,4 +33,7 @@
   <data name="OpenSource" xml:space="preserve"><value>Open Source</value></data>
 <data name="Binding.Parameter"><value>Parameter</value></data>
   <data name="TargetArchiveVersion" xml:space="preserve"><value>Target archive version</value></data>
+<data name="Composer.IdentityHelp" xml:space="preserve"><value>These are the Pack manifest coordinates. The server assigns the project identifier when it is created in the current request scope.</value></data>
+<data name="Composer.ReviewHelp" xml:space="preserve"><value>Review the Pack metadata, included dependencies and external bindings. Creation recomputes the composition and preserves an immutable source snapshot.</value></data>
+<data name="Composer.OperationUnconfirmed" xml:space="preserve"><value>Project creation could not be confirmed. Your input is retained; check the project list before trying again.</value></data>
 </root>

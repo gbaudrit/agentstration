@@ -702,6 +702,8 @@ export const TestIds = {
     packProjectDisplayName: 'pack-project-display-name',
     packProjectAddResource: 'pack-project-add-resource',
     packProjectCreate: 'pack-project-create',
+    packComposerForm: 'pack-composer-form',
+    packComposerRefresh: 'pack-composer-refresh',
     packProjectBuild: 'pack-project-build',
     packProjectStatus: 'pack-project-status',
     packProjectInstall: 'pack-project-install',
