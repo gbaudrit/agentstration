@@ -162,4 +162,5 @@
   <data name="ServiceType" xml:space="preserve"><value>Type de service</value></data>
 <data name="CompleteConfiguration"><value>Complétez la configuration obligatoire avant de créer le service connecté.</value></data>
 <data name="IdentityMismatch"><value>Le service connecté retourné ne correspond pas à l’identité demandée.</value></data>
+  <data name="TypeContractUnavailable" xml:space="preserve"><value>Le contrat de type épinglé est indisponible dans ce contexte. Les valeurs enregistrées restent consultables ; la configuration ne peut être modifiée que lorsque le contrat exact est disponible.</value></data>
 </root>

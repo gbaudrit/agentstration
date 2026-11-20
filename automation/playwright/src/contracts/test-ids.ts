@@ -4,6 +4,13 @@ export const TestIds = {
     next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',
     nextTop: 'creation-wizard-next-top', previousTop: 'creation-wizard-previous-top', finishTop: 'creation-wizard-finish-top',
   },
+  connectedServiceEditor: {
+    root: 'connected-service-editor', form: 'connected-service-form', fields: 'connected-service-definition-fields',
+    identity: 'connected-service-identity-editor', name: 'connected-service-name', displayName: 'connected-service-display-name',
+    type: 'connected-service-type', save: 'connected-service-save', enabled: 'connected-service-enabled',
+    requirement: 'connected-service-value-requirement', bindingKind: 'connected-service-binding-kind',
+    bindingLiteral: 'connected-service-binding-literal', bindingTarget: 'connected-service-binding-target',
+  },
   connectedStorageCollections: {
     storageRow: 'storage-row', storageName: 'storage-name-link',
     storageTypeRow: 'storage-type-row', storageTypeName: 'storage-type-name-link',

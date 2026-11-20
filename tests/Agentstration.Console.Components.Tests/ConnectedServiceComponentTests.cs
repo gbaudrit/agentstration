@@ -22,7 +22,7 @@ using ConnectedServiceEditorPage = Agentstration.Web.Components.Pages.ConnectedS
 using ConnectedServicesPage = Agentstration.Web.Components.Pages.ConnectedServices;
 
 [TestClass]
-public sealed class ConnectedServiceComponentTests
+public sealed partial class ConnectedServiceComponentTests
 {
     [TestMethod]
     public void CatalogRendersTypeAvailabilityAndExactScope()

@@ -34,7 +34,8 @@ public sealed class ResourceCompositionTests
         var changed = false;
         var page = context.Render<PageHeader>(p => p.Add(v => v.Title, "Service"));
         Assert.IsEmpty(page.FindAll("input[role=switch]"));
-        page.Render(p => p.Add(v => v.Enabled, true).Add(v => v.EnabledChanged, value => changed = !value));
+        page.Render(p => p.Add(v => v.Enabled, true).Add(v => v.EnabledChanged, value => changed = !value).Add(v => v.EnabledTestId, "service-enabled"));
+        Assert.AreEqual("service-enabled", page.Find("input[role=switch]").GetAttribute("data-testid"));
         page.Find("input[role=switch]").Change(false);
         Assert.IsTrue(changed);
         page.Render(p => p.Add(v => v.EnabledDisabled, true));

@@ -6,7 +6,7 @@
         @if (!string.IsNullOrWhiteSpace(Description)) { <p>@Description</p> }
         @if (Metadata is not null) { <div class="page-header-metadata">@Metadata</div> }
     </div>
-    @if (Enabled is not null || Actions is not null) { <div class="page-actions">@if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="EnabledTestId" /> }@Actions</div> }
+    @if (Enabled is not null || Actions is not null) { <div class="page-actions">@if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="@EnabledTestId" /> }@Actions</div> }
 </header>
 
 @code {

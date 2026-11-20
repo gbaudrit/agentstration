@@ -94,8 +94,10 @@ public sealed class JsonSchemaInputEditorTests
         StringAssert.Contains(textarea.GetAttribute("value") ?? textarea.TextContent, "Agentstration");
         textarea.Input("not-json");
         rendered.WaitForAssertion(() => Assert.IsFalse(validation?.IsValid));
+        Assert.IsNotNull(rendered.Find(".form-field[aria-invalid=true] textarea"));
         textarea.Input("{\"name\":\"Restored\",\"mode\":\"fast\"}");
         rendered.WaitForAssertion(() => Assert.IsTrue(validation?.IsValid));
+        Assert.IsEmpty(rendered.FindAll(".form-field[aria-invalid=true]"));
         rendered.Find("[data-testid='schema-form-mode']").Click();
         Assert.AreEqual("Restored", rendered.Find("input[type=text]").GetAttribute("value"));
     }

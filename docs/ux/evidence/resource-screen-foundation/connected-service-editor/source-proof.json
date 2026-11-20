@@ -1,0 +1,79 @@
+{
+  "base": "2da32ef4d39bee5f2b44d902ba95cbc2d0ac25d3",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "5d68357dc11e89aa4898977adb50fc6e80abc5779efa416d708aa2d3e1e06f89",
+    "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor": "9ecc4d30c44a38d8d12a55c6879ea28e4cc4fcfc748660ee4886f117cfceba37",
+    "src/Agentstration.Console.Components/Console/ConnectedServiceEditorModel.cs": "f2476c2a6c9572eaf911863d70c066de94e62cec3ec46af41f8645f1bbe454d9",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ConnectedServiceStrings.fr-FR.resx": "045ebfdac7b0d8b4b0616a11d1a93d8119cca1ed7c835050f8e83a3fbe345c59",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ConnectedServiceStrings.resx": "b7cd3f1e95caaaf6e125c4f6c17ada5e0d61b4abb551b2bd6af7fb39a959ca91",
+    "src/Agentstration.Web.Components/JsonSchema/JsonSchemaInputEditor.razor": "9de391d54308f4d2ef7613302ba8a634b4e1dde99de7c90048500f9d33b28454",
+    "src/Agentstration.Web.Components/PageHeader.razor": "5e557e7acc0aed880e13d5019fdcc87debf9b9a8cdfc32543e872943c85dbb27",
+    "src/Agentstration.Web.Components/wwwroot/resource-form.js": "a90da99a6696012d0533f8499710706bc8693000b161e0cfe2c4ee9c0abfe55e",
+    "tests/Agentstration.Console.Components.Tests/ConnectedServiceComponentTests.Editor.cs": "6b43320ebde9e47f7a6148d2e8826dd673d5ecaab59b1dfaea23d82eb377b499",
+    "tests/Agentstration.Console.Components.Tests/ConnectedServiceComponentTests.cs": "c12d4400615c73d3c04817b9743973ce246d58d18a578b988999f8117a24bae4",
+    "tests/Agentstration.Web.Components.Tests/JsonSchemaInputEditorTests.cs": "1cb72e57b5a1525a4ef87b2460238fc7186eb8e96fdf2dc1bc7599bb7354746a",
+    "tests/Agentstration.Web.Components.Tests/ResourceCompositionTests.cs": "294e18314dd817c2d1e811b48660a617adfd265cf636624d65e45c4e424116f9"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "aa60159065feae0ddb717384689423dca82a64e8a67e4dac291adbeeea6a514f",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "05f0f974658bfb70442fe948631e89c5457ac20b68ff1b36dfa83a99bf8f02ec",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "0387b33ea3c9b38942b5575583b88672952cf65778ac952dba122141ff399444",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "aa60159065feae0ddb717384689423dca82a64e8a67e4dac291adbeeea6a514f",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "aa60159065feae0ddb717384689423dca82a64e8a67e4dac291adbeeea6a514f",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "05f0f974658bfb70442fe948631e89c5457ac20b68ff1b36dfa83a99bf8f02ec",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "05f0f974658bfb70442fe948631e89c5457ac20b68ff1b36dfa83a99bf8f02ec",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "0387b33ea3c9b38942b5575583b88672952cf65778ac952dba122141ff399444",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "0387b33ea3c9b38942b5575583b88672952cf65778ac952dba122141ff399444"
+  },
+  "phases": [
+    {
+      "name": "connected-editor",
+      "exitCode": 0,
+      "seconds": 89.8
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 126.4
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "validation": {
+    "consoleFocusedCases": 50,
+    "webFocusedCases": 20,
+    "failed": 0,
+    "typescript": "passed",
+    "resourceFormJavaScriptSyntax": "passed",
+    "releaseHosts": [
+      "Web",
+      "GovernedInventoryHost",
+      "Workplace.Web"
+    ],
+    "familyDesktopTouchCases": 2,
+    "maintainedAgentDesktopMobileCases": 2,
+    "realCaptures": 16,
+    "fullSolutionSuites": "Not run: maintainer requested focused validation only",
+    "ci": "Not inspected or repaired at maintainer request",
+    "persistedHost": "ConnectedServiceDetails remains pending its separate migration"
+  },
+  "protectedAgentSha256": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "validationLogsSha256": {
+    "connected-editor-components-tests.log": "445b99d29cb5f45ba3478bfb5218baece0b1ad899736e2bdaa2871dc1dfc15a3",
+    "connected-editor-schema-tests.log": "aa0c9d48b5a907d3d812a2fcee1d4efe21ee7812a6d68d7d628531dbe503e44d",
+    "connected-editor-web-build.log": "7b85e248106a3928a8463b1d4a7464cf0e83214cb6057a57cae6bcf9fa1ff819",
+    "connected-editor-governed-build.log": "326be0ae8e0681cb03d4eecefe3e61dba1206b2d2ac81d357599aba3af4ab6ac",
+    "connected-editor-workplace-build.log": "707c69c79e0a637072294e60e78b99164ed23d1b6dadf286f48c47078ee4a85a"
+  },
+  "parallelIntegration": {
+    "beforeScreenCommit": "5c9c53d26c114d6d12b4e15ea9ac0a21ead0665f",
+    "scope": "Sources, Source Registry and installed Pack collections, bounded Pack listing client/API/service and their tests/evidence. All tested editor/shared source hashes remain identical. Their parallel changes are not claimed as covered by the recorded editor campaign; tested browser base remains explicit."
+  }
+}

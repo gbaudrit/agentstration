@@ -162,4 +162,5 @@
   <data name="ServiceType" xml:space="preserve"><value>Service type</value></data>
 <data name="CompleteConfiguration"><value>Complete the required configuration before creating the Connected Service.</value></data>
 <data name="IdentityMismatch"><value>The returned Connected Service does not match the requested identity.</value></data>
+  <data name="TypeContractUnavailable" xml:space="preserve"><value>The pinned type contract is unavailable in this context. Saved values remain available for inspection; configuration cannot be changed until the exact contract is available.</value></data>
 </root>
