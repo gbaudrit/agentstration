@@ -3687,14 +3687,14 @@
     {
       "id": "agents-agent-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
-      "line": 37,
+      "line": 11,
       "host": "console",
       "routes": [
         "/agents"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "AgentSummary",
-      "identityLabel": "CollectionResource",
+      "identityLabel": "Agents",
       "scope": true,
       "state": true,
       "actions": true,
@@ -3702,7 +3702,7 @@
         "Definition",
         "ModelProfile",
         "Deployment",
-        "LastActivity"
+        "List.DeploymentUpdated"
       ],
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
@@ -3770,6 +3770,14 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "5c22628e5c4b78506ec51ec63158b70555893e83"
+      },
+      "pageComposition": {
+        "contract": "Primary Agent API skip/top with nextLink, 20/50/100 pages, unknown total/no arbitrary jumps. No unsupported global search or local status filters.",
+        "enrichment": "Single bounded first-1000 deployment observation per page, exact owner/namespace/name association; missing matches are unknown, with incomplete-window help and actual observed deployment update time.",
+        "state": "ResourcesRead/Write gates, compatible refresh and successful pager facts retained; principal/logical/physical context + revision guards, denied/late metadata cleared.",
+        "commands": "Existing scoped links, namespace/managed/ownership gates, Run/Edit/Delete/QuickInspect and latest scoped ETag confirmation retained; inspector Run permission aligned.",
+        "evidence": "docs/ux/evidence/list-layout/agents/README.md",
+        "tests": "AgentCollectionPermissionsTests; AgentsCollectionTests; ApiClientTests.AgentCollections"
       }
     },
     {

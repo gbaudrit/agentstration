@@ -24,6 +24,7 @@ public sealed record AgentSummary(string Id, string Name, string Type, string Ve
     public string? DeploymentUrl => DeploymentId is null ? null : ConsoleResourceUrls.Deployment(Namespace, DeploymentId);
     public string DetailsUrl => ConsoleResourceUrls.Agent(Namespace, Id, ScopeRef);
 }
+public sealed record AgentSummaryPage(IReadOnlyList<AgentSummary> Items, bool HasMore, bool DeploymentWindowComplete);
 public sealed record ResourceSnapshot<T>(T Value, string ETag);
 public sealed record DeploymentSummary(
     string Id,

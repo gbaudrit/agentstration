@@ -1,0 +1,21 @@
+{
+  "baseCommit": "f5d790f3fafcb1240da91b5400661b88d5de8af9",
+  "route": "/agents",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Agents.razor": "1e092761bffc85f591b3cc3f173a346dc6a8ede9",
+    "src/Agentstration.Console.Components/Components/Pages/Agents.razor.cs": "6b965fac4e0d48df424b10fa28272f9370ee27ea",
+    "src/Agentstration.Console.Client/ApiClients.cs": "94432d2247b2d71d381cd390384c70963f3bf7c5",
+    "src/Agentstration.Console.Client/ConsoleModels.cs": "7252c4e636c5ff9c2fa532a118379edbfea4a286",
+    "src/Agentstration.Console.Client/ManagementApiClient.cs": "6d2e287fef9d8c4d320e987d4e5484f69f641dcc",
+    "src/Agentstration.Agents.Api/Api/ListAgentsEndpoint.cs": "6c8459be248f60815b0198c7333864bdc98223c0",
+    "src/Agentstration.Agents.Api/Api/ListDeploymentsEndpoint.cs": "dc3a4cf4763ccc45de4737bcefe246c5e36def24",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae",
+    "src/Agentstration.Web.Components/PageHeader.razor": "2511939fa3442c87953fcf79a8b487b47889c137"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ],
+  "synchronizationReview": "f5d790f3 optional PageHeader activation TestId fix is not used by this list; post-integration Web build and populated browser checks pass."
+}

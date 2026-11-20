@@ -25,8 +25,8 @@ public sealed class AgentCollectionPermissionsTests
         context.Services.AddAgentstrationWebComponents();
         context.Services.AddSingleton<IManagementApiClient>(new MockApiClient(TimeProvider.System));
         var permissions = canManage
-            ? new HashSet<string> { AuthorizationPermissions.ResourcesWrite, AuthorizationPermissions.ResourcesDelete, AuthorizationPermissions.RunsExecute }
-            : [];
+            ? new HashSet<string> { AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite, AuthorizationPermissions.ResourcesDelete, AuthorizationPermissions.RunsExecute }
+            : new HashSet<string> { AuthorizationPermissions.ResourcesRead };
         context.Services.AddSingleton<IConsoleContextProvider>(new ContextProvider(new(
             Guid.NewGuid(), "Reader", Guid.NewGuid(), "tenant", "Tenant", workspaceId,
             "default", "Default workspace", permissions, [])));
@@ -48,13 +48,10 @@ public sealed class AgentCollectionPermissionsTests
             var run = menu.QuerySelectorAll("a").Single(link => link.TextContent == strings["Run"].Value).GetAttribute("href")!;
             StringAssert.Contains(run, "/run?scopeRef=");
         }
-        Assert.AreEqual(string.Empty, cut.Find("input[type='search']").GetAttribute("value"));
-        cut.Find("input[type='search']").Input("dotnet");
-        Assert.HasCount(1, cut.FindAll("tbody tr"));
-        cut.Find("input[type='search']").Input("no-such-agent");
-        Assert.IsEmpty(cut.FindAll(".resource-collection"));
-        cut.Find("input[type='search']").Input(string.Empty);
+        Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-page-number"));
         Assert.HasCount(2, cut.FindAll("tbody tr"));
+        await cut.FindAll(".collection-actions-menu button").First(button => button.TextContent == strings["QuickInspect"].Value).ClickAsync(new());
+        Assert.AreEqual(canManage, cut.Find(".quick-inspector-actions").QuerySelectorAll("a").Any(link => link.TextContent == strings["RunAgent"].Value));
     }
 
     private sealed class ContextProvider(ConsoleContextSnapshot snapshot) : IConsoleContextProvider

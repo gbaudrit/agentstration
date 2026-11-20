@@ -20,6 +20,19 @@ namespace Agentstration.Web.Console;
 
 public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiClient, IAgentRunnerManagementClient
 {
+    public async Task<AgentSummaryPage> GetAgentsPageAsync(int skip, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(take, 100);
+        var agentsTask = ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, $"api/agents?allNamespaces=true&skip={skip}&top={take}", cancellationToken);
+        var deploymentsTask = ApiResponse.ReadAsync<PagedResponse<AgentDeployment>>(httpClient, "api/deployments?top=1000", cancellationToken);
+        await Task.WhenAll(agentsTask, deploymentsTask);
+        var page = await agentsTask;
+        var deployments = await deploymentsTask;
+        return new(ToSummaries(page.Value, deployments.Value, observedOnly: true), !string.IsNullOrWhiteSpace(page.NextLink), string.IsNullOrWhiteSpace(deployments.NextLink));
+    }
+
     public async Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken)
     {
         var agentsTask = ApiResponse.ReadAsync<PagedResponse<AgentResource>>(httpClient, "api/agents?allNamespaces=true&top=1000", cancellationToken);
@@ -40,12 +53,12 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
 
     private static IReadOnlyList<AgentSummary> ToSummaries(
         IReadOnlyList<AgentResource> agents,
-        IReadOnlyList<AgentDeployment> deployments) =>
+        IReadOnlyList<AgentDeployment> deployments, bool observedOnly = false) =>
         agents.Select(agent =>
         {
             var modelProfile = agent.Definition.ModelProfile.Resolve(agent.Namespace, ModelResourceKinds.ModelProfile);
-            var deployment = FindCurrentDeployment(agent, deployments);
-            return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), DeploymentStatus(deployment), deployment?.UpdatedAt ?? DateTimeOffset.MinValue, modelProfile.Name)
+            var deployment = FindCurrentDeployment(agent, deployments, observedOnly);
+            return new AgentSummary(agent.Metadata.Name, agent.Definition.DisplayName, agent.Definition.Handler, agent.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture), agent.Status.ProvisioningState.ToString(), agent.Definition.Tools.Select(tool => tool.Name).ToArray(), observedOnly && deployment is null ? "Unknown" : DeploymentStatus(deployment), deployment?.UpdatedAt ?? DateTimeOffset.MinValue, modelProfile.Name)
             {
                 Namespace = agent.Namespace,
                 IsManaged = agent.Governance.IsManaged,
@@ -60,12 +73,13 @@ public sealed class ManagementApiClient(HttpClient httpClient) : IManagementApiC
             };
         }).ToArray();
 
-    private static AgentDeployment? FindCurrentDeployment(AgentResource agent, IReadOnlyList<AgentDeployment> deployments)
+    private static AgentDeployment? FindCurrentDeployment(AgentResource agent, IReadOnlyList<AgentDeployment> deployments, bool requireExactOwner = false)
     {
         var canonicalName = $"{agent.Metadata.Name}--g{agent.Generation:000000}";
         return deployments
             .Where(deployment =>
-                deployment.AgentNamespace == agent.Namespace
+                (!requireExactOwner || deployment.ScopeRef == agent.ScopeRef)
+                && deployment.AgentNamespace == agent.Namespace
                 && string.Equals(deployment.AgentName, agent.Metadata.Name, StringComparison.Ordinal))
             .OrderByDescending(deployment => string.Equals(deployment.Metadata.Name, canonicalName, StringComparison.Ordinal))
             .ThenByDescending(deployment => deployment.DesiredState == DesiredAgentState.Running)

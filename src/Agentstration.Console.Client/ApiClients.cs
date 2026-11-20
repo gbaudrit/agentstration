@@ -20,6 +20,8 @@ namespace Agentstration.Web.Console;
 public interface IManagementApiClient
 {
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken);
+    Task<AgentSummaryPage> GetAgentsPageAsync(int skip, int take, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support Agent collection paging.");
     Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         GetAgentsAsync(cancellationToken);
     Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken);

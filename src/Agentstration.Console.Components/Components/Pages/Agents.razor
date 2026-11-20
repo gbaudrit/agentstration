@@ -1,5 +1,6 @@
 @page "/agents"
 @implements IDisposable
+@inject ConsoleContextState Context
 @inject IServiceProvider Services
 @inject IManagementApiClient Client
 @inject NotificationState Notifications
@@ -7,138 +8,41 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DeploymentStrings> DeploymentLocalizer
 
 <PageTitle>@T("PageTitle")</PageTitle>
-<PageHeader Eyebrow="@T("Eyebrow")" Title="@T("Agents")" Description="@T("Description")" TestId="resource-agents">
-    <Metadata><span>@F("AgentCount", Filtered.Count)</span><span>@F("DeployedCount", DeployedCount)</span><span>@F("AttentionCount", FailedCount)</span></Metadata>
-    <Actions><a class="button-primary" href="/agents/new">@T("CreateAgent")</a></Actions>
-</PageHeader>
-
-<ResourceToolbar Label="@T("AgentFilters")">
-    <ChildContent>
-        <SearchBox Value="@search" ValueChanged="value => search = value" Placeholder="@T("SearchAgentsPlaceholder")" Label="@T("SearchAgents")" />
-        <select @bind="status" aria-label="@T("FilterAgentStatus")"><option value="">@T("StatusAll")</option><option value="Accepted">@T("StatusValid")</option><option value="Deployed">@T("StatusDeployed")</option><option value="Failed">@T("StatusFailed")</option></select>
-    </ChildContent>
-    <Actions><button class="button-secondary" @onclick="LoadAsync" disabled="@loading">@(loading ? T("Refreshing") : T("Refresh"))</button></Actions>
-</ResourceToolbar>
-
-@if (loading && items is null)
-{
-    <LoadingState />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-else if (Filtered.Count == 0)
-{
-    <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"><a class="button-primary" href="/agents/new">@T("CreateAgent")</a></EmptyState>
-}
-else
-{
-    <CollectionView TItem="AgentSummary" Items="Filtered" InformationLabels="@(new[] { T("Definition"), T("ModelProfile"), T("Deployment"), T("LastActivity") })">
-        <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
-        <Information Context="item">
-            <CollectionValue Label="@T("Definition")"><strong>@ResourceName(item.Type)</strong></CollectionValue>
-            <CollectionValue Label="@T("ModelProfile")"><a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a></CollectionValue>
-            <CollectionValue Label="@T("Deployment")">@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@item.DeploymentUrl">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</CollectionValue>
-            <CollectionValue Label="@T("LastActivity")">@LastActivity(item.LastActivity)</CollectionValue>
-        </Information>
-        <Actions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")">
-            <a href="@EditUrl(item)">@T("Open")</a>
-            @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)">@T("Run")</a></PermissionGate> }
-            @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@EditUrl(item)#definition/configuration">@T("EditDefinition")</a></PermissionGate><PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" @onclick="() => RequestDelete(item)">@T("Delete")</button></PermissionGate> }
-            <button type="button" @onclick="() => selected = item">@T("QuickInspect")</button>
-        </CollectionActions></Actions>
-    </CollectionView>
-}
+<ResourceCollectionTemplate TItem="AgentSummary" Title="@T("Agents")" Description="@T("Description")" TestId="resource-agents" ContextKey="@contextKey"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" RowTestId="agent-row" Query="query" QueryChanged="ChangeQueryAsync"
+                            Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive || deleting)" EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <PrimaryActions>@if (CanCreate) { <a class="button-primary" href="@CreateUrl">@T("CreateAgent")</a> }</PrimaryActions>
+    <EmptyActions>@if (CanCreate) { <a class="button-primary" href="@CreateUrl">@T("CreateAgent")</a> }</EmptyActions>
+    <Feedback>
+        @if (!deploymentWindowComplete) { <p class="help-text">@T("List.DeploymentWindowLimited")</p> }
+        @if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
+    </Feedback>
+    <ItemActions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")">
+        <a href="@EditUrl(item)">@T("Open")</a>
+        @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)">@T("Run")</a></PermissionGate> }
+        @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@EditUrl(item)#definition/configuration">@T("EditDefinition")</a></PermissionGate><PermissionGate Permission="@AuthorizationPermissions.ResourcesDelete"><button class="danger-text" type="button" disabled="@deleting" @onclick="() => RequestDelete(item)">@T("Delete")</button></PermissionGate> }
+        <button type="button" @onclick="() => selected = item">@T("QuickInspect")</button>
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
 
 @if (selected is not null)
 {
     <aside class="quick-inspector" aria-label="@T("QuickInspector")">
-        <header><div><p class="eyebrow">Agent</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusLabel(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="@T("CloseInspector")">×</button></header>
-        <dl class="resource-details resource-section"><dt>@T("Namespace")</dt><dd><code>@selected.Namespace.Value</code></dd><dt>@T("Definition")</dt><dd>@ResourceName(selected.Type) · @F("Generation", selected.Version)</dd><dt>@T("ModelProfile")</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>@T("Deployment")</dt><dd>@if (selected.DeploymentUrl is not null) { <a class="text-button" href="@selected.DeploymentUrl">@selected.DeploymentId</a><span class="resource-secondary"><StatusBadge Text="@DeploymentStatusLabel(selected.Runtime)" Status="@PlatformDashboardService.ToStatus(selected.Runtime)" /></span> } else { @DeploymentStatusLabel(selected.Runtime) }</dd><dt>@T("ResourceId")</dt><dd><code>@selected.Id</code></dd></dl>
-        <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<a class="button-primary" href="@RunUrl(selected)">@T("RunAgent")</a>}<a class="button-secondary" href="@EditUrl(selected)">@T("OpenDetails")</a></div>
+        <header><div><p class="eyebrow">@T("Agents")</p><h2>@selected.Name</h2><StatusIndicator Text="@StatusLabel(selected.Status)" Status="@StatusPresentation.Tone(selected.Status)" /></div><button class="icon-button" @onclick="() => selected = null" aria-label="@T("CloseInspector")">×</button></header>
+        <dl class="resource-details resource-section"><dt>@T("Namespace")</dt><dd><code>@selected.Namespace.Value</code></dd><dt>@T("Definition")</dt><dd>@ResourceName(selected.Type) · @F("Generation", selected.Version)</dd><dt>@T("ModelProfile")</dt><dd>@ResourceName(selected.ModelProfile)</dd><dt>@T("Deployment")</dt><dd>@if (selected.DeploymentUrl is not null) { <a class="text-button" href="@DeploymentUrl(selected)">@selected.DeploymentId</a><span class="resource-secondary"><StatusBadge Text="@DeploymentStatusLabel(selected.Runtime)" Status="@PlatformDashboardService.ToStatus(selected.Runtime)" /></span> } else { @DeploymentStatusLabel(selected.Runtime) }</dd><dt>@T("ResourceId")</dt><dd><code>@selected.Id</code></dd></dl>
+        <div class="quick-inspector-actions">@if(selected.Namespace.IsDefault){<PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a class="button-primary" href="@RunUrl(selected)">@T("RunAgent")</a></PermissionGate>}<a class="button-secondary" href="@EditUrl(selected)">@T("OpenDetails")</a></div>
     </aside>
 }
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteAgent")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteAgent")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<AgentSummary>? items;
-    private AgentstrationApiException? error;
-    private AgentSummary? pendingDelete;
-    private AgentSummary? selected;
-    private string search = string.Empty;
-    private string status = string.Empty;
-    private bool loading;
-
-    private IReadOnlyList<AgentSummary> Filtered => items?.Where(item =>
-        (string.IsNullOrWhiteSpace(search)
-            || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.Id.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.Namespace.Value.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.ModelProfile.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.Capabilities.Any(capability => capability.Contains(search, StringComparison.OrdinalIgnoreCase)))
-        && (string.IsNullOrWhiteSpace(status)
-            || string.Equals(status, "Deployed", StringComparison.OrdinalIgnoreCase) && item.DeploymentId is not null
-            || string.Equals(item.Status, status, StringComparison.OrdinalIgnoreCase))).ToArray() ?? [];
-    private int DeployedCount => items?.Count(item => item.DeploymentId is not null) ?? 0;
-    private int FailedCount => items?.Count(item => string.Equals(item.Status, "Failed", StringComparison.OrdinalIgnoreCase)) ?? 0;
-    private string DeleteMessage => pendingDelete is null ? string.Empty : F("DeleteMessage", pendingDelete.Name);
-
-    protected override Task OnInitializedAsync() => LoadAsync();
-
-    private async Task LoadAsync()
-    {
-        loading = true;
-        error = null;
-        try { items = await Client.GetAgentsAsync(cancellation.Token); }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
-    }
-
-    private void RequestDelete(AgentSummary item) => pendingDelete = item;
-    private void CancelDelete() => pendingDelete = null;
-
-    private async Task DeleteAsync()
-    {
-        if (pendingDelete is null) return;
-        var deleted = pendingDelete;
-        pendingDelete = null;
-        try
-        {
-            var snapshot = deleted.ScopeRef is { } scopeRef
-                ? await Client.GetAgentAsync(deleted.Namespace, deleted.Id, scopeRef, cancellation.Token)
-                : await Client.GetAgentAsync(deleted.Namespace, deleted.Id, cancellation.Token);
-            if (deleted.ScopeRef is { } exactScopeRef)
-                await Client.DeleteAgentAsync(deleted.Namespace, deleted.Id, exactScopeRef, snapshot.ETag, cancellation.Token);
-            else
-                await Client.DeleteAgentAsync(deleted.Id, snapshot.ETag, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("AgentDeleted"), deleted.Name, DateTimeOffset.Now, UiStatus.Success));
-            await LoadAsync();
-        }
-        catch (AgentstrationApiException exception)
-        {
-            error = exception;
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeleteFailed"), exception.Message, DateTimeOffset.Now, UiStatus.Danger));
-        }
-    }
-
-    private string EditUrl(AgentSummary item) => ResourceOwnershipContext.PreserveNavigation(item.DetailsUrl, Services);
-    private string RunUrl(AgentSummary item)
-    {
-        var url = EditUrl(item); var query = url.IndexOf('?');
-        return query < 0 ? $"{url}/run" : $"{url[..query]}/run{url[query..]}";
-    }
-    private static string ModelProfileUrl(AgentSummary item) => ConsoleResourceUrls.ModelProfile(item.ModelProfileAddress, item.ModelProfileScopeRef);
-    private static string TechnicalName(AgentSummary item) => item.Id;
-    private static string ResourceName(string resourceId) => resourceId;
-    private string LastActivity(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("NoActivityReported") : value.LocalDateTime.ToString("g");
-    private string StatusLabel(string value) => value switch { "Accepted" => T("StatusValid"), "Succeeded" => T("StatusPublished"), "Failed" => T("StatusFailed"), "Unknown" or "" => T("StatusUnknown"), _ => value };
-    private string DeploymentStatusLabel(string value) => string.Equals(value, "Not deployed", StringComparison.OrdinalIgnoreCase)
-        ? DeploymentLocalizer["Status.NotDeployed"]
-        : DeploymentLocalizer[$"Status.{value}"];
-    private string T(string key) => Localizer[key];
-    private string F(string key, params object[] arguments) => Localizer[key, arguments];
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private CollectionColumn<AgentSummary> IdentityColumn => new("identity", T("Agents"), item => @<CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@EditUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>);
+    private IReadOnlyList<CollectionColumn<AgentSummary>> Columns =>
+    [
+        new("definition", T("Definition"), item => @<strong>@ResourceName(item.Type)</strong>),
+        new("model", T("ModelProfile"), item => @<a class="text-button" href="@ModelProfileUrl(item)">@ResourceName(item.ModelProfile)</a>),
+        new("deployment", T("Deployment"), item => @<text>@if (item.DeploymentUrl is not null) { <span class="agent-deployment-line"><a class="text-button" href="@DeploymentUrl(item)">@item.DeploymentId</a><StatusBadge Text="@DeploymentStatusLabel(item.Runtime)" Status="@PlatformDashboardService.ToStatus(item.Runtime)" /></span> } else { <span>@DeploymentStatusLabel(item.Runtime)</span> }</text>),
+        new("updated", T("List.DeploymentUpdated"), item => @<text>@LastActivity(item.LastActivity)</text>)
+    ];
 }

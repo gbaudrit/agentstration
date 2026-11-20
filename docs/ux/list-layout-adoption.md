@@ -50,7 +50,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | Source | Routes / aliases | Batch status |
 | --- | --- | --- |
 | `AgentRuns.razor` | `/agent-runs` | Adopted |
-| `Agents.razor` | `/agents` | Remaining; requires individual contract review |
+| `Agents.razor` | `/agents` | Adopted; server offset pages, unknown total; bounded deployment observations, scoped commands/ETags and inspector preserved. [Evidence](evidence/list-layout/agents/README.md) |
 | `Artifacts.razor` | `/artifacts` | Adopted |
 | `BootstrapProfiles.razor` | `/settings/bootstrap` | Remaining; requires individual contract review |
 | `ConnectedServices.razor` | `/connected-services` | Protected pilot |
