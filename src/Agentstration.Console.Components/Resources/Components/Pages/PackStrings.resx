@@ -36,4 +36,24 @@
 <data name="Composer.IdentityHelp" xml:space="preserve"><value>These are the Pack manifest coordinates. The server assigns the project identifier when it is created in the current request scope.</value></data>
 <data name="Composer.ReviewHelp" xml:space="preserve"><value>Review the Pack metadata, included dependencies and external bindings. Creation recomputes the composition and preserves an immutable source snapshot.</value></data>
 <data name="Composer.OperationUnconfirmed" xml:space="preserve"><value>Project creation could not be confirmed. Your input is retained; check the project list before trying again.</value></data>
+<data name="Project.RefreshDraftConflict" xml:space="preserve"><value>This resource changed on the server. Your pending changes and original ETags are retained.</value></data>
+<data name="Project.DiscardResourceDrafts" xml:space="preserve"><value>Discard resource edits and load the current definition</value></data>
+<data name="Project.YamlHelp" xml:space="preserve"><value>Read-only saved resource metadata and definition. Internal artifact storage locators are omitted.</value></data>
+<data name="Project.Value" xml:space="preserve"><value>Value</value></data>
+<data name="Project.Updated" xml:space="preserve"><value>Updated</value></data>
+<data name="Project.Generation" xml:space="preserve"><value>Generation</value></data>
+<data name="Project.SourcesUnavailable" xml:space="preserve"><value>Source documents could not be loaded. Refresh to retry.</value></data>
+<data name="Project.BuildsUnavailable" xml:space="preserve"><value>Build history could not be loaded. Refresh to retry.</value></data>
+<data name="Project.SourcePath" xml:space="preserve"><value>Archive path</value></data>
+<data name="Project.SourceUnsaved" xml:space="preserve"><value>Unsaved changes</value></data>
+<data name="Project.SourceSaved" xml:space="preserve"><value>Saved {0}/{1} in Pack Project revision {2}.</value></data>
+<data name="Project.OperationUnconfirmed" xml:space="preserve"><value>The command could not be confirmed. Your changes are retained; refresh to check the outcome before trying again.</value></data>
+<data name="Project.RetainedBindingReference" xml:space="preserve"><value>Retained reference</value></data>
+<data name="Project.UnknownState" xml:space="preserve"><value>Unknown</value></data>
+<data name="Project.InstallTarget" xml:space="preserve"><value>Installation target</value></data>
+<data name="Project.ApplyToYaml" xml:space="preserve"><value>Apply to YAML</value></data>
+<data name="ApplyToForm" xml:space="preserve"><value>Apply to form</value></data>
+<data name="Project.ReplaceSourceDraftTitle" xml:space="preserve"><value>Use this editor version?</value></data>
+<data name="Project.ReplaceSourceDraftMessage" xml:space="preserve"><value>The pending content in the other editor view will be replaced by this version. A rejected save retains both drafts.</value></data>
+<data name="Project.UseCurrentSource" xml:space="preserve"><value>Use this version</value></data>
 </root>

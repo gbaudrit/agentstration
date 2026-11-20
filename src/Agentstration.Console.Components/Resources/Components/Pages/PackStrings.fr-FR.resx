@@ -36,4 +36,24 @@
 <data name="Composer.IdentityHelp" xml:space="preserve"><value>Ces coordonnées identifient le manifeste du Pack. Le serveur attribue l’identifiant du projet lors de sa création dans le périmètre de la requête actuelle.</value></data>
 <data name="Composer.ReviewHelp" xml:space="preserve"><value>Vérifiez les métadonnées du Pack, les dépendances incluses et les liaisons externes. La création recalcule la composition et conserve un instantané source immuable.</value></data>
 <data name="Composer.OperationUnconfirmed" xml:space="preserve"><value>La création du projet n’a pas pu être confirmée. Votre saisie est conservée ; consultez la liste des projets avant de réessayer.</value></data>
+<data name="Project.RefreshDraftConflict" xml:space="preserve"><value>Cette ressource a changé sur le serveur. Vos modifications et les ETags d’origine sont conservés.</value></data>
+<data name="Project.DiscardResourceDrafts" xml:space="preserve"><value>Abandonner les modifications de la ressource et charger la définition actuelle</value></data>
+<data name="Project.YamlHelp" xml:space="preserve"><value>Métadonnées et définition enregistrées en lecture seule. Les adresses internes de stockage des artefacts sont omises.</value></data>
+<data name="Project.Value" xml:space="preserve"><value>Valeur</value></data>
+<data name="Project.Updated" xml:space="preserve"><value>Mis à jour</value></data>
+<data name="Project.Generation" xml:space="preserve"><value>Génération</value></data>
+<data name="Project.SourcesUnavailable" xml:space="preserve"><value>Les documents sources n’ont pas pu être chargés. Actualisez pour réessayer.</value></data>
+<data name="Project.BuildsUnavailable" xml:space="preserve"><value>L’historique des constructions n’a pas pu être chargé. Actualisez pour réessayer.</value></data>
+<data name="Project.SourcePath" xml:space="preserve"><value>Chemin dans l’archive</value></data>
+<data name="Project.SourceUnsaved" xml:space="preserve"><value>Modifications non enregistrées</value></data>
+<data name="Project.SourceSaved" xml:space="preserve"><value>{0}/{1} enregistré dans la révision {2} du projet de Pack.</value></data>
+<data name="Project.OperationUnconfirmed" xml:space="preserve"><value>La commande n’a pas pu être confirmée. Vos modifications sont conservées ; actualisez pour vérifier le résultat avant de réessayer.</value></data>
+<data name="Project.RetainedBindingReference" xml:space="preserve"><value>Référence conservée</value></data>
+<data name="Project.UnknownState" xml:space="preserve"><value>Inconnu</value></data>
+<data name="Project.InstallTarget" xml:space="preserve"><value>Cible d’installation</value></data>
+<data name="Project.ApplyToYaml" xml:space="preserve"><value>Appliquer au YAML</value></data>
+<data name="ApplyToForm" xml:space="preserve"><value>Appliquer au formulaire</value></data>
+<data name="Project.ReplaceSourceDraftTitle" xml:space="preserve"><value>Utiliser cette version de l’éditeur ?</value></data>
+<data name="Project.ReplaceSourceDraftMessage" xml:space="preserve"><value>Le contenu en attente dans l’autre vue de l’éditeur sera remplacé par cette version. Un enregistrement refusé conserve les deux brouillons.</value></data>
+<data name="Project.UseCurrentSource" xml:space="preserve"><value>Utiliser cette version</value></data>
 </root>
