@@ -24,6 +24,9 @@ public sealed class StorageTypeCollectionTests
         using var handler = new Handler((_, uri) => Task.FromResult(Response(uri.Query.Contains("skip=20", StringComparison.Ordinal) ? "second" : "first", true)));
         using var context = Context(handler);
         var cut = context.Render<StorageTypes>();
+        var storagesNavigation = cut.Find("header a.button-secondary");
+        Assert.AreEqual(culture == "fr-FR" ? "Stockages" : "Storages", storagesNavigation.TextContent);
+        Assert.AreEqual("/storages", storagesNavigation.GetAttribute("href"));
         Assert.AreEqual(1, handler.Requests.Count);
         StringAssert.Contains(handler.Requests[0].Query, "scopeRef=%2Finstance&skip=0&take=20");
         Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-page-number, .collection-pager [role=status]"));

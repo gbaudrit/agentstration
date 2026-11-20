@@ -5902,6 +5902,10 @@
         "states": "Retained successful rows and pager facts on failed page or refresh; retry requested page; removed terminal page falls back once to page one; context replacement and stale response protection.",
         "actions": "Existing authorized create and Storages navigation retained.",
         "validation": "StorageTypeCollectionTests plus maintained existing list regressions; real API desktop/mobile smoke; list-layout-adoption.md records limits."
+      },
+      "headerLabelReview": {
+        "navigation": "Header /storages destination uses the existing localized Storages label instead of Back to Storages; owner/context and permissions unchanged.",
+        "evidence": "evidence/list-layout/storage-types/header-review/README.md"
       }
     },
     {

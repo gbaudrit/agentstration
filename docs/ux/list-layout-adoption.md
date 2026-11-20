@@ -101,3 +101,5 @@ The required Integration lane passes: 1,570 cases total, 1,542 passed, zero fail
 Transformation Functions received a subsequent user-requested presentation correction: actual FunctionKind column with compact muted type text, 51% desktop description width and full-width descriptions in cards. [Updated populated EN/FR desktop/mobile captures and scoped validation](evidence/list-layout/transformation-functions/column-review/README.md) record the final composition.
 
 Storages received a subsequent user-requested correction: supplementary type panel/footer links removed, scoped Storage types navigation moved to the header, and unnecessary type-catalog loading removed. [Fresh evidence and scoped validation](evidence/list-layout/storages/header-review/README.md).
+
+The Storage types list header now uses the concise localized destination label Stockages / Storages in place of Retour aux stockages / Back to Storages. [EN/FR desktop/mobile validation](evidence/list-layout/storage-types/header-review/README.md) covers reciprocal navigation with preserved context.
