@@ -152,6 +152,12 @@ public sealed partial class ConnectedServiceComponentTests
             Assert.HasCount(8, rendered.FindAll(".resource-navigation-rail a[data-resource-section]"));
             Assert.AreEqual(workspace.Value, rendered.Find(".resource-header .resource-owner-scope").GetAttribute("data-scope-ref"));
             Assert.HasCount(3, rendered.FindAll(".metric-card"));
+            var diagnostics = rendered.Find(".metric-card .service-diagnostics");
+            Assert.AreEqual(resource.ObservedState!.ObservedAt.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture), diagnostics.QuerySelector("dd")!.TextContent);
+            Assert.AreEqual(3, diagnostics.QuerySelectorAll("dd").Length);
+            Assert.AreEqual("—", diagnostics.QuerySelectorAll("dd")[1].TextContent);
+            Assert.AreEqual("—", diagnostics.QuerySelectorAll("dd")[2].TextContent);
+            Assert.HasCount(1, rendered.FindAll(".service-diagnostics"));
             Assert.HasCount(1, rendered.FindAll(".resource-overview .resource-identity-summary"));
             Assert.IsEmpty(rendered.FindAll(".resource-overview .schema-input-editor"));
             Assert.DoesNotContain("Exports and capabilities", rendered.Markup, StringComparison.Ordinal);

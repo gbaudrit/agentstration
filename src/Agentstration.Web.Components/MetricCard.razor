@@ -4,6 +4,7 @@
         <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
         @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
         <span class="metric-card-arrow" aria-hidden="true">→</span>
+        @ChildContent
         <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
     </button>
 }
@@ -13,6 +14,7 @@ else if (!string.IsNullOrWhiteSpace(Url))
         <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
         @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
         <span class="metric-card-arrow" aria-hidden="true">→</span>
+        @ChildContent
         <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
     </a>
 }
@@ -21,6 +23,7 @@ else
     <article class="metric-card @(!string.IsNullOrWhiteSpace(HelpText) ? "metric-card-help" : null)">
         <div><span class="metric-label">@Label @if (!string.IsNullOrWhiteSpace(HelpText)) { <HelpTooltip Text="@HelpText" /> }</span><strong>@Value</strong></div>
         @if (!string.IsNullOrWhiteSpace(Detail)) { <small>@Detail</small> }
+        @ChildContent
         <span class="metric-accent metric-@Status.ToString().ToLowerInvariant()" aria-hidden="true"></span>
     </article>
 }
@@ -29,6 +32,7 @@ else
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
     [Parameter] public string? Detail { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? HelpText { get; set; }
     [Parameter] public UiStatus Status { get; set; }
     [Parameter] public string? Url { get; set; }
