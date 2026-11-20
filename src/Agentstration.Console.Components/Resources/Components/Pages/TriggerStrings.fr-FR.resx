@@ -64,4 +64,8 @@
   <data name="Editor.FlowsUnavailable" xml:space="preserve"><value>Le catalogue des Flows est indisponible. La cible enregistrée est conservée.</value></data>
   <data name="Editor.IdentityMismatch" xml:space="preserve"><value>Le déclencheur retourné ne correspond plus à cette ressource.</value></data>
   <data name="Editor.OperationUnconfirmed" xml:space="preserve"><value>L’enregistrement n’a pas pu être confirmé. Vos modifications sont conservées ; actualisez pour vérifier son résultat.</value></data>
+  <data name="HistoryUnavailable" xml:space="preserve"><value>L’historique des occurrences n’a pas pu être chargé. Réessayez pour consulter l’historique actuel.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Ce déclencheur a changé sur le serveur. Vos modifications sont conservées ; abandonnez-les pour charger la dernière définition.</value></data>
+  <data name="OperationUnconfirmed" xml:space="preserve"><value>La commande n’a pas pu être confirmée. Actualisez pour vérifier le résultat avant de réessayer.</value></data>
+  <data name="Value" xml:space="preserve"><value>Valeur</value></data>
 </root>

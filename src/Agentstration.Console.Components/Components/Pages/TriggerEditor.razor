@@ -1,5 +1,4 @@
 @page "/triggers/new"
-@page "/triggers/{Name}/edit"
 @implements IDisposable
 @using System.Xml
 @using Agentstration.Triggers
@@ -81,7 +80,7 @@ else
                 <FormField Label="@T("MissedOccurrence")"><ChildContent><ClearableSelect @bind-Value="model.MisfirePolicy"><option value="@TriggerMisfirePolicy.FireOnce">@T("Misfire.FireOnce")</option><option value="@TriggerMisfirePolicy.Skip">@T("Misfire.Skip")</option></ClearableSelect><small>@T("MisfireHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.MisfirePolicy" /></Validation></FormField>
                 <FormField Label="@T("PreviousWorkActive")"><ChildContent><ClearableSelect @bind-Value="model.ConcurrencyPolicy"><option value="@TriggerConcurrencyPolicy.Skip">@T("Concurrency.Skip")</option><option value="@TriggerConcurrencyPolicy.Allow">@T("Concurrency.Allow")</option></ClearableSelect><small>@T("ConcurrencyHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.ConcurrencyPolicy" /></Validation></FormField>
             </FormGrid>
-            @if (!string.IsNullOrWhiteSpace(scheduleError)) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
+            @if (!string.IsNullOrWhiteSpace(scheduleError) && !editContext.GetValidationMessages(editContext.Field(nameof(model.ScheduleType))).Any()) { <p class="form-alert form-alert-danger" role="alert">@scheduleError</p> }
             @if (preview.Count > 0)
             {
                 <div class="trigger-preview" aria-live="polite"><strong>@T("NextOccurrences")</strong><ol>@foreach (var value in preview) { <li>@TriggerUi.OccurrenceLabel(value, model.TimeZone, TimeProvider.GetUtcNow(), Localizer)</li> }</ol></div>
@@ -91,7 +90,7 @@ else
             <FormGrid>
                 <FormField Label="@T("JsonObject")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.InputJson" rows="10" class="trigger-json form-code-editor" data-testid="trigger-input" /><small>@T("StaticInputHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.InputJson" /></Validation></FormField>
             </FormGrid>
-            @if (!string.IsNullOrWhiteSpace(inputError)) { <p class="form-alert form-alert-danger" role="alert">@inputError</p> }
+
         </ChildContent></FormSection>;
     private RenderFragment ReviewFields => @<div class="resource-editor-view"><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Namespace="@model.Namespace" Description="@model.Description" Labels="existing?.Value.Metadata.Tags"><Scope><ResourceScopeBadge ScopeRef="model.ScopeRef" /></Scope></ResourceIdentitySummary>
         <FormSection Title="@Shared["Configuration"]"><dl class="resource-details"><dt>@T("Flow")</dt><dd><code>@model.FlowKey</code></dd><dt>@T("Schedule")</dt><dd>@ScheduleReview</dd><dt>@T("Enabled")</dt><dd>@T("No")</dd></dl><pre class="trigger-json">@model.InputJson</pre></FormSection></div>;
@@ -173,7 +172,7 @@ else
     }
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!disposed && revealValidation && !saving && !loading && definitionForm is not null) { revealValidation = false; await definitionForm.RevealValidationAsync(); }
+        if (!disposed && revealValidation && !saving && !loading && definitionForm is { Busy: false }) { revealValidation = false; await definitionForm.RevealValidationAsync(); }
         if (!disposed && reportedDirty != IsDirty) { reportedDirty = IsDirty; await DraftChanged.InvokeAsync(IsDirty); }
     }
     private string InvalidStep()

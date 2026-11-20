@@ -16,7 +16,7 @@
                          ResourceIdentity="@EffectiveIdentity" SectionState="SectionState" SelectionChanged="SelectionChanged" SectionPresentations="SectionPresentations"
                          DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" AdditionalContent="@AdditionalContent"
                          OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityLabels="Resource?.Metadata.Tags" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent"
-                         DefinitionContent="@DefinitionContent" AccessContent="@(CanManageAccess ? AccessPanel : null)" YamlContent="@YamlEditor"
+                         DefinitionContent="@DefinitionContent" AccessContent="@(Resource is null ? null : AccessContent ?? (CanManageAccess ? AccessPanel : null))" YamlContent="@YamlEditor"
                          YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
                          ExpandNavigationGroups="ExpandNavigationGroups" NavigationLabel="@NavigationLabel" NavigationTestId="@NavigationTestId"
                          SectionTestIdPrefix="@SectionTestIdPrefix" TestId="@TestId" />
@@ -64,6 +64,8 @@
     [Parameter, EditorRequired] public RenderFragment? OverviewConfiguration { get; set; }
     [Parameter] public RenderFragment? OverviewContent { get; set; }
     [Parameter, EditorRequired] public RenderFragment<string>? DefinitionContent { get; set; }
+    [Parameter] public ResourceScopeRef? DefinitionContextScope { get; set; }
+    [Parameter] public RenderFragment? AccessContent { get; set; }
     [Parameter] public bool AllowAccess { get; set; } = true;
     [Parameter] public string? AccessVersion { get; set; }
     [Parameter] public bool EvaluateSavedAccess { get; set; }
@@ -92,7 +94,7 @@
     private bool HasUnsavedChanges => HasDraft || accessDirty || HasAdditionalDraft;
     private ResourceReadOnlyReason? EffectiveReadOnlyReason => Resource is null ? null
         : Resource.ScopeRef is null ? DefinitionReadOnlyReason ?? ResourceReadOnlyReason.Unspecified
-        : !ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services) ? ResourceReadOnlyReason.Inherited
+        : !(DefinitionContextScope is { } context ? Resource.ScopeRef == context : ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services)) ? ResourceReadOnlyReason.Inherited
         : Resource.Governance.IsManaged ? ResourceReadOnlyReason.Managed : DefinitionReadOnlyReason;
     private RenderFragment OwnerContextAction => @<a class="button-secondary" href="@Navigation.GetUriWithQueryParameter("context", Resource!.ScopeRef!.Value.Value)" data-testid="switch-to-owner-context">@Ui["InheritedResource.SwitchToOwner"]</a>;
     private RenderFragment AccessPanel

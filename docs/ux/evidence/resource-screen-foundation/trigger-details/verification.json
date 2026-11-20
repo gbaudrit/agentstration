@@ -1,0 +1,186 @@
+{
+  "base": "733ec2d9a3aa6eadfe876b9b2bbcae55e2081a36",
+  "sourceHashes": {
+    "automation/playwright/src/pages/operational-triggers.page.ts": "730971e9c3e2c15676f135137a57fe38cb34a42993185f9cae90c4912a004c07",
+    "src/Agentstration.Console.Components/Components/ConsoleResourceDetailsTemplate.razor": "7f0efea6ea6bbbee62a5e5b3e968f5a971a8c73628c29b57f24a9d1e5e6cf992",
+    "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor": "b8e835ed455d73ed494563a3e395faa8d1800887b73f9331bd4a5c0722af5209",
+    "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor": "1b42e403db854c7a868d62111119705cf0b482d95eacbc52c4363af43647efb1",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/TriggerStrings.fr-FR.resx": "4f821ac56a52f0e00392edf9f5db3bf15ea57c36142ed904d79b25ae5a45b1bd",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/TriggerStrings.resx": "7a35434f41964b4c314ae7df075d02531f56dd7da66dfd31331fcd1f38535341",
+    "tests/Agentstration.Console.Components.Tests/TriggerDetailsFoundationTests.cs": "327e1da6c3242d38b4134668a6b074409fa6801eff87b73b168ff35ea7bdccda",
+    "tests/Agentstration.Console.Components.Tests/TriggerDetailsPermissionsTests.cs": "ac5365f6753336396c3759679c96377e92ca2c849aa840a13c3bec0d9ce943f5",
+    "tests/Agentstration.Console.Components.Tests/TriggerDetailsTests.cs": "ad64a54594bbfcc462e9f21a20cee0ea41df6c0b710eb151e87742760fb64e5b"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "8471389868ade599199543b982508e2db14d5031fcf25c76c4f24c191a6fecd6",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "be58fbb86643fb5a3406af78a4235b81a0df4e7b17e7c8df1cf788d777260b0c",
+    "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "c20cedce97d722f535689c1c04f2912ba6c52b43c2d3d6f00601ec3b489564e1",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "8471389868ade599199543b982508e2db14d5031fcf25c76c4f24c191a6fecd6",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "8471389868ade599199543b982508e2db14d5031fcf25c76c4f24c191a6fecd6",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "be58fbb86643fb5a3406af78a4235b81a0df4e7b17e7c8df1cf788d777260b0c",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "be58fbb86643fb5a3406af78a4235b81a0df4e7b17e7c8df1cf788d777260b0c",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "c20cedce97d722f535689c1c04f2912ba6c52b43c2d3d6f00601ec3b489564e1",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "c20cedce97d722f535689c1c04f2912ba6c52b43c2d3d6f00601ec3b489564e1"
+  },
+  "phases": [
+    {
+      "name": "trigger-details",
+      "exitCode": 0,
+      "seconds": 119.4
+    },
+    {
+      "name": "operational-triggers-regression",
+      "exitCode": 0,
+      "seconds": 120.5
+    },
+    {
+      "name": "agent-regression",
+      "exitCode": 0,
+      "seconds": 113.4
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "maintainedRegressions": {
+    "campaign": "trigger-details-05",
+    "phases": [
+      {
+        "name": "operational-triggers-regression",
+        "exitCode": 0,
+        "seconds": 120.5
+      },
+      {
+        "name": "agent-regression",
+        "exitCode": 0,
+        "seconds": 113.4
+      }
+    ],
+    "sourceHashesMatch": true,
+    "hostHashesMatch": true
+  },
+  "screenshots": [
+    {
+      "file": "trigger-details-overview-desktop-en.png",
+      "sha256": "80bd7bb6b25386b02c105f06651070dd6680b79bf073d875ef955a0882cda241"
+    },
+    {
+      "file": "trigger-details-identity-desktop-en.png",
+      "sha256": "eecdef4218b7f5621baef5dc0820a5147ba7634819e7a1512aee4934622e4e62"
+    },
+    {
+      "file": "trigger-details-configuration-desktop-en.png",
+      "sha256": "6d94472d0a3be36a071799b70a248ae6d439b453dd83a5c235636b6709f29f80"
+    },
+    {
+      "file": "trigger-details-yaml-desktop-en.png",
+      "sha256": "4f5dbc6b8e2f66b9677b542c920da48066c815aef278d8db48010d43da814e15"
+    },
+    {
+      "file": "trigger-details-access-desktop-en.png",
+      "sha256": "3d15eb9e16fcb18bfeec7fb6cfe0bd5a2aadcaf51531b0bf3f29de3e5c810adc"
+    },
+    {
+      "file": "trigger-details-history-desktop-en.png",
+      "sha256": "91c0f35bcc28cfaf1f3b1159282570e256bd4147223c010cbc141de7ff3de8c1"
+    },
+    {
+      "file": "trigger-details-invalid-retained-desktop-en.png",
+      "sha256": "32342441cb790fe0b3e3387648455756ec5af5891a3c654ffee18a8382a77e07"
+    },
+    {
+      "file": "trigger-details-enabled-with-draft-desktop-en.png",
+      "sha256": "ac8ee3cfe738e49a915e5b825f99ab2c8b98fe2ad63a4c2d311456eaa07e50c9"
+    },
+    {
+      "file": "trigger-details-execution-desktop-en.png",
+      "sha256": "875070286aa7b1cd01c374f063281f7f2d9b45cf0a37f03946183a51faef45e6"
+    },
+    {
+      "file": "trigger-details-saved-desktop-en.png",
+      "sha256": "208e699f6f98dc6793fe86301aab517f8d2c9c276f7014f328d8f1cdccb3f3cc"
+    },
+    {
+      "file": "trigger-details-changed-refresh-desktop-en.png",
+      "sha256": "db2c0fbc6ca45ce70dc1864ad3c2f881d94edd751117b8d6a684a44cd5f49a39"
+    },
+    {
+      "file": "trigger-details-discarded-desktop-en.png",
+      "sha256": "0aecca81b249804360341ef62bc7e78152937829fd2e90ad96605a591b303ad3"
+    },
+    {
+      "file": "trigger-details-edit-route-desktop-en.png",
+      "sha256": "f5f3a47ec00292885fc0ad56b7e9ed8fe0a12fcab54299ea9c9ae96543b82f6b"
+    },
+    {
+      "file": "trigger-details-overview-mobile-fr.png",
+      "sha256": "a4195ce08858ed3548811351cbe427218a9b7f16265122b6f28a0bb0634fcfdd"
+    },
+    {
+      "file": "trigger-details-identity-mobile-fr.png",
+      "sha256": "ff9570d3d3e7d5791bf22edf05c138a57cc1d96b5479712710812971cd79f4b6"
+    },
+    {
+      "file": "trigger-details-configuration-mobile-fr.png",
+      "sha256": "91a89e8c94494523978c05ecbda38d0207ce10787e332f3b673922dc87a1cf29"
+    },
+    {
+      "file": "trigger-details-yaml-mobile-fr.png",
+      "sha256": "775bcb8b268275b2ce085919e34365b00aa14688ad34ec0ec8fdc4eaf44edfda"
+    },
+    {
+      "file": "trigger-details-access-mobile-fr.png",
+      "sha256": "7e8e12a83653b23b94dbdf3454ac9323ddc3941f9226c3f82ad6529d64313d2a"
+    },
+    {
+      "file": "trigger-details-history-mobile-fr.png",
+      "sha256": "eb96e863c8c88aed5586dd1f02e04d690c9ce52cdc354018db6a0b94c94a7a92"
+    },
+    {
+      "file": "trigger-details-invalid-retained-mobile-fr.png",
+      "sha256": "a72ecdcbaa43cd3c1d40908d84a8cb361b9ef6ae138e4cd50ebcb23e39c9426e"
+    },
+    {
+      "file": "trigger-details-enabled-with-draft-mobile-fr.png",
+      "sha256": "1eb30d0d4804f9cee26df7fcc5d02c8044bdc89ac71aa2cd7f3dada7fe07ff01"
+    },
+    {
+      "file": "trigger-details-execution-mobile-fr.png",
+      "sha256": "b4cff82a72d544f104494187e8164b2f88f1e19f12a37f63f31f759fc0aa4677"
+    },
+    {
+      "file": "trigger-details-saved-mobile-fr.png",
+      "sha256": "9b411ab9274c066a094a2202fb7a1d3341c6146713c58790239662ef8c6abb06"
+    },
+    {
+      "file": "trigger-details-changed-refresh-mobile-fr.png",
+      "sha256": "8a43e7181c39c66e5fbb03a969a35f8aac5a9299016f2c4f42f9db6e16d974e8"
+    },
+    {
+      "file": "trigger-details-discarded-mobile-fr.png",
+      "sha256": "5921fc943827ed14cedc4f339801372b5d47138dd1dea4becd8a82766bfd9f9f"
+    },
+    {
+      "file": "trigger-details-edit-route-mobile-fr.png",
+      "sha256": "34025fb096de993748de407f69809b5adb507ceb5cef79604098743f5fc77e3f"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 43,
+    "logSha256": "581485c604ea15cb057d06f7a9715cdc3b684b706815e431cb81db72dd2d1c58"
+  },
+  "nativeProbeSha256": "b9b42a02013eb7708758b8cfc8eec95dcc4bf05d467996789a4767937588af74",
+  "limits": [
+    "Native probes use real local API-created Flow/Trigger data; no production fixture resource.",
+    "Existing global mobile navigation/platform overlay remains visible in full-page captures; global layout is outside this resource pass.",
+    "No CI investigation/remediation.",
+    "New reusable #1236 scenario deferred until UX validation and merge; full solution suites omitted at maintainer request."
+  ]
+}

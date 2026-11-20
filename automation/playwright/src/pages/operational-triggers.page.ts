@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 import { fillAndCommit } from './controls.js';
 import type { ExecutionScopeFixture } from './execution-scopes.page.js';
 
@@ -131,10 +132,11 @@ export class OperationalTriggersPage {
 
     await this.open(
       `${consoleUrl}/triggers/${encodeURIComponent(fixture.triggerName)}/edit`,
-      TestIds.resourceAdministration.triggerEditor,
+      TestIds.resourceAdministration.triggerDetails,
     );
     await expect(this.page.getByTestId(TestIds.triggers.name)).toHaveValue(fixture.triggerName);
     await expect(this.page.getByTestId(TestIds.triggers.displayName)).toHaveValue(fixture.triggerDisplayName);
+    await selectResourceSection(this.page, 'definition/configuration');
     await expect(this.page.getByTestId(TestIds.triggers.flow)).toHaveValue(
       `${fixture.execution.scopes.instance}|default|${fixture.execution.flowName}`,
     );
@@ -157,7 +159,7 @@ export class OperationalTriggersPage {
     expect(trigger.scopeRef).toBe(operationalScopeRef);
     expect(trigger.definition.target.flow.scopeRef).toBe(fixture.execution.scopes.instance);
     expect(trigger.definition.executionScope ?? null).toBeNull();
-    await expect(this.details).not.toContainText(operationalScopeRef);
+    await expect(this.details.locator(`.resource-scope-badge[title="${operationalScopeRef}"]`).first()).toBeVisible();
     return identity.context.workspaceId;
   }
 
@@ -206,6 +208,7 @@ export class OperationalTriggersPage {
     if (!flowRun) throw new Error(`The Trigger Work Item '${workItemId}' did not expose its Flow Run.`);
     expect(flowRun.executionScopeRef).toBe(executionScopeRef);
     expect(flowRun.definitionScopeRef).toBe(fixture.execution.scopes.instance);
+    await selectResourceSection(this.page, 'history');
     await this.page.getByTestId(TestIds.triggers.refreshOccurrences).click();
     await expect(this.page.locator(
       `[data-testid="${TestIds.triggers.occurrenceRow}"][data-trigger-occurrence-id="${occurrence.id}"]`,

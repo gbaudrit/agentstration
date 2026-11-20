@@ -1,4 +1,5 @@
 using Agentstration.Triggers;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -15,7 +16,8 @@ public sealed class TriggerDetailsTests
     [DataRow(false)]
     public async Task DetailsWaitForTheSelectedContextBeforeRenderingManagementActions(bool canWrite)
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var provider = new PendingContextProvider();
         var state = new ConsoleContextState(provider);
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -23,6 +25,12 @@ public sealed class TriggerDetailsTests
         context.Services.AddSingleton<ITriggerApiClient>(new TriggerClient());
         context.Services.AddSingleton<NotificationState>();
         context.Services.AddSingleton(TimeProvider.System);
+
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        navigation.NavigateTo("http://localhost/triggers/scheduled-flow");
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Setup<string>("currentLocation", _ => true).SetResult(navigation.Uri);
+        module.Setup<string>("navigate", _ => true).SetResult(navigation.Uri + "#overview");
 
         // The layout starts loading permissions independently of its route component.
         var loadingContext = state.LoadAsync(default);
@@ -38,7 +46,7 @@ public sealed class TriggerDetailsTests
         rendered.WaitForAssertion(() =>
         {
             Assert.HasCount(1, rendered.FindAll("[data-testid=resource-trigger-details]"));
-            Assert.HasCount(canWrite ? 1 : 0, rendered.FindAll("[data-testid=trigger-enable]"));
+            Assert.AreEqual(!canWrite, rendered.Find("[data-testid=trigger-enable]").HasAttribute("disabled"));
         });
     }
 
@@ -47,7 +55,7 @@ public sealed class TriggerDetailsTests
         private readonly TaskCompletionSource<ConsoleContextSnapshot> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => completion.Task.WaitAsync(cancellationToken);
         public void Complete(bool canWrite) => completion.SetResult(new(Guid.Empty, "Administrator", "/instance", ConsoleContextKind.Instance,
-            Guid.Empty, "tenant", "Tenant", Guid.Empty, "operational", "Operational", new HashSet<string>(canWrite ? ["resources/read", "resources/write"] : ["resources/read"]), [], []));
+            Guid.Empty, "tenant", "Tenant", Guid.Parse("11111111-1111-1111-1111-111111111111"), "operational", "Operational", new HashSet<string>(canWrite ? ["resources/read", "resources/write"] : ["resources/read"]), [], []));
     }
 
     private sealed class TriggerClient : ITriggerApiClient
@@ -56,6 +64,7 @@ public sealed class TriggerDetailsTests
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = TriggerResourceKinds.Trigger,
+            Uid = Guid.NewGuid(),
             Metadata = new() { Name = name },
             ScopeRef = ResourceScopeRef.Workspace(Guid.Parse("11111111-1111-1111-1111-111111111111")),
             Definition = new()

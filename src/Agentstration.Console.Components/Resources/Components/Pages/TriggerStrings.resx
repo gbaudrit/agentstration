@@ -64,4 +64,8 @@
   <data name="Editor.FlowsUnavailable" xml:space="preserve"><value>The Flow catalog is unavailable. The saved target is retained.</value></data>
   <data name="Editor.IdentityMismatch" xml:space="preserve"><value>The returned Trigger no longer matches this resource.</value></data>
   <data name="Editor.OperationUnconfirmed" xml:space="preserve"><value>The save could not be confirmed. Your changes are retained; refresh to check the outcome.</value></data>
+  <data name="HistoryUnavailable" xml:space="preserve"><value>Occurrence history could not be loaded. Retry to check the current history.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>This Trigger changed on the server. Your pending changes are retained; discard them to load the latest definition.</value></data>
+  <data name="OperationUnconfirmed" xml:space="preserve"><value>The command could not be confirmed. Refresh to check the outcome before trying again.</value></data>
+  <data name="Value" xml:space="preserve"><value>Value</value></data>
 </root>
