@@ -386,7 +386,9 @@ public sealed partial class FlowDetailsDesignerTests
     }
 
     [TestMethod]
-    public void ManualRunUsesPublishedSchemaAndSubmitsValidatedInput()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ManualRunUsesPublishedSchemaAndSubmitsValidatedInput(bool retainDefinitionDraft)
     {
         using var context = FlowContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -396,6 +398,12 @@ public sealed partial class FlowDetailsDesignerTests
         var strings = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<FlowDetailsStrings>>();
         var rendered = context.Render<FlowDetails>(parameters => parameters.Add(component => component.FlowId, "sample"));
 
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        if (retainDefinitionDraft)
+        {
+            SelectFlowSection(context, "definition/identity");
+            rendered.Find("[data-testid=flow-definition-display-name]").Input("Unsubmitted metadata");
+        }
         SelectFlowSection(context, "runs");
         rendered.Find("[data-testid=flow-run-open]").Click();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Find("[data-testid='flow-run-submit']").HasAttribute("disabled")));
@@ -409,6 +417,17 @@ public sealed partial class FlowDetailsDesignerTests
         Assert.AreEqual("local", client.LastRunRequest.DeploymentResourceId);
         Assert.AreEqual(client.ScopeRef, client.LastRunRequest.DefinitionScopeRef);
         Assert.IsNull(client.LastRunRequest.ExecutionScopeRef);
+        if (retainDefinitionDraft)
+        {
+            rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[role=alertdialog]")));
+            Assert.AreEqual("Unsubmitted metadata", rendered.Find("[data-testid=flow-definition-display-name]").GetAttribute("value"));
+            Assert.IsNull(client.LastDraftUpdate);
+        }
+        else
+        {
+            rendered.WaitForAssertion(() => StringAssert.Contains(navigation.Uri, "/flow-runs/flowrun-manual?scopeRef="));
+            Assert.IsEmpty(rendered.FindAll("[role=alertdialog]"));
+        }
     }
 
     [TestMethod]

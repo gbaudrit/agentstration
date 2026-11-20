@@ -31,7 +31,7 @@ public partial class FlowDetails
     private ValidationMessageStore? definitionMessages;
     private ResourceDefinitionForm? definitionForm;
     private string runVersion = string.Empty;
-    private string? loadedKey, error, definitionError, definitionBaseline;
+    private string? loadedKey, error, definitionError, definitionBaseline, submittedRunLocation;
     private bool loading, busy, showRun, submitting, runInputValid = true, orchestrationDirty, orchestrationSaving;
     private bool definitionLoaded, definitionLoading, definitionSaving, definitionSaved, definitionInvalid;
     private bool versionsKnown, runsKnown, disposed, subscribed;
@@ -123,6 +123,7 @@ public partial class FlowDetails
         DetachDefinitionContext(); definitionModel = new(); definitionBaseline = null;
         error = definitionError = null; definitionLoaded = definitionLoading = definitionSaving = definitionSaved = definitionInvalid = false;
         busy = showRun = submitting = orchestrationDirty = orchestrationSaving = false;
+        submittedRunLocation = null;
     }
     private Task RefreshAsync() => Busy ? Task.CompletedTask : LoadAsync();
     private async Task LoadAsync()
@@ -348,10 +349,22 @@ public partial class FlowDetails
         try
         {
             var run = await Client.CreateFlowRunAsync(current.Namespace, current.Id, new(runInput.Clone(), runVersion, "local", FlowRunTrigger.Manual) { DefinitionScopeRef = current.ScopeRef }, lifetimeToken);
-            if (Current(revision, key)) { showRun = false; Navigation.NavigateTo(ResourceOwnershipContext.PreserveNavigation($"/flow-runs/{Uri.EscapeDataString(run.Id)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", Services)); }
+            if (Current(revision, key))
+            {
+                showRun = false;
+                submittedRunLocation = ResourceOwnershipContext.PreserveNavigation($"/flow-runs/{Uri.EscapeDataString(run.Id)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", Services);
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { if (Current(revision, key)) error = exception.Message; }
         finally { if (Current(revision, key)) submitting = false; }
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (disposed || submittedRunLocation is not { } location) return;
+        submittedRunLocation = null;
+        // Render the closed run editor before the guard evaluates navigation. Independent
+        // definition and access-policy drafts must still ask for explicit discard.
+        Navigation.NavigateTo(location);
     }
     private static JsonElement ParseInput(string value)
     {
