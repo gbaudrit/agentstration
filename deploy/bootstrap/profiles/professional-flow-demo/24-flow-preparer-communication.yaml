@@ -1,0 +1,53 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: preparer-communication
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Préparer une communication
+  description: Produit une communication professionnelle adaptée au contexte, au public et à l'objectif.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target: { kind: agent, id: redacteur-professionnel, namespace: demo.flows-professionnels }
+  graph:
+    entryStep: entree
+    inputSchema:
+      type: object
+      properties:
+        contexte: { type: string }
+        publicCible: { type: string }
+        objectif: { type: string }
+        informationsImportantes: { type: object }
+      required: [contexte, publicCible, objectif, informationsImportantes]
+      additionalProperties: false
+    steps:
+      - { type: input, name: entree, displayName: Besoin de communication }
+      - type: agent
+        name: rediger
+        displayName: Rédiger la communication
+        agent: { resourceId: redacteur-professionnel, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Communication
+          contexte: "${input.contexte}"
+          publicCible: "${input.publicCible}"
+          objectif: "${input.objectif}"
+          informationsImportantes: "${input.informationsImportantes}"
+      - type: output
+        name: resultat
+        displayName: Communication prête
+        outputMapping:
+          communication: "${steps.rediger.output}"
+    transitions:
+      - { id: entree-vers-redaction, fromStep: entree, event: completed, toStep: rediger }
+      - { id: redaction-vers-resultat, fromStep: rediger, event: completed, toStep: resultat }
+    outputSchema:
+      type: object
+      properties:
+        communication: { type: string }
+      required: [communication]
+      additionalProperties: false
+  metadata: { bootstrapProfile: professional-flow-demo, capability: professional-communication }
+  publish: true
+  activate: true
