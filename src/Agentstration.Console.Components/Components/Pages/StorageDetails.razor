@@ -9,13 +9,13 @@
 
 <PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 @{ var presentations = Presentations; var editorIdentity = Identity; }
-<ConsoleResourceDetailsTemplate Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("Storage")" Domain="storage" IconName="database" Description="@resource?.Definition.Description"
+<ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("Storages")" Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("Storage")" Domain="storage" IconName="database" Description="@resource?.Definition.Description"
     Enabled="resource?.Definition.Enabled" EnabledChanged="ChangeEnabledAsync" EnabledDisabled="@(Busy || !CanWrite)" EnabledTestId="storage-enabled"
     StatusText="@AvailabilityLabel" Status="AvailabilityColor" ResourceIdentity="@(loadedKey ?? Name ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections"
     DefinitionReadOnlyReason="ExplicitReadOnlyReason" AllowAccess="IsOwner" EvaluateSavedAccess HasDraft="HasDraft"
     LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="Busy" Yaml="@ResourceYaml" YamlLabel="@T("Yaml.Label")" YamlDescription="@T("Yaml.Help")" YamlInputTestId="storage-yaml"
     SectionTestIdPrefix="storage" TestId="storage-details">
-    <Actions>@if (CanWrite) { <button class="button-secondary" type="button" disabled="@Busy" @onclick="RequestReconcile" data-testid="storage-reconcile">@T("Reconcile")</button> }<a class="button-secondary" href="@BackUrl">@T("Back")</a></Actions>
+    <Actions>@if (CanWrite) { <button class="button-secondary" type="button" disabled="@Busy" @onclick="RequestReconcile" data-testid="storage-reconcile">@T("Reconcile")</button> }</Actions>
     <Feedback><StorageError Error="error" />@if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }</Feedback>
     <OverviewMetrics><MetricCard Label="@T("Availability")" Value="@AvailabilityLabel" Status="AvailabilityColor" /><MetricCard Label="@T("Generation")" Value="@(resource?.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /></OverviewMetrics>
     <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
