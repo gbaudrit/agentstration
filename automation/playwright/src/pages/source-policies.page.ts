@@ -228,9 +228,11 @@ export class SourcePoliciesPage {
     expect(response.status()).toBe(404);
   }
 
-  public async openDataset(base: string, name: string): Promise<void> {
-    await this.page.goto(`${base}/data-sources/${name}?context=%2Finstance&scopeRef=%2Finstance#definition/configuration`);
+  public async openDataset(base: string, name: string, section = 'definition/configuration'): Promise<void> {
+    await this.page.goto(`${base}/data-sources/${name}?context=%2Finstance&scopeRef=%2Finstance#${section}`);
+    await selectResourceSection(this.page, section);
     await expect(this.page.getByTestId(TestIds.sourcePolicies.definitionFields)).toBeEnabled();
+    await expect(this.page.locator(`[data-definition-section="${section}"]`)).toBeVisible();
   }
   public async openKnowledge(base: string, name: string): Promise<void> {
     await this.page.goto(`${base}/knowledge-sources/${name}?context=%2Finstance#definition/configuration`);

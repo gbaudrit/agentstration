@@ -31,8 +31,10 @@ export class GovernedKnowledgePage {
 
   public async publishExposure(consoleUrl: string, knowledge: string, scope: string, text: ExpectedText['governedKnowledge']): Promise<void> {
     const url = new URL(`/knowledge-sources/${knowledge}`, consoleUrl);
-    url.search = new URLSearchParams({ namespace: 'default', context: scope, scopeRef: scope, view: 'tools' }).toString();
+    url.search = new URLSearchParams({ namespace: 'default', context: scope, scopeRef: scope }).toString();
+    url.hash = 'tools';
     await this.page.goto(url.toString());
+    await selectResourceSection(this.page, 'tools');
     const exposurePanel = this.page.getByTestId(TestIds.governedKnowledge.exposure);
     await exposurePanel.getByRole('button', { name: text.publishExposure, exact: true }).click();
     await expect(exposurePanel.getByTestId(TestIds.governedKnowledge.toolLink)).toHaveCount(6);
@@ -55,9 +57,15 @@ export class GovernedKnowledgePage {
       await expect(version).toContainText(`knowledge.${operation.route}`);
     }
     await selectResourceSection(this.page, 'overview');
-    const configuration = this.publishedTools.locator('.resource-configuration-summary');
+    const overview = this.publishedTools.locator('.resource-overview');
+    const identity = overview.locator('.resource-identity-summary');
+    const configuration = overview.locator('.resource-configuration-summary');
+    for (const panel of [identity, configuration]) {
+      const disclosure = panel.locator('.panel-disclosure');
+      if (await disclosure.getAttribute('aria-expanded') === 'false') await disclosure.click();
+    }
     await expect(configuration).toBeVisible();
-    await expect(this.publishedTools.locator('.resource-identity-summary .resource-label')
+    await expect(identity.locator('.resource-label')
       .filter({ hasText: 'agentstration.io/category' })).toHaveText('agentstration.io/category : knowledge-source');
     await expect(configuration).toContainText(`agentstration.io/knowledge-source=${knowledge}`);
     await this.page.goto(`${consoleUrl}/tools/sets?context=${encodeURIComponent(scope)}`);
@@ -242,8 +250,13 @@ export class GovernedKnowledgePage {
       await new LoginPage(reader).signIn(consoleUrl, userName, password);
       await new ConsoleAdministrationPage(reader).restoreLanguage(consoleUrl, locale);
       await reader.goto(this.toolsUrl(consoleUrl, restricted, scope));
+      await selectResourceSection(reader, 'tools');
       await reader.getByTestId(TestIds.governedKnowledge.exposure).getByRole('button', { name: text.publishExposure, exact: true }).click();
-      await expect(reader.locator('.form-alert-danger[role="status"]')).toContainText(/403|Forbidden/i);
+      const denied = reader.getByRole('alert');
+      await expect(denied.getByRole('heading', { name: text.accessDenied, exact: true })).toBeVisible();
+      await expect(denied).toContainText(text.resourceForbidden);
+      await expect(reader.getByTestId(TestIds.governedKnowledge.exposure)).toHaveCount(0);
+      await expect(reader.locator('.resource-details-navigation')).toHaveCount(0);
       await status(await reader.request.post(this.url(consoleUrl, `/api/knowledgesources/${restricted}/tool-exposure`, scope), {
         data: { version: '1.0.0' },
       }), 403);
@@ -268,7 +281,8 @@ export class GovernedKnowledgePage {
   }
   private toolsUrl(consoleUrl: string, knowledge: string, scope: string): string {
     const url = new URL(`/knowledge-sources/${knowledge}`, consoleUrl);
-    url.search = new URLSearchParams({ namespace: 'default', context: scope, scopeRef: scope, view: 'tools' }).toString();
+    url.search = new URLSearchParams({ namespace: 'default', context: scope, scopeRef: scope }).toString();
+    url.hash = 'tools';
     return url.toString();
   }
   private toolSetUrl(consoleUrl: string, name: string, scope: string): string {
@@ -281,6 +295,7 @@ export class GovernedKnowledgePage {
   }
   private async openTools(consoleUrl: string, knowledge: string, scope: string): Promise<void> {
     await this.page.goto(this.toolsUrl(consoleUrl, knowledge, scope));
+    await selectResourceSection(this.page, 'tools');
     await expect(this.page.getByTestId(TestIds.governedKnowledge.exposure)).toBeVisible();
   }
   private async get(consoleUrl: string, path: string, scope: string): Promise<APIResponse> {

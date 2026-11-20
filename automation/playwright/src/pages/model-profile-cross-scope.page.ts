@@ -156,8 +156,17 @@ export class ModelProfileCrossScopePage {
 
   public async openUsages(consoleUrl: string, fixture: ExecutionScopeFixture): Promise<void> {
     const target = this.profileUsagesUrl(consoleUrl, fixture);
-    const response = await this.page.goto(target, { waitUntil: 'domcontentloaded' });
-    expect(response?.status(), target).toBe(200);
+    const current = new URL(this.page.url());
+    const destination = new URL(target);
+    if (current.origin !== destination.origin || current.pathname !== destination.pathname || current.search !== destination.search) {
+      const response = await this.page.goto(target, { waitUntil: 'domcontentloaded' });
+      expect(response?.status(), target).toBe(200);
+    } else {
+      // This operation reopens saved usages after API fixture writes. A fragment alone retains the old read.
+      const response = await this.page.reload({ waitUntil: 'domcontentloaded' });
+      expect(response?.status(), target).toBe(200);
+    }
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await selectResourceSection(this.page, 'usages');
     await this.usagesPanel.waitFor({ state: 'visible' });
     await this.expectContext(fixture.scopes.instance);

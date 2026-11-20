@@ -167,10 +167,13 @@ export class GovernedExtensionInventoryPage {
     this.assertScopedLink(await provider.getAttribute('href'));
     await expect(this.page.locator('main')).toContainText('Governed inventory fixture');
     await provider.click();
+    await expect(this.page.getByTestId(TestIds.resourceAdministration.toolProviderEditor)).toBeVisible();
     await selectResourceSection(this.page, 'definition/identity');
     await expect(this.page.locator('#tool-provider-resource-form > fieldset')).toHaveAttribute('disabled', '');
     await selectResourceSection(this.page, 'overview');
-    await this.page.locator("a[href^='/extensions/qa-managed?']").click();
+    const managingExtension = this.page.locator('.provider-ownership-banner .provider-ownership-link');
+    this.assertScopedLink(await managingExtension.getAttribute('href'));
+    await managingExtension.click();
     await this.navigate(`${consoleUrl}/tools?context=%2Finstance`);
     const owners = this.page.locator("a[href^='/extensions/qa-managed?']");
     await expect(async () => {

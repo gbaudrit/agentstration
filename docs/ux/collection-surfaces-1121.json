@@ -3,28 +3,6 @@
   "baseline": "8f1645446d7ae9082ed2d00bd28cce98ebaa023a merged with previous promotion8b568e36; old captures retain recorded immutable sources",
   "frames": [
     {
-      "id": "extension-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
-      "host": "console",
-      "routes": ["/extensions", "/extensions/{RegistrationName}", "/extensions/enrollment/{EnrollmentInstanceId:guid}"],
-      "renderer": "CollectionView",
-      "itemType": "SavedSetting",
-      "identityLabel": "Configuration",
-      "scope": false,
-      "state": false,
-      "actions": false,
-      "informationKeys": ["Saved"],
-      "validation": "source-adopted-and-regression-mapped",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "ExtensionResourcePreviewTests / ExtensionsConsoleTests",
-        "domainSpecifications": ["tests/governed-extension-inventory.spec.ts"],
-        "sharedHostSpecifications": [],
-        "routeEvidence": [],
-        "interpretation": "The extracted saved configuration is shared by Extension details and an exact scoped registration Preview. Historical captures do not certify this new composition."
-      }
-    },
-    {
       "id": "agent-runner-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
       "line": 62,
@@ -6673,6 +6651,671 @@
         "routeEvidence": [],
         "interpretation": "Final inventory-only reconciliation of upstream 67784be2 saved configuration frame; protected detail UI unchanged, no new browser claim."
       }
+    },
+    {
+      "id": "console-entry-interaction-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor",
+      "host": "console",
+      "routes": [
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 33,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/console-entry-interaction.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved interaction settings retain execution context and input semantics, independent of resource ownership.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "data-source-dataset-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new?composition=dataset",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "DatasetSetting",
+      "identityLabel": "Name",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceSettingValue"
+      ],
+      "line": 51,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/source-policies.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved acquisition, destination, freshness and transformation settings retain dataset business semantics.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "data-source-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceSetting",
+      "identityLabel": "Name",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SourceSettingValue"
+      ],
+      "line": 54,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/source-policies.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved enabled state, exact profile reference and configuration JSON; profile links retain their owner and namespace.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "entry-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 53,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts",
+          "tests/console-entry-interaction.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved execution target and draft review values remain separate datasets; neither acquires a fabricated namespace, owner, status or publication version.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "entry-editor-draft-configuration-review",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "host": "console",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "line": 215,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts",
+          "tests/console-entry-interaction.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved execution target and draft review values remain separate datasets; neither acquires a fabricated namespace, owner, status or publication version.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "extension-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
+      "host": "console",
+      "routes": [
+        "/extensions",
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 18,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Extension configuration is shared by the persisted overview and exact registration Preview. Enrollment configuration remains a separate read-only Definition collection.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "extension-details-enrollment-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 80,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved registration configuration and enrollment configuration are distinct collections; authorized endpoint links retain their exact destinations.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "knowledge-source-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KeyValuePair<string,string>",
+      "identityLabel": "SettingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SettingValue"
+      ],
+      "line": 27,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-knowledge.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved knowledge binding and retrieval settings are configuration values, not additional resources.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "knowledge-source-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "host": "console",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KeyValuePair<string,string>",
+      "identityLabel": "SettingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SettingValue"
+      ],
+      "line": 27,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-knowledge.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved knowledge binding and retrieval settings are configuration values, not additional resources.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "organization-member-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "host": "console",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Member.Value"
+      ],
+      "line": 80,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved account, identity and role information retain member-access semantics and are not resource ownership badges.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "pack-project-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Project.Value"
+      ],
+      "line": 54,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved publisher, version, audience, purpose, categories, tags and provenance retain Pack Project semantics.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "pack-project-details-source-documents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "host": "console",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Source document kind/name, full copyable path, retained unsaved state and direct Form/YAML selection preserve editor selection semantics; no fabricated resource owner or detail destination.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "itemType": "PackProjectSourceDocument",
+      "identityLabel": "PackResources",
+      "informationKeys": [
+        "Project.SourcePath"
+      ],
+      "scope": false,
+      "state": true,
+      "actions": true,
+      "line": 62,
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "resource-plan-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "host": "console",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ReviewSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 46,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset.",
+        "nativeSpecifications": [
+          "tests/Agentstration.Console.Playwright/resource-plan-review.spec.mjs"
+        ]
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved review settings summarize the Resource Plan; approval, review and execution commands keep their independent authorization.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "schema-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "host": "console",
+      "routes": [
+        "/schemas/new",
+        "/schemas/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "KeyValuePair<string,string>",
+      "identityLabel": "SettingName",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "SettingValue"
+      ],
+      "line": 34,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/schema-administration.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved schema format and contract metadata retain schema semantics; publication history remains a separate collection.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "source-registries-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "host": "console",
+      "routes": [
+        "/settings/source-registries",
+        "/settings/source-registries/new",
+        "/settings/source-registries/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 97,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts",
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved registry endpoint, authentication, trust and refresh policies remain configuration values.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "sources-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "host": "console",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SourceSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "line": 65,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved source registration and publication settings retain source catalog semantics.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "storage-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Type.Value"
+      ],
+      "line": 215,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/connected-storage-collection.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Storage connection and policy values preserve their business labels and exact reference destinations.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "storage-type-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "host": "console",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationRow",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Type.Value"
+      ],
+      "line": 218,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/connected-storage-collection.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved enabled state, provider, connector and export-contract values retain their existing meanings.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "trigger-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "host": "console",
+      "routes": [
+        "/triggers/{Name}",
+        "/triggers/{Name}/edit"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "Setting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "line": 233,
+      "validation": "source-reviewed-regression-owned",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/operational-triggers.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved schedule, Flow target, version resolution, misfire, concurrency, last schedule, error and input retain Trigger semantics and exact target links.",
+        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+      },
+      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
     }
   ],
   "specialized": [
@@ -8180,45 +8823,6 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "8eacc3f9268d389422b63931845f1e9597fcc3c7"
-      }
-    },
-    {
-      "id": "pack-project-details-source-documents",
-      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
-      "host": "console",
-      "routes": [
-        "/pack-projects/{ProjectId:guid}"
-      ],
-      "renderer": "native-specialized",
-      "adaptation": "Source document selection remains native alongside its specialized editors; builds use the common frame with exact identity and inline inspection.",
-      "validation": "source-adopted-and-regression-mapped",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "native applicable semantics; preserve family interaction",
-        "domainSpecifications": [
-          "tests/distribution.spec.ts"
-        ],
-        "sharedHostSpecifications": [],
-        "routeEvidence": [],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering.",
-        "compactEvidence": {
-          "routeCases": [],
-          "populatedHostCases": [
-            "case-57fbc53bcfaf"
-          ],
-          "workplaceObservationIndexes": []
-        }
-      },
-      "compactAdoption": {
-        "decision": "shared-identity-and-applicable-markers",
-        "identity": "Current ResourceIcon, folder-free exact identity, complete adjacent copy and applicable corner disclosures. Preserve the family-provided destination.",
-        "context": "Owner markers compose the authorized type/name in IconBadges; execution/assignment/audit contexts retain their original meaning.",
-        "domainSemantics": "Source document selection remains native alongside its specialized editors; builds use the common frame with exact identity and inline inspection.",
-        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
-        "implementationPR": 1123,
-        "coveragePR": 1132,
-        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
-        "sourceBlob": "867c4a4cee0fcfdaff7aa94acb8e7f02e7f82443"
       }
     },
     {
@@ -18324,6 +18928,40 @@
       "unmountedLegacy": 4,
       "activeCollections": 346,
       "auditedRepeatedItemSources": 147
+    },
+    {
+      "date": "2026-11-20",
+      "reviewedSourceCommit": "821efdf74a9672521a79fa180dbfb8f7a49e3c00",
+      "reason": "Reconcile eighteen new resource configuration/review summaries and migrate the existing Pack Project source-document collection from native to shared-frame ownership without counting it twice.",
+      "addedFrames": [
+        "console-entry-interaction-saved-configuration-summary",
+        "data-source-dataset-editor-saved-configuration-summary",
+        "data-source-editor-saved-configuration-summary",
+        "entry-editor-saved-configuration-summary",
+        "entry-editor-draft-configuration-review",
+        "extension-details-saved-configuration-summary",
+        "extension-details-enrollment-configuration-summary",
+        "knowledge-source-details-saved-configuration-summary",
+        "knowledge-source-editor-saved-configuration-summary",
+        "organization-member-details-saved-configuration-summary",
+        "pack-project-details-saved-configuration-summary",
+        "resource-plan-details-saved-configuration-summary",
+        "schema-editor-saved-configuration-summary",
+        "source-registries-saved-configuration-summary",
+        "sources-saved-configuration-summary",
+        "storage-details-saved-configuration-summary",
+        "storage-type-details-saved-configuration-summary",
+        "trigger-details-saved-configuration-summary"
+      ],
+      "migratedFrames": [
+        "pack-project-details-source-documents"
+      ],
+      "sharedFrames": 131,
+      "specializedActive": 256,
+      "unmountedLegacy": 4,
+      "activeCollections": 387,
+      "auditedRepeatedItemSources": 155,
+      "validation": "Source catalog checked locally; family browser results and optional limitations are reported in PR #1238 for the final head. Historical screenshots retain their original provenance."
     }
   ],
   "retiredSurfaces": [

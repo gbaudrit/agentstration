@@ -29,10 +29,11 @@ export class SharedFormsPage {
 
   public async assertAssociations(): Promise<void> {
     const failures = await this.page.locator('.workspace .form-field').evaluateAll(fields => fields.flatMap(field => {
-      const controls = [...field.querySelectorAll<HTMLInputElement>('input, textarea, select')].filter(control => control.type !== 'hidden');
+      const controls = [...field.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')].filter(control => control.type !== 'hidden');
       return controls.flatMap(control => {
         const problems: string[] = [];
-        if (!control.id || ![...field.querySelectorAll('label')].some(label => label.htmlFor === control.id)) problems.push(`Missing associated label: ${control.id}`);
+        // Native labels include both explicit `for` associations and wrapping labels.
+        if (![...(control.labels ?? [])].some(label => label.textContent?.trim())) problems.push(`Missing associated label: ${control.id}`);
         for (const id of (control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean)) {
           if (!document.getElementById(id)) problems.push(`Missing field description: ${id}`);
         }

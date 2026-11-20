@@ -713,8 +713,9 @@ export class SourceLifecyclePage {
     const current = new URL(this.page.url());
     if ((path.startsWith('/data-sources/') || path.startsWith('/knowledge-sources/')) && url.hash && current.origin === url.origin && current.pathname === url.pathname && current.search === url.search) {
       await selectResourceSection(this.page, url.hash.slice(1));
-      // Reopen the saved server state after API fixture commands; resource headers have no global Refresh action.
-      await this.page.reload({ waitUntil: 'domcontentloaded' });
+      // Data Source fixtures also change profile readiness through the API.
+      // Knowledge section changes retain the live projection/snapshot state already updated by the screen.
+      if (path.startsWith('/data-sources/')) await this.page.reload({ waitUntil: 'domcontentloaded' });
     } else {
       const response = await this.page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
       expect(response?.status()).toBe(200);

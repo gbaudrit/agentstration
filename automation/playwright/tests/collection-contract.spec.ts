@@ -28,6 +28,8 @@ for (const variant of [
   { name: 'mobile French light', locale: 'fr-FR', theme: 'light', width: 390, height: 844, tag: '@responsive' },
 ] as const) {
   test.describe(variant.name, () => {
+    // Each route owns its page and restores preferences; shard cases independently.
+    test.describe.configure({ mode: 'parallel' });
     test.use({ locale: variant.locale, colorScheme: variant.theme, viewport: { width: variant.width, height: variant.height } });
     test.afterEach(async ({ page, product }) => {
       if (variant.locale !== 'en-US')

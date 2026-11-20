@@ -61,13 +61,16 @@ jobs:
             shards: 3
           - project: mobile-chromium
             shard: 1
-            shards: 3
+            shards: 4
           - project: mobile-chromium
             shard: 2
-            shards: 3
+            shards: 4
           - project: mobile-chromium
             shard: 3
-            shards: 3
+            shards: 4
+          - project: mobile-chromium
+            shard: 4
+            shards: 4
           - project: locale-contracts
             shard: 1
             shards: 1
