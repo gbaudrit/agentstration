@@ -1,0 +1,206 @@
+{
+  "screen": "Extension \u2014 saved registration and independent enrollment",
+  "nativeCases": [
+    {
+      "title": "Extension registration keeps independent drafts and real inventory ",
+      "project": "desktop-chromium",
+      "durationMs": 16939
+    },
+    {
+      "title": "Extension registration keeps independent drafts and real inventory @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 25959
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "85fcf61137d57f89334f9bf749d753bd0a406069",
+      "reportSha256": "3a6f3ca9ee7fba079c4ddf0944dad52229e04aa21b736727ae5ceaed290cb780",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor": "f3e740a901c98d0f366c9ec56091d61157be6091830dd589b618c65cbe40c520",
+        "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor.cs": "be1f19e067e669b2c30934af3079a4d65fcaf51a661471157db4ea80826f0efe",
+        "src/Agentstration.Console.Components/Console/ExtensionRegistrationEditorModel.cs": "16a64d6d4cda5390202522ccb9d47432edaaf47917fad1fa896254c67bffc09f",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ExtensionStrings.resx": "b5d5d05ed1ba5700e9f64567cf5a10399ee051f74f6a9f7c7da124b6bf06eff1",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ExtensionStrings.fr-FR.resx": "fc2fd8d013cf6981beb75ef8502cdcd04baec09ee43614bc4f7d6425730a9e29",
+        "tests/Agentstration.Console.Components.Tests/ExtensionsConsoleTests.cs": "551d2030703bfbbb966489882f727cdab7a16fbb08a330528cec4c901d57b8bf",
+        "tests/Agentstration.Console.Components.Tests/ExtensionsConsoleTests.Foundation.cs": "7c0fd23f380c2bed9a58904b88a10f309c541229a4a8902d1a7b5740a6840257",
+        "automation/playwright/src/pages/governed-extension-inventory.page.ts": "d04df12d76ba72020e5ece5aede3af3c184e43fec998f4f7672b15cdf98d9623"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "6cae5186431d484dd2314092aa2293ddc7c71f8d49aeb4aa338a4d5baca383a3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "6cae5186431d484dd2314092aa2293ddc7c71f8d49aeb4aa338a4d5baca383a3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "6cae5186431d484dd2314092aa2293ddc7c71f8d49aeb4aa338a4d5baca383a3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "33e9cd1e3a49ad704a1657b9681d330ae422af214dc748497d9e9d95d909c66f",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "33e9cd1e3a49ad704a1657b9681d330ae422af214dc748497d9e9d95d909c66f",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "33e9cd1e3a49ad704a1657b9681d330ae422af214dc748497d9e9d95d909c66f",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "99c856e40c5c1efcbb4cef58693b0aa20b0850207b79a38d8742a217d5dcc197",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "99c856e40c5c1efcbb4cef58693b0aa20b0850207b79a38d8742a217d5dcc197",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "99c856e40c5c1efcbb4cef58693b0aa20b0850207b79a38d8742a217d5dcc197",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "3a3192a5065b821670015e35b31fb9f6da48b7f2e4b2347ec237cb4a211722a1",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "3a3192a5065b821670015e35b31fb9f6da48b7f2e4b2347ec237cb4a211722a1",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "3a3192a5065b821670015e35b31fb9f6da48b7f2e4b2347ec237cb4a211722a1"
+      },
+      "campaign": "screens-09"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "extensions-regression",
+      "passed": 3,
+      "sha256": "d857219725c63529385414549f9e2fe44cfb9d8913887159c74053f5ef571bad"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "extension-details-overview-desktop-en.png",
+      "sha256": "88215b54e4019ecdf7ed9d98af1f78df6a0efec7d2057c8d5761089385af3a12"
+    },
+    {
+      "file": "extension-details-invalid-definition-desktop-en.png",
+      "sha256": "aad45ccd35e212caf994387069b497689d64e8821f80654847117778ee06ed43"
+    },
+    {
+      "file": "extension-details-activation-preserves-invalid-draft-desktop-en.png",
+      "sha256": "4603688771ea90ad3bd8f7c85b1364e13b64573cc1b32e5816b64f147849a375"
+    },
+    {
+      "file": "extension-details-retained-refresh-desktop-en.png",
+      "sha256": "ac002966867a0a059ed79c0e5e906bb409b9189740510460abbfa91dda773ac0"
+    },
+    {
+      "file": "extension-details-explicit-discard-desktop-en.png",
+      "sha256": "a639c195d5ac9643483d195cc5d931af29851a16d213e87cd4837b3c9fff0da9"
+    },
+    {
+      "file": "extension-details-contributions-desktop-en.png",
+      "sha256": "c41ae925ead0df268aca7565d4efd5d98b938cfe26f041a766fa215e17a5f598"
+    },
+    {
+      "file": "extension-details-resources-desktop-en.png",
+      "sha256": "9803202471b81ece74e83220ee62e8cdb54de97d8aa5e1a1d9405bafd0d41512"
+    },
+    {
+      "file": "extension-details-options-desktop-en.png",
+      "sha256": "5ef3d0cd2e79c6ddf00b9fa98774acf90d93fb0bda9fe92f72204b100f08dc09"
+    },
+    {
+      "file": "extension-details-usages-desktop-en.png",
+      "sha256": "877e833d9307342ffa8758b7ed90c58cd3b2662114f1acf820810a856b2cf38c"
+    },
+    {
+      "file": "extension-details-enrollment-desktop-en.png",
+      "sha256": "4cc8a7f6d8e49b55bc145260a43d325e9e4e12e767b00cee7882ad9161b198ec"
+    },
+    {
+      "file": "extension-details-yaml-desktop-en.png",
+      "sha256": "3caf8fa72a86fca01826e30ab2cf8a6eda477a24766682aa5e737d2790044f24"
+    },
+    {
+      "file": "extension-details-overview-mobile-fr.png",
+      "sha256": "17917712f3533b839ec59d7961ae83810e80b17fef1704fe36db6fb890eb410f"
+    },
+    {
+      "file": "extension-details-invalid-definition-mobile-fr.png",
+      "sha256": "b081490cfce6eb1779161b659949efdf4a715c6633d1504d645bb402b22e211c"
+    },
+    {
+      "file": "extension-details-activation-preserves-invalid-draft-mobile-fr.png",
+      "sha256": "e88b96bcbf18f01513b45fbf9d42ed035f83526a6c14882d978a16bee3e44931"
+    },
+    {
+      "file": "extension-details-retained-refresh-mobile-fr.png",
+      "sha256": "e9e79ea68f1391af75c7ac449c3ead4094207cda49f65f63561337b9a47e8737"
+    },
+    {
+      "file": "extension-details-explicit-discard-mobile-fr.png",
+      "sha256": "7f2765b1bf8c52d811182177fd37b3b1d093c24d71c9b0b6b27146e42678f081"
+    },
+    {
+      "file": "extension-details-contributions-mobile-fr.png",
+      "sha256": "3d2ee05f8d392ee170e86d17b9490ba22ac0214baa2e45968faab30ac2a86016"
+    },
+    {
+      "file": "extension-details-resources-mobile-fr.png",
+      "sha256": "0d536618f6a7123e43578496fc3cc955c9e4105665d52681b3b247ef737a792c"
+    },
+    {
+      "file": "extension-details-options-mobile-fr.png",
+      "sha256": "138663a11214d4c8aaf24fe2009ec622f6bf7cfcaa38c75ba04523e644490b7b"
+    },
+    {
+      "file": "extension-details-usages-mobile-fr.png",
+      "sha256": "dbfc29f0aea89c5984bf356f5337597d474b7a1cba6eb0c0ae2f6de2cba174dd"
+    },
+    {
+      "file": "extension-details-enrollment-mobile-fr.png",
+      "sha256": "691b22b69d7961b91ee28553279dd254110ca1dcfab49cafdb2c3a7caa1e356a"
+    },
+    {
+      "file": "extension-details-yaml-mobile-fr.png",
+      "sha256": "cb7fa295e191ada6af2f1ecf4eac37a8ad9dfdb514c1867dfcf40d377ae2a435"
+    }
+  ],
+  "limits": [
+    "A forbidden associated enrollment is shown as local read feedback rather than being presented as an enrollment success; direct enrollment remains independently authorized.",
+    "Description/tags and YAML writes are unsupported by the current family command API and remain read-only.",
+    "The first native failures were real context-render/independent-read defects. Existing CSS selectors did exist; subsequent semantic selector improvements do not account for or hide these product corrections."
+  ],
+  "postSyncFocusedChecks": {
+    "extensions": {
+      "passed": 50,
+      "sha256": "dd16981c759f2f910e57677677d5278d736f6680e4cc8dc07d8485d3c2afa17c"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "a0ad5cb9d1a9737ed3e7f469699c4511e90651f19f28d3d18b8b636986f8d2fb"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "ca31a649db3aa32718e15d3d4ca45ce6bcbd50f74a265163855bd07b6b54199f"
+    },
+    "schema-composition": {
+      "passed": 27,
+      "sha256": "92c3b5adaadefe2347809ddf10e4947e13acaee2ddc4cadfb6998029464adc2e"
+    }
+  },
+  "validationNote": "These post-synchronization focused checks overlap earlier targetedGroupChecks; their counts must not be added as distinct tests.",
+  "finalExtensionChecks": {
+    "passed": 55,
+    "sha256": "338fb025ed31b0aea046d464cf9274afaaede54d9c954ce4da3dcee904993afe",
+    "overlapsEarlierChecks": true
+  }
+}

@@ -46,4 +46,9 @@
   <data name="TechnicalDetails"><value>Détails techniques</value></data>
   <data name="PublishedVersions"><value>Versions publiées</value></data>
   <data name="InventorySnapshot.Help" xml:space="preserve"><value>Cet inventaire combine les points de terminaison enregistrés avec au plus 200 demandes d’enrôlement. Il présente un instantané du catalogue, qui peut être incomplet.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>L’enregistrement a changé pendant la modification. Abandonnez vos modifications pour charger la dernière configuration enregistrée.</value></data>
+  <data name="IdentityMismatch" xml:space="preserve"><value>La réponse ne correspond pas à cet enregistrement d’extension. Rechargez la ressource.</value></data>
+  <data name="RegistrationYaml" xml:space="preserve"><value>YAML de l’enregistrement d’extension</value></data>
+  <data name="YamlReadOnlyProjection" xml:space="preserve"><value>Projection de la ressource enregistrée en lecture seule. Les vérificateurs de codes d’enrôlement et les valeurs d’identifiants sont omis.</value></data>
+  <data name="BundleInstallations" xml:space="preserve"><value>Installations de bundles</value></data>
 </root>

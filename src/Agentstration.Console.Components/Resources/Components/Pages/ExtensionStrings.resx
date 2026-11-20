@@ -46,4 +46,9 @@
   <data name="TechnicalDetails"><value>Technical details</value></data>
   <data name="PublishedVersions"><value>Published versions</value></data>
   <data name="InventorySnapshot.Help" xml:space="preserve"><value>This inventory combines registered endpoints with up to 200 enrollment requests. It is a snapshot, not a complete catalog.</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>The registration changed while you were editing. Discard your changes to load the latest saved configuration.</value></data>
+  <data name="IdentityMismatch" xml:space="preserve"><value>The response does not belong to this extension registration. Reload the resource.</value></data>
+  <data name="RegistrationYaml" xml:space="preserve"><value>Extension registration YAML</value></data>
+  <data name="YamlReadOnlyProjection" xml:space="preserve"><value>Read-only saved resource projection. Enrollment code verifiers and credential values are omitted.</value></data>
+  <data name="BundleInstallations" xml:space="preserve"><value>Bundle installations</value></data>
 </root>

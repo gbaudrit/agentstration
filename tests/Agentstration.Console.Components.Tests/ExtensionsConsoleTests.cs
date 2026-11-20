@@ -20,7 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ExtensionsConsoleTests
+public sealed partial class ExtensionsConsoleTests
 {
     [TestMethod]
     [DataRow("en-US", "snapshot")]
@@ -271,10 +271,10 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
 
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
             .Add(value => value.RegistrationName, "llama-cpp-local"));
-        var tabs = rendered.WaitForElements("[role='tab']");
-        await tabs[3].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "contributions");
 
         rendered.WaitForAssertion(() =>
         {
@@ -295,10 +295,10 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
 
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
             .Add(value => value.RegistrationName, "llama-cpp-local"));
-        var tabs = rendered.WaitForElements("[role='tab']");
-        await tabs[3].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "contributions");
 
         rendered.WaitForAssertion(() =>
         {
@@ -320,10 +320,10 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
 
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
             .Add(value => value.RegistrationName, "crawl4ai"));
-        var tabs = rendered.WaitForElements("[role='tab']");
-        await tabs[3].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "contributions");
 
         rendered.WaitForAssertion(() =>
         {
@@ -380,10 +380,10 @@ public sealed class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
 
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
             .Add(value => value.RegistrationName, "llama-cpp-local"));
-        var tabs = rendered.WaitForElements("[role='tab']");
-        await tabs[2].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "enrollment");
 
         rendered.WaitForAssertion(() =>
         {
@@ -410,10 +410,10 @@ public sealed class ExtensionsConsoleTests
         await contextState.LoadAsync(default);
         context.Services.AddSingleton(contextState);
 
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters => parameters
             .Add(value => value.RegistrationName, "llama-cpp-local"));
-        var tabs = rendered.WaitForElements("[role='tab']");
-        await tabs[2].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "enrollment");
         var unenroll = rendered.WaitForElement("section.resource-section .panel-actions button.button-danger");
         Assert.AreEqual("Désenrôler l’extension", unenroll.TextContent.Trim());
 
@@ -621,9 +621,10 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient(state));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
             parameters.Add(value => value.RegistrationName, "crawl4ai"));
-        await rendered.WaitForElements("[role='tab']")[3].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "contributions");
         rendered.WaitForAssertion(() =>
         {
             var card = rendered.Find("[data-contribution-id='web.crawl']");
@@ -687,13 +688,14 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
             parameters.Add(value => value.RegistrationName, "crawl4ai"));
-        await rendered.WaitForElements("[role='tab']")[3].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "contributions");
         var card = rendered.Find("[data-contribution-id='crawl4ai-web']");
         StringAssert.Contains(card.TextContent, label);
         Assert.IsEmpty(card.QuerySelectorAll("a"));
-        await rendered.FindAll("[role='tab']")[4].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "resources");
         StringAssert.Contains(rendered.Markup, "crawl4ai-web-acquisition");
         Assert.IsEmpty(rendered.FindAll("article.resource-section td a"));
         var evidence = rendered.Find(".extension-bundle-evidence");
@@ -716,9 +718,10 @@ public sealed class ExtensionsConsoleTests
         context.Services.AddSingleton<IToolsClient>(new BundleToolsClient());
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         context.Services.AddSingleton(new NotificationState());
+        ConfigureExtensionNavigation(context);
         var rendered = context.Render<Agentstration.Web.Components.Pages.ExtensionDetails>(parameters =>
             parameters.Add(value => value.RegistrationName, "crawl4ai"));
-        await rendered.WaitForElements("[role='tab']")[4].ClickAsync(new());
+        await SelectExtensionSectionAsync(rendered, "resources");
 
         var grid = rendered.Find(".extension-bundle-grid");
         Assert.HasCount(3, grid.QuerySelectorAll("tbody tr"));
@@ -798,6 +801,9 @@ public sealed class ExtensionsConsoleTests
 
         public Task<IReadOnlyList<ExtensionRegistrationResource>> GetRegistrationsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<ExtensionRegistrationResource>>([]);
+
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            GetRegistrationAsync(@namespace, name, cancellationToken);
 
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
@@ -1004,6 +1010,9 @@ public sealed class ExtensionsConsoleTests
             }
         };
 
+        public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
+            GetRegistrationAsync(@namespace, name, cancellationToken);
+
         public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
             Task.FromResult(new ResourceSnapshot<ExtensionRegistrationResource>(new ExtensionRegistrationResource
             {
@@ -1011,6 +1020,7 @@ public sealed class ExtensionsConsoleTests
                 Kind = ExtensionKinds.ExtensionRegistration,
                 Metadata = new ResourceMetadata { Name = name, Namespace = @namespace },
                 Generation = 1,
+                ScopeRef = source ? ResourceScopeRef.Instance : null,
                 Definition = new ExtensionRegistrationProperties
                 {
                     DisplayName = "llama.cpp",

@@ -24,7 +24,8 @@ The classification below identifies inspection boundaries; specialized exception
 | `DataSourceEditor.razor` | New foundation migrated; local verification below | Standard persisted template and retained forms for profile/dataset variants; independent operations/Access and preserved exact pins | Yes |
 | `DataSourceProfileEditor.razor` | New foundation migrated; local verification recorded below | Historical profile resource; preserve definition-only API and publication/Flow contracts | Yes |
 | `EntryEditor.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
-| `ExtensionDetails.razor` | Previously remaining | Persisted resource detail; adopt the Console template and shared definition contract | No |
+| `ExtensionDetails.razor` | Saved registrations and operational inventory reconciled; verification below | Actual authorized Core registration/enrollment frame; inventory-only observations retain justified operational rendering and independent reads | Not applicable |
+| `Extensions.razor` | Previously remaining; creation verification pending | Existing collection retained; separately inventoried inline Tenant registration creation wizard with independent authorization | Yes |
 | `FlowDesigner.razor` | Specialized workshop reconciled; verification below | Dedicated Graph/Definition/Split editor; guarded exact target/session and independent execute versus write capabilities | Not applicable |
 | `FlowDetails.razor` | New foundation migrated; verification below | Actual Flow identity and retained delegated or graph metadata forms; independent execution/Access and final family YAML | Not applicable |
 | `FlowOrchestrationEditor.razor` | Delegated definition reconciled; verification below | Shared retained form and exact owning Flow state/presentation dictionary; specialized references and independent publication draft preserved | Not applicable |
@@ -69,6 +70,8 @@ The classification below identifies inspection boundaries; specialized exception
 | `VaultEditor.razor` | New foundation migrated; local verification recorded below | Persisted resource detail; adopt the Console template and shared definition contract | Yes |
 
 ## Embedded and delegated surfaces
+
+The final review identified the existing inline registration creator in `Extensions.razor` as an additional explicit screen boundary. The historical inventory remains **51** components; the current reconciliation contains **52** components, grouping route aliases and delegated editors rather than claiming 52 distinct routes. Its own verification is recorded separately from `ExtensionDetails`.
 
 The previous inventory also explicitly identifies `DataSourceDatasetEditor`, `ModelProviders`, `ModelProfiles`, `Sources`, `SourceRegistries`, `Extensions`, `ToolSets`, organization and workspace editors as review boundaries. An outer collection must not acquire a resource-detail template solely because it contains an editor. Shared/delegated forms must receive the owning detail's section state and presentation; no second resource shell or duplicate form is implied by this inventory.
 
@@ -473,3 +476,13 @@ Tool Definition creation feedback follow-up: final-attempt identity errors now t
 - New duplicate Tool journey **Not applicable**; #1236 stays deferred. Protected Agent source/styles/translations unchanged; no CI remediation or full solution lanes.
 
 - Current reconciliation: **49/51** components verified; 2 remaining. The Agent reference is protected.
+
+### ExtensionDetails — saved identity and independent enrollment inspection
+
+- Authorized registration/enrollment Resources use ConsoleResourceDetailsTemplate with actual saved owner/namespace/UID/governance. Metrics precede saved Identity/tags and wrapping Configuration. One retained registration ResourceDefinitionForm shares the exact state/presentation dictionary and real Fields; standard Identity/Configuration lead to contributions/resources/options/usages/enrollment, independently authorized Access and safe read-only YAML last. Metadata/API limitations remain read-only. Observations without an authorized Core envelope keep the shared operational Content/Sections frame instead of fabricated ownership/definition/policy.
+- Activation acknowledges its own real ETag and retains invalid metadata/EditContext; changed refreshes require explicit discard. Exact references, confirmations, migration restrictions, direct enrollment commands and independent permissions remain. Private read loss/replaced UID/context/disposed callbacks clear or reject content. Enrollment YAML excludes private credential/code-verifier material.
+- Actual native and maintained smoke exposed a context-change reload that finished without rendering; it now renders under a disposal guard and has a deferred-context/inventory regression test. Associated enrollment read failures now stay local to common Enrollment feedback/retry while authorized registration inspection remains available. A directly denied enrollment still blocks the page and purges private data; forbidden/failed/recovery cases preserve those distinctions without broadening permissions.
+- All 55 Extensions cases, TypeScript/catalog checks and warning-free Release hosts pass. Native EN/dark desktop and FR/light true-touch metadata/invalid fields/activation/ETags/changed refresh/discard/save/sections/YAML plus three maintained local/governed cases pass: [22 real captures and exact hashes](evidence/resource-screen-foundation/extension-details/README.md). The existing API canonicalizes endpoint trailing slashes on update; a real initial PUT prepares the fixture baseline before exact assertions, rather than changing the command or weakening expectations.
+- New duplicate Extensions journey **Not applicable**; #1236 stays deferred. No shared/protected Agent screen/style/translation change, CI remediation or full solution lane. Inline collection creation retains its separate inventory row and commit.
+
+- Current reconciliation: **50/52** components verified; 2 remaining. The Agent reference is protected.
