@@ -1,0 +1,11 @@
+# Source registry list composition
+
+Real deterministic Development Web executable in Instance context, showing the existing official registration and three disposable local disabled registry registrations with distinct real trust policies. Fixture URLs use fixture.invalid; periodic refresh is disabled and the smoke performs no endpoint fetch or import.
+
+[Desktop English table, 1440×1000](desktop-en.png), [mobile French controls, 390×844](mobile-fr.png), [mobile French results](mobile-fr-results.png), [source proof](source-proof.json).
+
+Both browser checks pass: four actual API metadata records, explicit first-1,000 bound, no unsupported global query controls, pager, totals or metrics, retained refresh/cards/table, legitimate registry/discovery/imported-Source navigation, exact context-preserving detail links and no document horizontal overflow. Captures inspected. The application service reads at most 1,000 Instance registrations without continuation; former global-looking metric counts are omitted. Trust policy, official registration, freshness, scheduling and enabled facts remain visible. Redundant Manage links are removed from the action menu; toggle and business refresh remain.
+
+The extracted SourceRegistryCollection owns list state, leaving the existing creation/editor/detail branches and their command handling intact. List authorization remains the PlatformAdmin API decision, including after every context notification. Compatible refresh retains rows; denial clears rows/options/commands, and request revisions reject late responses. Toggle reads the latest definition and ETag before writing.
+
+Fourteen focused cases pass: nine existing Source registry Console regressions and five new bounded-contract/state/command cases. Warning-free Release Web build, full targeted format verification, symmetric duplicate-free EN/FR catalogs and two collection inventory assertions pass. Live external registry retrieval is intentionally not used; business refresh and ETag behavior are exercised through the real HTTP client in component tests. The known incoming TransformationFunctionEditor inventory omission remains for its family review. Full functional lanes and the new reusable #1242 journey remain deferred.

@@ -75,7 +75,7 @@ This source inventory identifies concrete top-level list adapters still outside 
 | `Secrets.razor` | `/secrets` | Adopted |
 | `Settings.razor` | `/settings` | Remaining; requires individual contract review |
 | `SourceProviders.razor` | `/sourceproviders` | Adopted |
-| `SourceRegistries.razor` | `/settings/source-registries` | Remaining; requires individual contract review |
+| `SourceRegistries.razor` | `/settings/source-registries` | Adopted via isolated list adapter; bounded 1,000-registration snapshot, API PlatformAdmin, commands/ETags preserved. [Evidence](evidence/list-layout/source-registries/README.md) |
 | `Sources.razor` | `/settings/sources` | Remaining; requires individual contract review |
 | `StorageTypes.razor` | `/storage-types` | Adopted |
 | `Storages.razor` | `/storages` | Adopted |

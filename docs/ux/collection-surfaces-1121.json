@@ -3038,15 +3038,15 @@
     },
     {
       "id": "source-registries-source-registry-registration-view",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
-      "line": 61,
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryCollection.razor",
+      "line": 8,
       "host": "console",
       "routes": [
         "/settings/source-registries",
         "/settings/source-registries/new",
         "/settings/source-registries/{Name}"
       ],
-      "renderer": "CollectionView",
+      "renderer": "ResourceCollectionTemplate",
       "itemType": "SourceRegistryRegistrationView",
       "identityLabel": "Registry",
       "scope": true,
@@ -3123,6 +3123,13 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "be7cec3afab3325f621215f19a25d311dea401ed"
+      },
+      "pageComposition": {
+        "contract": "Bounded first 1000 Instance registry registrations, no continuation, global search/filter/pager/total or global metrics. Explicit snapshot help.",
+        "state": "API PlatformAdmin authoritative; cached catalog cleared on every context notification, late responses rejected; compatible refresh retained.",
+        "commands": "Latest snapshot/ETag toggle and explicit business refresh retained; redundant Manage destination removed from menu. Editor/detail remain in SourceRegistries host.",
+        "evidence": "docs/ux/evidence/list-layout/source-registries/README.md",
+        "tests": "SourceRegistryCollectionTests; SourceRegistryConsoleTests"
       }
     },
     {

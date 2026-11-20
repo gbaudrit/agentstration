@@ -152,6 +152,8 @@ public sealed class SourceRegistryConsoleTests
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConsoleContextProvider>(new ResourceListContextProvider());
+        context.Services.AddSingleton<ConsoleContextState>();
         context.Services.AddSingleton(client);
         context.Services.AddSingleton(secrets ?? new StubSecretsClient());
         context.Services.AddSingleton(new NotificationState());
