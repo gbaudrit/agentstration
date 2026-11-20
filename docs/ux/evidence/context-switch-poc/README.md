@@ -22,7 +22,7 @@ Le POC conserve la page et sa section ; il ne promet pas une position de défile
 
 ## Vérifications
 
-Les 18 nouveaux cas .NET couvrent la résolution de destination, les identités exactes, les homonymes/remplacements, les erreurs attendues et techniques, la protection des brouillons sans barre visible, le retrait du contenu pendant le chargement et les réponses tardives.
+Les 18 cas .NET du POC couvrent la résolution de destination, les identités exactes, les homonymes/remplacements, les erreurs attendues et techniques, la protection des brouillons sans barre visible, le retrait du contenu pendant le chargement et les réponses tardives.
 
 Le smoke ponctuel [smoke.mts](smoke.mts) réutilise les fixtures et les page objects existants. Il vérifie sur Chromium réel : conservation de la fiche/ancre et lecture seule, historique sans rechargement, section inaccessible, homonyme présent dans la liste cible, indépendance d’un autre onglet, retour explicite, annulation/confirmation d’un brouillon, français mobile et absence de débordement horizontal ou d’exception navigateur. Résultats : [verification.json](verification.json).
 
@@ -42,14 +42,22 @@ Le SDK .NET du dépôt doit être dans `PATH`. Le script démarre puis arrête s
 ## Validation technique exécutée
 
 - Solution complète, compilation Release : réussite, aucun avertissement ni erreur.
-- 18 nouveaux cas .NET du POC : réussite. Les tests de navigation de `MainLayout` passent également (16 cas au total), dont le retour au contexte précédent après un chargement refusé et le blocage du sélecteur pendant un chargement.
-- Dernière suite Fast : 2 486 cas, 2 485 réussites et 1 échec préexistant (`ConversationListReturnsToThePersistedGenericInteraction`). Une exécution précédente relève aussi `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows`, qui est intermittent. Les deux échecs sont reproduits dans un checkout isolé de `82206267` : le contrôle de base exécute les 1 527 cas de `Console.Components.Tests`, avec 1 525 réussites et ces 2 échecs.
-- Suite Integration : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés sans fournisseurs réels/PostgreSQL configurés. Cette campagne précède les derniers gardes de présentation pendant un chargement et au retour après échec ; ceux-ci sont vérifiés par la dernière suite Fast et le smoke du POC.
+- 18 cas .NET du POC et 2 cas de régression Flow : réussite. Les tests de navigation de `MainLayout` passent également (16 cas au total), dont le retour au contexte précédent après un chargement refusé et le blocage du sélecteur pendant un chargement.
+- Dernière suite Fast après correction Flow : 2 488 cas, 2 485 réussites et 3 échecs. `ConversationListReturnsToThePersistedGenericInteraction` et `LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows` sont déjà reproduits dans un checkout isolé de `82206267` (1 527 cas, 1 525 réussites et ces 2 échecs). Le troisième, `ReplacedOperationalWorkspaceRejectsLateMetadataAndInspectRevocationClearsBothCollections`, concerne un test Artifact inchangé qui partage une même réponse HTTP entre deux lectures ; il passe dans la vérification ciblée suivante de 93 cas Flow, Access et Artifact. Ces 93 cas passent intégralement, de même que les 73 cas Flow seuls.
+- Suite Integration réexécutée après correction Flow : 1 570 cas, 1 542 réussites, aucun échec, 28 cas optionnels ignorés sans fournisseurs réels/PostgreSQL configurés.
 - Tests JavaScript des composants : 17 réussites. Compilation TypeScript : réussite. Catalogues de localisation anglais/français : XML valide, aucune clé dupliquée et clés symétriques.
 - Smoke ponctuel du POC : les huit vérifications de `verification.json` passent, avec les quatre captures ci-dessous.
 - Régressions navigateur ciblées : 11 cas réussis sur Chromium système, en bureau, mobile et localisation. Les traces et vidéos restent activées ; le binaire ffmpeg du système est utilisé dans cet environnement.
 
 La campagne navigateur globale de 494 cas n’est pas exécutée intégralement pour ce POC. Les régressions ciblées couvrent les contextes hiérarchiques, les ressources héritées, l’inventaire des périmètres et les usages inter-périmètres des profils de modèle, sur bureau, mobile et localisation. Leur ancien lien `tab=usages` est remplacé par `#usages` ; la confirmation native de bascule est remplacée par le dialogue du garde partagé.
+
+## Retour utilisateur : accès Flow et langue automatique
+
+L’échec des accès est reproduit après Workspace → Instance → création d’un Flow brouillon. La page transmettait la chaîne littérale `PublishedVersion` à la politique, au lieu de la version publiée calculée. L’API répondait `422 resource_identity_stale`. La liaison Razor est corrigée ; aucune règle d’autorisation ni de validation d’identité serveur n’est assouplie. Les deux nouveaux cas vérifient une version publiée réelle et l’absence de version publiée pour un brouillon.
+
+Le smoke ponctuel [flow-access-smoke.mts](flow-access-smoke.mts), lancé comme `smoke.mts`, crée un Flow par l’interface après la bascule et enregistre Discover/Use avec propagation aux descendants. Il relit la politique enregistrée par l’API. Les deux exécutions, français et anglais automatiques sans cookie de langue, passent sans erreur navigateur : [résultats](flow-access-verification.json).
+
+Le passage involontaire du français à l’anglais reste distinct et non résolu. Le signalement précise Chrome, lancement Aspire/AppHost, langue automatique, dès Workspace → Instance. Le parcours équivalent reste en français sur l’hôte Console de test ainsi que sur AppHost, en HTTP (`localhost:5100`) puis en HTTPS (`localhost:7100`, certificat local de test). Les préférences restent automatiques et aucun cookie de langue n’est créé. Ces vérifications ne reproduisent pas le signalement ; elles ne prouvent pas sa résolution. Ce point reste suivi dans la PR brouillon #1256.
 
 ## Captures
 
