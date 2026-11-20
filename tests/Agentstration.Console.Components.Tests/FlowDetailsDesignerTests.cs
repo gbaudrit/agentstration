@@ -518,7 +518,7 @@ public sealed partial class FlowDetailsDesignerTests
             .Add(component => component.FlowNamespace, "pack.sample")
             .Add(component => component.Embedded, true));
 
-        StringAssert.Contains(rendered.Markup, strings["ReadOnly"].Value);
+        Assert.HasCount(1, rendered.FindAll(".resource-readonly-notice"));
         StringAssert.Contains(rendered.Markup, strings["PublishedVersion"].Value);
         Assert.IsFalse(rendered.FindAll("button").Any(button => button.TextContent.Contains(strings["Save"].Value, StringComparison.Ordinal) || button.TextContent.Contains(strings["PublishAndActivate"].Value, StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Find("fieldset.orchestration-configuration").HasAttribute("disabled"));

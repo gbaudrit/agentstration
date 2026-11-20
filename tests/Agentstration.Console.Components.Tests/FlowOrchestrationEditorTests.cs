@@ -139,8 +139,8 @@ public sealed class FlowOrchestrationEditorTests
     private sealed class ManagementStub : IManagementApiClient
     {
         public Task<IReadOnlyList<AgentSummary>> GetAgentsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<AgentSummary>>([
-            new("agent-a", "Agent A", "assistant", "1", "Ready", [], "local", DateTimeOffset.UnixEpoch, "default"),
-            new("agent-b", "Agent B", "assistant", "1", "Ready", [], "local", DateTimeOffset.UnixEpoch, "default")]);
+            new("agent-a", "Agent A", "assistant", "1", "Ready", [], "local", DateTimeOffset.UnixEpoch, "default") { Namespace = new("team"), ScopeRef = Owner },
+            new("agent-b", "Agent B", "assistant", "1", "Ready", [], "local", DateTimeOffset.UnixEpoch, "default") { Namespace = new("team"), ScopeRef = Owner }]);
         public Task<IReadOnlyList<DeploymentSummary>> GetDeploymentsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<TriggerResource>> GetTriggersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<AgentResource>> GetAgentAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
