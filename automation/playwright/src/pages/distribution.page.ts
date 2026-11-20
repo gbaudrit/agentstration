@@ -16,6 +16,7 @@ export interface PackProjectDefinition {
   displayName: string;
   resourceKind?: string;
   resourceName?: string;
+  resourceNamespace?: string;
 }
 
 export class DistributionPage {
@@ -228,11 +229,20 @@ export class DistributionPage {
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
     await expect(this.page.getByTestId(TestIds.distribution.packProjectName)).toHaveValue(project.name);
-    const add = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${project.resourceName ?? 'system-direct-agent-dotnet-expert'}"]`)
-      .getByTestId(TestIds.distribution.packProjectAddResource);
+    const resourceName = project.resourceName ?? 'system-direct-agent-dotnet-expert';
+    let resource = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${resourceName}"]`);
+    if (project.resourceNamespace) {
+      resource = resource.filter({ has: this.page.getByText(`${project.resourceNamespace}/${resourceName}`, { exact: true }) });
+    }
+    const add = resource.getByTestId(TestIds.distribution.packProjectAddResource);
     await this.page.locator('[data-wizard-step=resources]').click();
     await expect(this.page.locator('[data-step-id=resources]')).toBeVisible();
+    await expect(resource).toHaveCount(1);
+    if (project.resourceNamespace) {
+      await expect(resource.locator('.collection-qualified-name code')).toHaveText(`${project.resourceNamespace}/${resourceName}`);
+    }
     await add.waitFor({ state: 'visible' });
+    await expect(add).toBeEnabled();
     await add.click();
     await this.page.locator('[data-wizard-step=review]').click();
     await expect(this.page.locator('[data-step-id=review]')).toBeVisible();
@@ -259,9 +269,25 @@ export class DistributionPage {
     await this.page.locator(`[data-testid="${TestIds.distribution.packProjectStatus}"][data-state="success"]`).waitFor({ state: 'visible' });
   }
 
-  public async installPackProject(): Promise<string> {
-    await this.page.getByTestId(TestIds.distribution.packProjectInstall).click();
-    await this.page.getByTestId(TestIds.distribution.packProjectStatus).waitFor({ state: 'visible' });
+  public async installPackProject(bindings: readonly { name: string; namespace: string; scopeRef: string | null }[] = []): Promise<string> {
+    for (const target of bindings) {
+      const value = `${target.scopeRef ? target.scopeRef + '|' : ''}${target.namespace}:${target.name}`;
+      const selection = this.page.locator('.studio-bindings select').filter({
+        has: this.page.locator(`option[value="${value}"]`),
+      });
+      await expect(selection).toHaveCount(1);
+      await expect(selection).toBeEnabled();
+      await selection.selectOption(value);
+      await expect(selection).toHaveValue(value);
+    }
+    const install = this.page.getByTestId(TestIds.distribution.packProjectInstall);
+    await expect(install).toBeEnabled();
+    const status = this.page.getByTestId(TestIds.distribution.packProjectStatus);
+    const buildStatus = await status.innerText();
+    await install.click();
+    await status.waitFor({ state: 'visible' });
+    await expect(status).not.toHaveText(buildStatus);
+    await expect(status).toHaveAttribute('data-state', 'success');
     return this.page.getByTestId(TestIds.distribution.packProjectNamespace).innerText();
   }
 

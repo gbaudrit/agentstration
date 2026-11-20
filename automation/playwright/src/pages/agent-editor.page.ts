@@ -54,8 +54,12 @@ export class AgentEditorPage {
   }
 
   public async fillIdentity(agent: Pick<AgentDefinition, 'name' | 'displayName' | 'description'>): Promise<void> {
-    await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.name), agent.name);
-    await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.displayName), agent.displayName);
+    const name = this.page.getByTestId(TestIds.agentEditor.name);
+    if (await name.isEditable()) await fillAndCommit(name, agent.name);
+    else await expect(name).toHaveValue(agent.name);
+    const displayName = this.page.getByTestId(TestIds.agentEditor.displayName);
+    await expect(displayName).toBeEditable();
+    await fillAndCommit(displayName, agent.displayName);
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.description), agent.description);
   }
 

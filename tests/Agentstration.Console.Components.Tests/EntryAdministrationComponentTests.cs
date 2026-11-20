@@ -1,5 +1,7 @@
 using System.Globalization;
 using Agentstration.Agents;
+using Agentstration.Web.Components;
+using Agentstration.Resources;
 using Agentstration.Flows;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
@@ -14,7 +16,7 @@ namespace Agentstration.Web.Tests;
 
 [TestClass]
 [DoNotParallelize]
-public sealed class EntryAdministrationComponentTests
+public sealed partial class EntryAdministrationComponentTests
 {
     private CultureInfo? originalCulture;
     private CultureInfo? originalUiCulture;
@@ -81,11 +83,13 @@ public sealed class EntryAdministrationComponentTests
         using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
-        var rendered = context.Render<EntryEditor>();
+        var rendered = await RenderEntry(context, _ => { });
 
-        Assert.HasCount(6, rendered.FindAll("[role='tab']"));
-        Assert.AreEqual("true", rendered.Find("[data-testid='entry-tab-overview']").GetAttribute("aria-selected"));
-        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+        Assert.HasCount(6, rendered.FindAll(".creation-wizard-progress li"));
+        Assert.AreEqual("identity", rendered.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        rendered.Find("[data-testid=entry-name]").Input("prepare-report");
+        rendered.Find("[data-testid=entry-display-name]").Input("Prepare a report");
+        await SelectEntry(rendered, "definition/configuration");
         Assert.IsTrue(rendered.Markup.Contains("Direct Agent Flow", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Find("[data-testid='exposure-workplace']").HasAttribute("checked"));
         Assert.IsTrue(rendered.Find("[data-testid='placement-owning-space']").HasAttribute("checked"));
@@ -109,7 +113,8 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsTrue(rendered.FindAll("input[type='checkbox'], input[type='radio']").All(value => value.ParentElement?.ClassList.Contains("entry-toggle") == true));
         Assert.IsTrue(rendered.FindAll(".entry-row-actions").All(value => !value.ClassList.Contains("form-actions")));
         await primaryRadios[1].ClickAsync(new());
-        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Publish pinned version", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("review"));
+        await rendered.Find("[data-testid=entry-publish]").ClickAsync(new());
 
         Assert.IsNotNull(client.SavedEntry);
         Assert.AreEqual(EntryBindingKind.Flow, client.SavedEntry.Binding.Kind);
@@ -130,9 +135,13 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual("field2", client.SavedEntry.Presentation.Fields.Single(value => value.Role == EntryFieldRole.PrimaryInput).Name);
         Assert.IsTrue(rendered.Markup.Contains("Published Entry v1 with pinned Flow 1.0.0", StringComparison.Ordinal));
         Assert.IsFalse(rendered.Markup.Contains("Validate and publish", StringComparison.Ordinal));
-        await rendered.Find("[data-testid='entry-tab-preview']").ClickAsync(new());
-        Assert.IsTrue(rendered.Markup.Contains("Current draft presentation", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.FindAll(".entry-renderer input").All(value => value.HasAttribute("disabled")));
+        rendered.Dispose();
+        using var previewContext = CreateContext();
+        previewContext.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        var preview = await RenderEntry(previewContext, p => p.Add(c => c.Name, "prepare-report"));
+        await SelectEntry(preview, "preview");
+        Assert.IsTrue(preview.Markup.Contains("Current draft presentation", StringComparison.Ordinal));
+        Assert.IsTrue(preview.FindAll(".entry-renderer input").All(value => value.HasAttribute("disabled")));
     }
 
     [TestMethod]
@@ -142,12 +151,12 @@ public sealed class EntryAdministrationComponentTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
-        var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
+        var rendered = await RenderEntry(context, parameters => parameters.Add(value => value.Name, "primary"));
 
-        await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
+        await SelectEntry(rendered, "yaml");
 
         var editor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
-        Assert.IsTrue(editor.Closest(".entry-yaml-field") is not null);
+        Assert.IsTrue(editor.Closest(".resource-yaml-editor") is not null);
         var yaml = editor.GetAttribute("value") ?? editor.TextContent;
         Assert.IsTrue(yaml.Contains("kind: Entry", StringComparison.Ordinal));
         Assert.IsTrue(yaml.Contains("suggestions:", StringComparison.Ordinal));
@@ -167,9 +176,9 @@ public sealed class EntryAdministrationComponentTests
     {
         using var context = CreateContext();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(new FakeEntryAdministrationApiClient());
-        var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
+        var rendered = await RenderEntry(context, parameters => parameters.Add(value => value.Name, "primary"));
 
-        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+        await SelectEntry(rendered, "definition/configuration");
 
         var suggestion = rendered.Find(".entry-suggestion-form");
         Assert.IsTrue(suggestion.ClassList.Contains("form-grid"));
@@ -195,9 +204,10 @@ public sealed class EntryAdministrationComponentTests
         using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
-        var rendered = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "primary"));
+        var rendered = await RenderEntry(context, parameters => parameters.Add(value => value.Name, "primary"));
 
-        Assert.AreEqual("Published", rendered.FindAll(".entry-facts dd")[0].TextContent.Trim());
+        Assert.AreEqual("Published", rendered.Find(".entry-summary-bar .status-badge").TextContent.Trim());
+        Assert.IsTrue(rendered.FindComponents<MetricCard>().Any(card => card.Instance.Label == "Published version" && card.Instance.Value == "1"));
         Assert.HasCount(1, rendered.FindAll(".entry-summary-bar .status-badge"));
         var summary = rendered.Find(".entry-summary-bar").TextContent;
         Assert.IsTrue(summary.Contains("Published", StringComparison.Ordinal));
@@ -205,13 +215,13 @@ public sealed class EntryAdministrationComponentTests
         Assert.IsFalse(summary.Contains("Draft", StringComparison.Ordinal));
         Assert.IsFalse(summary.Contains("Revision", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Personal", StringComparison.Ordinal));
-        await rendered.Find("[data-testid='entry-tab-usage']").ClickAsync(new());
+        await SelectEntry(rendered, "usage");
         Assert.IsTrue(rendered.Markup.Contains("Depends on", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Used by", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Primary · position 1", StringComparison.Ordinal));
-        Assert.HasCount(2, rendered.FindAll("details"));
+        Assert.HasCount(2, rendered.FindAll(".entry-usage-grid details"));
 
-        await rendered.Find("[data-testid='entry-tab-versions']").ClickAsync(new());
+        await SelectEntry(rendered, "versions");
         Assert.IsTrue(rendered.Markup.Contains("Version 1", StringComparison.Ordinal));
         Assert.IsFalse(rendered.Markup.Contains("fabricated version history", StringComparison.Ordinal));
         Assert.HasCount(1, rendered.FindAll(".entry-version-card"));
@@ -224,27 +234,27 @@ public sealed class EntryAdministrationComponentTests
         var client = new FakeEntryAdministrationApiClient { EntryManagedByPack = true };
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
         var @namespace = new Agentstration.Resources.ResourceNamespace("agentstration.daily-life-assistant");
-        var rendered = context.Render<EntryEditor>(parameters => parameters
+        var rendered = await RenderEntry(context, parameters => parameters
             .Add(value => value.Name, "main")
             .Add(value => value.EntryNamespace, @namespace.Value));
 
         Assert.AreEqual(@namespace, client.RequestedNamespace);
-        Assert.HasCount(6, rendered.FindAll("[role='tab']"));
-        Assert.IsTrue(rendered.Markup.Contains("entry-tab-definition", StringComparison.Ordinal));
+        Assert.IsEmpty(rendered.FindAll("[role='tab']"));
+        Assert.IsTrue(rendered.FindComponent<ResourceNavigation>().Instance.Items.Any(item => item.Path == "definition/identity"));
         Assert.IsTrue(rendered.Markup.Contains("managed by its namespaced Pack source", StringComparison.Ordinal));
-        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+        await SelectEntry(rendered, "definition/configuration");
         Assert.IsTrue(rendered.Find("[data-testid='entry-definition-fields']").HasAttribute("disabled"));
         Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent.Contains("Save draft", StringComparison.Ordinal)));
         Assert.IsTrue(rendered.Markup.Contains("Prompt starters", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("Input schema", StringComparison.Ordinal));
-        await rendered.Find("[data-testid='entry-tab-yaml']").ClickAsync(new());
+        await SelectEntry(rendered, "yaml");
         var yamlEditor = rendered.Find("[data-testid='entry-yaml-editor'] textarea");
         Assert.IsTrue(yamlEditor.HasAttribute("readonly"));
-        Assert.IsTrue(yamlEditor.Closest(".entry-yaml-field") is not null);
+        Assert.IsTrue(yamlEditor.Closest(".resource-yaml-editor") is not null);
         Assert.IsFalse(rendered.FindAll("button").Any(value => value.TextContent.Contains("Save YAML", StringComparison.Ordinal)));
         var workplaceLink = rendered.FindAll("a").Single(value => value.TextContent.Contains("Use in Workplace", StringComparison.Ordinal));
         Assert.AreEqual("workspaces?entry=main&entryNamespace=agentstration.daily-life-assistant", workplaceLink.GetAttribute("href")?.TrimStart('/'));
-        await rendered.Find("[data-testid='entry-tab-usage']").ClickAsync(new());
+        await SelectEntry(rendered, "usage");
         Assert.AreEqual(@namespace, client.RequestedDependencyNamespace);
     }
 
@@ -254,18 +264,20 @@ public sealed class EntryAdministrationComponentTests
         using var context = CreateContext();
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
-        var rendered = context.Render<EntryEditor>(parameters => parameters
+        var rendered = await RenderEntry(context, parameters => parameters
             .Add(value => value.Name, "ask-agentstration")
             .Add(value => value.EntryNamespace, "agentstration.assistant"));
+        Assert.Contains("agentstration.assistant/router", rendered.Find(".resource-configuration-summary").TextContent);
+        Assert.DoesNotContain("default/router", rendered.Find(".resource-configuration-summary").TextContent);
 
-        await rendered.Find("[data-testid='entry-tab-definition']").ClickAsync(new());
+        await SelectEntry(rendered, "definition/configuration");
 
         Assert.IsFalse(rendered.Find("[data-testid='entry-definition-fields']").HasAttribute("disabled"));
         Assert.IsTrue(rendered.Markup.Contains("can be edited and published independently", StringComparison.Ordinal));
         Assert.IsFalse(rendered.Markup.Contains("managed by its namespaced Pack source", StringComparison.Ordinal));
         await rendered.Find("[data-testid='exposure-console']").ChangeAsync(new ChangeEventArgs { Value = true });
         await rendered.Find("[data-testid='console-fallback']").ChangeAsync(new ChangeEventArgs { Value = true });
-        await rendered.FindAll("button").Single(value => value.TextContent.Contains("Save draft", StringComparison.Ordinal)).ClickAsync(new());
+        await rendered.Find("#entry-resource-form").SubmitAsync();
 
         Assert.IsNotNull(client.SavedEntry);
         Assert.AreEqual(new Agentstration.Resources.ResourceNamespace("agentstration.assistant"), client.SavedNamespace);
@@ -436,14 +448,14 @@ public sealed class EntryAdministrationComponentTests
     }
 
     [TestMethod]
-    public void ClearingDescriptionKeepsTheSelectedBindingAndDoesNotPublishOrSaveImplicitly()
+    public async Task ClearingDescriptionKeepsTheSelectedBindingAndDoesNotPublishOrSaveImplicitly()
     {
         using var context = CreateContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var client = new FakeEntryAdministrationApiClient();
         context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
-        var editor = context.Render<EntryEditor>(parameters => parameters.Add(value => value.Name, "prepare-report"));
-        editor.WaitForElement("[data-testid='entry-tab-definition']").Click();
+        var editor = await RenderEntry(context, parameters => parameters.Add(value => value.Name, "prepare-report"));
+        await SelectEntry(editor, "definition/identity");
         editor.Find("[data-testid='entry-description']").Input("Unsaved description");
         var selected = editor.Find("[data-testid='target-resource']").GetAttribute("value");
         var description = editor.Find("[data-testid='entry-description']");
@@ -454,7 +466,7 @@ public sealed class EntryAdministrationComponentTests
         Assert.AreEqual(string.Empty, editor.Find("[data-testid='entry-description']").GetAttribute("value"));
         Assert.AreEqual(selected, editor.Find("[data-testid='target-resource']").GetAttribute("value"));
         Assert.IsNull(client.SavedEntry);
-        editor.Find("[data-testid='entry-save-draft']").Click();
+        await editor.Find("#entry-resource-form").SubmitAsync();
         editor.WaitForAssertion(() => Assert.IsNotNull(client.SavedEntry));
         var saved = client.SavedEntry;
         Assert.IsNotNull(saved);
@@ -462,6 +474,26 @@ public sealed class EntryAdministrationComponentTests
     }
 
     private static string ResourceName(string resourceId) => resourceId[(resourceId.LastIndexOf('/') + 1)..];
+
+    private static async Task<IRenderedComponent<EntryEditor>> RenderEntry(BunitContext context, Action<ComponentParameterCollectionBuilder<EntryEditor>> parameters)
+    {
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var navigation = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        navigation.Setup<string>("currentLocation", _ => true).SetResult("http://localhost/#overview");
+        foreach (var path in new[] { "overview", "definition/identity", "definition/configuration", "definition/presentation", "definition/fields", "definition/suggestions", "preview", "usage", "versions", "yaml" })
+            navigation.Setup<string>("navigate", call => call.Arguments[0] is string target && target.EndsWith("#" + path, StringComparison.Ordinal)).SetResult("http://localhost/#" + path);
+        var page = context.Render<EntryEditor>(parameters);
+        if (page.Instance.Name != "new")
+        {
+            foreach (var path in new[] { "definition/identity", "definition/configuration", "definition/presentation", "definition/fields", "definition/suggestions" })
+                await SelectEntry(page, path);
+            await SelectEntry(page, "overview");
+        }
+        return page;
+    }
+    private static Task SelectEntry(IRenderedComponent<EntryEditor> page, string path) => page.Instance.Name == "new"
+        ? page.InvokeAsync(() => page.FindComponent<CreationWizard>().Instance.GoToStepAsync(path.Replace("definition/", "", StringComparison.Ordinal)))
+        : page.InvokeAsync(() => page.FindComponent<ResourceNavigation>().Instance.NavigateSection(path));
 
     private static BunitContext CreateContext()
     {
@@ -490,6 +522,9 @@ public sealed class EntryAdministrationComponentTests
         public Agentstration.Resources.ResourceNamespace RequestedDependencyNamespace { get; private set; }
         public Agentstration.Resources.ResourceNamespace SavedNamespace { get; private set; }
         public EntryDraft? SavedEntry { get; private set; }
+        public EntryDraftResponse? EntryOverride { get; set; }
+        public Exception? ReadError { get; set; }
+        public Exception? SaveError { get; set; }
         public WorkplaceDashboardDraft? SavedDashboard { get; private set; }
         public IReadOnlyList<EntryDraftResponse> EntryDrafts { get; init; } = [];
         public IReadOnlyList<WorkplaceWorkspaceResponse>? Workspaces { get; init; }
@@ -504,6 +539,8 @@ public sealed class EntryAdministrationComponentTests
         public Task<EntryDraftResponse> GetEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
+            if (ReadError is not null) throw ReadError;
+            if (EntryOverride is not null) return Task.FromResult(EntryOverride);
             var published = PublishedEntry(name, @namespace);
             var draft = new EntryDraft
             {
@@ -523,7 +560,7 @@ public sealed class EntryAdministrationComponentTests
             };
             return Task.FromResult(new EntryDraftResponse(draft, published, EntryManagedByPack));
         }
-        public Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken) { SavedEntry = draft with { Revision = 2, UpdatedAt = Now }; return Task.FromResult(SavedEntry); }
+        public Task<EntryDraft> SaveEntryAsync(EntryDraft draft, CancellationToken cancellationToken) { SavedEntry = draft with { Revision = 2, UpdatedAt = Now }; if (SaveError is not null) throw SaveError; return Task.FromResult(SavedEntry); }
         public Task<EntryDraft> SaveEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, EntryDraft draft, CancellationToken cancellationToken) { SavedNamespace = @namespace; return SaveEntryAsync(draft, cancellationToken); }
         public Task<EntryValidationResponse> ValidateEntryAsync(string name, CancellationToken cancellationToken) => Task.FromResult(new EntryValidationResponse(true, []));
         public Task<EntryValidationResponse> ValidateEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken) => ValidateEntryAsync(name, cancellationToken);

@@ -1,152 +1,95 @@
 @page "/entries/{Name}"
 @page "/namespaces/{EntryNamespace}/entries/{Name}"
+@implements IDisposable
 @using Agentstration.Resources
 @rendermode InteractiveServer
 @inject IEntryAdministrationApiClient Client
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<PageTitle>@(IsNew ? T("CreateEntry") : displayName) · Agentstration</PageTitle>
-<PageHeader ScopeRef="selectedScope" Eyebrow="@T("WorkplaceEntry")" Title="@(IsNew ? T("CreateEntry") : displayName)" Description="@T("Entry.Description")">
-    <Actions>
-        @if (!IsNew && published is not null) { <a class="button-primary" href="@WorkspaceConfigurationUrl">@T("UseInWorkplace")</a> }
-        <a class="button-secondary" href="/entries">@T("BackToEntries")</a>
-    </Actions>
-</PageHeader>
-
-@if (loading)
+<UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+<PageTitle>@(IsNew ? T("CreateEntry") : saved?.Value.DisplayName ?? Name) · Agentstration</PageTitle>
+@{
+    var presentations = Presentations;
+    RenderFragment feedback = @<div>@if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="entry-message">@message</div> }
+        @if (newerEntry is not null) { <div class="form-alert form-alert-warning" role="status">@T("EntryRefreshDraftConflict")</div> }
+        @if (HasRawDraft && !sectionState.Is("yaml")) { <div class="form-alert form-alert-warning" role="status">@Shared["YamlConflict"]<button type="button" class="text-button" @onclick="DiscardYaml">@Shared["DiscardYaml"]</button></div> }
+        @if (validation is { IsValid: false }) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("ValidationIssues")</strong><ul>@foreach (var issue in validation.Issues) { <li><code>@issue.Code</code> — @issue.Message</li> }</ul></div> }
+        @if (!EntryResourceNamespace.IsDefault) { <p class="muted">@T(IsPackOwned ? "PackManagedEntryHelp" : "NamespacedEntryHelp")</p> }
+    </div>;
+    RenderFragment definition = @<ResourceDefinitionForm @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels" Id="entry-resource-form" FormName="entry-definition"
+        FieldsTestId="entry-definition-fields" data-interactive="@(interactive ? "true" : "false")" ReadOnly="@(!CanWrite)" Busy="busy" Disabled="HasRawDraft"
+        SectionState="@(IsNew ? null : sectionState)" Sections="presentations" SectionContent="@(IsNew ? null : DefinitionContent)" SectionRequested="ShowSection" InvalidInputChanged="value => invalidInput = value" OnValidSubmit="SaveAsync">
+        <ChildContent>@if (IsNew) { <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p><CreationWizard @ref="wizard" Steps="Steps" Busy="busy" OnFinish="FinishAsync" OnStepReady="StepReadyAsync" FinishLabel="@T("PublishPinnedVersion")" FinishTestId="entry-publish" /> }</ChildContent>
+    </ResourceDefinitionForm>;
+    RenderFragment yaml = @<ResourceYamlEditor Value="@rawYaml" ValueChanged="RawChanged" ReadOnly="@(!CanWrite)" Busy="busy" Error="@rawError" Label="@T("ResourceManifest")" />;
+}
+@if (IsNew)
 {
-    <LoadingState Message="@T("LoadingEntry")" />
+    <PageHeader Title="@T("CreateEntry")" Description="@T("Entry.Description")"><Actions><a class="button-secondary" href="@BackUrl">@T("BackToEntries")</a></Actions></PageHeader>
+    @if (loading) { <LoadingState Message="@T("LoadingEntry")" /> }
+    else if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RefreshAsync" /> }
+    else {
+        @feedback
+        <FormActions><button class="button-secondary" type="button" @onclick="ToggleYaml">@(sectionState.Is("yaml") ? T("EntryForm") : Shared["Yaml"])</button><button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@(busy || !CanWrite || HasRawDraft)" data-testid="entry-save-draft">@T("SaveDraft")</button>@ValidateActions</FormActions>
+        @if (sectionState.Is("yaml")) { <FormSection Title="@T("EntryYaml")" TestId="entry-yaml-editor">@yaml<FormActions>@YamlActions</FormActions></FormSection> }
+        <div hidden="@sectionState.Is("yaml")">@definition</div>
+    }
 }
 else
 {
-    <div class="entry-summary-bar" aria-label="@T("EntryStatus")" data-testid="entry-status" data-state="@(published is null ? "draft" : "published")">
-        @if (published is null)
-        {
-            <StatusBadge Text="@T("Draft")" Status="UiStatus.Info" />
-            <span>@T("Revision", draftRevision)</span>
-        }
-        else
-        {
-            <StatusBadge Text="@T("Published")" Status="UiStatus.Success" />
-            <span>@T("Version", published.Version)</span>
-        }
-    </div>
+    <ResourceDetailsTemplate Name="@(saved?.Value.DisplayName ?? Name)" ResourceType="@T("WorkplaceEntry")" Description="@saved?.Value.Description" TechnicalName="@(saved?.Value.Name ?? Name)" Namespace="@EntryResourceNamespace.Value" Domain="work" IconName="layout-grid"
+        ResourceIdentity="@($"{loadedKey}|{saved?.Value.WorkspaceId}")" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections"
+        LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" HasDraft="HasDraft" Busy="busy" DefinitionReadOnlyReason="ReadOnlyReason"
+        SelectionChanged="SelectSectionAsync" NavigationLabel="@T("EntrySections")" SectionTestIdPrefix="entry" TestId="resource-entry-editor" YamlTitle="@T("EntryYaml")" YamlDescription="@T(CanWrite ? "EntryYamlEditableHelp" : "EntryYamlReadOnlyHelp")">
+        <Metadata><div class="entry-summary-bar" aria-label="@T("EntryStatus")" data-testid="entry-status" data-state="@(published is null ? "draft" : "published")"><StatusBadge Text="@T(published is null ? "Draft" : "Published")" Status="@(published is null ? UiStatus.Neutral : UiStatus.Success)" /><span>@(published is null ? T("Revision", draftRevision) : T("Version", published.Version))</span></div></Metadata>
+        <PrimaryActions>@if (saved is not null && CanWrite) { <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(busy || loading || HasRawDraft)" data-testid="entry-publish">@T("PublishPinnedVersion")</button> }</PrimaryActions>
+        <Actions>@if (published is not null) { <a class="button-secondary" href="@WorkspaceConfigurationUrl">@T("UseInWorkplace")</a> }<a class="button-secondary" href="@BackUrl">@T("BackToEntries")</a></Actions>
+        <Feedback>@feedback</Feedback>
+        <OverviewMetrics>@if (saved is not null) { <MetricCard Label="@T("DraftRevision")" Value="@draftRevision.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("PublishedVersionLabel")" Value="@(published?.Version.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")" /><MetricCard Label="@T("PublishedDashboards")" Value="@(usageLoaded ? PublishedUsages.Count.ToString(System.Globalization.CultureInfo.CurrentCulture) : "—")" /> }</OverviewMetrics>
+        <IdentityDetails><dt>@T("EntryExecutionWorkspace")</dt><dd>@WorkspaceDisplayName</dd></IdentityDetails>
+        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
+        <DefinitionContent Context="path">@definition</DefinitionContent>
+        <AdditionalContent Context="path">@if (path == "preview") { @Preview } else if (path == "usage") { @Usage } else { @Versions }</AdditionalContent>
+        <YamlContent>@yaml</YamlContent>
+        <DraftActions><button type="button" class="button-secondary" disabled="@(busy || loading)" @onclick="Discard">@Shared["Discard"]</button>@if (sectionState.Is("yaml")) { <button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@(busy || loading)">@T("SaveYamlDraft")</button> } else { <button class="button-primary" type="submit" form="entry-resource-form" disabled="@(busy || loading || HasRawDraft)" data-testid="entry-save-draft">@T("SaveDraft")</button> }</DraftActions>
+    </ResourceDetailsTemplate>
+}
 
-    @if (!EntryResourceNamespace.IsDefault)
-    {
-        <p class="muted">@T(IsPackOwned ? "PackManagedEntryHelp" : "NamespacedEntryHelp")</p>
-    }
-
-    <div class="entry-tabs">
-        <ResourceTabs Label="@T("EntrySections")">
-            @foreach (var tab in AvailableTabs)
-            {
-                <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="entry-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@($"entry-tab-{tab.ToString().ToLowerInvariant()}")" @onclick="() => SelectTab(tab)">@TabLabel(tab)</button>
-            }
-        </ResourceTabs>
-    </div>
-
-    @if (!string.IsNullOrWhiteSpace(message))
-    {
-        <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="entry-message">@message</div>
-    }
-
-    <main id="entry-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-        @if (activeTab == EntryTab.Overview)
-        {
-            <section class="entry-overview-grid" aria-label="@T("EntryOverview")">
-                <article class="panel entry-overview-card">
-                    <p class="eyebrow">@T("Definition")</p>
-                    <h2>@T("EntrySummary")</h2>
-                    <dl class="entry-facts">
-                        <dt>@T("Status")</dt><dd>@T(published is null ? "Draft" : "Published")</dd>
-                        <dt>@T("DraftRevision")</dt><dd>@draftRevision</dd>
-                        <dt>@T("PublishedVersionLabel")</dt><dd>@(published?.Version.ToString() ?? T("NotPublished"))</dd>
-                        <dt>@T("Presentation")</dt><dd>@EnumLabel("Presentation", presentationKind)</dd>
-                    </dl>
-                </article>
-                <article class="panel entry-overview-card">
-                    <p class="eyebrow">@T("Execution")</p>
-                    <h2>@T("BindingAndResolution")</h2>
-                    <dl class="entry-facts">
-                        <dt>@T("Binding")</dt><dd>@EnumLabel("Binding", bindingKind)</dd>
-                        <dt>@T("Resource")</dt><dd>@BindingResourceName</dd>
-                        <dt>@T("ResolvedFlow")</dt><dd>@ResolvedFlowName</dd>
-                        <dt>@T("Strategy")</dt><dd>@(published is null ? T("PinnedOnPublication") : T("PinnedVersion", published.ResolvedTarget.Version))</dd>
-                    </dl>
-                </article>
-                <article class="panel entry-overview-card">
-                    <p class="eyebrow">@T("Usage")</p>
-                    <h2>@T("WorkplaceAvailability")</h2>
-                    <dl class="entry-facts">
-                        <dt>@T("PublishedDashboards")</dt><dd>@PublishedUsages.Count</dd>
-                        <dt>@T("PrimaryIn")</dt><dd>@PrimaryUsages.Count</dd>
-                        <dt>@T("Dashboards")</dt><dd>@UsageSummary</dd>
-                        <dt>@T("LastPublication")</dt><dd>@FormatDate(published?.PublishedAt)</dd>
-                    </dl>
-                </article>
-            </section>
-        }
-        else if (activeTab == EntryTab.Definition)
-        {
-            <div class="entry-definition-toolbar">
-                <div><p class="eyebrow">@T("Definition")</p><h2>@(IsPackOwned ? T("PackEntryDefinition") : T("DraftRevisionValue", draftRevision))</h2></div>
-                @if (IsPackOwned)
-                {
-                    <StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" />
-                }
-                else
-                {
-                    <div class="entry-primary-actions" aria-label="@T("EntryActions")">
-                        <button class="button-secondary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="entry-save-draft">@T("SaveDraft")</button>
-                        <button class="button-secondary" type="button" @onclick="ValidateAsync" disabled="@busy" data-testid="entry-validate">@T("Validate")</button>
-                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="entry-publish">@T("PublishPinnedVersion")</button>
-                    </div>
-                }
-            </div>
-
-            @if (validation is not null && !validation.IsValid)
-            {
-                <div class="form-alert form-alert-danger" role="alert"><strong>@T("ValidationIssues")</strong><ul>@foreach (var issue in validation.Issues) { <li><code>@issue.Code</code> — @issue.Message</li> }</ul></div>
-            }
-
-            <fieldset class="entry-definition-fields" disabled="@IsPackOwned" data-testid="entry-definition-fields" data-interactive="@(interactive ? "true" : "false")">
-
-            <FormSection Title="@T("Identity")" Eyebrow="@T("General")" TestId="entry-identity-section"><ChildContent>
-                <FormGrid>
-                    <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="resourceName" Policy="ResourceNamePolicy.Entry" IsNew="@IsNew" DisplayNameTestId="entry-display-name" TechnicalNameTestId="entry-name" />
-                    <ResourceScopeFormField ResourceKind="@EntryResourceKinds.Entry" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-                    <FormField Label="@T("Description")" Optional="true" Class="form-span-2"><ClearableText Multiline="true" @bind-Value="description" rows="2" data-testid="entry-description"></ClearableText></FormField>
-                </FormGrid>
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("EntryExposure")" Eyebrow="@T("Exposure")" Description="@T("EntryExposureHelp")"><ChildContent>
+@code {
+    private RenderFragment IdentityFields => @<FormSection Title="@T("Identity")" TestId="entry-identity-section"><FormGrid>
+        <ResourceIdentityFields DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)" TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)" Policy="ResourceNamePolicy.Entry" IsNew="IsNew" DisplayNameTestId="entry-display-name" TechnicalNameTestId="entry-name" />
+        <FormField Label="@Shared["Namespace"]"><ClearableText Value="@EntryResourceNamespace.Value" Disabled /></FormField>
+        <FormField Label="@T("EntryExecutionWorkspace")"><span class="resource-text">@WorkspaceDisplayName</span></FormField>
+        <FormField Label="@T("Description")" Optional Class="form-span-2"><ClearableText Multiline @bind-Value="model.Description" rows="3" data-testid="entry-description" /></FormField>
+    </FormGrid></FormSection>;
+    private RenderFragment EntryExposureFields => @<div class="resource-editor-view"><FormField Class="form-span-2" Label="@T("EntryExposure")"><ChildContent><FormSection Title="@T("EntryExposure")" Eyebrow="@T("Exposure")" Description="@T("EntryExposureHelp")"><ChildContent>
                 <div class="entry-toggle-list">
-                    <label class="entry-toggle"><FormCheckbox data-testid="exposure-workplace" @bind-Value="exposeWorkplace" /><span><strong>@T("Exposure.Workplace")</strong><small>@T("Exposure.Workplace.Help")</small></span></label>
+                    <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" data-testid="exposure-workplace" @bind-Value="model.ExposeWorkplace" /><span><strong>@T("Exposure.Workplace")</strong><small>@T("Exposure.Workplace.Help")</small></span></label>
                     <div class="entry-toggle-card" data-testid="exposure-console-card">
-                        <label class="entry-toggle"><FormCheckbox data-testid="exposure-console" @bind-Value="exposeConsole" /><span><strong>@T("Exposure.Console")</strong><small>@T("Exposure.Console.Help")</small></span></label>
-                        @if (exposeConsole)
+                        <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" data-testid="exposure-console" @bind-Value="model.ExposeConsole" /><span><strong>@T("Exposure.Console")</strong><small>@T("Exposure.Console.Help")</small></span></label>
+                        @if (model.ExposeConsole)
                         {
-                            <label class="entry-toggle entry-toggle-option"><FormCheckbox data-testid="console-fallback" @bind-Value="consoleFallback" /><span><strong>@T("ConsoleRole.Fallback")</strong><small>@T("ConsoleRole.Fallback.Help")</small></span></label>
+                            <label class="entry-toggle entry-toggle-option resource-enabled-toggle"><FormCheckbox role="switch" data-testid="console-fallback" @bind-Value="model.ConsoleFallback" /><span><strong>@T("ConsoleRole.Fallback")</strong><small>@T("ConsoleRole.Fallback.Help")</small></span></label>
                         }
                     </div>
                 </div>
-                @if (exposeWorkplace)
+                @if (model.ExposeWorkplace)
                 {
                     <div class="entry-toggle-list">
-                        <label class="entry-toggle"><FormCheckbox data-testid="placement-owning-space" @bind-Value="exposeOwningSpace" /><span><strong>@T("Placement.OwningSpace")</strong><small>@T("Placement.OwningSpace.Help")</small></span></label>
-                        <label class="entry-toggle"><FormCheckbox data-testid="placement-tenant-home" @bind-Value="exposeTenantHome" /><span><strong>@T("Placement.TenantHome")</strong><small>@T("Placement.TenantHome.Help")</small></span></label>
+                        <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" data-testid="placement-owning-space" @bind-Value="model.ExposeOwningSpace" /><span><strong>@T("Placement.OwningSpace")</strong><small>@T("Placement.OwningSpace.Help")</small></span></label>
+                        <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" data-testid="placement-tenant-home" @bind-Value="model.ExposeTenantHome" /><span><strong>@T("Placement.TenantHome")</strong><small>@T("Placement.TenantHome.Help")</small></span></label>
                     </div>
                 }
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("WorkplaceAppearance")" Eyebrow="@T("Presentation")" TestId="entry-appearance-section"><ChildContent>
+            </ChildContent></FormSection></ChildContent><Validation><ValidationMessage For="() => model.ExposeConsole" /><ValidationMessage For="() => model.ExposeOwningSpace" /></Validation></FormField></div>;
+    private RenderFragment WorkplaceAppearanceFields => @<div class="resource-editor-view"><FormSection Title="@T("WorkplaceAppearance")" Eyebrow="@T("Presentation")" TestId="entry-appearance-section"><ChildContent>
                 <FormGrid>
-                <FormField Label="@T("Presentation")"><ClearableSelect TValue="EntryPresentationKind" data-testid="presentation-kind" @bind-Value="presentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></ClearableSelect></FormField>
-                <FormField Label="@T("Placeholder")"><ClearableText @bind-Value="placeholder" data-testid="entry-placeholder" /></FormField>
+                <FormField Label="@T("Presentation")"><ClearableSelect TValue="EntryPresentationKind" data-testid="presentation-kind" @bind-Value="model.PresentationKind"><option value="Prompt">@T("Presentation.Prompt")</option><option value="Form">@T("Presentation.Form")</option></ClearableSelect></FormField>
+                <FormField Label="@T("Placeholder")"><ClearableText @bind-Value="model.Placeholder" data-testid="entry-placeholder" /></FormField>
                 <div class="form-span-2">
-                    <IconPicker @bind-Value="icon"
+                    <IconPicker @bind-Value="model.Icon"
                                 SelectedLabel="@T("SelectedIcon")"
                                 NoneLabel="@T("NoIcon")"
                                 ClearLabel="@T("ClearIcon")"
@@ -156,77 +99,72 @@ else
                                 NoResultsLabel="@T("NoIconsFound")"
                                 MoreResultsLabel="@T("MoreIconsAvailable")" />
                 </div>
-                <label class="entry-toggle"><FormCheckbox @bind-Value="allowAttachments" /><span>@T("AllowAttachments")</span></label>
-                <label class="entry-toggle"><FormCheckbox @bind-Value="allowVoiceInput" /><span>@T("AllowVoiceInput")</span></label>
+                <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.AllowAttachments" /><span>@T("AllowAttachments")</span></label>
+                <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.AllowVoiceInput" /><span>@T("AllowVoiceInput")</span></label>
                 </FormGrid>
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("InteractionPresentation")" Eyebrow="@T("ExecutionExperience")" Description="@T("InteractionHelp")" TestId="entry-interaction-section"><ChildContent>
+            </ChildContent></FormSection></div>;
+    private RenderFragment InteractionPresentationFields => @<div class="resource-editor-view"><FormSection Title="@T("InteractionPresentation")" Eyebrow="@T("ExecutionExperience")" Description="@T("InteractionHelp")" TestId="entry-interaction-section"><ChildContent>
                 <FormGrid>
-                    <FormField Label="@T("AgentIdentities")" Help="@T("ParticipantVisibilityHelp")"><ClearableSelect TValue="EntryParticipantVisibility" data-testid="participants-visibility" @bind-Value="participantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</ClearableSelect></FormField>
-                    <FormField Label="@T("Progress")"><ClearableSelect TValue="EntryProgressVisibility" data-testid="progress-visibility" @bind-Value="progressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@EnumLabel("Progress", value)</option> }</ClearableSelect></FormField>
-                    <FormField Label="@T("Task")"><ClearableSelect TValue="EntryTaskDisplay" data-testid="task-display" @bind-Value="taskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@EnumLabel("TaskDisplay", value)</option> }</ClearableSelect></FormField>
-                    <FormField Label="@T("Results")"><ClearableSelect TValue="EntryResultDisplay" data-testid="results-display" @bind-Value="resultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@EnumLabel("ResultDisplay", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("AgentIdentities")" Help="@T("ParticipantVisibilityHelp")"><ClearableSelect TValue="EntryParticipantVisibility" data-testid="participants-visibility" @bind-Value="model.ParticipantsVisibility">@foreach (var value in Enum.GetValues<EntryParticipantVisibility>()) { <option value="@value">@EnumLabel("Participants", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("Progress")"><ClearableSelect TValue="EntryProgressVisibility" data-testid="progress-visibility" @bind-Value="model.ProgressVisibility">@foreach (var value in Enum.GetValues<EntryProgressVisibility>()) { <option value="@value">@EnumLabel("Progress", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("Task")"><ClearableSelect TValue="EntryTaskDisplay" data-testid="task-display" @bind-Value="model.TaskDisplay">@foreach (var value in Enum.GetValues<EntryTaskDisplay>()) { <option value="@value">@EnumLabel("TaskDisplay", value)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("Results")"><ClearableSelect TValue="EntryResultDisplay" data-testid="results-display" @bind-Value="model.ResultDisplay">@foreach (var value in Enum.GetValues<EntryResultDisplay>()) { <option value="@value">@EnumLabel("ResultDisplay", value)</option> }</ClearableSelect></FormField>
                 </FormGrid>
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("InputSchema")" Eyebrow="@T("Fields")" TestId="entry-fields-section"><Actions><button class="button-secondary" data-testid="add-field" type="button" @onclick="AddField">@T("AddField")</button></Actions><ChildContent>
+            </ChildContent></FormSection></div>;
+    private RenderFragment InputSchemaFields => @<div class="resource-editor-view"><FormField Class="form-span-2" Label="@T("InputSchema")"><ChildContent><FormSection Title="@T("InputSchema")" Eyebrow="@T("Fields")" TestId="entry-fields-section"><Actions><button class="button-secondary" data-testid="add-field" type="button" @onclick="AddField">@T("AddField")</button></Actions><ChildContent>
                 <div class="entry-card-list">
-                    @for (var index = 0; index < fields.Count; index++)
+                    @for (var index = 0; index < model.Fields.Count; index++)
                     {
-                        var field = fields[index];
-                            <article class="entry-field-card" @key="field" data-testid="entry-field-card" data-field-index="@index">
-                            <header><div><strong>@FieldTitle(field)</strong><span>@EnumLabel("FieldType", field.Type)</span></div>@if (field.Primary) { <StatusBadge Text="@T("PrimaryInput")" Status="UiStatus.Info" /> }</header>
+                        var entryField = model.Fields[index];
+                            <article class="entry-field-card" @key="entryField" data-testid="entry-field-card" data-field-index="@index">
+                            <header><div><strong>@FieldTitle(entryField)</strong><span>@EnumLabel("FieldType", entryField.Type)</span></div>@if (entryField.Primary) { <StatusBadge Text="@T("PrimaryInput")" Status="UiStatus.Info" /> }</header>
                             <FormGrid>
-                                <FormField Label="@T("Name")"><ClearableText @bind-Value="field.Name" data-testid="entry-field-name" /></FormField>
-                                <FormField Label="@T("Label")"><ClearableText @bind-Value="field.Label" data-testid="entry-field-label" /></FormField>
-                                <FormField Label="@T("Description")" Optional="true"><ClearableText @bind-Value="field.Description" data-testid="entry-field-description" /></FormField>
-                                <FormField Label="@T("Placeholder")"><ClearableText @bind-Value="field.Placeholder" data-testid="entry-field-placeholder" /></FormField>
-                                <FormField Label="@T("Type")"><ClearableSelect TValue="EntryFieldType" @bind-Value="field.Type" data-testid="entry-field-type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</ClearableSelect></FormField>
-                                @if (field.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <FormField Label="@T("OptionsValueLabel")"><ClearableText @bind-Value="field.Options" /></FormField> }
+                                <FormField Label="@T("Name")"><ClearableText @bind-Value="entryField.Name" data-testid="entry-field-name" /></FormField>
+                                <FormField Label="@T("Label")"><ClearableText @bind-Value="entryField.Label" data-testid="entry-field-label" /></FormField>
+                                <FormField Label="@T("Description")" Optional="true"><ClearableText @bind-Value="entryField.Description" data-testid="entry-field-description" /></FormField>
+                                <FormField Label="@T("Placeholder")"><ClearableText @bind-Value="entryField.Placeholder" data-testid="entry-field-placeholder" /></FormField>
+                                <FormField Label="@T("Type")"><ClearableSelect TValue="EntryFieldType" @bind-Value="entryField.Type" data-testid="entry-field-type">@foreach (var type in Enum.GetValues<EntryFieldType>()) { <option value="@type">@EnumLabel("FieldType", type)</option> }</ClearableSelect></FormField>
+                                @if (entryField.Type is EntryFieldType.Choice or EntryFieldType.MultiChoice) { <FormField Label="@T("OptionsValueLabel")"><ClearableText @bind-Value="entryField.Options" /></FormField> }
                                 <div class="entry-toggle-group">
-                                    <label class="entry-toggle"><FormCheckbox @bind-Value="field.Required" data-testid="entry-field-required" /><span>@T("Required")</span></label>
-                                    <label class="entry-toggle"><input type="radio" name="primary-input" checked="@field.Primary" @onclick="() => SetPrimary(field)" data-testid="entry-field-primary" /><span>@T("PrimaryInput")</span></label>
+                                    <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="entryField.Required" data-testid="entry-field-required" /><span>@T("Required")</span></label>
+                                    <label class="entry-toggle resource-enabled-toggle"><input type="radio" name="primary-input" checked="@entryField.Primary" @onclick="() => SetPrimary(entryField)" data-testid="entry-field-primary" /><span>@T("PrimaryInput")</span></label>
                                 </div>
                                 <div class="entry-row-actions">
-                                    <button type="button" class="button-secondary" title="@T("MoveUp")" aria-label="@T("MoveFieldUp")" @onclick="() => MoveField(field, -1)" disabled="@(index == 0)">↑</button>
-                                    <button type="button" class="button-secondary" title="@T("MoveDown")" aria-label="@T("MoveFieldDown")" @onclick="() => MoveField(field, 1)" disabled="@(index == fields.Count - 1)">↓</button>
-                                    <button type="button" class="text-button entry-remove" @onclick="() => RemoveField(field)" disabled="@(fields.Count == 1)">@T("Remove")</button>
+                                    <button type="button" class="button-secondary" title="@T("MoveUp")" aria-label="@T("MoveFieldUp")" @onclick="() => MoveField(entryField, -1)" disabled="@(index == 0)">↑</button>
+                                    <button type="button" class="button-secondary" title="@T("MoveDown")" aria-label="@T("MoveFieldDown")" @onclick="() => MoveField(entryField, 1)" disabled="@(index == model.Fields.Count - 1)">↓</button>
+                                    <button type="button" class="text-button entry-remove" @onclick="() => RemoveField(entryField)" disabled="@(model.Fields.Count == 1)">@T("Remove")</button>
                                 </div>
                             </FormGrid>
                         </article>
                     }
                 </div>
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("BindingAndResolvedTarget")" Eyebrow="@T("Execution")" TestId="entry-binding-section"><ChildContent>
+            </ChildContent></FormSection></ChildContent><Validation><ValidationMessage For="() => model.Fields" /></Validation></FormField></div>;
+    private RenderFragment BindingAndResolvedTargetFields => @<div class="resource-editor-view"><FormSection Title="@T("BindingAndResolvedTarget")" Eyebrow="@T("Execution")" TestId="entry-binding-section"><ChildContent>
                 <FormGrid>
-                    <FormField Label="@T("TargetKind")"><ClearableSelect TValue="EntryBindingKind" data-testid="target-kind" Value="@bindingKind" ValueExpression="@(() => bindingKind)" ValueChanged="value => BindingKindChanged(new ChangeEventArgs { Value = value })"><option value="Agent">@T("Binding.Agent")</option><option value="Flow">@T("Flow")</option></ClearableSelect></FormField>
-                    <FormField Label="@T("TargetResource")"><ClearableSelect TValue="string" data-testid="target-resource" @bind-Value="resourceId"><option value="">@T("SelectTarget", EnumLabel("Binding", bindingKind))</option>@foreach (var resource in resources) { <option value="@ResourceKey(resource)">@resource.Name · @resource.ScopeRef · @resource.Namespace · @resource.Version · @resource.State</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("TargetKind")"><ClearableSelect TValue="EntryBindingKind" data-testid="target-kind" Value="@model.BindingKind" ValueExpression="@(() => model.BindingKind)" ValueChanged="value => BindingKindChanged(new ChangeEventArgs { Value = value })"><option value="Agent">@T("Binding.Agent")</option><option value="Flow">@T("Flow")</option></ClearableSelect></FormField>
+                    <FormField Required Label="@T("TargetResource")"><Validation><ValidationMessage For="() => model.ResourceId" /></Validation><ChildContent><ClearableSelect TValue="string" data-testid="target-resource" @bind-Value="model.ResourceId" @bind-Value:after="BindingSelectionChanged"><option value="">@T("SelectTarget", EnumLabel("Binding", model.BindingKind))</option>@if (SelectedResource is null && model.ResourceId.Length > 0) { <option value="@model.ResourceId">@model.ResourceId</option> }@foreach (var resource in resources) { <option value="@ResourceKey(resource)">@resource.Name · @resource.ScopeRef · @resource.Namespace · @resource.Version · @resource.State</option> }</ClearableSelect></ChildContent></FormField>
                 </FormGrid>
-                @if (bindingKind == EntryBindingKind.Agent) { <p class="resource-hint">@T("DirectAgentFlowHelp")</p> }
+                @if (model.BindingKind == EntryBindingKind.Agent) { <p class="resource-hint">@T("DirectAgentFlowHelp")</p> }
                 <div class="entry-resolution-grid">
-                    <article><h3>@T("DeclaredBinding")</h3><dl class="entry-facts"><dt>@T("Type")</dt><dd>@EnumLabel("Binding", bindingKind)</dd><dt>@T("Resource")</dt><dd>@BindingResourceName</dd><dt>@T("State")</dt><dd>@(SelectedResource?.State ?? T("NotSelected"))</dd>@if (SelectedModelProfile is not null) { <dt>@T("ModelProfile")</dt><dd>@SelectedModelProfile</dd> }</dl>@if (!string.IsNullOrWhiteSpace(resourceId)) { <details><summary>@T("ResourceId")</summary><code>@resourceId</code></details> }</article>
+                    <article><h3>@T("DeclaredBinding")</h3><dl class="entry-facts"><dt>@T("Type")</dt><dd>@EnumLabel("Binding", model.BindingKind)</dd><dt>@T("Resource")</dt><dd>@BindingResourceName</dd><dt>@T("State")</dt><dd>@(SelectedResource?.State ?? T("NotSelected"))</dd>@if (SelectedModelProfile is not null) { <dt>@T("ModelProfile")</dt><dd>@SelectedModelProfile</dd> }</dl>@if (!string.IsNullOrWhiteSpace(model.ResourceId)) { <details><summary>@T("ResourceId")</summary><code>@model.ResourceId</code></details> }</article>
                     <article><h3>@T("ResolvedTarget")</h3><dl class="entry-facts"><dt>@T("Flow")</dt><dd>@ResolvedFlowName</dd><dt>@T("VersionLabel")</dt><dd>@(published?.ResolvedTarget.Version ?? T("ResolvedOnPublication"))</dd><dt>@T("Strategy")</dt><dd>@T("Pinned")</dd></dl>@if (published is not null) { <details><summary>@T("FlowResourceId")</summary><code>@published.ResolvedTarget.FlowResourceId</code></details> }</article>
                 </div>
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("ConversationAndExecution")" Eyebrow="@T("Behavior")" TestId="entry-behavior-section"><ChildContent>
+            </ChildContent></FormSection></div>;
+    private RenderFragment ConversationAndExecutionFields => @<div class="resource-editor-view"><FormSection Title="@T("ConversationAndExecution")" Eyebrow="@T("Behavior")" TestId="entry-behavior-section"><ChildContent>
                 <div class="entry-behavior-layout">
-                    <FormField Label="@T("TaskCreation")"><ClearableSelect TValue="TaskCreationMode" @bind-Value="taskMode" data-testid="entry-task-mode"><option value="Automatic">@T("TaskCreation.Automatic")</option><option value="OnDemand">@T("TaskCreation.OnDemand")</option><option value="Never">@T("TaskCreation.Never")</option></ClearableSelect></FormField>
+                    <FormField Label="@T("TaskCreation")"><ClearableSelect TValue="TaskCreationMode" @bind-Value="model.TaskMode" data-testid="entry-task-mode"><option value="Automatic">@T("TaskCreation.Automatic")</option><option value="OnDemand">@T("TaskCreation.OnDemand")</option><option value="Never">@T("TaskCreation.Never")</option></ClearableSelect></FormField>
                     <div class="entry-toggle-list">
-                        <label class="entry-toggle"><FormCheckbox @bind-Value="allowConversation" data-testid="entry-allow-conversation" /><span><strong>@T("AllowConversation")</strong><small>@T("AllowConversationHelp")</small></span></label>
-                        <label class="entry-toggle"><FormCheckbox @bind-Value="streamResponse" data-testid="entry-stream-response" /><span><strong>@T("StreamResponse")</strong><small>@T("StreamResponseHelp")</small></span></label>
+                        <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.AllowConversation" data-testid="entry-allow-conversation" /><span><strong>@T("AllowConversation")</strong><small>@T("AllowConversationHelp")</small></span></label>
+                        <label class="entry-toggle resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.StreamResponse" data-testid="entry-stream-response" /><span><strong>@T("StreamResponse")</strong><small>@T("StreamResponseHelp")</small></span></label>
                     </div>
                 </div>
-            </ChildContent></FormSection>
-
-            <FormSection Title="@T("PromptStarters")" Eyebrow="@T("Suggestions")" TestId="entry-suggestions-section"><Actions><button class="button-secondary" type="button" @onclick="AddSuggestion" data-testid="entry-add-suggestion">@T("AddSuggestion")</button></Actions><ChildContent>
-                @if (suggestions.Count == 0) { <p class="entry-empty-copy">@T("NoPromptStarters")</p> }
+            </ChildContent></FormSection></div>;
+    private RenderFragment SuggestionsFields => @<div class="resource-editor-view"><FormField Class="form-span-2" Label="@T("PromptStarters")"><ChildContent><FormSection Title="@T("PromptStarters")" Eyebrow="@T("Suggestions")" TestId="entry-suggestions-section"><Actions><button class="button-secondary" type="button" @onclick="AddSuggestion" data-testid="entry-add-suggestion">@T("AddSuggestion")</button></Actions><ChildContent>
+                @if (model.Suggestions.Count == 0) { <p class="entry-empty-copy">@T("NoPromptStarters")</p> }
                 else
                 {
                     <div class="entry-card-list">
-                        @foreach (var suggestion in suggestions)
+                        @foreach (var suggestion in model.Suggestions)
                         {
                             <article class="entry-suggestion-card" @key="suggestion" data-testid="entry-suggestion-card">
                                 <div class="form-grid entry-suggestion-form">
@@ -248,18 +186,11 @@ else
                         }
                     </div>
                 }
-            </ChildContent></FormSection>
-            </fieldset>
-        }
-        else if (activeTab == EntryTab.Preview)
-        {
-            <FormSection Title="@T("WorkplaceRenderer")" Eyebrow="@T("Preview")" Description="@T("PreviewHelp")"><Actions><StatusBadge Text="@T("NoExecution")" Status="UiStatus.Info" /></Actions><ChildContent>
+            </ChildContent></FormSection></ChildContent><Validation><ValidationMessage For="() => model.Suggestions" /></Validation></FormField></div>;
+    private RenderFragment Preview => @<div><FormSection Title="@T("WorkplaceRenderer")" Eyebrow="@T("Preview")" Description="@T("PreviewHelp")"><Actions><StatusBadge Text="@T("NoExecution")" Status="UiStatus.Info" /></Actions><ChildContent>
                 <div class="entry-preview"><Agentstration.Workplace.Components.EntryRenderer Definition="PreviewDefinition" OnSubmit="PreviewSubmitted" Disabled="true" /></div>
-            </ChildContent></FormSection>
-        }
-        else if (activeTab == EntryTab.Usage)
-        {
-            <section class="entry-usage-grid">
+            </ChildContent></FormSection></div>;
+    private RenderFragment Usage => @<div>@if (!usageLoaded) { <ErrorState Message="@T("EntryUsageUnavailable")" /><button class="button-secondary" type="button" @onclick="RefreshAsync">@Shared["RefreshResource"]</button> } else { <section class="entry-usage-grid">
                 <article class="panel form-section">
                     <div class="panel-header"><div><p class="eyebrow">@T("DependsOn")</p><h2>@T("ExecutionResources")</h2></div><StatusBadge Text="@dependencies.Count.ToString()" Status="UiStatus.Neutral" /></div>
                     @if (dependencies.Count == 0) { <p class="entry-empty-copy">@T("DependenciesAfterPublication")</p> }
@@ -270,185 +201,17 @@ else
                     @if (PublishedUsages.Count == 0) { <p class="entry-empty-copy">@T("NotUsedByDashboard")</p> }
                     else { <div class="entry-card-list">@foreach (var usage in PublishedUsages) { var reference = UsageReference(usage)!; <article class="entry-usage-card"><CollectionIdentity DisplayName="@usage.Published!.DisplayName" Name="@usage.Published.Id.Value" IconName="layout-grid" /><span>@EnumLabel("Role", reference.Role) · @T("Position", reference.Order + 1)</span><details><summary>@T("DashboardResourceId")</summary><code>@usage.Published.Id.Value</code></details></article> }</div> }
                 </article>
-            </section>
-        }
-        else if (activeTab == EntryTab.Versions)
-        {
-            <FormSection Title="@T("PublishedEntry")" Eyebrow="@T("Versions")"><ChildContent>
+            </section> }</div>;
+    private RenderFragment Versions => @<div><FormSection Title="@T("PublishedEntry")" Eyebrow="@T("Versions")"><ChildContent>
                 @if (published is null) { <p class="entry-empty-copy">@T("NoPublishedVersion")</p> }
                 else
                 {
                     <article class="entry-version-card"><div><StatusBadge Text="@T("Published")" Status="UiStatus.Success" /><strong>@T("Version", published.Version)</strong><span>@T("PublishedAt", FormatDate(published.PublishedAt))</span></div><dl class="entry-facts"><dt>@T("Binding")</dt><dd>@PublishedBindingSummary</dd><dt>@T("ResolvedFlow")</dt><dd>@FriendlyResourceName(published.ResolvedTarget.FlowResourceId)</dd><dt>@T("FlowVersion")</dt><dd>@published.ResolvedTarget.Version · @T("PinnedLower")</dd></dl><details><summary>@T("ResolvedFlowResourceId")</summary><code>@published.ResolvedTarget.FlowResourceId</code></details></article>
                 }
-            </ChildContent></FormSection>
-        }
-        else
-        {
-            <FormSection Title="@T("EntryYaml")" Eyebrow="@T("RawResource")" Description="@T(IsPackOwned ? "EntryYamlReadOnlyHelp" : "EntryYamlEditableHelp")" TestId="entry-yaml-editor"><Actions>@if (IsPackOwned) { <StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /> }</Actions><ChildContent>
-                @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-                @if (IsPackOwned)
-                {
-                    <FormField Class="entry-yaml-field" Label="@T("ResourceManifest")"><ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" ReadOnly="true" Value="@rawYaml"></ClearableText></FormField>
-                }
-                else
-                {
-                    <FormField Label="@T("ResourceManifest")" Class="entry-yaml-field"><ChildContent><ClearableText Multiline="true" class="form-code-editor runner-json" rows="30" @bind-Value="rawYaml"></ClearableText></ChildContent></FormField>
-                    <FormActions><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy">@(busy ? T("Saving") : T("SaveYamlDraft"))</button></FormActions>
-                }
-            </ChildContent></FormSection>
-        }
-    </main>
-}
-
-@code {
-    [Parameter] public string Name { get; set; } = "new";
-    [Parameter] public string? EntryNamespace { get; set; }
-    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
-    private static readonly EntryTab[] Tabs = Enum.GetValues<EntryTab>();
-    private static readonly EntryTab[] NamespacedTabs = [EntryTab.Overview, EntryTab.Definition, EntryTab.Preview, EntryTab.Usage, EntryTab.Versions, EntryTab.Yaml];
-    private bool IsNew => string.Equals(Name, "new", StringComparison.OrdinalIgnoreCase);
-    private ResourceNamespace EntryResourceNamespace => string.IsNullOrWhiteSpace(EntryNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(EntryNamespace);
-    private bool IsPackOwned => managedByPack;
-    private IReadOnlyList<EntryTab> AvailableTabs => EntryResourceNamespace.IsDefault ? Tabs : NamespacedTabs;
-    private bool loading = true, busy, hasError, managedByPack;
-    private bool interactive;
-    private long draftRevision = 1;
-    private string resourceName = "", displayName = "", description = "", placeholder = "Ask Agentstration", icon = "", resourceId = "", message = "";
-    private ResourceScopeRef? selectedScope;
-    private string rawYaml = "";
-    private string? rawError;
-    private EntryTab activeTab = EntryTab.Overview;
-    private EntryBindingKind bindingKind = EntryBindingKind.Agent;
-    private EntryPresentationKind presentationKind = EntryPresentationKind.Prompt;
-    private EntryParticipantVisibility participantsVisibility = EntryParticipantVisibility.Hidden;
-    private EntryProgressVisibility progressVisibility = EntryProgressVisibility.Compact;
-    private EntryTaskDisplay taskDisplay = EntryTaskDisplay.Auto;
-    private EntryResultDisplay resultDisplay = EntryResultDisplay.Auto;
-    private TaskCreationMode taskMode = TaskCreationMode.Automatic;
-    private bool allowConversation = true, streamResponse = true, allowAttachments, allowVoiceInput, rawPublish;
-    private bool exposeWorkplace = true, exposeConsole, exposeOwningSpace = true, exposeTenantHome, consoleFallback;
-    private readonly List<EditorField> fields = [new() { Name = "request", Label = "Request", Type = EntryFieldType.Prompt, Required = true, Primary = true }];
-    private readonly List<EditorSuggestion> suggestions = [];
-    private EntryResource? published;
-    private EntryBinding? publishedBinding;
-    private EntryValidationResponse? validation;
-    private IReadOnlyList<ResourcePickerItem> resources = [];
-    private IReadOnlyList<EntryDependencyResponse> dependencies = [];
-    private IReadOnlyList<WorkplaceWorkspaceResponse> workspaces = [];
-    private IReadOnlyList<WorkplaceDashboardDraftResponse> dashboards = [];
-    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private string EnumLabel<TValue>(string group, TValue value) where TValue : struct, Enum => T($"{group}.{value}");
-    private ResourcePickerItem? SelectedResource => resources.FirstOrDefault(value => ResourceKey(value) == resourceId) ?? resources.FirstOrDefault(value => value.ResourceId == resourceId);
-    private string? SelectedModelProfile => SelectedResource?.Details?.GetValueOrDefault("modelProfile");
-    private string BindingResourceName => SelectedResource?.Name ?? (string.IsNullOrWhiteSpace(resourceId) ? T("NotSelected") : FriendlyResourceName(resourceId));
-    private string ResolvedFlowName => published is null ? T("ResolvedOnPublication") : FriendlyResourceName(published.ResolvedTarget.FlowResourceId);
-    private IReadOnlyList<WorkplaceDashboardDraftResponse> PublishedUsages => dashboards.Where(value => UsageReference(value) is not null).ToArray();
-    private IReadOnlyList<WorkplaceDashboardDraftResponse> PrimaryUsages => PublishedUsages.Where(value => UsageReference(value)?.Role == DashboardItemRole.Primary).ToArray();
-    private string UsageSummary => PublishedUsages.Count == 0 ? T("NotUsed") : string.Join(", ", PublishedUsages.Take(3).Select(value => value.Published!.DisplayName));
-    private string WorkspaceConfigurationUrl => $"/workspaces?entry={Uri.EscapeDataString(EntryIdValue)}&entryNamespace={Uri.EscapeDataString(EntryResourceNamespace.Value)}";
-    private string PublishedBindingSummary => publishedBinding is null ? T("NotRetained") : $"{EnumLabel("Binding", publishedBinding.Kind)} · {FriendlyResourceName(publishedBinding.ResourceId)}";
-    private EntryResource PreviewDefinition => new() { WorkspaceId = CurrentWorkspaceId, Id = new(string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName), Name = string.IsNullOrWhiteSpace(resourceName) ? "preview" : resourceName, DisplayName = string.IsNullOrWhiteSpace(displayName) ? "Entry preview" : displayName, Description = description, Presentation = Presentation(), Exposure = Exposure(), ResolvedTarget = published?.ResolvedTarget ?? new("preview", "1.0.0"), Behavior = Behavior() };
-
-    protected override async Task OnInitializedAsync()
-    {
-        if (!IsNew)
-        {
-            var response = await Client.GetEntryAsync(EntryResourceNamespace, Name, default); var draft = response.Value; published = response.Published; managedByPack = response.ManagedByPack; rawPublish = published is not null; publishedBinding = draft.PublishedBinding; draftRevision = draft.Revision;
-            resourceName = draft.Name; displayName = draft.DisplayName; description = draft.Description ?? ""; placeholder = draft.Presentation.Placeholder ?? ""; icon = draft.Presentation.Icon ?? ""; presentationKind = draft.Presentation.Kind; participantsVisibility = draft.Presentation.Participants.Visibility; progressVisibility = draft.Presentation.Progress.Visibility; taskDisplay = draft.Presentation.Task.Display; resultDisplay = draft.Presentation.Results.Display; bindingKind = draft.Binding.Kind; resourceId = BindingKey(draft.Binding); taskMode = draft.Behavior.TaskCreationMode; allowConversation = draft.Behavior.AllowConversation; streamResponse = draft.Behavior.StreamResponse; allowAttachments = draft.Presentation.AllowAttachments; allowVoiceInput = draft.Presentation.AllowVoiceInput;
-            exposeWorkplace = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = draft.Exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = draft.Exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome); consoleFallback = draft.Exposure.Console.Role == EntryConsoleRole.Fallback;
-            fields.Clear(); fields.AddRange(draft.Presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));
-            suggestions.Clear(); suggestions.AddRange(draft.Presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
-            dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, Name, default);
-        }
-        await LoadDashboardUsagesAsync();
-        await LoadResourcesAsync();
-        if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = EntryTab.Definition;
-        else if (string.Equals(View, "yaml", StringComparison.OrdinalIgnoreCase)) { PrepareRawYaml(); activeTab = EntryTab.Yaml; }
-        loading = false;
-    }
-
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (!firstRender) return;
-        interactive = true;
-        StateHasChanged();
-    }
-
-    private void SelectTab(EntryTab tab) { if (tab == EntryTab.Yaml) PrepareRawYaml(); activeTab = tab; message = ""; }
-    private static string TabId(EntryTab tab) => $"entry-tab-{tab.ToString().ToLowerInvariant()}";
-    private string TabLabel(EntryTab tab) => T($"Tab.{tab}");
-    private DashboardEntryReference? UsageReference(WorkplaceDashboardDraftResponse dashboard) => dashboard.Published?.Entries.FirstOrDefault(value => value.EntryResourceId == new EntryId(EntryIdValue, EntryResourceNamespace));
-    private async Task LoadDashboardUsagesAsync()
-    {
-        workspaces = await Client.GetWorkspacesAsync(default);
-        var values = new List<WorkplaceDashboardDraftResponse>();
-        foreach (var workspace in workspaces) values.AddRange(await Client.GetDashboardsAsync(workspace.Name, default));
-        dashboards = values;
-    }
-    private string EntryIdValue => resourceName;
-    private string FormatDate(DateTimeOffset? value) => value is null || value == default ? T("NotPublished") : value.Value.LocalDateTime.ToString("g");
-    private static string FriendlyResourceName(string value) => value[(value.LastIndexOf('/') + 1)..];
-    private string FriendlyRelationship(string value) => value == "ResolvedTarget" ? T("ResolvedTarget") : value;
-    private string FieldTitle(EditorField field) => string.IsNullOrWhiteSpace(field.Label) ? (string.IsNullOrWhiteSpace(field.Name) ? T("UntitledField") : field.Name) : field.Label;
-    private async Task BindingKindChanged(ChangeEventArgs args) { bindingKind = Enum.Parse<EntryBindingKind>(args.Value?.ToString() ?? "Agent"); resourceId = ""; await LoadResourcesAsync(); }
-    private async Task LoadResourcesAsync() { resources = await Client.GetResourcesAsync(bindingKind, default); var selected = SelectedResource; if (selected is not null) resourceId = ResourceKey(selected); }
-    private static string ResourceKey(ResourcePickerItem resource) => resource.ScopeRef is null
-        ? $"{resource.Namespace.Value}:{resource.ResourceId}"
-        : $"{resource.ScopeRef.Value.Value}|{resource.Namespace.Value}|{resource.ResourceId}";
-    private static string BindingKey(EntryBinding binding) => binding.ScopeRef is null
-        ? binding.ResourceId
-        : $"{binding.ScopeRef.Value.Value}|{(binding.Namespace ?? ResourceNamespace.Default).Value}|{binding.ResourceId}";
-    private void AddField() => fields.Add(new EditorField { Name = $"field{fields.Count + 1}", Label = T("NewField"), Type = EntryFieldType.Text, Primary = fields.Count == 0 });
-    private void RemoveField(EditorField field) { fields.Remove(field); if (fields.Count > 0 && fields.All(value => !value.Primary)) fields[0].Primary = true; }
-    private void SetPrimary(EditorField field) { foreach (var value in fields) value.Primary = ReferenceEquals(value, field); }
-    private void MoveField(EditorField field, int offset) { var index = fields.IndexOf(field); var target = index + offset; if (index < 0 || target < 0 || target >= fields.Count) return; fields.RemoveAt(index); fields.Insert(target, field); }
-    private void AddSuggestion() => suggestions.Add(new EditorSuggestion { Label = T("Suggestion"), Value = "" });
-    private void RemoveSuggestion(EditorSuggestion suggestion) => suggestions.Remove(suggestion);
-    private EntryPresentation Presentation() => new() { Kind = presentationKind, Placeholder = NullIfWhiteSpace(placeholder), Icon = NullIfWhiteSpace(icon), AllowAttachments = allowAttachments, AllowVoiceInput = allowVoiceInput, Participants = new(participantsVisibility), Progress = new(progressVisibility), Task = new(taskDisplay), Results = new(resultDisplay), Fields = fields.Select((value, index) => new EntryFieldDefinition { Name = value.Name.Trim(), Label = NullIfWhiteSpace(value.Label), Description = NullIfWhiteSpace(value.Description), Placeholder = NullIfWhiteSpace(value.Placeholder), Type = value.Type, Required = value.Required, Role = value.Primary ? EntryFieldRole.PrimaryInput : EntryFieldRole.Standard, Order = index, Options = ParseOptions(value.Options), DefaultValue = value.DefaultValue, Validation = value.Validation ?? (value.Type is EntryFieldType.Prompt or EntryFieldType.Text or EntryFieldType.Textarea or EntryFieldType.Conversation ? new EntryFieldValidation(1, 10_000) : null) }).ToArray(), Suggestions = suggestions.Where(value => !string.IsNullOrWhiteSpace(value.Label) && !string.IsNullOrWhiteSpace(value.Value)).Select(value => new EntrySuggestion(value.Label.Trim(), value.Value.Trim())).ToArray() };
-    private static IReadOnlyList<EntryFieldOption> ParseOptions(string options) => options.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(value => { var parts = value.Split(':', 2, StringSplitOptions.TrimEntries); return new EntryFieldOption(parts[0], parts.Length == 2 ? parts[1] : parts[0]); }).ToArray();
-    private EntryBehavior Behavior() => new(taskMode, allowConversation, streamResponse, new EntryConversationBehavior(allowConversation));
-    private EntryExposure Exposure() => new()
-    {
-        Surfaces = Enum.GetValues<EntryExposureSurface>().Where(value => value switch { EntryExposureSurface.Workplace => exposeWorkplace, EntryExposureSurface.Console => exposeConsole, _ => false }).ToArray(),
-        WorkplacePlacements = exposeWorkplace
-            ? Enum.GetValues<EntryWorkplacePlacement>().Where(value => value switch { EntryWorkplacePlacement.OwningSpace => exposeOwningSpace, EntryWorkplacePlacement.TenantHome => exposeTenantHome, _ => false }).ToArray()
-            : [],
-        Console = new(exposeConsole && consoleFallback ? EntryConsoleRole.Fallback : EntryConsoleRole.Standard)
-    };
-    private Agentstration.Resources.WorkspaceId CurrentWorkspaceId => new(workspaces.FirstOrDefault()?.Id ?? published?.WorkspaceId.Value ?? Guid.Empty);
-    private EntryDraft Draft() => new() { WorkspaceId = CurrentWorkspaceId, Id = new(EntryIdValue, EntryResourceNamespace), Name = resourceName.Trim(), DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Presentation = Presentation(), Exposure = Exposure(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace, SelectedResource?.ScopeRef), PublishedBinding = publishedBinding, Behavior = Behavior(), Revision = draftRevision };
-    private RawEntryResource RawResource() => new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = EntryResourceKinds.Entry, Metadata = new() { Name = resourceName.Trim() }, Definition = new() { DisplayName = displayName.Trim(), Description = NullIfWhiteSpace(description), Presentation = Presentation(), Exposure = Exposure(), Binding = new(bindingKind, SelectedResource?.ResourceId ?? resourceId, SelectedResource?.Namespace, SelectedResource?.ScopeRef), Behavior = Behavior(), Publish = rawPublish } };
-    private void PrepareRawYaml() { rawError = null; try { rawYaml = ResourceManifestSerializer.ToYaml(RawResource()); } catch (Exception exception) { rawError = exception.Message; } }
-    private bool ApplyRawYaml()
-    {
-        rawError = null;
-        try
-        {
-            var manifest = ResourceManifestSerializer.FromYaml<RawEntryResource>(rawYaml);
-            if (!string.Equals(manifest.ApiVersion, ResourceApiVersions.CoreV1, StringComparison.Ordinal)) throw new ArgumentException(T("ApiVersionRequired", ResourceApiVersions.CoreV1));
-            if (!string.Equals(manifest.Kind, EntryResourceKinds.Entry, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", EntryResourceKinds.Entry));
-            if (!IsNew && !string.Equals(manifest.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("EntryNameImmutable"));
-            resourceName = manifest.Metadata.Name; displayName = manifest.Definition.DisplayName ?? manifest.Metadata.Name; description = manifest.Definition.Description ?? "";
-            var presentation = manifest.Definition.Presentation; presentationKind = presentation.Kind; placeholder = presentation.Placeholder ?? ""; icon = presentation.Icon ?? ""; allowAttachments = presentation.AllowAttachments; allowVoiceInput = presentation.AllowVoiceInput; participantsVisibility = presentation.Participants.Visibility; progressVisibility = presentation.Progress.Visibility; taskDisplay = presentation.Task.Display; resultDisplay = presentation.Results.Display;
-            var exposure = manifest.Definition.Exposure; exposeWorkplace = exposure.Surfaces.Contains(EntryExposureSurface.Workplace); exposeConsole = exposure.Surfaces.Contains(EntryExposureSurface.Console); exposeOwningSpace = exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.OwningSpace); exposeTenantHome = exposure.WorkplacePlacements.Contains(EntryWorkplacePlacement.TenantHome); consoleFallback = exposure.Console.Role == EntryConsoleRole.Fallback;
-            fields.Clear(); fields.AddRange(presentation.Fields.Select(value => new EditorField { Name = value.Name, Label = value.Label ?? "", Description = value.Description ?? "", Placeholder = value.Placeholder ?? "", Type = value.Type, Required = value.Required, Primary = value.Role == EntryFieldRole.PrimaryInput, Options = string.Join(", ", value.Options.Select(option => $"{option.Value}:{option.Label}")), DefaultValue = value.DefaultValue, Validation = value.Validation }));
-            suggestions.Clear(); suggestions.AddRange(presentation.Suggestions.Select(value => new EditorSuggestion { Label = value.Label, Value = value.Value }));
-            bindingKind = manifest.Definition.Binding.Kind; resourceId = BindingKey(manifest.Definition.Binding); taskMode = manifest.Definition.Behavior.TaskCreationMode; allowConversation = manifest.Definition.Behavior.AllowConversation; streamResponse = manifest.Definition.Behavior.StreamResponse; rawPublish = manifest.Definition.Publish;
-            rawYaml = ResourceManifestSerializer.ToYaml(RawResource()); message = T("YamlApplied"); return true;
-        }
-        catch (Exception exception) { rawError = exception.Message; return false; }
-    }
-    private async Task SaveRawAsync() { if (!ApplyRawYaml()) return; if (rawPublish) await PublishAsync(); else await SaveAsync(); }
-    private static string? NullIfWhiteSpace(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private async Task SaveAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(EntryResourceNamespace, Draft(), default); draftRevision = saved.Revision; publishedBinding = saved.PublishedBinding; message = T("EntryDraftSaved", saved.Revision); if (IsNew) Navigation.NavigateTo($"/entries/{saved.Name}", forceLoad: true); }); }
-    private async Task ValidateAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(EntryResourceNamespace, Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(EntryResourceNamespace, resourceName, default); message = T(validation.IsValid ? "EntryValid" : "ValidationFoundErrors"); hasError = !validation.IsValid; }); }
-    private async Task PublishAsync() { await ExecuteAsync(async () => { var saved = await Client.SaveEntryAsync(EntryResourceNamespace, Draft(), default); draftRevision = saved.Revision; validation = await Client.ValidateEntryAsync(EntryResourceNamespace, resourceName, default); if (!validation.IsValid) { hasError = true; message = T("ResolveValidationErrors"); return; } published = await Client.PublishEntryAsync(EntryResourceNamespace, resourceName, default); publishedBinding = saved.Binding; dependencies = await Client.GetDependenciesAsync(EntryResourceNamespace, resourceName, default); await LoadDashboardUsagesAsync(); message = T("EntryPublished", published.Version, published.ResolvedTarget.Version); }); }
-    private async Task ExecuteAsync(Func<Task> action) { busy = true; hasError = false; message = ""; try { await action(); } catch (Exception exception) { hasError = true; message = exception.Message; } finally { busy = false; } }
-    private Task PreviewSubmitted(IReadOnlyDictionary<string, JsonElement> _) => Task.CompletedTask;
-    private enum EntryTab { Overview, Definition, Preview, Usage, Versions, Yaml }
-    private sealed class EditorField { public string Name { get; set; } = ""; public string Label { get; set; } = ""; public string Description { get; set; } = ""; public string Placeholder { get; set; } = ""; public string Options { get; set; } = ""; public EntryFieldType Type { get; set; } public bool Required { get; set; } public bool Primary { get; set; } public JsonElement? DefaultValue { get; set; } public EntryFieldValidation? Validation { get; set; } }
-    private sealed class EditorSuggestion { public string Label { get; set; } = ""; public string Value { get; set; } = ""; }
-    private sealed record RawEntryMetadata { public required string Name { get; init; } }
-    private sealed record RawEntryDefinition { public string? DisplayName { get; init; } public string? Description { get; init; } public required EntryPresentation Presentation { get; init; } public EntryExposure Exposure { get; init; } = new(); public required EntryBinding Binding { get; init; } public EntryBehavior Behavior { get; init; } = new(); public bool Publish { get; init; } }
-    private sealed record RawEntryResource { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required RawEntryMetadata Metadata { get; init; } public required RawEntryDefinition Definition { get; init; } }
+            </ChildContent></FormSection></div>;
+    private RenderFragment ConfigurationFields => @<div class="resource-editor-view">@EntryExposureFields @BindingAndResolvedTargetFields @ConversationAndExecutionFields</div>;
+    private RenderFragment PresentationFields => @<div class="resource-editor-view">@WorkplaceAppearanceFields @InteractionPresentationFields</div>;
+    private RenderFragment ValidateActions => @<button type="button" class="button-secondary" @onclick="ValidateAsync" disabled="@(busy || loading || HasRawDraft)" data-testid="entry-validate">@T("Validate")</button>;
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><CollectionView TItem="ConfigurationEntry" Items="DraftConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Value") })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("Value")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></FormSection>;
+    private RenderFragment YamlActions => @<text>@if (CanWrite) { <button class="button-secondary" type="button" @onclick="ApplyRawAsync" disabled="@busy">@T("ApplyToForm")</button>@if (IsNew) { <button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy">@T("SaveYamlDraft")</button> } }</text>;
 }

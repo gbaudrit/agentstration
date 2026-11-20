@@ -33,4 +33,24 @@
 <data name="AgentIdentities"><value>Identité des agents</value></data>
 <data name="ParticipantVisibilityHelp"><value>Masqués présente un seul assistant Agentstration et garde les participants du handoff privés.</value></data>
 <data name="Exposure"><value>Exposition</value></data><data name="EntryExposure"><value>Surfaces et emplacement</value></data><data name="EntryExposureHelp"><value>Choisissez où cette entrée publiée peut être présentée. Son Workspace propriétaire et sa frontière d’exécution ne changent jamais.</value></data><data name="Exposure.Workplace"><value>Workplace</value></data><data name="Exposure.Workplace.Help"><value>Autoriser cette entrée sur les surfaces Workplace destinées aux utilisateurs.</value></data><data name="Exposure.Console"><value>Console</value></data><data name="Exposure.Console.Help"><value>Autoriser cette entrée sur les surfaces de l’assistant Console.</value></data><data name="ConsoleRole.Fallback"><value>Fallback des commandes</value></data><data name="ConsoleRole.Fallback.Help"><value>Proposer cette entrée lorsque la recherche Console ne trouve aucune page, commande ou ressource.</value></data><data name="Placement.OwningSpace"><value>Espace propriétaire</value></data><data name="Placement.OwningSpace.Help"><value>Présenter l’entrée dans l’espace du Workspace qui la possède.</value></data><data name="Placement.TenantHome"><value>Accueil du Tenant</value></data><data name="Placement.TenantHome.Help"><value>Promouvoir l’entrée sur l’accueil du Tenant pour les utilisateurs autorisés.</value></data>
+<data name="EntryForm" xml:space="preserve"><value>Formulaire</value></data>
+<data name="EntryPreview" xml:space="preserve"><value>Aperçu de l’entrée</value></data>
+<data name="EntryRequestLabel" xml:space="preserve"><value>Demande</value></data>
+<data name="EntryExecutionWorkspace" xml:space="preserve"><value>Espace d’exécution</value></data>
+<data name="EntryRefreshDraftConflict" xml:space="preserve"><value>Une entrée enregistrée plus récente est disponible. Vos saisies de formulaire et YAML sont conservées jusqu’à leur abandon explicite.</value></data>
+<data name="EntryDraftInvalid" xml:space="preserve"><value>Corrigez cette section avant d’enregistrer l’entrée ({0}).</value></data>
+<data name="EntryFieldsInvalid" xml:space="preserve"><value>Corrigez la configuration invalide des champs de saisie.</value></data>
+<data name="EntryUsageUnavailable" xml:space="preserve"><value>Les dépendances et utilisations dans les tableaux de bord n’ont pas pu être chargées. Leurs nombres sont inconnus.</value></data>
+<data name="EntryValidation.entry_id_invalid" xml:space="preserve"><value>Utilisez 1 à 128 lettres, chiffres, tirets ou traits de soulignement, en commençant par une lettre ou un chiffre.</value></data>
+<data name="EntryValidation.entry_binding_invalid" xml:space="preserve"><value>Sélectionnez un Agent ou un Flow cible avec un nom technique valide.</value></data>
+<data name="EntryValidation.entry_exposure_surfaces_invalid" xml:space="preserve"><value>Sélectionnez au moins une surface d’exposition prise en charge.</value></data>
+<data name="EntryValidation.entry_workplace_placement_required" xml:space="preserve"><value>Sélectionnez au moins un emplacement pour l’exposition Workplace.</value></data>
+<data name="EntryValidation.entry_field_duplicate" xml:space="preserve"><value>Les noms des champs de saisie doivent être uniques.</value></data>
+<data name="EntryValidation.entry_field_name_required" xml:space="preserve"><value>Donnez un nom technique à chaque champ de saisie.</value></data>
+<data name="EntryValidation.entry_primary_input_required" xml:space="preserve"><value>Sélectionnez exactement un champ de saisie principal.</value></data>
+<data name="EntryValidation.entry_field_options_required" xml:space="preserve"><value>Renseignez au moins une option pour chaque champ de choix.</value></data>
+<data name="EntryValidation.entry_field_options_invalid" xml:space="preserve"><value>Les options de choix nécessitent des valeurs et des libellés non vides et uniques.</value></data>
+<data name="EntryValidation.entry_field_options_not_supported" xml:space="preserve"><value>Seuls les champs Choice et MultiChoice prennent en charge des options.</value></data>
+<data name="EntryValidation.entry_field_validation_invalid" xml:space="preserve"><value>La longueur minimale d’un champ ne peut pas dépasser son maximum.</value></data>
+<data name="EntryValidation.entry_suggestions_invalid" xml:space="preserve"><value>Les suggestions nécessitent des libellés non vides et uniques ainsi que des valeurs non vides.</value></data>
 </root>
