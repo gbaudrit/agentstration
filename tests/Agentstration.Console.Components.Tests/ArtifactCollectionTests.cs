@@ -75,16 +75,24 @@ public sealed class ArtifactCollectionTests
     [TestMethod]
     public async Task ReplacedOperationalWorkspaceRejectsLateMetadataAndInspectRevocationClearsBothCollections()
     {
-        var pending = new TaskCompletionSource<HttpResponseMessage>();
+        var pending = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var provider = new WorkspaceProvider();
-        using var handler = new Handler((call, staged) => call is 3 or 4 ? pending.Task : Task.FromResult(Response(call <= 2 ? 1 : 2, staged)));
+        using var handler = new Handler(async (call, staged) =>
+        {
+            if (call is 3 or 4)
+            {
+                await pending.Task;
+                return new HttpResponseMessage(HttpStatusCode.Forbidden);
+            }
+            return Response(call <= 2 ? 1 : 2, staged);
+        });
         using var context = Context(handler, provider);
         var cut = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
         var refresh = cut.Find("[data-testid=resource-artifacts-refresh]").ClickAsync(new());
         provider.WorkspaceId = Guid.NewGuid();
         await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
         cut.WaitForAssertion(() => Assert.HasCount(2, cut.FindAll("[data-testid=durable-artifact-row]")));
-        pending.SetResult(new(HttpStatusCode.Forbidden));
+        pending.SetResult(true);
         await refresh;
         Assert.HasCount(2, cut.FindAll("[data-testid=durable-artifact-row]"));
         provider.Permissions = new HashSet<string> { AuthorizationPermissions.ResourcesRead };

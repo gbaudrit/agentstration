@@ -345,7 +345,11 @@ export class SourceLifecyclePage {
     await this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave).click();
     await expect(this.page).toHaveURL(/\/data-sources\/new(?:[?#]|$)/);
     await expect(this.page.locator('[data-wizard-step=configuration]')).toHaveAttribute('aria-current', 'step');
-    await editor.locator('[data-schema-path="$.artifactId"] input').fill(this.fixture.artifactIds[index]);
+    await expect(endpoint).toBeFocused();
+    const artifact = editor.locator('[data-schema-path="$.artifactId"] input');
+    await artifact.fill(this.fixture.artifactIds[index]);
+    await artifact.blur();
+    await expect(artifact).toHaveValue(this.fixture.artifactIds[index]);
     await endpoint.fill(`https://example.test/lifecycle/${index}`);
     await endpoint.blur();
     await expect(this.page.getByTestId(TestIds.schemaDrivenSources.dataSourceSave)).toBeEnabled();

@@ -203,7 +203,9 @@ export class SchemaDrivenSourcesPage {
   private async createKnowledgeSource(consoleUrl: string, scopeRef: string, dataSourceName: string, knowledgeSourceName: string,
     transformationFlow: string, projectionFlow: string): Promise<void> {
     await this.open(`${consoleUrl}/knowledge-sources/new`, TestIds.schemaDrivenSources.knowledgeSourceEditor);
-    await this.page.locator('[data-wizard-step=configuration]').click();
+    const configurationStep = this.page.locator('[data-wizard-step=configuration]');
+    await configurationStep.click();
+    await expect(configurationStep).toHaveAttribute('aria-current', 'step');
     await selectContaining(this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceProjectionFlow), projectionFlow);
     const binding = this.page.getByTestId(TestIds.schemaDrivenSources.knowledgeSourceBinding).first();
     await binding.getByRole('textbox').first().fill('origin');
@@ -314,6 +316,7 @@ export class SchemaDrivenSourcesPage {
   private async open(url: string, marker: string): Promise<void> {
     const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Schema-driven source route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
   }
 
