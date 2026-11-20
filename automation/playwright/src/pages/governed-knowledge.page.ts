@@ -250,8 +250,13 @@ export class GovernedKnowledgePage {
       await new LoginPage(reader).signIn(consoleUrl, userName, password);
       await new ConsoleAdministrationPage(reader).restoreLanguage(consoleUrl, locale);
       await reader.goto(this.toolsUrl(consoleUrl, restricted, scope));
+      await selectResourceSection(reader, 'tools');
       await reader.getByTestId(TestIds.governedKnowledge.exposure).getByRole('button', { name: text.publishExposure, exact: true }).click();
-      await expect(reader.locator('.form-alert-danger[role="status"]')).toContainText(/403|Forbidden/i);
+      const denied = reader.getByRole('alert');
+      await expect(denied.getByRole('heading', { name: text.accessDenied, exact: true })).toBeVisible();
+      await expect(denied).toContainText(text.resourceForbidden);
+      await expect(reader.getByTestId(TestIds.governedKnowledge.exposure)).toHaveCount(0);
+      await expect(reader.locator('.resource-details-navigation')).toHaveCount(0);
       await status(await reader.request.post(this.url(consoleUrl, `/api/knowledgesources/${restricted}/tool-exposure`, scope), {
         data: { version: '1.0.0' },
       }), 403);
