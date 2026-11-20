@@ -24,4 +24,12 @@
   <data name="Observed.Disabled"><value>Disabled</value></data><data name="Observed.NeverFetched"><value>Never fetched</value></data><data name="Observed.Fresh"><value>Fresh</value></data><data name="Observed.Stale"><value>Stale</value></data><data name="Observed.RefreshFailed"><value>Refresh failed</value></data><data name="Observed.Invalid"><value>Invalid</value></data><data name="Observed.NoCompatibleCatalog"><value>No compatible shard</value></data><data name="Observed.PolicyDenied"><value>Policy denied</value></data><data name="Observed.Recovered"><value>Recovered</value></data>
   <data name="Outcome.Succeeded"><value>Succeeded</value></data><data name="Outcome.NotModified"><value>Not modified</value></data><data name="Outcome.Unavailable"><value>Unavailable</value></data><data name="Outcome.Invalid"><value>Invalid</value></data><data name="Outcome.NoCompatibleCatalog"><value>No compatible shard</value></data><data name="Outcome.Disabled"><value>Disabled</value></data><data name="Outcome.PolicyDenied"><value>Policy denied</value></data><data name="Trigger.Manual"><value>Manual</value></data><data name="Trigger.Scheduled"><value>Scheduled</value></data>
   <data name="List.SnapshotHelp"><value>Shows up to 1,000 configured registries. This bounded snapshot has no global search, filters or pagination.</value></data>
+  <data name="Editor.Generation" xml:space="preserve"><value>Generation</value></data>
+  <data name="Editor.RefreshDraftConflict" xml:space="preserve"><value>The saved registration changed. Your pending edits are retained until you discard them.</value></data>
+  <data name="Editor.RetainedCredential" xml:space="preserve"><value>Saved credential reference is unavailable</value></data>
+  <data name="Editor.TrustUnavailable" xml:space="preserve"><value>Registry origin evidence could not be loaded.</value></data>
+  <data name="Editor.HistoryUnavailable" xml:space="preserve"><value>Refresh history could not be loaded.</value></data>
+  <data name="Editor.DetailsUnavailable" xml:space="preserve"><value>The registry details do not match this registration.</value></data>
+  <data name="Editor.OperationUnconfirmed" xml:space="preserve"><value>The operation could not be confirmed. Your pending edits are retained.</value></data>
+  <data name="Editor.UnknownState" xml:space="preserve"><value>Unknown</value></data>
 </root>
