@@ -254,9 +254,9 @@ public partial class MainLayout
             StateHasChanged();
             selfReference = DotNetObjectReference.Create(this);
             if (EnableCommandPalette)
-                commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
+                commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", cancellationToken, selfReference);
             cancellationToken.ThrowIfCancellationRequested();
-            navigationTooltipRegistration = await navigationTooltipModule.InvokeAsync<IJSObjectReference>("registerCollapsedNavigationTooltips", shellElement);
+            navigationTooltipRegistration = await navigationTooltipModule.InvokeAsync<IJSObjectReference>("registerCollapsedNavigationTooltips", cancellationToken, shellElement);
             cancellationToken.ThrowIfCancellationRequested();
             CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language);
         }
@@ -474,7 +474,6 @@ public partial class MainLayout
             if (navigationTooltipModule is not null) await navigationTooltipModule.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
-        catch (OperationCanceledException) { }
         selfReference?.Dispose();
         GC.SuppressFinalize(this);
     }

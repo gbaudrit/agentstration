@@ -1,5 +1,4 @@
 export function attachCtrlWheelZoom(element, dotNetReference) {
-    if (!element?.isConnected) return { dispose() {} };
     let pendingDelta = 0;
     let animationFrame = 0;
 
@@ -7,7 +6,7 @@ export function attachCtrlWheelZoom(element, dotNetReference) {
         animationFrame = 0;
         const delta = pendingDelta;
         pendingDelta = 0;
-        if (delta !== 0 && element.isConnected) {
+        if (delta !== 0) {
             void dotNetReference.invokeMethodAsync('ApplyCtrlWheelZoom', delta);
         }
     };

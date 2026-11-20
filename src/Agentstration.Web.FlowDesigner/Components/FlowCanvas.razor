@@ -38,9 +38,6 @@
     private DotNetObjectReference<FlowCanvas>? dotNetReference;
     private IJSObjectReference? canvasModule;
     private IJSObjectReference? wheelRegistration;
-    private Task? canvasInitialization;
-    private bool disposed;
-    private readonly CancellationTokenSource lifetimeCancellation = new();
     private FlowNodeInteractionContext nodeInteractions = default!;
     private int ZoomPercent => (int)Math.Round(diagram.Zoom * 100);
 
@@ -142,27 +139,13 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (disposed) return;
         TryFit();
         if (!firstRender) return;
-        canvasInitialization = InitializeCanvasAsync(lifetimeCancellation.Token);
-        await canvasInitialization;
-    }
 
-    private async Task InitializeCanvasAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            canvasModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import", cancellationToken, "./_content/Agentstration.Web.FlowDesigner/js/flow-canvas.js?v=20261120-1");
-            cancellationToken.ThrowIfCancellationRequested();
-            dotNetReference = DotNetObjectReference.Create(this);
-            // Retain a late registration so disposal can release its browser handler.
-            wheelRegistration = await canvasModule.InvokeAsync<IJSObjectReference>("attachCtrlWheelZoom", canvasElement, dotNetReference);
-            cancellationToken.ThrowIfCancellationRequested();
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (JSDisconnectedException) when (disposed) { }
+        canvasModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Agentstration.Web.FlowDesigner/js/flow-canvas.js?v=20261005-1");
+        dotNetReference = DotNetObjectReference.Create(this);
+        wheelRegistration = await canvasModule.InvokeAsync<IJSObjectReference>("attachCtrlWheelZoom", canvasElement, dotNetReference);
     }
 
     public void Center()
@@ -178,7 +161,7 @@
     [JSInvokable]
     public void ApplyCtrlWheelZoom(double deltaY)
     {
-        if (disposed || deltaY == 0) return;
+        if (deltaY == 0) return;
         SetZoom(diagram.Zoom + (deltaY < 0 ? 0.15 : -0.15));
     }
 
@@ -370,9 +353,6 @@
 
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return;
-        disposed = true;
-        await lifetimeCancellation.CancelAsync();
         diagram.PointerEnter -= PreviewEnter;
         diagram.PointerLeave -= PreviewLeave;
         diagram.PointerMove -= RefreshPreview;
@@ -395,7 +375,6 @@
 
         try
         {
-            if (canvasInitialization is not null) await canvasInitialization;
             if (wheelRegistration is not null)
                 await wheelRegistration.InvokeVoidAsync("dispose");
             if (wheelRegistration is not null)
@@ -407,11 +386,6 @@
         {
             // The browser circuit can close before the component is disposed.
         }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            dotNetReference?.Dispose();
-            lifetimeCancellation.Dispose();
-        }
+        dotNetReference?.Dispose();
     }
 }

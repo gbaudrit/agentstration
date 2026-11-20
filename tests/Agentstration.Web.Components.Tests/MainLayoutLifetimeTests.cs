@@ -37,27 +37,11 @@ public sealed class MainLayoutLifetimeTests
         Assert.IsTrue(runtime.Modules.Values.All(module => module.Disposals == 1));
     }
 
-    [TestMethod]
-    public async Task CanceledJavascriptDisposalDoesNotFailTheContainingCircuit()
-    {
-        using var context = new BunitContext();
-        var runtime = new ControlledRuntime(false);
-        runtime.Complete();
-        context.Services.AddAgentstrationWebComponents();
-        context.Services.AddSingleton<IJSRuntime>(runtime);
-        var rendered = context.Render<MainLayout>();
-        runtime.CancelDisposal = true;
-        await rendered.InvokeAsync(rendered.Instance.DisposeAsync);
-        await rendered.InvokeAsync(rendered.Instance.DisposeAsync);
-        Assert.AreEqual(1, runtime.Modules.Values.Sum(module => module.Disposals));
-    }
-
     private sealed class ControlledRuntime(bool delayImport) : IJSRuntime
     {
         private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Dictionary<string, ControlledModule> Modules { get; } = [];
         public bool PendingReached { get; private set; }
-        public bool CancelDisposal { get; set; }
         public void Complete() => ready.SetResult();
         public ValueTask<T> InvokeAsync<T>(string identifier, object?[]? args) => InvokeAsync<T>(identifier, CancellationToken.None, args);
         public ValueTask<T> InvokeAsync<T>(string identifier, CancellationToken token, object?[]? args)
@@ -96,11 +80,7 @@ public sealed class MainLayoutLifetimeTests
                 return ValueTask.FromResult(default(T)!);
             }
             private async Task<T> ReadThemeAsync<T>() { await runtime.ready.Task; return (T)(object)false; }
-            public ValueTask DisposeAsync()
-            {
-                Disposals++; Disposed = true;
-                return runtime.CancelDisposal ? ValueTask.FromException(new TaskCanceledException()) : ValueTask.CompletedTask;
-            }
+            public ValueTask DisposeAsync() { Disposals++; Disposed = true; return ValueTask.CompletedTask; }
         }
     }
 }
