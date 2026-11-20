@@ -9,7 +9,9 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
 
 <PageTitle>@Localizer["Title"]</PageTitle>
-<PageHeader Title="@Localizer["Title"]" Description="@Localizer["Description"]" />
+<PageHeader Title="@Localizer["Title"]" Eyebrow="@Localizer["Startup"]" Description="@Localizer["Description"]">
+    <Status>@if (snapshot is not null) { <StatusBadge Text="@Localizer[snapshot.State == "failed" ? "Failed" : "Running"]" Status="@(snapshot.State == "failed" ? UiStatus.Danger : UiStatus.Info)" /> }</Status>
+</PageHeader>
 
 @if (denied)
 {
@@ -25,8 +27,14 @@ else
     <StepProgress Steps="@Steps" ActiveStepId="@snapshot.ActiveStepId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
         <HeaderContent>
             <div class="startup-progress-summary" role="status">
-                <strong>@Localizer[snapshot.State == "failed" ? "Failed" : "Running"]</strong>
-                <span>@Localizer["StepCount", snapshot.Steps.Count(step => step.State is "succeeded" or "skipped"), snapshot.Steps.Count]</span>
+                <div class="startup-progress-summary-heading">
+                    <span class="startup-progress-summary-icon" aria-hidden="true"><UiIcon Name="@(snapshot.State == "failed" ? "alert-triangle" : "cloud-upload")" /></span>
+                    <div><strong>@Localizer[snapshot.State == "failed" ? "Failed" : "Running"]</strong><p>@Localizer["CurrentStage", Localizer["Stage_" + snapshot.ActiveStepId].Value]</p></div>
+                </div>
+                <div class="startup-progress-completion">
+                    <span>@Localizer["StepCount", CompletedSteps, snapshot.Steps.Count]</span>
+                    <progress value="@CompletedSteps" max="@snapshot.Steps.Count" aria-label="@Localizer["StepCount", CompletedSteps, snapshot.Steps.Count]"></progress>
+                </div>
             </div>
         </HeaderContent>
     </StepProgress>
@@ -41,6 +49,7 @@ else
     private bool following = true, denied, disconnected;
     private Task? polling;
 
+    private int CompletedSteps => snapshot?.Steps.Count(step => step.State is "succeeded" or "skipped") ?? 0;
     private IReadOnlyList<ProgressStep> Steps => snapshot!.Steps.Select(step => new ProgressStep(
         step.Id, Localizer["Stage_" + step.Id].Value, step.State switch
         {
@@ -77,7 +86,11 @@ else
             var current = await Client.GetAsync(stopping.Token);
             if (snapshot is not null && snapshot.AttemptId != current.AttemptId) { selected = null; following = true; }
             snapshot = current; disconnected = denied = false;
-            if (current.Ready) Navigation.NavigateTo(BootstrapStartupNavigation.LocalReturnUrl(ReturnUrl).TrimStart('/'), replace: true);
+            if (current.Ready)
+            {
+                var destination = BootstrapStartupNavigation.LocalReturnUrl(ReturnUrl);
+                Navigation.NavigateTo(destination == "/" ? Navigation.BaseUri : destination.TrimStart('/'), replace: true);
+            }
         }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { snapshot = null; denied = true; }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)

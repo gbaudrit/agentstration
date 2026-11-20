@@ -3,12 +3,6 @@
   <data name="Brand" xml:space="preserve">
     <value>Agentstration</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrateur</value>
-  </data>
-  <data name="SignOut" xml:space="preserve">
-    <value>Se déconnecter</value>
-  </data>
   <data name="Title" xml:space="preserve">
     <value>Initialisation de l’instance</value>
   </data>
@@ -110,5 +104,23 @@
   </data>
   <data name="GateConnectionLostDescription" xml:space="preserve">
     <value>L’instance est momentanément injoignable. Réessayez.</value>
+  </data>
+  <data name="Startup" xml:space="preserve">
+    <value>Démarrage</value>
+  </data>
+  <data name="CurrentStage" xml:space="preserve">
+    <value>Étape actuelle : {0}</value>
+  </data>
+  <data name="WaitingForDependency" xml:space="preserve">
+    <value>En attente d’une dépendance requise</value>
+  </data>
+  <data name="DependencyUnresolved" xml:space="preserve">
+    <value>Dépendance requise non résolue</value>
+  </data>
+  <data name="ResourceOutcomes" xml:space="preserve">
+    <value>Ressources traitées</value>
+  </data>
+  <data name="DependencyFailureDescription" xml:space="preserve">
+    <value>Une dépendance requise n’a pas pu être résolue.</value>
   </data>
 </root>

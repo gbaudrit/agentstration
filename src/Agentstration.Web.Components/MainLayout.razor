@@ -37,8 +37,12 @@
             }
         </nav>
         <a class="sidebar-footer" href="/" aria-label="@T("OpenPlatformHealth")">
-            <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatusLabel" Status="@PlatformStatus.Status" />
-            @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>@T("RequiresAttention")</small> }
+            @if (StatusContent is not null) { @StatusContent }
+            else
+            {
+                <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatusLabel" Status="@PlatformStatus.Status" />
+                @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>@T("RequiresAttention")</small> }
+            }
         </a>
     </aside>
 
@@ -48,7 +52,7 @@
                 <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="@T("ToggleNavigation")" aria-expanded="@(!Navigation.IsSidebarCollapsed)" data-testid="console-sidebar-toggle">☰</button>
                 <nav class="breadcrumb" aria-label="@T("CurrentContext")" data-testid="console-breadcrumb"><span>@CurrentContextPath</span><span>/</span><strong>@CurrentSection</strong></nav>
             </div>
-            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")" data-testid="console-command-trigger">
+            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" disabled="@(!EnableCommandPalette)" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")" data-testid="console-command-trigger">
                 <UiIcon Name="search" /><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
             </button>
             <div class="topbar-actions">

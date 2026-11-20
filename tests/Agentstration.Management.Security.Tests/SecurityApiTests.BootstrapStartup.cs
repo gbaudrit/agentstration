@@ -54,10 +54,14 @@ public sealed partial class SecurityApiTests
         using var overview = await administrator.GetAsync("/?source=login");
         Assert.AreEqual(HttpStatusCode.Redirect, overview.StatusCode);
         Assert.AreEqual(BootstrapStartupNavigation.ProgressUrl("/?source=login"), overview.Headers.Location?.OriginalString);
+        using var direct = await administrator.GetAsync("/agents/assistant?tab=overview");
+        Assert.AreEqual(HttpStatusCode.Redirect, direct.StatusCode);
+        Assert.AreEqual(BootstrapStartupNavigation.ProgressUrl("/agents/assistant?tab=overview"), direct.Headers.Location?.OriginalString);
         using var repair = await newAdmin.GetAsync("/api/extensionregistrations");
         Assert.AreEqual(HttpStatusCode.OK, repair.StatusCode);
         using var memberRepair = await member.GetAsync("/api/extensionregistrations");
         Assert.AreEqual(HttpStatusCode.Forbidden, memberRepair.StatusCode);
+        newAdmin.DefaultRequestHeaders.Accept.ParseAdd("text/html");
         using var tools = await newAdmin.GetAsync("/api/tools");
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, tools.StatusCode);
 

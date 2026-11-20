@@ -240,7 +240,8 @@ public sealed class ConsoleHostTests
         var progress = await client.GetStringAsync("/startup/progress?ReturnUrl=%2F");
         StringAssert.Contains(progress, "bootstrap-startup-progress");
         StringAssert.Contains(progress, "Bootstrap in progress");
-        Assert.IsFalse(progress.Contains("console-sidebar", StringComparison.Ordinal));
+        StringAssert.Contains(progress, "console-sidebar");
+        Assert.IsFalse(progress.Contains("bootstrap-startup-header", StringComparison.Ordinal));
         startup.Ready = true;
         using var ready = await client.GetAsync("/");
         Assert.AreEqual(HttpStatusCode.OK, ready.StatusCode);

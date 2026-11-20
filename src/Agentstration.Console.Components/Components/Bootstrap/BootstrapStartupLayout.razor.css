@@ -1,8 +1,0 @@
-.bootstrap-startup-shell { display: block; min-height: 100vh; background: var(--bg, #f3f6fb); color: var(--text, #102039); }
-.bootstrap-startup-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1rem 2rem; border-bottom: 1px solid var(--border, #d7e2f4); background: var(--surface, #fff); }
-.bootstrap-startup-brand, .bootstrap-startup-session { display: flex; align-items: center; gap: 1rem; }
-.bootstrap-startup-brand { color: inherit; text-decoration: none; font-size: 1.25rem; }
-.bootstrap-startup-brand img { width: 2rem; height: 2rem; object-fit: contain; }
-.bootstrap-startup-session { flex-wrap: wrap; font-size: .9rem; }
-.bootstrap-startup-main { max-width: 1280px; margin: auto; padding: 2.5rem 1.5rem; }
-@media (max-width: 40rem) { .bootstrap-startup-header { padding: 1rem; } .bootstrap-startup-main { padding: 1.5rem 1rem; } }

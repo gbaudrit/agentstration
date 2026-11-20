@@ -13,8 +13,7 @@ internal sealed class BootstrapStartupAdmissionMiddleware(RequestDelegate next)
         {
             await next(context); return;
         }
-        var browser = HttpMethods.IsGet(context.Request.Method)
-            && context.Request.GetTypedHeaders().Accept?.Any(value => value.MediaType.Value == "text/html" && value.Quality != 0) == true;
+        var browser = BootstrapAdministrationAccess.IsConsoleNavigation(context.Request);
         var path = context.Request.Path;
         if (context.User.Identity?.IsAuthenticated == true)
         {

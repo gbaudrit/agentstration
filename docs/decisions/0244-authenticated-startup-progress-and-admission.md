@@ -72,3 +72,14 @@ model or changes an operator's resource decisions.
   its own process health is not authority readiness.
 - Browser smoke remains required now. The new reusable journey #1251 stays deferred
   until explicit maintainer UX validation and implementation merge.
+
+## Presentation follow-up — 2026-11-20
+
+The maintainer requested reuse of the existing Console frame after reviewing the
+first page. The Bootstrap layout adapter now renders MainLayout rather than its
+own header/shell. Generic status-content and section-title slots preserve the
+standard navigation, context, preferences and session actions without starting
+operational dashboard reads. The command palette can be disabled by the adapter
+while its underlying destinations remain fenced. The shared layout has no
+Bootstrap contract or orchestration dependency. This presentation refinement
+preserves the admission, observation and readiness decisions above.

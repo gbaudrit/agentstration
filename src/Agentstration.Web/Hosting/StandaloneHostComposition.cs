@@ -192,7 +192,8 @@ internal static class StandaloneHostCompositionExtensions
                 && string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/api/aep/enrollments/announce", StringComparison.OrdinalIgnoreCase);
             if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement
                 && !(startup.AdministrationReady && (BootstrapAdministrationAccess.IsAdministrationPath(context.Request.Path)
-                    || BootstrapAdministrationAccess.IsLoginOrAsset(context.Request.Path))))
+                    || BootstrapAdministrationAccess.IsLoginOrAsset(context.Request.Path)
+                    || BootstrapAdministrationAccess.IsConsoleNavigation(context.Request))))
             {
                 await Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable,
                     extensions: new Dictionary<string, object?> { ["code"] = "bootstrap_initializing" }).ExecuteAsync(context);

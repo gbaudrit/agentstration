@@ -14,7 +14,8 @@ an initially empty model catalog, then the exact `qwen3:1.7b` model. No live mod
 weights, cloud account, Docker or inference is involved. Generated credentials and
 shared keys stay in temporary fixture storage and are not included here.
 
-Chromium, 1440×1000/fr-FR and 390×844/en-US, reduced motion enabled.
+Chromium, 1440×1000/fr-FR and 390×844/en-US, light/dark themes and reduced motion.
+The updated captures use the existing Console MainLayout, not a separate application frame.
 
 ## Observations
 
@@ -35,8 +36,17 @@ Chromium, 1440×1000/fr-FR and 390×844/en-US, reduced motion enabled.
 - The authorized provider-configuration repair link opens the actual provider
   page even after failure. The logout link opens the existing confirmation page;
   submitting it returns to login.
-- Mobile cards stack without document overflow; the brand mark remains 32px.
-  No browser page errors were observed during the success path.
+- The existing Console sidebar, context selector, theme and session actions remain
+  present. A custom status slot prevents operational dashboard reads during startup;
+  the command palette is temporarily disabled. Direct HTML navigation to an Agent
+  route returns to progress, while API execution remains fenced.
+- Native stage progress, shared status badges and metric cards present real phase
+  completion and outcomes; no global work-completion percentage is invented.
+- Light/dark preference changes work while pending. Mobile cards stack without
+  document overflow; the menu and context selector do not overlap, and the sidebar
+  health footer stays hidden in the mobile navigation bar. The root transition
+  also works with the standard Console context-preservation handler.
+- No browser page errors were observed during the success path.
 
 Network read failures/timeouts and subsequent recovery are covered by component
 regressions with a controlled clock. Real HTTP security regressions separately
@@ -54,7 +64,9 @@ new deferred #1251 scenario.
 
 - [Delayed contribution, desktop FR](desktop-contributions-fr.png)
 - [Model dependency, desktop FR](desktop-model-wait-fr.png)
-- [Model dependency, mobile EN](mobile-model-wait-en.png)
+- [Model dependency, dark desktop FR](desktop-model-wait-dark-fr.png)
+- [Preparation steps, mobile EN](mobile-model-wait-en.png)
+- [Model dependency details, mobile EN](mobile-detail-en.png)
 - [Terminal model timeout, desktop FR](desktop-failed-fr.png)
 
 The first delivery observes the current process-local startup attempt. It does

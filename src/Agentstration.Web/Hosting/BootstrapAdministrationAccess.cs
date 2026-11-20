@@ -13,6 +13,14 @@ internal static class BootstrapAdministrationAccess
             "/api/bootstrap", "/api/internal/bff", "/api/notifications", "/api/navigation", "/api/console", "/_blazor" }
             .Any(prefix => path.StartsWithSegments(prefix));
 
+    // Let document navigations reach authentication and the post-authentication
+    // redirect. API/MCP/Hub traffic remains subject to the execution fence.
+    internal static bool IsConsoleNavigation(HttpRequest request) => HttpMethods.IsGet(request.Method)
+        && !new[] { "/api", "/mcp", "/hubs", "/health", "/_blazor", "/_framework", "/_content" }
+            .Any(prefix => request.Path.StartsWithSegments(prefix))
+        && request.GetTypedHeaders().Accept?.Any(value =>
+            value.MediaType.Equals("text/html", StringComparison.OrdinalIgnoreCase) && value.Quality is null or > 0) == true;
+
     internal static bool IsLoginOrAsset(PathString path) =>
         path == "/" || path == "/auth.css" || path == "/resource-name-fields.js" || (path.Value?.StartsWith("/Agentstration.Web.", StringComparison.Ordinal) == true
             && path.Value.EndsWith(".styles.css", StringComparison.Ordinal)) || new[] { "/account", "/Account", "/auth", "/login", "/logout", "/signin-oidc", "/signout-callback-oidc", "/_framework", "/_content", "/css", "/js", "/images", "/favicon.ico" }

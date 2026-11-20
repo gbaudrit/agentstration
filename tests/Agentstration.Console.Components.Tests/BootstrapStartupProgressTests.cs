@@ -70,6 +70,12 @@ public sealed class BootstrapStartupProgressTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/startup/progress?ReturnUrl=%2F%2Fexternal.example");
         var cut = context.Render<BootstrapStartupProgress>();
         var navigation = context.Services.GetRequiredService<NavigationManager>();
+        // The Console shell preserves context through a location-changing handler.
+        using var registration = navigation.RegisterLocationChangingHandler(change =>
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(change.TargetLocation);
+            return ValueTask.CompletedTask;
+        });
         api.Timeout = timeout; api.FailRead = true;
         clock.Tick();
         cut.WaitForAssertion(() => StringAssert.Contains(cut.Markup, "Observation will resume"));

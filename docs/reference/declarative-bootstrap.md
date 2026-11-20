@@ -689,6 +689,13 @@ stage until the administrator selects another stage; following can be resumed.
 Model/provider details are activity data in the generic resource panel. No panel
 is specific to an extension or provider implementation.
 
+The page uses the existing Console layout, navigation, context selector, theme and
+session actions. Its layout adapter supplies startup status instead of loading
+operational dashboard statistics. The command palette stays disabled until
+ordinary Console access resumes; direct document navigation returns to progress
+while execution APIs remain fenced. Stage completion, dependency facts and
+resource outcomes use the same visual primitives as other Console pages.
+
 The page reads `GET /api/bootstrap/startup` every two seconds. This PlatformAdmin
 endpoint returns an attempt identity, revision, stage states, safe dependency
 identities and resource outcome counts. It exposes no raw exception, credential,

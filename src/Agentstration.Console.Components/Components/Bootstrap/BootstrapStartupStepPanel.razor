@@ -1,33 +1,68 @@
 @using Agentstration.Bootstrap.Contracts
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StepProgressStrings> StepLocalizer
 
-<section>
-    <h2>@Localizer["Stage_" + StepId]</h2>
-    <p>@Localizer["Explanation_" + StepId]</p>
+<section class="startup-step-content">
+    <header class="startup-step-heading">
+        <h2>@Localizer["Stage_" + StepId]</h2>
+        <StatusBadge Text="@StepLocalizer[PresentationState.ToString()]" Status="@BadgeStatus" />
+    </header>
+    <p class="startup-step-description">@Localizer["Explanation_" + StepId]</p>
     @if (Snapshot.ActiveStepId == StepId && Snapshot.Activity is { } activity)
     {
-        @if (activity.WaitReason is not null) { <p class="inline-warning" role="status">@Localizer[activity.WaitReason switch { "required_model_missing" => "ModelMissing", "contribution_unavailable" => "ContributionMissing", _ => "ProviderUnavailable" }]</p> }
-        <dl class="resource-details">
-            @if (activity.ResourceName is not null) { <dt>@Localizer["Resource"]</dt><dd>@activity.ResourceKind / @activity.ResourceName</dd> }
-            @if (activity.ProviderName is not null) { <dt>@Localizer["Provider"]</dt><dd>@activity.ProviderName</dd> }
-            @if (activity.ModelName is not null) { <dt>@Localizer["ExpectedModel"]</dt><dd>@activity.ModelName</dd> }
-            @if (activity.ExtensionId is not null) { <dt>@Localizer["Extension"]</dt><dd>@activity.ExtensionId</dd> }
-            @if (activity.ContributionId is not null) { <dt>@Localizer["Contribution"]</dt><dd>@activity.ContributionId</dd> }
+        @if (activity.WaitReason is not null)
+        {
+            <div class="startup-dependency-callout @(Snapshot.State == "failed" ? "is-failed" : null)" role="status">
+                <span aria-hidden="true"><UiIcon Name="@(Snapshot.State == "failed" ? "alert-triangle" : "clock")" /></span>
+                <div><strong>@Localizer[Snapshot.State == "failed" ? "DependencyUnresolved" : "WaitingForDependency"]</strong><p>@Localizer[Snapshot.State == "failed" ? "DependencyFailureDescription" : activity.WaitReason switch { "required_model_missing" => "ModelMissing", "contribution_unavailable" => "ContributionMissing", _ => "ProviderUnavailable" }]</p></div>
+            </div>
+        }
+        <dl class="startup-resource-facts">
+            @if (activity.ResourceName is not null) { <div><dt>@Localizer["Resource"]</dt><dd><code>@activity.ResourceKind / @activity.ResourceName</code></dd></div> }
+            @if (activity.ProviderName is not null) { <div><dt>@Localizer["Provider"]</dt><dd>@activity.ProviderName</dd></div> }
+            @if (activity.ModelName is not null) { <div><dt>@Localizer["ExpectedModel"]</dt><dd><code>@activity.ModelName</code></dd></div> }
+            @if (activity.ExtensionId is not null) { <div><dt>@Localizer["Extension"]</dt><dd><code>@activity.ExtensionId</code></dd></div> }
+            @if (activity.ContributionId is not null) { <div><dt>@Localizer["Contribution"]</dt><dd>@activity.ContributionId</dd></div> }
         </dl>
         @if (activity.ProviderName is { } provider)
         {
             var providerUrl = ConsoleResourceUrls.Resource("/modelproviders", provider, ResourceNamespace.Parse(activity.ProviderNamespace),
                 activity.ProviderScopeRef is { } scope ? ResourceScopeRef.Parse(scope) : null);
-            <a class="button-secondary" href="@providerUrl">@Localizer["OpenProvider"]</a>
+            <div class="startup-step-actions"><a class="button-secondary" href="@providerUrl"><UiIcon Name="settings" />@Localizer["OpenProvider"]</a></div>
         }
     }
     @if (StepId == "resources")
     {
-        <dl class="resource-details"><dt>@Localizer["Created"]</dt><dd>@Snapshot.Created</dd><dt>@Localizer["Skipped"]</dt><dd>@Snapshot.Skipped</dd><dt>@Localizer["Conflicts"]</dt><dd>@Snapshot.Conflicts</dd><dt>@Localizer["ResourceFailures"]</dt><dd>@Snapshot.Failed</dd></dl>
+        <section class="startup-resource-outcomes" aria-label="@Localizer["ResourceOutcomes"]">
+            <h3>@Localizer["ResourceOutcomes"]</h3>
+            <div class="startup-resource-metrics">
+                <MetricCard Label="@Localizer["Created"]" Value="@Snapshot.Created.ToString()" Status="UiStatus.Success" />
+                <MetricCard Label="@Localizer["Skipped"]" Value="@Snapshot.Skipped.ToString()" Status="UiStatus.Neutral" />
+                <MetricCard Label="@Localizer["Conflicts"]" Value="@Snapshot.Conflicts.ToString()" Status="@(Snapshot.Conflicts > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
+                <MetricCard Label="@Localizer["ResourceFailures"]" Value="@Snapshot.Failed.ToString()" Status="@(Snapshot.Failed > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
+            </div>
+        </section>
     }
 </section>
 
 @code {
     [Parameter, EditorRequired] public BootstrapStartupSnapshot Snapshot { get; set; } = default!;
     [Parameter, EditorRequired] public string StepId { get; set; } = string.Empty;
+    private ProgressStepStatus PresentationState => Snapshot.Steps.First(step => step.Id == StepId).State switch
+    {
+        "succeeded" => ProgressStepStatus.Succeeded,
+        "waiting" => ProgressStepStatus.Waiting,
+        "running" => ProgressStepStatus.Running,
+        "failed" => ProgressStepStatus.Failed,
+        "skipped" => ProgressStepStatus.Skipped,
+        _ => ProgressStepStatus.Pending
+    };
+    private UiStatus BadgeStatus => PresentationState switch
+    {
+        ProgressStepStatus.Succeeded => UiStatus.Success,
+        ProgressStepStatus.Failed => UiStatus.Danger,
+        ProgressStepStatus.Waiting => UiStatus.Warning,
+        ProgressStepStatus.Running => UiStatus.Info,
+        _ => UiStatus.Neutral
+    };
 }
