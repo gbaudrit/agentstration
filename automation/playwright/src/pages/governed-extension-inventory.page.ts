@@ -168,6 +168,7 @@ export class GovernedExtensionInventoryPage {
     this.assertScopedLink(await provider.getAttribute('href'));
     await expect(this.page.locator('main')).toContainText('Governed inventory fixture');
     await provider.click();
+    await expect(this.page.getByTestId(TestIds.resourceAdministration.toolProviderEditor)).toBeVisible();
     await selectResourceSection(this.page, 'definition/identity');
     await expect(this.page.locator('#tool-provider-resource-form > fieldset')).toHaveAttribute('disabled', '');
     await selectResourceSection(this.page, 'overview');
