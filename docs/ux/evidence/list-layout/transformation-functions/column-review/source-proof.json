@@ -1,0 +1,22 @@
+{
+  "baseCommit": "9fe63ae59e549da77fb1edd81c6cdcbf31a061da",
+  "routes": [
+    "/transformation-functions",
+    "/function-kinds"
+  ],
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor": "cf9b3ff4ab9cad944364a74259a963a3e48f10c8",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.css": "147f8f8c91f72266c5fb135636c650ea6f220e4d",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.cs": "da2ddf34ee996ef22104ffe8689da9c051738370",
+    "src/Agentstration.Web.Components/CollectionIdentity.razor": "ceffed21ffc400044776dc7e39b9c87654233065",
+    "src/Agentstration.Console.Components/Components/Pages/Flows.razor": "cabc0491875d462e150edb69b9a5c0c9bbfc2ebc",
+    "src/Agentstration.Web.Components/wwwroot/management.css": "51b2f8f6514e0a774d3ff76b075ec3fa78f8299a"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "desktop-fr.png",
+    "mobile-fr.png"
+  ],
+  "targetedComponentCases": 20,
+  "catalogAssertions": 2
+}

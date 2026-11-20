@@ -5561,6 +5561,7 @@
       "state": true,
       "actions": false,
       "informationKeys": [
+        "Kind",
         "Version",
         "FunctionDescription"
       ],
@@ -5587,6 +5588,11 @@
         "query": "Independent offset pages of 20/50 with one lookahead record; API maximum 100, no total or continuation. No search, local page filter, global metric or direct jump.",
         "states": "Context/principal reauthorization, revisions, retained refresh and successful pager, independent forbidden states.",
         "evidence": "evidence/list-layout/transformation-functions/README.md"
+      },
+      "columnReview": {
+        "type": "Actual FunctionKind names referenced by all declared versions, with repeated names collapsed; compact muted presentation like Flow types.",
+        "description": "51% of desktop table width; full-width description value in cards. Family-scoped proportions affect only the transformation-function catalog.",
+        "evidence": "evidence/list-layout/transformation-functions/column-review/README.md"
       }
     },
     {
