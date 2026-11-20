@@ -4,59 +4,223 @@
 @inject IWorkOperationsRealtimeClient Realtime
 @inject Microsoft.Extensions.Options.IOptions<AgentstrationWebOptions> Options
 @inject ConsoleContextState ContextState
+@inject IServiceProvider Services
+@inject TimeProvider Clock
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TaskDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TasksStrings> TaskStrings
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> Identity
 
 <PageTitle>@T("PageTitle")</PageTitle>
+<UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+<ConfirmationDialog IsOpen="confirmCancel" Title="@T("CancelTitle")" Message="@T("CancelMessage")" ConfirmLabel="@T("ConfirmCancellation")" CancelLabel="@T("KeepTask")" TestId="task-cancel-confirmation" OnConfirm="CancelAsync" OnCancel="() => confirmCancel = false" />
 <div data-testid="flow-observability-task-details" data-task-id="@TaskId">
-@if (notFound)
-{
-    <EmptyState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")"><a class="button-secondary" href="/tasks">@T("BackToTasks")</a></EmptyState>
-}
-else if (unavailable)
-{
-    <WorkApiUnavailableState OnRetry="LoadAsync" />
-}
-else if (detail is null)
-{
-    <LoadingState />
-}
-else
-{
-    var task=detail.Task;
-    <PageHeader Title="@task.Title" Description="@F("OperationalWorkTask", ShortId(task.Id))">
-        <Actions><RealtimeStatus State="Realtime.State" />@if(task.Status==WorkTaskStatus.Running){<button class="button-secondary" @onclick="PauseAsync">@T("Pause")</button>}@if(task.Status==WorkTaskStatus.Paused){<button class="button-primary" @onclick="ResumeAsync">@T("Resume")</button>}@if(task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused){<button class="button-danger" @onclick="()=>confirmCancel=true">@T("Cancel")</button>}<a class="button-secondary" href="/tasks">@T("Back")</a></Actions>
-    </PageHeader>
-    @if(confirmCancel){<section class="panel task-error"><h2>@T("CancelTitle")</h2><p>@T("CancelMessage")</p><button class="button-danger" @onclick="CancelAsync">@T("ConfirmCancellation")</button><button class="button-secondary" @onclick="()=>confirmCancel=false">@T("KeepTask")</button></section>}
-    @if(task.Error is not null){<section class="panel task-error"><h2>@task.Error.Title</h2><p><strong>@task.Error.Code</strong> · @task.Error.Message</p><time datetime="@task.Error.OccurredAt.ToString("O")">@task.Error.OccurredAt.ToLocalTime().ToString("F")</time></section>}
-    <div class="task-detail-grid">
-        <div class="task-detail-stack">
-            <section class="panel"><div class="panel-header"><h2>@T("Overview")</h2><TaskStatusBadge Status="task.Status" /></div><dl class="resource-details"><dt>@T("OriginalRequest")</dt><dd>@OriginalRequest</dd><dt>@T("Origin")</dt><dd><code>@(task.EntryId is null ? T("Trigger") : ResourceName(task.EntryId))</code></dd><dt>@T("Workspace")</dt><dd>@ResourceName(task.WorkspaceId)</dd><dt>@T("Interaction")</dt><dd><code>@ShortId(task.InteractionId)</code></dd><dt>@T("CurrentActivity")</dt><dd>@(task.CurrentActivity??"—")</dd><dt>@T("Created")</dt><dd><time title="@task.CreatedAt.ToLocalTime().ToString("F")">@task.CreatedAt.ToLocalTime().ToString("g")</time></dd><dt>@T("Updated")</dt><dd><time title="@task.UpdatedAt.ToLocalTime().ToString("F")">@task.UpdatedAt.ToLocalTime().ToString("g")</time></dd><dt>@T("Duration")</dt><dd>@Duration(task)</dd></dl>@if(WorkplaceTaskUrl is not null){<a class="text-button" href="@WorkplaceTaskUrl" target="_blank">@T("OpenTaskInWorkplace") →</a>}</section>
-            <section class="panel"><div class="panel-header"><h2>@T("Execution")</h2><span>@F("RunCount", detail.FlowRuns.Count)</span></div>@if(detail.FlowRuns.Count==0){<p>@T("FlowRunUnavailable")</p>}else{<ol class="operations-list">@foreach(var run in detail.FlowRuns){<li class="@(run.ParentFlowRunId is null?null:"flow-run-child")"><div class="panel-header"><CollectionIdentity DisplayName="@ShortId(run.Id)" Name="@run.Id" Href="@($"/tasks/{TaskId}/flowruns/{Uri.EscapeDataString(run.Id)}")" IconName="workflow" ><IconBadges><StatusBadge Text="@Label("RunStatus", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status)" IconOnly /></IconBadges></CollectionIdentity></div><p>@Label("TriggerType", run.Trigger) · <code>@run.FlowId</code></p><small>@F("ResultCount", run.ResultCount) · @F("ArtifactCount", run.ArtifactCount) · @RunDuration(run)</small>@if(run.ParentFlowRunId is not null){<small class="table-secondary">@T("Parent") @ShortId(run.ParentFlowRunId)</small>}</li>}</ol>}</section>
-            <section class="panel"><div class="panel-header"><h2>@T("Results")</h2><span>@detail.Results.Count</span></div>@if(detail.Results.Count==0){<p>@T("ResultsUnavailable")</p>}else{<ol class="operations-list">@foreach(var result in detail.Results.OrderByDescending(value=>value.Sequence)){<li><div class="panel-header"><strong>@result.Title @(result.Sequence==detail.Results.Max(value=>value.Sequence)?T("LatestSuffix"):null)</strong><span>@T("Version") @result.Sequence</span></div><small>@result.Kind · @result.CreatedAt.ToLocalTime().ToString("g") · FlowRun @ShortId(result.FlowRunId)</small><pre class="result-preview">@FormatContent(result.Content)</pre></li>}</ol>}</section>
+<ResourceDetailsTemplate Name="@(detail?.Task.Title ?? T("Task"))" ResourceType="@T("Task")" Domain="work" IconName="clipboard"
+                         Description="@F("OperationalWorkTask", ShortId(TaskId))" TechnicalName="@TaskId.ToString()"
+                         StatusText="@(detail is null ? null : TaskStrings[$"Status.{detail.Task.Status}"].Value)" Status="@TaskStatus"
+                         Sections="Sections" ResourceIdentity="@(loadedKey ?? ContextKey)" DefaultSection="overview" SectionState="sectionState" SelectionChanged="SelectSection"
+                         LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RetryAsync" HasDraft="HasDraft" Busy="IsBusy">
+    <Actions>
+        <RealtimeStatus State="Realtime.State" />
+        @if (detail is not null && CanExecute)
+        {
+            @if (detail.Task.Status == WorkTaskStatus.Running) { <button class="button-secondary" disabled="@IsBusy" @onclick="PauseAsync">@T("Pause")</button> }
+            @if (detail.Task.Status == WorkTaskStatus.Paused) { <button class="button-primary" disabled="@IsBusy" @onclick="ResumeAsync">@T("Resume")</button> }
+            @if (detail.Task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused) { <button class="button-danger" disabled="@IsBusy" @onclick="() => confirmCancel = true">@T("Cancel")</button> }
+        }
+        <a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/tasks", Services)">@T("Back")</a>
+    </Actions>
+    <Feedback>
+        @if (newerDetail is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+        @if (commandError is not null) { <div class="form-alert form-alert-danger" role="alert">@commandError</div> }
+    </Feedback>
+    <Content>
+    @if (detail is not null)
+    {
+        var task = detail.Task;
+        <div data-task-section="overview" hidden="@(!sectionState.Is("overview"))">
+            <section class="metric-grid">
+                <MetricCard Label="@T("Status")" Value="@TaskStrings[$"Status.{task.Status}"]" Status="TaskStatus" />
+                <MetricCard Label="@T("Duration")" Value="@Duration(task)" />
+                <MetricCard Label="@T("PendingActions")" Value="@task.PendingActionCount.ToString()" />
+            </section>
+            <FormSection Title="@Shared["Identity"]"><dl class="resource-details">
+                <dt>@Identity["DisplayName"]</dt><dd>@task.Title</dd>
+                <dt>@T("Task")</dt><dd><CopyableValue Value="@task.Id.ToString()" /></dd>
+                @if (!string.IsNullOrWhiteSpace(task.Description)) { <dt>@Shared["Description"]</dt><dd>@task.Description</dd> }
+                <dt>@T("Workspace")</dt><dd>@WorkspaceName <CopyableValue Value="@task.WorkspaceId" /></dd>
+                <dt>@T("Interaction")</dt><dd>@if (task.InteractionId is { } interaction) { <CopyableValue Value="@interaction.ToString()" /> } else { @T("Autonomous") }</dd>
+            </dl></FormSection>
+            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><dl class="resource-details">
+                <dt>@T("OriginalRequest")</dt><dd>@OriginalRequest</dd>
+                <dt>@T("Origin")</dt><dd><code>@(task.EntryId ?? T("Trigger"))</code></dd>
+                <dt>@T("CurrentActivity")</dt><dd>@(task.CurrentActivity ?? "—")</dd>
+                <dt>@T("Created")</dt><dd><time datetime="@task.CreatedAt.ToString("O")">@task.CreatedAt.ToLocalTime().ToString("g")</time></dd>
+                <dt>@T("Updated")</dt><dd><time datetime="@task.UpdatedAt.ToString("O")">@task.UpdatedAt.ToLocalTime().ToString("g")</time></dd>
+            </dl></FormSection>
+            @if (task.Error is not null) { <section class="panel task-error"><h2>@task.Error.Title</h2><p><strong>@task.Error.Code</strong> · @task.Error.Message</p><time datetime="@task.Error.OccurredAt.ToString("O")">@task.Error.OccurredAt.ToLocalTime().ToString("F")</time></section> }
+            @if (WorkplaceTaskUrl is not null) { <a class="text-button" href="@WorkplaceTaskUrl" target="_blank" rel="noopener">@T("OpenTaskInWorkplace") →</a> }
+        </div>
+        <div data-task-section="execution" hidden="@(!sectionState.Is("execution"))">
+            <section class="panel"><div class="panel-header"><h2>@T("Execution")</h2><span>@F("RunCount", detail.FlowRuns.Count)</span></div>@if(detail.FlowRuns.Count==0){<p>@T("FlowRunUnavailable")</p>}else{<ol class="operations-list">@foreach(var run in detail.FlowRuns){<li class="@(run.ParentFlowRunId is null?null:"flow-run-child")"><div class="panel-header"><CollectionIdentity DisplayName="@ShortId(run.Id)" Name="@run.Id" Href="@ResourceOwnershipContext.PreserveNavigation($"/tasks/{TaskId}/flowruns/{Uri.EscapeDataString(run.Id)}", Services)" IconName="workflow" ><IconBadges><StatusBadge Text="@Label("RunStatus", run.Status)" Status="@PlatformDashboardService.ToStatus(run.Status)" IconOnly /></IconBadges></CollectionIdentity></div><p>@Label("TriggerType", run.Trigger) · <code>@run.FlowId</code></p><small>@F("ResultCount", run.ResultCount) · @F("ArtifactCount", run.ArtifactCount) · @RunDuration(run)</small>@if(run.ParentFlowRunId is not null){<small class="table-secondary">@T("Parent") @ShortId(run.ParentFlowRunId)</small>}</li>}</ol>}</section>
+        </div>
+        <div data-task-section="results" hidden="@(!sectionState.Is("results"))">
+            <section class="panel"><div class="panel-header"><h2>@T("Results")</h2><span>@detail.Results.Count</span></div>@if(detail.Results.Count==0){<p>@T("ResultsUnavailable")</p>}else{<ol class="operations-list">@foreach(var result in detail.Results.OrderByDescending(value=>value.Sequence)){<li><div class="panel-header"><strong>@result.Title @(result.Sequence==detail.Results.Max(value=>value.Sequence)?T("LatestSuffix"):null)</strong><span>@T("Version") @result.Sequence</span></div><small>@Label("ResultKind", result.Kind) · @result.CreatedAt.ToLocalTime().ToString("g") · FlowRun @ShortId(result.FlowRunId)</small><pre class="result-preview">@FormatContent(result.Content)</pre></li>}</ol>}</section>
+        </div>
+        <div data-task-section="artifacts" hidden="@(!sectionState.Is("artifacts"))">
             <section class="panel"><div class="panel-header"><h2>@T("Artifacts")</h2><span>@detail.Artifacts.Count</span></div>@if(detail.Artifacts.Count==0){<p>@T("ArtifactUnavailable")</p>}else{<ul class="operations-list">@foreach(var artifact in detail.Artifacts.OrderByDescending(value=>value.Sequence)){<li><CollectionIdentity DisplayName="@artifact.Name" Name="@artifact.Id.ToString()" Href="@ArtifactUrl(artifact)" IconName="document" download="" /><p>@artifact.ContentType · @FormatSize(artifact.Length) · @T("Version") @artifact.Sequence</p><small>FlowRun @ShortId(artifact.FlowRunId) · @artifact.CreatedAt.ToLocalTime().ToString("g")</small><CollectionActions ResourceName="@($"{artifact.Name} ({artifact.Id})")"><a class="text-button" href="@ArtifactUrl(artifact)" download>@T("Download")</a></CollectionActions></li>}</ul>}</section>
         </div>
-        <aside class="task-detail-stack">
+        <div data-task-section="pending-actions" hidden="@(!sectionState.Is("pending-actions"))">
             <section class="panel"><div class="panel-header"><h2>@T("PendingActions")</h2><span>@detail.PendingActions.Count(value=>value.Status==PendingActionStatus.Pending)</span></div>
                 @if(!string.IsNullOrWhiteSpace(pendingActionError)){<p class="form-alert form-alert-danger" role="alert">@pendingActionError</p>}
-                @if(detail.PendingActions.Count==0){<p>@T("NoPendingAction")</p>}else{@foreach(var action in detail.PendingActions){if(CanExecute && action.Status==PendingActionStatus.Pending && TaskPendingActionUi.ToAction(action) is { } workplaceAction){<Agentstration.Workplace.Components.PendingActionPanel Action="workplaceAction" Busy="@(respondingActionId==action.Id)" OnSubmit="RespondPendingActionAsync" />}else{<article class="task-resolved-action"><div class="panel-header"><strong>@action.Title</strong><StatusBadge Text="@Label("ActionStatus", action.Status)" Status="@PlatformDashboardService.ToStatus(action.Status.ToString())" /></div><p>@action.Kind @if(!string.IsNullOrWhiteSpace(action.Description)){<span>· @action.Description</span>}</p><small>@T("Created") @action.CreatedAt.ToLocalTime().ToString("g")</small>@if(action.Status==PendingActionStatus.Pending && !CanExecute){<p class="table-secondary">@T("ExecutePermissionRequired")</p>}</article>}}}
+                @if(detail.PendingActions.Count==0){<p>@T("NoPendingAction")</p>}else{@foreach(var action in detail.PendingActions){if(CanExecute && action.Status==PendingActionStatus.Pending && TaskPendingActionUi.ToAction(action) is { } workplaceAction){<Agentstration.Workplace.Components.PendingActionPanel Action="workplaceAction" @key="(action.Id, draftEpoch)" Busy="@busy" SubmitDisabled="@loading" DraftChanged="value => TrackDraft(action.Id, value)" OnSubmit="RespondPendingActionAsync" />}else{<article class="task-resolved-action"><div class="panel-header"><strong>@action.Title</strong><StatusBadge Text="@Label("ActionStatus", action.Status)" Status="@PlatformDashboardService.ToStatus(action.Status.ToString())" /></div><p>@Label("ActionKind", action.Kind) @if(!string.IsNullOrWhiteSpace(action.Description)){<span>· @action.Description</span>}</p><small>@T("Created") @action.CreatedAt.ToLocalTime().ToString("g")</small>@if(action.Status==PendingActionStatus.Pending && !CanExecute){<p class="table-secondary">@T("ExecutePermissionRequired")</p>}</article>}}}
                 @if(WorkplaceInteractionUrl is not null){<a class="text-button" href="@WorkplaceInteractionUrl" target="_blank">@T("OpenInteractionInWorkplace") →</a>}
             </section>
+        </div>
+        <div data-task-section="interaction" hidden="@(!sectionState.Is("interaction"))">
             <section class="panel"><div class="panel-header"><h2>@T("Interaction")</h2><span>@T("ReadOnly")</span></div><details><summary>@F("MessageCount", detail.Messages.Count)</summary><ol class="operations-list">@foreach(var message in detail.Messages){<li><strong>@Label("Role", message.Role)</strong><p>@message.Content</p><small>@message.CreatedAt.ToLocalTime().ToString("g")</small></li>}</ol></details></section>
-            <section class="panel"><div class="panel-header"><h2>@T("Activity")</h2><span>@detail.Activities.Count</span></div>@if(detail.Activities.Count==0){<p>@T("NoFunctionalActivity")</p>}else{<ol class="operations-list">@foreach(var activity in detail.Activities.OrderByDescending(value=>value.CreatedAt)){<li><strong>@activity.Title</strong><p>@activity.Type @if(!string.IsNullOrWhiteSpace(activity.Description)){<span>· @activity.Description</span>}</p><time title="@activity.CreatedAt.ToLocalTime().ToString("F")">@activity.CreatedAt.ToLocalTime().ToString("g")</time></li>}</ol>}</section>
-        </aside>
-    </div>
-}
-
+        </div>
+        <div data-task-section="activity" hidden="@(!sectionState.Is("activity"))">
+            <section class="panel"><div class="panel-header"><h2>@T("Activity")</h2><span>@detail.Activities.Count</span></div>@if(detail.Activities.Count==0){<p>@T("NoFunctionalActivity")</p>}else{<ol class="operations-list">@foreach(var activity in detail.Activities.OrderByDescending(value=>value.CreatedAt)){<li><strong>@activity.Title</strong><p>@Label("ActivityType", activity.Type) @if(!string.IsNullOrWhiteSpace(activity.Description)){<span>· @activity.Description</span>}</p><time title="@activity.CreatedAt.ToLocalTime().ToString("F")">@activity.CreatedAt.ToLocalTime().ToString("g")</time></li>}</ol>}</section>
+        </div>
+    }
+    </Content>
+    <DraftActions><button class="button-secondary" type="button" disabled="@IsBusy" @onclick="DiscardDrafts">@Shared["Discard"]</button></DraftActions>
+</ResourceDetailsTemplate>
 </div>
+
 @code {
     [Parameter] public Guid TaskId { get; set; }
-    private readonly CancellationTokenSource lifetime=new();private WorkTaskOperationsDetailResponse? detail;private bool unavailable,notFound,confirmCancel,realtimeStarted;private Guid? respondingActionId;private string? pendingActionError;
-    protected override async Task OnParametersSetAsync()=>await LoadAsync();
-    private async Task LoadAsync(){unavailable=false;notFound=false;try{detail=await Client.GetTaskAsync(TaskId,lifetime.Token);if(!realtimeStarted){realtimeStarted=true;Realtime.Updated+=OnRealtime;Realtime.StateChanged+=OnStateChanged;await Realtime.StartAsync([detail.Task.WorkspaceId],lifetime.Token);}}catch(AgentstrationApiException exception) when(exception.StatusCode==System.Net.HttpStatusCode.NotFound){notFound=true;detail=null;}catch(Exception exception) when(exception is AgentstrationApiException or HttpRequestException or TimeoutException){unavailable=true;detail=null;}}
-    private Task OnRealtime(WorkOperationsRealtimeUpdate update)=>update.RequiresResynchronization||update.TaskId==TaskId?InvokeAsync(LoadAsync):Task.CompletedTask;private void OnStateChanged()=>InvokeAsync(StateHasChanged);
-    private async Task PauseAsync(){await Client.PauseTaskAsync(TaskId,lifetime.Token);await LoadAsync();}private async Task ResumeAsync(){await Client.ResumeTaskAsync(TaskId,lifetime.Token);await LoadAsync();}private async Task CancelAsync(){confirmCancel=false;await Client.CancelTaskAsync(TaskId,lifetime.Token);await LoadAsync();}
-    private async Task RespondPendingActionAsync(Agentstration.Workplace.Components.PendingActionAnswer answer){if(respondingActionId is not null)return;respondingActionId=answer.PendingActionId.Value;pendingActionError=null;try{await Client.RespondTaskPendingActionAsync(TaskId,answer.PendingActionId.Value,answer.Values,lifetime.Token);await LoadAsync();}catch(Exception exception){pendingActionError=exception.Message;}finally{respondingActionId=null;}}
-    private bool CanExecute=>ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
+    private readonly CancellationTokenSource lifetime = new();
+    private CancellationToken lifetimeToken;
+    private WorkTaskOperationsDetailResponse? detail, newerDetail;
+    private readonly ResourceSectionState sectionState = new();
+    private readonly HashSet<Guid> pendingDrafts = [];
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private string? loadedKey, commandError, pendingActionError;
+    private bool loading, busy, confirmCancel, realtimeStarted, disposed, refreshQueued;
+    private Guid? respondingActionId;
+    private long loadVersion, draftEpoch;
+    private bool IsBusy => loading || busy;
+    private bool HasDraft => !disposed && detail is not null && pendingDrafts.Count > 0;
+    private string ContextKey => $"{TaskId:D}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.UserId}|{ContextState.Current?.WorkspaceId}";
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", Shared["Overview"], "home"), new("execution", T("Execution"), "sitemap"), new("results", T("Results"), "file-text"), new("artifacts", T("Artifacts"), "archive"), new("pending-actions", T("PendingActions"), "clipboard"), new("interaction", T("Interaction"), "message-circle"), new("activity", T("Activity"), "history")];
+    private UiStatus TaskStatus => detail?.Task.Status switch { WorkTaskStatus.Completed => UiStatus.Success, WorkTaskStatus.Failed or WorkTaskStatus.Cancelled => UiStatus.Danger, WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused => UiStatus.Warning, WorkTaskStatus.Running => UiStatus.Info, _ => UiStatus.Neutral };
+    private string WorkspaceName => Guid.TryParse(detail?.Task.WorkspaceId, out var id) ? ContextState.Current?.Workspaces.FirstOrDefault(value => value.Id == id)?.DisplayName ?? detail!.Task.WorkspaceId : detail?.Task.WorkspaceId ?? "—";
+    protected override void OnInitialized() { lifetimeToken = lifetime.Token; Realtime.Updated += OnRealtime; Realtime.StateChanged += OnStateChanged; }
+    protected override async Task OnParametersSetAsync()
+    {
+        await ContextState.EnsureLoadedAsync(lifetimeToken);
+        if (disposed || loadedKey == ContextKey) return;
+        loadedKey = ContextKey; ClearPrivate(); sectionState.Reset(loadedKey);
+        await LoadAsync(false);
+    }
+    private void SelectSection(string? value) => sectionState.Select(value ?? "overview");
+    private async Task TrackDraft(Guid id, bool dirty)
+    {
+        if (dirty) pendingDrafts.Add(id); else pendingDrafts.Remove(id);
+        // Queue adoption after the originating input/clear event, which may still focus its control.
+        await Task.Yield();
+        if (!disposed && !HasDraft && newerDetail is { } latest) { detail = latest; newerDetail = null; }
+    }
+    private void DiscardDrafts() { if (IsBusy) return; if (newerDetail is not null) detail = newerDetail; newerDetail = null; pendingDrafts.Clear(); ++draftEpoch; pendingActionError = commandError = null; }
+    private void ClearPrivate() { detail = newerDetail = null; pendingDrafts.Clear(); ++draftEpoch; confirmCancel = busy = false; respondingActionId = null; commandError = pendingActionError = null; refreshQueued = false; }
+    private Task RetryAsync() => IsBusy ? Task.CompletedTask : LoadAsync(detail is not null);
+    private Task RefreshAsync() => IsBusy ? Task.CompletedTask : LoadAsync(true);
+    private bool IsCurrent(long request, string? key) => !disposed && request == loadVersion && key == loadedKey && key == ContextKey;
+    private bool HasExpectedIdentity(WorkTaskOperationsDetailResponse saved, Guid taskId, string? expectedWorkspace)
+    {
+        if (saved.Task.Id != taskId || !Guid.TryParse(saved.Task.WorkspaceId, out var workspace)
+            || ContextState.Current is not { } context || workspace != context.WorkspaceId && !context.Workspaces.Any(value => value.Id == workspace)
+            || expectedWorkspace is not null && saved.Task.WorkspaceId != expectedWorkspace) return false;
+        return (saved.Interaction is null || saved.Interaction.WorkspaceId == workspace && saved.Interaction.Id == saved.Task.InteractionId)
+            && saved.PendingActions.All(value => value.WorkspaceId == workspace && value.WorkTaskId == taskId)
+            && saved.Activities.All(value => value.WorkspaceId.Value == workspace && value.WorkTaskId.Value == taskId)
+            && saved.Messages.All(value => value.WorkspaceId.Value == workspace && value.InteractionId.Value == saved.Task.InteractionId);
+    }
+    private static string Fingerprint(WorkTaskOperationsDetailResponse value) => System.Text.Json.JsonSerializer.Serialize(value);
+    private async Task LoadAsync(bool refresh, bool reconcileCommandStatus = false)
+    {
+        var request = ++loadVersion; var key = loadedKey; var task = TaskId; var expectedWorkspace = detail?.Task.WorkspaceId;
+        loading = true;
+        loadState = new(refresh && detail is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = detail is not null };
+        try
+        {
+            var saved = await Client.GetTaskAsync(task, lifetimeToken);
+            if (!IsCurrent(request, key)) return;
+            if (!HasExpectedIdentity(saved, task, expectedWorkspace)) { ClearPrivate(); loadState = new(ResourceLoadStatus.Forbidden); return; }
+            if (reconcileCommandStatus && detail is not null)
+                detail = detail with { Task = detail.Task with { Status = saved.Task.Status, UpdatedAt = saved.Task.UpdatedAt, CompletedAt = saved.Task.CompletedAt, CurrentActivity = saved.Task.CurrentActivity } };
+            if (HasDraft) newerDetail = detail is not null && Fingerprint(saved) == Fingerprint(detail) ? null : saved;
+            else { detail = saved; newerDetail = null; }
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            if (!realtimeStarted)
+            {
+                realtimeStarted = true;
+                await Realtime.StartAsync([saved.Task.WorkspaceId], lifetimeToken);
+            }
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            if (!IsCurrent(request, key)) return;
+            SetFailure(exception);
+        }
+        finally { if (IsCurrent(request, key)) { loading = false; await ProcessQueuedRefreshAsync(); } }
+    }
+    private void SetFailure(Exception exception)
+    {
+        var status = exception is AgentstrationApiException api ? api.StatusCode switch
+        {
+            System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+            System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+            _ => ResourceLoadStatus.Failed
+        } : ResourceLoadStatus.Failed;
+        if (status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearPrivate();
+        loadState = new(status) { HasContent = detail is not null, Message = status == ResourceLoadStatus.NotFound ? T("NotFoundMessage") : null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+    }
+    private Task OnRealtime(WorkOperationsRealtimeUpdate update) => disposed || !update.RequiresResynchronization && update.TaskId != TaskId ? Task.CompletedTask : InvokeAsync(async () => { if (IsBusy) refreshQueued = true; else await LoadAsync(detail is not null); StateHasChanged(); });
+    private async Task ProcessQueuedRefreshAsync() { if (refreshQueued && !disposed && !IsBusy && detail is not null) { refreshQueued = false; await LoadAsync(true); } }
+    private void OnStateChanged() { if (!disposed) _ = InvokeAsync(StateHasChanged); }
+    private Task PauseAsync() => RunCommandAsync(Client.PauseTaskAsync, detail?.Task.Status == WorkTaskStatus.Running);
+    private Task ResumeAsync() => RunCommandAsync(Client.ResumeTaskAsync, detail?.Task.Status == WorkTaskStatus.Paused);
+    private Task CancelAsync() => RunCommandAsync(Client.CancelTaskAsync, detail?.Task.Status is WorkTaskStatus.Pending or WorkTaskStatus.Running or WorkTaskStatus.ActionRequired or WorkTaskStatus.Paused);
+    private async Task RunCommandAsync(Func<Guid, CancellationToken, Task> command, bool applicable)
+    {
+        if (IsBusy || !CanExecute || detail is null || !applicable) return;
+        var request = loadVersion; var key = loadedKey; var task = TaskId; busy = true; commandError = null; confirmCancel = false;
+        try { await command(task, lifetimeToken); if (IsCurrent(request, key)) await LoadAsync(true, reconcileCommandStatus: true); }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            if (IsCurrent(request, key)) { if (exception is AgentstrationApiException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.NotFound }) SetFailure(exception); else commandError = exception is AgentstrationApiException api ? api.Message : T("OperationUnconfirmed"); }
+        }
+        finally { if (!disposed && key == loadedKey) { busy = false; await ProcessQueuedRefreshAsync(); } }
+    }
+    private async Task RespondPendingActionAsync(Agentstration.Workplace.Components.PendingActionAnswer answer)
+    {
+        if (IsBusy || !CanExecute || detail is null || !detail.PendingActions.Any(value => value.Id == answer.PendingActionId.Value && value.Status == PendingActionStatus.Pending)) return;
+        var request = loadVersion; var key = loadedKey; var task = TaskId; var actionId = answer.PendingActionId.Value;
+        busy = true; respondingActionId = actionId; pendingActionError = null;
+        try
+        {
+            var saved = await Client.RespondTaskPendingActionAsync(task, actionId, answer.Values, lifetimeToken);
+            if (!IsCurrent(request, key)) return;
+            if (saved.Id != actionId || saved.WorkTaskId != task || saved.WorkspaceId.ToString("D") != detail.Task.WorkspaceId) { ClearPrivate(); loadState = new(ResourceLoadStatus.Forbidden); return; }
+            pendingDrafts.Remove(actionId);
+            detail = detail with { PendingActions = detail.PendingActions.Select(value => value.Id == actionId ? saved : value).ToArray() };
+            await LoadAsync(true);
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or TimeoutException)
+        {
+            if (IsCurrent(request, key)) { if (exception is AgentstrationApiException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.NotFound }) SetFailure(exception); else pendingActionError = exception is AgentstrationApiException api ? api.Message : T("OperationUnconfirmed"); }
+        }
+        finally { if (!disposed && key == loadedKey) { respondingActionId = null; busy = false; await ProcessQueuedRefreshAsync(); } }
+    }
+    private bool CanExecute => ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
+    public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; Realtime.Updated -= OnRealtime; Realtime.StateChanged -= OnStateChanged; lifetime.Cancel(); lifetime.Dispose(); }
+
     private string T(string key)=>Localizer[key];private string F(string key,params object[] arguments)=>Localizer[key,arguments];private string Label(string prefix,object value){var raw=value.ToString()??string.Empty;var localized=Localizer[$"{prefix}.{raw}"];return localized.ResourceNotFound?raw:localized.Value;}
     private string OriginalRequest=>detail?.Interaction?.InputValues.TryGetValue("request",out var request)==true?(request.ValueKind==System.Text.Json.JsonValueKind.String?request.GetString()??"—":request.ToString()):detail?.Task.EntryId is null?T("ScheduledAutonomousWork"):"—";
     private string? WorkplaceTaskUrl=>WorkplaceUrl($"tasks/{TaskId}");private string? WorkplaceInteractionUrl=>detail?.Task.InteractionId is null?null:WorkplaceUrl($"?interaction={detail.Task.InteractionId}");
@@ -65,6 +229,6 @@ else
     private static string ResourceName(string value)=>value[(value.LastIndexOf('/')+1)..];private string ShortId(Guid? value)=>value is null?T("Autonomous"):value.Value.ToString("N")[..8];private static string ShortId(string? value)=>string.IsNullOrWhiteSpace(value)?"—":value.Length<=12?value:value[..12];
     private static string FormatContent(System.Text.Json.JsonElement value)=>value.ValueKind==System.Text.Json.JsonValueKind.String?value.GetString()??"":System.Text.Json.JsonSerializer.Serialize(value,new System.Text.Json.JsonSerializerOptions{WriteIndented=true});
     private static string FormatSize(long bytes)=>bytes<1024?$"{bytes} B":bytes<1024*1024?$"{bytes/1024d:F1} KB":$"{bytes/1024d/1024d:F1} MB";
-    private static string Duration(WorkTaskOperationsSummary task){var end=task.CompletedAt??DateTimeOffset.UtcNow;var start=task.StartedAt??task.CreatedAt;return end<start?"—":$"{end-start:g}";}private string RunDuration(WorkTaskFlowRunResponse run)=>run.StartedAt is null?T("NotStarted"):$"{(run.CompletedAt??DateTimeOffset.UtcNow)-run.StartedAt.Value:g}";
-    public void Dispose(){Realtime.Updated-=OnRealtime;Realtime.StateChanged-=OnStateChanged;lifetime.Cancel();lifetime.Dispose();}
+    private string Duration(WorkTaskOperationsSummary task){var end=task.CompletedAt??Clock.GetUtcNow();var start=task.StartedAt??task.CreatedAt;var elapsed = end - start; return elapsed < TimeSpan.Zero ? "—" : elapsed.TotalSeconds >= 1 ? $"{elapsed.TotalSeconds:0.##} s" : $"{elapsed.TotalMilliseconds:0.##} ms";}private string RunDuration(WorkTaskFlowRunResponse run)=>run.StartedAt is null?T("NotStarted"):$"{(run.CompletedAt??Clock.GetUtcNow())-run.StartedAt.Value:g}";
+
 }

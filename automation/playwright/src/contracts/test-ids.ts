@@ -540,6 +540,9 @@ export const TestIds = {
     publish: 'flow-publish-and-activate',
     statusMessage: 'flow-status-message',
   },
+  taskDetails: {
+    cancelConfirmation: 'task-cancel-confirmation',
+  },
   flowObservability: {
     flows: 'flow-observability-flows',
     flowDetails: 'flow-observability-flow-details',

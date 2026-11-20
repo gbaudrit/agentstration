@@ -108,6 +108,7 @@ export class FlowObservabilityPage {
 
   public async openFirstTaskFlowRun(taskId: string): Promise<string> {
     requireIdentifier(taskId, 'task');
+    await selectResourceSection(this.page, 'execution');
     const link = this.page.locator(`a[href^="/tasks/${attributeValue(taskId)}/flowruns/"]`).first();
     await link.waitFor({ state: 'visible' });
     const href = await link.getAttribute('href');

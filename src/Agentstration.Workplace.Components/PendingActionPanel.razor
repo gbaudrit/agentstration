@@ -27,22 +27,22 @@
         <div class="choice-grid">
             @foreach (var option in choice.Options)
             {
-                <button class="@(selected == option.Value ? "selected" : null)" aria-pressed="@(selected == option.Value)" disabled="@(Busy || submitting)" @onclick="() => SubmitChoice(choice, option)">@(selected == option.Value && submitting ? $"{option.Label}…" : option.Label)</button>
+                <button class="@(selected == option.Value ? "selected" : null)" aria-pressed="@(selected == option.Value)" disabled="@(Busy || submitting || SubmitDisabled)" @onclick="() => SubmitChoice(choice, option)">@(selected == option.Value && submitting ? $"{option.Label}…" : option.Label)</button>
             }
         </div>
     }
     else if (Action is RequestConfirmationAction confirmation)
     {
         <div class="confirmation-actions">
-            <button class="button-secondary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, false)">@Localizer["Cancel"]</button>
-            <button class="button-primary" disabled="@(Busy || submitting)" @onclick="() => SubmitConfirmation(confirmation, true)">@Localizer["Confirm"]</button>
+            <button class="button-secondary" disabled="@(Busy || submitting || SubmitDisabled)" @onclick="() => SubmitConfirmation(confirmation, false)">@Localizer["Cancel"]</button>
+            <button class="button-primary" disabled="@(Busy || submitting || SubmitDisabled)" @onclick="() => SubmitConfirmation(confirmation, true)">@Localizer["Confirm"]</button>
         </div>
     }
     else if (Action is RequestInputAction input)
     {
         <div class="input-response">
-            <ClearableText UpdateOnInput="false" Multiline="true" @bind-Value="text" placeholder="@Localizer["YourResponse"]" aria-label="@Localizer["YourResponse"]" Disabled="@(Busy || submitting)"></ClearableText>
-            <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy || submitting)" @onclick="() => SubmitInput(input)">@(submitting ? Localizer["Continuing"] : Localizer["Continue"])</button>
+            <ClearableText UpdateOnInput="@DraftChanged.HasDelegate" Multiline="true" Value="@text" ValueChanged="SetTextAsync" ValueExpression="@(() => text)" placeholder="@Localizer["YourResponse"]" aria-label="@Localizer["YourResponse"]" Disabled="@(Busy || submitting)"></ClearableText>
+            <button class="button-primary action-button" disabled="@(string.IsNullOrWhiteSpace(text) || Busy || submitting || SubmitDisabled)" @onclick="() => SubmitInput(input)">@(submitting ? Localizer["Continuing"] : Localizer["Continue"])</button>
         </div>
     }
 </section>
@@ -59,6 +59,12 @@
 
     [Parameter]
     public EventCallback<PendingActionAnswer> OnSubmit { get; set; }
+
+    [Parameter] public bool SubmitDisabled { get; set; }
+
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+
+    private async Task SetTextAsync(string? value) { text = value ?? string.Empty; await DraftChanged.InvokeAsync(text.Length > 0); }
 
     private string? selected = null;
     private string text = string.Empty;
@@ -85,24 +91,24 @@
 
     private async Task SubmitChoice(RequestChoiceAction action, EntryFieldOption option)
     {
-        if (submitting || Busy) return;
+        if (submitting || Busy || SubmitDisabled) return;
         selected = option.Value;
         submitting = true;
-        try { await OnSubmit.InvokeAsync(new(action.PendingActionId, action.ResumeToken, new Dictionary<string, JsonElement> { [action.FieldName] = JsonSerializer.SerializeToElement(option.Value) })); }
+        try { await DraftChanged.InvokeAsync(true); await OnSubmit.InvokeAsync(new(action.PendingActionId, action.ResumeToken, new Dictionary<string, JsonElement> { [action.FieldName] = JsonSerializer.SerializeToElement(option.Value) })); }
         finally { submitting = false; }
     }
 
     private async Task SubmitConfirmation(RequestConfirmationAction action, bool value)
     {
-        if (submitting || Busy) return;
+        if (submitting || Busy || SubmitDisabled) return;
         submitting = true;
-        try { await OnSubmit.InvokeAsync(new(action.PendingActionId, action.ResumeToken, new Dictionary<string, JsonElement> { ["confirmed"] = JsonSerializer.SerializeToElement(value) })); }
+        try { await DraftChanged.InvokeAsync(true); await OnSubmit.InvokeAsync(new(action.PendingActionId, action.ResumeToken, new Dictionary<string, JsonElement> { ["confirmed"] = JsonSerializer.SerializeToElement(value) })); }
         finally { submitting = false; }
     }
 
     private async Task SubmitInput(RequestInputAction action)
     {
-        if (submitting || Busy || string.IsNullOrWhiteSpace(text)) return;
+        if (submitting || Busy || SubmitDisabled || string.IsNullOrWhiteSpace(text)) return;
         submitting = true;
         try
         {
