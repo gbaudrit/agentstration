@@ -291,7 +291,15 @@ else
         try
         {
             if (DatasetMode) return;
-            selectedScope = string.IsNullOrWhiteSpace(ScopeRef) ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
+            if (Services.GetService<ConsoleContextState>() is { } context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token);
+                if (disposed || version != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            selectedScope = string.IsNullOrWhiteSpace(ScopeRef)
+                ? ResourceOwnershipContext.TryGetCurrent(Services) ?? (ConsoleContext is { } current ? ResourceScopeRef.Parse(current.SelectedScopeRef) : null)
+                : ResourceScopeRef.Parse(ScopeRef);
             if (!IsNew)
             {
                 var snapshot = await Client.GetAsync(ResourceNamespace.Parse(Namespace), Name!, selectedScope!.Value, cancellation.Token);

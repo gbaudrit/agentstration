@@ -1,8 +1,10 @@
 using System.Net;
 using Agentstration.DataSources.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
@@ -12,6 +14,36 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class DataSourceEditorTests
 {
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void NewSourceStartsCleanAndTracksIdentityInput(bool explicitOwner)
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton(TimeProvider.System);
+        context.Services.AddSingleton<IDataSourcesClient>(new SourceClientStub());
+        context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfileClientStub());
+        context.Services.AddSingleton(new ConsoleContextState(new AcquisitionConsoleContextProvider(Acquisition, true)));
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new CreationScopeInventory());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            explicitOwner ? $"/data-sources/new?scopeRef={Uri.EscapeDataString(Scope.Value)}" : "/data-sources/new");
+        var cut = context.Render<DataSourceEditor>();
+        var guard = cut.FindComponent<UnsavedNavigationGuard>().Instance;
+        cut.WaitForAssertion(() => Assert.IsFalse(guard.HasUnsavedChanges!()));
+        Assert.AreEqual(Scope.Value, cut.Find("[data-testid=resource-scope-picker]").GetAttribute("value"));
+        cut.Find("[data-testid=data-source-display-name]").Input("New source draft");
+        Assert.AreEqual("New source draft", cut.Find("[data-testid=data-source-display-name]").GetAttribute("value"));
+        Assert.IsTrue(guard.HasUnsavedChanges!());
+    }
+
+    private sealed class CreationScopeInventory : IResourceScopeInventoryClient
+    {
+        public Task<ResourceScopeInventoryResponse> GetAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ResourceScopeTargetResponse>> GetTargetsAsync(string resourceKind, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Catalog", true)]);
+    }
+
     private static BunitContext FoundationContext(SourceClientStub client)
     {
         var context = new BunitContext().WithCollectionPresentation();
