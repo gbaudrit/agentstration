@@ -61,6 +61,12 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.OK, repair.StatusCode);
         using var memberRepair = await member.GetAsync("/api/extensionregistrations");
         Assert.AreEqual(HttpStatusCode.Forbidden, memberRepair.StatusCode);
+        using var memberTransport = await member.PostAsync("/_blazor/negotiate?negotiateVersion=1", null);
+        Assert.AreEqual(HttpStatusCode.Forbidden, memberTransport.StatusCode);
+        using var administratorTransport = await newAdmin.PostAsync("/_blazor/negotiate?negotiateVersion=1", null);
+        Assert.AreEqual(HttpStatusCode.OK, administratorTransport.StatusCode);
+        using var memberHealth = await member.GetAsync("/health/live");
+        Assert.AreEqual(HttpStatusCode.OK, memberHealth.StatusCode);
         newAdmin.DefaultRequestHeaders.Accept.ParseAdd("text/html");
         using var tools = await newAdmin.GetAsync("/api/tools");
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, tools.StatusCode);
@@ -73,12 +79,15 @@ public sealed partial class SecurityApiTests
             Assert.IsTrue((await admission.Content.ReadFromJsonAsync<BootstrapStartupAdmission>())!.Ready);
             await LoginAsync(freshMember, "startup-member", LocalPassword);
         }
+        using var logout = await member.PostAsync("/api/auth/logout", null);
+        Assert.AreEqual(HttpStatusCode.NoContent, logout.StatusCode);
     }
 
     [TestMethod]
     public async Task LocalBffCredentialValidationUsesTheSameStartupAdmissionRule()
     {
-        await using var factory = Factory("Local");
+        using var fixture = BffFixture.Create();
+        await using var factory = fixture.Factory();
         using var administrator = UnredirectedClient(factory);
         await BootstrapAsync(administrator, "bff-startup-owner");
         var context = await administrator.GetFromJsonAsync<ConsoleContextView>("/api/identity/context");
@@ -92,6 +101,11 @@ public sealed partial class SecurityApiTests
             AuthenticationVersion: existing.Identity.AuthenticationVersion);
         Assert.IsTrue((await service.ValidateAsync(session, default)).Active);
         state.Begin(); state.EnableAdministration();
+        using var trustedTransport = fixture.SignedRequest("primary");
+        using var transportResponse = await administrator.SendAsync(trustedTransport);
+        Assert.AreEqual(HttpStatusCode.OK, transportResponse.StatusCode);
+        using var unsignedTransport = await administrator.GetAsync("/api/internal/bff/trust");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, unsignedTransport.StatusCode);
         Assert.IsFalse((await service.ValidateAsync(session, default)).Active);
         var denied = await service.AuthenticateLocalAsync(new("bff-startup-member", LocalPassword), default);
         Assert.AreEqual(LocalLoginOutcome.Failed, denied.Outcome);

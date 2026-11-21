@@ -35,14 +35,15 @@ internal sealed class BootstrapStartupPageMiddleware(RequestDelegate next)
             return;
         }
 
+        var pathBase = AuthenticationReturnUrls.Normalize(request.PathBase.Value).TrimEnd('/');
         var returnUrl = startupPage || request.Path == "/login"
             ? AuthenticationReturnUrls.Normalize(request.Query["ReturnUrl"])
             : AuthenticationReturnUrls.Normalize(request.PathBase + request.Path + request.QueryString);
-        var loginUrl = $"{request.PathBase}/login?ReturnUrl={Uri.EscapeDataString(returnUrl)}";
+        var loginUrl = $"{pathBase}/login?ReturnUrl={Uri.EscapeDataString(returnUrl)}";
         context.Response.Headers.CacheControl = "no-store";
         if (loginAvailable)
         {
-            context.Response.Redirect(loginUrl);
+            await Results.LocalRedirect(loginUrl).ExecuteAsync(context);
             return;
         }
 
@@ -73,7 +74,7 @@ internal sealed class BootstrapStartupPageMiddleware(RequestDelegate next)
                     <h1>{{title}}</h1>
                 </main>
                 <script>
-                    const readyUrl = {{JsonSerializer.Serialize($"{request.PathBase}/startup/ready")}};
+                    const readyUrl = {{JsonSerializer.Serialize($"{pathBase}/startup/ready")}};
                     const loginUrl = {{JsonSerializer.Serialize(loginUrl)}};
                     async function checkLogin() {
                         try {

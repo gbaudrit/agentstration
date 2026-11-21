@@ -681,6 +681,14 @@ and validation, enabled OIDC sign-in, and retained authenticated sessions enforc
 this temporary admission rule. Workspace administrator membership alone is
 insufficient. Ordinary admission resumes at startup readiness.
 
+The post-authentication gate checks retained user sessions before considering
+public endpoint metadata or session exit. A path prefix such as `/_blazor` or
+`/api/auth` cannot exempt a protected endpoint. Trusted BFF transport is identified
+by its verified workload authentication scheme; local session issuance and
+validation still apply the administrator admission policy. Startup navigation uses
+local redirects, with both return destinations and deployment path prefixes
+validated before generating browser URLs.
+
 Browser entry after sign-in opens `/startup/progress` instead of the partial
 Console overview. The shared StepProgress component displays the coordinator's
 four actual stages: instance structure, required extensions/contributions,
