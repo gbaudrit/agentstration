@@ -903,7 +903,7 @@ Source profiles cannot be mixed. See [ADR-0248](../decisions/0248-manual-bootstr
 Initial startup and manual application opt into the shared StepProgress viewport
 layout. Desktop panes use the remaining screen height and scroll independently;
 following keeps the current step and resource visible, including its bounded page.
-Scrolling, filtering, paging or inspecting another step pauses following. The
+Filtering, paging or inspecting another step pauses following; scrolling alone keeps it enabled. The
 existing follow command resumes it. Startup resource queries optionally accept
 `followResourceId` to return the bounded page containing that matching resource;
 filters, group, attempt and administrator authorization still apply.
@@ -918,3 +918,9 @@ publication failures, highlights the failed group and preserves preceding outcom
 Older history without diagnostic metadata explicitly states that the precise cause
 was not recorded. This additive JSON change needs no relational migration and does
 not introduce rollback or durable initial-startup history.
+
+Initial progress automatically returns to following when an observed dependency
+wait ends and Bootstrap resumes applying resources. Scrolling a pane does not
+disable following. Selecting a different step or using resource filters/paging
+pauses inspection temporarily; resuming following clears those filters so they
+cannot hide the current resource. Terminal failures retain their diagnostic view.

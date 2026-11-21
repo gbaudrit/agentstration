@@ -152,12 +152,18 @@ height. Narrow layouts keep stacked panes with bounded scrolling regions.
 
 While following, selection changes reveal the selected tab, and `ProgressKey`
 changes reveal the feature-owned row marked `data-progress-current="true"`.
-Scrolling either pane or interacting with detail controls pauses following.
-Clicking plain panel text or blank space leaves following enabled. Content
+Scrolling, pointer interactions and keyboard events in panel content never change
+the follow binding. Layout JavaScript only reveals the selected step/current row;
+it sends no pause callbacks to .NET. Explicit step selection and feature-owned
+inspection controls (search, filters or pagination) can pause following. The
+existing follow command restores it and the current selection together. Content
 mutations and pane/current-row resizes reposition the visible target even when
-its progress identity has not changed. An explicit resume releases the local
-pause even when pause/resume updates arrive within one animation frame.
-The existing follow command restores it without moving document scroll or
-changing execution. Paging/search adapters bind the same follow state, so manual
-inspection stays stable through polling. Features remain responsible for bounded
-resource queries and determining the current or failed resource.
+its identity has not changed. Features remain responsible for bounded resource
+queries, clearing incompatible inspection filters on resume, and determining the
+current or failed resource.
+
+The initial Bootstrap adapter resumes following when an observed dependency wait
+ends and execution continues. An administrator may inspect a completed group
+while the provider/model is unavailable; the next active group is selected when
+Bootstrap resumes. Ordinary progress refreshes during application continue to
+preserve deliberate inspection, and terminal failures do not silently resume it.

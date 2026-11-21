@@ -103,7 +103,6 @@
     private IEnumerable<ProgressStep> VisibleSteps => Steps.Where(step => step.ParentId is null || !collapsed.Contains(step.ParentId));
     private ElementReference root;
     private IJSObjectReference? module;
-    private DotNetObjectReference<StepProgress>? reference;
     private string? selectedId;
     private string? previousSelectedParameter;
     private bool previousFollowParameter = true;
@@ -194,13 +193,11 @@
         if (Selectable(ActiveStepId) is not { } active) return;
         requestedFocus = active.Id;
         if (active.ParentId is { } parentId) collapsed.Remove(parentId);
+        var selectionChanged = selectedId != active.Id;
+        selectedId = active.Id;
         following = true;
+        if (selectionChanged) await SelectedStepIdChanged.InvokeAsync(selectedId);
         await FollowActiveStepChanged.InvokeAsync(true);
-        if (selectedId != active.Id)
-        {
-            selectedId = active.Id;
-            await SelectedStepIdChanged.InvokeAsync(selectedId);
-        }
     }
 
     private async Task KeyDownAsync(KeyboardEventArgs args, string stepId)
@@ -234,8 +231,7 @@
         if (firstRender)
         {
             module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/step-progress.js");
-            reference = DotNetObjectReference.Create(this);
-            await module.InvokeVoidAsync("attach", root, reference);
+            await module.InvokeVoidAsync("attach", root);
         }
         if (requestedFocus is { } target)
         {
@@ -244,7 +240,6 @@
         }
     }
 
-    [JSInvokable]
     public async Task PauseFollowingAsync()
     {
         if (!FitToViewport || !following) return;
@@ -274,6 +269,5 @@
             await module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
-        finally { reference?.Dispose(); }
     }
 }

@@ -31,12 +31,15 @@
     private string search = string.Empty;
     private string? expanded;
     private int pageNumber = 1;
+    private bool previouslyFollowing;
     private IReadOnlyList<BootstrapApplicationProgressRow> Filtered => Rows.Where(row => string.IsNullOrWhiteSpace(search)
         || row.Resource.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || row.Resource.Kind.Contains(search, StringComparison.OrdinalIgnoreCase)
         || row.Resource.Profile.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
     private IReadOnlyList<BootstrapApplicationProgressRow> Visible => Filtered.Skip((pageNumber - 1) * 25).Take(25).ToArray();
     protected override void OnParametersSet()
     {
+        if (FollowCurrent && !previouslyFollowing) { search = string.Empty; pageNumber = 1; }
+        previouslyFollowing = FollowCurrent;
         var index = Filtered.ToList().FindIndex(row => row.IsCurrent || row.Status is ProgressStepStatus.Running or ProgressStepStatus.Failed);
         if (FollowCurrent && index >= 0 && Filtered[index].Status == ProgressStepStatus.Failed) expanded = RowKey(Filtered[index]);
         pageNumber = FollowCurrent && string.IsNullOrWhiteSpace(search) && index >= 0 ? index / 25 + 1

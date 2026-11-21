@@ -138,6 +138,11 @@ public sealed class BootstrapStartupProgressTests
         cut.Find("[data-testid='startup-resource-row'] .collection-actions button").Click();
         StringAssert.Contains(cut.Find("[data-testid='startup-resource-operations']").TextContent, "Apply resource");
         Assert.AreEqual("failed", api.ResourceQueries.Last().State);
+        cut.Find(".step-progress-follow").Click();
+        cut.WaitForAssertion(() => Assert.IsNull(api.ResourceQueries.Last().State));
+        Assert.AreEqual(25, cut.FindAll("[data-testid='startup-resource-row']").Count);
+        cut.Find("[data-testid='startup-resource-row'] .collection-actions button").Click();
+        Assert.AreEqual("false", cut.Find("[data-step-progress]").GetAttribute("data-follow-active"));
     }
 
     [TestMethod]
@@ -248,6 +253,50 @@ public sealed class BootstrapStartupProgressTests
         Assert.AreEqual(1, api.Reads);
         button.Click();
         Assert.AreEqual("http://localhost/agents", navigation.Uri);
+    }
+
+    [TestMethod]
+    public void DependencyReleaseResumesFollowingAfterInspectingACompletedGroup()
+    {
+        var api = new StartupClient();
+        var clock = new ManualClock();
+        api.Snapshot = api.Snapshot with
+        {
+            Activity = new("ModelProfile", "waiting-profile", WaitReason: "required_model_missing", GroupId: "second"),
+            Steps = api.Snapshot.Steps.Select(step => step.Id == "resources" ? step with { State = "waiting" } : step).ToArray(),
+            Families = [new("resources", "ModelProfile", "succeeded", 1, 1, 1, 0, 0, 0, 0) { GroupId = "first" },
+                new("resources", "ModelProfile", "waiting", 1, 0, 0, 0, 0, 0, 1) { GroupId = "second" },
+                new("resources", "Agent", "pending", 41, 0, 0, 0, 0, 0, 0) { GroupId = "agents" },
+                new("resources", "Flow", "pending", 40, 0, 0, 0, 0, 0, 0) { GroupId = "flows" }]
+        };
+        using var context = Context(api, clock);
+        var cut = context.Render<BootstrapStartupProgress>();
+        cut.Find("[data-step-id='resources:ModelProfile:first']").Click();
+        Assert.AreEqual("false", cut.Find("[data-step-progress]").GetAttribute("data-follow-active"));
+        Assert.AreEqual("resources:ModelProfile:first", cut.Find("[data-selected-step]").GetAttribute("data-selected-step"));
+        clock.Tick();
+        cut.WaitForAssertion(() => Assert.AreEqual("resources:ModelProfile:first", cut.Find("[data-selected-step]").GetAttribute("data-selected-step")));
+        api.Snapshot = api.Snapshot with
+        {
+            Revision = api.Snapshot.Revision + 1,
+            Activity = new("Agent", "next-agent", GroupId: "agents"),
+            Steps = api.Snapshot.Steps.Select(step => step.Id == "resources" ? step with { State = "running" } : step).ToArray(),
+            Families = api.Snapshot.Families.Select(family => family.GroupId == "second" ? family with { State = "succeeded" }
+                : family.GroupId == "agents" ? family with { State = "running" } : family).ToArray()
+        };
+        clock.Tick();
+        cut.WaitForAssertion(() => Assert.AreEqual("resources:Agent:agents", cut.Find("[data-selected-step]").GetAttribute("data-selected-step")));
+        Assert.AreEqual("true", cut.Find("[data-step-progress]").GetAttribute("data-follow-active"));
+        api.Snapshot = api.Snapshot with
+        {
+            Revision = api.Snapshot.Revision + 1,
+            Activity = new("Flow", "next-flow", GroupId: "flows"),
+            Families = api.Snapshot.Families.Select(family => family.GroupId == "agents" ? family with { State = "succeeded" }
+                : family.GroupId == "flows" ? family with { State = "running" } : family).ToArray()
+        };
+        clock.Tick();
+        cut.WaitForAssertion(() => Assert.AreEqual("resources:Flow:flows", cut.Find("[data-selected-step]").GetAttribute("data-selected-step")));
+        Assert.AreEqual("true", cut.Find("[data-step-progress]").GetAttribute("data-follow-active"));
     }
 
     [TestMethod]

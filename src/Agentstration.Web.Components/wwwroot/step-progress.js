@@ -8,9 +8,9 @@ function reveal(container, node) {
     else if (item.bottom > box.bottom) container.scrollTop += Math.min(item.top - box.top - 8, item.bottom - box.bottom + 8);
 }
 
-export function attach(root, reference) {
+export function attach(root) {
     detach(root);
-    let frame = 0, selected, paused = false;
+    let frame = 0, selected;
     const observed = new Set([root]);
     const sync = () => {
         frame = 0;
@@ -19,8 +19,7 @@ export function attach(root, reference) {
         const available = Math.max(240, (window.visualViewport?.height ?? window.innerHeight) - Math.max(0, layout.getBoundingClientRect().top) - 20);
         const height = `${Math.floor(available)}px`;
         if (root.style.getPropertyValue("--step-progress-available") !== height) root.style.setProperty("--step-progress-available", height);
-        if (root.dataset.followActive !== "true") { paused = false; return; }
-        if (paused) return;
+        if (root.dataset.followActive !== "true") return;
         const panel = root.querySelector("[data-selected-step]");
         const current = panel?.querySelector('[data-progress-current="true"]');
         const tabs = root.querySelector("[data-step-progress-tabs]");
@@ -33,22 +32,7 @@ export function attach(root, reference) {
         reveal(panel, current);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(sync); };
-    const pause = event => {
-        if (!root.classList.contains("fit-viewport") || root.dataset.followActive !== "true" || paused) return;
-        if (!event.target.closest?.(".step-progress-panel, [data-step-progress-tabs]")) return;
-        paused = true;
-        reference?.invokeMethodAsync("PauseFollowingAsync").catch(() => {});
-    };
-    const interaction = event => {
-        const container = event.target.closest?.(".step-progress-panel, [data-step-progress-tabs]");
-        if (!container) return;
-        const box = container.getBoundingClientRect();
-        const scrollbar = event.target === container && (event.clientX >= box.left + container.clientLeft + container.clientWidth
-            || event.clientY >= box.top + container.clientTop + container.clientHeight);
-        if (scrollbar || event.target.closest?.("button, a, input, select, textarea, summary, [contenteditable=true]")) pause(event);
-    };
     const listener = event => {
-        if (event.key !== "Tab" && event.target.closest?.(".step-progress-panel")) pause(event);
         const list = event.target.closest?.("[data-step-progress-tabs]");
         if (list?.closest("[data-step-progress]") !== root
             || !event.target.matches("button[role=tab]")
@@ -56,14 +40,7 @@ export function attach(root, reference) {
         if (navigationKeys.has(event.key)) event.preventDefault();
     };
     root.addEventListener("keydown", listener);
-    root.addEventListener("wheel", pause, { passive: true });
-    root.addEventListener("touchmove", pause, { passive: true });
-    root.addEventListener("pointerdown", interaction);
-    const mutation = new MutationObserver(records => {
-        // A pause and explicit resume can be rendered before the next animation frame.
-        if (records.some(record => record.target === root && record.attributeName === "data-follow-active")) paused = false;
-        schedule();
-    });
+    const mutation = new MutationObserver(schedule);
     mutation.observe(root, { attributes: true, childList: true, characterData: true, subtree: true, attributeFilter: ["data-follow-active", "data-active-step", "data-progress-key", "data-selected-step", "data-progress-current", "data-progress-resource", "aria-selected"] });
     const resize = new ResizeObserver(schedule);
     resize.observe(root);
@@ -73,9 +50,6 @@ export function attach(root, reference) {
     schedule();
     listeners.set(root, () => {
         root.removeEventListener("keydown", listener);
-        root.removeEventListener("wheel", pause);
-        root.removeEventListener("touchmove", pause);
-        root.removeEventListener("pointerdown", interaction);
         mutation.disconnect(); resize.disconnect();
         window.removeEventListener("resize", schedule);
         window.removeEventListener("scroll", schedule);

@@ -153,7 +153,12 @@ else
         try
         {
             var current = await Client.GetAsync(stopping.Token);
-            if (snapshot is not null && snapshot.AttemptId != current.AttemptId) { selected = null; following = true; }
+            if (snapshot is not null && (snapshot.AttemptId != current.AttemptId
+                || IsWaiting(snapshot) && !IsWaiting(current) && current.State != "failed"))
+            {
+                selected = null;
+                following = true;
+            }
             snapshot = current; disconnected = denied = false;
         }
         catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { snapshot = null; denied = true; }
@@ -163,6 +168,9 @@ else
         catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or InvalidOperationException or OperationCanceledException) { disconnected = true; }
         if (!stopping.IsCancellationRequested) StateHasChanged();
     }
+    private static bool IsWaiting(BootstrapStartupSnapshot value) =>
+        value.Activity?.WaitReason is not null || value.Steps.Any(step => step.State == "waiting");
+
     private void OpenConsole()
     {
         if (snapshot?.Ready != true) return;

@@ -96,33 +96,27 @@ test('following repositions both panes after content changes with unchanged prog
   assert.equal(browser.observed.size, 0);
 });
 
-test('an explicit resume before the next animation frame releases a local scroll pause', () => {
+test('following stays enabled through wheel and pointer events until the feature pauses it', () => {
   const browser = environment();
   browser.flush();
   browser.wheel();
-  assert.equal(browser.pauses(), 1);
+  browser.pointer(false);
+  browser.pointer(true);
+  assert.equal(browser.pauses(), 0, 'Layout JavaScript must never issue a late pause callback.');
   browser.panel.scrollTop = browser.tabs.scrollTop = 0;
   browser.mutation();
   browser.flush();
-  assert.equal(browser.panel.scrollTop, 0, 'Ordinary polling must retain the operator pause.');
-  // Blazor can render false and then true before the scheduled frame executes.
+  assert.ok(browser.panel.scrollTop > 0);
+  assert.ok(browser.tabs.scrollTop > 0);
+  browser.root.dataset.followActive = 'false';
+  browser.panel.scrollTop = browser.tabs.scrollTop = 0;
+  browser.mutation(['data-follow-active']);
+  browser.flush();
+  assert.equal(browser.panel.scrollTop, 0, 'An explicit feature-owned inspection pause remains effective.');
   browser.root.dataset.followActive = 'true';
-  browser.mutation(['data-follow-active', 'data-follow-active']);
+  browser.mutation(['data-follow-active']);
   browser.flush();
   assert.ok(browser.panel.scrollTop > 0);
   assert.ok(browser.tabs.scrollTop > 0);
-  browser.resize();
-  assert.equal(browser.frameCount(), 1);
-  module.detach(browser.root);
-  assert.equal(browser.frameCount(), 0);
-});
-
-test('plain panel clicks retain following while interactive inspection pauses it', () => {
-  const browser = environment();
-  browser.flush();
-  browser.pointer(false);
-  assert.equal(browser.pauses(), 0);
-  browser.pointer(true);
-  assert.equal(browser.pauses(), 1);
   module.detach(browser.root);
 });

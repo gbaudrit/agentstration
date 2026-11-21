@@ -47,6 +47,7 @@ public sealed class BootstrapProgressComponentTests
         cut.Render(p => p.Add(x => x.Application, application));
         StringAssert.Contains(cut.Find("[data-progress-current='true']").TextContent, "parameter-41");
         await cut.InvokeAsync(cut.FindComponent<StepProgress>().Instance.PauseFollowingAsync);
+        cut.Find("input[type='search']").Input("parameter-26");
         application = application with { Definition = application.Definition with { CurrentResource = new("batch", "52.yaml", "Parameter", "parameter-52", BootstrapResourceDisposition.Create) } };
         cut.Render(p => p.Add(x => x.Application, application));
         StringAssert.Contains(cut.Markup, "parameter-26");

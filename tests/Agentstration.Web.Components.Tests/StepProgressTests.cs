@@ -122,6 +122,11 @@ public sealed class StepProgressTests
         cut.Find(".step-progress-follow").Click();
         Assert.AreEqual("verify", cut.Instance.Selection);
         Assert.IsTrue(cut.Instance.Follow);
+        await cut.InvokeAsync(() => cut.Instance.MoveTo("transfer"));
+        Assert.AreEqual("transfer", cut.Instance.Selection);
+        Assert.IsTrue(cut.Instance.Follow);
+        await cut.InvokeAsync(() => cut.Instance.MoveTo("verify"));
+        Assert.AreEqual("verify", cut.Instance.Selection);
         await cut.InvokeAsync(() => cut.Instance.Inspect("prepare"));
         Assert.AreEqual("prepare", cut.Find("[role='tabpanel']").GetAttribute("data-selected-step"));
         Assert.IsFalse(cut.Instance.Follow);

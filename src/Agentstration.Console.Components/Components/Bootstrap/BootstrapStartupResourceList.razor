@@ -92,14 +92,18 @@
         {
             identity = next; pageNumber = 1; search = state = string.Empty; expanded = null; resourcePage = null; loadedRevision = -1;
         }
-        if (FollowCurrent && !previouslyFollowing) loadedRevision = -1;
+        if (FollowCurrent && !previouslyFollowing) { search = state = string.Empty; pageNumber = 1; loadedRevision = -1; }
         previouslyFollowing = FollowCurrent;
         return loadedRevision != Snapshot.Revision ? LoadAsync() : Task.CompletedTask;
     }
     private async Task SearchAsync(string value) { await FollowCurrentChanged.InvokeAsync(false); search = value; pageNumber = 1; await LoadAsync(); }
     private async Task FilterAsync(string value) { await FollowCurrentChanged.InvokeAsync(false); state = value; pageNumber = 1; await LoadAsync(); }
     private async Task PageAsync(int value) { await FollowCurrentChanged.InvokeAsync(false); pageNumber = value; await LoadAsync(); }
-    private void ToggleDetails(string id) => expanded = expanded == id ? null : id;
+    private async Task ToggleDetails(string id)
+    {
+        await FollowCurrentChanged.InvokeAsync(false);
+        expanded = expanded == id ? null : id;
+    }
     private async Task LoadAsync()
     {
         if (search.Length > 128) { readError = true; return; }
