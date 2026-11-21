@@ -56,3 +56,21 @@ The existing registered distribution Bootstrap catalog smoke also passed.
 No generic shell, routing, worker-observability or unrelated UX files were changed
 for this refinement. See the PR validation section for the final complete-lane
 results; these images alone do not certify authentication/security behavior.
+
+## Main synchronization after PR #1268
+
+Fetched `main` at `af66c226` and merged it into the Bootstrap branch. PR #1268's
+full-width rule originally targets only ResourceDetailsTemplate. Extend that same
+rule to the startup page's explicit marker and the Bootstrap catalog, preserving
+the standard Console layout and the ResourceDetails metric-tile constraints.
+
+Fresh Release executable checks passed on both `/startup/progress` and
+`/settings/bootstrap`: content uses all 1,640 available pixels at viewport 1,920,
+and all 2,280 pixels at viewport 2,560. At viewport widths 390 and 320, content
+fits without page-wide horizontal overflow. The ordinary Agents list retains its
+1,500-pixel cap. No browser JavaScript errors occurred. The existing deferred
+journeys #1251 / #1217 retain their UX-validation and merge gates.
+
+[Startup at 1,920 pixels](startup-full-width-1920.png) and
+[Bootstrap catalog at 1,920 pixels](catalog-full-width-1920.png) show the result.
+The implementation smoke was temporary; no new reusable journey was introduced.

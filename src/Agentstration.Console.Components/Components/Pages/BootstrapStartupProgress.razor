@@ -8,6 +8,7 @@
 @inject TimeProvider Clock
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
 
+<div class="bootstrap-startup-page">
 <PageTitle>@Localizer["Title"]</PageTitle>
 <PageHeader Title="@Localizer["Title"]" Eyebrow="@Localizer["Startup"]" Description="@Localizer["Description"]">
     <Status>@if (snapshot is not null) { <StatusBadge Text="@Localizer[snapshot.State == "failed" ? "Failed" : "Running"]" Status="@(snapshot.State == "failed" ? UiStatus.Danger : UiStatus.Info)" /> }</Status>
@@ -40,6 +41,8 @@ else
     </StepProgress>
     @if (snapshot.State == "failed") { <p class="startup-progress-notice" role="alert">@Localizer["Recovery"]</p> }
 }
+
+</div>
 
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "ReturnUrl")] public string? ReturnUrl { get; set; }
