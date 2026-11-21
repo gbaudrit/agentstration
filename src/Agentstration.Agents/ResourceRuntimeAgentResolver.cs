@@ -51,6 +51,21 @@ public sealed class ResourceRuntimeAgentResolver(
                 && !string.Equals(revision.Value.DefinitionHash, definitionHash, StringComparison.Ordinal))
             throw new RuntimeAgentResolutionException("agent_reference_stale", "The Agent revision no longer matches the exact pinned identity.");
         await ValidatePinnedDependenciesAsync(revision.Value.Definition, cancellationToken);
+        RuntimeDeploymentReference? deployment = null;
+        if (reference.Deployment is { } requested)
+        {
+            var dataScope = requestContext.IsInitialized && requestContext.Current.WorkspaceId != Guid.Empty
+                ? ResourceScopeRef.Workspace(requestContext.Current.WorkspaceId) : CurrentConsumerScopeRef();
+            if (requestContext.AccessMode != ControlPlaneAccessMode.System && dataScope != requested.ScopeRef)
+                throw new RuntimeAgentResolutionException("agent_deployment_unavailable", "The deployment assignment is unavailable.");
+            var stored = await store.GetExactAsync<AgentDeployment>(new(requested.ScopeRef, requested.Namespace, AgentResourceKinds.AgentDeployment, requested.Name), cancellationToken);
+            var config = stored?.Value.Uid == requested.Uid ? stored.Value.Configurations.SingleOrDefault(value => value.Id == requested.ConfigurationId) : null;
+            if (config is null || config.AgentUid != agent.Value.Uid || config.RevisionUid != revision.Value.Uid
+                || config.RevisionOwner != revision.Value.ScopeRef || config.RevisionNamespace != revision.Value.Namespace
+                || config.RevisionName != revision.Value.Name || config.DefinitionHash != revision.Value.DefinitionHash)
+                throw new RuntimeAgentResolutionException("agent_deployment_unavailable", "The deployment assignment is unavailable.");
+            deployment = requested with { Name = stored!.Value.Name, ScopeRef = stored.Value.ScopeRef!.Value };
+        }
         var modelProfileNamespace = revision.Value.Definition.ModelProfileNamespace
             ?? (agent.Value.Generation == reference.Version
                 ? agent.Value.Definition.ModelProfile.Resolve(agent.Value.Namespace, ModelResourceKinds.ModelProfile).Namespace
@@ -71,6 +86,8 @@ public sealed class ResourceRuntimeAgentResolver(
             AgentNamespace = reference.Namespace,
             AgentScopeRef = agent.Value.ScopeRef,
             RevisionUid = revision.Value.Uid,
+            Deployment = deployment,
+            DefinitionHash = revision.Value.DefinitionHash,
             RuntimeProfileNamespace = revision.Value.Definition.RuntimeProfileNamespace,
             ModelProfileNamespace = modelProfileNamespace,
             ModelProfileScopeRef = revision.Value.Definition.ModelProfilePin?.ScopeRef

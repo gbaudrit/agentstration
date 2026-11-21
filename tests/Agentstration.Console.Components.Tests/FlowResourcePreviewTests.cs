@@ -157,6 +157,61 @@ public sealed class FlowResourcePreviewTests
         Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
     }
 
+    [TestMethod]
+    [DataRow("uid")]
+    [DataRow("etag")]
+    [DataRow("match")]
+    public async Task GraphPreviewRequiresTheObservedUidAndSavedState(string change)
+    {
+        var saved = Resource("graph-preview");
+        using var handler = new Handler((_, _) => Task.FromResult(Response(saved)));
+        using var context = await ContextAsync(handler);
+        var expectation = new ResourcePreviewExpectation(Scope, change == "uid" ? Guid.NewGuid() : saved.Uid!.Value,
+            change == "generation" ? 999 : null, change == "etag" ? "stale" : "\"preview\"");
+        var cut = context.Render<FlowResourcePreview>(p => p.Add(c => c.Address, Target("graph-preview"))
+            .Add(c => c.Expectation, expectation).Add(c => c.OverviewHref, "/overview").Add(c => c.DefinitionHref, "/definition").Add(c => c.DesignerHref, "/designer"));
+        if (change == "match") Assert.HasCount(1, cut.FindComponents<FlowResourceSummary>());
+        else
+        {
+            Assert.IsEmpty(cut.FindComponents<FlowResourceSummary>());
+            Assert.AreEqual(ResourceLoadStatus.NotFound, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+            Assert.DoesNotContain("Saved graph-preview", cut.Markup);
+        }
+    }
+
+    [TestMethod]
+    public async Task GraphPreviewDoesNotReadInAnotherActorContext()
+    {
+        using var handler = new Handler((_, _) => throw new InvalidOperationException("Unexpected read."));
+        using var context = await ContextAsync(handler);
+        var cut = context.Render<FlowResourcePreview>(p => p.Add(c => c.Address, Target("graph-preview"))
+            .Add(c => c.Expectation, new ResourcePreviewExpectation(ResourceScopeRef.Instance, Guid.NewGuid()))
+            .Add(c => c.OverviewHref, "/overview").Add(c => c.DefinitionHref, "/definition").Add(c => c.DesignerHref, "/designer"));
+        Assert.AreEqual(0, handler.Reads);
+        Assert.AreEqual(ResourceLoadStatus.Forbidden, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ChangingActorOrRevokingReadPermissionClearsAnOpenGraphPreview(bool changeActor)
+    {
+        var saved = Resource("graph-preview");
+        using var handler = new Handler((_, _) => Task.FromResult(Response(saved)));
+        using var context = await ContextAsync(handler);
+        var cut = context.Render<FlowResourcePreview>(p => p.Add(c => c.Address, Target("graph-preview"))
+            .Add(c => c.Expectation, new ResourcePreviewExpectation(Scope, saved.Uid!.Value))
+            .Add(c => c.OverviewHref, "/overview").Add(c => c.DefinitionHref, "/definition").Add(c => c.DesignerHref, "/designer"));
+        Assert.HasCount(1, cut.FindComponents<FlowResourceSummary>());
+        var provider = (ResourceListContextProvider)context.Services.GetRequiredService<Agentstration.Web.Components.State.IConsoleContextProvider>();
+        if (changeActor) provider.Scope = ResourceScopeRef.Instance.Value;
+        else provider.Permissions = new HashSet<string>();
+        await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
+        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindComponents<FlowResourceSummary>()));
+        Assert.DoesNotContain("Saved graph-preview", cut.Markup);
+        Assert.AreEqual(1, handler.Reads);
+    }
+
     private static ScopedResourceAddress Target(string name) => ScopedResourceAddress.Create(Scope, ResourceNamespace.Default, FlowResourceKinds.Flow, name);
     private static FlowResponse Resource(string name) => new(name, "Saved " + name, null, "1.0.0", true, "1.0.0",
         new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent")),

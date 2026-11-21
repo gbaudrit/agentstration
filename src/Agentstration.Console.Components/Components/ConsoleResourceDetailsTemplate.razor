@@ -1,5 +1,7 @@
 @namespace Agentstration.Web.Components
 @using Agentstration.Web.Components.Pages
+@using Agentstration.SystemGraph.Contracts
+@using Agentstration.Web.Components.ResourceRelations
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Ui
@@ -15,7 +17,7 @@
                          DefinitionReadOnlyReason="EffectiveReadOnlyReason" ReadOnlyContextActions="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? OwnerContextAction : null)"
                          ReadOnlyTestId="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? "inherited-resource-notice" : null)"
                          ResourceIdentity="@EffectiveIdentity" SectionState="SectionState" SelectionChanged="SelectionChanged" SectionPresentations="SectionPresentations"
-                         DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" AdditionalContent="@AdditionalContent"
+                         DefinitionSections="DefinitionSections" AdditionalSections="ComposedSections" AdditionalContent="@ComposedContent"
                          OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityContent="@ExtensionProvenance" IdentityLabels="Resource?.Metadata.Tags" ResourceUid="Resource?.Uid" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent" OverviewSummary="@OverviewSummary"
                          DefinitionContent="@DefinitionContent" AccessContent="@(Resource is null ? null : AccessContent ?? (CanManageAccess ? AccessPanel : null))" YamlContent="@YamlEditor"
                          YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
@@ -95,6 +97,17 @@
 
     private string? accessIdentity;
     private bool accessDirty;
+    private ResourceScopeRef? RelationsContext => ResourceOwnershipContext.TryGetCurrent(Services);
+    private bool HasRelations => Resource is { Kind: AgentResourceKinds.Agent, ScopeRef: not null } saved
+        && saved.Uid != Guid.Empty && RelationsContext is not null;
+    private IReadOnlyList<ResourceNavigationItem> ComposedSections => HasRelations
+        ? [.. AdditionalSections, new("relations", Ui["ResourceSection.Relations"], "hierarchy")]
+        : AdditionalSections;
+    private RenderFragment<string>? ComposedContent => HasRelations ? RenderAdditionalSection : AdditionalContent;
+    private RenderFragment RenderAdditionalSection(string path) => path == "relations"
+        ? @<ResourceRelations @key="@((EffectiveIdentity, RelationsContext, Resource!.Generation, Resource.ETag))"
+            Context="RelationsContext!.Value" Namespace="Resource!.Namespace" Root="@SystemGraphIds.Definition(Resource!.Uid)" />
+        : AdditionalContent!(path);
     private string EffectiveIdentity => Resource is null ? $"{ResourceIdentity}|pending" : $"{ResourceIdentity}|{Resource.Uid}|{Resource.ScopeRef}|{Resource.Namespace}|{Resource.Kind}|{Resource.Name}";
     private ResourceLoadState? EffectiveLoadState => LoadState is null ? null : LoadState with { HasContent = Resource is not null && LoadState.HasContent };
     private bool CanManageAccess => AllowAccess && Resource is { ScopeRef: not null } && Resource.Uid != Guid.Empty
@@ -133,6 +146,10 @@
     {
         if (Resource is null && EffectiveLoadState?.BlocksContent != true)
             throw new InvalidOperationException("A pending resource requires a blocking load state.");
+        if (HasRelations && AdditionalSections.Any(section => section.Path == "relations"))
+            throw new ArgumentException("The Console layout supplies the Agent relations section.", nameof(AdditionalSections));
+        if (AdditionalSections.Count > 0 && AdditionalContent is null)
+            throw new ArgumentException("Additional sections require their content.", nameof(AdditionalContent));
         var identity = EffectiveIdentity;
         if (accessIdentity != identity || !CanManageAccess) accessDirty = false;
         accessIdentity = identity;

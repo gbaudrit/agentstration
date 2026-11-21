@@ -13,7 +13,9 @@ using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Local;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Security.AspNetCoreIdentity;
+using Agentstration.SystemGraph.Contracts;
 using Agentstration.Tools;
+using Agentstration.Web.Console;
 using Agentstration.Web.Hosting;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -67,6 +69,7 @@ public sealed class StandaloneRegistrationContractTests
             AssertSingleDescriptor<IModelProfileReferenceValidator>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IChatClientResolver>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<IFlowRunEventSink>(services, ServiceLifetime.Singleton);
+            AssertSingleDescriptor<ISystemGraphStreamClient>(services, ServiceLifetime.Scoped);
             AssertSingleDescriptor<TimeProvider>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<GenAiObservabilityOptions>(services, ServiceLifetime.Singleton);
             AssertSingleDescriptor<GenAiHttpPayloadCaptureHandler>(services, ServiceLifetime.Transient);
@@ -90,6 +93,7 @@ public sealed class StandaloneRegistrationContractTests
             AssertStorageProvider<IFlowRepository>();
             AssertStorageProvider<IRuntimeRunStore>();
             using var scope = provider.CreateScope();
+            Assert.AreSame<object>(scope.ServiceProvider.GetRequiredService<ISystemExplorerClient>(), scope.ServiceProvider.GetRequiredService<ISystemGraphStreamClient>());
             var identity = scope.ServiceProvider.GetRequiredService<LocalIdentityDbContext>();
             Assert.AreEqual(storageProvider == "PostgreSql" ? "Npgsql.EntityFrameworkCore.PostgreSQL" : "Microsoft.EntityFrameworkCore.Sqlite",
                 identity.Database.ProviderName);
@@ -117,6 +121,8 @@ public sealed class StandaloneRegistrationContractTests
     {
         var contributions = new Dictionary<Type, int>
         {
+            [typeof(Agentstration.Reconciliation.Contracts.IReconciliationPreviewService)] = 1,
+            [typeof(ISystemGraphContributor)] = 12,
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
@@ -146,6 +152,10 @@ public sealed class StandaloneRegistrationContractTests
             .Select(group => $"{group.Key.FullName}: {group.Count()}")
             .ToArray();
         Assert.HasCount(0, duplicates, string.Join(Environment.NewLine, duplicates));
+        AssertSingleDescriptor<ISystemGraphQueryService>(services, ServiceLifetime.Singleton);
+        AssertSingleDescriptor<ISystemGraphImpactService>(services, ServiceLifetime.Singleton);
+        AssertSingleDescriptor<ISystemGraphAuthorization>(services, ServiceLifetime.Singleton);
+        AssertSingleDescriptor<ISystemGraphReadScope>(services, ServiceLifetime.Singleton);
     }
 
     private static void AssertSingleDescriptor<TService>(IServiceCollection services, ServiceLifetime lifetime)

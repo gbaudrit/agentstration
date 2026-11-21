@@ -42,5 +42,7 @@ public sealed record FlowVersion(
     string? ReleaseNotes = null,
     IReadOnlyDictionary<string, SchemaBindingSnapshot>? SchemaBindings = null)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? ResourceUid { get; init; }
     public ResourceGovernance Governance { get; init; } = ResourceGovernance.User;
 }

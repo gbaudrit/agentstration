@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Title" xml:space="preserve"><value>System Explorer</value></data>
+  <data name="Description" xml:space="preserve"><value>Explore authorized resources and their recorded dependencies.</value></data>
+  <data name="Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Namespace" xml:space="preserve"><value>Namespace</value></data>
+  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Loading" xml:space="preserve"><value>Loading authorized resources…</value></data>
+  <data name="Partial" xml:space="preserve"><value>Partial observation; unsupported or invisible dependencies remain unknown. Observed:</value></data>
+  <data name="AllResources" xml:space="preserve"><value>All resources</value></data>
+  <data name="Next" xml:space="preserve"><value>Next page</value></data>
+  <data name="Export" xml:space="preserve"><value>Export received resources as JSON</value></data>
+  <data name="Diagram" xml:space="preserve"><value>Show diagram</value></data>
+  <data name="Empty" xml:space="preserve"><value>No resources available</value></data>
+  <data name="EmptyHelp" xml:space="preserve"><value>No visible resource matches this namespace or identity.</value></data>
+  <data name="DiagramLabel" xml:space="preserve"><value>Resource dependency diagram; the same resources are available in the table below.</value></data>
+  <data name="DiagramUnavailable" xml:space="preserve"><value>The diagram is unavailable. Use the resource table and JSON export.</value></data>
+  <data name="Resources" xml:space="preserve"><value>Resources</value></data>
+  <data name="Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Kind" xml:space="preserve"><value>Kind</value></data>
+  <data name="Owner" xml:space="preserve"><value>Owner scope</value></data>
+  <data name="State" xml:space="preserve"><value>State</value></data>
+  <data name="Evidence" xml:space="preserve"><value>Generation / publication</value></data>
+  <data name="Neighbors" xml:space="preserve"><value>Explore dependencies</value></data>
+  <data name="Selection" xml:space="preserve"><value>Selected resource</value></data>
+  <data name="OpenDetails" xml:space="preserve"><value>Open resource details</value></data>
+  <data name="OpenDesigner" xml:space="preserve"><value>Open Flow Designer</value></data>
+  <data name="Relations" xml:space="preserve"><value>Recorded relationships on this page</value></data>
+  <data name="Systems" xml:space="preserve"><value>Logical systems</value></data>
+  <data name="SystemsHelp" xml:space="preserve"><value>Membership describes an authored grouping. It does not create execution dependencies. Only currently visible members are shown.</value></data>
+  <data name="NewSystem" xml:space="preserve"><value>New system name</value></data>
+  <data name="Create" xml:space="preserve"><value>Create system</value></data>
+  <data name="System" xml:space="preserve"><value>System</value></data>
+  <data name="ChooseSystem" xml:space="preserve"><value>Select a system</value></data>
+  <data name="Rename" xml:space="preserve"><value>Rename</value></data>
+  <data name="AddSelected" xml:space="preserve"><value>Add selected resource</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove membership</value></data>
+  <data name="Delete" xml:space="preserve"><value>Delete system</value></data>
+  <data name="DeleteHelp" xml:space="preserve"><value>Delete this logical system and its memberships? Member resources will be preserved.</value></data>
+  <data name="ConfirmDelete" xml:space="preserve"><value>Confirm deletion</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="LoadFailed" xml:space="preserve"><value>The authorized inventory could not be loaded. Refresh to try again.</value></data>
+  <data name="ChangeFailed" xml:space="preserve"><value>The change could not be applied. Refresh and check your permissions, memberships and the latest system version.</value></data>
+  <data name="ExportFailed" xml:space="preserve"><value>The JSON export could not be downloaded.</value></data>
+  <data name="Draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="Published" xml:space="preserve"><value>Published</value></data>
+  <data name="RecordedGeneration" xml:space="preserve"><value>Recorded generation</value></data>
+  <data name="ReferenceIdentity" xml:space="preserve"><value>Referenced identity</value></data>
+  <data name="Metadata" xml:space="preserve"><value>Metadata</value></data>
+  <data name="Membership" xml:space="preserve"><value>Logical membership</value></data>
+  <data name="Dependency" xml:space="preserve"><value>Exact dependency</value></data>
+  <data name="DynamicDependency" xml:space="preserve"><value>Dynamic dependency</value></data>
+  <data name="GenerationOf" xml:space="preserve"><value>Generation of resource</value></data>
+  <data name="Publication" xml:space="preserve"><value>Publication</value></data>
+  <data name="Relation" xml:space="preserve"><value>Relationship</value></data>
+  <data name="Definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="ReconTitle" xml:space="preserve"><value>Reconciliation preview</value></data>
+  <data name="ReconDescription" xml:space="preserve"><value>Review a dependency change and the explicitly selected consumers.</value></data>
+  <data name="ReconBack" xml:space="preserve"><value>Back to System Explorer</value></data>
+  <data name="ReconReadOnly" xml:space="preserve"><value>This review performs no adoption or publication. Execution is currently unavailable.</value></data>
+  <data name="ReconFrom" xml:space="preserve"><value>Previous dependency evidence</value></data>
+  <data name="ReconTo" xml:space="preserve"><value>Target dependency evidence</value></data>
+  <data name="ReconChoose" xml:space="preserve"><value>Select an exact identity</value></data>
+  <data name="ReconInspect" xml:space="preserve"><value>Inspect affected consumers</value></data>
+  <data name="ReconConsumers" xml:space="preserve"><value>Selected consumers</value></data>
+  <data name="ReconConsumerHelp" xml:space="preserve"><value>Choose the exact consumers to review. Versions are proposals and are not published by this review.</value></data>
+  <data name="ReconNoConsumers" xml:space="preserve"><value>No authorized consumer is available in this bounded result. Missing evidence does not prove absence of impact.</value></data>
+  <data name="ReconProposedVersion" xml:space="preserve"><value>Proposed new publication version</value></data>
+  <data name="ReconPreview" xml:space="preserve"><value>Build review</value></data>
+  <data name="ReconReview" xml:space="preserve"><value>Dependency review</value></data>
+  <data name="ReconCurrent" xml:space="preserve"><value>The reviewed evidence and your current read access are unchanged. Execution remains unavailable.</value></data>
+  <data name="ReconPartial" xml:space="preserve"><value>Coverage is partial. This review cannot certify a globally complete or executable plan.</value></data>
+  <data name="ReconDigest" xml:space="preserve"><value>Review fingerprint</value></data>
+  <data name="ReconBindings" xml:space="preserve"><value>Inspect recorded bindings</value></data>
+  <data name="ReconBefore" xml:space="preserve"><value>Previous evidence</value></data>
+  <data name="ReconAfter" xml:space="preserve"><value>Current evidence</value></data>
+  <data name="ReconRevalidate" xml:space="preserve"><value>Revalidate review</value></data>
+  <data name="ReconFailed" xml:space="preserve"><value>The review could not be completed or its evidence changed. Reload and build a fresh review.</value></data>
+  <data name="ReconNoOp" xml:space="preserve"><value>No publication needed</value></data>
+  <data name="ReconAdopt" xml:space="preserve"><value>Dependency adoption</value></data>
+  <data name="ReconPublish" xml:space="preserve"><value>New publication</value></data>
+  <data name="ReconBlocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="ReconUnknown" xml:space="preserve"><value>Unknown or unsupported evidence</value></data>
+  <data name="ReconCompatible" xml:space="preserve"><value>The compatible dynamic binding requires no downstream publication.</value></data>
+  <data name="ReconSame" xml:space="preserve"><value>Both selections refer to the same observation.</value></data>
+  <data name="ReconMismatch" xml:space="preserve"><value>The selected latest contract is incompatible; no older fallback was selected.</value></data>
+  <data name="ReconAgentUnavailable" xml:space="preserve"><value>Agent adoption requires an approved adoption and publication policy.</value></data>
+  <data name="ReconConditionalUnavailable" xml:space="preserve"><value>A reviewed conditional publication command is required for this family.</value></data>
+  <data name="ReconUnavailable" xml:space="preserve"><value>Some selected evidence is unavailable in your current context.</value></data>
+  <data name="ReconCycle" xml:space="preserve"><value>A dependency cycle prevents safe ordering.</value></data>
+  <data name="ReconTruncated" xml:space="preserve"><value>A bounded evidence read was truncated.</value></data>
+  <data name="ReconAuthoringSource" xml:space="preserve"><value>Current consumer definition</value></data>
+  <data name="OpsTitle" xml:space="preserve"><value>Operational evidence</value></data>
+  <data name="OpsEnable" xml:space="preserve"><value>Enable live overlay</value></data>
+  <data name="OpsLive" xml:space="preserve"><value>Live, authorized sample</value></data>
+  <data name="OpsUnavailable" xml:space="preserve"><value>Disconnected or unavailable. Disable and enable to reconnect.</value></data>
+  <data name="OpsWindow" xml:space="preserve"><value>Active runs now and terminal runs updated within the last 15 minutes; at most 50 attested runs.</value></data>
+  <data name="OpsSampled" xml:space="preserve"><value>Last observed</value></data>
+  <data name="OpsInvocation" xml:space="preserve"><value>Invocation scope</value></data>
+  <data name="OpsDataScope" xml:space="preserve"><value>Stored execution scope</value></data>
+  <data name="OpsPublication" xml:space="preserve"><value>Publication</value></data>
+  <data name="OpsProvisioning" xml:space="preserve"><value>Provisioning</value></data>
+  <data name="OpsDependencies" xml:space="preserve"><value>Observed dependency pins</value></data>
+  <data name="OpsWorkers" xml:space="preserve"><value>Worker presence</value></data>
+  <data name="OpsObserved" xml:space="preserve"><value>Observed in this sample</value></data>
+  <data name="OpsActive" xml:space="preserve"><value>Active</value></data>
+  <data name="OpsSucceeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="OpsFailed" xml:space="preserve"><value>Failed or timed out</value></data>
+  <data name="OpsCancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="OpsDuration" xml:space="preserve"><value>Mean duration per completed run</value></data>
+  <data name="OpsUnknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OpsTokens" xml:space="preserve"><value>Reported input / output tokens</value></data>
+  <data name="OpsNoMetrics" xml:space="preserve"><value>Metrics unavailable: no authorized, attested direct run in this sample.</value></data>
+  <data name="OpsPartial" xml:space="preserve"><value>Partial evidence; no global health conclusion.</value></data>
+  <data name="OpsWorkItem" xml:space="preserve"><value>WorkItem</value></data>
+  <data name="OpsPlacement" xml:space="preserve"><value>Assignment</value></data>
+  <data name="OpsAttempt" xml:space="preserve"><value>Attempt / worker</value></data>
+  <data name="OpsLease" xml:space="preserve"><value>Lease expires</value></data>
+  <data name="OpsFencing" xml:space="preserve"><value>Fencing generation</value></data>
+  <data name="OpsState_unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OpsState_unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="OpsState_online" xml:space="preserve"><value>Online</value></data>
+  <data name="OpsState_offline" xml:space="preserve"><value>Offline</value></data>
+  <data name="OpsState_stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="OpsState_draft" xml:space="preserve"><value>Draft</value></data>
+  <data name="OpsState_definition" xml:space="preserve"><value>Definition</value></data>
+  <data name="OpsState_publication" xml:space="preserve"><value>Published version</value></data>
+  <data name="OpsState_published" xml:space="preserve"><value>Published</value></data>
+  <data name="OpsState_recorded-generation" xml:space="preserve"><value>Recorded generation</value></data>
+  <data name="OpsState_reference-identity" xml:space="preserve"><value>Identity reference</value></data>
+  <data name="OpsState_observed-pins-current" xml:space="preserve"><value>Observed pins match current generations</value></data>
+  <data name="OpsState_observed-pins-stale" xml:space="preserve"><value>Observed pins are stale</value></data>
+  <data name="OpsState_observed-consumers-stale" xml:space="preserve"><value>Observed consumers retain older generations</value></data>
+  <data name="OpsState_attested-window" xml:space="preserve"><value>Attested sample</value></data>
+  <data name="OpsState_bounded-sample" xml:space="preserve"><value>Result limit reached</value></data>
+  <data name="OpsState_family-unsupported" xml:space="preserve"><value>No operational adapter for this family</value></data>
+  <data name="OpsState_run-read-required" xml:space="preserve"><value>Run read permission required</value></data>
+  <data name="OpsState_pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="OpsState_running" xml:space="preserve"><value>Running</value></data>
+  <data name="OpsState_waiting" xml:space="preserve"><value>Waiting</value></data>
+  <data name="OpsState_succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="OpsState_failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="OpsState_cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="OpsState_timed-out" xml:space="preserve"><value>Timed out</value></data>
+  <data name="OpsState_assigned" xml:space="preserve"><value>Assigned</value></data>
+  <data name="OpsState_active" xml:space="preserve"><value>Active</value></data>
+  <data name="OpsState_interrupted" xml:space="preserve"><value>Interrupted</value></data>
+  <data name="OpsState_reported-complete" xml:space="preserve"><value>All token counts reported</value></data>
+  <data name="OpsState_reported-partial" xml:space="preserve"><value>Partial reported token counts</value></data>
+  <data name="OpsState_ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="OpsState_reconciling" xml:space="preserve"><value>Reconciling</value></data>
+  <data name="OpsState_provisioning" xml:space="preserve"><value>Provisioning</value></data>
+  <data name="OpsState_deleting" xml:space="preserve"><value>Deleting</value></data>
+  <data name="OpsState_notprovisioned" xml:space="preserve"><value>Not provisioned</value></data>
+<data name="OpsConnecting" xml:space="preserve"><value>Connecting to authorized evidence…</value></data>
+<data name="OpsStale" xml:space="preserve"><value>Evidence is stale. Facts were cleared; disable and enable to reconnect.</value></data>
+  <data name="OpsFlowBindingsTitle" xml:space="preserve"><value>Flow binding evidence</value></data>
+  <data name="OpsFlowBindingsHelp" xml:space="preserve"><value>These Flow Runs recorded this exact Agent binding. This association does not prove execution and is excluded from direct-run metrics. Turn and step evidence is shown only when attested by the assignment ledger.</value></data>
+  <data name="OpsFlowBindingsPartial" xml:space="preserve"><value>The Flow binding sample limit was reached.</value></data>
+  <data name="OpsConsumerState" xml:space="preserve"><value>Consumer Flow state</value></data>
+  <data name="OpsParticipant" xml:space="preserve"><value>Recorded participant</value></data>
+  <data name="OpsBoundRevision" xml:space="preserve"><value>Recorded Agent version / revision UID</value></data>
+  <data name="OpsInvocationUnknown" xml:space="preserve"><value>No attested invocation coordinates in this sample.</value></data>
+  <data name="OpsInvocationsPartial" xml:space="preserve"><value>At most eight invocation groups are shown for this binding.</value></data>
+  <data name="OpsStepExecution" xml:space="preserve"><value>Step execution</value></data>
+  <data name="OpsTurns" xml:space="preserve"><value>Observed distinct turns</value></data>
+  <data name="OpsSession" xml:space="preserve"><value>Worker session</value></data>
+  <data name="LoadingProgress" xml:space="preserve"><value>Loading — {0} authorized resources received.</value></data>
+  <data name="WindowCount" xml:space="preserve"><value>{0} displayed / {1} received</value></data>
+  <data name="Previous" xml:space="preserve"><value>Previous resources</value></data>
+  <data name="SystemsLoadFailed" xml:space="preserve"><value>Logical systems could not be loaded. Resource exploration remains available.</value></data>
+  <data name="LimitReached" xml:space="preserve"><value>The observation reached its limit. Narrow the context or namespace to explore the remaining resources.</value></data>
+  <data name="Perspective" xml:space="preserve"><value>Explorer perspectives</value></data>
+  <data name="PerspectiveResources" xml:space="preserve"><value>Resources</value></data>
+  <data name="PerspectiveDefinition" xml:space="preserve"><value>Definition</value></data>
+  <data name="PerspectiveDeployment" xml:space="preserve"><value>Deployments</value></data>
+  <data name="ChooseAgent" xml:space="preserve"><value>Choose an Agent</value></data>
+  <data name="DefinitionVersion" xml:space="preserve"><value>Definition version</value></data>
+  <data name="DefinitionDraft" xml:space="preserve"><value>Current editable definition</value></data>
+  <data name="DefinitionRevision" xml:space="preserve"><value>Revision {0}</value></data>
+  <data name="DefinitionCompare" xml:space="preserve"><value>Compare with</value></data>
+  <data name="DefinitionSingle" xml:space="preserve"><value>Single revision</value></data>
+  <data name="DefinitionDynamicNote" xml:space="preserve"><value>Recorded references retain their exact identities. Dynamic dependencies show current authorized metadata; an older generation is not a retained executable copy. Shared resources are grouped in the diagram; exact nodes remain in the list and export.</value></data>
+  <data name="DeploymentAssignment" xml:space="preserve"><value>Deployment assignment</value></data>
+  <data name="DeploymentConfiguration" xml:space="preserve"><value>Configuration history</value></data>
+  <data name="ChooseDeployment" xml:space="preserve"><value>Choose a deployment</value></data>
+  <data name="ChooseConfiguration" xml:space="preserve"><value>Choose a configuration</value></data>
+  <data name="DeploymentHistoryHelp" xml:space="preserve"><value>A deployment remains an assignment even without active runs. Each explicit reassignment retains the previous configuration. History is available while its referenced revisions remain retained and authorized.</value></data>
+  <data name="DeploymentEnvironment" xml:space="preserve"><value>Environment</value></data>
+  <data name="DeploymentTargetId" xml:space="preserve"><value>Stable target identifier</value></data>
+  <data name="DeploymentTargetName" xml:space="preserve"><value>Target name</value></data>
+  <data name="DeploymentTargetKind" xml:space="preserve"><value>Target kind</value></data>
+  <data name="DeploymentRuntime" xml:space="preserve"><value>Runtime container</value></data>
+  <data name="DeploymentName" xml:space="preserve"><value>New deployment name</value></data>
+  <data name="DeploymentRevision" xml:space="preserve"><value>Assigned revision</value></data>
+  <data name="DeploymentSnapshotAt" xml:space="preserve"><value>Configuration recorded at</value></data>
+  <data name="DeploymentDesired" xml:space="preserve"><value>Desired deployment</value></data>
+  <data name="DeploymentObservedRead" xml:space="preserve"><value>Read observed placements</value></data>
+  <data name="DeploymentObservedUnknown" xml:space="preserve"><value>Only runs explicitly associated with this deployment configuration are shown. Physical infrastructure and pool membership remain unknown unless attested. Sampled at:</value></data>
+  <data name="DeploymentObservedNone" xml:space="preserve"><value>No placement is attested for this configuration in the sampled window. This does not establish that no execution exists.</value></data>
+  <data name="DeploymentObservedPartial" xml:space="preserve"><value>Bounded observation: up to 20 Worker sessions. Historical attempts do not establish current availability.</value></data>
+  <data name="DeploymentNoConfiguration" xml:space="preserve"><value>No retained authorized configuration is available. A legacy name-only reference cannot establish a deployment snapshot.</value></data>
+  <data name="DeploymentNew" xml:space="preserve"><value>Create durable assignment</value></data>
+  <data name="DeploymentReassign" xml:space="preserve"><value>Record a new configuration</value></data>
+  <data name="DeploymentAssignHint" xml:space="preserve"><value>Saving records the desired assignment. It does not provision infrastructure, route work or start an Agent.</value></data>
+  <data name="DeploymentReadOnlyContext" xml:space="preserve"><value>Choose a Workspace context with resource write access to record an assignment.</value></data>
+  <data name="DeploymentSaveFailed" xml:space="preserve"><value>The assignment could not be saved. Refresh and verify the revision, target and permissions.</value></data>
+  <data name="DeploymentObservedFailed" xml:space="preserve"><value>Observed placement is unavailable. Previously displayed observations have been cleared.</value></data>
+  <data name="DeploymentTarget_worker-pool" xml:space="preserve"><value>Worker pool</value></data>
+  <data name="DeploymentTarget_host" xml:space="preserve"><value>Host</value></data>
+  <data name="DeploymentTarget_cluster" xml:space="preserve"><value>Cluster</value></data>
+  <data name="DeploymentTarget_remote-endpoint" xml:space="preserve"><value>Remote endpoint</value></data>
+  <data name="DeploymentRuntime_awp-worker" xml:space="preserve"><value>AWP Worker</value></data>
+  <data name="DeploymentRuntime_agentstration-server" xml:space="preserve"><value>Agentstration server</value></data>
+  <data name="DeploymentRuntime_remote-runtime" xml:space="preserve"><value>Remote runtime</value></data>
+  <data name="C4Environment" xml:space="preserve"><value>Declared deployment environment</value></data>
+  <data name="C4Worker" xml:space="preserve"><value>Worker</value></data>
+  <data name="RecordedGenerations" xml:space="preserve"><value>Referenced generations</value></data>
+  <data name="CurrentGeneration" xml:space="preserve"><value>Current generation</value></data>
+  <data name="DeploymentConfigurationState" xml:space="preserve"><value>Deployment configuration</value></data>
+  <data name="DeploymentConfigurationRelation" xml:space="preserve"><value>Selected configuration</value></data>
+  <data name="DeployedRevisionRelation" xml:space="preserve"><value>Assigned revision</value></data>
+  <data name="DeploymentNoAssignment" xml:space="preserve"><value>No authorized deployment assignment is available for this Agent.</value></data>
+  <data name="DeploymentRevisionHelp" xml:space="preserve"><value>Published revisions are available under Definition. Assign a revision to an environment and target from an authorized Workspace.</value></data>
+  <data name="DeploymentOpenDefinition" xml:space="preserve"><value>View published revisions</value></data>
+  <data name="DeploymentWorkspaces" xml:space="preserve"><value>Open deployment Workspace</value></data>
+  <data name="DeploymentWriteRequired" xml:space="preserve"><value>Resource write access is required to record or reassign a deployment in this Workspace.</value></data>
+  <data name="SummaryTechnical" xml:space="preserve"><value>Show technical details</value></data>
+  <data name="SummaryHelp" xml:space="preserve"><value>The summary groups generations of the same resource and places ToolSet access on the links. The list and JSON export keep exact received identities.</value></data>
+  <data name="SummaryCount" xml:space="preserve"><value>{0} diagram elements.</value></data>
+  <data name="SummaryLinks" xml:space="preserve"><value>Inspect diagram links</value></data>
+  <data name="SummaryLinkDetails" xml:space="preserve"><value>Link details</value></data>
+  <data name="SummaryDirectAccess" xml:space="preserve"><value>Direct access</value></data>
+  <data name="SummaryViaToolSet" xml:space="preserve"><value>via {0} · {1}</value></data>
+  <data name="SummaryViaToolSets" xml:space="preserve"><value>via {0} visible ToolSets</value></data>
+  <data name="SummaryToolSetAccess" xml:space="preserve"><value>Selected ToolSet member</value></data>
+  <data name="SummaryDefinitionPath" xml:space="preserve"><value>via tool definition</value></data>
+  <data name="SummaryPathHelp" xml:space="preserve"><value>These paths describe received references and selected ToolSet members. An unspecified legacy origin remains unknown; references alone do not establish execution or Worker placement.</value></data>
+  <data name="SummaryExactEvidence" xml:space="preserve"><value>Exact received evidence</value></data>
+  <data name="SummaryToolDefinitions" xml:space="preserve"><value>ToolDefinition provenance</value></data>
+  <data name="ResourceRelations" xml:space="preserve"><value>Relationships</value></data>
+  <data name="RelationsDirection" xml:space="preserve"><value>Relationship direction</value></data>
+  <data name="RelationsDependencies" xml:space="preserve"><value>Dependencies</value></data>
+  <data name="RelationsUsages" xml:space="preserve"><value>Uses of this resource</value></data>
+  <data name="RelationsDepth" xml:space="preserve"><value>Depth</value></data>
+  <data name="RelationsExpand" xml:space="preserve"><value>Expand one level</value></data>
+  <data name="RelationsOpenExplorer" xml:space="preserve"><value>Open in System Explorer</value></data>
+  <data name="RelationsDependenciesHelp" xml:space="preserve"><value>Resources referenced by this resource, directly or indirectly.</value></data>
+  <data name="RelationsUsagesHelp" xml:space="preserve"><value>Resources that reference this resource, directly or indirectly.</value></data>
+  <data name="RelationsList" xml:space="preserve"><value>Accessible resource list</value></data>
+  <data name="RelationsRoot" xml:space="preserve"><value>Resource in focus</value></data>
+  <data name="RelationsSelection" xml:space="preserve"><value>Selected resource</value></data>
+  <data name="RelationsRecenter" xml:space="preserve"><value>Center on this resource</value></data>
+  <data name="RelationsTechnicalDetails" xml:space="preserve"><value>Exact received metadata</value></data>
+  <data name="RelationsWindowLimit" xml:space="preserve"><value>The diagram is limited to {0} resources. Reduce the depth or center on a neighbor to continue.</value></data>
+  <data name="RelationsEmpty" xml:space="preserve"><value>No relationships are visible in the observed scope.</value></data>
+  <data name="RelationsPartial" xml:space="preserve"><value>Partial observation · Authorized resources only. Missing or unsupported relationships remain unknown.</value></data>
+  <data name="RelationsArrows" xml:space="preserve"><value>Arrows point from a referencing resource to its dependency.</value></data>
+  <data name="RelationsUnavailable" xml:space="preserve"><value>Relationships are unavailable in the current context. Refresh to try again.</value></data>
+  <data name="RelationsDiagramFailed" xml:space="preserve"><value>The graph is unavailable. You can explore the same resources in this list.</value></data>
+  <data name="RelationsTruncated" xml:space="preserve"><value>An exploration limit was reached; additional visible relationships may exist.</value></data>
+  <data name="RelationsViewport" xml:space="preserve"><value>Diagram viewport</value></data>
+  <data name="RelationsZoomIn" xml:space="preserve"><value>Zoom in</value></data>
+  <data name="RelationsZoomOut" xml:space="preserve"><value>Zoom out</value></data>
+  <data name="RelationsFit" xml:space="preserve"><value>Fit diagram to view</value></data>
+  <data name="RelationsResetFocus" xml:space="preserve"><value>Return to the page resource</value></data>
+  <data name="RelationsErrorTitle" xml:space="preserve"><value>Relationships unavailable</value></data>
+  <data name="RelationsMaximize" xml:space="preserve"><value>Full screen</value></data>
+  <data name="RelationsRestore" xml:space="preserve"><value>Exit full screen</value></data>
+  <data name="RelationsPresentation" xml:space="preserve"><value>Display mode</value></data>
+  <data name="RelationsGraph" xml:space="preserve"><value>Graph</value></data>
+  <data name="RelationsListView" xml:space="preserve"><value>List</value></data>
+  <data name="RelationsOneLevel" xml:space="preserve"><value>{0} level</value></data>
+  <data name="RelationsLevels" xml:space="preserve"><value>{0} levels</value></data>
+  <data name="RelationsOneResource" xml:space="preserve"><value>{0} resource</value></data>
+  <data name="RelationsResourceCount" xml:space="preserve"><value>{0} resources</value></data>
+  <data name="RelationsShowDetails" xml:space="preserve"><value>Resource details</value></data>
+  <data name="RelationsCloseDetails" xml:space="preserve"><value>Close details</value></data>
+  <data name="RelationsSelectionHint" xml:space="preserve"><value>Drag to explore · Select a resource for details</value></data>
+  <data name="RelationsPartialLabel" xml:space="preserve"><value>Partial observation</value></data>
+  <data name="RelationsKind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="RelationsKind.AgentRevision" xml:space="preserve"><value>Agent revision</value></data>
+  <data name="RelationsKind.AgentDeployment" xml:space="preserve"><value>Agent deployment</value></data>
+  <data name="RelationsKind.Tool" xml:space="preserve"><value>Tool</value></data>
+  <data name="RelationsKind.ToolDefinition" xml:space="preserve"><value>Tool definition</value></data>
+  <data name="RelationsKind.ToolSet" xml:space="preserve"><value>Tool set</value></data>
+  <data name="RelationsKind.ToolProvider" xml:space="preserve"><value>Tool provider</value></data>
+  <data name="RelationsKind.KnowledgeSource" xml:space="preserve"><value>Knowledge source</value></data>
+  <data name="RelationsKind.DataSource" xml:space="preserve"><value>Data source</value></data>
+  <data name="RelationsKind.ConnectedService" xml:space="preserve"><value>Connected service</value></data>
+  <data name="RelationsKind.ModelProfile" xml:space="preserve"><value>Model profile</value></data>
+  <data name="RelationsKind.RuntimeProfile" xml:space="preserve"><value>Runtime profile</value></data>
+  <data name="RelationsKind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="RelationsKind.FlowVersion" xml:space="preserve"><value>Flow version</value></data>
+  <data name="RelationsKind.Entry" xml:space="preserve"><value>Entry</value></data>
+  <data name="RelationsKind.Extension" xml:space="preserve"><value>Extension</value></data>
+  <data name="RelationsKind.ExtensionInstallation" xml:space="preserve"><value>Extension installation</value></data>
+  <data name="RelationsKind.System" xml:space="preserve"><value>System</value></data>
+  <data name="RelationsFocusViewport" xml:space="preserve"><value>Center view on the focused resource</value></data>
+  <data name="RelationsDiagramLabel" xml:space="preserve"><value>Resource relationship graph. The List view provides the same resources.</value></data>
+  <data name="RelationsPreparingGraph" xml:space="preserve"><value>Preparing graph…</value></data>
+  <data name="RelationsTypes" xml:space="preserve"><value>Types</value></data>
+  <data name="RelationsVisibleTypes" xml:space="preserve"><value>Visible resource types</value></data>
+  <data name="RelationsFiltersHelp" xml:space="preserve"><value>The focused resource stays visible. Hiding a type preserves resources beyond it.</value></data>
+  <data name="RelationsShowAllTypes" xml:space="preserve"><value>Show all types</value></data>
+  <data name="RelationsFilteredResourceCount" xml:space="preserve"><value>{0} / {1} resources</value></data>
+  <data name="RelationsHiddenResources" xml:space="preserve"><value>{0} resources hidden by type filters</value></data>
+  <data name="RelationsKind.ModelProvider" xml:space="preserve"><value>Model provider</value></data>
+  <data name="RelationsKind.ExtensionRegistration" xml:space="preserve"><value>Extension</value></data>
+  <data name="RelationsOneHiddenResource" xml:space="preserve"><value>{0} resource hidden by type filters</value></data>
+  <data name="RelationsKind.ConnectedServiceOperation" xml:space="preserve"><value>Service operation</value></data>
+  <data name="RelationsKind.ConnectedServiceType" xml:space="preserve"><value>Service type</value></data>
+  <data name="RelationsKind.ConnectedServiceOperationType" xml:space="preserve"><value>Service operation type</value></data>
+  <data name="RelationsKind.DataSourceQuery" xml:space="preserve"><value>Data source query</value></data>
+  <data name="RelationsKind.DataSourceProfile" xml:space="preserve"><value>Data source profile</value></data>
+  <data name="RelationsKind.Storage" xml:space="preserve"><value>Storage</value></data>
+  <data name="RelationsKind.Schema" xml:space="preserve"><value>Schema</value></data>
+  <data name="RelationsKind.TransformationFunction" xml:space="preserve"><value>Transformation function</value></data>
+  <data name="RelationsKind.Trigger" xml:space="preserve"><value>Trigger</value></data>
+  <data name="RelationsKind.Parameter" xml:space="preserve"><value>Parameter</value></data>
+  <data name="RelationsKind.Secret" xml:space="preserve"><value>Secret</value></data>
+  <data name="RelationsKind.Artifact" xml:space="preserve"><value>Artifact</value></data>
+  <data name="RelationsKind.Source" xml:space="preserve"><value>Source</value></data>
+  <data name="RelationsKind.SourceRegistry" xml:space="preserve"><value>Source registry</value></data>
+  <data name="RelationsKind.Model" xml:space="preserve"><value>Model</value></data>
+  <data name="RelationsKind.ExtensionBundleInstallation" xml:space="preserve"><value>Extension installation</value></data>
+</root>

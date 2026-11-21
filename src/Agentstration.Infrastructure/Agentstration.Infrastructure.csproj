@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.SystemOperations/Agentstration.SystemOperations.csproj" />
+    <ProjectReference Include="../Agentstration.Reconciliation/Agentstration.Reconciliation.csproj" />
+
+    <ProjectReference Include="../Agentstration.Systems/Agentstration.Systems.csproj" />
+    <ProjectReference Include="../Agentstration.SystemGraph/Agentstration.SystemGraph.csproj" />
     <ProjectReference Include="../Agentstration.Functions/Agentstration.Functions.csproj" />
     <ProjectReference Include="../Agentstration.Functions.Builtins/Agentstration.Functions.Builtins.csproj" />
 

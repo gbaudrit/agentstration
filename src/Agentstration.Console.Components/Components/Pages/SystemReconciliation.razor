@@ -1,0 +1,53 @@
+@page "/system-explorer/reconciliation"
+@using Agentstration.Reconciliation.Contracts
+@using Agentstration.SystemGraph.Contracts
+@implements IDisposable
+@inject ISystemExplorerClient Inventory
+@inject IReconciliationClient Client
+@inject IConsoleContextProvider ContextProvider
+@inject IConsoleNavigationContext NavigationContext
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SystemExplorerStrings> Localizer
+
+<PageTitle>@T("ReconTitle") · Agentstration</PageTitle>
+<PageHeader Title="@T("ReconTitle")" Description="@T("ReconDescription")" TestId="system-reconciliation" />
+<a href="@ExplorerUrl">@T("ReconBack")</a>
+@if (loading) { <LoadingState Message="@T("Loading")" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+else
+{
+    <p><code>@actor.Value</code> · <code>@resourceNamespace.Value</code></p>
+    <p class="muted">@T("ReconReadOnly")</p>
+    <form @onsubmit="CompareAsync" @onsubmit:preventDefault>
+        <FormField Label="@T("ReconFrom")"><ClearableSelect TValue="string" aria-label="@T("ReconFrom")" @bind-Value="from" @bind-Value:after="ClearReview"><option value="">@T("ReconChoose")</option>@foreach (var node in candidates) { <option value="@node.Id">@NodeLabel(node)</option> }</ClearableSelect></FormField>
+        <FormField Label="@T("ReconTo")"><ClearableSelect TValue="string" aria-label="@T("ReconTo")" @bind-Value="to" @bind-Value:after="ClearReview"><option value="">@T("ReconChoose")</option>@foreach (var node in candidates) { <option value="@node.Id">@NodeLabel(node)</option> }</ClearableSelect></FormField>
+        <button type="submit" class="button-secondary" disabled="@(busy || string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to))">@T("ReconInspect")</button>
+    </form>
+    @if (actionError is not null) { <ErrorState Message="@actionError" /> }
+    @if (comparison is not null)
+    {
+        <section class="panel"><h2>@T("ReconConsumers")</h2><p>@T("ReconConsumerHelp")</p>
+        @if (consumers.Count == 0) { <p role="status">@T("ReconNoConsumers")</p> }
+        @foreach (var node in consumers)
+        {
+            <div class="recon-consumer" @key="node.Id"><label><input type="checkbox" checked="@selected.Contains(node.Id)" @onchange="args => Select(node.Id, args.Value is true)" /> @NodeLabel(node)</label>
+            @if (selected.Contains(node.Id)) { <FormField Label="@T("ReconProposedVersion")"><ClearableText UpdateOnInput="false" maxlength="128" Value="@Version(node.Id)" ValueChanged="value => ChangeVersion(node.Id, value)" /></FormField> }</div>
+        }
+        <button type="button" class="button-primary" disabled="@(busy || selected.Count == 0)" @onclick="PreviewAsync">@T("ReconPreview")</button>
+        </section>
+    }
+    @if (review is not null)
+    {
+        <section class="panel" aria-label="@T("ReconReview")" data-testid="reconciliation-review"><h2>@T("ReconReview")</h2>
+        <p role="status">@T(revalidated ? "ReconCurrent" : "ReconPartial")</p><p>@T("ReconDigest") <code>@review.Digest</code></p>
+        <ul>@foreach (var reason in review.Blockers) { <li>@Reason(reason)</li> }</ul>
+        <ol>@foreach (var step in review.Steps)
+        {
+            <li @key="step.Consumer"><strong>@step.Identity.Kind · @step.Identity.Namespace/@step.Identity.Name</strong> <code>@step.Identity.OwnerScope.Value</code><p>@Action(step.Action) · @Status(step.Status) — @Reason(step.Reason)</p>
+            @if (step.ProposedVersion is not null) { <p>@T("ReconProposedVersion") <code>@step.ProposedVersion</code></p> }
+            @if (step.AuthoringSource is { } source) { <p>@T("ReconAuthoringSource") <code>@source.Identity.Namespace/@source.Identity.Name</code> · <code>@source.Evidence?.ETag</code></p> }
+            <details><summary>@T("ReconBindings")</summary><h3>@T("ReconBefore")</h3><pre>@JsonSerializer.Serialize(step.BeforeBindings, JsonOptions)</pre><h3>@T("ReconAfter")</h3><pre>@JsonSerializer.Serialize(step.AfterBindings, JsonOptions)</pre></details></li>
+        }</ol>
+        <button type="button" class="button-secondary" @onclick="RevalidateAsync" disabled="@busy">@T("ReconRevalidate")</button>
+        </section>
+    }
+}

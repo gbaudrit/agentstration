@@ -141,6 +141,62 @@ public sealed class ExtensionResourcePreviewTests
         response.SetResult(Response(Resource("extension-a")));
     }
 
+    [TestMethod]
+    [DataRow("uid")]
+    [DataRow("etag")]
+    [DataRow("generation")]
+    [DataRow("match")]
+    public async Task GraphPreviewRequiresTheObservedUidAndSavedState(string change)
+    {
+        var saved = Resource("graph-preview");
+        using var handler = new Handler((_, _) => Task.FromResult(Response(saved)));
+        using var context = await ContextAsync(handler);
+        var expectation = new ResourcePreviewExpectation(Scope, change == "uid" ? Guid.NewGuid() : saved.Uid,
+            change == "generation" ? 999 : saved.Generation, change == "etag" ? "stale" : "\"preview\"");
+        var cut = context.Render<ExtensionResourcePreview>(p => p.Add(c => c.Address, Target("graph-preview"))
+            .Add(c => c.Expectation, expectation).Add(c => c.OverviewHref, "/overview").Add(c => c.DefinitionHref, "/definition"));
+        if (change == "match") Assert.HasCount(1, cut.FindComponents<ExtensionResourceSummary>());
+        else
+        {
+            Assert.IsEmpty(cut.FindComponents<ExtensionResourceSummary>());
+            Assert.AreEqual(ResourceLoadStatus.NotFound, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+            Assert.DoesNotContain("Saved graph-preview", cut.Markup);
+        }
+    }
+
+    [TestMethod]
+    public async Task GraphPreviewDoesNotReadInAnotherActorContext()
+    {
+        using var handler = new Handler((_, _) => throw new InvalidOperationException("Unexpected read."));
+        using var context = await ContextAsync(handler);
+        var cut = context.Render<ExtensionResourcePreview>(p => p.Add(c => c.Address, Target("graph-preview"))
+            .Add(c => c.Expectation, new ResourcePreviewExpectation(ResourceScopeRef.Instance, Guid.NewGuid()))
+            .Add(c => c.OverviewHref, "/overview").Add(c => c.DefinitionHref, "/definition"));
+        Assert.AreEqual(0, handler.Reads);
+        Assert.AreEqual(ResourceLoadStatus.Forbidden, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task ChangingActorOrRevokingReadPermissionClearsAnOpenGraphPreview(bool changeActor)
+    {
+        var saved = Resource("graph-preview");
+        using var handler = new Handler((_, _) => Task.FromResult(Response(saved)));
+        using var context = await ContextAsync(handler);
+        var cut = context.Render<ExtensionResourcePreview>(p => p.Add(c => c.Address, Target("graph-preview"))
+            .Add(c => c.Expectation, new ResourcePreviewExpectation(Scope, saved.Uid))
+            .Add(c => c.OverviewHref, "/overview").Add(c => c.DefinitionHref, "/definition"));
+        Assert.HasCount(1, cut.FindComponents<ExtensionResourceSummary>());
+        var provider = (ResourceListContextProvider)context.Services.GetRequiredService<Agentstration.Web.Components.State.IConsoleContextProvider>();
+        if (changeActor) provider.Scope = ResourceScopeRef.Instance.Value;
+        else provider.Permissions = new HashSet<string>();
+        await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
+        cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindComponents<ExtensionResourceSummary>()));
+        Assert.DoesNotContain("Saved graph-preview", cut.Markup);
+        Assert.AreEqual(1, handler.Reads);
+    }
+
     private static ScopedResourceAddress Target(string name) => ScopedResourceAddress.Create(Scope, ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, name);
     private static ExtensionRegistrationResource Resource(string name) => new()
     {

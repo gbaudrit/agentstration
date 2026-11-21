@@ -77,6 +77,16 @@ The [Agents Summary POC](agents-summary-poc.md) supplies `OverviewSummary` inste
 
 Definition, additional sections, Access and YAML mount on first visit and remain mounted while hidden. Definition uses one retained fragment for its child sections so a family can keep a single validated form and `EditContext`. The Console adapter supplies `ResourceAccessPanel` from the saved `Resource` identity and existing ownership permissions. It combines access drafts with definition drafts in one leave guard, preserves policy edits across generation refreshes and rejects callbacks from replaced resource identities. The shared Web component has no dependency on Console clients or permission models. The adapter also supplies `ResourceYamlEditor` inside the shared YAML panel; parsing, authorization and save semantics remain family-owned.
 
+The Console adapter automatically adds **Relations** (`#relations`) for saved
+Agents with an exact UID/owner and a known Console actor context. It owns the
+entry, graph mounting and saved-generation/ETag invalidation; Agent screens add
+no section or fragment. Do not declare another `relations` primary entry. This
+is a central first-rollout restriction; later family activation also belongs in
+the adapter. Other additional sections and form drafts remain unchanged. The
+shared Web template stays neutral and owns no graph client. See the
+[resource relations contract](../reference/resource-relations.md) for authorized
+context, identity, coverage and deferred UX scenario details.
+
 Pass one `ResourceSectionState` instance to the adapter and read its `CurrentPath`, `DefinitionPath` and visited destinations in the family screen. The shared template updates that same instance after accepted navigation. Derive display predicates from it; do not maintain mutable per-section mode flags or a second visited-section registry. Request persisted section changes through navigation and let the accepted destination update the state. Creation may use the state directly for its form/YAML switch and record visited wizard editors.
 
 Declare section presentation in `SectionPresentations`, keyed by an exact navigable section path. Each `ResourceSectionPresentation` declares `HasRequiredFields`, `ReadOnly`, optional `ReadOnlyReason`/localized `ReadOnlyMessage`, its root model `Fields` and authorized `Actions`/`ReadOnlyActions`. Pass the same declaration to the retained `ResourceDefinitionForm`. The template adds one localized required-fields legend on a discreet guidance row above both body columns, outside header metadata, only for an editable section declaring required fields. Content and navigation keep the same starting position. State/loading views suppress the legend. Agent declares required fields for Identity, Configuration and Model/execution; Overview, Tools, Contracts, Access and YAML have no page-level legend. Creation keeps its existing form-start guidance.

@@ -163,8 +163,16 @@ public sealed class DataSourceQueryService(IResourceStore resources, IResourceSc
                 execution.ConsumerScope, ResourceAccessAction.Use, ct);
             if (!decision.Allowed) throw Error("data_source_query_access_denied");
         }
+        return await SelectPublicationAsync(owner, reference.Version, ct);
+    }
+
+    // Shared metadata selection for invocation and family-owned graph extraction. No content access.
+    internal async Task<DataSourceQueryVersionResource> SelectPublicationAsync(DataSourceQueryResource owner, string? selectedVersion, CancellationToken ct)
+    {
+        var scope = owner.ScopeRef!.Value;
+        var ns = owner.Namespace;
         DataSourceQueryVersionResource? version;
-        if (reference.Version is { } selected)
+        if (selectedVersion is { } selected)
         {
             Version(selected);
             using var authorizedVersion = scopes.PushSystem();

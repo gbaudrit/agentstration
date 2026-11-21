@@ -51,6 +51,8 @@ dotnet tool restore
 
 The script merges every module result into `artifacts/coverage/report/Cobertura.xml`, writes the line and branch totals to `artifacts/coverage/report/summary.md`, and generates the browsable report at `artifacts/coverage/report/index.html`. The same summary appears in the GitHub Actions run, and the complete raw and consolidated output is retained as the `functional-code-coverage` artifact.
 
+The CI Integration lane and coverage shard A have a 45-minute job budget. Native API modules can each take more than 20 minutes, and the full functional lane has exceeded 30 minutes locally. The Fast lane and coverage shard B retain their existing budgets; test assertions, module inventories and minimum test counts remain unchanged.
+
 ## Performance lane
 
 Performance workloads live in a dedicated project and are never discovered by the fast or integration lanes:

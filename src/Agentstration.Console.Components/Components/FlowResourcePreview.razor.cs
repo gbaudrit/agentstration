@@ -11,6 +11,7 @@ namespace Agentstration.Web.Components;
 public partial class FlowResourcePreview
 {
     [Parameter, EditorRequired] public ScopedResourceAddress Address { get; set; }
+    [Parameter] public ResourcePreviewExpectation? Expectation { get; set; }
     [Parameter, EditorRequired] public string OverviewHref { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string DefinitionHref { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string DesignerHref { get; set; } = string.Empty;
@@ -20,9 +21,12 @@ public partial class FlowResourcePreview
     private string? requestedKey;
     private long revision;
     private bool disposed;
-    private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
+    private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}|{Expectation}";
     private bool CanEdit => resource is not null && !resource.Governance.IsManaged && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef
         && Context.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    protected override void OnInitialized() => Context.Changed += ContextChanged;
+    private void ContextChanged() => _ = InvokeAsync(async () => { if (disposed) return; await LoadAsync(); if (!disposed) StateHasChanged(); });
+
     protected override Task OnParametersSetAsync() => requestedKey == SelectionKey ? Task.CompletedTask : LoadAsync();
     private async Task LoadAsync()
     {
@@ -33,7 +37,7 @@ public partial class FlowResourcePreview
         pending?.Cancel(); pending?.Dispose(); pending = new();
         var token = pending.Token;
         resource = null; loadState = new(ResourceLoadStatus.Loading);
-        if (!Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+        if (Context.Error is not null || Expectation?.CanRead(Context) == false || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
         if (target.Kind != FlowResourceKinds.Flow || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
         try
         {
@@ -41,6 +45,8 @@ public partial class FlowResourcePreview
             if (!IsCurrent(requestRevision, key)) return;
             if (snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Id != target.Name)
             { loadState = new(ResourceLoadStatus.Forbidden); return; }
+            if (Expectation?.Matches(snapshot.Value.Uid, null, snapshot.ETag) == false)
+            { loadState = new(ResourceLoadStatus.NotFound); return; }
             resource = snapshot.Value; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -57,10 +63,10 @@ public partial class FlowResourcePreview
             { ErrorId = (error as AgentstrationApiException)?.ErrorId };
         }
     }
-    private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
+    private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey && Context.Error is null && Expectation?.CanRead(Context) != false && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; revision++; pending?.Cancel(); pending?.Dispose(); GC.SuppressFinalize(this);
+        disposed = true; revision++; Context.Changed -= ContextChanged; pending?.Cancel(); pending?.Dispose(); GC.SuppressFinalize(this);
     }
 }

@@ -1,0 +1,48 @@
+@namespace Agentstration.Web.Components.ResourceRelations
+@using Agentstration.SystemGraph.Contracts
+
+@if (CanPreview(Node))
+{
+    @switch (Node.Identity.Kind)
+    {
+        case AgentResourceKinds.Agent:
+            <AgentResourcePreview @key="Expectation" Address="Address" Expectation="Expectation" OverviewHref="@SectionUrl("overview")" DefinitionHref="@SectionUrl("definition/configuration")" RunHref="@RunUrl" />
+            break;
+        case FlowResourceKinds.Flow:
+            <FlowResourcePreview @key="Expectation" Address="Address" Expectation="Expectation" OverviewHref="@SectionUrl("overview")" DefinitionHref="@SectionUrl("definition/configuration")" DesignerHref="@DesignerUrl" />
+            break;
+        case ExtensionKinds.ExtensionRegistration:
+            <ExtensionResourcePreview CanManageEnrollment="false" @key="Expectation" Address="Address" Expectation="Expectation" OverviewHref="@SectionUrl("overview")" DefinitionHref="@SectionUrl("definition/configuration")" />
+            break;
+    }
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter, EditorRequired] public SystemGraphNode Node { get; set; } = null!;
+    [Parameter, EditorRequired] public ResourceScopeRef Context { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    // Current family previews read saved definitions, never retained generations or publications.
+    internal static bool CanPreview(SystemGraphNode node) => node.State == "definition"
+        && node.Id == SystemGraphIds.Definition(node.Identity.ResourceUid)
+        && node.Identity.ResourceUid != Guid.Empty
+        && node.Identity.Kind is AgentResourceKinds.Agent or FlowResourceKinds.Flow or ExtensionKinds.ExtensionRegistration;
+
+    private ScopedResourceAddress Address => ScopedResourceAddress.Create(Node.Identity.OwnerScope, Node.Identity.Namespace, Node.Identity.Kind, Node.Identity.Name);
+    private ResourcePreviewExpectation Expectation => new(Context, Node.Identity.ResourceUid, Node.Evidence?.Generation, Node.Evidence?.ETag);
+    private string Collection => Node.Identity.Kind switch { AgentResourceKinds.Agent => "/agents", FlowResourceKinds.Flow => "/flows", _ => "/extensions" };
+    private string OverviewUrl => Node.Identity.Kind switch
+    {
+        AgentResourceKinds.Agent => ConsoleResourceUrls.Agent(Address.Namespace, Address.Name, Address.ScopeRef, Context),
+        FlowResourceKinds.Flow => ConsoleResourceUrls.Flow(new FlowId(Address.Name, Address.Namespace), Address.ScopeRef) + "&context=" + Uri.EscapeDataString(Context.Value),
+        _ => ConsoleResourceUrls.Resource(Collection, Address.Name, Address.Namespace, Address.ScopeRef, Context)
+    };
+    private string SectionUrl(string section) => OverviewUrl + "#" + section;
+    private string RunUrl => ConsoleResourceUrls.Resource("/agents", Address.Name, Address.Namespace, Address.ScopeRef, Context).Replace("?", "/run?", StringComparison.Ordinal);
+    private string DesignerUrl => (Address.Namespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(Address.Namespace.Value)}/flows")
+        + $"/{Uri.EscapeDataString(Address.Name)}/designer?scopeRef={Uri.EscapeDataString(Address.ScopeRef.Value)}&context={Uri.EscapeDataString(Context.Value)}";
+}

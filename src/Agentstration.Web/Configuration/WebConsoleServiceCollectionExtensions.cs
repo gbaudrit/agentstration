@@ -82,6 +82,10 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);
         AddClient<ToolSetsApiClient, IToolSetsClient>(services, configured.ManagementApi);
+        AddClient<SystemExplorerApiClient, ISystemExplorerClient>(services, configured.ManagementApi);
+        services.Replace(ServiceDescriptor.Scoped<ISystemGraphStreamClient>(provider => (ISystemGraphStreamClient)provider.GetRequiredService<ISystemExplorerClient>()));
+        AddClient<SystemOperationsClient, ISystemOperationsClient>(services, configured.ManagementApi);
+        AddClient<ReconciliationApiClient, IReconciliationClient>(services, configured.ManagementApi);
         AddClient<KnowledgeSourcesApiClient, IKnowledgeSourcesClient>(services, configured.ManagementApi);
         AddClient<DataSourcesApiClient, IDataSourcesClient>(services, configured.ManagementApi);
         AddClient<DataSourceProfilesApiClient, IDataSourceProfilesClient>(services, configured.ManagementApi);

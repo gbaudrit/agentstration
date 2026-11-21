@@ -20,4 +20,5 @@
   <data name="ExecutionProgress.CurrentStep" xml:space="preserve"><value>Étape en cours :</value></data>
   <data name="ExecutionProgress.WaitingStep" xml:space="preserve"><value>En attente de l’étape suivante</value></data>
   <data name="ExecutionProgress.BeforePublication" xml:space="preserve"><value>Transformation avant publication</value></data>
+  <data name="ResourceSection.Relations" xml:space="preserve"><value>Relations</value></data>
 </root>

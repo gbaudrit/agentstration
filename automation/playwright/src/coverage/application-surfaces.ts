@@ -346,6 +346,9 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'partial', trackingIssue: 1122,
     relatedSpecifications: ['tests/shared-forms.spec.ts'],
   },
+  // Inventory only: reusable System journeys retain their maintainer validation gates.
+  planned('system-explorer', `${consolePages}/SystemExplorer.razor`, ['/system-explorer'], 1201),
+  planned('system-reconciliation', `${consolePages}/SystemReconciliation.razor`, ['/system-explorer/reconciliation'], 1202),
   planned('transformation-functions', `${consolePages}/TransformationFunctions.razor`, ['/transformation-functions', '/function-kinds'], 1122),
   planned('transformation-function-editor', `${consolePages}/TransformationFunctionEditor.razor`, ['/transformation-functions/{Name}'], 1122, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),

@@ -1,0 +1,220 @@
+@page "/system-explorer"
+@using Agentstration.SystemGraph.Contracts
+@using Agentstration.Systems.Contracts
+@using Agentstration.Web.SystemExplorer
+@implements IDisposable
+@inject ISystemExplorerClient Client
+@inject IConsoleContextProvider ContextProvider
+@inject IConsoleNavigationContext NavigationContext
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SystemExplorerStrings> Localizer
+
+<PageTitle>@T("Title") · Agentstration</PageTitle>
+<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="system-explorer">
+    <Actions><button type="button" class="button-secondary" @onclick="RefreshAsync" disabled="@busy">@T("Refresh")</button></Actions>
+</PageHeader>
+<nav class="explorer-actions" aria-label="@T("Perspective")">
+    <a class="button-secondary" aria-current="@(Perspective == "resources" ? "page" : null)" href="@PerspectiveUrl("resources")">@T("PerspectiveResources")</a>
+    <a class="button-secondary" aria-current="@(Perspective == "definition" ? "page" : null)" href="@PerspectiveUrl("definition")">@T("PerspectiveDefinition")</a>
+    <a class="button-secondary" aria-current="@(Perspective == "deployment" ? "page" : null)" href="@PerspectiveUrl("deployment")">@T("PerspectiveDeployment")</a>
+</nav>
+@if (Perspective != "resources")
+{
+    <section class="panel" aria-label="@T("Perspective")">
+        @if (catalog is null)
+        {
+            <FormField Label="@T("ChooseAgent")"><ClearableSelect TValue="string" Value="@string.Empty" aria-label="@T("ChooseAgent")" ValueChanged="value => ChooseAgent(new ChangeEventArgs { Value = value })"><option value="">@T("ChooseAgent")</option>
+                @foreach (var agent in received?.Nodes.Where(node => node.Identity.Kind == "Agent" && node.State == "definition") ?? [])
+                { <option value="@agent.Id">@(agent.DisplayName ?? agent.Identity.Name) · @agent.Identity.OwnerScope.Value</option> }
+            </ClearableSelect></FormField>
+        }
+        else { <h2>@(catalog.Agent.DisplayName ?? catalog.Agent.Identity.Name)</h2> }
+        @if (Perspective == "definition" && catalog is not null)
+        {
+            <div class="explorer-actions">
+                <FormField Label="@T("DefinitionVersion")" Required="true"><ClearableSelect AllowClear="false" TValue="string" aria-label="@T("DefinitionVersion")" Value="@(VersionQuery ?? catalog.Revisions.FirstOrDefault()?.Id ?? "draft")" ValueChanged="value => ChangeDefinition(new ChangeEventArgs { Value = value })">
+                    <option value="draft">@T("DefinitionDraft")</option>
+                    @foreach (var value in catalog.Revisions) { <option value="@value.Id">@Localizer["DefinitionRevision", value.Evidence?.Publication ?? ""]</option> }
+                </ClearableSelect></FormField>
+                <FormField Label="@T("DefinitionCompare")"><ClearableSelect TValue="string" aria-label="@T("DefinitionCompare")" Value="@(CompareQuery ?? "")" ValueChanged="value => ChangeComparison(new ChangeEventArgs { Value = value })"><option value="">@T("DefinitionSingle")</option>
+                    @foreach (var value in catalog.Revisions.Where(value => value.Id != graphRoot)) { <option value="@value.Id">@Localizer["DefinitionRevision", value.Evidence?.Publication ?? ""]</option> }
+                </ClearableSelect></FormField>
+            </div>
+            <p>@T("DefinitionDynamicNote")</p>
+        }
+        @if (Perspective == "deployment")
+        {
+            <div class="explorer-actions">
+                <FormField Label="@T("DeploymentAssignment")"><ClearableSelect TValue="string" aria-label="@T("DeploymentAssignment")" disabled="@(loading || assignments.Count == 0)" Value="@(assignment?.Uid.ToString("D") ?? "")" ValueChanged="value => ChangeDeployment(new ChangeEventArgs { Value = value })"><option value="">@T("ChooseDeployment")</option>
+                    @foreach (var value in assignments) { <option value="@value.Uid">@value.Name · @value.Namespace.Value · @value.ScopeRef.Value</option> }
+                </ClearableSelect></FormField>
+                <FormField Label="@T("DeploymentConfiguration")"><ClearableSelect TValue="string" aria-label="@T("DeploymentConfiguration")" disabled="@(loading || assignment?.Configurations.Count is not > 0)" Value="@(configuration?.Id.ToString("D") ?? "")" ValueChanged="value => ChangeConfiguration(new ChangeEventArgs { Value = value })"><option value="">@T("ChooseConfiguration")</option>
+                    @foreach (var value in assignment?.Configurations.Reverse() ?? [])
+                    { <option value="@value.Id">@value.Environment · @Localizer["DefinitionRevision", value.AgentVersion] · @value.RecordedAt.ToLocalTime().ToString("g")</option> }
+                </ClearableSelect></FormField>
+            </div>
+            <p>@T("DeploymentHistoryHelp")</p>
+            @if (configuration is not null)
+            {
+                <dl class="resource-details"><dt>@T("DeploymentEnvironment")</dt><dd>@configuration.Environment</dd><dt>@T("DeploymentTargetName")</dt><dd>@configuration.Target.Name <code>@configuration.Target.Id</code></dd>
+                    <dt>@T("DeploymentRevision")</dt><dd>@configuration.RevisionName · <code>@configuration.RevisionUid</code></dd><dt>@T("DeploymentSnapshotAt")</dt><dd>@configuration.RecordedAt.ToLocalTime().ToString("G")</dd></dl>
+                <div class="explorer-actions"><button type="button" class="button-secondary" @onclick="ShowDesiredDeployment">@T("DeploymentDesired")</button>
+                    <button type="button" class="button-secondary" disabled="@(loading || observing)" @onclick="ObserveDeploymentAsync">@T("DeploymentObservedRead")</button></div>
+                @if (diagramOptions?.Mode == "observed")
+                {
+                    <p role="status">@T("DeploymentObservedUnknown") @if (deploymentObservation is not null) { <time>@deploymentObservation.SampledAt.ToLocalTime().ToString("G")</time> }</p>
+                    @if (!HasPlacement) { <p role="status">@T("DeploymentObservedNone")</p> }
+                    else { <p>@T("DeploymentObservedPartial")</p> }
+                }
+            }
+            else if (!loading)
+            {
+                <p role="status">@T(assignments.Count == 0 ? "DeploymentNoAssignment" : "DeploymentNoConfiguration")</p>
+                @if (catalog?.Revisions.Count > 0)
+                {
+                    <p>@T("DeploymentRevisionHelp") <a class="text-button" href="@PerspectiveUrl("definition")">@T("DeploymentOpenDefinition")</a></p>
+                }
+            }
+            @if (catalog?.Revisions.Count > 0 && contextScope.Kind == ResourceScopeKind.Workspace && canWrite)
+            {
+                <form @onsubmit="() => SaveAssignmentAsync(true)" @onsubmit:preventDefault>
+                    <FormField Label="@T("DeploymentName")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="deploymentName" maxlength="63" required /></FormField>
+                    <FormField Label="@T("DeploymentRevision")" Required="true"><ClearableSelect AllowClear="false" TValue="string" aria-label="@T("DeploymentRevision")" @bind-Value="deploymentRevision">@foreach (var value in catalog.Revisions) { <option value="@value.Identity.ResourceUid.ToString("D")">@Localizer["DefinitionRevision", value.Evidence?.Publication ?? ""]</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("DeploymentEnvironment")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="deploymentEnvironment" maxlength="100" required /></FormField>
+                    <FormField Label="@T("DeploymentTargetId")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="deploymentTargetId" maxlength="200" required /></FormField>
+                    <FormField Label="@T("DeploymentTargetName")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="deploymentTargetName" maxlength="200" required /></FormField>
+                    <FormField Label="@T("DeploymentTargetKind")" Required="true"><ClearableSelect AllowClear="false" TValue="string" aria-label="@T("DeploymentTargetKind")" @bind-Value="deploymentTargetKind">@foreach (var kind in new[] { "worker-pool", "host", "cluster", "remote-endpoint" }) { <option value="@kind">@T("DeploymentTarget_" + kind)</option> }</ClearableSelect></FormField>
+                    <FormField Label="@T("DeploymentRuntime")" Required="true"><ClearableSelect AllowClear="false" TValue="string" aria-label="@T("DeploymentRuntime")" @bind-Value="deploymentRuntime">@foreach (var kind in new[] { "awp-worker", "agentstration-server", "remote-runtime" }) { <option value="@kind">@T("DeploymentRuntime_" + kind)</option> }</ClearableSelect></FormField>
+                    <button type="submit" class="button-primary" disabled="@(!CanAssign)">@T("DeploymentNew")</button>
+                    @if (assignment is not null) { <button type="button" class="button-secondary" disabled="@(!CanReassign)" @onclick="() => SaveAssignmentAsync(false)">@T("DeploymentReassign")</button> }
+                </form>
+                <p>@T("DeploymentAssignHint")</p>
+            }
+            else if (catalog is not null)
+            {
+                <p>@T(contextScope.Kind == ResourceScopeKind.Workspace ? "DeploymentWriteRequired" : "DeploymentReadOnlyContext")</p>
+                @if (contextScope.Kind != ResourceScopeKind.Workspace && deploymentWorkspaces.Count > 0)
+                {
+                    <nav aria-label="@T("DeploymentWorkspaces")" class="explorer-actions">
+                        @foreach (var workspace in deploymentWorkspaces)
+                        { <a class="button-secondary" href="@DeploymentWorkspaceUrl(workspace)">@workspace.TenantDisplayName · @workspace.DisplayName</a> }
+                    </nav>
+                }
+            }
+        }
+        @if (perspectiveError is not null) { <ErrorState Message="@perspectiveError" /> }
+    </section>
+}
+<form @onsubmit="ApplyNamespace" @onsubmit:preventDefault>
+    <FormField Label="@T("Namespace")"><ClearableText UpdateOnInput="false" @bind-Value="namespaceInput" maxlength="63" disabled="@(!contextReady)" /></FormField>
+    <button class="button-secondary" type="submit" disabled="@(!contextReady)">@T("Apply")</button>
+</form>
+@if (loading && page is null) { <LoadingState Message="@T("Loading")" /> }
+@if (error is not null) { <ErrorState Message="@error" /> }
+@if (page is not null)
+{
+    @if (loading) { <p class="explorer-loading" role="status">@Localizer["LoadingProgress", page.Nodes.Count]</p> }
+    @if (truncated) { <p role="status">@T("LimitReached")</p> }
+    <p class="muted" role="status">@T("Partial") <time datetime="@(page.ObservedAt.ToString("O"))">@(page.ObservedAt.LocalDateTime.ToString("g"))</time></p>
+    <p><code>@contextScope.Value</code> · <code>@resourceNamespace.Value</code></p>
+    <div class="explorer-actions">
+        <a class="button-secondary" href="@ExplorerUrl(null)">@T("AllResources")</a>
+        @if (windowOffset > 0) { <button class="button-secondary" type="button" @onclick="PreviousAsync">@T("Previous")</button> }
+        @if (HasNextWindow) { <button class="button-secondary" type="button" @onclick="NextAsync">@T("Next")</button> }
+        <span role="status">@Localizer["WindowCount", diagramPage?.Nodes.Count ?? 0, page.Nodes.Count]</span>
+        <button class="button-secondary" type="button" @onclick="ExportAsync">@T("Export")</button>
+        <label><input type="checkbox" @bind="showDiagram" /> @T("Diagram")</label>
+        @if (Perspective != "deployment") { <label><input type="checkbox" checked="@technicalDiagram" @onchange="ChangeTechnical" /> @T("SummaryTechnical")</label> }
+    </div>
+    @if (actionError is not null) { <ErrorState Message="@actionError" /> }
+    @if (!loading && page.Nodes.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("EmptyHelp")" /> }
+    else if (page.Nodes.Count > 0)
+    {
+        @if (showDiagram && !diagramFailed && (Perspective != "deployment" || configuration is not null && (diagramOptions?.Mode != "observed" || HasPlacement))) { <SystemGraphDiagram @key="(revision, windowOffset, Perspective, technicalDiagram)" Page="visualPage!" Options="diagramOptions" RelationshipLabels="RelationshipLabels" OverlayNotes="overlayNotes" Label="@T("DiagramLabel")" Selected="Select" LinkSelected="SelectLink" Failed="DiagramFailed" /> }
+        @if (diagramFailed) { <p role="status">@T("DiagramUnavailable")</p> }
+        @if (summary is not null)
+        {
+            <p>@T("SummaryHelp") @Localizer["SummaryCount", summary.Graph.Nodes.Count]</p>
+            @if (summary.Links.Count > 0)
+            {
+                <details><summary>@T("SummaryLinks")</summary><ul>
+                    @foreach (var link in summary.Links)
+                    { <li><button type="button" class="text-button" @onclick="() => SelectLink(link.Id)">@(link.Source.DisplayName ?? link.Source.Identity.Name) → @(link.Target.DisplayName ?? link.Target.Identity.Name) · @LinkTitle(link)</button></li> }
+                </ul></details>
+            }
+        }
+        @if (selectedLink is not null)
+        {
+            <section class="panel" aria-label="@T("SummaryLinkDetails")">
+                <h2>@T("SummaryLinkDetails")</h2><p>@(selectedLink.Source.DisplayName ?? selectedLink.Source.Identity.Name) → @(selectedLink.Target.DisplayName ?? selectedLink.Target.Identity.Name)</p>
+                <p>@T("SummaryPathHelp")</p>
+                @foreach (var path in selectedLink.Paths)
+                {
+                    @if (path.Via is { } via)
+                    { <h3>@NodeDisplayName(via) · @via.Evidence?.Publication</h3><code>@via.Identity.OwnerScope.Value · @via.Identity.Namespace.Value · @via.Id</code> }
+                    <ol>@foreach (var step in path.Steps)
+                    { <li><code>@step.Source</code> — @RelationKind(step.Kind) → <code>@step.Target</code><br /><code>@step.SourceField</code> <code>@step.Resolution</code> <code>@step.SelectedPublication</code></li> }</ol>
+                }
+                @if (selectedLink.ToolDefinitions.Count > 0)
+                {
+                    <h3>@T("SummaryToolDefinitions")</h3><ul>@foreach (var definition in selectedLink.ToolDefinitions)
+                    { <li>@(definition.DisplayName ?? definition.Identity.Name) · @definition.Evidence?.Publication<br /><code>@definition.Id</code> · <code>@definition.Identity.OwnerScope.Value</code> · <code>@definition.Identity.Namespace.Value</code></li> }</ul>
+                }
+                <details><summary>@T("SummaryExactEvidence")</summary><pre class="explorer-json">@JsonSerializer.Serialize(selectedLink, JsonOptions)</pre></details>
+            </section>
+        }
+        <section aria-label="@T("Resources")" aria-busy="@loading">
+            <h2>@T("Resources")</h2>
+            <div class="explorer-scroll"><table class="data-grid"><thead><tr><th>@T("Name")</th><th>@T("Kind")</th><th>@T("Owner")</th><th>@T("State")</th><th>@T("Evidence")</th><th></th></tr></thead><tbody>
+            @foreach (var node in diagramPage!.Nodes)
+            {
+                <tr @key="node.Id" data-testid="explorer-node" aria-selected="@(selected?.Id == node.Id)"><td><button type="button" class="text-button" @onclick="() => Select(node.Id)">@(node.DisplayName ?? node.Identity.Name)</button><br /><code>@node.Identity.Namespace/@node.Identity.Name</code></td><td><code>@node.Identity.Kind</code></td><td><code>@node.Identity.OwnerScope.Value</code></td><td>@NodeState(node.State)</td><td><code>@(node.Evidence?.Publication ?? node.Evidence?.Generation?.ToString() ?? "—")</code></td><td><a href="@ExplorerUrl(node.Id)">@T("Neighbors")</a>@if (node.Identity.Kind is "Agent" or "AgentRevision") { <br /><a href="@PerspectiveUrl("definition", node.Id)">@T("PerspectiveDefinition")</a><br /><a href="@PerspectiveUrl("deployment", node.Id)">@T("PerspectiveDeployment")</a> }</td></tr>
+            }
+            </tbody></table></div>
+        </section>
+        @if (selected is not null)
+        {
+            <section class="panel" aria-label="@T("Selection")" data-testid="explorer-selection">
+                <h2>@NodeDisplayName(selected)</h2><p><code>@selected.Id</code></p>
+                @if (DetailsUrl(selected) is { } url) { <a class="button-secondary" href="@url">@T("OpenDetails")</a> }
+                @if (selected.Identity.Kind == "Flow") { <a class="button-secondary" href="@DetailsUrl(selected, true)">@T("OpenDesigner")</a> }
+                <a class="button-secondary" href="@ReconciliationUrl(selected.Id)">@T("ReconTitle")</a>
+                <SystemOperationsPanel @key="selected.Id" Root="@selected.Id" Context="contextScope" Namespace="selected.Identity.Namespace" Changed="OperationalChanged" />
+                <pre class="explorer-json">@JsonSerializer.Serialize(selected, JsonOptions)</pre>
+                <h3>@T("Relations")</h3>
+                <ul>@foreach (var edge in page.Relations.Where(edge => edge.Source == selected.Id || edge.Target == selected.Id))
+                    { <li><code>@edge.Source</code> — @RelationKind(edge.Kind) → <code>@edge.Target</code><br /><code>@edge.SourceField</code> <code>@edge.Resolution</code> <code>@edge.Assessment</code></li> }</ul>
+            </section>
+        }
+    }
+    <section class="panel" aria-label="@T("Systems")">
+        <h2>@T("Systems")</h2><p>@T("SystemsHelp")</p>
+        <FormField Label="@T("Owner")" Required="true"><ClearableSelect AllowClear="false" TValue="string" aria-label="@T("Owner")" Value="@ownerScope.Value" ValueChanged="value => ChangeOwner(new ChangeEventArgs { Value = value })">
+            @foreach (var scope in page.Scopes) { <option value="@scope.Scope.Value">@scope.Scope.Value</option> }
+        </ClearableSelect></FormField>
+        @if (canWrite && ownerScope == contextScope)
+        {
+            <form @onsubmit="CreateAsync" @onsubmit:preventDefault><FormField Label="@T("NewSystem")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="newLabel" maxlength="200" required /></FormField><button class="button-primary" type="submit" disabled="@MutationBlocked">@T("Create")</button></form>
+        }
+        <FormField Label="@T("System")"><ClearableSelect TValue="string" aria-label="@T("System")" Value="@(system?.Uid.ToString() ?? "")" ValueChanged="value => ChangeSystem(new ChangeEventArgs { Value = value })"><option value="">@T("ChooseSystem")</option>@foreach (var value in systems) { <option value="@value.Uid">@value.DisplayName</option> }</ClearableSelect></FormField>
+        @if (system is not null)
+        {
+            <p><code>@system.Namespace/@system.Name</code> · <code>@system.Uid</code></p>
+            @if (canWrite && ownerScope == contextScope)
+            {
+                <form @onsubmit="RenameAsync" @onsubmit:preventDefault><FormField Label="@T("Name")" Required="true"><ClearableText UpdateOnInput="false" @bind-Value="renameLabel" maxlength="200" required /></FormField><button class="button-secondary" type="submit" disabled="@MutationBlocked">@T("Rename")</button></form>
+                @if (selected is not null && selected.Id == SystemGraphIds.Definition(selected.Identity.ResourceUid) && selected.Identity.ResourceUid != system.Uid)
+                { <button class="button-secondary" type="button" disabled="@MutationBlocked" @onclick="AddMemberAsync">@T("AddSelected")</button> }
+            }
+            <ul>@foreach (var member in system.Members)
+            { <li @key="member.Uid"><a href="@ExplorerUrl(SystemGraphIds.Definition(member.Uid), member.Namespace)">@member.Kind · @member.Namespace/@member.Name</a> <code>@member.ScopeRef.Value</code>
+                @if (canWrite && ownerScope == contextScope) { <button type="button" class="text-button" disabled="@MutationBlocked" @onclick="() => RemoveMemberAsync(member.Uid)">@T("Remove")</button> }</li> }</ul>
+            @if (canDelete && ownerScope == contextScope)
+            {
+                @if (!confirmDelete) { <button type="button" class="button-secondary" @onclick="() => confirmDelete = true">@T("Delete")</button> }
+                else { <p>@T("DeleteHelp")</p><button type="button" class="button-danger" disabled="@MutationBlocked" @onclick="DeleteAsync">@T("ConfirmDelete")</button><button type="button" class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button> }
+            }
+        }
+    </section>
+}

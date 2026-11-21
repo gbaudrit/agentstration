@@ -25,3 +25,7 @@
 *.ico binary
 *.woff binary
 *.woff2 binary
+
+# Reproducible third-party output retains upstream template/notice whitespace.
+src/Agentstration.Web.SystemExplorer/wwwroot/system-explorer.js -whitespace linguist-generated=true
+src/Agentstration.Web.SystemExplorer/Frontend/THIRD_PARTY_NOTICES.txt -whitespace linguist-generated=true

@@ -535,7 +535,8 @@ public sealed class DependencyTests
 
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddSignalR("));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "AddMcpServer("));
-        Assert.AreEqual(2, CountOccurrences(apiTransport, "MapHub<"));
+        Assert.AreEqual(3, CountOccurrences(apiTransport, "MapHub<"));
+        Assert.AreEqual(1, CountOccurrences(apiTransport, "MapHub<SystemOperationsHub>"));
         Assert.AreEqual(1, CountOccurrences(apiTransport, "MapMcp("));
 
         string RegistrationMethod(string method)
