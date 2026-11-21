@@ -136,16 +136,22 @@ Validation: Release component/test build passed without warnings/errors; 40 sour
 
 Separate collection/detail route adapters preserve disposal and Preview history for the shared Sources screen. Saved Source identity, publisher, origin, local bindings and refresh policies. Full details additionally supply the already selected immutable publication and its declared channels. The exact Source Summary endpoint reads only Source and local SourceConfiguration by owner/publisher/name; it does not enumerate versions, providers, catalog materializations or channels. Preview omits unknown publication facts instead of resolving history. Existing full-detail verification/import observations remain caller-supplied. The family Preview uses `ISourceConsoleApiClient.GetSavedSummaryAsync(owner, namespace/publisher, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 98 sources tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 98 sources tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/settings/sources/README.md). Final offline lanes remain pending.
 
 ## Trigger
 
 Saved Trigger identity, schedule, target, resolution and execution policy/input. Preview displays the logical administrative context, retaining the physical operational Workspace only in its exact address. The server rejects a requested physical owner different from the current operational context; no scope fallback, firing, schedule preview, history or Flow catalog read. Full details retain their existing failure observation and execution/history panels. The family Preview uses `ITriggerApiClient.GetAsync(exact physical owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 71 triggers tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 71 triggers tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/triggers/README.md). Final offline lanes remain pending.
 
 ## TransformationFunction
 
 Saved identity, enabled state and immutable version-to-kind/configuration references. Full details may supply already loaded native contract observations; exact Preview does not load implementations, Function Kind catalogs, editor options or mutation state. The family Preview uses `ITransformationFunctionsClient.GetAsync(exact FunctionReference, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 34 transformation functions tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 34 transformation functions tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/transformation-functions/README.md). Final offline lanes remain pending.
+
+## FunctionKind
+
+The separate Function Kind catalog retains its existing immutable contract expansion and guarded activation command inside the row menu, and adds Open/Preview. A read-only addressable detail composes the same saved Summary through OverviewSummary. Preview performs only the exact kind read and never loads implementation choices or mutates activation. The native version/executor/schema dataset remains explicitly inventoried.
+
+Validation: Release component/test build passed without warnings/errors; 48 function kinds tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/function-kinds/README.md). Final offline lanes remain pending.

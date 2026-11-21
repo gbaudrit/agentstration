@@ -17432,14 +17432,14 @@
     },
     {
       "id": "function-kind-version-contracts",
-      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "source": "src/Agentstration.Console.Components/Components/FunctionKindResourceSummary.razor",
       "host": "console",
       "routes": [
         "/transformation-functions",
         "/function-kinds"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Expanded kind contracts retain immutable versions, executor and schema inspection within the selected actual kind; historical contract versions remain useful evidence.",
+      "adaptation": "The same immutable version/executor/schema dataset is shared by native expansion, read-only details and exact-address Preview.",
       "validation": "source-reviewed-current-validation-pending",
       "discoveredDuring": "2026-11-18 main synchronization #1174",
       "verification": {
@@ -19021,6 +19021,16 @@
       "source": "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved TransformationFunction configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/FunctionKindResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted existing native immutable version contracts shared by overview and Preview."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FunctionKindDetails.razor",
+      "classification": "inventoried",
+      "reason": "Read-only detail adapter composes the inventoried Function Kind Summary."
     }
   ],
   "reconciliation": {

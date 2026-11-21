@@ -30,12 +30,13 @@
                             Query="kinds.Query" QueryChanged="ChangeKindsAsync" Pagination="kinds.Pagination" LoadState="kinds.LoadState" Disabled="@(!interactive || savingKind)"
                             IsExpanded="@(kind => expandedKinds.Contains(KindKey(kind)))" OnRefresh="LoadKindsAsync" OnRetry="RetryKindsAsync">
     <Feedback>@if (operationError is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@operationError.Message</pre></details><button class="button-secondary" @onclick="LoadKindsAsync">@T("Refresh")</button></div> }</Feedback>
-    <ItemActions Context="kind"><CollectionActions ResourceName="@kind.Definition.DisplayName"><Primary>
+    <ItemActions Context="kind"><CollectionActions ResourceName="@kind.Definition.DisplayName">
+        <a href="@(KindUrl(kind) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        <button type="button" disabled="@(kind.ScopeRef is null)" data-testid="function-kind-preview" @onclick="() => OpenKindPreview(kind)"><UiIcon Name="eye" />@Shared["Preview"]</button>
         <button type="button" class="button-secondary" aria-expanded="@(expandedKinds.Contains(KindKey(kind)).ToString().ToLowerInvariant())" @onclick="() => ToggleKindDetails(kind)">@T("Details")</button>
         @if (CanToggle(kind)) { <button type="button" class="button-secondary" disabled="@(savingKind || kinds.LoadState.Status is ResourceLoadStatus.Loading or ResourceLoadStatus.Refreshing)" @onclick="() => ToggleKindAsync(kind)">@T(kind.Definition.Enabled ? "Disable" : "Enable")</button> }
-    </Primary></CollectionActions></ItemActions>
-            <Details Context="kind"><ul class="collection-specialized">@foreach (var descriptor in kind.Definition.Versions)
-                { <li><CollectionIdentity DisplayName="@descriptor.Version" Name="@descriptor.Version" IconName="cube"><Badges><code>@descriptor.Executor</code></Badges></CollectionIdentity><SchemaDocumentEditor Value="descriptor.DefinitionSchema" ReadOnly="true" /></li> }</ul></Details>
+    </CollectionActions></ItemActions>
+            <Details Context="kind"><FunctionKindResourceSummary Resource="kind" ShowIdentity="false" ConfigurationInitiallyCollapsed="false" /></Details>
 </ResourceCollectionTemplate>
 </section>
 </div>
@@ -44,7 +45,15 @@
     <ChildContent Context="address"><TransformationFunctionResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
 </ResourceCollectionPreview>
 
+<ResourceCollectionPreview @ref="kindPreview" ResourceKind="@FunctionResourceKinds.FunctionKind" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && kinds.LoadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><FunctionKindResourcePreview Address="address" OverviewHref="@KindPreviewUrl(address)" DefinitionHref="@KindPreviewUrl(address)" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? kindPreview;
+    private string KindUrl(FunctionKindResource resource) => ResourceOwnershipContext.Resource(Services, "/function-kinds", resource.Name, resource.Namespace, resource.ScopeRef);
+    private string KindPreviewUrl(ScopedResourceAddress address) => ResourceOwnershipContext.Resource(Services, "/function-kinds", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#overview";
+    private void OpenKindPreview(FunctionKindResource resource) { if (resource.ScopeRef is { } owner) kindPreview?.Open(ScopedResourceAddress.Create(owner, resource.Namespace, FunctionResourceKinds.FunctionKind, resource.Name)); }
     private ResourceCollectionPreview? preview;
     private bool CanPreviewEdit(TransformationFunctionResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
     private void OpenPreview(TransformationFunctionResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, FunctionResourceKinds.TransformationFunction, item.Name)); }
@@ -60,6 +69,6 @@
         new("versions", T("Version"), item => @<text>@string.Join(", ", item.Definition.Versions.Select(value => value.Version))</text>),
         new("description", T("FunctionDescription"), item => @<FunctionDescription Description="@item.Definition.Description" ImplementationId="@ImplementationId(item)" BuiltIn="@(item.Governance.Origin.Kind == ResourceOriginKind.BuiltIn)" />)
     ];
-    private CollectionColumn<FunctionKindResource> KindIdentity => new("identity", T("Kinds"), kind => @<CollectionIdentity DisplayName="@kind.Definition.DisplayName" Namespace="@kind.Namespace.Value" Name="@kind.Name" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="kind.ScopeRef" IconOnly /><StatusBadge Text="@T(kind.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(kind.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@kind.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(kind.ScopeRef, Services))" IconOnly /></IconBadges><Badges>@if (kind.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <small>@T("BuiltIn")</small> }</Badges></CollectionIdentity>);
+    private CollectionColumn<FunctionKindResource> KindIdentity => new("identity", T("Kinds"), kind => @<CollectionIdentity DisplayName="@kind.Definition.DisplayName" Namespace="@kind.Namespace.Value" Name="@kind.Name" Href="@(KindUrl(kind) + "#overview")" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="kind.ScopeRef" IconOnly /><StatusBadge Text="@T(kind.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(kind.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@kind.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(kind.ScopeRef, Services))" IconOnly /></IconBadges><Badges>@if (kind.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <small>@T("BuiltIn")</small> }</Badges></CollectionIdentity>);
     private IReadOnlyList<CollectionColumn<FunctionKindResource>> KindColumns => [new("versions", T("Version"), kind => @<text>@string.Join(", ", kind.Definition.Versions.Select(value => value.Version))</text>)];
 }

@@ -509,7 +509,7 @@
       "rowTypes": [
         "SourceConsoleListItem"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Source",
       "coordinates": "Exact owner + namespace (publisher) + name; verify Source and SourceConfiguration addresses and linked Source UID.",
       "overview": "/settings/sources/{publisher}/{name}?scopeRef={owner}&context={context}#overview",
@@ -530,7 +530,8 @@
         "SourcesCollectionTests"
       ],
       "apiValidation": "Exact HTTP integration passed for publisher homonyms, matching configuration UID, missing publisher and missing owner. No Source versions or observed state need exist for this read.",
-      "validation": "Release component/test build passed without warnings/errors; 98 sources tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 98 sources tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/settings/sources/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
@@ -755,10 +756,9 @@
         "/function-kinds"
       ],
       "rowTypes": [
-        "TransformationFunctionResource",
-        "FunctionKindResource"
+        "TransformationFunctionResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "TransformationFunction",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/transformation-functions/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -778,7 +778,8 @@
         "TransformationFunctionResourcePreviewTests",
         "TransformationFunctionCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 34 transformation functions tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 34 transformation functions tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/transformation-functions/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
@@ -788,7 +789,7 @@
       "rowTypes": [
         "TriggerResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Trigger",
       "coordinates": "Exact physical operational Workspace + namespace + name; display the logical administrative context. The requested physical owner must equal the current operational owner.",
       "overview": "/triggers/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -809,7 +810,8 @@
         "TriggerCollectionTests"
       ],
       "apiValidation": "Exact HTTP test passed for default/namespaced homonyms, ETag, missing namespace, another physical owner and a logical Instance owner without fallback. English/French component checks verify the physical Workspace is absent from identity.",
-      "validation": "Release component/test build passed without warnings/errors; 71 triggers tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 71 triggers tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/triggers/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",
@@ -841,6 +843,39 @@
       ],
       "validation": "Release component/test build passed; 43 Vault tests passed; browser/final offline checks pending. All four desktop/mobile English/French light/dark smoke variants passed.",
       "evidence": "evidence/1257/vaults/README.md"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "routes": [
+        "/function-kinds",
+        "/transformation-functions"
+      ],
+      "rowTypes": [
+        "FunctionKindResource"
+      ],
+      "catalog": "function-kinds-catalog",
+      "status": "implemented-smoke-passed",
+      "family": "FunctionKind",
+      "coordinates": "Exact ScopeRef + Namespace + Name; reject mismatched kind and address.",
+      "overview": "/function-kinds/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview",
+        "Existing contract expansion",
+        "Existing activation toggle (authorized)"
+      ],
+      "quickActions": [
+        "Open"
+      ],
+      "summary": "Immutable version/executor/schema contracts remain a native read-only dataset shared by expansion, addressable details and lazy Preview. Activation stays in its existing guarded catalog command; no editor or execution command is invented.",
+      "loader": "ITransformationFunctionsClient.GetKindAsync(exact FunctionReference, token)",
+      "tests": [
+        "FunctionKindResourcePreviewTests",
+        "FunctionCatalogCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 48 function kinds tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/function-kinds/README.md"
     }
   ],
   "surfaces": [
@@ -1276,7 +1311,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "vaults-vault-response",
@@ -1606,7 +1642,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "organization-member-details-external-identity",
@@ -1691,7 +1728,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "transformation-functions-transformation-function-resource",
@@ -1702,7 +1740,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "storages-storage-resource",
@@ -1982,7 +2021,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "flowrunartifactdetails-configurationentry",
@@ -2215,7 +2255,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "storage-details-saved-configuration-summary",
@@ -2248,7 +2289,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "entries-entry-catalog",
@@ -4079,7 +4121,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-provider-bindings",
@@ -4089,7 +4132,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-provider-binding-choices",
@@ -4099,7 +4143,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-declared-channel-contracts",
@@ -4109,7 +4154,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-channel-status",
@@ -4119,7 +4165,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-channel-catalogs",
@@ -4129,7 +4176,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-bootstrap-catalog-entries",
@@ -4139,7 +4187,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-pack-catalog-entries",
@@ -4149,7 +4198,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-pack-binding-requirements",
@@ -4159,7 +4209,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-pack-binding-target-choices",
@@ -4169,7 +4220,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "sources-pack-preview-resources",
@@ -4179,7 +4231,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "source-registries-credential-choices",
@@ -4805,7 +4858,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "source-flow-function-choices",

@@ -347,6 +347,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
     relatedSpecifications: ['tests/shared-forms.spec.ts'],
   },
   planned('transformation-functions', `${consolePages}/TransformationFunctions.razor`, ['/transformation-functions', '/function-kinds'], 1122),
+  planned('function-kind-details', `${consolePages}/FunctionKindDetails.razor`, ['/function-kinds/{Name}'], 1258, ['name']),
   planned('transformation-function-editor', `${consolePages}/TransformationFunctionEditor.razor`, ['/transformation-functions/{Name}'], 1122, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
   coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),

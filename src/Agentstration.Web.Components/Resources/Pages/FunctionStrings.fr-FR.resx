@@ -46,4 +46,5 @@
   <data name="ScopeRequired" xml:space="preserve"><value>Un périmètre propriétaire est requis.</value></data>
   <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La fonction retournée ne correspond pas à l’identité demandée.</value></data>
   <data name="SelectionUnavailable" xml:space="preserve"><value>Le type de fonction ou l’implémentation native sélectionné n’est plus disponible.</value></data>
+  <data name="KindInspectionOnly" xml:space="preserve"><value>La définition des types de fonction est consultable ici ; l’activation est gérée depuis le catalogue.</value></data>
 </root>

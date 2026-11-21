@@ -82,7 +82,7 @@ public partial class TransformationFunctions
         _ = InvokeAsync(async () =>
         {
             if (disposed) return;
-            preview?.Close(); functions.Clear(); kinds.Clear(); expandedKinds.Clear(); operationError = null;
+            preview?.Close(); kindPreview?.Close(); functions.Clear(); kinds.Clear(); expandedKinds.Clear(); operationError = null;
             if (contextKey != CurrentContextKey) { functions.Query = new(); kinds.Query = new(); contextKey = CurrentContextKey; }
             var loading = LoadBothAsync(); StateHasChanged(); await loading; StateHasChanged();
         });

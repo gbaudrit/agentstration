@@ -46,4 +46,5 @@
   <data name="ScopeRequired" xml:space="preserve"><value>An owner scope is required.</value></data>
   <data name="ResourceIdentityMismatch" xml:space="preserve"><value>The returned function does not match the requested identity.</value></data>
   <data name="SelectionUnavailable" xml:space="preserve"><value>The selected function kind or native implementation is no longer available.</value></data>
+  <data name="KindInspectionOnly" xml:space="preserve"><value>Function Kind definitions are inspected here; activation is managed from the catalog.</value></data>
 </root>

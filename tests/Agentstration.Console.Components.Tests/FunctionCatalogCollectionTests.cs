@@ -77,7 +77,7 @@ public sealed class FunctionCatalogCollectionTests
         using var handler = new Handler((kind, skip, take, call) => kind ? Task.FromResult(Page(true, skip, take, call == 1 ? 1 : 2)) : call switch { 1 => Task.FromResult(Page(false, skip, take, 1)), 2 => old.Task, 3 => replacement.Task, _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)) });
         using var context = Context(handler);
         var cut = context.Render<TransformationFunctions>();
-        await cut.Find("[data-testid=function-kind-row] .collection-primary-actions button[aria-expanded]").ClickAsync(new());
+        await cut.Find("[data-testid=function-kind-row] .collection-actions-panel button[aria-expanded]").ClickAsync(new());
         var refresh = cut.Find("[data-testid=function-catalog-refresh]").ClickAsync(new());
         await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
         cut.WaitForAssertion(() => Assert.IsEmpty(cut.FindAll("[data-testid=transformation-function-row], .collection-expanded")));
@@ -97,7 +97,7 @@ public sealed class FunctionCatalogCollectionTests
         using var handler = new Handler((kind, skip, take, _) => Task.FromResult(Page(kind, skip, take, 1)));
         using var context = Context(handler);
         var cut = context.Render<TransformationFunctions>();
-        var toggle = cut.FindAll("[data-testid=function-kind-row] .collection-primary-actions button")[1];
+        var toggle = cut.Find("[data-testid=function-kind-row] .collection-actions-panel button.button-secondary:not([aria-expanded])");
         await toggle.ClickAsync(new());
         Assert.AreEqual(1, handler.Writes);
         Assert.AreEqual(1, handler.KindDetailReads);
