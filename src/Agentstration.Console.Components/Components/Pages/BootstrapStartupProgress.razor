@@ -11,7 +11,6 @@
 <div class="bootstrap-startup-page">
 <PageTitle>@Localizer["Title"]</PageTitle>
 <PageHeader Title="@Localizer["Title"]" Eyebrow="@Localizer["Startup"]" Description="@Localizer["Description"]">
-    <Status>@if (snapshot is not null) { <StatusBadge Text="@Localizer[snapshot.State == "failed" ? "Failed" : "Running"]" Status="@(snapshot.State == "failed" ? UiStatus.Danger : UiStatus.Info)" /> }</Status>
 </PageHeader>
 
 @if (denied)
@@ -25,8 +24,14 @@ else if (snapshot is null)
 else
 {
     @if (disconnected) { <p class="startup-progress-notice" role="status">@Localizer["ConnectionLostDescription"]</p> }
-    <StepProgress @key="snapshot.AttemptId" AutoCollapseCompletedGroups="true" Steps="@Steps" ActiveStepId="@ActiveNavigationId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
+    <StepProgress @key="snapshot.AttemptId" AutoCollapseCompletedGroups="true" FitToViewport="true" ProgressKey="@snapshot.Revision.ToString()" Steps="@Steps" ActiveStepId="@ActiveNavigationId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
         <HeaderContent>
+            @if (snapshot.State == "failed")
+            {
+                <BootstrapFailureView Failure="@snapshot.Failure" ResourceTitle="@(snapshot.Activity is { ResourceName: not null } activity ? activity.ResourceKind + " / " + activity.ResourceName : null)" />
+                <details class="startup-recovery"><summary>@Localizer["RecoveryAction"]</summary><p>@Localizer["Recovery"]</p></details>
+            }
+            <div class="startup-progress-header">
             <div class="startup-progress-summary" role="status">
                 <div class="startup-progress-summary-heading">
                     <span class="startup-progress-summary-icon" aria-hidden="true"><UiIcon Name="@(snapshot.State == "failed" ? "alert-triangle" : "cloud-upload")" /></span>
@@ -37,9 +42,15 @@ else
                     <progress value="@CompletedSteps" max="@snapshot.Steps.Count" aria-label="@Localizer["StepCount", CompletedSteps, snapshot.Steps.Count]"></progress>
                 </div>
             </div>
+            <div class="startup-progress-metrics">
+                <MetricCard Label="@Localizer["Created"]" Value="@snapshot.Created.ToString()" Status="UiStatus.Success" />
+                <MetricCard Label="@Localizer["Skipped"]" Value="@snapshot.Skipped.ToString()" />
+                <MetricCard Label="@Localizer["Conflicts"]" Value="@snapshot.Conflicts.ToString()" Status="@(snapshot.Conflicts > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
+                <MetricCard Label="@Localizer["ResourceFailures"]" Value="@snapshot.Failed.ToString()" Status="@(snapshot.Failed > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
+            </div></div>
         </HeaderContent>
     </StepProgress>
-    @if (snapshot.State == "failed") { <p class="startup-progress-notice" role="alert">@Localizer["Recovery"]</p> }
+
 }
 
 </div>
@@ -107,6 +118,8 @@ else
         builder.AddAttribute(3, nameof(BootstrapStartupStepPanel.Kind), kind);
         builder.AddAttribute(4, nameof(BootstrapStartupStepPanel.GroupId), groupId);
         builder.AddAttribute(5, nameof(BootstrapStartupStepPanel.GroupTitle), title);
+        builder.AddAttribute(6, nameof(BootstrapStartupStepPanel.FollowCurrent), following);
+        builder.AddAttribute(7, nameof(BootstrapStartupStepPanel.FollowCurrentChanged), EventCallback.Factory.Create<bool>(this, value => following = value));
         builder.CloseComponent();
     };
 

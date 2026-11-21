@@ -11,27 +11,43 @@
     @if (Visible.Count == 0) { <EmptyState Title="@Localizer["NoResourceOutcome"]" /> }
     else
     {
-        <CollectionView TItem="BootstrapApplicationProgressRow" Items="@Visible" IdentityLabel="@Localizer["Resource"]" StateLabel="@Localizer["Outcome"]" InformationLabels="@(new[] { Localizer["Profile"].Value, Localizer["Target"].Value, Localizer["Details"].Value })" Compact="true" RowTestId="bootstrap-application-resource">
+        <CollectionView TItem="BootstrapApplicationProgressRow" Items="@Visible" IdentityLabel="@Localizer["Resource"]" StateLabel="@Localizer["Outcome"]" InformationLabels="@(new[] { Localizer["Profile"].Value, Localizer["Target"].Value })" IsExpanded="@(row => RowKey(row) == expanded)" Compact="true" RowTestId="bootstrap-application-resource" ItemAttributes="RowAttributes">
             <Identity Context="row"><strong>@row.Resource.Kind/@row.Resource.Name</strong></Identity>
             <State Context="row"><StatusBadge Text="@Label(row)" Status="@Tone(row.Status)" /></State>
-            <Information Context="row"><CollectionValue Label="@Localizer["Profile"]">@row.Resource.Profile</CollectionValue><CollectionValue Label="@Localizer["Target"]">@(row.Resource.TargetLabel ?? TargetLabel)</CollectionValue><CollectionValue Label="@Localizer["Details"]"><code>@row.Resource.Location</code></CollectionValue></Information>
+            <Information Context="row"><CollectionValue Label="@Localizer["Profile"]">@row.Resource.Profile</CollectionValue><CollectionValue Label="@Localizer["Target"]">@(row.Resource.TargetLabel ?? TargetLabel)</CollectionValue></Information>
+            <Actions Context="row"><button type="button" class="button-secondary" @onclick="() => InspectAsync(row)" aria-expanded="@((RowKey(row) == expanded).ToString().ToLowerInvariant())">@Localizer["Details"]</button></Actions>
+            <Details Context="row"><p><code>@row.Resource.Location</code></p>@if (row.Result?.Disposition == BootstrapResourceDisposition.Failed) { <BootstrapFailureView Failure="@row.Result.Failure" /> }</Details>
         </CollectionView>
-        <CollectionPager Page="@pageNumber" PageSize="25" Total="@Filtered.Count" HasMore="@(pageNumber * 25 < Filtered.Count)" SupportsDirectNavigation="true" PageChanged="value => pageNumber = value" />
+        <CollectionPager Page="@pageNumber" PageSize="25" Total="@Filtered.Count" HasMore="@(pageNumber * 25 < Filtered.Count)" SupportsDirectNavigation="true" PageChanged="PageAsync" />
     }
 </section>
 
 @code {
+    [Parameter] public bool FollowCurrent { get; set; }
+    [Parameter] public EventCallback<bool> FollowCurrentChanged { get; set; }
     [Parameter] public string? TargetLabel { get; set; }
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
     [Parameter, EditorRequired] public IReadOnlyList<BootstrapApplicationProgressRow> Rows { get; set; } = [];
     private string search = string.Empty;
+    private string? expanded;
     private int pageNumber = 1;
     private IReadOnlyList<BootstrapApplicationProgressRow> Filtered => Rows.Where(row => string.IsNullOrWhiteSpace(search)
         || row.Resource.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || row.Resource.Kind.Contains(search, StringComparison.OrdinalIgnoreCase)
         || row.Resource.Profile.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
     private IReadOnlyList<BootstrapApplicationProgressRow> Visible => Filtered.Skip((pageNumber - 1) * 25).Take(25).ToArray();
-    protected override void OnParametersSet() => pageNumber = Math.Clamp(pageNumber, 1, Math.Max(1, (Filtered.Count + 24) / 25));
-    private void Search(string value) { search = value; pageNumber = 1; }
+    protected override void OnParametersSet()
+    {
+        var index = Filtered.ToList().FindIndex(row => row.IsCurrent || row.Status is ProgressStepStatus.Running or ProgressStepStatus.Failed);
+        if (FollowCurrent && index >= 0 && Filtered[index].Status == ProgressStepStatus.Failed) expanded = RowKey(Filtered[index]);
+        pageNumber = FollowCurrent && string.IsNullOrWhiteSpace(search) && index >= 0 ? index / 25 + 1
+            : Math.Clamp(pageNumber, 1, Math.Max(1, (Filtered.Count + 24) / 25));
+    }
+    private static IReadOnlyDictionary<string, object> RowAttributes(BootstrapApplicationProgressRow row) => new Dictionary<string, object>
+    { ["data-progress-resource"] = RowKey(row), ["data-progress-current"] = (row.IsCurrent || row.Status is ProgressStepStatus.Running or ProgressStepStatus.Failed).ToString().ToLowerInvariant() };
+    private static string RowKey(BootstrapApplicationProgressRow row) => row.Resource.Profile + "\n" + row.Resource.Location;
+    private async Task InspectAsync(BootstrapApplicationProgressRow row) { await FollowCurrentChanged.InvokeAsync(false); expanded = expanded == RowKey(row) ? null : RowKey(row); }
+    private async Task Search(string value) { await FollowCurrentChanged.InvokeAsync(false); search = value; pageNumber = 1; }
+    private async Task PageAsync(int value) { await FollowCurrentChanged.InvokeAsync(false); pageNumber = value; }
     private string Label(BootstrapApplicationProgressRow row) => row.Result is { } result ? Localizer["Disposition." + result.Disposition] : StepStrings[row.Status.ToString()];
     private static UiStatus Tone(ProgressStepStatus status) => status switch
     {

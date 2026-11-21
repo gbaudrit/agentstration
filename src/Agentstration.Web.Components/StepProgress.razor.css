@@ -56,3 +56,23 @@
 .step-progress-row.is-child:has(+ .step-progress-row:not(.is-child)) > .step-progress-step::after { display: none; }
 .step-progress-row.is-child .step-progress-marker ::deep .ui-icon { width: .95rem; height: .95rem; }
 .step-progress-row.is-child .step-progress-spinner { width: 1rem; height: 1rem; border-width: 2px; }
+
+.fit-viewport .step-progress-header { margin-bottom: .75rem; }
+.fit-viewport .step-progress-layout { gap: 1rem; }
+.fit-viewport .step-progress-navigation { display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: .85rem .5rem; }
+.fit-viewport [data-step-progress-tabs] { overflow: auto; min-height: 0; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.fit-viewport .step-progress-navigation-heading { padding-bottom: .6rem; flex-shrink: 0; }
+.fit-viewport .step-progress-panel { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 1rem; scrollbar-gutter: stable; }
+.fit-viewport .step-progress-step { --step-marker-size: 1.7rem; padding-block: .6rem; gap: .6rem; }
+.fit-viewport .step-progress-row.is-child .step-progress-step { --step-marker-size: 1.35rem; padding-block: .45rem; }
+.fit-viewport .step-progress-row.is-child { padding-inline-start: 1.1rem; }
+.fit-viewport .step-progress-state, .fit-viewport .step-progress-summary { font-size: .75rem; }
+.fit-viewport .step-progress-step::after { top: calc(.6rem + var(--step-marker-size) + .2rem); }
+.fit-viewport .step-progress-row.is-child > .step-progress-step::after { top: calc(.45rem + var(--step-marker-size) + .2rem); }
+@media (min-width: 48.01rem) {
+    .fit-viewport .step-progress-layout { height: var(--step-progress-available, 65dvh); align-items: stretch; grid-template-columns: minmax(14rem, .85fr) minmax(0, 1.8fr); }
+}
+@media (max-width: 48rem) {
+    .fit-viewport [data-step-progress-tabs] { max-height: 13rem; }
+    .fit-viewport .step-progress-panel { max-height: max(24rem, 65dvh); }
+}

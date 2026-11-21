@@ -1,3 +1,12 @@
 .bootstrap-application-resources { display: grid; gap: var(--space-3); min-width: 0; }
 .bootstrap-application-resources h2 { margin: 0; }
 .bootstrap-application-resources ::deep .resource-toolbar { margin: 0; }
+
+.bootstrap-application-resources ::deep .resource-collection .data-grid { min-width: 0; table-layout: fixed; }
+.bootstrap-application-resources ::deep .data-grid th:first-child { width: 30%; }
+.bootstrap-application-resources ::deep .data-grid th:last-child { width: 8rem; }
+.bootstrap-application-resources ::deep .data-grid td, .bootstrap-application-resources ::deep .data-grid th { white-space: normal; overflow-wrap: anywhere; }
+.bootstrap-application-resources ::deep .data-grid .table-actions { min-width: 0; flex-wrap: wrap; }
+.bootstrap-application-resources ::deep .data-grid button { white-space: normal; }
+
+.bootstrap-application-resources ::deep .data-grid .status-badge { max-width: 100%; white-space: normal; }

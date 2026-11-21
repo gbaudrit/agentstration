@@ -3,7 +3,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
 
 <MainLayout SectionTitle="@SectionTitle" EnableCommandPalette="false" Body="@Body">
-    <NoticeContent>@if (ShowNotice) { <BootstrapStartupNotice /> }</NoticeContent>
+    <NoticeContent>@if (ShowNotice && SectionTitle is null) { <BootstrapStartupNotice /> }</NoticeContent>
     <StatusContent>
         <HealthIndicator Label="@Localizer["Brand"]" StatusText="@Localizer["Title"]" Status="UiStatus.Info" />
     </StatusContent>

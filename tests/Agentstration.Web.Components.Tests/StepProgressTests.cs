@@ -11,6 +11,21 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class StepProgressTests
 {
     [TestMethod]
+    public async Task ViewportFollowingCanPauseForInspectionAndResumeAtTheNewActiveStep()
+    {
+        using var context = Context();
+        var cut = context.Render<StepProgress>(p => p.Add(x => x.Steps, Steps()).Add(x => x.ActiveStepId, "transfer").Add(x => x.FitToViewport, true));
+        Assert.IsTrue(cut.Find("[data-step-progress]").ClassList.Contains("fit-viewport"));
+        await cut.InvokeAsync(cut.Instance.PauseFollowingAsync);
+        Assert.AreEqual("false", cut.Find("[data-step-progress]").GetAttribute("data-follow-active"));
+        cut.Render(p => p.Add(x => x.ActiveStepId, "verify"));
+        Assert.AreEqual("transfer", Panel(cut));
+        cut.Find(".step-progress-follow").Click();
+        Assert.AreEqual("verify", Panel(cut));
+        Assert.AreEqual("true", cut.Find("[data-step-progress]").GetAttribute("data-follow-active"));
+    }
+
+    [TestMethod]
     public void SubstepsCollapseAndFollowWithoutChangingExecutionOrRenderingOtherFamilies()
     {
         using var context = Context();

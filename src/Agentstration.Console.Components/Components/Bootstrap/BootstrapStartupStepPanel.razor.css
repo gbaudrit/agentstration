@@ -25,3 +25,17 @@
 .startup-resource-metrics ::deep strong { font-size: 1.35rem; }
 @media (max-width: 75rem) { .startup-resource-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 32rem) { .startup-resource-facts > div { grid-template-columns: minmax(0, 1fr); gap: .35rem; } .startup-step-actions a { width: 100%; justify-content: center; text-align: center; } }
+
+.startup-step-content { display: grid; gap: .75rem; }
+.startup-step-heading { align-items: center; }
+.startup-step-heading h2 { font-size: 1.1rem; }
+.startup-step-description { margin: 0; font-size: .85rem; }
+.startup-dependency-callout { padding: .7rem .85rem; gap: .65rem; }
+.startup-dependency-callout p { margin-top: .2rem; font-size: .8rem; }
+.startup-resource-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; }
+.startup-resource-facts > div { padding: .55rem .75rem; grid-template-columns: minmax(0,.7fr) minmax(0,1fr); gap: .5rem; }
+.startup-resource-facts > div + div { border-top: 0; }
+.startup-resource-facts > div:nth-child(n+3) { border-top: 1px solid var(--border); }
+.startup-resource-facts > div:nth-child(even) { border-inline-start: 1px solid var(--border); }
+.startup-resource-facts dd, .startup-resource-facts code { font-size: .8rem; }
+@media(max-width:64rem) { .startup-resource-facts { grid-template-columns: minmax(0,1fr); } .startup-resource-facts > div + div { border-top: 1px solid var(--border); border-inline-start: 0; } }

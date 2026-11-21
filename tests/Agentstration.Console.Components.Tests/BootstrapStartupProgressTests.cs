@@ -17,6 +17,16 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapStartupProgressTests
 {
     [TestMethod]
+    public void StartupProgressDoesNotRepeatItsOwnNavigationNotice()
+    {
+        using var context = Context(new StartupClient());
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/startup/progress");
+        var cut = context.Render<BootstrapStartupLayout>(p => p.Add(x => x.Body, builder => builder.AddContent(0, "Progress body")));
+        Assert.AreEqual(0, cut.FindAll("[data-testid='bootstrap-startup-notice']").Count);
+        Assert.AreEqual(1, cut.FindAll("[data-testid='console-shell']").Count);
+    }
+
+    [TestMethod]
     public void PendingStartupRedirectsWithoutRenderingTheOverview()
     {
         var api = new StartupClient();

@@ -30,6 +30,9 @@ catalogs. The caller localizes its titles, summaries and panel content.
 | `ActiveStepId` | The current execution step, supplied by the feature |
 | `SelectedStepId` / `SelectedStepIdChanged` | Optional two-way binding of the inspected step |
 | `FollowActiveStep` / `FollowActiveStepChanged` | Optional two-way binding of automatic following; defaults to true |
+| `AutoCollapseCompletedGroups` | Fold completed top-level groups once while retaining operator reopening and inspection |
+| `FitToViewport` | Opt-in bounded desktop panes sized from their actual position in the available viewport; default false |
+| `ProgressKey` | Feature-owned observation token that triggers following the current resource within a stable step |
 | `Label` | List heading and accessible label; defaults to localized preparation steps |
 | `HeaderContent` | Optional caller-owned overall summary above both panes |
 | `EmptyContent` | Optional replacement for the empty-list message |
@@ -139,3 +142,18 @@ closes it. Manually reopened completed groups remain open across refreshes.
 In follow mode, a completed active child resolves to the folded parent summary
 until activity advances. This also handles observations where completion arrives
 before the next active-step identity.
+
+## Viewport following
+
+Bootstrap opts into `FitToViewport`. The navigation and detail panes scroll
+independently inside the remaining desktop viewport; headers and summaries remain
+outside those scroll regions. Resize observation recalculates the available
+height. Narrow layouts keep stacked panes with bounded scrolling regions.
+
+While following, selection changes reveal the selected tab, and `ProgressKey`
+changes reveal the feature-owned row marked `data-progress-current="true"`.
+Scrolling either pane or interacting with detail controls pauses following.
+The existing follow command restores it without moving document scroll or
+changing execution. Paging/search adapters bind the same follow state, so manual
+inspection stays stable through polling. Features remain responsible for bounded
+resource queries and determining the current or failed resource.

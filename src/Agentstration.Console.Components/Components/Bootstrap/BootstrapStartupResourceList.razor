@@ -2,6 +2,7 @@
 @implements IDisposable
 @inject IBootstrapStartupApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StepProgressStrings> StepStrings
 
 <section class="startup-resource-list" data-testid="startup-resource-list" aria-busy="@loading.ToString().ToLowerInvariant()">
     <ResourceToolbar Label="@Localizer["ResourceFilters"]">
@@ -29,16 +30,17 @@
         {
             <CollectionView TItem="BootstrapStartupResource" Items="@resourcePage.Items" RowTestId="startup-resource-row"
                             IdentityLabel="@Localizer["Resource"]" ScopeLabel="@Localizer["Target"]" StateLabel="@Localizer["ResourceState"]"
-                            InformationLabels="@(new[] { Localizer["Profile"].Value })" IsExpanded="@(item => item.Id == expanded)" Compact="true">
+                            InformationLabels="@(new[] { Localizer["Profile"].Value })" IsExpanded="@(item => item.Id == expanded)" Compact="true" ItemAttributes="@(item => new Dictionary<string, object> { ["data-progress-resource"] = item.Id, ["data-progress-current"] = (item.Id == Snapshot.Activity?.ResourceId).ToString().ToLowerInvariant() })">
                 <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Name="@item.Name" Namespace="@item.Namespace" OnOpen="() => ToggleDetails(item.Id)" /></Identity>
                 <Scope Context="item"><code>@item.TargetLevel</code></Scope>
-                <State Context="item"><StatusBadge Text="@Localizer["State_" + item.State]" Status="@Tone(item.State)" /></State>
+                <State Context="item"><StatusBadge Text="@(item.State == "waiting" ? StepStrings["Waiting"].Value : Localizer["State_" + item.State].Value)" Status="@Tone(item.State)" /></State>
                 <Information Context="item"><CollectionValue Label="@Localizer["Profile"]">@item.Profile</CollectionValue></Information>
                 <Actions Context="item"><button type="button" class="button-secondary" aria-expanded="@((item.Id == expanded).ToString().ToLowerInvariant())" @onclick="() => ToggleDetails(item.Id)">@Localizer["ResourceDetails"]</button></Actions>
                 <Details Context="item">
                     <div class="startup-resource-operations" data-testid="startup-resource-operations">
                         <h3>@Localizer["ResourceDetails"] — @item.Name</h3>
                         <p><code>@item.Kind</code> · @item.Profile · <code>@item.Location</code></p>
+                        @if (item.State == "failed") { <BootstrapFailureView Failure="@item.Failure" /> }
                         @if (item.Substitution is { } correction)
                         {
                             <p>@Localizer["SubstitutionApplied"]</p>
@@ -67,6 +69,8 @@
 </section>
 
 @code {
+    [Parameter] public bool FollowCurrent { get; set; }
+    [Parameter] public EventCallback<bool> FollowCurrentChanged { get; set; }
     [Parameter, EditorRequired] public BootstrapStartupSnapshot Snapshot { get; set; } = default!;
     [Parameter, EditorRequired] public string StepId { get; set; } = string.Empty;
     [Parameter] public string? Kind { get; set; }
@@ -79,7 +83,7 @@
     private string? expanded;
     private int pageNumber = 1, request;
     private long loadedRevision = -1;
-    private bool loading, readError;
+    private bool loading, readError, previouslyFollowing;
 
     protected override Task OnParametersSetAsync()
     {
@@ -88,11 +92,13 @@
         {
             identity = next; pageNumber = 1; search = state = string.Empty; expanded = null; resourcePage = null; loadedRevision = -1;
         }
+        if (FollowCurrent && !previouslyFollowing) loadedRevision = -1;
+        previouslyFollowing = FollowCurrent;
         return loadedRevision != Snapshot.Revision ? LoadAsync() : Task.CompletedTask;
     }
-    private Task SearchAsync(string value) { search = value; pageNumber = 1; return LoadAsync(); }
-    private Task FilterAsync(string value) { state = value; pageNumber = 1; return LoadAsync(); }
-    private Task PageAsync(int value) { pageNumber = value; return LoadAsync(); }
+    private async Task SearchAsync(string value) { await FollowCurrentChanged.InvokeAsync(false); search = value; pageNumber = 1; await LoadAsync(); }
+    private async Task FilterAsync(string value) { await FollowCurrentChanged.InvokeAsync(false); state = value; pageNumber = 1; await LoadAsync(); }
+    private async Task PageAsync(int value) { await FollowCurrentChanged.InvokeAsync(false); pageNumber = value; await LoadAsync(); }
     private void ToggleDetails(string id) => expanded = expanded == id ? null : id;
     private async Task LoadAsync()
     {
@@ -103,9 +109,10 @@
         {
             var result = await Client.GetResourcesAsync(new(Snapshot.AttemptId, StepId, Kind,
                 string.IsNullOrEmpty(state) ? null : state, string.IsNullOrWhiteSpace(search) ? null : search,
-                (pageNumber - 1) * 25, 25, GroupId), stopping.Token);
+                (pageNumber - 1) * 25, 25, GroupId, FollowCurrent && string.IsNullOrEmpty(state) && string.IsNullOrWhiteSpace(search) ? Snapshot.Activity?.ResourceId : null), stopping.Token);
             if (current != request || stopping.IsCancellationRequested || result.AttemptId != Snapshot.AttemptId) return;
-            resourcePage = result; readError = false; loadedRevision = result.Revision;
+            if (FollowCurrent && result.Items.FirstOrDefault(item => item.State == "failed") is { } failed) expanded = failed.Id;
+            resourcePage = result; pageNumber = result.Offset / 25 + 1; readError = false; loadedRevision = result.Revision;
             if (pageNumber > 1 && resourcePage.Items.Count == 0) { pageNumber = Math.Max(1, (int)Math.Ceiling(resourcePage.Total / 25d)); await LoadAsync(); }
         }
         catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }

@@ -1512,10 +1512,10 @@
       "identityLabel": "Resource",
       "scope": false,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Profile",
-        "Details"
+        "Target"
       ],
       "validation": "current-bootstrap-progress-adapter",
       "verification": {
@@ -1559,7 +1559,7 @@
             "screenshot": null
           }
         ],
-        "interpretation": "Historical route captures predate the StepProgress adapter. Current implementation smoke and component regression cover planned/applied rows, paging and reconnect; reusable #1217 remains deferred.",
+        "interpretation": "Current implementation checks cover viewport following across bounded pages, pause/resume, failed-group selection, safe diagnostics and same-ID reload; reusable #1217 remains gated by UX validation and merge.",
         "routeEvidencePeriod": "Historical pre-compact captures; current evidence is recorded separately below.",
         "compactEvidence": {
           "routeCases": [
@@ -1569,7 +1569,7 @@
           "populatedHostCases": [],
           "workplaceObservationIndexes": []
         },
-        "currentImplementationEvidence": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md"
+        "currentImplementationEvidence": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md"
       },
       "compactAdoption": {
         "decision": "native-domain-presentation",
@@ -1585,7 +1585,7 @@
       "listLayoutDisposition": {
         "decision": "shared-catalog-with-preserved-preview-workflow",
         "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
-        "review": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md",
+        "review": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md",
         "uiChanged": true
       }
     },
@@ -7416,13 +7416,13 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionView / BootstrapStartupProgressTests",
         "domainSpecifications": [],
-        "interpretation": "Administrator-only paged startup resource observations; #1251 is deferred until maintainer UX validation and merge.",
-        "currentImplementationEvidence": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md"
+        "interpretation": "Administrator-only bounded startup observations, optional focused paging, viewport follow/pause and visible safe failure diagnostics; reusable #1251 remains gated by UX validation and merge.",
+        "currentImplementationEvidence": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md"
       },
       "listLayoutDisposition": {
         "decision": "bounded-startup-resource-progress",
         "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
-        "review": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md",
+        "review": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md",
         "uiChanged": true
       }
     }
@@ -18054,7 +18054,8 @@
       "validation": "implementation-smoke-and-component-tests; reusable-journey-deferred",
       "verification": {
         "sourceReviewed": true,
-        "interpretation": "Implementation review only; native UX child #1217 remains blocked by validation and merge. No new reusable journey is claimed."
+        "interpretation": "Implementation review only; native UX child #1217 remains blocked by validation and merge. No new reusable journey is claimed.",
+        "currentImplementationEvidence": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md"
       }
     },
     {

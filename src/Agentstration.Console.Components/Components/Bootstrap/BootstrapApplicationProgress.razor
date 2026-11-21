@@ -4,8 +4,12 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Startup
 
-<StepProgress @key="Application.Metadata.Name" Steps="@Steps" ActiveStepId="@ActiveStep" AutoCollapseCompletedGroups="true" TestId="bootstrap-manual-step-progress">
+<StepProgress @key="Application.Metadata.Name" Steps="@Steps" ActiveStepId="@ActiveStep" AutoCollapseCompletedGroups="true" FitToViewport="true" ProgressKey="@ProgressKey" @bind-FollowActiveStep="following" TestId="bootstrap-manual-step-progress">
     <HeaderContent>
+        @if (Application.Definition.Status is BootstrapApplicationStatus.Failed or BootstrapApplicationStatus.PartiallyApplied)
+        {
+            <BootstrapFailureView Failure="@(Application.Definition.Failure ?? Application.Definition.Resources.LastOrDefault(row => row.Failure is not null)?.Failure)" />
+        }
         <div class="bootstrap-application-metrics">
             <MetricCard Label="@Startup["Created"]" Value="@Count(BootstrapResourceDisposition.Create).ToString()" Status="UiStatus.Success" />
             <MetricCard Label="@Startup["Skipped"]" Value="@Count(BootstrapResourceDisposition.Skip).ToString()" />
@@ -30,6 +34,10 @@
 @code {
     [Parameter] public string? TargetLabel { get; set; }
     [Parameter, EditorRequired] public BootstrapApplicationResource Application { get; set; } = default!;
+    private bool following = true;
+    private string? observedApplication;
+    private string ProgressKey => Application.Definition.Resources.Count + ":" + Application.Definition.CurrentResource?.Location + ":" + Application.Definition.Status;
+    private Task FollowChanged(bool value) { following = value; return Task.CompletedTask; }
     private IReadOnlyList<BootstrapApplicationProgressGroup> groups = [];
     private bool Prepared => !(Application.Definition.Error == "bootstrap_application_invalid" && Application.Definition.Resources.Count == 0)
         && (Application.Definition.TotalResources > 0 || Application.Definition.Resources.Count > 0 || Application.Definition.Status == BootstrapApplicationStatus.Succeeded);
@@ -41,9 +49,14 @@
         BootstrapApplicationStatus.Interrupted => ProgressStepStatus.Interrupted,
         _ => ProgressStepStatus.Failed
     };
-    private string ActiveStep => !Prepared ? "prepare" : groups.FirstOrDefault(group => group.Rows.Any(row => row.Status == ProgressStepStatus.Running)) is { } current ? "resources:" + current.Id : "resources";
+    private string ActiveStep => !Prepared ? "prepare" : groups.FirstOrDefault(group => group.Rows.Any(row => row.IsCurrent)) is { } current ? "resources:" + current.Id : groups.FirstOrDefault(group => group.Rows.Any(row => row.Status == ProgressStepStatus.Failed)) is { } failed ? "resources:" + failed.Id : "resources";
     private int Count(BootstrapResourceDisposition disposition) => Application.Definition.Resources.Count(row => row.Disposition == disposition);
-    protected override void OnParametersSet() => groups = BootstrapApplicationProgressModel.Groups(Application);
+    protected override void OnParametersSet()
+    {
+        if (observedApplication != Application.Metadata.Name) following = true;
+        observedApplication = Application.Metadata.Name;
+        groups = BootstrapApplicationProgressModel.Groups(Application);
+    }
     private string Family(string kind)
     {
         var value = Startup["Family_" + kind];
@@ -75,5 +88,5 @@
         }
     }
     private RenderFragment Preparation => @<section><h2>@Localizer["Preparation"]</h2><p>@Localizer["PreparationDescription"]</p><p>@string.Join(" → ", Application.Definition.Profiles)</p></section>;
-    private RenderFragment Panel(IReadOnlyList<BootstrapApplicationProgressRow> rows, string title) => @<BootstrapApplicationResources Rows="rows" Title="@title" TargetLabel="@TargetLabel" />;
+    private RenderFragment Panel(IReadOnlyList<BootstrapApplicationProgressRow> rows, string title) => @<BootstrapApplicationResources Rows="rows" Title="@title" TargetLabel="@TargetLabel" FollowCurrent="@following" FollowCurrentChanged="FollowChanged" />;
 }

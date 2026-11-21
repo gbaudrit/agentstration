@@ -40,3 +40,12 @@
 .bootstrap-preview-targets { display: grid; gap: var(--space-3); margin: 0; padding-inline-start: 1.5rem; }
 .bootstrap-preview-targets li { overflow-wrap: anywhere; }
 .bootstrap-preview-target-label { display: block; margin-block-start: var(--space-1); color: var(--muted); }
+
+.bootstrap-preparation-content { display: grid; gap: var(--space-4); }
+.bootstrap-preparation-content > p { margin: 0; color: var(--muted); font-size: var(--font-size-sm); }
+.bootstrap-scope-group { min-width: 0; }
+.bootstrap-scope-group h3 { margin: 0 0 var(--space-2); font-size: var(--font-size-md); }
+.bootstrap-scope-group .bootstrap-order { margin: 0; padding: 0; gap: 0; list-style: none; }
+.bootstrap-scope-group .bootstrap-order li { padding: var(--space-3); gap: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
+.bootstrap-scope-group .bootstrap-order li + li { margin-top: var(--space-2); }
+.bootstrap-scope-group .bootstrap-order ::deep .bootstrap-target { max-width: none; }

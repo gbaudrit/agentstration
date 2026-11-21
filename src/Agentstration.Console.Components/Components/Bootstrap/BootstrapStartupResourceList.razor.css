@@ -12,3 +12,19 @@
 .startup-resource-list ::deep .resource-toolbar input, .startup-resource-list ::deep .resource-toolbar select { height: var(--field-height, 42px); }
 .startup-resource-list ::deep .search-box .clearable-field { height: 100%; }
 .startup-resource-list ::deep .search-box input { height: 100%; }
+
+.startup-resource-list { margin-block: 0; min-width: 0; }
+.startup-resource-count { margin-block: .5rem; font-size: .78rem; }
+.startup-resource-list ::deep .collection-ui { min-width: 0; }
+.startup-resource-list ::deep .data-grid code { white-space: normal; overflow-wrap: anywhere; }
+
+.startup-resource-list ::deep .resource-collection .data-grid { min-width: 0; table-layout: fixed; }
+.startup-resource-list ::deep .data-grid th:first-child { width: 30%; }
+.startup-resource-list ::deep .data-grid th:nth-child(2) { width: auto; }
+.startup-resource-list ::deep .data-grid th:nth-child(3) { width: 9rem; }
+.startup-resource-list ::deep .data-grid th:last-child { width: 8rem; }
+.startup-resource-list ::deep .data-grid td, .startup-resource-list ::deep .data-grid th { white-space: normal; overflow-wrap: anywhere; }
+.startup-resource-list ::deep .data-grid .table-actions { min-width: 0; flex-wrap: wrap; }
+.startup-resource-list ::deep .data-grid button { white-space: normal; }
+
+.startup-resource-list ::deep .data-grid .status-badge { max-width: 100%; white-space: normal; overflow-wrap: normal; }

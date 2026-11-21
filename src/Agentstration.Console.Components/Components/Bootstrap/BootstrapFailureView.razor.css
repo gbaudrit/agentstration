@@ -1,0 +1,7 @@
+.bootstrap-failure { display: flex; align-items: start; gap: .65rem; padding: .75rem 1rem; border: 1px solid color-mix(in srgb,var(--color-danger) 35%,var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb,var(--color-danger) 5%,var(--surface)); color: var(--text); min-width: 0; }
+.bootstrap-failure > div { min-width: 0; }
+.bootstrap-failure ::deep .ui-icon { flex-shrink: 0; color: var(--color-danger); }
+.bootstrap-failure p { margin: .25rem 0; color: var(--muted); font-size: var(--font-size-sm); }
+.bootstrap-failure dl { display: flex; flex-wrap: wrap; gap: .25rem .65rem; margin: .35rem 0 0; font-size: var(--font-size-xs); }
+.bootstrap-failure dt { color: var(--muted); }
+.bootstrap-failure dd { margin: 0; overflow-wrap: anywhere; }

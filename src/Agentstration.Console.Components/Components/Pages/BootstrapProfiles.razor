@@ -46,12 +46,12 @@ else
     {
         @if (selectedProfiles.Count > 0)
         {
-            <FormSection Title="@T("SelectProfiles")"><ChildContent>
+            <FormSection Title="@T("SelectProfiles")" Class="bootstrap-preparation"><ChildContent><div class="bootstrap-preparation-content">
                 <p>@T("PlanOrderHelp")</p>
                 @if (sourceSelection is not null) { <p>@T("SourceSelection", sourceSelection.Publisher, sourceSelection.SourceName, sourceSelection.Locale) <code>@sourceSelection.Path</code></p> }
                 @foreach (var group in selectedProfiles.GroupBy(name => Profile(name).Scope))
                 {
-                    <h3>@ScopeLabel(group.Key)</h3>
+                    <div class="bootstrap-scope-group"><h3>@ScopeLabel(group.Key)</h3>
                     <ol class="bootstrap-order">
                     @foreach (var name in group)
                     {
@@ -75,9 +75,9 @@ else
                             </span>
                         </li>
                     }
-                    </ol>
+                    </ol></div>
                 }
-            </ChildContent></FormSection>
+            </div></ChildContent></FormSection>
         }
         @if (SelectedBindings.Count > 0)
         {
@@ -153,7 +153,7 @@ else
     {
     @if (selectedApplication is not null)
     {
-        <FormSection Title="@selectedApplication.Metadata.Name" Eyebrow="@T("LatestResult")" id="bootstrap-application-detail" TestId="bootstrap-application-progress">
+        <FormSection Title="@T("LatestResult")" Class="bootstrap-application-detail" id="bootstrap-application-detail" data-application-id="@selectedApplication.Metadata.Name" TestId="bootstrap-application-progress">
             <Actions>
                 @if (selectedApplication.Definition.Status == BootstrapApplicationStatus.Running)
                 {
@@ -162,10 +162,11 @@ else
             </Actions>
             <ChildContent>
                 @if (observationInterrupted) { <p class="inline-warning" role="status">@T("ObservationInterrupted")</p> }
-                @if (selectedApplication.Definition.Error is not null) { <p class="error-panel" role="alert">@ApplicationError(selectedApplication.Definition.Error)</p> }
+                @if (selectedApplication.Definition.Error is not null && selectedApplication.Definition.Status is not BootstrapApplicationStatus.Failed and not BootstrapApplicationStatus.PartiallyApplied) { <p class="error-panel" role="alert">@ApplicationError(selectedApplication.Definition.Error)</p> }
                 <BootstrapApplicationProgress Application="@selectedApplication" TargetLabel="@ApplicationTargetLabel(selectedApplication)" />
                 <details class="bootstrap-application-audit"><summary>@T("ApplicationDetail")</summary>
             <dl class="resource-details">
+                <dt>@T("ApplicationDetail")</dt><dd><code>@selectedApplication.Metadata.Name</code></dd>
                 <dt>@T("Actor")</dt><dd><code>@selectedApplication.Definition.ActorPrincipalId</code></dd>
                 <dt>@T("Source")</dt><dd>@selectedApplication.Definition.Source</dd>
                 @if (selectedApplication.Definition.SourceProvenance is { } provenance)

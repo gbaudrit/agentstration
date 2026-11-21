@@ -16,6 +16,62 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapProgressComponentTests
 {
     [TestMethod]
+    public async Task FollowingTracksTheActiveResourcePageAndTerminalFailureWithoutStealingManualInspection()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = Context(new StubClient());
+        var plan = Enumerable.Range(1, 60).Select(index => new BootstrapPlannedResource("batch", index + ".yaml", "Parameter", "parameter-" + index)).ToArray();
+        var application = new BootstrapApplicationResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Metadata = new() { Name = "follow" },
+            Definition = new()
+            {
+                Profiles = ["batch"],
+                TotalResources = 60,
+                ResourcePlan = plan,
+                CurrentResource = new("batch", "41.yaml", "Parameter", "parameter-41", BootstrapResourceDisposition.Create)
+            }
+        };
+        var cut = context.Render<BootstrapApplicationProgress>(p => p.Add(x => x.Application, application));
+        StringAssert.Contains(cut.Find("[data-progress-current='true']").TextContent, "parameter-41");
+        Assert.HasCount(25, cut.FindAll("[data-testid='bootstrap-application-resource']"));
+        application = application with
+        {
+            Definition = application.Definition with
+            {
+                CurrentResource = null,
+                Resources = plan.Take(41).Select(row => new BootstrapAppliedResource(row.Profile, row.Location, row.Kind, row.Name, BootstrapResourceDisposition.Create)).ToArray()
+            }
+        };
+        cut.Render(p => p.Add(x => x.Application, application));
+        StringAssert.Contains(cut.Find("[data-progress-current='true']").TextContent, "parameter-41");
+        await cut.InvokeAsync(cut.FindComponent<StepProgress>().Instance.PauseFollowingAsync);
+        application = application with { Definition = application.Definition with { CurrentResource = new("batch", "52.yaml", "Parameter", "parameter-52", BootstrapResourceDisposition.Create) } };
+        cut.Render(p => p.Add(x => x.Application, application));
+        StringAssert.Contains(cut.Markup, "parameter-26");
+        cut.Find(".step-progress-follow").Click();
+        StringAssert.Contains(cut.Find("[data-progress-current='true']").TextContent, "parameter-52");
+        var failure = new BootstrapFailure("validation", "data_source_profile_not_published", "test-log-reference");
+        application = application with
+        {
+            Definition = application.Definition with
+            {
+                Status = BootstrapApplicationStatus.PartiallyApplied,
+                CurrentResource = null,
+                Failure = failure,
+                ResourcePlan = [.. plan, new("next", "failure.yaml", "DataSourceProfile", "failed-profile")],
+                Resources = [.. plan.Select(row => new BootstrapAppliedResource(row.Profile, row.Location, row.Kind, row.Name, BootstrapResourceDisposition.Create)),
+                new("next", "failure.yaml", "DataSourceProfile", "failed-profile", BootstrapResourceDisposition.Failed, "PRIVATE-ERROR-BODY") { Failure = failure }]
+            }
+        };
+        cut.Render(p => p.Add(x => x.Application, application));
+        StringAssert.Contains(cut.Find("[role='tabpanel']").TextContent, "data_source_profile_not_published");
+        StringAssert.Contains(cut.Markup, "test-log-reference");
+        Assert.IsFalse(cut.Markup.Contains("PRIVATE-ERROR-BODY", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Processed 1 of 512 resources", "Created", "Resource 2:")]
     [DataRow("fr-FR", "1 ressources traitées sur 512", "Créées", "Ressource 2 :")]
     public void ReloadResumesPersistedProgressWithoutSubmittingAgain(string locale, string progress, string created, string current)
@@ -49,7 +105,7 @@ public sealed class BootstrapProgressComponentTests
             .NavigateTo("/settings/bootstrap?applicationId=retained-application");
         var rendered = context.Render<BootstrapProfiles>();
         rendered.WaitForAssertion(() => Assert.AreEqual("retained-application",
-            rendered.Find("#bootstrap-application-detail h2").TextContent));
+            rendered.Find("#bootstrap-application-detail").GetAttribute("data-application-id")));
         Assert.AreEqual(0, client.Submissions);
     }
 

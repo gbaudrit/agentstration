@@ -199,4 +199,20 @@
   <data name="Family_KnowledgeSourceToolExposure" xml:space="preserve"><value>Expositions d’outils des sources de connaissances</value></data>
   <data name="ChooseModel" xml:space="preserve"><value>Choisir un modèle disponible</value></data>
   <data name="FamilyOccurrence" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="FailureTitle" xml:space="preserve"><value>Diagnostic du bootstrap</value></data>
+  <data name="FailureCode" xml:space="preserve"><value>Code de l’erreur</value></data>
+  <data name="DiagnosticId" xml:space="preserve"><value>Référence des journaux</value></data>
+  <data name="FailureLegacy" xml:space="preserve"><value>La cause précise n’a pas été enregistrée pour cette application. Vérifiez la ressource en échec et ses dépendances, puis consultez les journaux avec l’identifiant de l’application.</value></data>
+  <data name="Failure_validation" xml:space="preserve"><value>La validation ou la publication de la ressource a échoué. Vérifiez sa définition et ses références requises vers les Flows, outils et profils. Les ressources déjà créées sont conservées.</value></data>
+  <data name="Failure_configuration" xml:space="preserve"><value>La configuration de la ressource n’a pas pu être appliquée. Vérifiez ses champs requis, sa portée et ses dépendances ; la référence permet de retrouver le diagnostic dans les journaux.</value></data>
+  <data name="Failure_access" xml:space="preserve"><value>Les droits d’accès ou la gouvernance empêchent cette opération. Vérifiez la portée cible et les autorisations sur ses dépendances.</value></data>
+  <data name="Failure_dependency" xml:space="preserve"><value>Une ressource requise est indisponible. Vérifiez que les dépendances sont créées avant cette ressource et accessibles depuis la portée cible.</value></data>
+  <data name="Failure_timeout" xml:space="preserve"><value>La dépendance requise n’est pas devenue disponible avant l’expiration du délai. Vérifiez le fournisseur, l’extension ou le modèle requis, puis réessayez après correction.</value></data>
+  <data name="Failure_storage" xml:space="preserve"><value>Le stockage n’a pas pu terminer l’opération. Vérifiez sa disponibilité et les droits d’accès à l’aide de la référence des journaux.</value></data>
+  <data name="Failure_provider" xml:space="preserve"><value>Le fournisseur n’a pas pu être joint. Vérifiez sa disponibilité et sa configuration de connexion.</value></data>
+  <data name="Failure_unexpected" xml:space="preserve"><value>Une erreur inattendue a arrêté cette ressource. Les ressources terminées sont conservées. Utilisez le code et la référence des journaux pour établir le diagnostic avant de préparer une nouvelle application.</value></data>
+  <data name="FailureFlowUnavailable" xml:space="preserve"><value>Le Flow d’acquisition ou de découverte est absent, désactivé ou incompatible dans la portée cible. Vérifiez sa révision et les autorisations d’accès.</value></data>
+  <data name="FailureToolUnavailable" xml:space="preserve"><value>Un outil requis ou son fournisseur est absent ou indisponible. Vérifiez les références du profil et la configuration de l’outil et du fournisseur dans la portée cible.</value></data>
+  <data name="FailureProfileUnpublished" xml:space="preserve"><value>Le profil référencé n’a aucune révision publiée active. Vérifiez puis publiez le profil avant de réessayer la ressource.</value></data>
+  <data name="RecoveryAction" xml:space="preserve"><value>Comment reprendre le bootstrap</value></data>
 </root>

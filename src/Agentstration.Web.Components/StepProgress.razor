@@ -2,7 +2,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StepProgressStrings> Localizer
 @inject IJSRuntime JS
 
-<div @ref="root" class="step-progress @Class" data-step-progress data-testid="@TestId">
+<div @ref="root" class="step-progress @(FitToViewport ? "fit-viewport" : null) @Class" data-follow-active="@following.ToString().ToLowerInvariant()" data-active-step="@ActiveStepId" data-progress-key="@ProgressKey" data-step-progress data-testid="@TestId">
     <span class="step-progress-announcement" role="status" aria-live="polite" aria-atomic="true">@ActiveAnnouncement</span>
     @if (HeaderContent is not null)
     {
@@ -82,6 +82,8 @@
     [Parameter] public EventCallback<string?> SelectedStepIdChanged { get; set; }
     [Parameter] public bool FollowActiveStep { get; set; } = true;
     [Parameter] public bool AutoCollapseCompletedGroups { get; set; }
+    [Parameter] public bool FitToViewport { get; set; }
+    [Parameter] public string? ProgressKey { get; set; }
     [Parameter] public EventCallback<bool> FollowActiveStepChanged { get; set; }
     [Parameter] public string? Label { get; set; }
     [Parameter] public RenderFragment? HeaderContent { get; set; }
@@ -101,6 +103,7 @@
     private IEnumerable<ProgressStep> VisibleSteps => Steps.Where(step => step.ParentId is null || !collapsed.Contains(step.ParentId));
     private ElementReference root;
     private IJSObjectReference? module;
+    private DotNetObjectReference<StepProgress>? reference;
     private string? selectedId;
     private string? previousSelectedParameter;
     private bool previousFollowParameter = true;
@@ -231,13 +234,23 @@
         if (firstRender)
         {
             module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/step-progress.js");
-            await module.InvokeVoidAsync("attach", root);
+            reference = DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("attach", root, reference);
         }
         if (requestedFocus is { } target)
         {
             requestedFocus = null;
             if (buttons.TryGetValue(target, out var button)) await button.FocusAsync(preventScroll: true);
         }
+    }
+
+    [JSInvokable]
+    public async Task PauseFollowingAsync()
+    {
+        if (!FitToViewport || !following) return;
+        following = false;
+        await FollowActiveStepChanged.InvokeAsync(false);
+        StateHasChanged();
     }
 
     private static string StatusClass(ProgressStepStatus status) => "status-" + status.ToString().ToLowerInvariant();
@@ -261,5 +274,6 @@
             await module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
+        finally { reference?.Dispose(); }
     }
 }

@@ -7,19 +7,7 @@
         <h2>@(GroupTitle ?? (Kind is null ? Localizer["Stage_" + StepId].Value : FamilyLabel(Kind)))</h2>
         <StatusBadge Text="@StepLocalizer[PresentationState.ToString()]" Status="@BadgeStatus" />
     </header>
-    <p class="startup-step-description">@Localizer["Explanation_" + StepId]</p>
-    @if (StepId == "resources")
-    {
-        <section class="startup-resource-outcomes" aria-label="@Localizer["ResourceOutcomes"]">
-            <h3>@Localizer["ResourceOutcomes"]</h3>
-            <div class="startup-resource-metrics">
-                <MetricCard Label="@Localizer["Created"]" Value="@((SelectedFamily?.Created ?? Snapshot.Created).ToString())" Status="UiStatus.Success" />
-                <MetricCard Label="@Localizer["Skipped"]" Value="@((SelectedFamily?.Skipped ?? Snapshot.Skipped).ToString())" Status="UiStatus.Neutral" />
-                <MetricCard Label="@Localizer["Conflicts"]" Value="@((SelectedFamily?.Conflicts ?? Snapshot.Conflicts).ToString())" Status="@((SelectedFamily?.Conflicts ?? Snapshot.Conflicts) > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
-                <MetricCard Label="@Localizer["ResourceFailures"]" Value="@((SelectedFamily?.Failed ?? Snapshot.Failed).ToString())" Status="@((SelectedFamily?.Failed ?? Snapshot.Failed) > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
-            </div>
-        </section>
-    }
+    @if (Kind is null) { <p class="startup-step-description">@Localizer["Explanation_" + StepId]</p> }
     @if (Snapshot.ActiveStepId == StepId && Snapshot.Activity is { } activity && (GroupId is null || activity.GroupId == GroupId) && (Kind is null || Kind == activity.ResourceKind || StepId == "extensions" && Kind == "ExtensionContribution"))
     {
         @if (activity.WaitReason is not null)
@@ -44,12 +32,14 @@
     }
     @if (Snapshot.Families.Any(family => family.StepId == StepId))
     {
-        <BootstrapStartupResourceList Snapshot="@Snapshot" StepId="@StepId" Kind="@Kind" GroupId="@GroupId" />
+        <BootstrapStartupResourceList Snapshot="@Snapshot" StepId="@StepId" Kind="@Kind" GroupId="@GroupId" FollowCurrent="@FollowCurrent" FollowCurrentChanged="@FollowCurrentChanged" />
     }
 
 </section>
 
 @code {
+    [Parameter] public bool FollowCurrent { get; set; }
+    [Parameter] public EventCallback<bool> FollowCurrentChanged { get; set; }
     [Parameter, EditorRequired] public BootstrapStartupSnapshot Snapshot { get; set; } = default!;
     [Parameter, EditorRequired] public string StepId { get; set; } = string.Empty;
     [Parameter] public string? Kind { get; set; }
