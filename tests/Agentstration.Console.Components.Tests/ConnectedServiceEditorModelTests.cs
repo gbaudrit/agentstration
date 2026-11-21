@@ -64,6 +64,6 @@ public sealed class ConnectedServiceEditorModelTests
             Definition = properties
         });
         Assert.IsTrue(reopened.ExposeOperationsToDescendants);
-        Assert.IsFalse(new ConnectedServiceEditorModel().ExposeOperationsToDescendants);
+        Assert.IsTrue(new ConnectedServiceEditorModel().ExposeOperationsToDescendants);
     }
 }

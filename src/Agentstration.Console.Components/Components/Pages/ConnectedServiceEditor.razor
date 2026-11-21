@@ -92,9 +92,9 @@ else
     }
     else if (savedSnapshot is { } saved) { <FormSection Title="@T("Configuration")"><p class="inline-warning">@T("TypeContractUnavailable")</p><pre class="runner-json">@JsonSerializer.Serialize(new { saved.Value.Definition.Bindings, saved.Value.Definition.Options }, new JsonSerializerOptions { WriteIndented = true })</pre></FormSection> }
 </div>;
-    private RenderFragment SharingFields => @<div>    <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" OnChanged="UsePolicyChanged" />
+    private RenderFragment SharingFields => @<div>
     <FormSection Title="@T("OperationAccess")" Description="@T("ExposeOperationsToDescendantsHelp")">
-        <label class="checkbox-field"><FormCheckbox Value="model.ExposeOperationsToDescendants" ValueChanged="SetOperationExposure" ValueExpression="() => model.ExposeOperationsToDescendants" disabled="@(IsBusy || !CanMutate)" data-testid="connected-service-expose-operations" /><span>@T("ExposeOperationsToDescendants")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="model.ExposeOperationsToDescendants" ValueChanged="SetOperationExposure" ValueExpression="() => model.ExposeOperationsToDescendants" disabled="@(IsBusy || !CanMutate)" data-testid="connected-service-expose-operations" /><span>@T("ExposeOperationsToDescendants")</span></label>
     </FormSection>
 </div>;
     private RenderFragment Review => @<div><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Description="@model.Description" Namespace="@ResourceNamespaceValue.Value"><Scope><ResourceScopeBadge ScopeRef="selectedScope" /></Scope></ResourceIdentitySummary>
@@ -417,7 +417,6 @@ else
         editContext.NotifyFieldChanged(editContext.Field(nameof(model.ExposeOperationsToDescendants)));
         MarkDirty();
     }
-    private void UsePolicyChanged() { if (CanMutate) { editContext.NotifyFieldChanged(editContext.Field(nameof(model.UseGrants))); MarkDirty(); } }
     private async Task CreatorChanged(ConnectedServiceBindingEditorModel binding, bool open)
     {
         if (open) creators.Add(binding); else creators.Remove(binding);

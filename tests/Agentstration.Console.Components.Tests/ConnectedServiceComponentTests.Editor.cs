@@ -29,8 +29,10 @@ public sealed partial class ConnectedServiceComponentTests
         var cut = context.Render<ConnectedServiceEditor>();
         cut.Find("[data-wizard-step=access]").Click();
         var checkbox = cut.Find("[data-testid=connected-service-expose-operations]");
-        Assert.IsFalse(checkbox.HasAttribute("checked"));
+        Assert.AreEqual("switch", checkbox.GetAttribute("role"));
+        Assert.IsTrue(checkbox.HasAttribute("checked"));
         StringAssert.Contains(checkbox.ParentElement!.TextContent, label);
+        checkbox.Change(false);
         checkbox.Change(true);
         Assert.IsTrue(((ConnectedServiceEditorModel)cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext.Model).ExposeOperationsToDescendants);
         cut.Find("[data-wizard-step=review]").Click();

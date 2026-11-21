@@ -21,7 +21,7 @@ public sealed class ConnectedServiceEditorModel
     public string Tags { get; set; } = string.Empty;
     private ConnectedServiceTypeReference? originalType;
     public bool Enabled { get; set; } = true;
-    public bool ExposeOperationsToDescendants { get; set; }
+    public bool ExposeOperationsToDescendants { get; set; } = true;
     public JsonElement Options { get; set; } = JsonSerializer.SerializeToElement(new { });
     public List<ConnectedServiceBindingEditorModel> Bindings { get; set; } = [];
     public List<DescendantUseGrant> UseGrants { get; set; } = [];

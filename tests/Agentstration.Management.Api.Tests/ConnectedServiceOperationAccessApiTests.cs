@@ -43,16 +43,16 @@ public sealed partial class ConnectedServiceApiTests
             {
                 type = await store.PutExactAsync(ResourceScopeRef.Instance, type.Value with
                 {
-                    Definition = type.Value.Definition with { UsePolicy = new() { Grants = new[] { new DescendantUseGrant(owner), new DescendantUseGrant(consumer) }.Distinct().Where(g => g.ScopeRef != ResourceScopeRef.Instance).ToArray() } }
+                    Definition = type.Value.Definition with { UsePolicy = new() { Grants = new[] { new DescendantUseGrant(owner) }.Distinct().Where(g => g.ScopeRef != ResourceScopeRef.Instance).ToArray() } }
                 }, type.ETag, false, default);
                 operationType = await store.PutExactAsync(ResourceScopeRef.Instance, operationType.Value with
                 {
-                    Definition = operationType.Value.Definition with { UsePolicy = new() { Grants = new[] { new DescendantUseGrant(owner), new DescendantUseGrant(consumer) }.Distinct().Where(g => g.ScopeRef != ResourceScopeRef.Instance).ToArray() } }
+                    Definition = operationType.Value.Definition with { UsePolicy = new() { Grants = new[] { new DescendantUseGrant(owner) }.Distinct().Where(g => g.ScopeRef != ResourceScopeRef.Instance).ToArray() } }
                 }, operationType.ETag, false, default);
             }
             foreach (var resource in new Resource[] { type.Value, operationType.Value })
                 _ = await policies.PutAsync(new(new(resource.Uid, ResourceScopeRef.Instance, resource.Namespace, resource.Kind),
-                    new[] { owner, consumer }.Distinct().Where(s => s != ResourceScopeRef.Instance)
+                    new[] { owner }.Distinct().Where(s => s != ResourceScopeRef.Instance)
                         .Select(s => new ResourceAccessGrant(s, [ResourceAccessAction.Discover, ResourceAccessAction.Use])).ToArray()), null, default);
             var version = type.Value.Definition.Versions.Single(v => v.Version == type.Value.Definition.PreferredVersion);
             service = await management.CreateAsync(new()
@@ -64,10 +64,11 @@ public sealed partial class ConnectedServiceApiTests
                 Definition = new()
                 {
                     DisplayName = "Shared HTTP",
+                    ExposeOperationsToDescendants = false,
                     Type = new() { Type = new(type.Value.Name, type.Value.ScopeRef, type.Value.Namespace), TypeUid = type.Value.Uid, Version = version.Version, SchemaDigest = version.SchemaDigest },
                     Options = JsonSerializer.SerializeToElement(new { }),
                     Bindings = [new() { InputId = "baseUrl", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement("https://example.test/news") }],
-                    UsePolicy = new() { Grants = [new(consumer)] }
+                    UsePolicy = new()
                 }
             }, default);
             Assert.IsFalse(service.Value.Definition.ExposeOperationsToDescendants);
@@ -114,6 +115,23 @@ public sealed partial class ConnectedServiceApiTests
             await Assert.ThrowsExactlyAsync<ResourceConcurrencyException>(() => management.PutExactAsync(owner, ns, service.Value.Name,
                 service.Value.Definition with { ExposeOperationsToDescendants = false }, before.ETag, default));
         }
+        if (ownerKind == "instance")
+        {
+            SelectConsoleContext(client, ResourceScopeRef.Tenant(context.TenantId));
+            Assert.IsTrue((await client.GetFromJsonAsync<ConnectedServiceResource[]>("/api/connected-services"))!.Any(s => s.Uid == service.Value.Uid));
+            SelectConsoleContext(client, consumer);
+        }
+        Assert.IsFalse((await client.GetFromJsonAsync<ConnectedServiceOperationTypeResource[]>("/api/connected-service-operation-types"))!.Any(t => t.Uid == operation.Definition.Type.TypeUid));
+        using (var contract = await client.PostAsJsonAsync("/api/connected-service-operations/contract", reference))
+        {
+            Assert.AreEqual(HttpStatusCode.OK, contract.StatusCode, await contract.Content.ReadAsStringAsync());
+            Assert.AreEqual(operation.Definition.Type.Version, (await contract.Content.ReadFromJsonAsync<ConnectedServiceOperationContract>())!.Type.Version);
+        }
+        using (var staleContract = await client.PostAsJsonAsync("/api/connected-service-operations/contract", reference with { OperationUid = Guid.NewGuid() }))
+        {
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, staleContract.StatusCode);
+            StringAssert.Contains(await staleContract.Content.ReadAsStringAsync(), "operation_revision_stale");
+        }
         Assert.AreEqual(operation.Uid, (await client.GetFromJsonAsync<ConnectedServiceOperationResource>(detailUrl))!.Uid);
         Assert.HasCount(1, (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(serviceListUrl))!);
         Assert.IsTrue((await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>("/api/connected-service-operations"))!.Any(o => o.Uid == operation.Uid));
@@ -146,6 +164,8 @@ public sealed partial class ConnectedServiceApiTests
             await identityStore.AddTenantAsync(new(foreignTenantId, "operation-foreign", "Foreign", TenantStatus.Active, DateTimeOffset.UnixEpoch), default);
             await identityStore.AddWorkspaceAsync(new(siblingId, foreignTenantId, "operation-sibling", "Sibling", WorkspaceStatus.Active, DateTimeOffset.UnixEpoch), default);
             Assert.IsFalse((await policies.EvaluateAsync(new(operation.Uid, owner, ns, operation.Kind), ResourceScopeRef.Workspace(siblingId), ResourceAccessAction.Use, default)).Allowed);
+            var foreign = await Assert.ThrowsExactlyAsync<ConnectedServiceOperationDiscoveryException>(() => operations.ResolveAsync(reference, ResourceScopeRef.Workspace(siblingId), true, default));
+            Assert.AreEqual("operation_access_denied", foreign.Code);
             Assert.IsFalse((await policies.EvaluateAsync(new(operation.Uid, owner, new ResourceNamespace("other"), operation.Kind), consumer, ResourceAccessAction.Use, default)).Allowed);
             var current = (await store.GetExactAsync<ConnectedServiceOperationResource>(address, default))!;
             var disabled = await operations.SetEnabledAsync(address, false, current.ETag, default);
@@ -166,6 +186,11 @@ public sealed partial class ConnectedServiceApiTests
         {
             var denied = await Assert.ThrowsExactlyAsync<ConnectedServiceOperationDiscoveryException>(() => operations.ResolveAsync(reference, consumer, true, default));
             Assert.AreEqual("operation_access_denied", denied.Code);
+        }
+        using (var deniedContract = await client.PostAsJsonAsync("/api/connected-service-operations/contract", reference))
+        {
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, deniedContract.StatusCode);
+            StringAssert.Contains(await deniedContract.Content.ReadAsStringAsync(), "operation_access_denied");
         }
         Assert.HasCount(2, (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(serviceListUrl))!);
         using (scopes.PushSystem())

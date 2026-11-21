@@ -12,7 +12,8 @@ public sealed class ConnectedServiceOperationService(
     IResourceAccessPolicyService access,
     DescendantResourceUseAuthorizer hierarchy,
     ConnectedServiceManagementService services,
-    ConnectedServiceOperationTypeManagementService types)
+    ConnectedServiceOperationTypeManagementService types,
+    IRequestContextScopeFactory? requestContexts = null)
 {
     public async Task<IReadOnlyList<ConnectedServiceOperationResource>> ListAsync(CancellationToken cancellationToken) =>
         (await store.ListAllAsync<ConnectedServiceOperationResource>(ConnectedServiceResourceKinds.ConnectedServiceOperation, cancellationToken))
@@ -40,24 +41,36 @@ public sealed class ConnectedServiceOperationService(
         if (address.Kind != ConnectedServiceResourceKinds.ConnectedServiceOperation
             || !await hierarchy.IsSameOrDescendantAsync(address.ScopeRef, consumer, cancellationToken))
             throw Error("operation_access_denied", "The operation is outside the consumer scope.");
+        using var ownerRead = requestContexts?.PushSystem();
         var operation = (await store.GetExactAsync<ConnectedServiceOperationResource>(address, cancellationToken))?.Value
-            ?? throw Error("operation_not_found", "The operation is unavailable.");
+            ?? throw Error(consumer == address.ScopeRef ? "operation_not_found" : "operation_access_denied", "The operation is unavailable.");
+        if (!(await access.EvaluateAsync(new(operation.Uid, address.ScopeRef, address.Namespace,
+                address.Kind, operation.Generation), consumer, ResourceAccessAction.Use, cancellationToken)).Allowed)
+            throw Error("operation_access_denied", "The operation does not authorize this consumer.");
+        if (operation.ScopeRef != operation.Definition.Service.Service.ScopeRef
+            || operation.Namespace != operation.Definition.Service.Service.Address.Namespace)
+            throw Error("operation_access_denied", "The operation does not match its owning service.");
         if (operation.Uid != reference.OperationUid || operation.Generation != reference.Generation
             || operation.Definition.DefinitionDigest != reference.DefinitionDigest)
             throw Error("operation_revision_stale", "The exact operation revision is unavailable. Reconcile explicitly.");
         if (requireEnabled && !operation.Enabled
             || operation.ObservedState.Availability != ConnectedServiceOperationAvailability.Available)
             throw Error("operation_unavailable", "The operation is disabled, stale or unavailable.");
-        if (!(await access.EvaluateAsync(new(operation.Uid, address.ScopeRef, address.Namespace,
-                address.Kind, operation.Generation), consumer, ResourceAccessAction.Use, cancellationToken)).Allowed)
-            throw Error("operation_access_denied", "The operation does not authorize this consumer.");
         _ = await services.InspectAsync(operation.Definition.Service,
             new(consumer, operation.Address), cancellationToken);
-        var (type, version) = await types.ResolveExactAsync(operation.Definition.Type, operation.Namespace, consumer, cancellationToken);
+        // The consumer uses the configured operation; its owner's exact adapter dependencies stay private.
+        var (type, version) = await types.ResolveExactAsync(operation.Definition.Type, operation.Namespace, address.ScopeRef, cancellationToken);
         if (!(await access.EvaluateAsync(new(type.Uid, type.ScopeRef!.Value, type.Namespace,
-                type.Kind, type.Generation), consumer, ResourceAccessAction.Use, cancellationToken)).Allowed)
+                type.Kind, type.Generation), address.ScopeRef, ResourceAccessAction.Use, cancellationToken)).Allowed)
             throw Error("operation_type_access_denied", "The operation type does not authorize this consumer.");
         return (operation, version);
+    }
+
+    public async Task<ConnectedServiceOperationContract> InspectContractAsync(
+        ConnectedServiceOperationRevisionReference reference, CancellationToken cancellationToken)
+    {
+        var (_, type) = await ResolveAsync(reference, scopes.DefaultScopeRef(ConnectedServiceResourceKinds.ConnectedServiceOperation), false, cancellationToken);
+        return new(reference, type);
     }
 
     private static ConnectedServiceOperationDiscoveryException Error(string code, string message) => new(code, message);

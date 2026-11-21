@@ -24,6 +24,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
         Agentstration.ConnectedServices.Contracts.ConnectedServiceDiscoveryFlowReference reference,
         CancellationToken cancellationToken)
     {
+        using var ownerRead = requestScopes.PushSystem();
         var scope = reference.Flow.ScopeRef ?? throw Error("operation_flow_scope_required", "The operation Flow must have an exact scope.");
         var ns = reference.Flow.Namespace ?? ResourceNamespace.Default;
         var flow = await flows.GetExactAsync(scope, new FlowId(reference.Flow.Name, ns), cancellationToken);
@@ -41,7 +42,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
             throw Error("operation_flow_stale", "The exact operation Flow revision or contract is unavailable.");
         return new(reference.Flow.Name, ns, reference.Version, false, resolved.Graph?.InputSchema,
             resolved.Graph?.OutputSchema, reference.Contract, hash)
-        { ScopeRef = scope };
+        { ScopeRef = scope, DefinitionUseScopeRef = consumerScope };
     }
 
     public async Task<ResolvedDataSourceFlowBinding> ResolveFlowAsync(
@@ -298,7 +299,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
     private static DataSourceAcquisitionException Error(string code, string message) => new(code, message);
 }
 
-public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDataSourceAcquisitionFlowGateway
+public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IRequestContextScopeFactory? requestScopes = null) : IDataSourceAcquisitionFlowGateway
 {
     public async Task<DataSourceFlowRunSnapshot> StartAsync(
         DataSourceFlowRunRequest request,
@@ -306,6 +307,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
     {
         try
         {
+            using var ownerRead = request.Flow.DefinitionUseScopeRef is not null ? requestScopes?.PushSystem() : null;
             var stored = await runs.EnsureRootAsync(new EnsureRootFlowRunCommand(
                 request.RunId,
                 new FlowId(request.Flow.Name, request.Flow.Namespace),
@@ -327,6 +329,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs) : IDat
                 Scope(request.WorkspaceId, request.TenantId, request.PrincipalId) with { LogicalScopeRef = request.LogicalScopeRef })
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
+                DefinitionUseScopeRef = request.Flow.DefinitionUseScopeRef,
                 Compositions = request.Compositions,
                 AcceptedCompositionSchemas = true,
                 TransientPayloads = request.TransientPayloads

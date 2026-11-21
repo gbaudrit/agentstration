@@ -18,7 +18,8 @@ public sealed class ConnectedServiceManagementService(
     IParameterResolver parameters,
     ISecretResolver secrets,
     IResourceAccessPolicyService accessPolicies,
-    TimeProvider timeProvider) : IConnectedServiceResolver, IConnectedServiceExportInspector
+    TimeProvider timeProvider,
+    IRequestContextScopeFactory? requestContexts = null) : IConnectedServiceResolver, IConnectedServiceExportInspector
 {
     public const int MaximumDisplayNameLength = 200;
     public const int MaximumDescriptionLength = 2_000;
@@ -219,6 +220,7 @@ public sealed class ConnectedServiceManagementService(
     {
         var resource = await AuthorizeAsync(service, context, cancellationToken);
         if (resource is null) return null;
+        using var ownerRead = requestContexts?.PushSystem();
         var (_, version) = await ResolveTypeAsync(resource, cancellationToken);
         var inputs = new List<ResolvedConnectedServiceInput>();
         try
@@ -251,15 +253,14 @@ public sealed class ConnectedServiceManagementService(
             throw new ConnectedServiceValidationException("The referenced resource must be a ConnectedService.");
         if (!await useAuthorizer.IsSameOrDescendantAsync(service.ScopeRef, context.ConsumerScopeRef, cancellationToken))
             throw new ConnectedServiceAccessDeniedException(service.Address);
+        using var ownerRead = requestContexts?.PushSystem();
         var stored = await store.GetExactAsync<ConnectedServiceResource>(new ScopedResourceAddress(
             service.ScopeRef, service.Address.Namespace, service.Address.Kind, service.Address.Name), cancellationToken);
         if (stored is null) return null;
+        await EnsureMetadataUseAsync(stored.Value, context.ConsumerScopeRef, cancellationToken);
         if (!stored.Value.Definition.Enabled
             || stored.Value.ObservedState?.Availability != ConnectedServiceAvailability.Ready)
             throw new ConnectedServiceUnavailableException(service.Address);
-        if (!await useAuthorizer.CanUseAsync(service.ScopeRef, context.ConsumerScopeRef,
-                stored.Value.Definition.UsePolicy, cancellationToken))
-            throw new ConnectedServiceAccessDeniedException(service.Address);
 
         _ = await ResolveTypeAsync(stored.Value, cancellationToken);
         return stored.Value;
@@ -291,19 +292,17 @@ public sealed class ConnectedServiceManagementService(
             || !await useAuthorizer.IsSameOrDescendantAsync(reference.ScopeRef,
                 context.ConsumerScopeRef, cancellationToken))
             throw new ConnectedServiceAccessDeniedException(reference.Address);
+        using var ownerRead = requestContexts?.PushSystem();
         var stored = await store.GetExactAsync<ConnectedServiceResource>(new(reference.ScopeRef,
             reference.Address.Namespace, reference.Address.Kind, reference.Address.Name), cancellationToken)
             ?? throw new ConnectedServiceUnavailableException(reference.Address);
+        await EnsureMetadataUseAsync(stored.Value, context.ConsumerScopeRef, cancellationToken);
         if (stored.Value.Uid != service.ServiceUid || stored.Value.Generation != service.Generation)
             throw new ConnectedServiceTypeRevisionException("The pinned Connected Service revision is stale.");
         if (!stored.Value.Definition.Enabled
             || stored.Value.ObservedState?.Availability != ConnectedServiceAvailability.Ready)
             throw new ConnectedServiceUnavailableException(reference.Address);
-        if (!await useAuthorizer.CanUseAsync(reference.ScopeRef, context.ConsumerScopeRef,
-            stored.Value.Definition.UsePolicy, cancellationToken))
-            throw new ConnectedServiceAccessDeniedException(reference.Address);
         var (type, version) = await ResolveTypeAsync(stored.Value, cancellationToken);
-        await EnsureMetadataUseAsync(stored.Value, context.ConsumerScopeRef, cancellationToken);
         await EnsureMetadataUseAsync(type, reference.ScopeRef, cancellationToken);
         foreach (var binding in stored.Value.Definition.Bindings)
         {
@@ -428,6 +427,7 @@ public sealed class ConnectedServiceManagementService(
         ResolveTypeAsync(ConnectedServiceResource resource, CancellationToken cancellationToken)
     {
         var scopeRef = RequireScope(resource);
+        using var ownerRead = requestContexts?.PushSystem();
         var reference = resource.Definition.Type.Type;
         var typeScope = reference.ScopeRef
             ?? throw new ConnectedServiceValidationException("The Connected Service type reference must include an exact scopeRef.");
@@ -447,6 +447,7 @@ public sealed class ConnectedServiceManagementService(
                 stored.Value.Definition.UsePolicy, cancellationToken))
             throw new ConnectedServiceValidationException(
                 $"Connected Service type '{address}' cannot be used from this scope.");
+        await EnsureMetadataUseAsync(stored.Value, scopeRef, cancellationToken);
         var version = stored.Value.Definition.Versions.SingleOrDefault(value =>
             string.Equals(value.Version, resource.Definition.Type.Version, StringComparison.Ordinal));
         if (version is null)
