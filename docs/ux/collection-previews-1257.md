@@ -107,3 +107,9 @@ Validation: Release component/test build passed without warnings/errors; 123 mod
 Saved identity, Provider/Model reference, generation/reasoning/output options, stop sequences and provider options. The full overview may supply an already known Provider owner; Preview does not infer one from another catalog. Exact Preview avoids model resolution, Extension/Provider/Model pickers, capabilities and usage reads. Existing row deletion retains its authorization, ETag and confirmation workflow. The family Preview uses `IModelProfilesClient.GetModelProfileAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 132 model profiles tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/modelprofiles/README.md). Final offline lanes remain pending.
+
+## DataSource
+
+Saved identity and Profile-based or Dataset acquisition configuration, shared by both detail adapters. Optional already resolved service/operation/storage display names and observations stay in the full overview. Preview uses one exact snapshot and does not read readiness, operation contracts, service/storage catalogs, acquisitions, discovery or document contents. The family Preview uses `IDataSourcesClient.GetAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 137 data sources tests passed. Browser and final offline checks remain pending.

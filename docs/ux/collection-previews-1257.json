@@ -105,7 +105,27 @@
       "rowTypes": [
         "DataSourceResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "DataSource",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/data-sources/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/data-sources/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity and Profile-based or Dataset acquisition configuration, shared by both detail adapters. Optional already resolved service/operation/storage display names and observations stay in the full overview. Preview uses one exact snapshot and does not read readiness, operation contracts, service/storage catalogs, acquisitions, discovery or document contents.",
+      "loader": "IDataSourcesClient.GetAsync(namespace, name, owner, token)",
+      "tests": [
+        "DataSourceResourcePreviewTests",
+        "DataSourceCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 137 data sources tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",

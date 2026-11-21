@@ -48,8 +48,8 @@
             <PrimaryActions>@if (source is not null) { <button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || resourceRefreshing || !interactive || readiness?.CanAcquire != true)" @onclick="StartAsync"><UiIcon Name="play-circle" />@T("StartAcquisition")</button> }</PrimaryActions>
 
             <OverviewMetrics><MetricCard Label="@T("Generation")" Value="@source?.Generation.ToString()" /><MetricCard Label="@T("State")" Value="@(readiness is null ? "—" : T(readiness.Ready ? "Ready" : "NotReady"))" Status="@(readiness is null ? UiStatus.Neutral : readiness.Ready ? UiStatus.Success : UiStatus.Warning)" /></OverviewMetrics>
-            <OverviewConfiguration><CollectionView TItem="DatasetSetting" Items="SavedSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
-            <OverviewContent>@OverviewContent</OverviewContent>
+            <OverviewSummary Context="identity">@if (source is not null) { <DataSourceResourceSummary ConfigurationTestId="dataset-configuration-summary" Resource="source" Identity="identity" ServiceDisplayName="@SavedService?.Definition.DisplayName" OperationDisplayName="@SavedOperationLabel" StorageDisplayName="@SavedStorageLabel"><AdditionalContent>@OverviewContent</AdditionalContent></DataSourceResourceSummary> }</OverviewSummary>
+
             <DefinitionContent Context="path">@form</DefinitionContent>
             <AdditionalContent Context="path">@if (path == "acquisitions") { @AcquisitionsContent } else if (path == "content") { @ContentView } else if (source is not null) { <FormSection Title="@T(path == "tools" ? "Tools" : "Queries")"><DataSourceQueries @key="source.Uid" Source="source" ShowTools="@(path == "tools")" Acquisitions="history" /></FormSection> }</AdditionalContent>
             <DraftActions><button class="text-button" type="button" disabled="@(busy || resourceRefreshing)" @onclick="CancelDefinitionAsync">@T("SourceDiscard")</button><button class="button-primary" type="submit" form="data-source-dataset-definition" data-testid="data-source-save" disabled="@(busy || resourceRefreshing)">@T("Save")</button></DraftActions>
@@ -677,12 +677,6 @@
 
                 </div>
 </div>;
-    private sealed record DatasetSetting(string Label, string Value);
-    private IReadOnlyList<DatasetSetting> SavedSettings => source?.Definition.Dataset is not { } saved ? [] :
-    [new(T("DatasetService"), SavedService?.Definition.DisplayName ?? saved.Acquisition.Operation.Operation.ToString()), new(T("DatasetOperation"), SavedOperationLabel),
-     new(T("Parameters"), saved.Acquisition.Parameters.GetRawText()), new(T("DatasetStorage"), SavedStorageLabel), new(T("DatasetPrefix"), saved.Rule.Prefix),
-     new(T("AcquisitionOutputSchema"), ContractSummary(saved.Acquisition.OutputSchemaBinding)), new(T("ProjectedOutputSchema"), ContractSummary(saved.OutputSchemaBinding)),
-     new(T("LifecycleTitle"), JsonSerializer.Serialize(saved.Lifecycle)), new(T("WizardTreatments"), JsonSerializer.Serialize(new { saved.Orchestration, saved.Compositions, saved.Transformations }))];
     private Task SetEnabledAsync(bool value)
     {
         if (!CanManage || busy || resourceRefreshing) return Task.CompletedTask;

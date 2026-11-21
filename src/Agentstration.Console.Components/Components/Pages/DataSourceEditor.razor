@@ -51,11 +51,11 @@ else
                 <MetricCard Label="@T("Generation")" Value="@source?.Generation.ToString()" />
                 <MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? "—" : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition?.CreatedAt.ToLocalTime().ToString("g"))" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@(source is null ? null : AcquisitionsUrl)" />
             </OverviewMetrics>
-            <OverviewConfiguration><CollectionView TItem="SourceSetting" Items="SavedSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")">@if (entry.Href is { } href) { <a class="configuration-value" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information></CollectionView></OverviewConfiguration>
-            <OverviewContent>
+            <OverviewSummary Context="identity">@if (source is not null) { <DataSourceResourceSummary Resource="source" Identity="identity"><AdditionalContent>
                 @if (readiness?.Issues.Count > 0) { <FormSection Title="@T("State")">@foreach (var issue in readiness.Issues) { <p>@issue</p> }</FormSection> }
                 @if (AcquisitionFlow is { } flow) { <FormSection Title="@T("AcquisitionFlow")" Description="@T("AcquisitionFlowHelp")" TestId="data-source-flow-composition"><a class="data-source-flow-card" href="@AcquisitionFlowUrl" data-testid="data-source-acquisition-flow-link"><UiIcon Name="workflow" /><strong>@flow.Name</strong><code>@AcquisitionFlowIdentity</code></a></FormSection> }
-            </OverviewContent>
+            </AdditionalContent></DataSourceResourceSummary> }</OverviewSummary>
+
             <DefinitionContent Context="path">@form</DefinitionContent>
             <AdditionalContent Context="path">@if (path == "acquisitions") { @AcquisitionsContent } else if (path == "discovery") { @DiscoveryContent }</AdditionalContent>
             <DraftActions><button class="text-button" type="button" disabled="@(busy || resourceRefreshing)" @onclick="Discard">@T("SourceDiscard")</button>
@@ -599,12 +599,6 @@ else
         <div class="form-field-wide schema-backed-input" data-testid="data-source-configuration"><span>@T("Configuration")</span><JsonSchemaInputEditor Schema="ConfigurationSchema" Value="model.Configuration" ValueChanged="value => model.Configuration = value" ValidationChanged="ConfigurationValidated" Disabled="busy" /></div>
     </FormGrid></FormSection>;
     private RenderFragment<string> DefinitionContent => path => path == "definition/identity" ? IdentityContent : ConfigurationContent;
-    private sealed record SourceSetting(string Label, string Value, string? Href = null);
-    private string SavedProfileLabel => source?.Definition.Profile is not { } profile ? "—" : $"{profile.Namespace ?? source.Namespace}/{profile.Name}{(profile.ScopeRef is { } scope ? $" · {scope.Value}" : string.Empty)}";
-    private string? SavedProfileUrl => source?.Definition.Profile is { ScopeRef: { } owner } profile
-        ? ResourceOwnershipContext.Resource(Services, "/data-source-profiles", profile.Name, profile.Namespace ?? source.Namespace, owner) : null;
-    private IReadOnlyList<SourceSetting> SavedSettings => source is null ? [] :
-        [new(T("Enabled"), T(source.Definition.Enabled ? "Enabled" : "Disabled")), new(T("Profile"), SavedProfileLabel, SavedProfileUrl), new(T("Configuration"), source.Definition.Configuration.GetRawText())];
     private RenderFragment AcquisitionsContent => @<div class="resource-editor-view">        <section class="panel form-section data-source-acquisitions" data-testid="data-source-acquisitions"><div class="panel-header"><div><p class="eyebrow">@T("Acquisitions")</p><h2>@T("AcquisitionHistory")</h2><p>@T("AcquisitionHelp")</p></div><button class="button-primary" type="button" data-testid="data-source-start-acquisition" disabled="@(busy || !parametersValid || readiness?.CanAcquire != true || readiness?.Discovery is not null && string.IsNullOrWhiteSpace(selectedTarget))" @onclick="StartAsync">@T("StartAcquisition")</button></div>
         @if (readiness?.Discovery is not null) { <FormField Label="@T("AcquisitionTarget")" Class="form-span-2"><ClearableSelect TValue="string" @bind-Value="selectedTarget" data-testid="data-source-acquisition-target"><option value="">@T("SelectTarget")</option>@foreach (var item in targets.Where(value => value.Target.Enabled)) { <option value="@item.Target.Name" disabled="@item.Stale">@item.Target.DisplayName @(item.Stale ? $"· {T("Stale")}" : string.Empty)</option> }</ClearableSelect></FormField> }
         <div class="data-source-parameters" data-testid="data-source-acquisition-parameters" @oninput="() => businessTouched = true" @onchange="() => businessTouched = true"><span>@T("Parameters")</span><JsonSchemaInputEditor Schema="AcquisitionParametersSchema" Value="parameters" ValueChanged="value => parameters = value" ValidationChanged="state => parametersValid = state.IsValid" Disabled="busy" /><small>@T("ParametersHelp")</small></div>

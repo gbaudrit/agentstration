@@ -6705,7 +6705,7 @@
     },
     {
       "id": "data-source-dataset-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/data-sources/new?composition=dataset",
@@ -6720,7 +6720,7 @@
       "informationKeys": [
         "SourceSettingValue"
       ],
-      "line": 51,
+      "line": 23,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6740,11 +6740,12 @@
     },
     {
       "id": "data-source-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/data-sources/new",
-        "/data-sources/{Name}"
+        "/data-sources/{Name}",
+        "/data-sources"
       ],
       "renderer": "CollectionView",
       "itemType": "SourceSetting",
@@ -6755,7 +6756,7 @@
       "informationKeys": [
         "SourceSettingValue"
       ],
-      "line": 54,
+      "line": 23,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6765,7 +6766,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved DataSource configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18976,6 +18977,11 @@
       "source": "src/Agentstration.Console.Components/Components/ModelProfileResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved ModelProfile configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved DataSource configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
