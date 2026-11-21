@@ -105,7 +105,7 @@
       "rowTypes": [
         "DataSourceResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "DataSource",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/data-sources/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -125,7 +125,8 @@
         "DataSourceResourcePreviewTests",
         "DataSourceCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 137 data sources tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 137 data sources tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/data-sources/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
@@ -168,7 +169,7 @@
       "rowTypes": [
         "KnowledgeSourceResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "KnowledgeSource",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/knowledge-sources/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -188,7 +189,8 @@
         "KnowledgeSourceResourcePreviewTests",
         "KnowledgeSourceCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/knowledge-sources/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
@@ -446,7 +448,7 @@
       "rowTypes": [
         "SourceProviderSummaryResponse"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "SourceProvider",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/sourceproviders/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -466,7 +468,8 @@
         "SourceProviderResourcePreviewTests",
         "SourceProviderCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 34 source providers tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 34 source providers tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/sourceproviders/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryCollection.razor",
@@ -474,7 +477,28 @@
       "rowTypes": [
         "SourceRegistryRegistrationView"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-smoke-passed",
+      "family": "SourceRegistryRegistration",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/settings/source-registries/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/settings/source-registries/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved Instance/default-namespace registration identity, endpoint and credential reference, trust, endpoint, refresh and cache policies. The new exact desired-state endpoint reads only the selected registration; no observed-state provisioning, refresh, index download, discovery cache or history read. Existing full-detail observation panels and row toggle/refresh commands are retained. Other namespaces and unsupported owners never fall back.",
+      "loader": "ISourceRegistriesClient.GetRegistrationAsync(owner, namespace, name, token)",
+      "tests": [
+        "SourceRegistryRegistrationResourcePreviewTests",
+        "SourceRegistryRegistrationCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 40 source registries tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/settings/source-registries/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
@@ -1040,7 +1064,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "secrets-secret-response",
@@ -1136,7 +1161,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "resource-plans-resource-plan-snapshot",
@@ -1222,7 +1248,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "model-providers-model-provider-response",
@@ -1463,7 +1490,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "runtime-profiles-runtime-profile-summary-response",
@@ -1785,7 +1813,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "data-source-profile-configuration-summary",
@@ -1967,7 +1996,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "data-source-editor-saved-configuration-summary",
@@ -1978,7 +2008,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "entry-editor-saved-configuration-summary",
@@ -2033,7 +2064,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "knowledge-source-editor-saved-configuration-summary",
@@ -2044,7 +2076,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "organization-member-details-saved-configuration-summary",
@@ -2108,7 +2141,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "sources-saved-configuration-summary",

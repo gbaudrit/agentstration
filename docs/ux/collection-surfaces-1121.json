@@ -7165,7 +7165,7 @@
     },
     {
       "id": "source-registries-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "source": "src/Agentstration.Console.Components/Components/SourceRegistryRegistrationResourceSummary.razor",
       "host": "console",
       "routes": [
         "/settings/source-registries",
@@ -7181,7 +7181,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 97,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7191,7 +7191,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved SourceRegistryRegistration configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18994,6 +18994,11 @@
       "source": "src/Agentstration.Console.Components/Components/SourceProviderResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved SourceProvider configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SourceRegistryRegistrationResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved SourceRegistryRegistration configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

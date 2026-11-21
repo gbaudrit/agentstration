@@ -232,14 +232,6 @@ public partial class SourceRegistries
         else if (instanceSecrets.FirstOrDefault(secret => SecretKey(secret) == value) is { } choice) { model.CredentialName = choice.Resource.Name; model.CredentialNamespace = choice.Resource.Namespace; model.CredentialScopeRef = choice.Resource.ScopeRef; }
         messages.Clear(editContext.Field(nameof(model.CredentialName))); editContext.NotifyFieldChanged(editContext.Field(nameof(model.CredentialName)));
     }
-    private IReadOnlyList<Setting> SavedSettings
-    {
-        get
-        {
-            if (view is null) return []; var definition = view.Registration.Definition; var refresh = definition.RefreshPolicy;
-            return [new(T("IndexUrl"), definition.IndexUrl.AbsoluteUri), new(T("Enabled"), BooleanLabel(definition.Enabled)), new(T("TrustPolicy"), TrustPolicy(definition.TrustPolicy)), new(T("Authentication"), T($"Authentication.{definition.AuthenticationMode}")), new(T("CredentialReference"), definition.Credential is { } credential ? ReferenceDisplay(credential.Name, credential.ScopeRef, credential.Namespace) : "—"), new(T("AllowHttp"), BooleanLabel(definition.EndpointPolicy.AllowHttp)), new(T("AllowPrivateNetwork"), BooleanLabel(definition.EndpointPolicy.AllowPrivateNetwork)), new(T("PeriodicRefresh"), BooleanLabel(refresh.PeriodicEnabled)), new(T("IntervalMinutes"), refresh.Interval.TotalMinutes.ToString(CultureInfo.CurrentCulture)), new(T("TimeoutSeconds"), refresh.Timeout.TotalSeconds.ToString(CultureInfo.CurrentCulture)), new(T("MaximumAttempts"), refresh.MaximumAttempts.ToString(CultureInfo.CurrentCulture)), new(T("InitialBackoffSeconds"), refresh.InitialBackoff.TotalSeconds.ToString(CultureInfo.CurrentCulture)), new(T("MaximumBackoffSeconds"), refresh.MaximumBackoff.TotalSeconds.ToString(CultureInfo.CurrentCulture)), new(T("JitterSeconds"), refresh.Jitter.TotalSeconds.ToString(CultureInfo.CurrentCulture)), new(T("StaleAfterMinutes"), refresh.StaleAfter.TotalMinutes.ToString(CultureInfo.CurrentCulture)), new(T("RetainedObservations"), definition.CachePolicy.RetainedObservations.ToString(CultureInfo.CurrentCulture))];
-        }
-    }
     private void Notify(string titleKey, string message) => Notifications.Add(new(Guid.NewGuid(), T(titleKey), message, Clock.GetLocalNow(), UiStatus.Success));
     private string ObservedStatus(SourceRegistryObservedStatus value) => Enum.IsDefined(value) ? T($"Observed.{value}") : T("Editor.UnknownState");
     private string RefreshOutcome(SourceRegistryRefreshOutcome? value) => value is null ? T("Never") : T($"Outcome.{value}");

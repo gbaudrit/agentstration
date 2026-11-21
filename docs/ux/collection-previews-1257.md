@@ -112,16 +112,22 @@ Validation: Release component/test build passed without warnings/errors; 132 mod
 
 Saved identity and Profile-based or Dataset acquisition configuration, shared by both detail adapters. Optional already resolved service/operation/storage display names and observations stay in the full overview. Preview uses one exact snapshot and does not read readiness, operation contracts, service/storage catalogs, acquisitions, discovery or document contents. The family Preview uses `IDataSourcesClient.GetAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 137 data sources tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 137 data sources tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/data-sources/README.md). Final offline lanes remain pending.
 
 ## KnowledgeSource
 
 Saved identity, exact declared Flow references, projection parameters, input bindings, output storage pin and lifecycle/composition policy. Both full details and the standalone edit adapter reuse the saved Summary. Preview reads no readiness, resolved Flows, snapshots, Tool exposure, data-source/Storage catalogs or document content. Full-detail observations remain supplied by the owning page. The family Preview uses `IKnowledgeSourcesClient.GetAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/knowledge-sources/README.md). Final offline lanes remain pending.
 
 ## SourceProvider
 
 Saved identity and declared Extension/contribution reference. Existing exact owner/namespace/name reads are reused; legacy client implementations now reject unsupported exact reads instead of silently ignoring the owner. Preview does not inspect Extension connections, enumerate contributions, probe the provider or read usages. Catalog Platform administrator authorization remains enforced by the existing endpoint. The family Preview uses `ISourceProvidersClient.GetSourceProviderAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 34 source providers tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 34 source providers tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/sourceproviders/README.md). Final offline lanes remain pending.
+
+## SourceRegistryRegistration
+
+Saved Instance/default-namespace registration identity, endpoint and credential reference, trust, endpoint, refresh and cache policies. The new exact desired-state endpoint reads only the selected registration; no observed-state provisioning, refresh, index download, discovery cache or history read. Existing full-detail observation panels and row toggle/refresh commands are retained. Other namespaces and unsupported owners never fall back. The family Preview uses `ISourceRegistriesClient.GetRegistrationAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 40 source registries tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/settings/source-registries/README.md). Final offline lanes remain pending.
