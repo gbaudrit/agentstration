@@ -17,9 +17,40 @@ on resource screens or add a production route.
                    Root="@SystemGraphIds.Definition(resource.Uid)" />
 ```
 
-A host using the shared `ResourceNavigation` can mount the component when its
-configured `#relations` section is selected. The host retains fragment routing;
-this component does not parse or rewrite the resource page URL.
+Persisted resource screens follow the [resource-screen authoring guide](../ux/resource-screen-authoring.md)
+and compose `ConsoleResourceDetailsTemplate`. Declare a primary `relations` entry
+in its `AdditionalSections` and render the component from `AdditionalContent` for
+that path. Preserve any existing family sections and fragments. Do not replace
+`Sections`, `Content`, or the standard Overview/Definition/Access/YAML sections.
+
+```razor
+<ConsoleResourceDetailsTemplate ...
+    AdditionalSections="resourceSections">
+    @* Keep the screen's other named regions. *@
+    <AdditionalContent Context="path">
+        @if (path == "relations")
+        {
+            <ResourceRelations Context="actorContext"
+                               Namespace="resource.Namespace"
+                               Root="@SystemGraphIds.Definition(resource.Uid)" />
+        }
+    </AdditionalContent>
+</ConsoleResourceDetailsTemplate>
+```
+
+The screen supplies `resourceSections`, including
+`new ResourceNavigationItem("relations", localizedRelationsLabel, "hierarchy")`;
+use its existing bilingual catalog for the label. Only offer the section for a
+saved resource with a known nonempty UID, never an unsaved creation draft. The
+template mounts additional sections on first visit and retains their hidden panes;
+therefore ordinary Overview visits do not start a graph request. Its existing
+fragment navigation owns `#relations`, keyboard/mobile navigation and draft leave
+protection. This component does not parse or rewrite the resource page URL.
+
+This is the integration contract; resource-screen adoption is not installed by
+this component preparation. The Console adapter owns physical resource identity,
+while `PresentationScopeRef` is display-only and must not be passed as the actor
+context. Use the screen's current authorized actor context.
 
 The host supplies the current authorized **actor context**, independently of the
 resource owner. A Workspace actor inspecting an Instance resource retains its
