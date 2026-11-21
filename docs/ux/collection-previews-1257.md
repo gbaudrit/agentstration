@@ -263,3 +263,7 @@ Regression ownership: `OrganizationMembersCollectionTests / OrganizationMemberDe
 SecurityAuditEvent is append-only event evidence with action, outcome, actor/target IDs and occurrence time. The scope records where an event happened, not resource ownership. It has no inspectable saved definition or edit command; retain bounded audit snapshot and invariant identifiers.
 
 Regression ownership: `SecurityAuditCollectionTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
+
+### Cleanup resource candidates
+
+Agent, Flow and Entry deletion candidates with known owners offer saved Preview through existing adapters. Native run/task candidates remain operational evidence. Candidate rows do not infer governance or definition editability; family quick actions resolve saved authorization. Current administrative context is retained. Deletion ordering, selection and confirmation/ETag behavior stay independent. Context replacement closes Preview and rejects stale inventory responses.

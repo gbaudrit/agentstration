@@ -1238,6 +1238,33 @@
         "ResourceCollectionPreviewTests"
       ],
       "validation": "Release component/shared builds passed without warnings/errors; 6 scope-explorer component tests and 16 shared Preview history tests passed. Browser and final offline checks remain pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "rowTypes": [
+        "CleanupCandidate"
+      ],
+      "family": "Cleanup candidates",
+      "status": "implemented-validation-pending",
+      "coordinates": "Known candidate owner + namespace + Agent/Flow/Entry technical ID. Execution/task candidates remain native operational evidence.",
+      "overview": "Native resource overview #overview; preserve owner and current administrative context.",
+      "edit": "Governance is absent in cleanup projection, so row Edit is not inferred. Existing family adapters load actual governance before their quick actions.",
+      "rowActions": [
+        "Open",
+        "Preview (known resource candidate only)"
+      ],
+      "quickActions": [
+        "Existing independent Agent/Flow/Entry adapter actions"
+      ],
+      "summary": "Reuses existing family saved Summaries; no cleanup-specific resource model.",
+      "loader": "One existing family exact read, lazily mounted. Cleanup inventory, selection, deletion order, explicit confirmations and fresh ETags unchanged.",
+      "tests": [
+        "CleanupConsoleTests"
+      ],
+      "validation": "Release component build passed; 5 Cleanup component tests passed, including lazy exact-address resource inspection and existing fresh-ETag/confirmed deletion regressions. Browser/final broad checks pending."
     }
   ],
   "surfaces": [
@@ -2708,7 +2735,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted-resource-candidate-preview",
+      "reason": "Known exact live resource address delegates to existing family adapter; destructive candidate selection and confirmation remain independent."
     },
     {
       "id": "cleanup-flows",
@@ -2718,7 +2746,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted-resource-candidate-preview",
+      "reason": "Known exact live resource address delegates to existing family adapter; destructive candidate selection and confirmation remain independent."
     },
     {
       "id": "cleanup-agents",
@@ -2728,7 +2757,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted-resource-candidate-preview",
+      "reason": "Known exact live resource address delegates to existing family adapter; destructive candidate selection and confirmation remain independent."
     },
     {
       "id": "console-conversations-conversation-history",
