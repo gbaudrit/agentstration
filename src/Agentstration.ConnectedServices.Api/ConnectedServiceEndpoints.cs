@@ -125,23 +125,23 @@ internal static class ConnectedServiceEndpoints
             .Produces<IEnumerable<ConnectedServiceResource>>()
             .WithSummary("List Connected Services")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        services.MapGet("/{name}", async (string name, string? scopeRef, HttpResponse response,
+        services.MapGet("/{name}", async (string name, string? scopeRef, string? @namespace, HttpResponse response,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
             {
                 var scope = Scope(scopeRef);
                 var stored = scope is null
-                    ? await service.GetAsync(name, token)
-                    : await service.GetExactAsync(scope.Value, name, token);
+                    ? await service.GetAsync(ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, token)
+                    : await service.GetExactAsync(scope.Value, ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, token);
                 if (stored is null) throw new ConnectedServiceNotFoundException(name);
                 response.Headers.ETag = stored.ETag;
                 return Results.Ok(stored.Value);
             })).Produces<ConnectedServiceResource>()
             .WithSummary("Get a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        services.MapGet("/{name}/usages", async (string name, string scopeRef,
+        services.MapGet("/{name}/usages", async (string name, string scopeRef, string? @namespace,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
             {
-                var usages = (await service.GetUsagesAsync(ResourceScopeRef.Parse(scopeRef), name, token))
+                var usages = (await service.GetUsagesAsync(ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, token))
                     .Select(value => new ConnectedServiceUsageResponse(
                         value.Kind, value.Name, value.DisplayName, value.Url)).ToArray();
                 return Results.Ok(new ConnectedServiceUsagesResponse(usages, usages.Length));
@@ -161,60 +161,60 @@ internal static class ConnectedServiceEndpoints
             .Produces<ConnectedServiceResource>(StatusCodes.Status201Created)
             .WithSummary("Create a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        services.MapPut("/{name}", async (string name, string? scopeRef, PutConnectedServiceRequest body,
+        services.MapPut("/{name}", async (string name, string? scopeRef, string? @namespace, PutConnectedServiceRequest body,
             HttpRequest request, HttpResponse response, ConnectedServiceManagementService service,
             CancellationToken token) => await Execute(async () => Resource(Scope(scopeRef) is { } scope
-                ? await service.PutExactAsync(scope, name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token)
-                : await service.PutAsync(name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token),
+                ? await service.PutExactAsync(scope, ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token)
+                : await service.PutAsync(ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, body.Properties, request.Headers.IfMatch.FirstOrDefault(), token),
                 response, StatusCodes.Status200OK)))
             .Produces<ConnectedServiceResource>()
             .WithSummary("Update a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        services.MapPost("/{name}/reconcile", async (string name, string scopeRef, HttpRequest request,
+        services.MapPost("/{name}/reconcile", async (string name, string scopeRef, string? @namespace, HttpRequest request,
             HttpResponse response, ConnectedServiceManagementService service, CancellationToken token) =>
             await Execute(async () => Resource(await service.ReconcileAsync(
-                ResourceScopeRef.Parse(scopeRef), name, request.Headers.IfMatch.FirstOrDefault(), token),
+                ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, request.Headers.IfMatch.FirstOrDefault(), token),
                 response, StatusCodes.Status200OK)))
             .Produces<ConnectedServiceResource>()
             .WithSummary("Reconcile a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        services.MapPost("/{name}/deactivate", async (string name, string scopeRef, HttpRequest request,
+        services.MapPost("/{name}/deactivate", async (string name, string scopeRef, string? @namespace, HttpRequest request,
             HttpResponse response, ConnectedServiceManagementService service, CancellationToken token) =>
             await Execute(async () => Resource(await service.DeactivateAsync(
-                ResourceScopeRef.Parse(scopeRef), name, request.Headers.IfMatch.FirstOrDefault(), token),
+                ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, request.Headers.IfMatch.FirstOrDefault(), token),
                 response, StatusCodes.Status200OK)))
             .Produces<ConnectedServiceResource>()
             .WithSummary("Deactivate a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-        services.MapDelete("/{name}", async (string name, string scopeRef, HttpRequest request,
+        services.MapDelete("/{name}", async (string name, string scopeRef, string? @namespace, HttpRequest request,
             ConnectedServiceManagementService service, CancellationToken token) => await Execute(async () =>
             {
-                await service.DeleteAsync(ResourceScopeRef.Parse(scopeRef), name,
+                await service.DeleteAsync(ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name,
                     request.Headers.IfMatch.FirstOrDefault(), token);
                 return Results.NoContent();
             })).Produces(StatusCodes.Status204NoContent)
             .WithSummary("Delete a Connected Service")
             .RequireAuthorization(AgentstrationPolicies.CanDeleteResources);
 
-        services.MapPost("/{name}/operation-discoveries", async (string name, string scopeRef,
+        services.MapPost("/{name}/operation-discoveries", async (string name, string scopeRef, string? @namespace,
             StartConnectedServiceOperationDiscoveryRequest body,
             HttpResponse response, ConnectedServiceOperationDiscoveryService service, CancellationToken token) =>
             await Execute(async () => Resource(await service.StartAsync(ResourceScopeRef.Parse(scopeRef),
-                name, body.CorrelationId, body.IdempotencyKey, token), response, StatusCodes.Status202Accepted)))
+                ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, body.CorrelationId, body.IdempotencyKey, token), response, StatusCodes.Status202Accepted)))
             .Produces<ConnectedServiceOperationDiscoveryResource>(StatusCodes.Status202Accepted)
             .WithSummary("Discover Connected Service operations")
             .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns, AgentstrationPolicies.CanWriteResources);
-        services.MapGet("/{name}/operation-discoveries", async (string name, string scopeRef,
+        services.MapGet("/{name}/operation-discoveries", async (string name, string scopeRef, string? @namespace,
             ConnectedServiceOperationDiscoveryService service, CancellationToken token) =>
             await Execute(async () => Results.Ok(await service.ListAsync(
-                ResourceScopeRef.Parse(scopeRef), name, token))))
+                ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, token))))
             .Produces<ConnectedServiceOperationDiscoveryResource[]>()
             .WithSummary("List Connected Service operation discoveries")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
-        services.MapGet("/{name}/operations", async (string name, string scopeRef,
+        services.MapGet("/{name}/operations", async (string name, string scopeRef, string? @namespace,
             ConnectedServiceOperationDiscoveryService service, CancellationToken token) =>
             await Execute(async () => Results.Ok(await service.ListOperationsAsync(
-                ResourceScopeRef.Parse(scopeRef), name, token))))
+                ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace ?? ResourceNamespace.DefaultValue), name, token))))
             .Produces<ConnectedServiceOperationResource[]>()
             .WithSummary("List Connected Service operations")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);

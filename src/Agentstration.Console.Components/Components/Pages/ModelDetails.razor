@@ -3,193 +3,95 @@
 @inject IModelsClient ModelsClient
 @inject IModelProvidersClient ProvidersClient
 @inject IJSRuntime JavaScript
+@inject NavigationManager Navigation
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings> Localizer
 
 <PageTitle>@(model?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-
-@if (loading)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" />
-}
-else if (model is not null)
-{
-    <ResourceHeader ResourceType="@T("Model")" Domain="model" Icon="◈" Name="@model.Definition.DisplayName" Description="@T("ReadOnlyDescription")" StatusText="@ObservationLabel" Status="@ObservationTone" TestId="resource-model-details">
-        <Metadata><span><code>@model.Namespace.Value/@model.Name</code></span><span><code>@model.Definition.ExternalId</code></span></Metadata>
-        <Actions><a class="button-secondary" href="@ProviderUrl">@T("OpenProvider")</a><a class="button-secondary" href="/modelproviders">@T("BackToProviders")</a></Actions>
-    </ResourceHeader>
-
-    <nav class="section-tabs model-detail-tabs" role="tablist" aria-label="@T("ModelDetails")">
-        <button id="model-overview-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Overview ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Overview ? "active" : null)" @onclick="() => activeTab = PageTab.Overview">@T("Tab.Overview")</button>
-        <button id="model-overrides-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Overrides ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Overrides ? "active" : null)" @onclick="OpenOverrides">@T("Tab.Overrides")</button>
-        <button id="model-yaml-tab" type="button" role="tab" aria-selected="@(activeTab == PageTab.Yaml ? "true" : "false")" aria-controls="model-tab-panel" class="@(activeTab == PageTab.Yaml ? "active" : null)" @onclick="() => activeTab = PageTab.Yaml">@T("Tab.Yaml")</button>
-    </nav>
-
-    <main id="model-tab-panel" role="tabpanel" aria-labelledby="@ActiveTabId" tabindex="0">
-        @if (activeTab is PageTab.Overview or PageTab.Overrides)
+@{ var presentations = Presentations; }
+<ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("BackToProviders")" Resource="model" Name="@(model?.Definition.DisplayName ?? Name)" ResourceType="@T("Model")" Domain="model" IconName="stack-2"
+    StatusText="@(model is null ? null : ObservationLabel)" Status="ObservationTone" ResourceIdentity="@(loadedKey ?? Name)"
+    SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
+    DefinitionReadOnlyReason="ResourceReadOnlyReason.Unspecified" HasAdditionalDraft="HasOverrideDraft" Yaml="@ModelYaml" Busy="@Busy" SectionTestIdPrefix="model" TestId="resource-model-details">
+    <Actions>@if (ProviderUrl is { } providerUrl) { <a class="button-secondary" href="@providerUrl">@T("OpenProvider")</a> }</Actions>
+    <Feedback>@Feedback</Feedback>
+    <OverviewMetrics>
+        <MetricCard Label="@T("Availability")" Value="@ObservationLabel" Detail="@model?.Definition.ProviderStatus" HelpText="@T("AvailabilityHelp")" Status="@ObservationTone" />
+        <MetricCard Label="@T("LastObserved")" Value="@model?.Definition.Observation.LastObservedAt.ToLocalTime().ToString("d")" Detail="@(model is null ? null : T("LastAttempted", model.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("g")))" HelpText="@T("FreshnessHelp")" Status="@ObservationTone" />
+        <MetricCard Label="@T("InputModalities")" Value="@(model is null ? "—" : Modalities(EffectiveSpecification.Input))" Detail="@ProvenanceLabel(HasInputOverride)" HelpText="@T("InputHelp")" Status="@(model is not null && EffectiveSpecification.Input is not null ? UiStatus.Info : UiStatus.Neutral)" />
+        <MetricCard Label="@T("OutputModalities")" Value="@(model is null ? "—" : Modalities(EffectiveSpecification.Output))" Detail="@ProvenanceLabel(HasOutputOverride)" HelpText="@T("OutputHelp")" Status="@(model is not null && EffectiveSpecification.Output is not null ? UiStatus.Info : UiStatus.Neutral)" />
+    </OverviewMetrics>
+    <OverviewConfiguration><p class="field-help">@T("ReadOnlyDescription")</p>@ProviderFacts</OverviewConfiguration>
+    <OverviewContent><div class="resource-editor-view">@Capabilities(true) @Limits</div></OverviewContent>
+    <DefinitionContent Context="path">@if (overrideEditor is not null) {
+        <ResourceDefinitionForm @key="overrideEditor" EditContext="InspectionContext" FieldLabels="FieldLabels" Id="model-inspection-form" FormName="model-inspection"
+            Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" />
+    }</DefinitionContent>
+    <AdditionalContent Context="path">
+        @if (path == "observation") { @Observation }
+        else if (path == "overrides" && overrideEditor is not null && providerSnapshot is not null)
         {
-            @if (model.Definition.Observation.State != ModelObservationState.Available)
-            {
-                <div class="form-alert form-alert-warning model-observation-warning" role="status">
-                    <strong>@T("ObservationUnavailable")</strong><span>@ObservationExplanation</span>
-                </div>
-            }
-            @if (!string.IsNullOrWhiteSpace(diagnosticsWarning))
-            {
-                <div class="form-alert form-alert-warning" role="status"><strong>@T("EffectiveDiagnosticsUnavailable")</strong><span>@diagnosticsWarning</span></div>
-            }
-            @if (overrideError is not null)
-            {
-                <div class="form-alert form-alert-danger" role="alert" data-testid="model-override-error"><strong>@(overrideError.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSaveOverride"))</strong><span>@overrideError.Message</span>@if (overrideError.IsConcurrencyConflict) { <button class="text-button" type="button" @onclick="ReloadOverrideAsync">@T("ReloadCurrentVersion")</button> }</div>
-            }
-            @if (!string.IsNullOrWhiteSpace(overrideMessage))
-            {
-                <div class="form-alert form-alert-success" role="status" data-testid="model-override-message">@overrideMessage</div>
-            }
-
-            @if (activeTab == PageTab.Overview)
-            {
-            <section class="metric-grid model-detail-metrics" aria-label="@T("ModelSummary")">
-                <MetricCard Label="@T("Availability")" Value="@ObservationLabel" Detail="@model.Definition.ProviderStatus" HelpText="@T("AvailabilityHelp")" Status="@ObservationTone" />
-                <MetricCard Label="@T("LastObserved")" Value="@model.Definition.Observation.LastObservedAt.ToLocalTime().ToString("g")" Detail="@T("LastAttempted", model.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("g"))" HelpText="@T("FreshnessHelp")" Status="@ObservationTone" />
-                <MetricCard Label="@T("InputModalities")" Value="@Modalities(EffectiveSpecification.Input)" Detail="@ProvenanceLabel(HasInputOverride)" HelpText="@T("InputHelp")" Status="UiStatus.Info" />
-                <MetricCard Label="@T("OutputModalities")" Value="@Modalities(EffectiveSpecification.Output)" Detail="@ProvenanceLabel(HasOutputOverride)" HelpText="@T("OutputHelp")" Status="UiStatus.Info" />
-            </section>
-
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ModelIdentity")</h2></div><StatusBadge Text="@T("ObservedReadOnly")" Status="UiStatus.Neutral" /></div>
-                <dl class="resource-details model-identity-grid">
-                    <dt>@T("Provider")</dt><dd><a class="text-button" href="@ProviderUrl"><code>@ProviderAddress</code></a></dd>
-                    <dt>@T("ExternalId")</dt><dd><code>@model.Definition.ExternalId</code></dd>
-                    <dt>@T("Publisher")</dt><dd>@Text(model.Definition.Identity?.Publisher)</dd>
-                    <dt>@T("ModelFamily")</dt><dd>@Text(model.Definition.Identity?.Model)</dd>
-                    <dt>@T("Version")</dt><dd>@Text(model.Definition.Identity?.Version)</dd>
-                    <dt>@T("ResourceGeneration")</dt><dd>@model.Generation</dd>
-                </dl>
-            </section>
-
-            <section class="panel form-section" data-testid="model-capabilities">
-                <div class="panel-header"><div><p class="eyebrow">@T("EffectiveSpecification")</p><h2>@T("Capabilities")</h2><p>@T("CapabilitiesHelp")</p></div><div class="model-capability-actions">@if (effective?.SpecificationOverride is not null) { <StatusBadge Text="@T("OverrideApplied")" Status="UiStatus.Info" /> }@if (providerSnapshot is not null) { <button class="button-secondary" type="button" data-testid="edit-model-override" @onclick="OpenOverrides">@(effective?.SpecificationOverride is null ? T("AddOverride") : T("EditOverride"))</button> }</div></div>
-                <div class="model-capability-grid">
-                    @Capability(T("Streaming"), ObservedSpecification.Features.Streaming?.Support, EffectiveSpecification.Features.Streaming?.Support, HasStreamingOverride)
-                    @Capability(T("Tools"), ObservedSpecification.Features.Tools?.Support, EffectiveSpecification.Features.Tools?.Support, HasToolsOverride, ToolDetails)
-                    @Capability(T("StructuredOutput"), ObservedSpecification.Features.StructuredOutput?.Support, EffectiveSpecification.Features.StructuredOutput?.Support, HasStructuredOutputOverride, StructuredOutputDetails)
-                    @Capability(T("Reasoning"), ObservedSpecification.Features.Reasoning?.Support, EffectiveSpecification.Features.Reasoning?.Support, HasReasoningOverride, ReasoningDetails)
-                </div>
-            </section>
-            }
-
-            @if (activeTab == PageTab.Overrides && editingOverride && overrideEditor is not null)
-            {
-                <section class="panel form-section model-override-editor" data-testid="model-override-editor">
-                    <div class="panel-header"><div><p class="eyebrow">@T("ProviderOverride")</p><h2>@T("OverrideEditor")</h2><p>@T("OverrideEditorHelp")</p></div></div>
-
-                    @if (OverrideDiagnostics.Count > 0)
-                    {
-                        <div class="form-alert form-alert-warning model-override-diagnostics" role="status"><strong>@T("OverrideDiagnostics")</strong><ul>@foreach (var diagnostic in OverrideDiagnostics) { <li>@diagnostic</li> }</ul></div>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(overrideInteractionMessage))
-                    {
-                        <div class="form-alert form-alert-info" role="status" data-testid="model-override-interaction-message">@overrideInteractionMessage</div>
-                    }
-
-                    <div class="model-override-section">
-                        <h3>@T("Modalities")</h3><p>@T("CollectionOverrideHelp")</p>
-                        <div class="model-override-columns"><div><h4>@T("InputModalities")</h4>@OperationGridHeader()@foreach (var value in Enum.GetValues<ModelContentType>()) { @OperationField(T($"Modality.{value}"), value, overrideEditor.Input, ObservedSpecification.Input?.Contains(value)) }</div><div><h4>@T("OutputModalities")</h4>@OperationGridHeader()@foreach (var value in Enum.GetValues<ModelContentType>()) { @OperationField(T($"Modality.{value}"), value, overrideEditor.Output, ObservedSpecification.Output?.Contains(value)) }</div></div>
-                    </div>
-
-                    <div class="model-override-section">
-                        <h3>@T("Capabilities")</h3><p>@T("FeatureOverrideHelp")</p>
-                        <div class="model-feature-editor-grid">
-                            @SupportField(T("Streaming"), overrideEditor.StreamingSupport, ObservedSpecification.Features.Streaming?.Support, value => SetSimpleSupport(value, support => overrideEditor.StreamingSupport = support))
-                            <article><h4>@T("Tools")</h4>@OperationGridHeader()@SupportSelect(overrideEditor.ToolsSupport, ObservedSpecification.Features.Tools?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Tools?.Support, overrideEditor.ToolModes, support => overrideEditor.ToolsSupport = support, T("Tools")))@foreach (var value in Enum.GetValues<ModelToolMode>()) { @OperationField(T($"ToolMode.{value}"), value, overrideEditor.ToolModes, DetailDiscoveryValue(ObservedSpecification.Features.Tools?.Support, ObservedSpecification.Features.Tools?.Modes.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, overrideEditor.ToolModes, ObservedSpecification.Features.Tools?.Support, () => overrideEditor.ToolsSupport, support => overrideEditor.ToolsSupport = support, T("Tools"))) }<small>@T("ToolGovernanceWarning")</small></article>
-                            <article><h4>@T("StructuredOutput")</h4>@OperationGridHeader()@SupportSelect(overrideEditor.StructuredOutputSupport, ObservedSpecification.Features.StructuredOutput?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.StructuredOutput?.Support, overrideEditor.OutputFormats, support => overrideEditor.StructuredOutputSupport = support, T("StructuredOutput")))@foreach (var value in Enum.GetValues<ModelStructuredOutputFormat>()) { @OperationField(T($"OutputFormat.{value}"), value, overrideEditor.OutputFormats, DetailDiscoveryValue(ObservedSpecification.Features.StructuredOutput?.Support, ObservedSpecification.Features.StructuredOutput?.Formats.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, overrideEditor.OutputFormats, ObservedSpecification.Features.StructuredOutput?.Support, () => overrideEditor.StructuredOutputSupport, support => overrideEditor.StructuredOutputSupport = support, T("StructuredOutput"))) @if (overrideEditor.OutputFormats[value] == ModelOverrideOperation.Add) { @StrictField(value) } }</article>
-                            <article><h4>@T("Reasoning")</h4>@OperationGridHeader()@SupportSelect(overrideEditor.ReasoningSupport, ObservedSpecification.Features.Reasoning?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Reasoning?.Support, overrideEditor.ReasoningEfforts, support => overrideEditor.ReasoningSupport = support, T("Reasoning")))@foreach (var value in Enum.GetValues<ReasoningEffort>()) { @OperationField(T($"ReasoningEffort.{value}"), value, overrideEditor.ReasoningEfforts, DetailDiscoveryValue(ObservedSpecification.Features.Reasoning?.Support, ObservedSpecification.Features.Reasoning?.Efforts.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, overrideEditor.ReasoningEfforts, ObservedSpecification.Features.Reasoning?.Support, () => overrideEditor.ReasoningSupport, support => overrideEditor.ReasoningSupport = support, T("Reasoning"))) }</article>
-                        </div>
-                    </div>
-
-                    <div class="model-override-section">
-                        <h3>@T("KnownLimits")</h3><p>@T("LimitOverrideHelp")</p>
-                        <div class="model-limit-editor-grid"><label><span>@T("ContextTokens")</span><input type="number" min="1" data-testid="model-override-context-tokens" @bind="overrideEditor.ContextTokens" /><small>@T("ProviderDeclaredValue", Number(ObservedSpecification.Limits.ContextTokens))</small></label><label><span>@T("MaxOutputTokens")</span><input type="number" min="1" data-testid="model-override-max-output-tokens" @bind="overrideEditor.MaxOutputTokens" /><small>@T("ProviderDeclaredValue", Number(ObservedSpecification.Limits.MaxOutputTokens))</small></label></div>
-                    </div>
-
-                    <div class="form-actions"><button class="button-primary" type="button" data-testid="save-model-override" disabled="@savingOverride" @onclick="SaveOverrideAsync">@(savingOverride ? T("Saving") : T("SaveOverride"))</button><button class="button-secondary" type="button" disabled="@savingOverride" @onclick="CancelOverrideEdit">@T("Cancel")</button>@if (effective?.SpecificationOverride is not null) { <button class="button-danger" type="button" data-testid="remove-model-override" disabled="@savingOverride" @onclick="RemoveOverrideAsync">@T("RemoveOverride")</button> }</div>
-                </section>
-            }
-
-            @if (activeTab == PageTab.Overview)
-            {
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Capacity")</p><h2>@T("KnownLimits")</h2><p>@T("LimitsHelp")</p></div></div>
-                <div class="model-limit-grid">
-                    @Limit(T("ContextTokens"), ObservedSpecification.Limits.ContextTokens, EffectiveSpecification.Limits.ContextTokens, HasContextLimitOverride)
-                    @Limit(T("MaxOutputTokens"), ObservedSpecification.Limits.MaxOutputTokens, EffectiveSpecification.Limits.MaxOutputTokens, HasOutputLimitOverride)
-                </div>
-            </section>
-
-            <section class="panel form-section model-observation-details">
-                <div class="panel-header"><div><p class="eyebrow">@T("Reconciliation")</p><h2>@T("ObservationHistory")</h2></div></div>
-                <dl class="resource-details">
-                    <dt>@T("FirstObserved")</dt><dd>@model.Definition.Observation.FirstObservedAt.ToLocalTime().ToString("F")</dd>
-                    <dt>@T("LastObserved")</dt><dd>@model.Definition.Observation.LastObservedAt.ToLocalTime().ToString("F")</dd>
-                    <dt>@T("LastAttemptedLabel")</dt><dd>@model.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("F")</dd>
-                    @if (!string.IsNullOrWhiteSpace(model.Definition.Observation.ErrorCode)) { <dt>@T("ErrorCode")</dt><dd><code>@model.Definition.Observation.ErrorCode</code></dd> }
-                    @if (!string.IsNullOrWhiteSpace(model.Definition.Observation.ErrorMessage)) { <dt>@T("ErrorMessage")</dt><dd>@model.Definition.Observation.ErrorMessage</dd> }
-                </dl>
-            </section>
-            }
+            @* The Model stays immutable. This separate form writes only its authorized Provider, with the Provider UID and ETag. *@
+            <CascadingValue TValue="ResourceReadOnlyReason?" Value="@((ResourceReadOnlyReason?)null)">
+                <ResourceDefinitionForm @key="OverrideContext" @ref="overrideForm" EditContext="OverrideContext" FieldLabels="FieldLabels" Id="model-provider-override-form" FormName="model-provider-override"
+                    data-provider-etag="@providerSnapshot.ETag" data-provider-uid="@providerSnapshot.Value.Uid" Sections="presentations" SectionState="sectionState" SectionRequested="RevealOverrideErrorAsync" OnValidSubmit="() => SaveOverrideAsync()"
+                    ReadOnly="@(!CanEditOverrides)" Busy="savingOverride" InvalidInputChanged="value => invalidOverrideInput = value" @oninput="MarkOverrideDirty" @onchange="MarkOverrideDirty">
+                    @OverridePanel
+                </ResourceDefinitionForm>
+            </CascadingValue>
         }
-        else
-        {
-            <section class="panel model-yaml-panel" data-testid="model-yaml">
-                <div class="panel-header"><div><p class="eyebrow">@T("CanonicalResource")</p><h2>@T("ModelYaml")</h2><p>@T("YamlHelp")</p></div><div class="model-yaml-actions"><StatusBadge Text="@T("ObservedReadOnly")" Status="UiStatus.Neutral" /><button class="button-secondary" type="button" @onclick="CopyYamlAsync" data-testid="copy-model-yaml">@(copied ? T("Copied") : T("CopyYaml"))</button></div></div>
-                <textarea class="form-code-editor runner-json model-yaml-source" rows="34" readonly aria-label="@T("ModelYaml")">@ModelYaml</textarea>
-            </section>
-        }
-    </main>
-}
+        else if (path == "overrides") { <p>@T("EffectiveDiagnosticsUnavailable")</p> }
+    </AdditionalContent>
+</ConsoleResourceDetailsTemplate>
 
 @code {
     [Parameter] public string Name { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private ModelResource? model;
     private AvailableModelResponse? effective;
     private ResourceSnapshot<ModelProviderResource>? providerSnapshot;
-    private AgentstrationApiException? error;
+    private ModelBundle? savedBundle, newerBundle;
+    private ModelDetailsEditorModel? overrideEditor;
+    private EditContext? inspectionContext, overrideContext;
+    private ResourceDefinitionForm? overrideForm;
     private AgentstrationApiException? overrideError;
-    private string? diagnosticsWarning;
-    private string? overrideMessage;
-    private string? overrideInteractionMessage;
-    private bool loading = true;
-    private bool copied;
-    private bool editingOverride;
-    private bool savingOverride;
-    private ModelSpecificationOverrideEditorModel? overrideEditor;
-    private PageTab activeTab;
-    private string ActiveTabId => activeTab switch { PageTab.Overrides => "model-overrides-tab", PageTab.Yaml => "model-yaml-tab", _ => "model-overview-tab" };
+    private string? loadedKey, diagnosticsWarning, overrideMessage, overrideInteractionMessage, overrideBaseline;
+    private bool loading, savingOverride, editingOverride, invalidOverrideInput, overrideTouched, copied;
+    private long loadVersion;
+    private bool Busy => loading || savingOverride;
+    private bool CanWrite => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool CanEditOverrides => CanWrite && providerSnapshot is not null && !providerSnapshot.Value.Governance.IsManaged
+        && ResourceOwnershipContext.CanManage(providerSnapshot.Value.ScopeRef, Services);
+    private bool HasOverrideDraft => editingOverride && overrideEditor is not null && (overrideTouched || invalidOverrideInput || OverrideFingerprint != overrideBaseline);
+    private string OverrideFingerprint => JsonSerializer.Serialize(overrideEditor);
+    private EditContext InspectionContext => inspectionContext ??= new(overrideEditor!);
+    private EditContext OverrideContext => overrideContext ??= new(overrideEditor!);
     private ResourceNamespace ModelNamespace => ResourceNamespace.Parse(Namespace);
+    private ResourceAddress ProviderAddress => model!.Definition.Provider.Resolve(model.Namespace, ModelResourceKinds.ModelProvider);
+    private string? ProviderUrl => model is null || model.Definition.Provider.ScopeRef is { } scope && scope != ResourceScopeRef.Instance ? null
+        : ResourceOwnershipContext.Resource(Services, "/modelproviders", ProviderAddress.Name, ProviderAddress.Namespace, model.Definition.Provider.ScopeRef ?? model.ScopeRef);
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/modelproviders", Services);
     private ModelSpecification ObservedSpecification => model!.Definition.Specification;
+    private ModelSpecificationOverride? SavedOverride => model is not null && providerSnapshot?.Value.Definition.SpecificationOverrides.TryGetValue(model.Definition.ExternalId, out var value) == true ? value : null;
+    private bool ShowOverridePreview => editingOverride && sectionState.Is("overrides");
     private ModelSpecification EffectiveSpecification
     {
         get
         {
             var current = effective?.Specification ?? ObservedSpecification;
-            if (!editingOverride || overrideEditor is null) return current;
-            try { return EffectiveModelSpecificationResolver.Resolve(ObservedSpecification, overrideEditor.IsEmpty ? null : overrideEditor.ToOverride()); }
+            try { return ShowOverridePreview && overrideEditor is not null ? EffectiveModelSpecificationResolver.Resolve(ObservedSpecification, overrideEditor.IsEmpty ? null : overrideEditor.ToOverride())
+                : effective?.Specification ?? EffectiveModelSpecificationResolver.Resolve(ObservedSpecification, SavedOverride); }
             catch (ArgumentException) { return current; }
         }
     }
-    private ModelSpecificationOverride? DisplayedOverride => editingOverride && overrideEditor is not null
-        ? overrideEditor.IsEmpty ? null : overrideEditor.ToOverride()
-        : effective?.SpecificationOverride;
+    private ModelSpecificationOverride? DisplayedOverride => ShowOverridePreview && overrideEditor is not null ? overrideEditor.IsEmpty ? null : overrideEditor.ToOverride() : SavedOverride;
     private string ModelYaml => model is null ? string.Empty : ResourceManifestSerializer.ToYaml(model);
-    private ResourceAddress ProviderAddress => model!.Definition.Provider.Resolve(model.Namespace, ModelResourceKinds.ModelProvider);
-    private string ProviderUrl => $"/modelproviders/{Uri.EscapeDataString(ProviderAddress.Name)}?namespace={Uri.EscapeDataString(ProviderAddress.Namespace.Value)}";
-    private string ObservationLabel => T($"Observation.{model?.Definition.Observation.State}");
+    private string ObservationLabel => model is null ? string.Empty : T($"Observation.{model.Definition.Observation.State}");
     private UiStatus ObservationTone => model?.Definition.Observation.State switch { ModelObservationState.Available => UiStatus.Success, ModelObservationState.Missing => UiStatus.Warning, ModelObservationState.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
     private string ObservationExplanation => model?.Definition.Observation.State switch { ModelObservationState.Missing => T("MissingExplanation"), ModelObservationState.Failed => T("FailedExplanation"), _ => string.Empty };
     private bool HasInputOverride => DisplayedOverride?.Input is not null;
@@ -203,103 +105,277 @@ else if (model is not null)
     private string ToolDetails => Join(EffectiveSpecification.Features.Tools?.Modes.Keys.Select(value => T($"ToolMode.{value}")));
     private string StructuredOutputDetails => Join(EffectiveSpecification.Features.StructuredOutput?.Formats.Keys.Select(value => T($"OutputFormat.{value}")));
     private string ReasoningDetails => Join(EffectiveSpecification.Features.Reasoning?.Efforts.Keys.Select(value => T($"ReasoningEffort.{value}")));
-
-    protected override async Task OnParametersSetAsync()
-        => await LoadAsync();
-
-    private async Task LoadAsync()
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("overrides", T("Tab.Overrides"), "adjustments"), new("observation", T("ObservationHistory"), "history")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
     {
-        loading = true;
-        error = null;
-        diagnosticsWarning = null;
-        copied = false;
+        ["definition/identity"] = new() { ReadOnly = true, Fields = [nameof(ModelDetailsEditorModel.Name), nameof(ModelDetailsEditorModel.Namespace), nameof(ModelDetailsEditorModel.DisplayName), nameof(ModelDetailsEditorModel.Description), nameof(ModelDetailsEditorModel.Tags), nameof(ModelDetailsEditorModel.ScopeRef), nameof(ModelDetailsEditorModel.Provider), nameof(ModelDetailsEditorModel.ExternalId), nameof(ModelDetailsEditorModel.Publisher), nameof(ModelDetailsEditorModel.ModelFamily), nameof(ModelDetailsEditorModel.ModelVersion), nameof(ModelDetailsEditorModel.Generation)] },
+        ["definition/configuration"] = new() { ReadOnly = true, Fields = [nameof(ModelDetailsEditorModel.ObservedSpecification)], ReadOnlyActions = CanEditOverrides ? OpenOverrideAction : null },
+        ["overrides"] = new() { ReadOnly = !CanEditOverrides, Fields = [nameof(ModelDetailsEditorModel.Input), nameof(ModelDetailsEditorModel.Output), nameof(ModelDetailsEditorModel.StreamingSupport), nameof(ModelDetailsEditorModel.ToolsSupport), nameof(ModelDetailsEditorModel.ToolModes), nameof(ModelDetailsEditorModel.StructuredOutputSupport), nameof(ModelDetailsEditorModel.OutputFormats), nameof(ModelDetailsEditorModel.OutputFormatStrict), nameof(ModelDetailsEditorModel.ReasoningSupport), nameof(ModelDetailsEditorModel.ReasoningEfforts), nameof(ModelDetailsEditorModel.ContextTokens), nameof(ModelDetailsEditorModel.MaxOutputTokens)] },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyActions = CopyAction }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(ModelDetailsEditorModel.Name)] = Shared["TechnicalName"], [nameof(ModelDetailsEditorModel.Namespace)] = Shared["Namespace"], [nameof(ModelDetailsEditorModel.DisplayName)] = Shared["DisplayName"],
+        [nameof(ModelDetailsEditorModel.ContextTokens)] = T("ContextTokens"), [nameof(ModelDetailsEditorModel.MaxOutputTokens)] = T("MaxOutputTokens")
+    };
+    private RenderFragment Feedback => @<div>
+        @if (model is not null && model.Definition.Observation.State != ModelObservationState.Available) { <div class="form-alert form-alert-warning model-observation-warning" role="status"><strong>@T("ObservationUnavailable")</strong><span>@ObservationExplanation</span></div> }
+        @if (!string.IsNullOrWhiteSpace(diagnosticsWarning)) { <div class="form-alert form-alert-warning" role="status"><strong>@T("EffectiveDiagnosticsUnavailable")</strong><span>@diagnosticsWarning</span></div> }
+        @if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+        @if (overrideError is not null) { <div class="form-alert form-alert-danger" role="alert" data-testid="model-override-error"><strong>@(overrideError.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSaveOverride"))</strong><span>@overrideError.Message</span>@if (overrideError.IsConcurrencyConflict) { <button class="text-button" type="button" disabled="@Busy" @onclick="ReloadOverrideAsync">@Shared["RefreshResource"]</button> }</div> }
+        @if (!string.IsNullOrWhiteSpace(overrideMessage)) { <div class="form-alert form-alert-success" role="status" data-testid="model-override-message">@overrideMessage</div> }
+    </div>;
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@ModelResourceKinds.Model" DisplayName="@overrideEditor!.DisplayName" DisplayNameExpression="@(() => overrideEditor!.DisplayName)"
+        TechnicalName="@overrideEditor!.Name" TechnicalNameExpression="@(() => overrideEditor!.Name)" Namespace="@overrideEditor!.Namespace" NamespaceExpression="@(() => overrideEditor!.Namespace)"
+        ScopeRef="overrideEditor!.ScopeRef" Description="@overrideEditor!.Description" DescriptionExpression="@(() => overrideEditor!.Description)" Labels="@overrideEditor!.Tags" LabelsExpression="@(() => overrideEditor!.Tags)" ReadOnly="true" TestId="model-identity-editor">
+        <AdditionalPanels>@ProviderIdentity</AdditionalPanels>
+    </ResourceIdentityEditor>;
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => Identity, "definition/configuration" => @<div class="resource-editor-view">@Capabilities(false) @Limits</div>, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
+    private RenderFragment OpenOverrideAction => @<button class="button-secondary" type="button" disabled="@Busy" @onclick="OpenOverrides" data-testid="edit-model-override">@(SavedOverride is null ? T("AddOverride") : T("EditOverride"))</button>;
+    private RenderFragment CopyAction => @<button class="button-secondary" type="button" @onclick="CopyYamlAsync" data-testid="copy-model-yaml">@(copied ? T("Copied") : T("CopyYaml"))</button>;
+    private sealed record ModelBundle(ResourceSnapshot<ModelResource> Snapshot, ResourceSnapshot<ModelProviderResource>? Provider, AvailableModelResponse? Effective, string? Warning, bool ProviderUnavailable = false);
+    protected override Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{Namespace}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; ClearPrivate(); sectionState.Reset(key);
+        return LoadAsync(false);
+    }
+    private void ClearPrivate()
+    {
+        model = null; effective = null; providerSnapshot = null; overrideEditor = null; savedBundle = newerBundle = null;
+        inspectionContext = overrideContext = null; overrideError = null; diagnosticsWarning = overrideMessage = overrideInteractionMessage = overrideBaseline = null;
+        copied = editingOverride = savingOverride = invalidOverrideInput = overrideTouched = false;
+    }
+    private Task RetryAsync() => Busy ? Task.CompletedTask : LoadAsync(model is not null);
+    private Task RefreshAsync() => Busy ? Task.CompletedTask : LoadAsync(true);
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var expected = model; loading = true;
+        loadState = new(refresh && model is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = model is not null };
         try
         {
-            model = (await ModelsClient.GetModelAsync(ModelNamespace, Name, cancellation.Token)).Value;
-            try
+            var snapshot = await ModelsClient.GetModelAsync(ModelNamespace, Name, cancellation.Token);
+            if (request != loadVersion) return;
+            var value = snapshot.Value;
+            if (value.Name != Name || value.Namespace != ModelNamespace || value.ScopeRef != ResourceScopeRef.Instance
+                || !string.IsNullOrWhiteSpace(ScopeRefValue) && value.ScopeRef != ResourceScopeRef.Parse(ScopeRefValue)
+                || expected is not null && (expected.Uid != value.Uid || expected.Definition.ProviderUid != value.Definition.ProviderUid))
+            { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            var bundle = await ReadBundleAsync(snapshot, request);
+            if (request != loadVersion) return;
+            if (HasOverrideDraft && !bundle.ProviderUnavailable)
             {
-                var provider = ProviderAddress;
-                providerSnapshot = await ProvidersClient.GetModelProviderAsync(provider.Namespace, provider.Name, cancellation.Token);
-                var inventory = await ProvidersClient.GetProviderModelsAsync(provider.Namespace, provider.Name, cancellation.Token);
-                effective = inventory.SingleOrDefault(value => string.Equals(value.ResourceName, model.Name, StringComparison.Ordinal))
-                    ?? inventory.SingleOrDefault(value => string.Equals(value.Name, model.Definition.ExternalId, StringComparison.Ordinal));
-                if (effective is null) diagnosticsWarning = T("EffectiveModelNotFound");
+                diagnosticsWarning = bundle.Warning;
+                if (snapshot.ETag != savedBundle?.Snapshot.ETag || bundle.Provider?.ETag != providerSnapshot?.ETag) newerBundle = bundle;
             }
-            catch (AgentstrationApiException exception) { providerSnapshot = null; diagnosticsWarning = exception.Message; }
+            else Adopt(bundle);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (request != loadVersion) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden, System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
+            if (status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) ClearPrivate();
+            loadState = new(status) { HasContent = model is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
+        finally { if (request == loadVersion) loading = false; }
     }
-
-    private void BeginOverrideEdit()
+    private async Task<ModelBundle> ReadBundleAsync(ResourceSnapshot<ModelResource> snapshot, long request)
     {
-        overrideError = null;
-        overrideMessage = null;
-        overrideInteractionMessage = null;
-        overrideEditor = ModelSpecificationOverrideEditorModel.From(effective?.SpecificationOverride);
-        editingOverride = true;
+        var value = snapshot.Value; var address = value.Definition.Provider.Resolve(value.Namespace, ModelResourceKinds.ModelProvider);
+        ResourceSnapshot<ModelProviderResource>? provider = null; AvailableModelResponse? observed = null; string? warning = null;
+        try
+        {
+            provider = await ProvidersClient.GetModelProviderAsync(address.Namespace, address.Name, cancellation.Token);
+            if (request != loadVersion) return new(snapshot, null, null, null);
+            if (!ProviderMatches(value, provider.Value)) return new(snapshot, null, null, T("ProviderIdentityMismatch"), true);
+        }
+        catch (AgentstrationApiException exception)
+        {
+            if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+                return new(snapshot, null, null, exception.Message, true);
+            throw;
+        }
+        try
+        {
+            var inventory = await ProvidersClient.GetProviderModelsAsync(address.Namespace, address.Name, cancellation.Token);
+            observed = EffectiveFrom(inventory, value);
+            if (observed is null) warning = T("EffectiveModelNotFound");
+        }
+        catch (AgentstrationApiException exception)
+        {
+            if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+                return new(snapshot, null, null, exception.Message, true);
+            warning = exception.Message;
+        }
+        return new(snapshot, provider, observed, warning);
     }
-
-    private void OpenOverrides()
+    private static bool ProviderMatches(ModelResource value, ModelProviderResource provider)
     {
-        activeTab = PageTab.Overrides;
-        if (providerSnapshot is not null && (!editingOverride || overrideEditor is null)) BeginOverrideEdit();
+        var reference = value.Definition.Provider; var address = reference.Resolve(value.Namespace, ModelResourceKinds.ModelProvider);
+        return value.Definition.ProviderUid != Guid.Empty && provider.Uid == value.Definition.ProviderUid && provider.Name == address.Name && provider.Namespace == address.Namespace
+            && provider.ScopeRef == ResourceScopeRef.Instance && (reference.ScopeRef is null || reference.ScopeRef == provider.ScopeRef);
     }
-
-    private void CancelOverrideEdit()
+    private static AvailableModelResponse? EffectiveFrom(IReadOnlyList<AvailableModelResponse> inventory, ModelResource value) => inventory.SingleOrDefault(item => item.ResourceName == value.Name)
+        ?? inventory.SingleOrDefault(item => item.ResourceName is null && item.Name == value.Definition.ExternalId);
+    private void Adopt(ModelBundle bundle)
     {
-        overrideEditor = null;
-        overrideError = null;
-        overrideInteractionMessage = null;
-        editingOverride = false;
-        activeTab = PageTab.Overview;
+        savedBundle = bundle; model = bundle.Snapshot.Value; providerSnapshot = bundle.Provider; effective = bundle.Effective; diagnosticsWarning = bundle.Warning;
+        newerBundle = null; overrideEditor = ModelDetailsEditorModel.FromResource(model, SavedOverride); inspectionContext = overrideContext = null;
+        invalidOverrideInput = overrideTouched = copied = false; overrideBaseline = OverrideFingerprint;
+        if (providerSnapshot is null) editingOverride = false;
     }
-
-    private async Task SaveOverrideAsync() => await SaveOverrideAsync(remove: false);
-
-    private async Task RemoveOverrideAsync()
+    private Task ShowSection(string path) { var target = Navigation.Uri.Split('#')[0] + "#" + path; if (target != Navigation.Uri) Navigation.NavigateTo(target); return Task.CompletedTask; }
+    private async Task OpenOverrides()
     {
-        overrideEditor = new ModelSpecificationOverrideEditorModel();
-        await SaveOverrideAsync(remove: true);
+        if (!CanEditOverrides || Busy || overrideEditor is null) return;
+        overrideError = null; overrideMessage = overrideInteractionMessage = null; editingOverride = true;
+        await ShowSection("overrides");
     }
-
+    private void MarkOverrideDirty() { if (CanEditOverrides) { editingOverride = true; overrideTouched = true; } }
+    private async Task CancelOverrideEdit()
+    {
+        if (Busy || savedBundle is null) return;
+        Adopt(newerBundle ?? savedBundle); editingOverride = false; overrideError = null; overrideInteractionMessage = null;
+        await ShowSection("overview");
+    }
+    private async Task RevealOverrideErrorAsync(string unused)
+    {
+        await ShowSection("overrides"); overrideForm?.RequestValidationFocus();
+    }
+    private Task SaveOverrideAsync() => SaveOverrideAsync(false);
+    private Task RemoveOverrideAsync() => SaveOverrideAsync(true);
     private async Task SaveOverrideAsync(bool remove)
     {
-        if (model is null || providerSnapshot is null || overrideEditor is null) return;
-        savingOverride = true;
-        overrideError = null;
-        overrideMessage = null;
+        if (!CanEditOverrides || Busy || model is null || providerSnapshot is null || overrideEditor is null) return;
+        editingOverride = true;
+        if (!remove && (!OverrideContext.Validate() || invalidOverrideInput)) { await RevealOverrideErrorAsync(string.Empty); return; }
+        var request = loadVersion; var expectedModel = model; var provider = providerSnapshot; var removeTarget = remove || overrideEditor.IsEmpty;
+        savingOverride = true; overrideError = null; overrideMessage = null;
         try
         {
-            var provider = ProviderAddress;
-            var overrides = new Dictionary<string, ModelSpecificationOverride>(providerSnapshot.Value.Definition.SpecificationOverrides, StringComparer.Ordinal);
-            if (remove || overrideEditor.IsEmpty) overrides.Remove(model.Definition.ExternalId);
-            else overrides[model.Definition.ExternalId] = overrideEditor.ToOverride();
-            var properties = providerSnapshot.Value.Definition with { SpecificationOverrides = overrides };
-            providerSnapshot = await ProvidersClient.UpdateModelProviderAsync(provider.Namespace, provider.Name, new PutModelProviderRequest(properties), providerSnapshot.ETag, cancellation.Token);
-            var inventory = await ProvidersClient.GetProviderModelsAsync(provider.Namespace, provider.Name, cancellation.Token);
-            effective = inventory.SingleOrDefault(value => string.Equals(value.ResourceName, model.Name, StringComparison.Ordinal))
-                ?? inventory.SingleOrDefault(value => string.Equals(value.Name, model.Definition.ExternalId, StringComparison.Ordinal));
-            overrideMessage = remove || overrideEditor.IsEmpty ? T("OverrideRemoved") : T("OverrideSaved");
-            editingOverride = false;
-            overrideEditor = null;
-            activeTab = PageTab.Overview;
+            var overrides = new Dictionary<string, ModelSpecificationOverride>(provider.Value.Definition.SpecificationOverrides, StringComparer.Ordinal);
+            if (removeTarget) overrides.Remove(expectedModel.Definition.ExternalId); else overrides[expectedModel.Definition.ExternalId] = overrideEditor.ToOverride();
+            var updated = await ProvidersClient.UpdateModelProviderAsync(provider.Value.Namespace, provider.Value.Name, new(provider.Value.Definition with { SpecificationOverrides = overrides }), provider.ETag, cancellation.Token);
+            if (request != loadVersion) return;
+            if (!ProviderMatches(expectedModel, updated.Value)) { Adopt(new(savedBundle!.Snapshot, null, null, T("ProviderIdentityMismatch"), true)); return; }
+            // The write succeeded even when a later inventory observation fails. Do not retain a stale write ETag/draft.
+            Adopt(new(savedBundle!.Snapshot, updated, null, null)); editingOverride = false;
+            overrideMessage = removeTarget ? T("OverrideRemoved") : T("OverrideSaved");
+            try { var inventory = await ProvidersClient.GetProviderModelsAsync(updated.Value.Namespace, updated.Value.Name, cancellation.Token); if (request != loadVersion) return; effective = EffectiveFrom(inventory, expectedModel); if (savedBundle is not null) savedBundle = savedBundle with { Effective = effective }; }
+            catch (AgentstrationApiException exception)
+            {
+                if (request != loadVersion) return;
+                if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+                    Adopt(new(savedBundle!.Snapshot, null, null, exception.Message, true));
+                else diagnosticsWarning = exception.Message;
+            }
+            if (request == loadVersion) await ShowSection("overview");
         }
-        catch (AgentstrationApiException exception) { overrideError = exception; }
-        finally { savingOverride = false; }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) overrideError = exception; }
+        catch (ArgumentException exception) { if (request == loadVersion) overrideError = new(exception.Message, Guid.NewGuid().ToString("N")); }
+        finally { if (request == loadVersion) savingOverride = false; }
     }
-
     private async Task ReloadOverrideAsync()
     {
-        overrideError = null;
-        await LoadAsync();
-        if (providerSnapshot is not null) BeginOverrideEdit();
+        if (Busy) return;
+        await LoadAsync(true); // A conflict never silently replaces a pending override.
+    }
+    private async Task CopyYamlAsync() { if (model is null) return; await JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", ModelYaml); copied = true; }
+
+    private RenderFragment ProviderIdentity => @<FormSection Title="@T("ModelIdentity")" Eyebrow="@T("Identity")"><Actions><StatusBadge Text="@T("ObservedReadOnly")" Status="UiStatus.Neutral" /></Actions><ChildContent>@ProviderFacts</ChildContent></FormSection>;
+    private RenderFragment ProviderFacts
+    {
+        get
+        {
+            var saved = model ?? throw new InvalidOperationException("Model identity requires a saved model.");
+            return @<dl class="resource-details model-identity-grid">
+                <dt>@T("Provider")</dt><dd>@if (ProviderUrl is { } url) { <a class="text-button" href="@url"><code>@ProviderAddress</code></a> } else { <code>@ProviderAddress</code> }</dd>
+                <dt>@T("ExternalId")</dt><dd><code>@saved.Definition.ExternalId</code></dd>
+                <dt>@T("Publisher")</dt><dd>@Text(saved.Definition.Identity?.Publisher)</dd>
+                <dt>@T("ModelFamily")</dt><dd>@Text(saved.Definition.Identity?.Model)</dd>
+                <dt>@T("Version")</dt><dd>@Text(saved.Definition.Identity?.Version)</dd>
+                <dt>@T("ResourceGeneration")</dt><dd>@saved.Generation</dd>
+            </dl>;
+        }
     }
 
-    private async Task CopyYamlAsync()
+    private RenderFragment Capabilities(bool allowEdit) => @<FormSection Title="@T("Capabilities")" Eyebrow="@T("EffectiveSpecification")" Description="@T("CapabilitiesHelp")" Class="model-capabilities-panel" TestId="@(allowEdit ? "model-capabilities" : null)"><Actions><div class="model-capability-actions">@if (SavedOverride is not null) { <StatusBadge Text="@T("OverrideApplied")" Status="UiStatus.Info" /> }@if (CanEditOverrides && allowEdit) { <button class="button-secondary" type="button" data-testid="edit-model-override" @onclick="OpenOverrides">@(SavedOverride is null ? T("AddOverride") : T("EditOverride"))</button> }</div></Actions><ChildContent>
+                <div class="model-capability-grid">
+                    @Capability(T("Streaming"), ObservedSpecification.Features.Streaming?.Support, EffectiveSpecification.Features.Streaming?.Support, HasStreamingOverride)
+                    @Capability(T("Tools"), ObservedSpecification.Features.Tools?.Support, EffectiveSpecification.Features.Tools?.Support, HasToolsOverride, ToolDetails)
+                    @Capability(T("StructuredOutput"), ObservedSpecification.Features.StructuredOutput?.Support, EffectiveSpecification.Features.StructuredOutput?.Support, HasStructuredOutputOverride, StructuredOutputDetails)
+                    @Capability(T("Reasoning"), ObservedSpecification.Features.Reasoning?.Support, EffectiveSpecification.Features.Reasoning?.Support, HasReasoningOverride, ReasoningDetails)
+                </div>
+            </ChildContent></FormSection>;
+
+    private RenderFragment Limits => @<FormSection Title="@T("KnownLimits")" Eyebrow="@T("Capacity")" Description="@T("LimitsHelp")"><ChildContent>
+                <div class="model-limit-grid">
+                    @Limit(T("ContextTokens"), ObservedSpecification.Limits.ContextTokens, EffectiveSpecification.Limits.ContextTokens, HasContextLimitOverride)
+                    @Limit(T("MaxOutputTokens"), ObservedSpecification.Limits.MaxOutputTokens, EffectiveSpecification.Limits.MaxOutputTokens, HasOutputLimitOverride)
+                </div>
+            </ChildContent></FormSection>;
+
+    private RenderFragment Observation
     {
-        await JavaScript.InvokeVoidAsync("navigator.clipboard.writeText", ModelYaml);
-        copied = true;
+        get
+        {
+            var saved = model ?? throw new InvalidOperationException("A saved Model inspection is required.");
+            return @<section class="panel form-section model-observation-details">
+                <div class="panel-header"><div><p class="eyebrow">@T("Reconciliation")</p><h2>@T("ObservationHistory")</h2></div></div>
+                <dl class="resource-details">
+                    <dt>@T("FirstObserved")</dt><dd>@saved.Definition.Observation.FirstObservedAt.ToLocalTime().ToString("F")</dd>
+                    <dt>@T("LastObserved")</dt><dd>@saved.Definition.Observation.LastObservedAt.ToLocalTime().ToString("F")</dd>
+                    <dt>@T("LastAttemptedLabel")</dt><dd>@saved.Definition.Observation.LastAttemptedAt.ToLocalTime().ToString("F")</dd>
+                    @if (!string.IsNullOrWhiteSpace(saved.Definition.Observation.ErrorCode)) { <dt>@T("ErrorCode")</dt><dd><code>@saved.Definition.Observation.ErrorCode</code></dd> }
+                    @if (!string.IsNullOrWhiteSpace(saved.Definition.Observation.ErrorMessage)) { <dt>@T("ErrorMessage")</dt><dd>@saved.Definition.Observation.ErrorMessage</dd> }
+                </dl>
+            </section>;
+        }
+    }
+
+    private RenderFragment OverridePanel
+    {
+        get
+        {
+            var editor = overrideEditor ?? throw new InvalidOperationException("A saved Model inspection is required.");
+            return @<section class="panel form-section model-override-editor" data-testid="model-override-editor">
+                    <div class="panel-header"><div><p class="eyebrow">@T("ProviderOverride")</p><h2>@T("OverrideEditor")</h2><p>@T("OverrideEditorHelp")</p></div></div>
+
+                    @if (OverrideDiagnostics.Count > 0)
+                    {
+                        <div class="form-alert form-alert-warning model-override-diagnostics" role="status"><strong>@T("OverrideDiagnostics")</strong><ul>@foreach (var diagnostic in OverrideDiagnostics) { <li>@diagnostic</li> }</ul></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(overrideInteractionMessage))
+                    {
+                        <div class="form-alert form-alert-info" role="status" data-testid="model-override-interaction-message">@overrideInteractionMessage</div>
+                    }
+
+                    <div class="model-override-section">
+                        <h3>@T("Modalities")</h3><p>@T("CollectionOverrideHelp")</p>
+                        <div class="model-override-columns"><div><h4>@T("InputModalities")</h4>@OperationGridHeader()@foreach (var value in Enum.GetValues<ModelContentType>()) { @OperationField(T($"Modality.{value}"), value, editor.Input, ObservedSpecification.Input?.Contains(value)) }</div><div><h4>@T("OutputModalities")</h4>@OperationGridHeader()@foreach (var value in Enum.GetValues<ModelContentType>()) { @OperationField(T($"Modality.{value}"), value, editor.Output, ObservedSpecification.Output?.Contains(value)) }</div></div>
+                    </div>
+
+                    <div class="model-override-section">
+                        <h3>@T("Capabilities")</h3><p>@T("FeatureOverrideHelp")</p>
+                        <div class="model-feature-editor-grid">
+                            @SupportField(T("Streaming"), editor.StreamingSupport, ObservedSpecification.Features.Streaming?.Support, value => SetSimpleSupport(value, support => editor.StreamingSupport = support))
+                            <article><h4>@T("Tools")</h4>@OperationGridHeader()@SupportSelect(editor.ToolsSupport, ObservedSpecification.Features.Tools?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Tools?.Support, editor.ToolModes, support => editor.ToolsSupport = support, T("Tools")))@foreach (var value in Enum.GetValues<ModelToolMode>()) { @OperationField(T($"ToolMode.{value}"), value, editor.ToolModes, DetailDiscoveryValue(ObservedSpecification.Features.Tools?.Support, ObservedSpecification.Features.Tools?.Modes.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, editor.ToolModes, ObservedSpecification.Features.Tools?.Support, () => editor.ToolsSupport, support => editor.ToolsSupport = support, T("Tools"))) }<small>@T("ToolGovernanceWarning")</small></article>
+                            <article><h4>@T("StructuredOutput")</h4>@OperationGridHeader()@SupportSelect(editor.StructuredOutputSupport, ObservedSpecification.Features.StructuredOutput?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.StructuredOutput?.Support, editor.OutputFormats, support => editor.StructuredOutputSupport = support, T("StructuredOutput")))@foreach (var value in Enum.GetValues<ModelStructuredOutputFormat>()) { @OperationField(T($"OutputFormat.{value}"), value, editor.OutputFormats, DetailDiscoveryValue(ObservedSpecification.Features.StructuredOutput?.Support, ObservedSpecification.Features.StructuredOutput?.Formats.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, editor.OutputFormats, ObservedSpecification.Features.StructuredOutput?.Support, () => editor.StructuredOutputSupport, support => editor.StructuredOutputSupport = support, T("StructuredOutput"))) @if (editor.OutputFormats[value] == ModelOverrideOperation.Add) { @StrictField(value) } }</article>
+                            <article><h4>@T("Reasoning")</h4>@OperationGridHeader()@SupportSelect(editor.ReasoningSupport, ObservedSpecification.Features.Reasoning?.Support, value => SetFeatureSupport(value, ObservedSpecification.Features.Reasoning?.Support, editor.ReasoningEfforts, support => editor.ReasoningSupport = support, T("Reasoning")))@foreach (var value in Enum.GetValues<ReasoningEffort>()) { @OperationField(T($"ReasoningEffort.{value}"), value, editor.ReasoningEfforts, DetailDiscoveryValue(ObservedSpecification.Features.Reasoning?.Support, ObservedSpecification.Features.Reasoning?.Efforts.ContainsKey(value) == true), operation => SetDetailOperation(value, operation, editor.ReasoningEfforts, ObservedSpecification.Features.Reasoning?.Support, () => editor.ReasoningSupport, support => editor.ReasoningSupport = support, T("Reasoning"))) }</article>
+                        </div>
+                    </div>
+
+                    <div class="model-override-section">
+                        <h3>@T("KnownLimits")</h3><p>@T("LimitOverrideHelp")</p>
+                        <div class="model-limit-editor-grid"><FormField Label="@T("ContextTokens")"><HelpContent>@T("ProviderDeclaredValue", Number(ObservedSpecification.Limits.ContextTokens))</HelpContent><ChildContent><ClearableNumber min="1" data-testid="model-override-context-tokens" @bind-Value="editor.ContextTokens" /></ChildContent><Validation><ValidationMessage For="() => editor.ContextTokens" /></Validation></FormField><FormField Label="@T("MaxOutputTokens")"><HelpContent>@T("ProviderDeclaredValue", Number(ObservedSpecification.Limits.MaxOutputTokens))</HelpContent><ChildContent><ClearableNumber min="1" data-testid="model-override-max-output-tokens" @bind-Value="editor.MaxOutputTokens" /></ChildContent><Validation><ValidationMessage For="() => editor.MaxOutputTokens" /></Validation></FormField></div>
+                    </div>
+
+                    <FormActions><button class="button-primary" type="submit" data-testid="save-model-override" disabled="@(!CanEditOverrides || Busy)">@(savingOverride ? T("Saving") : T("SaveOverride"))</button><button class="button-secondary" type="button" disabled="@(!CanEditOverrides || Busy)" @onclick="CancelOverrideEdit">@T("Cancel")</button>@if (SavedOverride is not null) { <button class="button-danger" type="button" data-testid="remove-model-override" disabled="@(!CanEditOverrides || Busy)" @onclick="RemoveOverrideAsync">@T("RemoveOverride")</button> }</FormActions>
+                </section>;
+        }
     }
 
     private RenderFragment Capability(string label, ModelFeatureSupport? observed, ModelFeatureSupport? current, bool overridden, string? details = null) => @<article class="model-capability-card">
@@ -312,7 +388,7 @@ else if (model is not null)
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string SupportLabel(ModelFeatureSupport? support) => support is null ? T("Support.Omitted") : T($"Support.{support}");
-    private static UiStatus SupportTone(ModelFeatureSupport? support) => support switch { ModelFeatureSupport.Native => UiStatus.Success, ModelFeatureSupport.Emulated => UiStatus.Info, ModelFeatureSupport.Partial => UiStatus.Warning, ModelFeatureSupport.Unsupported => UiStatus.Neutral, _ => UiStatus.Warning };
+    private static UiStatus SupportTone(ModelFeatureSupport? support) => support switch { ModelFeatureSupport.Native => UiStatus.Success, ModelFeatureSupport.Emulated => UiStatus.Info, ModelFeatureSupport.Partial => UiStatus.Warning, ModelFeatureSupport.Unsupported => UiStatus.Neutral, _ => UiStatus.Neutral };
     private string ProvenanceLabel(bool overridden) => overridden ? T("ProviderOverride") : T("ProviderObservation");
     private string Modalities(IReadOnlyList<ModelContentType>? values) => values is null ? T("Unknown") : values.Count == 0 ? T("None") : string.Join(", ", values.Select(value => T($"Modality.{value}")));
     private string Text(string? value) => string.IsNullOrWhiteSpace(value) ? T("NotObserved") : value;
@@ -359,47 +435,33 @@ else if (model is not null)
     }
 
     private RenderFragment OperationGridHeader() => @<div class="model-operation-grid-header" aria-hidden="true"><span></span><span>@T("Discovery")</span><span>@T("Override")</span></div>;
-    private RenderFragment OperationField<TEnum>(string label, TEnum value, Dictionary<TEnum, ModelOverrideOperation> target, bool? providerValue, Action<ModelOverrideOperation>? setter = null) where TEnum : struct, Enum => @<div class="model-operation-field"><span>@label</span><span class="model-discovery-cell"><small>@T("Discovery")</small><strong class="model-discovery-state @AvailabilityClass(providerValue)">@AvailabilityLabel(providerValue)</strong></span><label><small>@T("Override")</small><select value="@target[value]" @onchange="args => ChangeOperation(value, target, setter, args.Value?.ToString())"><option value="@ModelOverrideOperation.Inherit">@T("NotOverridden")</option><option value="@ModelOverrideOperation.Add">@T("Operation.Add")</option><option value="@ModelOverrideOperation.Remove">@T("Operation.Remove")</option></select></label></div>;
+    private RenderFragment OperationField<TEnum>(string label, TEnum value, Dictionary<TEnum, ModelOverrideOperation> target, bool? providerValue, Action<ModelOverrideOperation>? setter = null) where TEnum : struct, Enum => @<div class="model-operation-field"><span>@label</span><span class="model-discovery-cell"><small>@T("Discovery")</small><strong class="model-discovery-state @AvailabilityClass(providerValue)">@AvailabilityLabel(providerValue)</strong></span><FormField Label="@T("Override")"><LabelContent><small>@T("Override")</small></LabelContent><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(target[value], System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => ChangeOperation(value, target, setter, (new ChangeEventArgs { Value = changed }).Value?.ToString())"><option value="@ModelOverrideOperation.Inherit">@T("NotOverridden")</option><option value="@ModelOverrideOperation.Add">@T("Operation.Add")</option><option value="@ModelOverrideOperation.Remove">@T("Operation.Remove")</option></ClearableSelect></ChildContent></FormField></div>;
     private RenderFragment SupportField(string label, ModelFeatureSupport? value, ModelFeatureSupport? providerValue, Action<ModelFeatureSupport?> setter) => @<article><h4>@label</h4>@OperationGridHeader()@SupportSelect(value, providerValue, setter)</article>;
-    private RenderFragment SupportSelect(ModelFeatureSupport? value, ModelFeatureSupport? providerValue, Action<ModelFeatureSupport?> setter) => @<div class="model-operation-field"><span>@T("FeatureSupport")</span><span class="model-discovery-cell"><small>@T("Discovery")</small><strong class="model-discovery-state @SupportClass(providerValue)">@DiscoverySupportLabel(providerValue)</strong></span><label><small>@T("Override")</small><select value="@(value?.ToString() ?? string.Empty)" @onchange="args => setter(ParseSupport(args.Value?.ToString()))"><option value="">@T("NotOverridden")</option>@foreach (var support in Enum.GetValues<ModelFeatureSupport>()) { <option value="@support">@OverrideSupportLabel(support)</option> }</select></label></div>;
+    private RenderFragment SupportSelect(ModelFeatureSupport? value, ModelFeatureSupport? providerValue, Action<ModelFeatureSupport?> setter) => @<div class="model-operation-field"><span>@T("FeatureSupport")</span><span class="model-discovery-cell"><small>@T("Discovery")</small><strong class="model-discovery-state @SupportClass(providerValue)">@DiscoverySupportLabel(providerValue)</strong></span><FormField Label="@T("Override")"><LabelContent><small>@T("Override")</small></LabelContent><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(value?.ToString() ?? string.Empty, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => setter(ParseSupport((new ChangeEventArgs { Value = changed }).Value?.ToString()))"><option value="">@T("NotOverridden")</option>@foreach (var support in Enum.GetValues<ModelFeatureSupport>()) { <option value="@support">@OverrideSupportLabel(support)</option> }</ClearableSelect></ChildContent></FormField></div>;
     private string OverrideSupportLabel(ModelFeatureSupport support) => T($"OverrideSupport.{support}");
     private string DiscoverySupportLabel(ModelFeatureSupport? support) => T($"DiscoverySupport.{support?.ToString() ?? "Unknown"}");
     private string AvailabilityLabel(bool? available) => T(available switch { true => "Availability.Available", false => "Availability.Unavailable", null => "Availability.Unknown" });
     private static string AvailabilityClass(bool? available) => available switch { true => "is-positive", false => "is-negative", null => "is-unspecified" };
     private static string SupportClass(ModelFeatureSupport? support) => support switch { ModelFeatureSupport.Native or ModelFeatureSupport.Emulated => "is-positive", ModelFeatureSupport.Partial => "is-partial", ModelFeatureSupport.Unsupported => "is-negative", _ => "is-unspecified" };
     private static bool? DetailDiscoveryValue(ModelFeatureSupport? parentSupport, bool declared) => declared ? true : parentSupport == ModelFeatureSupport.Unsupported ? false : null;
-    private void SetSimpleSupport(ModelFeatureSupport? value, Action<ModelFeatureSupport?> setter) { overrideInteractionMessage = null; setter(value); }
+    private void SetSimpleSupport(ModelFeatureSupport? value, Action<ModelFeatureSupport?> setter) { if (!CanEditOverrides) return; overrideInteractionMessage = null; setter(value); }
     private void SetFeatureSupport<TEnum>(ModelFeatureSupport? value, ModelFeatureSupport? discovered, Dictionary<TEnum, ModelOverrideOperation> details, Action<ModelFeatureSupport?> setter, string feature) where TEnum : struct, Enum
     {
-        overrideInteractionMessage = null;
-        if ((value == ModelFeatureSupport.Unsupported || value is null && discovered is null or ModelFeatureSupport.Unknown) && details.Values.Any(operation => operation == ModelOverrideOperation.Add))
-        {
-            foreach (var detail in details.Where(item => item.Value == ModelOverrideOperation.Add).Select(item => item.Key).ToArray()) details[detail] = ModelOverrideOperation.Inherit;
-            overrideInteractionMessage = T("PositiveDetailsCleared", feature);
-        }
-        setter(value);
+        if (!CanEditOverrides) return;
+        overrideInteractionMessage = ModelSpecificationOverrideEditorModel.SetFeatureSupport(value, discovered, details, setter) ? T("PositiveDetailsCleared", feature) : null;
     }
     private void SetDetailOperation<TEnum>(TEnum value, ModelOverrideOperation operation, Dictionary<TEnum, ModelOverrideOperation> target, ModelFeatureSupport? discovered, Func<ModelFeatureSupport?> support, Action<ModelFeatureSupport?> setSupport, string feature) where TEnum : struct, Enum
     {
-        overrideInteractionMessage = null;
-        if (operation == ModelOverrideOperation.Add)
-        {
-            if (discovered == ModelFeatureSupport.Unsupported) { overrideInteractionMessage = T("DiscoveredUnsupported", feature); return; }
-            if (support() == ModelFeatureSupport.Unsupported) { overrideInteractionMessage = T("OverriddenUnsupported", feature); return; }
-            if (support() is null && discovered is null or ModelFeatureSupport.Unknown)
-            {
-                setSupport(ModelFeatureSupport.Native);
-                overrideInteractionMessage = T("ParentSupportEnabled", feature);
-            }
-        }
-        target[value] = operation;
+        if (!CanEditOverrides) return;
+        var interaction = ModelSpecificationOverrideEditorModel.SetDetailOperation(value, operation, target, discovered, support, setSupport);
+        overrideInteractionMessage = interaction == ModelOverrideInteraction.None ? null : T(interaction.ToString(), feature);
     }
     private static void ChangeOperation<TEnum>(TEnum value, Dictionary<TEnum, ModelOverrideOperation> target, Action<ModelOverrideOperation>? setter, string? selected) where TEnum : struct, Enum
     {
         var operation = Enum.Parse<ModelOverrideOperation>(selected ?? nameof(ModelOverrideOperation.Inherit));
         if (setter is null) target[value] = operation; else setter(operation);
     }
-    private RenderFragment StrictField(ModelStructuredOutputFormat format) => @<label class="model-operation-field model-strict-field"><span>@T("SupportsStrict")</span><span></span><select value="@StrictValue(overrideEditor!.OutputFormatStrict[format])" @onchange="args => overrideEditor.OutputFormatStrict[format] = ParseStrict(args.Value?.ToString())"><option value="">@T("Unknown")</option><option value="true">@T("Yes")</option><option value="false">@T("No")</option></select></label>;
+    private RenderFragment StrictField(ModelStructuredOutputFormat format) => @<FormField Label="@T("SupportsStrict")" Class="model-operation-field model-strict-field"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(StrictValue(overrideEditor!.OutputFormatStrict[format]), System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => overrideEditor.OutputFormatStrict[format] = ParseStrict((new ChangeEventArgs { Value = changed }).Value?.ToString())"><option value="">@T("Unknown")</option><option value="true">@T("Yes")</option><option value="false">@T("No")</option></ClearableSelect></ChildContent></FormField>;
     private static ModelFeatureSupport? ParseSupport(string? value) => string.IsNullOrWhiteSpace(value) ? null : Enum.Parse<ModelFeatureSupport>(value);
     private static string StrictValue(bool? value) => value is null ? string.Empty : value.Value ? "true" : "false";
     private static bool? ParseStrict(string? value) => value switch { "true" => true, "false" => false, _ => null };
@@ -411,6 +473,5 @@ else if (model is not null)
         ReasoningEffort effort => T($"ReasoningEffort.{effort}"),
         _ => value.ToString()
     };
-    private enum PageTab { Overview, Overrides, Yaml }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

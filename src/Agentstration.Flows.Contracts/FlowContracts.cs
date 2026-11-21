@@ -18,6 +18,7 @@ public sealed record UpdateFlowRequest(string? Description, string Version, bool
 public sealed record CreateFlowVersionRequest(string Version, bool Activate = true);
 public sealed record FlowResponse(string Id, string Name, string? Description, string Version, bool Enabled, string? ActiveVersion, FlowDefinition Definition, IReadOnlyDictionary<string, string> Metadata, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, FlowGraphDefinition? Graph = null)
 {
+    public Guid? Uid { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }
@@ -25,6 +26,7 @@ public sealed record FlowResponse(string Id, string Name, string? Description, s
 }
 public sealed record FlowSummaryResponse(string Id, string Name, string? Description, FlowKind FlowKind, string Version, bool Enabled, string? ActiveVersion, DateTimeOffset UpdatedAt)
 {
+    public string? PublishedVersion { get; init; }
     public ResourceNamespace Namespace { get; init; } = ResourceNamespace.Default;
     public ResourceScopeRef? ScopeRef { get; init; }
     public string? DisplayName { get; init; }

@@ -1,0 +1,2 @@
+.resource-form, .form-section, .form-grid > * { min-width: 0; }
+.form-grid code { overflow-wrap: anywhere; }

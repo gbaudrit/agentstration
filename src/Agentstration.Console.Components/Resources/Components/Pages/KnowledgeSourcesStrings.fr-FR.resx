@@ -199,4 +199,14 @@
   <data name="RecordArtifact" xml:space="preserve"><value>Artefact</value></data>
   <data name="RecordOrdinal" xml:space="preserve"><value>Ligne {0}</value></data>
   <data name="RecordCount" xml:space="preserve"><value>{0} lignes JSON</value></data>
+  <data name="ActiveVersionLabel"><value>active</value></data>
+  <data name="Scope"><value>Périmètre</value></data>
+  <data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+  <data name="SettingValue" xml:space="preserve"><value>Valeur</value></data>
+  <data name="DiscardDraft" xml:space="preserve"><value>Abandonner le brouillon</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version plus récente est disponible. Votre brouillon est conservé jusqu’à son abandon explicite.</value></data>
+  <data name="NamespaceInvalid" xml:space="preserve"><value>Saisissez un namespace valide.</value></data>
+  <data name="IdentityChanged" xml:space="preserve"><value>L’identité de la ressource a changé. Rouvrez la source.</value></data>
+<data name="Identity" xml:space="preserve"><value>Identité</value></data>
+<data name="SettingName" xml:space="preserve"><value>Nom</value></data>
 </root>

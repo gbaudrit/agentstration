@@ -7,7 +7,7 @@
 <div class="schema-source-monaco" data-testid="schema-source-editor">
     @if (monacoReady)
     {
-        <StandaloneCodeEditor @ref="editor" Id="schema-document-source-monaco" ConstructionOptions="Options" OnDidChangeModelContent="Changed" />
+        <StandaloneCodeEditor @ref="editor" Id="@editorId" OnDidInit="EditorInitialized" ConstructionOptions="Options" OnDidChangeModelContent="Changed" />
     }
     else
     {
@@ -20,9 +20,11 @@
     [Parameter] public string Language { get; set; } = "json";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
+    private readonly string editorId = $"schema-document-source-{Guid.NewGuid():N}";
     private StandaloneCodeEditor? editor;
     private UserPreferencesState? preferences;
     private string editorValue = string.Empty;
+    private bool disposed, initialized;
     private string? appliedTheme;
     private bool monacoReady;
     private string Theme => preferences?.IsDarkTheme == true ? "vs-dark" : "vs";
@@ -35,7 +37,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (editor is null) editorValue = Value;
+        if (editor is null || !initialized) editorValue = Value;
         else if (Value != editorValue)
         {
             editorValue = Value;
@@ -48,13 +50,20 @@
         if (!monacoReady)
         {
             await JSRuntime.InvokeVoidAsync("agentstrationMonaco.ready");
+            if (disposed) return;
             monacoReady = true;
             StateHasChanged();
             return;
         }
+        if (initialized && editor is not null) await editor.UpdateOptions(new EditorUpdateOptions { ReadOnly = ReadOnly });
         if (editor is null || appliedTheme == Theme) return;
         await Global.SetTheme(JSRuntime, Theme);
         appliedTheme = Theme;
+    }
+
+    private void EditorInitialized()
+    {
+        if (!disposed) initialized = true;
     }
 
     private StandaloneEditorConstructionOptions Options(StandaloneCodeEditor _) => new()
@@ -70,14 +79,15 @@
 
     private async Task Changed(ModelContentChangedEvent _)
     {
-        if (ReadOnly || editor is null) return;
+        if (disposed || ReadOnly || editor is null) return;
         editorValue = await editor.GetValue();
-        await ValueChanged.InvokeAsync(editorValue);
+        if (!disposed && !ReadOnly) await ValueChanged.InvokeAsync(editorValue);
     }
 
     private void PreferencesChanged() => _ = InvokeAsync(StateHasChanged);
     public void Dispose()
     {
+        disposed = true;
         if (preferences is not null) preferences.Changed -= PreferencesChanged;
     }
 }

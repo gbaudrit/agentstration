@@ -1,0 +1,16 @@
+{
+  "baseCommit": "75b6b8a872dcbd1d0f263d6b4e88d6c667ccc90b",
+  "route": "/agent-runs",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor": "b52bece88c744646bf3055e7355e1fccaf10fea9",
+    "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor.cs": "b665cbf2d20cf74770a34eb54586c2cfbad59ac6",
+    "src/Agentstration.Console.Client/RuntimeApiClient.cs": "ff550a8851f38ced062e21d0e8d7ca6c95a1fc37",
+    "src/Agentstration.Console.Client/ApiClients.cs": "7113a4c41f8b05a3434c298188b27de695970b9c",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

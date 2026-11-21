@@ -5,7 +5,7 @@
     </div>
     @if (custom)
     {
-        <label>@Localizer["MappingJson"]<textarea data-testid="@(TestId + "-json")" disabled="@ReadOnly" value="@raw" @onchange="JsonChangedAsync"></textarea></label>
+        <FormField Label="@Localizer["MappingJson"]"><ClearableText UpdateOnInput="false" Multiline="true" data-testid="@(TestId + "-json")" Disabled="@ReadOnly" Value="@raw" ValueChanged="value => JsonChangedAsync(new ChangeEventArgs { Value = value })" /></FormField>
     }
     else
     {

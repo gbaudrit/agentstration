@@ -67,8 +67,10 @@ public static class BoundedXml
         if (Encoding.UTF8.GetByteCount(value) > MaximumBytes) throw new XmlException("XML size limit exceeded.");
         var settings = new XmlReaderSettings
         {
-            DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null,
-            MaxCharactersInDocument = MaximumBytes, MaxCharactersFromEntities = 1024
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = MaximumBytes,
+            MaxCharactersFromEntities = 1024
         };
         using var reader = XmlReader.Create(new StringReader(value), settings);
         var nodes = 0;

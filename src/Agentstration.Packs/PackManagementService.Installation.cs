@@ -15,6 +15,9 @@ public sealed partial class PackManagementService
     public Task<StoredResource<InstalledPackResource>?> GetAsync(PackIdentity identity, CancellationToken cancellationToken) =>
         store.GetAsync<InstalledPackResource>(new(PackKinds.InstalledPack, identity.ResourceName), cancellationToken);
 
+    public Task<StoredResource<InstalledPackResource>?> GetExactAsync(ResourceScopeRef scopeRef, PackIdentity identity, CancellationToken cancellationToken) =>
+        store.GetExactAsync<InstalledPackResource>(new(scopeRef, ResourceNamespace.Default, PackKinds.InstalledPack, identity.ResourceName), cancellationToken);
+
     public async Task<PackInstallationPreview> PreviewAsync(PackArchive archive, CancellationToken cancellationToken)
     {
         var prepared = await PrepareAsync(archive, [], cancellationToken);

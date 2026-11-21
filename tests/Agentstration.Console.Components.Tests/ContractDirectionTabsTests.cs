@@ -10,7 +10,7 @@ public sealed class ContractDirectionTabsTests
     [TestMethod]
     public void SwitchesBetweenInputAndOutputWithoutRenderingBothEditors()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var rendered = context.Render<ContractDirectionTabs>(parameters => parameters
             .Add(component => component.Label, "Invocation contracts")
             .Add(component => component.InputLabel, "Input")

@@ -1,0 +1,55 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<span class="resource-identity-trigger-host" @ref="root">
+    <button type="button" class="button-secondary resource-identity-trigger" @onclick="ToggleAsync" aria-controls="@panelId" aria-expanded="false" aria-haspopup="dialog" aria-label="@Shared["IdentityQuickView"]" title="@Shared["IdentityQuickView"]" data-identity-trigger data-testid="resource-identity-open"><UiIcon Name="id" /></button>
+    <div id="@panelId" class="resource-identity-popover" popover="auto" role="dialog" aria-label="@Shared["IdentityQuickView"]" @ref="panel" data-testid="resource-identity-popover">
+        <div class="resource-identity-popover-content">
+        <ResourceIdentitySummary DisplayName="@Name" TechnicalName="@TechnicalName" Namespace="@Namespace" Description="@Description" ResourceUid="ResourceUid" Labels="Labels" Version="@Version" VersionDescription="@VersionDescription" CopyFacts AdditionalDetails="AdditionalDetails" Scope="@(ScopeRef is null ? null : IdentityScope)">
+            <Badges><button type="button" class="icon-button" popovertarget="@panelId" popovertargetaction="hide" aria-label="@Shared["CloseIdentity"]" title="@Shared["CloseIdentity"]" data-identity-close><UiIcon Name="x" /></button></Badges>
+        </ResourceIdentitySummary>
+        </div>
+    </div>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string TechnicalName { get; set; } = string.Empty;
+    [Parameter] public string? Namespace { get; set; }
+    [Parameter] public Guid? ResourceUid { get; set; }
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public Agentstration.Resources.ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, string>? Labels { get; set; }
+    [Parameter] public string? Version { get; set; }
+    [Parameter] public string? VersionDescription { get; set; }
+    [Parameter] public RenderFragment? AdditionalDetails { get; set; }
+    private RenderFragment IdentityScope => @<ResourceScopeBadge ScopeRef="ScopeRef" JoinedName />;
+    private readonly string panelId = $"resource-identity-{Guid.NewGuid():N}";
+    private ElementReference root, panel;
+    private IJSObjectReference? module, binding;
+    private bool initializing, disposed;
+    private async Task ToggleAsync()
+    {
+        if (initializing || disposed) return;
+        initializing = true;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/resource-identity.js");
+            if (disposed) { await module.DisposeAsync(); return; }
+            binding ??= await module.InvokeAsync<IJSObjectReference>("bind", root, panel);
+            if (!disposed) await binding.InvokeVoidAsync("toggle");
+        }
+        finally { initializing = false; }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        try
+        {
+            if (binding is not null) { await binding.InvokeVoidAsync("dispose"); await binding.DisposeAsync(); }
+            if (module is not null) await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+    }
+}

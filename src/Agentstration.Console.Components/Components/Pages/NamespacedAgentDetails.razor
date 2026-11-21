@@ -5,52 +5,57 @@
 @inject IPacksClient PacksClient
 @inject IAgentRunnerRuntimeClient RuntimeClient
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Editor
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentsStrings> AgentLabels
+@inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> PackLabels
 @inject Microsoft.Extensions.Localization.IStringLocalizer<NamespacedAgentDetailsStrings> Localizer
 
-<PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 
-@if (loading)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" />
-}
-else if (agent is not null)
-{
-    <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@agent.Definition.DisplayName" Description="@agent.Definition.Description" StatusText="@StatusPresentation.Label(agent.Status.ProvisioningState.ToString())" Status="@StatusPresentation.Tone(agent.Status.ProvisioningState.ToString())" TestId="resource-namespaced-agent-details">
-        <Metadata><span><code>@AgentResourceNamespace.Value/@agent.Metadata.Name</code></span><span>@T("Generation", agent.Generation)</span></Metadata>
-        <Actions><button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button>@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="namespaced-agent-context-return">@T("ReturnToSource")</a> }<a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
-    </ResourceHeader>
-    <nav class="section-tabs namespaced-agent-tabs" role="tablist" aria-label="@T("AgentDetails")">
-        @foreach (var tab in Enum.GetValues<PageTab>())
-        {
-            <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="agent-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@TabLabel(tab)</button>
-        }
-    </nav>
-    <main id="agent-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-        @if (activeTab == PageTab.Overview)
-        {
-            <section class="metric-grid namespaced-agent-metrics" aria-label="@T("AgentStatusOverview")">
+<PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{ var presentations = Presentations; }
+<div class="namespaced-agent-screen">
+<ConsoleResourceDetailsTemplate CollectionHref="/agents" CollectionLabel="@T("BackToAgents")" Resource="agent" Name="@(agent?.Definition.DisplayName ?? Name)" ResourceType="@T("Agent")" Domain="agent" IconName="agent" Description="@agent?.Definition.Description"
+    StatusText="@(agent is null ? null : AgentStatus)" Status="@AgentStatusTone" ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations"
+    DefinitionSections="DefinitionSections" NavigationLabel="@T("AgentDetails")" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="@(loading || deploying)"
+    Yaml="@DefinitionYaml" YamlTitle="@(originalSource is null ? Shared["Yaml"] : T("AgentSourceYaml"))" YamlDescription="@T(originalSource is null ? "SavedDefinitionFallback" : "AgentSourceYamlHelp")" YamlLabel="@(originalSource is null ? Shared["Yaml"] : T("OriginalAgentYamlDefinition"))"
+    SectionTestIdPrefix="pack-agent" TestId="resource-namespaced-agent-details">
+    <Metadata>@if (agent is not null) { <span>@T("Generation", agent.Generation)</span> }</Metadata>
+    <Actions>@if (agent is not null && CanPrepareRuntime) { <button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(deploying || loading)">@DeploymentActionLabel</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="namespaced-agent-context-return">@T("ReturnToSource")</a> }</Actions>
+    <Feedback>@if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("DeploymentFailed")</strong><span>@deploymentError</span></div> }@if (!string.IsNullOrWhiteSpace(deploymentMessage)) { <div class="form-alert form-alert-success" role="status"><strong>@T("DeploymentReady")</strong><span>@deploymentMessage</span></div> }</Feedback>
+    <OverviewMetrics>@if (agent is not null) { @Metrics }</OverviewMetrics>
+    <OverviewConfiguration>@Configuration</OverviewConfiguration>
+    <OverviewContent><p class="muted">@T("NamespacedProvenance")</p></OverviewContent>
+    <DefinitionContent Context="path"><ResourceDefinitionForm @key="inspectionModel" EditContext="FormContext" Id="managed-agent-inspection-form" FormName="managed-agent-inspection"
+        Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" Busy="@(loading || deploying)" FieldLabels="FieldLabels" /></DefinitionContent>
+</ConsoleResourceDetailsTemplate>
+</div>
+
+@code {
+    private RenderFragment Metrics { get { var agent = this.agent!; return @<text>
                 <MetricCard Label="@T("GenerationLabel")" Value="@agent.Generation.ToString()" Detail="@AgentStatus" HelpText="@T("GenerationHelp")" Status="@AgentStatusTone" />
                 <MetricCard Label="@T("ModelProfile")" Value="@ModelBindingStatus" Detail="@ModelBindingDetail" HelpText="@ModelBindingHelp" Status="@ModelBindingTone" />
                 <MetricCard Label="@T("RuntimeProfile")" Value="@RuntimeBindingStatus" Detail="@RuntimeBindingDetail" HelpText="@RuntimeBindingHelp" Status="@RuntimeBindingTone" />
                 <MetricCard Label="@T("Deployment")" Value="@DeploymentOverviewStatus" Detail="@DeploymentOverviewDetail" HelpText="@T("DeploymentHelp")" Status="@DeploymentTone" />
-            </section>
-            <p class="muted namespaced-agent-provenance">@T("NamespacedProvenance")</p>
-            <article class="panel definition-grid">
-                <div><span class="field-label">@T("Namespace")</span><code>@AgentResourceNamespace.Value</code></div>
-                <div><span class="field-label">@T("ResourceName")</span><code>@agent.Metadata.Name</code></div>
-                <div><span class="field-label">@T("Handler")</span><strong>@agent.Definition.Handler</strong></div>
-                <div><span class="field-label">@T("ModelProfile")</span><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></div>
-                <div><span class="field-label">@T("RuntimeProfile")</span><a class="text-button" href="@RuntimeProfileUrl"><code>@RuntimeProfileAddress</code></a></div>
-                <div><span class="field-label">@T("Capabilities")</span><strong>@Capabilities</strong></div>
-                <div><span class="field-label">@T("Status")</span><strong>@AgentStatus</strong></div>
-            </article>
-        }
-        else if (activeTab == PageTab.Model)
-        {
+    </text>; } }
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]">@if (entry.Href is { } href) { <a class="configuration-value resource-name-link" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information></CollectionView>;
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@AgentResourceKinds.Agent" DisplayName="@inspectionModel.DisplayName" DisplayNameExpression="@(() => inspectionModel.DisplayName)"
+        TechnicalName="@inspectionModel.Name" TechnicalNameExpression="@(() => inspectionModel.Name)" Namespace="@inspectionModel.Namespace" NamespaceExpression="@(() => inspectionModel.Namespace)"
+        ScopeRef="inspectionModel.ScopeRef" Description="@inspectionModel.Description" DescriptionExpression="@(() => inspectionModel.Description)" Labels="@inspectionModel.Tags" LabelsExpression="@(() => inspectionModel.Tags)"
+        ReadOnly="true" TestId="managed-agent-identity-editor"><AdditionalPanels><FormSection Title="@T("InstallationConfiguration")"><p>@T("NamespacedProvenance")</p>@if (ownerPack is not null) { <dl class="resource-details"><dt>@T("ManagedBy")</dt><dd><a href="@PackUrl">@PackIdentity</a></dd></dl> }</FormSection></AdditionalPanels></ResourceIdentityEditor>;
+    private RenderFragment DefinitionSection(string path) => path switch
+    {
+        "definition/identity" => Identity,
+        "definition/configuration" => @<FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@Configuration</FormSection>,
+        "definition/source" => DefinitionPanel,
+        "definition/model" => ModelPanel,
+        "definition/runtime" => RuntimePanel,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
+    private RenderFragment ModelActions => @<text><a class="button-secondary" href="@ModelProfileUrl">@T("OpenEffectiveModelProfile")</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a> }</text>;
+    private RenderFragment RuntimeActions => @<text>@if (CanPrepareRuntime) { <button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(deploying || loading)">@DeploymentActionLabel</button> }<a class="button-secondary" href="@RuntimeProfileUrl">@T("OpenEffectiveRuntimeProfile")</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a> }</text>;
+    private RenderFragment ModelPanel { get { return @<div class="resource-editor-view">
             <section class="panel form-section namespaced-binding-panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("InstallationConfiguration")</p><h2>@T("ModelBinding")</h2></div>@if (modelBindings.Count > 0) { <StatusBadge Text="@T("BoundByPack")" Status="UiStatus.Info" /> }</div>
                 @if (ownerPack is null)
@@ -61,7 +66,6 @@ else if (agent is not null)
                 {
                     <p>@T("ContainedModelReference")</p>
                     <dl class="resource-details"><dt>@T("EffectiveProfile")</dt><dd><a class="text-button" href="@ModelProfileUrl"><code>@ModelProfileAddress</code></a></dd><dt>@T("ManagedBy")</dt><dd><code>@PackIdentity</code></dd></dl>
-                    <div class="namespaced-agent-actions"><a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a></div>
                 }
                 else
                 {
@@ -75,12 +79,10 @@ else if (agent is not null)
                         <dt>@T("ManagedBy")</dt><dd><code>@PackIdentity</code></dd>
                     </dl>
                     <p class="resource-hint">@T("BindingReadOnlyHelp")</p>
-                    <div class="namespaced-agent-actions"><a class="button-primary" href="@ModelProfileUrl">@T("OpenEffectiveModelProfile")</a><a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a></div>
                 }
             </section>
-        }
-        else if (activeTab == PageTab.Runtime)
-        {
+        </div>; } }
+    private RenderFragment RuntimePanel { get { var agent = this.agent!; return @<div class="resource-editor-view">
             <section class="panel form-section namespaced-binding-panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("LocalDeployment")</p><h2>@T("RuntimeBinding")</h2></div><div class="namespaced-agent-status">@if (runtimeBindings.Count > 0) { <StatusBadge Text="@T("BoundByPack")" Status="UiStatus.Info" /> }<StatusBadge Text="@DeploymentStatus" Status="@DeploymentTone" /></div></div>
                 @if (ownerPack is null)
@@ -109,37 +111,19 @@ else if (agent is not null)
                     <dt>@T("Deployment")</dt><dd>@(readiness?.DeploymentId ?? readiness?.RevisionId ?? T("NotPrepared"))</dd>
                     @if (!string.IsNullOrWhiteSpace(readiness?.RevisionId)) { <dt>@T("Revision")</dt><dd><code>@readiness.RevisionId</code></dd> }
                 </dl>
-                @if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("DeploymentFailed")</strong><span>@deploymentError</span></div> }
-                @if (!string.IsNullOrWhiteSpace(deploymentMessage)) { <div class="form-alert form-alert-success" role="status"><strong>@T("DeploymentReady")</strong><span>@deploymentMessage</span></div> }
-                <div class="namespaced-agent-actions"><button class="button-primary" type="button" @onclick="PrepareRuntimeAsync" disabled="@deploying">@DeploymentActionLabel</button><a class="button-secondary" href="@RuntimeProfileUrl">@T("OpenEffectiveRuntimeProfile")</a>@if (ownerPack is not null) { <a class="button-secondary" href="@PackUrl">@T("OpenPackInstallation")</a> }</div>
+
             </section>
-        }
-        else if (activeTab == PageTab.Access)
-        {
-            <ResourceAccessPanel OwnerScopeRef="@(agent.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="agent.Namespace" Kind="@AgentResourceKinds.Agent" Name="@agent.Name" Generation="agent.Generation" Governance="agent.Governance" />
-        }
-        else if (activeTab == PageTab.Definition)
-        {
-            <section data-testid="pack-agent-definition">
-                <div class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("OriginalDefinition")</p><h2>@T("AgentSourceForm")</h2><p>@T("AgentSourceFormHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div></div>
+        </div>; } }
+    private RenderFragment DefinitionPanel { get { return @<div class="resource-editor-view">
+            <section class="resource-editor-view" data-testid="pack-agent-definition">
+                <div class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("OriginalDefinition")</p><h2>@T("AgentSourceForm")</h2><p>@T(originalSource is null ? "SavedDefinitionFallback" : "AgentSourceFormHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div></div>
                 <PackAgentDefinitionForm Source="@DefinitionYaml" ReadOnly="true" />
             </section>
-        }
-        else
-        {
-            <section class="panel namespaced-instructions" data-testid="pack-agent-yaml">
-                <div class="panel-header"><div><p class="eyebrow">@T("OriginalDefinition")</p><h2>@T("AgentSourceYaml")</h2><p>@T("AgentSourceYamlHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div>
-                <textarea class="form-code-editor runner-json namespaced-definition-source" rows="30" readonly aria-label="@T("OriginalAgentYamlDefinition")">@DefinitionYaml</textarea>
-            </section>
-        }
-    </main>
-}
-
-@code {
+        </div>; } }
     [Parameter] public string AgentNamespace { get; set; } = string.Empty;
     [Parameter] public string Name { get; set; } = string.Empty;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private AgentResource? agent;
@@ -148,29 +132,75 @@ else if (agent is not null)
     private IReadOnlyList<PackBindingResolution> modelBindings = [];
     private IReadOnlyList<PackBindingResolution> runtimeBindings = [];
     private AgentRuntimeReadinessResponse? readiness;
-    private AgentstrationApiException? error;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private ManagedAgentInspectionModel inspectionModel = new();
+    private EditContext? editContext;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, inspectionModel) ? editContext : editContext = new(inspectionModel);
+    private readonly ResourceSectionState sectionState = new();
     private string? deploymentError;
     private string? deploymentMessage;
     private bool loading = true;
     private bool deploying;
-    private PageTab activeTab;
+    private string? loadedKey;
+    private long loadVersion;
+    private bool CanPrepareRuntime => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(Agentstration.Identity.Contracts.AuthorizationPermissions.ResourcesWrite);
+    private IReadOnlyList<ResourceNavigationItem> DefinitionSections => [new("definition/source", T("OriginalDefinition"), "file"), new("definition/model", T("Tab.Model"), "brain"), new("definition/runtime", T("Tab.Runtime"), "server")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = true, Fields = [nameof(inspectionModel.Name), nameof(inspectionModel.Namespace), nameof(inspectionModel.DisplayName), nameof(inspectionModel.Description), nameof(inspectionModel.ScopeRef), nameof(inspectionModel.Tags)] },
+        ["definition/configuration"] = new() { ReadOnly = true, Fields = [nameof(inspectionModel.Configuration)] },
+        ["definition/source"] = new() { ReadOnly = true, Fields = [nameof(inspectionModel.Source)] },
+        ["definition/model"] = new() { ReadOnly = true, Fields = [nameof(inspectionModel.ModelProfile)], ReadOnlyActions = ModelActions },
+        ["definition/runtime"] = new() { ReadOnly = true, Fields = [nameof(inspectionModel.RuntimeProfile)], ReadOnlyActions = RuntimeActions },
+        ["yaml"] = new() { ReadOnly = true }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(inspectionModel.Name)] = Editor["Name"], [nameof(inspectionModel.DisplayName)] = T("DisplayName"), [nameof(inspectionModel.Namespace)] = Shared["Namespace"],
+        [nameof(inspectionModel.Description)] = Shared["Description"], [nameof(inspectionModel.ScopeRef)] = Shared["Scope"], [nameof(inspectionModel.Tags)] = Shared["Labels"],
+        [nameof(inspectionModel.Configuration)] = Shared["Configuration"], [nameof(inspectionModel.Source)] = T("OriginalDefinition"), [nameof(inspectionModel.ModelProfile)] = T("ModelProfile"), [nameof(inspectionModel.RuntimeProfile)] = T("RuntimeProfile")
+    };
+    private sealed record ConfigurationEntry(string Label, string Value, string? Href = null);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => agent is null ? [] :
+    [
+        new(T("Handler"), agent.Definition.Handler),
+        new(T("Instructions"), agent.Definition.Instructions),
+        new(T("ModelProfile"), $"{ModelProfileAddress.Namespace}/{ModelProfileAddress.Name}", ModelProfileUrl),
+        new(T("RuntimeProfile"), $"{RuntimeProfileAddress.Namespace}/{RuntimeProfileAddress.Name}", RuntimeProfileUrl),
+        new(Editor["Tools"], JsonSerializer.Serialize(agent.Definition.Tools)),
+        new(Editor["GovernedToolSets"], JsonSerializer.Serialize(agent.Definition.ToolSets)),
+        new(T("Capabilities"), Capabilities),
+        new(Editor["Middleware"], JsonSerializer.Serialize(agent.Definition.Middleware)),
+        new(Editor["ContextProviders"], JsonSerializer.Serialize(agent.Definition.ContextProviders)),
+        new(T("Settings"), JsonSerializer.Serialize(agent.Definition.Settings, new JsonSerializerOptions { WriteIndented = true })),
+        new(Editor["InputContract"], JsonSerializer.Serialize(new { agent.Definition.InputSchema, agent.Definition.InputSchemaBinding }, new JsonSerializerOptions { WriteIndented = true })),
+        new(Editor["OutputContract"], JsonSerializer.Serialize(new { agent.Definition.OutputContract, agent.Definition.OutputSchema, agent.Definition.OutputSchemaBinding }, new JsonSerializerOptions { WriteIndented = true }))
+    ];
     private ResourceNamespace AgentResourceNamespace => ResourceNamespace.Parse(AgentNamespace);
     private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
     private ResourceAddress ModelProfileAddress => agent?.Definition.ModelProfile.Resolve(AgentResourceNamespace, ModelResourceKinds.ModelProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, ModelResourceKinds.ModelProfile, "unavailable");
-    private string ModelProfileUrl => ConsoleResourceUrls.ModelProfile(ModelProfileAddress, agent?.Definition.ModelProfile.ScopeRef);
+    private string ModelProfileUrl => ResourceOwnershipContext.Resource(Services, "/modelprofiles", ModelProfileAddress.Name, ModelProfileAddress.Namespace, agent?.Definition.ModelProfile.ScopeRef);
     private ResourceAddress RuntimeProfileAddress => agent?.Definition.RuntimeProfile.Resolve(AgentResourceNamespace, RuntimeProfileResourceKinds.RuntimeProfile)
         ?? ResourceAddress.Create(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile, "unavailable");
-    private string RuntimeProfileUrl => ConsoleResourceUrls.RuntimeProfile(RuntimeProfileAddress);
+    private string RuntimeProfileUrl => ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", RuntimeProfileAddress.Name, RuntimeProfileAddress.Namespace, agent?.Definition.RuntimeProfile.ScopeRef);
     private string PackIdentity => ownerPack is null ? T("UnknownPack") : $"{ownerPack.Definition.Publisher}/{ownerPack.Definition.PackName}";
     private string PackUrl => ownerPack is null ? "/packs" : $"/packs?publisher={Uri.EscapeDataString(ownerPack.Definition.Publisher)}&name={Uri.EscapeDataString(ownerPack.Definition.PackName)}";
     private string Capabilities => agent is null || agent.Definition.Behaviors.Count == 0 ? "—" : string.Join(", ", agent.Definition.Behaviors);
-    private string DeploymentStatus => readiness?.Ready == true ? T("Ready") : readiness?.State ?? T("NotDeployed");
-    private UiStatus DeploymentTone => readiness?.Ready == true ? UiStatus.Success : UiStatus.Warning;
-    private string DeploymentOverviewStatus => readiness?.Ready == true ? T("Ready") : T("NotReady");
+    private string DeploymentStatus => readiness?.Ready == true ? T("Ready") : readiness?.State ?? T("Unknown");
+    private UiStatus DeploymentTone => readiness is null ? UiStatus.Neutral : readiness.Ready ? UiStatus.Success : UiStatus.Warning;
+    private string DeploymentOverviewStatus => readiness is null ? T("Unknown") : readiness.Ready ? T("Ready") : T("NotReady");
     private string DeploymentOverviewDetail => readiness?.Ready == true ? readiness.DeploymentId ?? readiness.RevisionId ?? T("ActiveDeployment") : DeploymentStatus;
     private string DeploymentActionLabel => deploying ? T("Deploying") : readiness?.Ready == true ? T("ReconcileDeployment") : T("DeployGeneration", agent?.Generation ?? 0);
-    private string AgentStatus => agent is null ? T("Unknown") : StatusPresentation.Label(agent.Status.ProvisioningState.ToString());
+    private string AgentStatus => agent is null ? T("Unknown") : AgentStatusLabel(agent.Status.ProvisioningState);
+    private string AgentStatusLabel(ProvisioningState state) => state switch
+    {
+        ProvisioningState.Accepted => AgentLabels["StatusValid"],
+        ProvisioningState.Succeeded => AgentLabels["StatusPublished"],
+        ProvisioningState.Failed => AgentLabels["StatusFailed"],
+        ProvisioningState.Validating or ProvisioningState.Creating or ProvisioningState.Updating or ProvisioningState.Deleting or ProvisioningState.Canceled => PackLabels[$"Status.{state}"],
+        _ => T("Unknown")
+    };
     private UiStatus AgentStatusTone => agent is null ? UiStatus.Neutral : StatusPresentation.Tone(agent.Status.ProvisioningState.ToString());
     private bool ModelIsPackResource => ownerPack is not null && ModelProfileAddress.Namespace == AgentResourceNamespace;
     private string ModelBindingStatus => modelBindings.Count > 0 ? T("InstallationBinding") : ModelIsPackResource ? T("PackResource") : T("DirectReference");
@@ -182,7 +212,6 @@ else if (agent is not null)
             : T("DirectModelReferenceHelp");
     private UiStatus ModelBindingTone => modelBindings.Count > 0 ? UiStatus.Info : ownerPack is null ? UiStatus.Warning : UiStatus.Neutral;
     private bool RuntimeIsPackResource => ownerPack is not null && RuntimeProfileAddress.Namespace == AgentResourceNamespace;
-    private bool IsManaged => agent?.Governance.IsManaged is true;
     private string RuntimeBindingStatus => runtimeBindings.Count > 0 ? T("InstallationBinding") : RuntimeIsPackResource ? T("PackResource") : T("DirectReference");
     private string RuntimeBindingDetail => runtimeBindings.Count > 0 ? string.Join(", ", runtimeBindings.Select(binding => $"{binding.Name} → {BindingTarget(binding.Target)}")) : RuntimeProfileAddress.ToString();
     private string RuntimeBindingHelp => runtimeBindings.Count > 0
@@ -196,91 +225,134 @@ else if (agent is not null)
         ApiVersion = agent.ApiVersion,
         Kind = agent.Kind,
         Metadata = agent.Metadata,
-        Definition = agent.Definition
+        Definition = agent.Definition, ScopeRef = agent.ScopeRef
     }));
 
-    protected override async Task OnParametersSetAsync()
+    private string ContextKey => $"{AgentNamespace}|{Name}|{ScopeRefValue}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+    protected override Task OnParametersSetAsync()
     {
-        loading = true;
-        error = null;
+        if (ContextKey == loadedKey) return Task.CompletedTask;
+        loadedKey = ContextKey; sectionState.Reset(loadedKey); ClearInspection();
+        return LoadAsync(refresh: false);
+    }
+    private Task RetryAsync() => loading || deploying ? Task.CompletedTask : LoadAsync(refresh: agent is not null);
+    private Task RefreshAsync() => loading || deploying ? Task.CompletedTask : LoadAsync(refresh: true);
+    private void ClearInspection()
+    {
+        agent = null; ownerPack = null; originalSource = null; modelBindings = runtimeBindings = []; readiness = null;
+        inspectionModel = new(); editContext = null; deploymentError = deploymentMessage = null; deploying = false;
+    }
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var expected = agent; var requestedName = Name; var requestedNamespace = AgentResourceNamespace;
+        loading = true; loadState = new(refresh && agent is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = agent is not null };
         try
         {
-            agent = (await Client.GetAgentAsync(AgentResourceNamespace, Name, cancellation.Token)).Value;
-            await Task.WhenAll(LoadPackContextAsync(), LoadReadinessAsync());
-            if (!IsManaged)
+            ResourceScopeRef? owner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+            var saved = owner is { } scope ? await Client.GetAgentAsync(requestedNamespace, requestedName, scope, cancellation.Token) : await Client.GetAgentAsync(requestedNamespace, requestedName, cancellation.Token);
+            if (request != loadVersion) return;
+            var candidate = saved.Value;
+            if (candidate.Name != requestedName || candidate.Namespace != requestedNamespace || candidate.ScopeRef is null || owner is { } requestedOwner && candidate.ScopeRef != requestedOwner
+                || expected is not null && (candidate.ScopeRef != expected.ScopeRef || expected.Uid != Guid.Empty && candidate.Uid != expected.Uid))
             {
-                var editorUrl = $"/agents/{Uri.EscapeDataString(Name)}?namespace={Uri.EscapeDataString(AgentResourceNamespace.Value)}";
-                if (Navigation.Uri != Navigation.ToAbsoluteUri(editorUrl).AbsoluteUri)
-                    Navigation.NavigateTo(editorUrl, replace: true);
-                return;
+                ClearInspection(); loadState = new(ResourceLoadStatus.NotFound); return;
             }
-            if (string.Equals(View, "definition", StringComparison.OrdinalIgnoreCase)) activeTab = PageTab.Definition;
-            else if (string.Equals(View, "access", StringComparison.OrdinalIgnoreCase)) activeTab = PageTab.Access;
+            if (!candidate.Governance.IsManaged)
+            {
+                var target = ResourceOwnershipContext.Resource(Services, "/agents", candidate.Name, candidate.Namespace, candidate.ScopeRef);
+                if (SafeReturnUrl is { } returnUrl) target = Navigation.GetUriWithQueryParameters(target, new Dictionary<string, object?> { ["returnUrl"] = returnUrl });
+                var fragment = new Uri(Navigation.Uri).Fragment;
+                if (fragment is "#definition/model" or "#definition/runtime") fragment = "#definition/model-execution";
+                if (fragment is "#definition/source") fragment = "#yaml";
+                ClearInspection(); Navigation.NavigateTo(target + fragment, replace: true); return;
+            }
+            var context = await ReadPackContextAsync(candidate, request);
+            if (request != loadVersion) return;
+            agent = candidate; ownerPack = context.Pack; originalSource = context.Source;
+            modelBindings = context.ModelBindings; runtimeBindings = context.RuntimeBindings;
+            var next = ManagedAgentInspectionModel.From(candidate, DefinitionYaml);
+            if (next != inspectionModel) { inspectionModel = next; editContext = null; }
+            if (expected is null || expected.Generation != candidate.Generation) readiness = null;
+            await LoadReadinessAsync(candidate, request);
+            if (request != loadVersion) return;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (request != loadVersion) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch
+            {
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+                _ => ResourceLoadStatus.Failed
+            } : ResourceLoadStatus.Failed;
+            if (status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) ClearInspection();
+            loadState = new(status) { HasContent = agent is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
+        finally { if (request == loadVersion) loading = false; }
     }
 
-    private async Task LoadReadinessAsync()
+    private async Task LoadReadinessAsync(AgentResource resource, long request)
     {
-        readiness = null;
-        if (agent is null) return;
-        try { readiness = await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, agent.Metadata.Name, agent.Generation, cancellation.Token); }
-        catch (AgentstrationApiException exception) { deploymentError = exception.Message; }
+        try
+        {
+            var observed = resource.ScopeRef is { } owner
+                ? await RuntimeClient.GetAgentReadinessAsync(resource.Namespace, resource.Name, owner, resource.Generation, cancellation.Token)
+                : await RuntimeClient.GetAgentReadinessAsync(resource.Namespace, resource.Name, resource.Generation, cancellation.Token);
+            if (request == loadVersion) { readiness = observed; deploymentError = null; }
+        }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) { readiness = null; deploymentError = exception.Message; } }
     }
 
     private async Task PrepareRuntimeAsync()
     {
-        if (agent is null || deploying) return;
+        if (agent is null || deploying || loading || !CanPrepareRuntime) return;
+        var target = agent; var request = loadVersion;
         deploying = true;
         deploymentError = null;
         deploymentMessage = null;
         try
         {
-            var prepared = await RuntimeClient.PrepareAgentAsync(AgentResourceNamespace, agent.Metadata.Name, agent.Generation, cancellation.Token);
-            await LoadReadinessAsync();
+            var prepared = target.ScopeRef is { } owner
+                ? await RuntimeClient.PrepareAgentAsync(target.Namespace, target.Name, owner, target.Generation, cancellation.Token)
+                : await RuntimeClient.PrepareAgentAsync(target.Namespace, target.Name, target.Generation, cancellation.Token);
+            if (request != loadVersion) return;
+            await LoadReadinessAsync(target, request);
+            if (request != loadVersion) return;
             if (string.Equals(prepared.State, OperationalState.Ready.ToString(), StringComparison.Ordinal))
                 deploymentMessage = T("GenerationActiveThroughDeployment", prepared.Generation,
                     string.IsNullOrWhiteSpace(prepared.DeploymentId) ? prepared.RevisionId : prepared.DeploymentId);
             else
                 deploymentError = T("RuntimePreparationCompleted", prepared.State);
         }
-        catch (AgentstrationApiException exception) { deploymentError = exception.Message; }
-        finally { deploying = false; }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) deploymentError = exception.Message; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally { if (request == loadVersion) deploying = false; }
     }
 
-    private async Task LoadPackContextAsync()
+    private sealed record PackContext(InstalledPackResource? Pack, PackProjectSourceDocument? Source, IReadOnlyList<PackBindingResolution> ModelBindings, IReadOnlyList<PackBindingResolution> RuntimeBindings);
+    private async Task<PackContext> ReadPackContextAsync(AgentResource resource, long request)
     {
-        ownerPack = null;
-        originalSource = null;
-        modelBindings = [];
-        runtimeBindings = [];
-        if (agent is null
-            || !agent.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Publisher, out var publisher)
-            || !agent.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Name, out var packName)) return;
-
+        if (!resource.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Publisher, out var publisher)
+            || !resource.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Name, out var packName)) return new(null, null, [], []);
         try
         {
-            ownerPack = (await PacksClient.GetPackAsync(publisher, packName, cancellation.Token)).Value;
-            originalSource = (await PacksClient.GetPackResourcesAsync(publisher, packName, cancellation.Token))
-                .SingleOrDefault(resource => string.Equals(resource.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)
-                    && string.Equals(resource.Name, agent.Metadata.Name, StringComparison.Ordinal));
-            modelBindings = ownerPack.Definition.Bindings
-                .Where(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile
-                    && binding.Target.Resolve(ResourceNamespace.Default, ModelResourceKinds.ModelProfile) == ModelProfileAddress)
-                .ToArray();
-            runtimeBindings = ownerPack.Definition.Bindings
-                .Where(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile
-                    && binding.Target.Resolve(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile) == RuntimeProfileAddress)
-                .ToArray();
+            var pack = (await PacksClient.GetPackAsync(publisher, packName, cancellation.Token)).Value;
+            if (request != loadVersion) return new(null, null, [], []);
+            if (pack.Definition.Publisher != publisher || pack.Definition.PackName != packName || pack.Definition.Namespace != resource.Namespace || pack.ScopeRef != resource.ScopeRef
+                || resource.Metadata.Annotations.TryGetValue(PackProvenanceAnnotations.Version, out var version) && pack.Definition.Version != version) return new(null, null, [], []);
+            var source = (await PacksClient.GetPackResourcesAsync(publisher, packName, cancellation.Token))
+                .SingleOrDefault(value => value.Kind == AgentResourceKinds.Agent && value.Name == resource.Name);
+            var model = resource.Definition.ModelProfile.Resolve(resource.Namespace, ModelResourceKinds.ModelProfile);
+            var runtime = resource.Definition.RuntimeProfile.Resolve(resource.Namespace, RuntimeProfileResourceKinds.RuntimeProfile);
+            return new(pack, source,
+                pack.Definition.Bindings.Where(binding => binding.TargetKind == PackBindingTargetKind.ModelProfile && binding.Target.Resolve(ResourceNamespace.Default, ModelResourceKinds.ModelProfile) == model).ToArray(),
+                pack.Definition.Bindings.Where(binding => binding.TargetKind == PackBindingTargetKind.RuntimeProfile && binding.Target.Resolve(ResourceNamespace.Default, RuntimeProfileResourceKinds.RuntimeProfile) == runtime).ToArray());
         }
-        catch (AgentstrationApiException) { }
+        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound) { return new(null, null, [], []); }
     }
 
     private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
-    private static string TabId(PageTab tab) => $"agent-{tab.ToString().ToLowerInvariant()}-tab";
-    private string TabLabel(PageTab tab) => Localizer[$"Tab.{tab}"];
-    private enum PageTab { Overview, Definition, Model, Runtime, Access, Yaml }
-
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

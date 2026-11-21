@@ -1,0 +1,21 @@
+/agents en-US Dark 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /agents/hierarchical-execution-agent?scopeRef=%2Finstance&context=%2Finstance
+/modelprofiles en-US Dark 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /modelprofiles/execution-scope-reasoning?scopeRef=%2Finstance&context=%2Finstance
+/data-source-profiles en-US Dark 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /data-source-profiles/artifact-import-builtin?namespace=default&scopeRef=%2Finstance&context=%2Finstance
+/runtimeprofiles en-US Dark 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /runtimeprofiles/maf-builtin?namespace=default&context=%2Finstance
+/flows en-US Dark 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /flows/artifact-storage-filesystem-read-builtin?scopeRef=%2Finstance&context=%2Finstance
+/agents en-US Light 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /agents/hierarchical-execution-agent?scopeRef=%2Finstance&context=%2Finstance
+/modelprofiles en-US Light 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /modelprofiles/execution-scope-reasoning?scopeRef=%2Finstance&context=%2Finstance
+/data-source-profiles en-US Light 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /data-source-profiles/artifact-import-builtin?namespace=default&scopeRef=%2Finstance&context=%2Finstance
+/runtimeprofiles en-US Light 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /runtimeprofiles/maf-builtin?namespace=default&context=%2Finstance
+/flows en-US Light 1920: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /flows/artifact-storage-filesystem-read-builtin?scopeRef=%2Finstance&context=%2Finstance
+/agents fr-FR Dark 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /agents/hierarchical-execution-agent?scopeRef=%2Finstance&context=%2Finstance
+/modelprofiles fr-FR Dark 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /modelprofiles/execution-scope-reasoning?scopeRef=%2Finstance&context=%2Finstance
+/data-source-profiles fr-FR Dark 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /data-source-profiles/artifact-import-builtin?namespace=default&scopeRef=%2Finstance&context=%2Finstance
+/runtimeprofiles fr-FR Dark 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /runtimeprofiles/maf-builtin?namespace=default&context=%2Finstance
+/flows fr-FR Dark 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /flows/artifact-storage-filesystem-read-builtin?scopeRef=%2Finstance&context=%2Finstance
+/agents fr-FR Light 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /agents/hierarchical-execution-agent?scopeRef=%2Finstance&context=%2Finstance
+/modelprofiles fr-FR Light 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /modelprofiles/execution-scope-reasoning?scopeRef=%2Finstance&context=%2Finstance
+/data-source-profiles fr-FR Light 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /data-source-profiles/artifact-import-builtin?namespace=default&scopeRef=%2Finstance&context=%2Finstance
+/runtimeprofiles fr-FR Light 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /runtimeprofiles/maf-builtin?namespace=default&context=%2Finstance
+/flows fr-FR Light 390: identity/second-line copy/status label/menu/keyboard/no document overflow passed; /flows/artifact-storage-filesystem-read-builtin?scopeRef=%2Finstance&context=%2Finstance
+Long tenant: visible type, bounded ellipsis, full hover/focus/tap disclosure, Escape, complete accessible text passed. Homonymous profiles: exact namespace, scope and context navigation and clipboard passed.

@@ -13,8 +13,15 @@ public sealed record ModelProfileUsage(
     string Name,
     string DisplayName,
     ResourceScopeRef ScopeRef,
-    string ScopeDisplayName);
-public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName);
+    string ScopeDisplayName)
+{
+    public bool IsManaged { get; init; }
+}
+public sealed record ModelProviderUsage(string Kind, string Name, string DisplayName)
+{
+    public ResourceNamespace? Namespace { get; init; }
+    public ResourceScopeRef? ScopeRef { get; init; }
+}
 public sealed record ModelProfileResolution(
     ModelProfileResource Profile,
     ModelProviderConfiguration? Provider,

@@ -17,6 +17,26 @@ public interface IConnectedServicesClient
     Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetConnectedServiceAsync(name, scopeRef, cancellationToken)
+            : throw new NotSupportedException("This client does not support non-default Connected Service namespaces.");
+
+    Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? GetUsagesAsync(name, scopeRef, cancellationToken)
+            : throw new NotSupportedException("This client does not support non-default Connected Service namespaces.");
+
+    Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, PutConnectedServiceRequest request, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? UpdateConnectedServiceAsync(name, scopeRef, request, etag, cancellationToken)
+            : throw new NotSupportedException("This client does not support non-default Connected Service namespaces.");
+
+    Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? ReconcileAsync(name, scopeRef, etag, cancellationToken)
+            : throw new NotSupportedException("This client does not support non-default Connected Service namespaces.");
+
+    Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, string etag, CancellationToken cancellationToken) =>
+        @namespace.IsDefault ? DeactivateAsync(name, scopeRef, etag, cancellationToken)
+            : throw new NotSupportedException("This client does not support non-default Connected Service namespaces.");
+
 }
 
 public sealed class ConnectedServicesApiClient(HttpClient httpClient) : IConnectedServicesClient
@@ -50,6 +70,22 @@ public sealed class ConnectedServicesApiClient(HttpClient httpClient) : IConnect
     public Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, string etag, CancellationToken token) =>
         ReadSnapshotAsync(HttpMethod.Post, ActionPath(name, scopeRef, "deactivate"), null, etag, token);
 
+    public Task<ResourceSnapshot<ConnectedServiceResource>> GetConnectedServiceAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, CancellationToken token) =>
+        ReadSnapshotAsync(HttpMethod.Get, Path(name, scopeRef, @namespace), null, null, token);
+
+    public Task<ConnectedServiceUsagesResponse> GetUsagesAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, CancellationToken token) =>
+        ApiResponse.ReadAsync<ConnectedServiceUsagesResponse>(httpClient, ActionPath(name, scopeRef, "usages", @namespace), token);
+
+    public Task<ResourceSnapshot<ConnectedServiceResource>> UpdateConnectedServiceAsync(string name, ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, PutConnectedServiceRequest request, string etag, CancellationToken token) =>
+        ReadSnapshotAsync(HttpMethod.Put, Path(name, scopeRef, @namespace), JsonContent.Create(request), etag, token);
+
+    public Task<ResourceSnapshot<ConnectedServiceResource>> ReconcileAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, string etag, CancellationToken token) =>
+        ReadSnapshotAsync(HttpMethod.Post, ActionPath(name, scopeRef, "reconcile", @namespace), null, etag, token);
+
+    public Task<ResourceSnapshot<ConnectedServiceResource>> DeactivateAsync(string name, ResourceScopeRef scopeRef, ResourceNamespace @namespace, string etag, CancellationToken token) =>
+        ReadSnapshotAsync(HttpMethod.Post, ActionPath(name, scopeRef, "deactivate", @namespace), null, etag, token);
+
     private async Task<ResourceSnapshot<ConnectedServiceResource>> ReadSnapshotAsync(HttpMethod method, string path,
         HttpContent? content, string? etag, CancellationToken token)
     {
@@ -65,9 +101,11 @@ public sealed class ConnectedServicesApiClient(HttpClient httpClient) : IConnect
         return new(value, responseEtag);
     }
 
-    private static string Path(string name, ResourceScopeRef scopeRef) =>
-        $"api/connected-services/{Uri.EscapeDataString(name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
+    private static string Path(string name, ResourceScopeRef scopeRef, ResourceNamespace? @namespace = null) =>
+        $"api/connected-services/{Uri.EscapeDataString(name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}" + NamespaceQuery(@namespace);
 
-    private static string ActionPath(string name, ResourceScopeRef scopeRef, string action) =>
-        $"api/connected-services/{Uri.EscapeDataString(name)}/{action}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}";
+    private static string ActionPath(string name, ResourceScopeRef scopeRef, string action, ResourceNamespace? @namespace = null) =>
+        $"api/connected-services/{Uri.EscapeDataString(name)}/{action}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}" + NamespaceQuery(@namespace);
+
+    private static string NamespaceQuery(ResourceNamespace? value) => value is { IsDefault: false } ns ? "&namespace=" + Uri.EscapeDataString(ns.Value) : string.Empty;
 }

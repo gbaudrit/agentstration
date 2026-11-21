@@ -7,10 +7,12 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Tools;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,7 +34,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     public void ManagedResourcePanelResolvesReadableExtensionAndReciprocalLink(string cultureName, string bundleVersionLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
 
@@ -59,18 +61,174 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     public void ManagedToolSetShowsExtensionAndHidesDeleteAction()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolSetsClient>(new ToolSetsClientStub());
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
 
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js")
+            .Setup<string>("navigate", _ => true).SetResult(context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0] + "#overview");
         var rendered = context.Render<ToolSetDetails>(parameters => parameters.Add(component => component.Name, ToolSetName));
 
         rendered.WaitForAssertion(() =>
         {
             StringAssert.Contains(rendered.Find("[data-testid=extension-managed-resource]").TextContent, "Crawl4AI Web Acquisition");
-            Assert.HasCount(0, rendered.FindAll(".page-header button.button-danger"));
+            Assert.IsNotNull(rendered.Find(".resource-identity-summary [data-testid=extension-managed-resource]"));
+            Assert.HasCount(1, rendered.FindAll("[data-testid=extension-managed-resource]"));
+            Assert.IsFalse(rendered.Find("[data-testid=extension-managed-resource]").ClassList.Contains("panel"));
+            Assert.HasCount(0, rendered.FindAll(".resource-header button.button-danger"));
         });
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Enabled")]
+    [DataRow("fr-FR", "Activé")]
+    public async Task ToolSetOverviewHasSavedIdentityAndRetainsItsExactResourceAcrossSections(string locale, string enabled)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        var client = new ToolSetsClientStub();
+        client.Resource = client.Resource with { Definition = client.Resource.Definition with { Category = new("same-category", ResourceScopeRef.Instance, new("team-a")), Members = [new() { Tool = new("same-tool", ResourceScopeRef.Instance, new("team-b")), Capability = "search", Route = "search.documents" }] } };
+        context.Services.AddSingleton<IToolSetsClient>(client);
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var section in new[] { "overview", "versions" }) module.Setup<string>("navigate", call => call.Arguments[0] is string url && url.EndsWith("#" + section, StringComparison.Ordinal)).SetResult("http://localhost/#" + section);
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        Assert.Contains("Crawl4AI Web acquisition", cut.Find(".resource-identity-summary").TextContent);
+        Assert.Contains("team-a/same-category", cut.Find(".resource-configuration-summary").TextContent);
+        Assert.Contains("team-b/same-tool", cut.Find(".resource-configuration-summary").TextContent);
+        Assert.Contains("search.documents", cut.Find(".resource-configuration-summary").TextContent);
+        Assert.Contains(enabled, cut.Find(".resource-header .resource-enabled-toggle").TextContent);
+        Assert.IsTrue(cut.Find(".resource-header input[role=switch]").HasAttribute("disabled"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("versions"));
+        Assert.AreEqual("versions", cut.FindComponent<ResourceNavigation>().Instance.CurrentPath);
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
+        Assert.AreEqual(1, client.Reads);
+        Assert.IsEmpty(cut.FindAll(".resource-header button.button-danger"));
+    }
+
+    [TestMethod]
+    public void ToolSetResponseFromAnotherOwnerFailsClosed()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IToolSetsClient>(new ToolSetsClientStub()); context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var requested = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/tools/sets/{ToolSetName}?scopeRef={Uri.EscapeDataString(requested.Value)}");
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+        Assert.IsNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.IsEmpty(cut.FindAll(".resource-form, .resource-identity-summary"));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ToolSetUsesStandardReadOnlyIdentityConfigurationAndYamlWithIndependentAccess(bool managed)
+    {
+        var client = new ToolSetsClientStub(); if (!managed) client.Resource = client.Resource with { Governance = ResourceGovernance.User };
+        client.Resource = client.Resource with { Metadata = client.Resource.Metadata with { Tags = new Dictionary<string, string> { ["environment"] = "fixture" } } };
+        using var context = ToolSetContext(client); context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        Assert.Contains("environment : fixture", cut.Find(".resource-identity-summary .labels-summary").TextContent);
+        var navigation = cut.FindComponent<ResourceNavigation>().Instance;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        var form = cut.FindComponent<ResourceDefinitionForm>().Instance; var adapter = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;
+        Assert.AreSame(adapter.SectionState, form.SectionState); Assert.AreSame(adapter.SectionPresentations, form.Sections);
+        Assert.IsTrue(form.ReadOnly); Assert.IsTrue(cut.FindComponent<ResourceIdentityEditor>().Instance.ReadOnly);
+        Assert.AreEqual("environment=fixture", cut.FindComponent<LabelsEditor>().Instance.Value);
+        var original = form.EditContext;
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/configuration"));
+        await cut.InvokeAsync(() => navigation.NavigateSection("yaml"));
+        Assert.IsNotNull(cut.Find(".resource-yaml-editor textarea[readonly]")); Assert.Contains(ToolSetName, cut.Find(".resource-yaml-editor textarea").GetAttribute("value")!);
+        await cut.InvokeAsync(() => navigation.NavigateSection("access"));
+        Assert.AreEqual(client.Resource.Uid, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance.Parameters.Get(x => x.ResourceUid));
+        await cut.InvokeAsync(() => navigation.NavigateSection("definition/identity"));
+        Assert.AreSame(original, cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext);
+        Assert.IsEmpty(cut.FindAll(".unsaved-changes-bar")); Assert.AreEqual(1, client.Reads);
+    }
+
+    [TestMethod]
+    public async Task ToolSetRefreshPreservesPolicyDraftsAndFailedRefreshRetainsSavedContent()
+    {
+        var client = new ToolSetsClientStub(); using var context = ToolSetContext(client); context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
+        var policy = cut.FindComponent<Stub<ResourceAccessPanel>>().Instance;
+        await cut.InvokeAsync(() => policy.Parameters.Get(x => x.DraftChanged).InvokeAsync(true));
+        client.Resource = client.Resource with { Generation = 2, Definition = client.Resource.Definition with { DisplayName = "New saved name" } }; client.ReadEtag = "\"newer\"";
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.AreSame(policy, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance);
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.AreEqual(2L, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance.Parameters.Get(x => x.Generation));
+        client.ReadError = new AgentstrationApiException("Unavailable", "fixture", HttpStatusCode.ServiceUnavailable);
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        var adapter = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;
+        Assert.AreEqual(ResourceLoadStatus.Failed, adapter.LoadState!.Status); Assert.IsTrue(adapter.LoadState.HasContent);
+        Assert.AreEqual("New saved name", adapter.Name); Assert.AreSame(policy, cut.FindComponent<Stub<ResourceAccessPanel>>().Instance);
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        client.ReadError = null; await cut.InvokeAsync(() => adapter.OnRetry.InvokeAsync());
+        Assert.AreEqual(ResourceLoadStatus.Ready, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.LoadState!.Status);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ToolSetRefreshClearsPrivateContentOnLostAccessOrReplacement(bool replace)
+    {
+        var client = new ToolSetsClientStub(); using var context = ToolSetContext(client); context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("yaml"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
+        await cut.InvokeAsync(() => cut.FindComponent<Stub<ResourceAccessPanel>>().Instance.Parameters.Get(x => x.DraftChanged).InvokeAsync(true));
+        if (replace) client.Resource = client.Resource with { Uid = Guid.NewGuid() };
+        else client.ReadError = new AgentstrationApiException("Denied", "fixture", HttpStatusCode.Forbidden);
+        await cut.InvokeAsync(() => cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OnRefresh.InvokeAsync());
+        Assert.IsNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.IsEmpty(cut.FindAll(".resource-form, .resource-identity-summary, .resource-yaml-editor"));
+        Assert.IsFalse(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+    }
+
+    [TestMethod]
+    public async Task ToolSetConfirmedDeletionReleasesItsPendingPolicyDraft()
+    {
+        var client = new ToolSetsClientStub(); client.Resource = client.Resource with { Governance = ResourceGovernance.User, ScopeRef = ResourceScopeRef.Workspace(Guid.NewGuid()) };
+        using var context = ToolSetContext(client); context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        await ResourceScreenDeletionAssertions.ConfirmAndReleasePolicyDraftAsync(cut, context.Services.GetRequiredService<NavigationManager>());
+        Assert.AreEqual(1, client.Deletes); Assert.AreEqual("/tools/sets", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
+    [TestMethod]
+    public async Task ToolSetRejectedDeletionRetainsItsSavedIdentityAndPolicyDraft()
+    {
+        var client = new ToolSetsClientStub(); client.Resource = client.Resource with { Governance = ResourceGovernance.User };
+        client.DeleteError = new AgentstrationApiException("Existing deletion guard rejected the operation.", "fixture", HttpStatusCode.UnprocessableEntity);
+        using var context = ToolSetContext(client); context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        var cut = context.Render<ToolSetDetails>(p => p.Add(c => c.Name, ToolSetName));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
+        await cut.InvokeAsync(() => cut.FindComponent<Stub<ResourceAccessPanel>>().Instance.Parameters.Get(x => x.DraftChanged).InvokeAsync(true));
+        var snapshot = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource;
+        cut.Find(".resource-header button.button-danger").Click(); await cut.Find("[role=alertdialog] .button-danger").ClickAsync(new());
+        Assert.AreSame(snapshot, cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
+        Assert.IsTrue(cut.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        Assert.Contains("Existing deletion guard rejected", cut.Find(".form-alert-danger").TextContent);
+        Assert.AreEqual($"/tools/sets/{ToolSetName}", new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).AbsolutePath);
+    }
+
+    private static BunitContext ToolSetContext(ToolSetsClientStub client)
+    {
+        var context = new BunitContext().WithCollectionPresentation(); context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources"); context.Services.AddSingleton<IToolSetsClient>(client);
+        var uri = $"http://localhost/tools/sets/{ToolSetName}?scopeRef={Uri.EscapeDataString(client.Resource.ScopeRef!.Value.Value)}";
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(uri);
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var section in new[] { "overview", "definition/identity", "definition/configuration", "versions", "access", "yaml" })
+            module.Setup<string>("navigate", c => c.Arguments[0] is string value && value.EndsWith("#" + section, StringComparison.Ordinal)).SetResult(uri + "#" + section);
+        return context;
     }
 
     private static ResourceGovernance Governance() => ResourceGovernance.Extension(
@@ -81,7 +239,7 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     public void ManagedResourceDoesNotLinkToAResourceWithAnotherUid()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
         var rendered = context.Render<ExtensionManagedResourcePanel>(parameters => parameters
@@ -94,29 +252,33 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     public void ToolSetDetailsRequestsTheExactScopeForTheResourceAndVersions()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var client = new ToolSetsClientStub();
         context.Services.AddSingleton<IToolSetsClient>(client);
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/tools/sets/{ToolSetName}?scopeRef=%2Finstance&context=%2Finstance");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js")
+            .Setup<string>("navigate", _ => true).SetResult(context.Services.GetRequiredService<NavigationManager>().Uri.Split('#')[0] + "#overview");
         var rendered = context.Render<ToolSetDetails>(parameters => parameters
             .Add(component => component.Name, ToolSetName));
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(Scope, client.RequestedScope);
             Assert.AreEqual(Scope, client.RequestedVersionsScope);
-            Assert.IsEmpty(rendered.FindAll(".page-header button.button-danger"));
+            Assert.IsEmpty(rendered.FindAll(".resource-header button.button-danger"));
         });
     }
 
     [TestMethod]
-    [DataRow("en-US", "Managed · read-only")]
-    [DataRow("fr-FR", "Géré · lecture seule")]
+    [DataRow("en-US", "Managed / read-only")]
+    [DataRow("fr-FR", "Géré / lecture seule")]
     public void ProfileListShowsExtensionAndDistinctBundleVersion(string cultureName, string managedLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
@@ -134,10 +296,10 @@ public sealed class ExtensionManagedResourcePresentationTests
     [TestMethod]
     [DataRow("en-US", "Access")]
     [DataRow("fr-FR", "Accès")]
-    public void ManagedProfileKeepsAccessAdministrationAvailable(string cultureName, string accessLabel)
+    public async Task ManagedProfileKeepsAccessAdministrationAvailable(string cultureName, string accessLabel)
     {
         using var culture = new TestCultureScope(cultureName);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IDataSourceProfilesClient>(new ProfilesClientStub());
         context.Services.AddSingleton<IExtensionsClient>(new ExtensionsClientStub());
@@ -149,9 +311,14 @@ public sealed class ExtensionManagedResourcePresentationTests
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new ProfileScopes(tenant));
         context.Services.AddSingleton<IConsoleNavigationContext>(new ProfileNavigationContext(Scope.Value));
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        foreach (var path in new[] { "overview", "definition/identity", "access" })
+            module.Setup<string>("navigate", i => i.Arguments[0] is string url && url.EndsWith("#" + path, StringComparison.Ordinal)).SetResult("http://localhost/data-source-profiles/crawl4ai-web?scopeRef=%2Finstance&context=%2Finstance#" + path);
         var rendered = context.Render<DataSourceProfileEditor>(parameters => parameters.Add(component => component.Name, "crawl4ai-web"));
-        rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll(".page-header button.button-danger")));
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == accessLabel).Click();
+        rendered.WaitForAssertion(() => Assert.IsEmpty(rendered.FindAll("button.button-danger")));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("access"));
+        Assert.AreEqual(accessLabel, rendered.Find("a[data-resource-section=access]").TextContent.Trim());
         rendered.WaitForElement("[data-testid=resource-access-target]").Change(tenant.Value);
         rendered.Find("[data-testid=resource-access-add]").Click();
         rendered.Find("[data-testid=resource-access-save]").Click();
@@ -162,8 +329,11 @@ public sealed class ExtensionManagedResourcePresentationTests
             Assert.IsNull(policies.Saved.Resource.Version);
             Assert.AreEqual(tenant, policies.Saved.Grants.Single().TargetScopeRef);
         });
-        rendered.FindAll("[role=tab]").Single(value => value.TextContent == (cultureName == "fr-FR" ? "Définition" : "Definition")).Click();
-        Assert.IsTrue(rendered.Find("fieldset").HasAttribute("disabled"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("overview"));
+        Assert.IsNotNull(rendered.Find("a[data-resource-section='definition/identity']"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        Assert.IsTrue(rendered.FindComponent<ResourceDefinitionForm>().Instance.ReadOnly);
+        Assert.IsTrue(rendered.Find("form > fieldset").HasAttribute("disabled"));
         Assert.IsEmpty(rendered.FindAll("button[type=submit]"));
     }
 
@@ -251,6 +421,12 @@ public sealed class ExtensionManagedResourcePresentationTests
 
     private sealed class ToolSetsClientStub : IToolSetsClient
     {
+        public ToolSetResource Resource { get; set; } = ToolSet();
+        public int Reads { get; private set; }
+        public string ReadEtag { get; set; } = "\"etag-1\"";
+        public Exception? ReadError { get; set; }
+        public int Deletes { get; private set; }
+        public Exception? DeleteError { get; set; }
         public ResourceScopeRef? RequestedScope { get; private set; }
         public ResourceScopeRef? RequestedVersionsScope { get; private set; }
         public Task<ResourceSnapshot<ToolSetResource>> GetToolSetAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
@@ -266,8 +442,11 @@ public sealed class ExtensionManagedResourcePresentationTests
         public Task<IReadOnlyList<ToolSetResource>> GetToolSetsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ToolSetResource>>([ToolSet()]);
 
-        public Task<ResourceSnapshot<ToolSetResource>> GetToolSetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ResourceSnapshot<ToolSetResource>(ToolSet(), "\"etag-1\""));
+        public Task<ResourceSnapshot<ToolSetResource>> GetToolSetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return ReadError is { } error ? Task.FromException<ResourceSnapshot<ToolSetResource>>(error) : Task.FromResult(new ResourceSnapshot<ToolSetResource>(Resource, ReadEtag));
+        }
 
         public Task<IReadOnlyList<ToolSetVersionResource>> GetVersionsAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<ToolSetVersionResource>>([]);
@@ -275,8 +454,14 @@ public sealed class ExtensionManagedResourcePresentationTests
         public Task<ToolSetVersionResource> GetVersionAsync(ResourceNamespace @namespace, string name, string version, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+        public Task DeleteAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default)
+        {
+            Assert.AreEqual(Resource.ScopeRef, scopeRef); return DeleteAsync(@namespace, name, etag, cancellationToken);
+        }
+        public Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken = default)
+        {
+            Assert.AreEqual(Resource.Namespace, @namespace); Assert.AreEqual(Resource.Name, name); Assert.AreEqual(ReadEtag, etag); Deletes++; if (DeleteError is { } error) return Task.FromException(error); ReadError = new AgentstrationApiException("Deleted", "fixture", HttpStatusCode.NotFound); return Task.CompletedTask;
+        }
     }
 
     private sealed class ExtensionsClientStub : IExtensionsClient

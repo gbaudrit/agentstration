@@ -20,6 +20,8 @@ public sealed class AgentToolSetConfigurationTests
             .Add(component => component.Versions, [Version("documentation", "1.2.0")])
             .Add(component => component.SelectedChanged, value => selected = value));
 
+        Assert.AreEqual("documentation", rendered.Find("[role=heading][aria-level='3'] a").TextContent);
+
         await rendered.Find("input[type='checkbox']").ChangeAsync(true);
 
         Assert.HasCount(1, selected!);
@@ -80,7 +82,7 @@ public sealed class AgentToolSetConfigurationTests
 
     private static BunitContext CreateContext()
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }

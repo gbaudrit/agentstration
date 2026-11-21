@@ -1,42 +1,82 @@
 @page "/tools/categories/new"
 @page "/tools/categories/{Name}"
+@implements IDisposable
+@inject IServiceProvider Services
 @inject IToolCategoriesClient Categories
 @inject IToolsClient Tools
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<PageTitle>@(IsNew ? T("Create") : displayName) · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("Create") : displayName)" Description="@T("EditorDescription")" TestId="resource-tool-category-editor">
-    <Actions><a class="button-secondary" href="/tools/categories">@T("Back")</a>@if (!IsNew) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
-</PageHeader>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
+@if (IsNew) { <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" /> }
+<PageTitle>@(category?.Definition.DisplayName ?? T(IsNew ? "Create" : "Title")) · Agentstration</PageTitle>
+@{
+    RenderFragment feedback = @<div>
+        @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="@(failed ? "alert" : "status")">@message</div> }
+        @if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+    </div>;
+    var presentations = Presentations;
+}
+@if (IsNew)
+{
+    <PageHeader Title="@T("Create")" Description="@T("EditorDescription")" TestId="resource-tool-category-editor" CollectionHref="@BackUrl" CollectionLabel="@T("Title")" />
+    @if (loading) { <LoadingState Message="@T("Loading")" /> }
+    else if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
+    else
+    {
+        @feedback
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels" Id="category-resource-form" FormName="tool-category-editor" Busy="busy"
+            InvalidInputChanged="value => invalidInput = value" data-interactive="@(interactive ? "true" : "false")">
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="busy" FinishLabel="@T("Create")" FinishTestId="category-save" />
+        </ResourceDefinitionForm>
+    }
+}
 else
 {
-    @if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")">@message</div> }
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("Details")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("MemberCount", selected.Count)" Status="UiStatus.Info" /> }</div>
-        <div class="form-grid">
-            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@IsNew" DisplayNameTestId="category-display-name" TechnicalNameTestId="category-name" />
-            <label class="form-span-2"><span>@T("CategoryDescription")</span><textarea @bind="description" rows="3"></textarea></label>
-            <ResourceScopeFormField ResourceKind="@ToolResourceKinds.ToolCategory" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-        </div>
-    </section>
+    <ConsoleResourceDetailsTemplate Resource="category" Name="@(category?.Definition.DisplayName ?? Name!)" ResourceType="@T("Category")" Domain="tool" IconName="layers" Description="@category?.Definition.Description" CollectionHref="@BackUrl" CollectionLabel="@T("Title")"
+        LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations"
+        Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
+        Yaml="@SavedYaml" Busy="busy" TestId="resource-tool-category-editor" SectionTestIdPrefix="category">
+        <OverviewMetrics><MetricCard Label="@T("Members")" Value="@category!.Definition.Tools.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></OverviewMetrics>
+        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+        </CollectionView></OverviewConfiguration>
+        <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels" Id="category-resource-form" FormName="tool-category-editor"
+            Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
+            InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+        <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="category-resource-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="category-save">@(busy ? T("Saving") : T("Save"))</button> }</DraftActions>
+    </ConsoleResourceDetailsTemplate>
+}
+<ConfirmationDialog IsOpen="confirmDelete" Title="@T("DeleteTitle")" Message="@T("DeleteExplanation")" ConfirmLabel="@T("ConfirmDelete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
-    <section class="panel form-section">
-        <div class="panel-header tool-category-members-header"><div><p class="eyebrow">@T("Membership")</p><h2>@T("ChooseTools")</h2><p>@T("MembershipHelp")</p></div><label class="tool-category-search"><span aria-hidden="true"><TablerIcon Name="search" /></span><span class="sr-only">@T("Search")</span><input @bind="search" @bind:event="oninput" placeholder="@T("SearchPlaceholder")" /></label></div>
+@code {
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.ToolCategory"
+        DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
+        Namespace="@model.Namespace" NamespaceChanged="value => model.Namespace = value" NamespaceEditable="true" NamespaceExpression="@(() => model.Namespace)" NamespaceTestId="category-namespace"
+        ScopeRef="model.ScopeRef" ScopeRefChanged="ScopeChanged" Description="@model.Description" DescriptionChanged="value => model.Description = value ?? string.Empty" DescriptionExpression="@(() => model.Description)" DescriptionMaxLength="2000"
+        Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true" IsNew="IsNew" ReadOnly="@(!CanManage)"
+        DisplayNameTestId="category-display-name" TechnicalNameTestId="category-name">
+        <ScopeValidation><ValidationMessage For="@(() => model.ScopeRef)" /></ScopeValidation>
+    </ResourceIdentityEditor>;
+    private RenderFragment MembershipFields => @<div>    <FormSection Title="@T("ChooseTools")" Eyebrow="@T("Membership")" Description="@T("MembershipHelp")"><Actions><div class="tool-category-search"><SearchBox @bind-Value="search" Placeholder="@T("SearchPlaceholder")" Label="@T("Search")" /></div></Actions><ChildContent>
         <div class="tool-category-provider-list" data-testid="category-members">
             @foreach (var group in ProviderGroups)
             {
                 <section class="tool-category-provider" data-provider="@ProviderKey(group)">
                     <header class="tool-category-provider-header">
                         <div class="tool-category-provider-identity">
-                            <span class="tool-category-provider-icon" aria-hidden="true"><TablerIcon Name="server" /></span>
-                            <span><small>@ProviderKind(group)</small><strong>@ProviderDisplayName(group)</strong><code>@ProviderTechnicalName(group)</code></span>
+                            @if (group.Provider is { } provider)
+                            {
+                                <div><CollectionIdentity DisplayName="@ProviderDisplayName(group)" Namespace="@provider.Namespace.Value" Name="@provider.Name" Href="@ProviderUrl(provider)" IconName="server"><IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@provider.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><small>@ProviderKind(group)</small></div>
+                            }
+                            else { <strong>@ProviderDisplayName(group)</strong> }
                         </div>
                         <div class="tool-category-provider-summary">
                             <span><strong>@SelectedCount(group)</strong> @T("SelectedOf", group.Tools.Count)</span>
-                            @if (group.Provider is not null) { <a href="@ProviderUrl(group.Provider.Name)">@T("OpenProvider")</a> }
+                            @if (group.Provider is not null) { <CollectionActions ResourceName="@($"{group.Provider.Namespace}/{group.Provider.Name}, {group.Provider.ScopeRef}")"><a href="@ProviderUrl(group.Provider)">@T("OpenProvider")</a></CollectionActions> }
                         </div>
                     </header>
                     @if (group.Tools.Count == 0)
@@ -48,17 +88,17 @@ else
                         <div class="tool-category-members">
                         @foreach (var tool in group.Tools)
                         {
-                            var inputId = ToolInputId(tool.Name);
-                            var assigned = selected.Contains(ToolKey(tool));
+                            var inputId = ToolInputId(ToolKey(tool));
+                            var assigned = model.SelectedKeys.Contains(ToolKey(tool));
                             var usable = Assignable(tool);
                             <div class="tool-category-member">
-                                <input id="@inputId" type="checkbox" aria-label="@tool.Definition.DisplayName" checked="@assigned" disabled="@(!usable && !assigned)" @onchange="args => Toggle(tool, (bool)args.Value!)" />
-                                <label class="tool-category-member-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
-                                <span class="tool-category-member-copy">
-                                    <strong><a href="@ToolUrl(tool.Name)">@tool.Definition.DisplayName</a>@if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }</strong>
-                                    <small><code>@tool.Name</code></small>
-                                    <label class="tool-category-status @(usable ? "available" : assigned ? "warning" : "unavailable")" for="@inputId"><i></i>@Availability(tool)</label>
-                                </span>
+                                <FormCheckbox id="@inputId" aria-label="@tool.Definition.DisplayName" Value="@assigned" disabled="@(!usable && !assigned)" ValueChanged="changed => Toggle(tool, changed)" />
+                                <div class="tool-category-member-copy">
+                                    <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>
+                                    @if (!string.IsNullOrWhiteSpace(tool.Definition.Description)) { <HelpTooltip Text="@tool.Definition.Description" /> }
+                                    <StatusBadge Text="@Availability(tool)" Status="@(usable ? UiStatus.Success : assigned ? UiStatus.Warning : UiStatus.Danger)" />
+                                </div>
+                                <CollectionActions ResourceName="@($"{tool.Namespace}/{tool.Name}, {tool.ScopeRef}")"><a href="@ToolUrl(tool)">@T("OpenTool")</a></CollectionActions>
                             </div>
                         }
                         </div>
@@ -72,11 +112,10 @@ else
                     <div class="tool-category-members">
                     @foreach (var missing in VisibleMissingMembers)
                     {
-                        var inputId = ToolInputId(missing.Reference.Name);
+                        var inputId = ToolInputId(MemberKey(missing));
                         <div class="tool-category-member unavailable">
-                            <input id="@inputId" type="checkbox" checked @onchange="args => ToggleMissing(missing, (bool)args.Value!)" />
-                            <label class="tool-category-member-icon" for="@inputId" aria-hidden="true"><TablerIcon Name="tool" /></label>
-                            <span class="tool-category-member-copy"><strong>@missing.Reference.Name <HelpTooltip Text="@T("MissingMember")" /></strong><label class="tool-category-status warning" for="@inputId"><i></i>@T("Missing")</label></span>
+                            <FormCheckbox id="@inputId" aria-label="@missing.Reference.Name" Value="true" ValueChanged="changed => ToggleMissing(missing, changed)" />
+                            <div class="tool-category-member-copy"><strong>@missing.Reference.Name <HelpTooltip Text="@T("MissingMember")" /></strong><StatusBadge Text="@T("Missing")" Status="UiStatus.Warning" /></div>
                         </div>
                     }
                     </div>
@@ -87,30 +126,78 @@ else
                 <p class="tool-category-no-results">@T("NoSearchResults")</p>
             }
         </div>
-    </section>
-    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy">@(busy ? T("Saving") : T("Save"))</button></div>
-}
-
-@if (confirmDelete)
-{
-    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-category-title">
-        <h2 id="delete-category-title">@T("DeleteTitle")</h2><p>@T("DeleteExplanation")</p>
-        <div class="form-actions"><button class="button-secondary" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div>
-    </section>
-}
-
-@code {
+    </ChildContent></FormSection>
+</div>;
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@Shared["Identity"]</dt><dd>@model.DisplayName<br /><code>@model.Namespace/@model.Name</code></dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="model.ScopeRef" /></dd><dt>@T("Members")</dt><dd class="configuration-value">@string.Join("\n", References().Select(ReferenceText))</dd></dl></ChildContent></FormSection>;
+    private RenderFragment EditAction => @<button type="button" class="button-secondary" @onclick="() => ShowSection(ResourceDefinitionForm.FirstInvalidSection(formContext, Presentations) ?? sectionState.DefinitionPath)">@Shared["Edit"]</button>;
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => IdentityFields, "definition/configuration" => MembershipFields, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [Parameter] public string? Name { get; set; }
-    private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool loading = true, busy, failed, confirmDelete;
-    private string name = "", displayName = "", description = "", search = "";
-    private string? etag, message;
-    private ResourceScopeRef? selectedScope;
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
+    private ToolCategoryEditorModel model = new();
+    private ToolCategoryResource? category;
+    private ToolCategorySnapshot? newerSnapshot;
     private IReadOnlyList<ToolResource> tools = [];
     private IReadOnlyList<ToolProviderResource> providers = [];
-    private IReadOnlyList<ToolCategoryMember> missingMembers = [];
-    private readonly HashSet<string> selected = new(StringComparer.Ordinal);
+    private IReadOnlyList<ToolCategoryMember> savedMembers = [], missingMembers = [];
+    private string? etag, message, loadedKey;
+    private string search = "", baseline = "";
+    private bool busy, refreshing, failed, confirmDelete, interactive, loading = true, invalidInput;
+    private long loadVersion;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private EditContext formContext = null!;
+    private ValidationMessageStore messages = null!;
+    private ResourceDefinitionForm? definitionForm;
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/tools/categories", Services);
+    private string? NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+    private bool CanManage => IsNew || category is not null && category.ScopeRef is not null && !category.Governance.IsManaged && ResourceOwnershipContext.CanManage(category.ScopeRef, Services);
+    private string Fingerprint => JsonSerializer.Serialize(new { model.Name, model.DisplayName, model.Description, model.Namespace, model.ScopeRef, SelectionKeys = model.SelectedKeys.Order(StringComparer.Ordinal).ToArray() });
+    private bool HasDraft => !loading && baseline.Length > 0 && (Fingerprint != baseline || invalidInput);
+    private string SavedYaml => category is null ? string.Empty : ResourceManifestSerializer.ToYaml(category);
+    private bool IdentityComplete => model.IdentityComplete;
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = !CanManage, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Description), nameof(model.Tags), nameof(model.ScopeRef)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanManage, Fields = [nameof(model.SelectedKeys)] },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("ResourceYamlExport"), ReadOnlyActions = CanManage ? EditAction : null }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Namespace)] = Shared["Namespace"],
+        [nameof(model.Description)] = T("CategoryDescription"), [nameof(model.Tags)] = Shared["Labels"], [nameof(model.ScopeRef)] = Shared["Scope"]
+    };
+    private IReadOnlyList<CreationWizardStep> Steps =>
+    [
+        new("identity", Shared["Identity"], IdentityFields) { IsComplete = IdentityComplete },
+        new("members", T("Members"), MembershipFields) { IsComplete = true },
+        new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete }
+    ];
+    private void ShowSection(string path) { if (!IsNew) Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } if (!firstRender) return; interactive = true; StateHasChanged(); }
+    private void NewContext()
+    {
+        if (formContext is not null) formContext.OnFieldChanged -= FieldChanged;
+        formContext = new(model); messages = new(formContext); formContext.OnFieldChanged += FieldChanged;
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) { messages.Clear(args.FieldIdentifier); formContext.NotifyValidationStateChanged(); }
+    private bool Validate()
+    {
+        messages.Clear();
+        foreach (var result in model.Validate()) foreach (var field in result.MemberNames) messages.Add(new FieldIdentifier(model, field), T(result.ErrorMessage!));
+        formContext.NotifyValidationStateChanged(); return !formContext.GetValidationMessages().Any();
+    }
+    private void ScopeChanged(ResourceScopeRef? value)
+    {
+        if (!IsNew) return;
+        var initializing = model.ScopeRef is null && Fingerprint == baseline;
+        model.ScopeRef = value; if (initializing) baseline = Fingerprint;
+        messages.Clear(new FieldIdentifier(model, nameof(model.ScopeRef))); formContext.NotifyValidationStateChanged();
+    }
+    private async Task FinishAsync(CreationWizardFinish finish) { if (!Validate()) { finish.ReturnToStepId = "identity"; definitionForm?.RequestValidationFocus(); return; } await SaveAsync(); }
     private IEnumerable<ToolResource> FilteredTools => tools.Where(tool => string.IsNullOrWhiteSpace(search)
         || tool.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
         || tool.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)
@@ -118,95 +205,189 @@ else
     private IReadOnlyList<ToolCategoryMember> VisibleMissingMembers => missingMembers.Where(member => string.IsNullOrWhiteSpace(search)
         || member.Reference.Name.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
     private IReadOnlyList<ProviderToolGroup> ProviderGroups => BuildProviderGroups();
-
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
-        loading = true;
-        try
-        {
-            var toolsTask = Tools.GetToolsAsync();
-            var providersTask = Tools.GetProvidersAsync(default);
-            await Task.WhenAll(toolsTask, providersTask);
-            tools = await toolsTask;
-            providers = await providersTask;
-            if (!IsNew)
-            {
-                var categoryTask = Categories.GetCategoryAsync(Name!);
-                var membersTask = Categories.GetMembersAsync(Name!);
-                await Task.WhenAll(categoryTask, membersTask);
-                var snapshot = await categoryTask;
-                var members = await membersTask;
-                name = snapshot.Value.Name;
-                displayName = snapshot.Value.Definition.DisplayName;
-                description = snapshot.Value.Definition.Description ?? "";
-                selectedScope = snapshot.Value.ScopeRef;
-                etag = snapshot.ETag;
-                selected.Clear();
-                foreach (var reference in snapshot.Value.Definition.Tools) selected.Add(ReferenceKey(reference));
-                missingMembers = members.Where(member => member.Tool is null).ToArray();
-            }
-        }
-        catch (Exception exception) { failed = true; message = exception.Message; }
-        finally { loading = false; }
+        var key = $"{Name}|{NamespaceValue}|{ScopeRefValue}|{NavigationScope}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; return LoadAsync();
     }
-
-    private void Toggle(ToolResource tool, bool value) { if (value) selected.Add(ToolKey(tool)); else selected.Remove(ToolKey(tool)); }
-    private void ToggleMissing(ToolCategoryMember member, bool value) { if (value) selected.Add(ReferenceKey(member.Reference)); else selected.Remove(ReferenceKey(member.Reference)); }
-    private async Task SaveAsync()
+    private void Clear()
     {
-        busy = true; failed = false; message = null;
+        category = null; newerSnapshot = null; etag = null; model = new(); baseline = string.Empty; tools = []; providers = []; savedMembers = missingMembers = [];
+        busy = refreshing = failed = confirmDelete = invalidInput = false; NewContext();
+    }
+    private async Task LoadAsync()
+    {
+        var version = ++loadVersion; var addressKey = $"{Name}|{NamespaceValue}|{ScopeRefValue}";
+        loading = true; loadState = new(ResourceLoadStatus.Loading); message = null; search = ""; Clear();
         try
         {
-            var properties = new ToolCategoryProperties { DisplayName = displayName.Trim(), Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(), Tools = References() };
+            if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token); if (version != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            loadedKey = $"{addressKey}|{NavigationScope}";
+            var ns = ResourceNamespace.Parse(NamespaceValue);
+            var toolsTask = Tools.GetToolsAsync(cancellationToken: cancellation.Token); var providersTask = Tools.GetProvidersAsync(cancellation.Token);
+            await Task.WhenAll(toolsTask, providersTask); if (version != loadVersion) return;
+            var catalog = toolsTask.Result; var discoveredProviders = providersTask.Result;
             if (IsNew)
             {
-                var saved = await Categories.CreateCategoryAsync(new(name.Trim(), properties, ScopeRef: selectedScope));
-                Navigation.NavigateTo($"/tools/categories/{Uri.EscapeDataString(saved.Value.Name)}");
+                tools = catalog; providers = discoveredProviders; model.Namespace = ns.Value;
+                model.ScopeRef = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+                baseline = Fingerprint; loadState = new(ResourceLoadStatus.Ready); return;
+            }
+            var categoryTask = Categories.GetCategoryAsync(ns, Name!, cancellation.Token); var membersTask = Categories.GetMembersAsync(ns, Name!, cancellation.Token);
+            await Task.WhenAll(categoryTask, membersTask); if (version != loadVersion) return;
+            var snapshot = categoryTask.Result; var known = membersTask.Result;
+            ResourceScopeRef? requestedOwner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+            if (snapshot.Value.Namespace != ns || snapshot.Value.Name != Name || snapshot.Value.ScopeRef is null || requestedOwner is { } owner && snapshot.Value.ScopeRef != owner) throw new InvalidOperationException(T("ScopeMismatch"));
+            Apply(new(snapshot.Value, snapshot.ETag, known, catalog, discoveredProviders));
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == loadVersion) { Clear(); if (IsNew) { failed = true; message = exception.Message; } loadState = Failure(exception); } }
+        finally { if (version == loadVersion) loading = false; }
+    }
+    private sealed record ToolCategorySnapshot(ToolCategoryResource Resource, string ETag, IReadOnlyList<ToolCategoryMember> Members, IReadOnlyList<ToolResource> Tools, IReadOnlyList<ToolProviderResource> Providers);
+    private void Apply(ToolCategorySnapshot snapshot)
+    {
+        newerSnapshot = null; tools = snapshot.Tools.Concat(snapshot.Members.Where(m => m.Tool is not null).Select(m => m.Tool!)).DistinctBy(ToolKey).ToArray(); providers = snapshot.Providers;
+        ApplySnapshot(snapshot.Resource, snapshot.ETag, snapshot.Members);
+    }
+    private Task RetryAsync() => busy || loading || refreshing ? Task.CompletedTask : category is null ? LoadAsync() : RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        if (IsNew || category is not { ScopeRef: { } owner } current || loading || refreshing || busy) return;
+        var version = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Categories.GetCategoryAsync(current.Namespace, current.Name, cancellation.Token);
+            if (version != loadVersion) return;
+            var value = snapshot.Value;
+            if (value.Uid != current.Uid || value.ScopeRef != owner || value.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            var toolsTask = Tools.GetToolsAsync(cancellationToken: cancellation.Token); var providersTask = Tools.GetProvidersAsync(cancellation.Token); var membersTask = Categories.GetMembersAsync(current.Namespace, current.Name, cancellation.Token);
+            await Task.WhenAll(toolsTask, providersTask, membersTask); if (version != loadVersion) return;
+            var refreshed = new ToolCategorySnapshot(value, snapshot.ETag, membersTask.Result, toolsTask.Result, providersTask.Result);
+            if (HasDraft) newerSnapshot = refreshed;
+            else Apply(refreshed);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (version != loadVersion) return;
+            var failure = Failure(exception); if (failure.Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) Clear();
+            loadState = failure with { HasContent = category is not null };
+        }
+        finally { if (version == loadVersion) refreshing = false; }
+    }
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+        System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+        _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+    private void ApplySnapshot(ToolCategoryResource resource, string currentEtag, IReadOnlyList<ToolCategoryMember> known)
+    {
+        category = resource; etag = currentEtag; model = ToolCategoryEditorModel.From(resource); newerSnapshot = null;
+        savedMembers = resource.Definition.Tools.Select(reference =>
+        {
+            var existing = known.FirstOrDefault(m => m.Reference == reference);
+            if (existing is not null) return existing;
+            var tool = reference.ScopeRef is null ? null : tools.FirstOrDefault(t => t.Name == reference.Name && t.Namespace == (reference.Namespace ?? resource.Namespace) && t.ScopeRef == reference.ScopeRef);
+            return new ToolCategoryMember(reference, tool, tool is null ? "missing" : tool.Definition.Discovery?.Available == true ? "available" : "unavailable");
+        }).ToArray();
+        missingMembers = savedMembers.Where(m => m.Tool is null).ToArray(); model.SelectedKeys.Clear();
+        foreach (var member in savedMembers) model.SelectedKeys.Add(MemberKey(member));
+        NewContext(); invalidInput = false; baseline = Fingerprint;
+    }
+    private void Toggle(ToolResource tool, bool value) { if (!CanManage || busy || value && !Assignable(tool)) return; if (value) model.SelectedKeys.Add(ToolKey(tool)); else model.SelectedKeys.Remove(ToolKey(tool)); }
+    private void ToggleMissing(ToolCategoryMember member, bool value) { if (!CanManage || busy) return; if (value) model.SelectedKeys.Add(MemberKey(member)); else model.SelectedKeys.Remove(MemberKey(member)); }
+    private IReadOnlyList<ResourceReference> References() => model.References(savedMembers, tools);
+    private async Task SaveAsync()
+    {
+        if (!CanManage || busy || refreshing) return;
+        if (!Validate()) { if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return; }
+        busy = true; failed = false; message = null; var request = loadVersion;
+        try
+        {
+            var properties = model.Properties(References());
+            if (IsNew)
+            {
+                var saved = await Categories.CreateCategoryAsync(new(model.Name.Trim(), properties, Namespace: ResourceNamespace.Parse(model.Namespace).Value, ScopeRef: model.ScopeRef), cancellation.Token);
+                if (request != loadVersion) return;
+                if (saved.Value.Name != model.Name.Trim() || saved.Value.Namespace != ResourceNamespace.Parse(model.Namespace) || saved.Value.ScopeRef != model.ScopeRef) throw new InvalidOperationException(T("ScopeMismatch"));
+                baseline = Fingerprint; invalidInput = false;
+                Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/tools/categories", saved.Value.Name, saved.Value.Namespace, saved.Value.ScopeRef));
             }
             else
             {
-                var saved = await Categories.UpdateCategoryAsync(Name!, new(properties), etag!);
-                etag = saved.ETag;
-                message = T("Saved");
+                var saved = await Categories.UpdateCategoryAsync(category!.Namespace, category.Name, new(properties), etag!, cancellation.Token);
+                if (request != loadVersion) return;
+                if (saved.Value.Uid != category.Uid || saved.Value.Address != category.Address || saved.Value.ScopeRef != category.ScopeRef) throw new InvalidOperationException(T("ScopeMismatch"));
+                ApplySnapshot(saved.Value, saved.ETag, savedMembers); message = T("Saved");
             }
         }
-        catch (Exception exception) { failed = true; message = exception.Message; }
-        finally { busy = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) { failed = true; message = exception.Message; } }
+        finally { if (request == loadVersion) busy = false; }
     }
+    private void Discard()
+    {
+        if (busy || refreshing || category is null) return;
+        if (newerSnapshot is { } snapshot) Apply(snapshot);
+        else ApplySnapshot(category, etag!, savedMembers);
+        message = null;
+    }
+    private string? returnAfterDelete;
     private async Task DeleteAsync()
     {
-        busy = true;
-        try { await Categories.DeleteCategoryAsync(Name!, etag!); Navigation.NavigateTo("/tools/categories"); }
-        catch (Exception exception) { confirmDelete = false; failed = true; message = exception.Message; }
-        finally { busy = false; }
+        if (!CanManage || busy || refreshing || category is null) return;
+        confirmDelete = false; busy = true; var request = loadVersion;
+        try
+        {
+            await Categories.DeleteCategoryAsync(category.Namespace, category.Name, etag!, cancellation.Token);
+            if (request != loadVersion) return;
+            Clear(); message = null; loadState = new(ResourceLoadStatus.NotFound);
+            returnAfterDelete = BackUrl;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) { failed = true; message = exception.Message; } }
+        finally { if (request == loadVersion) busy = false; }
     }
-    private IReadOnlyList<ResourceReference> References() => tools.Where(tool => selected.Contains(ToolKey(tool)))
-        .Select(tool => new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace)).Concat(missingMembers.Where(member => selected.Contains(ReferenceKey(member.Reference))).Select(member => member.Reference)).ToArray();
-    private string ProviderLabel(ToolResource tool) => providers.FirstOrDefault(provider => provider.Name == tool.Definition.Provider?.Name)?.Definition.DisplayName ?? tool.Definition.Provider?.Name ?? T("NoProvider");
+    private string ReferenceText(ResourceReference reference) => $"{(reference.ScopeRef is { } owner ? owner.Value + " · " : "")}{reference.Namespace ?? category?.Namespace ?? ResourceNamespace.Parse(model.Namespace)}/{reference.Name}";
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => category is null ? [] : [new(T("Members"), category.Definition.Tools.Count == 0 ? Shared["NotProvided"] : string.Join("\n", category.Definition.Tools.Select(ReferenceText)))];
+    private static string ToolKey(ToolResource tool) => ToolCategoryEditorModel.ToolKey(tool);
+    private static string MemberKey(ToolCategoryMember member) => ToolCategoryEditorModel.MemberKey(member);
+    private string ProviderLabel(ToolResource tool) => providers.FirstOrDefault(provider => MatchesProvider(tool, provider))?.Definition.DisplayName ?? tool.Definition.Provider?.Name ?? T("NoProvider");
     private IReadOnlyList<ProviderToolGroup> BuildProviderGroups()
     {
         var visibleTools = FilteredTools.ToArray();
         var groups = providers
             .OrderBy(provider => provider.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase)
-            .Select(provider => new ProviderToolGroup(provider, visibleTools.Where(tool => tool.Definition.Provider?.Name == provider.Name).OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray()))
+            .Select(provider => new ProviderToolGroup(provider, visibleTools.Where(tool => MatchesProvider(tool, provider)).OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray()))
             .Where(group => string.IsNullOrWhiteSpace(search) || group.Tools.Count > 0)
             .ToList();
-        var providerNames = providers.Select(provider => provider.Name).ToHashSet(StringComparer.Ordinal);
-        var unassigned = visibleTools.Where(tool => tool.Definition.Provider is null || !providerNames.Contains(tool.Definition.Provider.Name)).OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        var unassigned = visibleTools.Where(tool => !providers.Any(provider => MatchesProvider(tool, provider))).OrderBy(tool => tool.Definition.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
         if (unassigned.Length > 0) groups.Add(new ProviderToolGroup(null, unassigned));
         return groups;
     }
-    private int SelectedCount(ProviderToolGroup group) => group.Tools.Count(tool => selected.Contains(ToolKey(tool)));
+    private int SelectedCount(ProviderToolGroup group) => group.Tools.Count(tool => model.SelectedKeys.Contains(ToolKey(tool)));
     private string ProviderDisplayName(ProviderToolGroup group) => group.Provider?.Definition.DisplayName ?? T("NoProvider");
     private string ProviderTechnicalName(ProviderToolGroup group) => group.Provider?.Name ?? T("UnassignedTools");
     private string ProviderKind(ProviderToolGroup group) => group.Provider?.Definition.ProviderType.ToString().ToUpperInvariant() ?? T("OtherTools");
-    private static string ProviderKey(ProviderToolGroup group) => group.Provider?.Name ?? "unassigned";
+    private static string ProviderKey(ProviderToolGroup group) => group.Provider is { } provider ? $"{provider.ScopeRef}|{provider.Namespace}/{provider.Name}" : "unassigned";
     private string Availability(ToolResource tool) => T(Assignable(tool) ? "Available" : "Unavailable");
-    private static bool Assignable(ToolResource tool) => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true;
-    private static string ToolKey(ToolResource tool) => $"{tool.ScopeRef?.Value}|{tool.Namespace.Value}|{tool.Name}";
-    private static string ReferenceKey(ResourceReference reference) => $"{reference.ScopeRef?.Value}|{(reference.Namespace ?? ResourceNamespace.Default).Value}|{reference.Name}";
-    private static string ToolUrl(string name) => $"/tools/{Uri.EscapeDataString(name)}";
-    private static string ProviderUrl(string name) => $"/tools/providers/{Uri.EscapeDataString(name)}";
-    private static string ToolInputId(string name) => $"category-tool-{Uri.EscapeDataString(name)}";
+    private static bool Assignable(ToolResource tool) => ToolCategoryEditorModel.CanAssign(tool);
+    private static bool MatchesProvider(ToolResource tool, ToolProviderResource provider) => tool.Definition.Provider is { } reference
+        && reference.Name == provider.Name && (reference.Namespace ?? tool.Namespace) == provider.Namespace
+        && (reference.ScopeRef ?? tool.ScopeRef) == provider.ScopeRef;
+    private string ToolUrl(ToolResource value) => ResourceOwnershipContext.Resource(Services, "/tools", value.Name, value.Namespace, value.ScopeRef);
+    private string ProviderUrl(ToolProviderResource value) => ResourceOwnershipContext.Resource(Services, "/tools/providers", value.Name, value.Namespace, value.ScopeRef);
+    private static string ToolInputId(string toolIdentity) => $"category-tool-{Uri.EscapeDataString(toolIdentity)}";
     private sealed record ProviderToolGroup(ToolProviderResource? Provider, IReadOnlyList<ToolResource> Tools);
+    public void Dispose() { ++loadVersion; if (formContext is not null) formContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }

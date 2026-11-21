@@ -3,7 +3,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 8px 12px;
-    margin: -8px 0 18px;
+    margin: 0;
     color: var(--muted);
     font-size: .82rem;
 }
@@ -110,11 +110,11 @@
     gap: 12px;
 }
 
-.entry-suggestion-form > label {
+.entry-suggestion-form ::deep .form-field {
     min-width: 0;
 }
 
-.entry-suggestion-label {
+.entry-suggestion-form ::deep .entry-suggestion-label {
     grid-column: 1 / -1;
 }
 
@@ -123,7 +123,7 @@
     justify-content: flex-end;
 }
 
-.entry-suggestion-value textarea {
+.entry-suggestion-form ::deep .entry-suggestion-value textarea {
     min-height: 84px;
     resize: vertical;
 }
@@ -187,8 +187,8 @@
     cursor: pointer;
 }
 
-.entry-toggle input[type="checkbox"],
-.entry-toggle input[type="radio"] {
+.entry-toggle ::deep input[type="checkbox"],
+.entry-toggle ::deep input[type="radio"] {
     flex: 0 0 auto;
     width: 17px;
     height: 17px;
@@ -299,6 +299,7 @@
 
 .entry-preview {
     width: min(860px, 100%);
+    min-width: 0;
     margin-inline: auto;
     padding: clamp(16px, 3vw, 28px);
     border: 1px solid var(--border);
@@ -307,6 +308,8 @@
 }
 
 .entry-preview ::deep .entry-renderer > form {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
     padding: clamp(20px, 4vw, 36px);
 }
 
@@ -339,9 +342,9 @@
 
 .entry-definition-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
 .entry-definition-fields:disabled { opacity: 1; }
-.entry-definition-fields:disabled input,
-.entry-definition-fields:disabled textarea,
-.entry-definition-fields:disabled select,
+.entry-definition-fields:disabled ::deep input,
+.entry-definition-fields:disabled ::deep textarea,
+.entry-definition-fields:disabled ::deep select,
 .entry-definition-fields:disabled button { cursor: default; }
 
 @media (max-width: 760px) {

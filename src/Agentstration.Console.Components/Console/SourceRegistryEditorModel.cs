@@ -13,6 +13,13 @@ public sealed class SourceRegistryEditorModel
     public SourceRegistryTrustPolicy TrustPolicy { get; set; } = SourceRegistryTrustPolicy.Untrusted;
     public SourceRegistryAuthenticationMode AuthenticationMode { get; set; }
     public string CredentialName { get; set; } = string.Empty;
+    public ResourceNamespace? CredentialNamespace { get; set; } = ResourceNamespace.Default;
+    public ResourceScopeRef? CredentialScopeRef { get; set; } = ResourceScopeRef.Instance;
+    public string Namespace { get; set; } = ResourceNamespace.DefaultValue;
+    public ResourceScopeRef? ScopeRef { get; set; } = ResourceScopeRef.Instance;
+    public string Tags { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool HasRequiredCredential => AuthenticationMode != SourceRegistryAuthenticationMode.StaticBearer || !string.IsNullOrWhiteSpace(CredentialName);
     public bool AllowHttp { get; set; }
     public bool AllowPrivateNetwork { get; set; }
     public bool PeriodicEnabled { get; set; }
@@ -33,7 +40,7 @@ public sealed class SourceRegistryEditorModel
         TrustPolicy = TrustPolicy,
         AuthenticationMode = AuthenticationMode,
         Credential = AuthenticationMode == SourceRegistryAuthenticationMode.StaticBearer && !string.IsNullOrWhiteSpace(CredentialName)
-            ? new ResourceReference(CredentialName, ResourceScopeRef.Instance, ResourceNamespace.Default)
+            ? new ResourceReference(CredentialName, CredentialScopeRef, CredentialNamespace)
             : null,
         EndpointPolicy = new() { AllowHttp = AllowHttp, AllowPrivateNetwork = AllowPrivateNetwork },
         RefreshPolicy = new()
@@ -53,12 +60,17 @@ public sealed class SourceRegistryEditorModel
     public static SourceRegistryEditorModel From(SourceRegistryRegistrationResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
         DisplayName = resource.Definition.DisplayName,
         IndexUrl = resource.Definition.IndexUrl.AbsoluteUri,
         Enabled = resource.Definition.Enabled,
         TrustPolicy = resource.Definition.TrustPolicy,
         AuthenticationMode = resource.Definition.AuthenticationMode,
         CredentialName = resource.Definition.Credential?.Name ?? string.Empty,
+        CredentialNamespace = resource.Definition.Credential?.Namespace,
+        CredentialScopeRef = resource.Definition.Credential?.ScopeRef,
         AllowHttp = resource.Definition.EndpointPolicy.AllowHttp,
         AllowPrivateNetwork = resource.Definition.EndpointPolicy.AllowPrivateNetwork,
         PeriodicEnabled = resource.Definition.RefreshPolicy.PeriodicEnabled,

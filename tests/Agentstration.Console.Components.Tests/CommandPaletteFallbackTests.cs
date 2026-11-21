@@ -101,7 +101,7 @@ public sealed class CommandPaletteFallbackTests
         IReadOnlyList<ResourceSearchResult> resources,
         IReadOnlyList<CommandPaletteFallbackResult> fallbacks)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IResourceSearchProvider>(new StubResourceSearchProvider(resources));
         context.Services.AddSingleton(new StubFallbackProvider(fallbacks));

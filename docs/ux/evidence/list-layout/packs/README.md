@@ -1,0 +1,13 @@
+# Installed Pack list composition
+
+Real deterministic Development Web executable, 25 disposable Workspace Pack installations plus one same-identity Instance installation. All archives are valid metadata-only Packs with no contained resources or execution. An actual Discover grant exposes the Instance fixture to this Workspace, so the list contains both versions 1.0.0 and 9.0.0 of list-layout/list-pack-0 under distinct owners.
+
+[Desktop English table, 1440×1000](desktop-en.png), [mobile French controls, 390×844](mobile-fr.png), [mobile French results](mobile-fr-results.png), [source proof](source-proof.json).
+
+Both browser checks pass: exact 20+6 visible pages and 20+5 Workspace pages, classification/publisher/owner filters, no-match reset, retained refresh/cards/table and no document horizontal overflow. Captures inspected. Name activation inspects the exact owner: the Workspace fixture shows version 1.0.0, and opening the ancestor switches to Instance context and shows 9.0.0. The primary Inspect-only menu is omitted. Existing inline inspection, projects, install/fork/uninstall dialogs and their commands are preserved.
+
+Installed Packs and projects are complete authorized store arrays; exact local totals and metrics are valid. Metrics describe the complete response independently of criteria. ResourcesRead gates loading and ResourcesWrite gates header creation. Cached metadata, supplementary choices and dialogs clear before context reauthorization; revisions guard primary/selection/optional-Source responses and compatible refresh retains rows. An unavailable optional Source label no longer suppresses an otherwise authorized Pack inspection.
+
+The collision smoke exposed an existing ambiguous unscoped inspection API. The family now accepts an optional canonical scopeRef on `GET /api/packs/{publisher}/{name}`, delegates to the existing exact scoped store boundary and preserves ETags. The list uses that explicit owner. Legacy unscoped callers and mutation API contracts are unchanged; this evidence verifies scoped inspection, not duplicate-visible-identity mutation behavior.
+
+Fourteen component cases pass, including eight maintained existing Pack regressions and the new filter/state/owner cases. A real API integration case proves visible same-identity Tenant/Workspace inspection, exact UID/version/scope/ETag, missing-owner 404 and invalid-scope 400. The existing desktop Pack Project composition/build browser journey passes after the change. Warning-free Release Web build, full targeted format verification for both affected projects, symmetric existing EN/FR catalogs and two collection inventory assertions pass. Full functional lanes and reusable #1242 journey remain deferred.

@@ -45,7 +45,7 @@ public static partial class FlowEndpoints
     private static Task<T> DeleteFlowAsync<T>(IResourceScopeOperations scopes, ResourceScopeRef scopeRef, Func<CancellationToken, Task<T>> operation, CancellationToken token) =>
         scopes.WriteAsync(FlowResourceKinds.Flow, scopeRef, AuthorizationPermissions.ResourcesDelete, operation, token);
 
-    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName, Governance = value.Governance };
+    private static FlowResponse ToResponse(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Version, value.Enabled, value.ActiveVersion, value.Definition, value.Metadata, value.CreatedAt, value.UpdatedAt, value.Graph) { Uid = value.Uid, Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName, Governance = value.Governance };
 
     private static FlowSummaryResponse ToSummary(FlowResource value) => new(value.Id.Value, value.Name, value.Description, value.Definition.Kind, value.Version, value.Enabled, value.ActiveVersion, value.UpdatedAt) { Namespace = value.Id.Namespace, ScopeRef = value.ScopeRef, DisplayName = value.DisplayName, Governance = value.Governance };
 

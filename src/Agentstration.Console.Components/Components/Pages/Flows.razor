@@ -1,28 +1,55 @@
 @page "/flows"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IFlowApiClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
 <PageTitle>@T("PageTitle")</PageTitle>
-<div data-testid="flow-observability-flows">
-<PageHeader Title="@T("Flows")" Description="@T("Description")">
-    <Actions><a class="button-primary" href="/flows/new">@T("NewFlow")</a><a class="button-secondary" href="/flow-runs">@T("ViewAllRuns")</a></Actions>
-</PageHeader>
-<nav class="section-tabs" aria-label="@T("FlowSections")"><a class="active" href="/flows">@T("Definitions")</a><a href="/flow-runs">@T("Runs")</a><a href="/flows#deployments">@T("Deployments")</a></nav>
-@if (items is null) { <LoadingState /> }
-else if (items.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <DataGrid TItem="FlowSummary" Items="items">
-        <Header><tr><th>@T("Flow")</th><th>@T("Scope")</th><th>@T("Status")</th><th>@T("Namespace")</th><th>@T("Kind")</th><th>@T("Version")</th><th>@T("Updated")</th></tr></Header>
-        <Row Context="item"><tr><td><strong><a class="resource-name-link" href="@item.DetailsUrl">@item.Name</a></strong><code>@item.Id</code></td><td><ResourceScopeBadge Kind="@(item.ScopeRef?.Kind ?? ResourceScopeKind.Workspace)" Compact /></td><td><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td><code>@item.Namespace.Value</code></td><td>@item.Kind</td><td>@item.Version</td><td>@item.UpdatedAt.LocalDateTime.ToString("g")</td></tr></Row>
-    </DataGrid>
-}
+<div class="flow-compact-list" data-testid="flow-observability-flows" data-interactive="@interactive.ToString().ToLowerInvariant()" aria-busy="@((loadState.Status is ResourceLoadStatus.Loading or ResourceLoadStatus.Refreshing).ToString().ToLowerInvariant())">
+    <ResourceCollectionTemplate TItem="FlowSummary" Title="@T("Flows")" Description="@T("Description")" TestId="flow-list" ContextKey="@contextKey"
+                                IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" Compact RowTestId="flow-row"
+                                Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" PageSizeId="flow-page-size" LoadState="loadState" Disabled="@(!interactive)"
+                                PrimaryActions="CreateAction" EmptyActions="CreateAction" EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")"
+                                OnRefresh="ReloadAsync" OnRetry="RetryAsync">
+        <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/flow-runs", Services)">@T("ViewAllRuns")</a></Actions>
+        <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+            <a href="@OverviewUrl(item)"><UiIcon Name="arrow-up-right" /><span>@Shared["OpenItem"]</span></a>
+            @if (CanEdit(item)) { <a href="@DefinitionUrl(item)"><UiIcon Name="pencil" /><span>@Shared["EditDefinition"]</span></a> }
+            <button type="button" data-testid="flow-preview" disabled="@(item.ScopeRef is null)" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" /><span>@Shared["Preview"]</span></button>
+        </CollectionActions></ItemActions>
+    </ResourceCollectionTemplate>
 </div>
+<ResourceCollectionPreview @ref="preview" ResourceKind="@FlowResourceKinds.Flow" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><FlowResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" DesignerHref="@DesignerUrl(address)" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<FlowSummary>? items;
-    protected override async Task OnInitializedAsync() => items = await Client.GetFlowsAsync(cancellation.Token);
     private string T(string key) => Localizer[key];
+    private ResourceCollectionPreview? preview;
+    private bool CanEdit(FlowSummary item) => !item.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(FlowSummary item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, FlowResourceKinds.Flow, item.Id)); }
+    private string OverviewUrl(FlowSummary item) => DetailsUrl(item).Split('#')[0] + "#overview";
+    private string DefinitionUrl(FlowSummary item) => DetailsUrl(item).Split('#')[0] + "#definition/configuration";
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.Flow(new FlowId(address.Name, address.Namespace), address.ScopeRef), Services).Split('#')[0] + "#" + section;
+    private string DesignerUrl(ScopedResourceAddress address) => ResourceOwnershipContext.PreserveNavigation($"{(address.Namespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(address.Namespace.Value)}/flows")}/{Uri.EscapeDataString(address.Name)}/designer?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}", Services);
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/flows/new", Services)">@T("NewFlow")</a></PermissionGate> : null;
+    private CollectionColumn<FlowSummary> IdentityColumn => new("identity", Shared["CollectionResource"], item => @<CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@OverviewUrl(item)" IconName="workflow" Domain="flow" ShowNamespaceIcon="false">
+        <IconBadges><span class="flow-icon-badges"><ResourceScopeBadge ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></span></IconBadges>
+        <NameSuffix><span class="flow-kind">@KindLabel(item.Kind)</span></NameSuffix>
+    </CollectionIdentity>);
+    // The current Flow page API supports offset/continuation only; no page-local filtering is advertised.
+    private IReadOnlyList<CollectionColumn<FlowSummary>> Columns =>
+    [
+        new("version", T("Version"), item => @<div class="flow-versions"><CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" Compact /></div>)
+        {
+            Heading = @<span class="flow-version-heading">@T("Version") <ValueDisclosure Value="@T("VersionHelp")" IconName="info-circle" /></span>
+        },
+        new("updated", T("Updated"), item => @<time datetime="@item.UpdatedAt.ToString("O")">@item.UpdatedAt.LocalDateTime.ToString("g")</time>)
+    ];
+    private string DetailsUrl(FlowSummary item) => ResourceOwnershipContext.PreserveNavigation(item.DetailsUrl, Services);
     private string StatusLabel(string value) { var localized = Localizer[$"Status.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private string KindLabel(string value) { var localized = Localizer[$"Kind.{value}"]; return localized.ResourceNotFound ? value : localized.Value; }
 }

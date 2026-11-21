@@ -76,4 +76,8 @@
 <data name="ConfigurationValues"><value>Configuration values</value></data><data name="ValueBindings"><value>Value Bindings</value></data><data name="ValueBindingsHelp"><value>Bind each AEP requirement to a literal value, a Parameter or a Secret. Values are revalidated by the server when saved and used.</value></data>
   <data name="Input"><value>Input</value></data>
   <data name="Output"><value>Output</value></data>
+  <data name="SpecificationOverrides" xml:space="preserve"><value>Model specification overrides</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer saved version is available. Discard your draft to load it.</value></data>
+  <data name="ObservationUnavailable" xml:space="preserve"><value>The available model catalog could not be loaded. Refresh to try again.</value></data>
+  <data name="UsagesUnavailable" xml:space="preserve"><value>Model profile usages could not be verified. Refresh before deleting this provider.</value></data>
 </root>

@@ -58,8 +58,10 @@ public sealed partial class TransformationFunctionService
         Versions([request.Version]);
         ValidateResource(new TransformationFunctionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-            ScopeRef = request.ScopeRef, Metadata = new() { Name = request.Name, Namespace = request.Namespace },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.TransformationFunction,
+            ScopeRef = request.ScopeRef,
+            Metadata = new() { Name = request.Name, Namespace = request.Namespace },
             Definition = new(request.DisplayName, [])
         }, FunctionResourceKinds.TransformationFunction, request.DisplayName);
         return ResolveTransformationAsync(request.Schema, request.ScopeRef, request.Namespace, request.ScopeRef, ct, resolver);
@@ -86,8 +88,10 @@ public sealed partial class TransformationFunctionService
         }
         var desired = existing?.Value ?? new TransformationFunctionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-            ScopeRef = request.ScopeRef, Metadata = new() { Name = request.Name, Namespace = request.Namespace },
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = FunctionResourceKinds.TransformationFunction,
+            ScopeRef = request.ScopeRef,
+            Metadata = new() { Name = request.Name, Namespace = request.Namespace },
             Definition = new(request.DisplayName, [])
         };
         try { return await PutAsync(desired with { Definition = desired.Definition with { Versions = [.. desired.Definition.Versions, version] } }, existing?.ETag, existing is null, ct); }

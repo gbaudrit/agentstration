@@ -4,9 +4,9 @@
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
     <p>@T("CompositionHelp")</p>
-    <label>@T("CompositionPoint")<input value="@Step.Point" disabled="@ReadOnly" @onchange="args => Changed.InvokeAsync(Step with { Point = args.Value?.ToString() ?? string.Empty })" data-testid="composition-point-name" /></label>
-    <label><input type="checkbox" checked="@Step.AllowEmpty" disabled="@ReadOnly" @onchange="args => Changed.InvokeAsync(Step with { AllowEmpty = args.Value is true })" />@T("CompositionAllowEmpty")</label>
-    <label>@T("TransformMapping")<textarea value="@(Step.InputMapping?.GetRawText() ?? "null")" disabled="@ReadOnly" @onchange="UpdateMappingAsync"></textarea></label>
+    <FormField Label="@T("CompositionPoint")"><ClearableText UpdateOnInput="false" Value="@Step.Point" Disabled="@ReadOnly" ValueChanged="value => Changed.InvokeAsync(Step with { Point = value })" data-testid="composition-point-name" /></FormField>
+    <label><FormCheckbox Value="@Step.AllowEmpty" disabled="@ReadOnly" ValueChanged="value => Changed.InvokeAsync(Step with { AllowEmpty = value })" />@T("CompositionAllowEmpty")</label>
+    <FormField Label="@T("TransformMapping")"><ClearableText UpdateOnInput="false" Multiline="true" Value="@(Step.InputMapping?.GetRawText() ?? "null")" Disabled="@ReadOnly" ValueChanged="value => UpdateMappingAsync(new ChangeEventArgs { Value = value })" /></FormField>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Progress" xml:space="preserve"><value>Étapes de création</value></data>
+  <data name="StepLabel" xml:space="preserve"><value>Étape {0} sur {1} : {2}</value></data>
+  <data name="Position" xml:space="preserve"><value>Étape {0} sur {1} · {2}</value></data>
+  <data name="Previous" xml:space="preserve"><value>Précédent</value></data>
+  <data name="Continue" xml:space="preserve"><value>Continuer</value></data>
+  <data name="Finish" xml:space="preserve"><value>Créer</value></data>
+  <data name="Working" xml:space="preserve"><value>Création…</value></data>
+  <data name="Complete" xml:space="preserve"><value>Complète</value></data>
+  <data name="Incomplete" xml:space="preserve"><value>À compléter</value></data>
+  <data name="TopNavigation" xml:space="preserve"><value>Navigation entre les étapes en haut</value></data>
+  <data name="BottomNavigation" xml:space="preserve"><value>Navigation entre les étapes en bas</value></data>
+</root>

@@ -1,179 +1,278 @@
 @page "/triggers/{Name}"
+@page "/triggers/{Name}/edit"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject ITriggerApiClient Client
 @inject NavigationManager Navigation
 @inject NotificationState Notifications
 @inject ConsoleContextState ContextState
+@inject IServiceProvider Services
 @inject TimeProvider TimeProvider
 @inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<PageTitle>@T("Trigger") · Agentstration</PageTitle>
-@if (loading)
-{
-    <LoadingState Message="@T("LoadingOperations")" />
-}
-else if (notFound || stored is null)
-{
-    <EmptyState Title="@T("NotFoundTitle")" Message="@T("NotFoundMessage")"><a class="button-secondary" href="/triggers">@T("BackToTriggers")</a></EmptyState>
-}
-else
-{
-    var trigger = stored.Value;
-    <PageHeader Title="@trigger.Definition.DisplayName" Description="@(T("TriggerResourceDescription", trigger.Namespace.Value, trigger.Name))" TestId="resource-trigger-details">
-        <Metadata><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" /><span data-testid="trigger-definition-scope"><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></span><span>@T("Generation", trigger.Generation)</span></Metadata>
-        <Actions>
-            @if (CanExecute) { <button class="button-primary" disabled="@(!trigger.Definition.Enabled || running)" @onclick="RunNowAsync" data-testid="trigger-run-now">@(running ? T("Submitting") : T("RunNow"))</button> }
-            @if (CanManage)
-            {
-                @if (trigger.Definition.Enabled) { <button class="button-secondary" disabled="@changingState" @onclick="DisableAsync">@(changingState ? T("Disabling") : T("Disable"))</button> }
-                else { <button class="button-primary" @onclick="() => confirmEnable = true" data-testid="trigger-enable">@T("Enable")</button> }
-                <a class="button-secondary" href="@($"/triggers/{Uri.EscapeDataString(trigger.Name)}/edit")">@T("Edit")</a>
-                <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button>
-            }
-            <a class="button-secondary" href="/triggers">@T("Back")</a>
-        </Actions>
-    </PageHeader>
-
-    <nav class="section-tabs" role="tablist" aria-label="@T("TriggerDetailsTabs")">
-        @foreach (var tab in Tabs)
-        {
-            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="trigger-tab-panel" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
-        }
-    </nav>
-
-    @if (!string.IsNullOrWhiteSpace(message)) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="@(hasError ? "trigger-error" : null)">@message</div> }
-    <main id="trigger-tab-panel" role="tabpanel" tabindex="0">
-        @if (activeTab == "Overview")
-        {
-            @if (trigger.Observed.LastOutcome == TriggerLastOutcome.Failed)
-            {
-                <section class="panel trigger-attention"><div class="panel-header"><div><p class="eyebrow">@T("RequiresAttention")</p><h2>@T("LastFiringFailed")</h2></div><StatusBadge Text="@T("Outcome.Failed")" Status="UiStatus.Danger" /></div><p>@(trigger.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></section>
-            }
-            <section class="metric-grid trigger-metrics" aria-label="@T("Overview")">
-                <MetricCard Label="@T("State")" Value="@T(trigger.Definition.Enabled ? "Enabled" : "Disabled")" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" />
-                <MetricCard Label="@T("NextOccurrence")" Value="@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)" Detail="@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)" Status="UiStatus.Info" />
-                <MetricCard Label="@T("LastFired")" Value="@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />
-                <MetricCard Label="@T("GenerationLabel")" Value="@trigger.Generation.ToString()" Detail="@($"{trigger.Namespace.Value}/{trigger.Name}")" Status="UiStatus.Neutral" />
-            </section>
-            <section class="panel trigger-history" data-testid="trigger-occurrences">
-                <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@refreshing" @onclick="LoadHistoryAsync" data-testid="trigger-refresh-occurrences">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
-                @if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
-                else
-                {
-                    <DataGrid TItem="TriggerOccurrence" Items="history">
-                        <Header><tr><th>@T("Kind")</th><th>@T("Scheduled")</th><th>@T("ActuallyFired")</th><th>@T("Outcome")</th><th>@T("GenerationLabel")</th><th>@T("WorkDetails")</th></tr></Header>
-                        <Row Context="occurrence"><tr data-testid="trigger-occurrence-row" data-trigger-occurrence-id="@occurrence.Id">
-                            <td>@T($"OccurrenceKind.{occurrence.Kind}")</td><td>@TriggerUi.FormatDate(occurrence.ScheduledAt)</td><td>@TriggerUi.FormatDate(occurrence.FiredAt)</td>
-                            <td><StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></td><td>@occurrence.TriggerGeneration</td>
-                            <td>@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</td>
-                        </tr></Row>
-                    </DataGrid>
-                }
-            </section>
-        }
-        else if (activeTab == "Definition")
-        {
-            <div class="trigger-detail-grid">
-                <div class="trigger-detail-stack">
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("When")</p><h2>@T("Schedule")</h2></div><StatusBadge Text="@T($"ScheduleType.{trigger.Definition.Source.Schedule!.Type}")" Status="UiStatus.Info" /></div>
-                        <dl class="resource-details"><dt>@T("Definition")</dt><dd>@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)</dd><dt>@T("NextOccurrence")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)</dd><dt>@T("LastScheduled")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)</dd><dt>@T("LastFired")</dt><dd>@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)</dd><dt>@T("Misfire")</dt><dd>@MisfireLabel(trigger.Definition.MisfirePolicy)</dd><dt>@T("Concurrency")</dt><dd>@ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)</dd></dl>
-                    </section>
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("What")</p><h2>@T("WorkSubmission")</h2></div></div>
-                        <dl class="resource-details"><dt>@T("TargetKind")</dt><dd>@T("Flow")</dd><dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd><dt>@T("DefinitionScope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd><dt>@T("Resolution")</dt><dd>@(trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version))</dd><dt>@T("Input")</dt><dd><pre class="trigger-input">@PrettyInput(trigger.Definition.Input)</pre></dd></dl>
-                    </section>
-                </div>
-                <aside class="trigger-detail-stack">
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("Security")</p><h2>@T("ExecutionIdentity")</h2></div></div>
-                        @if (trigger.Definition.ExecutionScope is { } scope)
-                        {
-                            <dl class="resource-details"><dt>@T("Principal")</dt><dd><code>@Short(scope.PrincipalId)</code></dd><dt>@T("ExecutionScope")</dt><dd><ResourceScopeBadge ScopeRef="scope.AccessScopeRef" Compact /></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
-                        }
-                        else { <p>@T("NoExecutionIdentity")</p> }
-                    </section>
-                    <section class="panel">
-                        <div class="panel-header"><div><p class="eyebrow">@T("Observed")</p><h2>@T("CurrentStatus")</h2></div><StatusBadge Text="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" /></div>
-                        <dl class="resource-details"><dt>@T("Enabled")</dt><dd>@T(trigger.Definition.Enabled ? "Yes" : "No")</dd><dt>@T("LastOutcome")</dt><dd>@T($"Outcome.{trigger.Observed.LastOutcome}")</dd><dt>@T("ErrorCode")</dt><dd><code>@(trigger.Observed.LastErrorCode ?? "—")</code></dd><dt>@T("Uid")</dt><dd><code>@Short(trigger.Uid)</code></dd></dl>
-                    </section>
-                </aside>
-            </div>
-        }
-        else if (activeTab == "Access")
-        {
-            <section class="panel form-section" data-testid="trigger-access-panel">
-                <div class="panel-header"><div><p class="eyebrow">@T("Access")</p><h2>@T("TriggerAccessModel")</h2><p>@T("TriggerAccessModelHelp")</p></div></div>
-                <dl class="resource-details">
-                    <dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowAccessUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd>
-                    <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd>
-                </dl>
-                <div class="form-actions"><a class="button-primary" href="@FlowAccessUrl(trigger)">@T("ManageFlowAccess")</a></div>
-            </section>
-        }
-        else
-        {
-            <section class="panel form-section" data-testid="trigger-yaml-viewer">
-                <div class="panel-header"><div><p class="eyebrow">@T("RawDefinition")</p><h2>@T("TriggerYaml")</h2><p>@T("TriggerYamlHelp")</p></div><StatusBadge Text="@T("ReadOnly")" Status="UiStatus.Neutral" /></div>
-                <textarea class="form-code-editor runner-json" rows="30" readonly aria-label="@T("TriggerYaml")">@TriggerYaml</textarea>
-            </section>
-        }
-    </main>
-}
-
+<PageTitle>@(stored?.Value.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{ var presentations = Presentations; var editorIdentity = Identity; }
+<ConsoleResourceDetailsTemplate Resource="stored?.Value" Name="@(stored?.Value.Definition.DisplayName ?? Name)" ResourceType="@T("Trigger")" Domain="automation" IconName="clock"
+    ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
+    Description="@stored?.Value.Definition.Description" CollectionHref="@BackUrl" CollectionLabel="@T("ListTriggers")" MoreActions="@(CanManage ? DeleteAction : null)"
+    Version="@(stored?.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture))" VersionDescription="@T("GenerationLabel")"
+    DefinitionContextScope="PhysicalOwner" PresentationScopeRef="@(stored is null ? null : TriggerUi.ContextScope(ContextState.Current))" DefinitionReadOnlyReason="ReadOnlyReason" AllowAccess="false" AccessContent="@(stored is null ? null : AccessPanel)"
+    Enabled="stored?.Value.Definition.Enabled" EnabledChanged="ChangeEnabledAsync" EnabledDisabled="@(Busy || !CanManage)" EnabledTestId="trigger-enable"
+    LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="Busy" HasDraft="HasDraft" Yaml="@TriggerYaml" YamlReadOnly
+    YamlTitle="@T("TriggerYaml")" YamlDescription="@T("TriggerYamlHelp")" YamlInputTestId="trigger-yaml-viewer" SectionTestIdPrefix="trigger" TestId="resource-trigger-details">
+    <PrimaryActions>@if (CanExecute) { <button class="button-primary" disabled="@(Busy || stored?.Value.Definition.Enabled != true)" @onclick="RunNowAsync" data-testid="trigger-run-now"><UiIcon Name="play-circle" />@(running ? T("Submitting") : T("Execute"))</button> }</PrimaryActions>
+    <Feedback>@if (message is not null) { <div class="form-alert @(hasError ? "form-alert-danger" : "form-alert-success")" role="@(hasError ? "alert" : "status")" data-testid="@(hasError ? "trigger-error" : null)">@message</div> }@if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }</Feedback>
+    <OverviewMetrics>@if (stored is { Value: var trigger }) {
+        <MetricCard Label="@T("State")" Value="@T(trigger.Definition.Enabled ? "Enabled" : "Disabled")" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" />
+        <MetricCard Label="@T("NextOccurrence")" Value="@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)" Detail="@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)" Status="UiStatus.Info" />
+        <MetricCard Label="@T("LastFired")" Value="@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />
+    }</OverviewMetrics>
+    <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
+    <OverviewContent>@if (stored?.Value.Observed.LastOutcome == TriggerLastOutcome.Failed) { <FormSection Title="@T("LastFiringFailed")"><p>@(stored.Value.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></FormSection> }</OverviewContent>
+    <DefinitionContent Context="path">@if (stored is { Value: var trigger }) {
+        <TriggerEditor @ref="editor" @key="loadedKey" Name="@trigger.Name" Embedded EmbeddedAddress="@(new ScopedResourceAddress(trigger.ScopeRef!.Value, trigger.Namespace, trigger.Kind, trigger.Name))"
+            InitialSnapshot="stored" ExternalActions SaveBlocked="@(loading || commandBusy)" ReadOnlyReason="ReadOnlyReason"
+            SectionState="sectionState" SectionPresentations="presentations" SectionRequested="ShowSection"
+            DraftChanged="value => EditorDraftChanged(editorIdentity, value)" SavingChanged="value => EditorSavingChanged(editorIdentity, value)" SnapshotSaved="snapshot => DefinitionSaved(editorIdentity, snapshot)" />
+    }</DefinitionContent>
+    <AdditionalContent Context="path">@if (stored is { Value: var trigger }) { if (path == "history") { @HistoryPanel } else if (path == "execution") { @ExecutionPanel } }</AdditionalContent>
+    <DraftActions><button type="button" class="button-secondary" disabled="@Busy" @onclick="DiscardDefinition">@Shared["Discard"]</button><button type="submit" form="@editor?.FormId" class="button-primary" disabled="@(Busy || editor?.CanEdit != true)" data-testid="trigger-save">@T("SaveChanges")</button></DraftActions>
+</ConsoleResourceDetailsTemplate>
 <ConfirmationDialog IsOpen="@confirmEnable" Title="@T("EnableTriggerTitle")" Message="@EnableMessage" ConfirmLabel="@T("EnableTrigger")" OnConfirm="EnableAsync" OnCancel="() => confirmEnable = false" TestId="trigger-enable-dialog" />
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteTriggerTitle")" Message="@T("DeleteTriggerMessage")" ConfirmLabel="@T("DeleteTrigger")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteTriggerTitle")" Message="@T("DeleteTriggerMessage")" ConfirmLabel="@T("DeleteTrigger")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="trigger-delete-dialog" />
 
 @code {
+    private RenderFragment DeleteAction => @<button type="button" class="button-danger" disabled="@Busy" @onclick="() => confirmDelete = true" data-testid="trigger-delete">@T("Delete")</button>;
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     [Parameter] public string Name { get; set; } = "";
-    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
-    private static readonly string[] Tabs = ["Overview", "Definition", "Access", "YAML"];
-    private ResourceSnapshot<TriggerResource>? stored;
+    [SupplyParameterFromQuery(Name = "context")] public string? ContextValue { get; set; }
+    private readonly ResourceSectionState sectionState = new();
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly CancellationToken lifetimeToken;
+    public TriggerDetails() => lifetimeToken = lifetime.Token;
+    private ResourceSnapshot<TriggerResource>? stored, newerSnapshot;
     private IReadOnlyList<TriggerOccurrence> history = [];
-    private bool loading = true, notFound, running, changingState, refreshing, confirmEnable, confirmDelete, hasError;
-    private string activeTab = "Overview";
-    private string? message;
-    private bool CanManage => ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
-    private bool CanExecute => ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
+    private TriggerEditor? editor;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private bool loading, running, changingState, refreshing, confirmEnable, confirmDelete, hasError, editorDirty, editorBusy, historyKnown, disposed;
+    private string? message, historyError, loadedKey, returnAfterDelete;
+    private long loadVersion, historyVersion;
+    private string Identity => $"{loadedKey}|{stored?.Value.Uid}";
+    private string ContextKey => $"{Name}|{NamespaceValue}|{ContextValue}|{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
+    private ResourceScopeRef? PhysicalOwner => ContextState.Current is { WorkspaceId: var workspace } && workspace != Guid.Empty ? ResourceScopeRef.Workspace(workspace) : null;
+    private bool HasDraft => editor?.IsDirty ?? editorDirty;
+    private bool commandBusy => running || changingState || refreshing;
+    private bool Busy => loading || commandBusy || editorBusy;
+    private bool CanManage => stored is not null && stored.Value.ScopeRef == PhysicalOwner && stored.Value.Governance.IsManaged == false && ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool CanExecute => stored is not null && ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
+    private ResourceReadOnlyReason? ReadOnlyReason => stored?.Value.Governance.IsManaged == true ? ResourceReadOnlyReason.Managed : !ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite) ? ResourceReadOnlyReason.InsufficientPermissions : null;
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(TriggerEditor.DefinitionPresentations(), StringComparer.Ordinal) { ["yaml"] = new() { ReadOnly = true } };
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("history", T("History"), "history"), new("execution", T("ExecutionIdentity"), "shield")];
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/triggers", Services);
     private string EnableMessage => stored is null ? T("EnableThisTrigger") : T("EnableMessage", stored.Value.Definition.DisplayName, TriggerUi.ScheduleLabel(stored.Value.Definition.Source.Schedule, Localizer), stored.Value.Definition.Target.Flow?.Name ?? "—");
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-
-    protected override async Task OnParametersSetAsync()
+    private Task ShowSection(string path) { Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); return Task.CompletedTask; }
+    protected override Task OnParametersSetAsync()
     {
-        activeTab = Tabs.FirstOrDefault(tab => string.Equals(tab, View, StringComparison.OrdinalIgnoreCase)) ?? "Overview";
-        await ContextState.EnsureLoadedAsync(CancellationToken.None);
-        await LoadAsync();
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        if (uri.AbsolutePath.EndsWith("/edit", StringComparison.OrdinalIgnoreCase)) { var target = new UriBuilder(uri) { Path = uri.AbsolutePath[..^5], Fragment = "definition/identity" }; Navigation.NavigateTo(target.Uri.AbsoluteUri, replace: true); return Task.CompletedTask; }
+        var key = ContextKey;
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; ClearPrivate(); sectionState.Reset(key); return LoadAsync(false);
     }
-    private async Task LoadAsync()
+    private void ClearPrivate()
     {
-        loading = true; notFound = false; message = null;
-        try { stored = await Client.GetAsync(ResourceNamespace.Default, Name, CancellationToken.None); if (stored is null) { notFound = true; return; } await LoadHistoryAsync(); }
-        catch (Exception exception) { SetError(exception); }
-        finally { loading = false; }
+        stored = newerSnapshot = null; editor = null; history = []; historyKnown = false; historyError = message = null;
+        editorDirty = editorBusy = running = changingState = refreshing = confirmEnable = confirmDelete = false; ++historyVersion;
     }
-    private async Task LoadHistoryAsync() { if (stored is null) return; refreshing = true; try { history = await Client.ListHistoryAsync(stored.Value.Namespace, stored.Value.Name, 100, CancellationToken.None); } catch (Exception exception) { SetError(exception); } finally { refreshing = false; } }
-    private async Task RunNowAsync() { if (stored is null || running || !CanExecute) return; running = true; ClearMessage(); try { var occurrence = await Client.RunNowAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); SetSuccess(occurrence.WorkItemId is null ? T("RunCompleted", T($"OccurrenceOutcome.{occurrence.Outcome}")) : T("WorkSubmitted", Short(occurrence.WorkItemId))); Notifications.Add(new(Guid.NewGuid(), T("Notification.Fired"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success)); await ReloadAsync(); } catch (Exception exception) { SetError(exception); } finally { running = false; } }
-    private async Task EnableAsync() { confirmEnable = false; await SetEnabledAsync(true); }
-    private async Task DisableAsync() => await SetEnabledAsync(false);
-    private async Task SetEnabledAsync(bool enabled) { if (stored is null || changingState || !CanManage) return; changingState = true; ClearMessage(); try { stored = await Client.SaveAsync(stored.Value with { Definition = stored.Value.Definition with { Enabled = enabled } }, stored.ETag, CancellationToken.None); SetSuccess(T(enabled ? "EnabledSuccess" : "DisabledSuccess")); Notifications.Add(new(Guid.NewGuid(), T(enabled ? "Notification.Enabled" : "Notification.Disabled"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), enabled ? UiStatus.Success : UiStatus.Neutral)); await LoadHistoryAsync(); } catch (Exception exception) { SetError(exception); } finally { changingState = false; } }
-    private async Task DeleteAsync() { if (stored is null || !CanManage) return; confirmDelete = false; try { await Client.DeleteAsync(stored.Value.Namespace, stored.Value.Name, stored.ETag, CancellationToken.None); Notifications.Add(new(Guid.NewGuid(), T("Notification.Deleted"), stored.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Neutral)); Navigation.NavigateTo("/triggers"); } catch (Exception exception) { SetError(exception); } }
-    private async Task ReloadAsync() { if (stored is null) return; stored = await Client.GetAsync(stored.Value.Namespace, stored.Value.Name, CancellationToken.None); await LoadHistoryAsync(); }
+    private Task RefreshAsync() => Busy ? Task.CompletedTask : LoadAsync(stored is not null);
+    private bool Current(long request, string? key) => !disposed && request == loadVersion && key == loadedKey && key == ContextKey;
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var key = loadedKey; var previous = stored; loading = true; message = null;
+        loadState = new(refresh && stored is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = stored is not null };
+        try
+        {
+            await ContextState.EnsureLoadedAsync(lifetimeToken);
+            if (disposed || request != loadVersion) return;
+            loadedKey = key = ContextKey;
+            if (!ContextState.HasPermission(AuthorizationPermissions.ResourcesRead)) { ClearPrivate(); loadState = new(ResourceLoadStatus.Forbidden); return; }
+            var snapshot = await Client.GetAsync(ResourceNamespace.Parse(NamespaceValue), Name, lifetimeToken);
+            if (!Current(request, key)) return;
+            if (snapshot is null || !Matches(snapshot, previous)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            if (HasDraft) newerSnapshot = snapshot.ETag != stored?.ETag || snapshot.Value.Generation != stored?.Value.Generation ? snapshot : null;
+            else { stored = snapshot; newerSnapshot = null; }
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            await ReadHistoryAsync(request, key);
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (!Current(request, key)) return;
+            var status = FailureStatus(exception); if (status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) ClearPrivate();
+            loadState = new(status) { HasContent = stored is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
+        finally { if (Current(request, key)) loading = false; }
+    }
+    private static ResourceLoadStatus FailureStatus(Exception exception) => exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden, System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
+    private bool Matches(ResourceSnapshot<TriggerResource> snapshot, ResourceSnapshot<TriggerResource>? previous) => snapshot.Value.Kind == TriggerResourceKinds.Trigger && snapshot.Value.Name == Name && snapshot.Value.Namespace == ResourceNamespace.Parse(NamespaceValue) && snapshot.Value.ScopeRef == PhysicalOwner && snapshot.Value.Uid != Guid.Empty && (previous is null || snapshot.Value.Uid == previous.Value.Uid);
+    private void DiscardDefinition()
+    {
+        if (Busy) return;
+        if (newerSnapshot is { } latest) { stored = latest; newerSnapshot = null; editor?.ApplySnapshot(latest, discard: true); }
+        else editor?.Discard(); editorDirty = false; message = null;
+    }
+    private void EditorDraftChanged(string identity, bool value) { if (!disposed && identity == Identity) editorDirty = value; }
+    private void EditorSavingChanged(string identity, bool value) { if (!disposed && identity == Identity) editorBusy = value; }
+    private void DefinitionSaved(string identity, ResourceSnapshot<TriggerResource> snapshot)
+    {
+        if (disposed || identity != Identity) return;
+        if (!Matches(snapshot, stored)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+        stored = snapshot; newerSnapshot = null; message = null; editorDirty = false; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+    }
+    private async Task ReadHistoryAsync(long request, string? key)
+    {
+        if (stored is not { } saved) return; var historyRequest = ++historyVersion;
+        try
+        {
+            var values = await Client.ListHistoryAsync(saved.Value.Namespace, saved.Value.Name, 100, lifetimeToken);
+            if (!Current(request, key) || historyRequest != historyVersion) return;
+            if (values.Any(value => value.WorkspaceId != ContextState.Current!.WorkspaceId || value.TriggerUid != saved.Value.Uid)) { history = []; historyKnown = false; historyError = T("HistoryUnavailable"); return; }
+            history = values; historyKnown = true; historyError = null;
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (!Current(request, key) || historyRequest != historyVersion) return;
+            if (FailureStatus(exception) is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) { history = []; historyKnown = false; }
+            historyError = T("HistoryUnavailable");
+        }
+    }
+    private async Task LoadHistoryAsync() { if (Busy || stored is null) return; var request = loadVersion; var key = loadedKey; refreshing = true; try { await ReadHistoryAsync(request, key); } finally { if (Current(request, key)) refreshing = false; } }
+    private async Task RunNowAsync()
+    {
+        if (!CanExecute || Busy || stored?.Value.Definition.Enabled != true) return;
+        var request = loadVersion; var key = loadedKey; var previous = stored; running = true; ClearMessage();
+        try
+        {
+            var occurrence = await Client.RunNowAsync(previous.Value.Namespace, previous.Value.Name, lifetimeToken);
+            if (!Current(request, key)) return;
+            if (occurrence.TriggerUid != previous.Value.Uid || occurrence.WorkspaceId != ContextState.Current!.WorkspaceId) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            SetSuccess(occurrence.WorkItemId is null ? T("RunCompleted", T($"OccurrenceOutcome.{occurrence.Outcome}")) : T("WorkSubmitted", Short(occurrence.WorkItemId)));
+            Notifications.Add(new(Guid.NewGuid(), T("Notification.Fired"), previous.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Success));
+            await LoadAsync(true);
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) { if (Current(request, key)) SetError(exception); }
+        finally { if (!disposed && key == loadedKey) running = false; }
+    }
+    private Task ChangeEnabledAsync(bool enabled)
+    {
+        if (!CanManage || Busy || stored!.Value.Definition.Enabled == enabled) return Task.CompletedTask;
+        if (enabled) { confirmEnable = true; return Task.CompletedTask; }
+        return SetEnabledAsync(false);
+    }
+    private Task EnableAsync() { confirmEnable = false; return SetEnabledAsync(true); }
+    private async Task SetEnabledAsync(bool enabled)
+    {
+        if (!CanManage || Busy || stored is not { } previous) return;
+        var request = loadVersion; var key = loadedKey; changingState = true; ClearMessage();
+        try
+        {
+            var saved = await Client.SaveAsync(previous.Value with { Definition = previous.Value.Definition with { Enabled = enabled } }, previous.ETag, lifetimeToken);
+            if (!Current(request, key)) return;
+            if (!Matches(saved, previous)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            stored = saved; newerSnapshot = null; editor?.ApplyOperationalSnapshot(saved);
+            SetSuccess(T(enabled ? "EnabledSuccess" : "DisabledSuccess")); Notifications.Add(new(Guid.NewGuid(), T(enabled ? "Notification.Enabled" : "Notification.Disabled"), saved.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), enabled ? UiStatus.Success : UiStatus.Neutral));
+            await ReadHistoryAsync(request, key);
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) { if (Current(request, key)) SetError(exception); }
+        finally { if (Current(request, key)) changingState = false; }
+    }
+    private async Task DeleteAsync()
+    {
+        confirmDelete = false; if (!CanManage || Busy || stored is not { } previous) return;
+        var request = loadVersion; var key = loadedKey; changingState = true; ClearMessage();
+        try
+        {
+            await Client.DeleteAsync(previous.Value.Namespace, previous.Value.Name, previous.ETag, lifetimeToken);
+            if (!Current(request, key)) return;
+            Notifications.Add(new(Guid.NewGuid(), T("Notification.Deleted"), previous.Value.Definition.DisplayName, TimeProvider.GetLocalNow(), UiStatus.Neutral));
+            ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl;
+        }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception) { if (Current(request, key)) SetError(exception); }
+        finally { if (Current(request, key)) changingState = false; }
+    }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); } }
     private void ClearMessage() { message = null; hasError = false; }
     private void SetSuccess(string value) { message = value; hasError = false; }
-    private void SetError(Exception exception) { message = TriggerUi.ErrorMessage(exception, Localizer); hasError = true; }
+    private void SetError(Exception exception) { message = exception is HttpRequestException or TimeoutException ? T("OperationUnconfirmed") : TriggerUi.ErrorMessage(exception, Localizer); hasError = true; }
     private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace), flow.ScopeRef); }
-    private static string FlowAccessUrl(TriggerResource value)
-    {
-        var url = FlowUrl(value);
-        return $"{url}{(url.Contains('?', StringComparison.Ordinal) ? '&' : '?')}view=access";
-    }
-    private static string? TaskUrl(TriggerOccurrence value) => Guid.TryParse(value.WorkItemId, out var taskId) ? $"/tasks/{taskId:D}" : null;
-    private static string Short(Guid value) => value.ToString("N")[..12];
+    private static string FlowAccessUrl(TriggerResource value) => FlowUrl(value) + "#access";
+    private static string? TaskUrl(TriggerOccurrence value) => Guid.TryParse(value.WorkItemId, out var taskId) ? $"/tasks/{taskId:D}?scopeRef={Uri.EscapeDataString(ResourceScopeRef.Workspace(value.WorkspaceId).Value)}" : null;
     private static string Short(string value) => value.Length <= 12 ? value : value[..12];
-    private string TriggerYaml => stored is null ? string.Empty : ResourceManifestSerializer.ToYaml(stored.Value);
+    private string TriggerYaml => stored is null ? string.Empty : ResourceManifestSerializer.ToYaml(new SavedManifest(stored.Value.ApiVersion, stored.Value.Kind, stored.Value.Metadata, stored.Value.ScopeRef, stored.Value.Definition));
+    private sealed record SavedManifest(string ApiVersion, string Kind, ResourceMetadata Metadata, ResourceScopeRef? ScopeRef, TriggerProperties Definition);
     private static string PrettyInput(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
     private string MisfireLabel(TriggerMisfirePolicy value) => T(value == TriggerMisfirePolicy.FireOnce ? "Misfire.FireOnceAfterRecovery" : "Misfire.Skip");
     private string ConcurrencyLabel(TriggerConcurrencyPolicy value) => T(value == TriggerConcurrencyPolicy.Skip ? "Concurrency.SkipActive" : "Concurrency.AllowOverlap");
     private static UiStatus OutcomeStatus(TriggerLastOutcome value) => value switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
     private static UiStatus OccurrenceStatus(TriggerOccurrenceOutcome value) => value switch { TriggerOccurrenceOutcome.Submitted => UiStatus.Success, TriggerOccurrenceOutcome.Skipped => UiStatus.Warning, TriggerOccurrenceOutcome.Failed => UiStatus.Danger, TriggerOccurrenceOutcome.Pending => UiStatus.Info, _ => UiStatus.Neutral };
+    private sealed record Setting(string Name, string Value, string? Href = null);
+    private IReadOnlyList<Setting> Settings => stored is not { Value: var trigger } ? [] : [
+        new(T("Schedule"), TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)),
+        new(T("Flow"), $"{trigger.Definition.Target.Flow!.Namespace ?? trigger.Namespace}/{trigger.Definition.Target.Flow.Name}", FlowUrl(trigger)),
+        new(T("DefinitionScope"), TriggerUi.DefinitionScope(trigger)?.Value ?? "—"),
+        new(T("Resolution"), trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version)),
+        new(T("Misfire"), MisfireLabel(trigger.Definition.MisfirePolicy)), new(T("Concurrency"), ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)),
+        new(T("LastScheduled"), TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)), new(T("ErrorCode"), trigger.Observed.LastErrorCode ?? "—"),
+        new(T("Input"), PrettyInput(trigger.Definition.Input))];
+    private RenderFragment ConfigurationSummary => @<CollectionView TItem="Setting" Items="Settings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Value") })">
+        <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity><Information Context="row"><CollectionValue Label="@T("Value")">@if (row.Href is { } href) { <a class="configuration-value text-button" href="@href">@row.Value</a> } else { <span class="configuration-value">@row.Value</span> }</CollectionValue></Information>
+    </CollectionView>;
+    private RenderFragment HistoryPanel => @<div>@if (stored is { Value: var trigger }) {
+            <section class="panel trigger-history" data-testid="trigger-occurrences">
+                <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@Busy" @onclick="LoadHistoryAsync" data-testid="trigger-refresh-occurrences">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>
+                @if (historyError is not null) { <div class="form-alert form-alert-danger" role="alert">@historyError</div> }
+                @if (!historyKnown) { <p>@T("HistoryUnavailable")</p> }
+                else if (history.Count == 0) { <EmptyState Title="@T("NoOccurrences")" Message="@T("NoOccurrencesMessage")" /> }
+                else
+                {
+                    <CollectionView TItem="TriggerOccurrence" Items="history" InformationLabels="@(new string[] { T("Scheduled"), T("ActuallyFired"), T("GenerationLabel"), T("WorkDetails") })" RowTestId="trigger-occurrence-row" ItemAttributes="@((occurrence) => new Dictionary<string, object> { ["data-trigger-occurrence-id"] = occurrence.Id })" IdentityLabel="@T("Kind")" StateLabel="@T("Outcome")">
+        <Identity Context="occurrence">
+@T($"OccurrenceKind.{occurrence.Kind}")</Identity>
+        <State Context="occurrence">
+<StatusBadge Text="@T($"OccurrenceOutcome.{occurrence.Outcome}")" Status="@OccurrenceStatus(occurrence.Outcome)" /></State>
+        <Information Context="occurrence">
+            <CollectionValue Label="@T("Scheduled")">@TriggerUi.FormatDate(occurrence.ScheduledAt)</CollectionValue>
+            <CollectionValue Label="@T("ActuallyFired")">@TriggerUi.FormatDate(occurrence.FiredAt)</CollectionValue>
+            <CollectionValue Label="@T("GenerationLabel")">@occurrence.TriggerGeneration</CollectionValue>
+            <CollectionValue Label="@T("WorkDetails")">@if (TaskUrl(occurrence) is { } taskUrl) { <a class="text-button" href="@taskUrl">@T("OpenTask")</a> } else if (occurrence.ErrorCode is not null) { <details><summary>@occurrence.ErrorCode</summary><p>@occurrence.ErrorMessage</p></details> } else { <span>—</span> }</CollectionValue>
+        </Information>
+    </CollectionView>
+                }
+            </section>
+    }</div>;
+    private RenderFragment ExecutionPanel => @<div>@if (stored is { Value: var trigger }) {
+                    <FormSection Title="@T("ExecutionIdentity")" Eyebrow="@T("Security")"><ChildContent>
+                        @if (trigger.Definition.ExecutionScope is { } scope)
+                        {
+                            <dl class="resource-details"><dt>@T("Principal")</dt><dd><CopyableValue Value="@scope.PrincipalId.ToString()" /></dd><dt>@T("ExecutionScope")</dt><dd><ResourceScopeBadge ScopeRef="scope.AccessScopeRef" Compact /></dd><dt>@T("Authorization")</dt><dd>@T("AuthorizationReevaluated")</dd><dt>@T("Revocation")</dt><dd>@T("FailsClosed")</dd></dl>
+                        }
+                        else { <p>@T("NoExecutionIdentity")</p> }
+                    </ChildContent></FormSection>
+    }</div>;
+    private RenderFragment AccessPanel => @<div>@if (stored is { Value: var trigger }) {
+            <FormSection Title="@T("TriggerAccessModel")" Eyebrow="@T("Access")" Description="@T("TriggerAccessModelHelp")" TestId="trigger-access-panel"><ChildContent>
+                <dl class="resource-details">
+                    <dt>@T("Flow")</dt><dd><a class="text-button" href="@FlowAccessUrl(trigger)">@trigger.Definition.Target.Flow!.Name</a></dd>
+                    <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" Compact /></dd>
+                </dl>
+                <FormActions><a class="button-primary" href="@FlowAccessUrl(trigger)">@T("ManageFlowAccess")</a></FormActions>
+            </ChildContent></FormSection>
+    }</div>;
+    public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; ++historyVersion; lifetime.Cancel(); lifetime.Dispose(); }
 }

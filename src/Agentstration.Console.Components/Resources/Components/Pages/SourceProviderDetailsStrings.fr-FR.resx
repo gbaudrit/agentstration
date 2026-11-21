@@ -51,4 +51,8 @@
   <data name="Status.Incompatible"><value>Incompatible</value></data>
   <data name="Status.Unknown"><value>Inconnu</value></data>
   <data name="LastChecked"><value>Vérifié le {0}</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>La ressource a changé sur le serveur. Votre brouillon de définition est conservé. Abandonnez-le explicitement pour charger la nouvelle définition.</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La ressource renvoyée ne correspond pas à l’identité demandée.</value></data>
+  <data name="ResourceYamlExport" xml:space="preserve"><value>Ce YAML exporte la ressource enregistrée. Modifiez sa définition pour effectuer des changements.</value></data>
+  <data name="MissingResourceOwner" xml:space="preserve"><value>Le périmètre propriétaire est absent de ce lien. Ouvrez cette ressource depuis la liste des fournisseurs de Sources.</value></data>
 </root>

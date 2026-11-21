@@ -1,0 +1,8 @@
+small, .registry-kind-note { display: block; margin-top: .25rem; color: var(--muted); }
+.registry-kind-note { color: var(--primary); font-weight: 700; }
+.registry-error { color: var(--danger); overflow-wrap: anywhere; }
+.switch-button { display: inline-flex; align-items: center; gap: .45rem; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.switch-button > span { width: 2rem; height: 1.1rem; padding: .14rem; border-radius: 999px; background: var(--border-strong, var(--border)); }
+.switch-button > span::after { content: ""; display: block; width: .82rem; height: .82rem; border-radius: 50%; background: white; transition: transform .15s ease; }
+.switch-button[aria-checked="true"] > span { background: var(--primary); }
+.switch-button[aria-checked="true"] > span::after { transform: translateX(.9rem); }

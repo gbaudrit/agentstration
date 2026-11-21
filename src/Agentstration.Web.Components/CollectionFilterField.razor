@@ -1,0 +1,36 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="collection-filter-field" data-filter-key="@Filter.Key">
+    @if (Filter.Kind == CollectionFilterKind.DateRange)
+    {
+        <fieldset class="collection-date-filter">
+            <legend>@Filter.Label</legend>
+            <FormField Label="@Shared["FilterFrom"]"><ClearableText Type="date" Value="@Value.Value" ValueChanged="value => Change(value, Value.End)" Disabled="Disabled" /></FormField>
+            <FormField Label="@Shared["FilterTo"]"><ClearableText Type="date" Value="@Value.End" ValueChanged="value => Change(Value.Value, value)" Disabled="Disabled" /></FormField>
+        </fieldset>
+    }
+    else
+    {
+        <FormField Label="@Filter.Label">
+            @if (Filter.Kind == CollectionFilterKind.Choice)
+            {
+                <ClearableSelect TValue="string" Value="@Value.Value" ValueChanged="value => Change(value, string.Empty)" disabled="@Disabled">
+                    <option value="">@(Filter.Placeholder ?? Shared["All"])</option>
+                    @foreach (var option in Filter.Options) { <option value="@option.Value">@option.Label</option> }
+                </ClearableSelect>
+            }
+            else
+            {
+                <ClearableText Type="@(Filter.Kind == CollectionFilterKind.Number ? "number" : "text")" Value="@Value.Value" ValueChanged="value => Change(value, string.Empty)" Disabled="Disabled" placeholder="@Filter.Placeholder" />
+            }
+        </FormField>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CollectionFilter Filter { get; set; } = null!;
+    [Parameter] public CollectionFilterValue Value { get; set; } = new();
+    [Parameter] public EventCallback<CollectionFilterValue> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private Task Change(string? value, string? end) => ValueChanged.InvokeAsync(new(value ?? string.Empty, end ?? string.Empty));
+}

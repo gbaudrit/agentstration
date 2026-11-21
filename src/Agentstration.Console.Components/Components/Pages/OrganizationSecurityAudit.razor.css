@@ -1,0 +1,8 @@
+.audit-action-code {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.audit-date {
+    white-space: nowrap;
+}

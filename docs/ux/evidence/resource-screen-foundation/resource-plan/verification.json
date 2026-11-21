@@ -1,0 +1,163 @@
+{
+  "screen": "Resource Plan \u2014 operational review",
+  "nativeCases": [
+    {
+      "title": "Resource Plan preserves the reviewed bindings through sections and changed refresh ",
+      "project": "desktop-chromium",
+      "durationMs": 21129
+    },
+    {
+      "title": "Resource Plan preserves the reviewed bindings through sections and changed refresh @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 27390
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "c325a34bdb108f5ab2215deb0673553068c7e6ba",
+      "reportSha256": "306dd5bd3133c13c1a8534d89f488437d3d5d5ddc574715cec706f0e24070d3d",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor": "ef058f5aa1218c65a991a033b5ecd63d3f24e22e9bc785c266a74344799461d9",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ResourcePlansStrings.resx": "7bc2ae07087cb278fb67842f2fd52887e3021ddea9f2240a2eaa533088ab639f",
+        "src/Agentstration.Console.Components/Resources/Components/Pages/ResourcePlansStrings.fr-FR.resx": "63a014c1c60f6d1b86d8cb814ca8da4e672391333fa36cbbe10204d45a3c6121",
+        "tests/Agentstration.Console.Components.Tests/ResourcePlanReviewTests.cs": "a02154d65278b17fa005990bda9884f03bab460ffecbc2b2cb22f2605abcbc9f"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada"
+      },
+      "campaign": "screens-05"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [],
+  "screenshots": [
+    {
+      "file": "resource-plan-overview-desktop-en.png",
+      "sha256": "0a3eed8e528dce59c7c847a21b09474f821e7357ef2c0d2d6a7e09ce482e65bb"
+    },
+    {
+      "file": "resource-plan-rejected-binding-desktop-en.png",
+      "sha256": "82b14b0387b39f5dcb8ddec1742db35cdc2c0ec6425cfee3c5084d2028238e89"
+    },
+    {
+      "file": "resource-plan-graph-desktop-en.png",
+      "sha256": "266a7e53e12a1cb7698b5e9a0612222ed487e82f95830758d55d6051224cbe52"
+    },
+    {
+      "file": "resource-plan-retained-refresh-desktop-en.png",
+      "sha256": "e22972880e67ebdde52917ee75078964c420666fed2acf3542f3aa6b723e5c08"
+    },
+    {
+      "file": "resource-plan-discarded-binding-desktop-en.png",
+      "sha256": "e3ed27501d48a111c3eb239ece9f04d7f9ff3c21a83e0dd7ecbcedc4f766e632"
+    },
+    {
+      "file": "resource-plan-saved-exact-binding-desktop-en.png",
+      "sha256": "5e1e28b9393ef0a5ef823ad6ccf8d117f5ef7294c25745db5ac6723aefa16319"
+    },
+    {
+      "file": "resource-plan-changes-desktop-en.png",
+      "sha256": "4d42f3c4631e53b0a7f5ebbd912dda59f3a8184e17bb8c6aa6f6285feee98f96"
+    },
+    {
+      "file": "resource-plan-validation-desktop-en.png",
+      "sha256": "ee47b9a2cc1abcc6f15508d85090760e74306310b7fb20afe0c36a7cca9a3b6b"
+    },
+    {
+      "file": "resource-plan-application-desktop-en.png",
+      "sha256": "6ec4615b276cf0ccc8d3741f5bc5dfd7d57e6398390f4819a5b20a28b7cb4c93"
+    },
+    {
+      "file": "resource-plan-activity-desktop-en.png",
+      "sha256": "c2d934eb927f4d02a4b94f3b535e9375b221e7c3c4defc320492b420e8afaa04"
+    },
+    {
+      "file": "resource-plan-overview-mobile-fr.png",
+      "sha256": "8f9c20abe9155ea3ecc9bad9ddb9400d6abadf33bd16633f66e96a59979b5c2a"
+    },
+    {
+      "file": "resource-plan-rejected-binding-mobile-fr.png",
+      "sha256": "f8c9f961496713c9ef2dd03efbf7c3bd1b22c22bdc03232afdff707f4b26b70a"
+    },
+    {
+      "file": "resource-plan-graph-mobile-fr.png",
+      "sha256": "3f70a3119962bcda67f58e6ae5d27751937a6b3de027f0186883a98814debe23"
+    },
+    {
+      "file": "resource-plan-retained-refresh-mobile-fr.png",
+      "sha256": "5cbcb51b6f441a9fbc45e998d55c45e2f96ef812bdcea42a8ce9308bd5e6d184"
+    },
+    {
+      "file": "resource-plan-discarded-binding-mobile-fr.png",
+      "sha256": "b373a660e451192da3b768ae8e4faec817a86c797d5cef2319b6373b2e5ddc91"
+    },
+    {
+      "file": "resource-plan-saved-exact-binding-mobile-fr.png",
+      "sha256": "7d4bd7f7614eaeb00f8d8168b1c26f911c5c9e224a1f789234cb94c75e6f73c2"
+    },
+    {
+      "file": "resource-plan-changes-mobile-fr.png",
+      "sha256": "d1d119ae40bb9a858d2c74af7202cc0cbec1c2941d1f2ee149e25174cb16495f"
+    },
+    {
+      "file": "resource-plan-validation-mobile-fr.png",
+      "sha256": "ef18d1cdd0693116b7751e811361570ed91707b00532a5d4d205ad41c8e00efe"
+    },
+    {
+      "file": "resource-plan-application-mobile-fr.png",
+      "sha256": "ac79baca57cffa650055def3f3635efd3e935580603800fe96b7fffb20b3d046"
+    },
+    {
+      "file": "resource-plan-activity-mobile-fr.png",
+      "sha256": "265bfd591a4437e9b28e646adb26c804e71b2ef601548054b82dcfb6e55852c1"
+    }
+  ],
+  "limits": [
+    "No maintained ResourcePlan browser journey was found; temporary native probes remain outside the repository. New reusable transverse coverage #1236 remains deferred.",
+    "Existing Plan metric-grid proportions and the global mobile platform footer are preserved; no shared shell or protected Agent style change was made."
+  ]
+}

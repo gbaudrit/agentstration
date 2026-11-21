@@ -1,0 +1,27 @@
+@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+
+@code {
+    [CascadingParameter] private EditContext? Current { get; set; }
+    [Parameter] public EventCallback<bool> InvalidInputChanged { get; set; }
+    private EditContext? subscribed;
+    private bool invalid;
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(subscribed, Current)) return;
+        Unsubscribe();
+        subscribed = Current;
+        if (subscribed is not null) subscribed.OnValidationStateChanged += Changed;
+        Notify();
+    }
+    private void Changed(object? sender, ValidationStateChangedEventArgs args) => Notify();
+    private void Notify()
+    {
+        var value = subscribed?.IsModified() == true && subscribed.GetValidationMessages().Any();
+        if (value == invalid) return;
+        invalid = value;
+        _ = InvalidInputChanged.InvokeAsync(value);
+    }
+    private void Unsubscribe() { if (subscribed is not null) subscribed.OnValidationStateChanged -= Changed; }
+    public void Dispose() => Unsubscribe();
+}

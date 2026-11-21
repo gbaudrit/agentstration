@@ -14,6 +14,23 @@ namespace Agentstration.Workplace.Components.Tests;
 public sealed class PendingActionPanelTests
 {
     [TestMethod]
+    public void OptionalDraftNotificationTracksRawTypingAndClearWithoutSubmitting()
+    {
+        using var context = CreateContext();
+        var changes = new List<bool>();
+        var action = new RequestInputAction("Response", null,
+            [new EntryFieldDefinition { Name = "answer", Type = EntryFieldType.Textarea }], PendingActionId.New(), "fixture-token");
+        var rendered = context.Render<PendingActionPanel>(parameters => parameters
+            .Add(value => value.Action, action)
+            .Add(value => value.DraftChanged, EventCallback.Factory.Create<bool>(this, value => changes.Add(value))));
+        rendered.Find("textarea").Input("response before blur");
+        CollectionAssert.AreEqual(new[] { true }, changes);
+        Assert.AreEqual("response before blur", rendered.Find("textarea").GetAttribute("value"));
+        rendered.Find("textarea").Input("");
+        CollectionAssert.AreEqual(new[] { true, false }, changes);
+    }
+
+    [TestMethod]
     public async Task ChoiceActionRendersInlineWithAdaptiveOptions()
     {
         using var context = CreateContext();
@@ -97,7 +114,7 @@ public sealed class PendingActionPanelTests
         Assert.AreEqual(1, rendered.FindAll(".workplace-brand-lockup .brand-lockup-logo").Count);
         Assert.AreEqual(1, rendered.FindAll(".mobile-brand-logo").Count);
         Assert.IsTrue(rendered.Find(".workplace-brand-lockup .brand-lockup-logo").GetAttribute("src")?.EndsWith("agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Find(".mobile-brand-logo").GetAttribute("src")?.EndsWith("agentstration-workplace-lockup-dark.png", StringComparison.Ordinal));
+        Assert.IsTrue(rendered.Find(".mobile-brand-logo").GetAttribute("src")?.EndsWith("agentstration-workplace-lockup-light.png", StringComparison.Ordinal));
         Assert.AreEqual(2, rendered.FindAll(".navigation-group").Count);
         Assert.AreEqual(localizer["Work"].Value, rendered.Find(".navigation-group h2").TextContent);
         Assert.AreEqual(3, rendered.FindAll(".side-nav .nav-icon").Count);

@@ -1,46 +1,54 @@
 @page "/connected-services"
 @implements IDisposable
 @inject IConnectedServicesClient Client
+@inject IServiceProvider Services
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("ConnectedServices") · Agentstration</PageTitle>
-<PageHeader Title="@T("ConnectedServices")" Description="@T("List.Description")" TestId="connected-services">
-    <Actions><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button><a class="button-primary" href="/connected-services/new" data-testid="connected-service-create">@T("Create")</a></Actions>
-</PageHeader>
-<div class="form-alert form-alert-info"><strong>@T("ConfiguredInstances")</strong><span>@T("ExtensionDistinction")</span></div>
-<div class="toolbar">
-    <input @bind="search" @bind:event="oninput" placeholder="@T("Search")" aria-label="@T("Search")" />
-    <select @bind="typeFilter" aria-label="@T("TypeFilter")"><option value="">@T("AllTypes")</option>@foreach (var type in Types) { <option value="@type">@type</option> }</select>
-    <select @bind="statusFilter" aria-label="@T("StatusFilter")"><option value="">@T("AllStatuses")</option>@foreach (var status in Enum.GetValues<ConnectedServiceAvailability>()) { <option value="@status">@StatusLabel(status)</option> }</select>
-</div>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error.Message"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }
-else if (Filtered.Count == 0) { <EmptyState Title="@T("Empty")" Message="@T("Empty.Message")" /> }
-else
-{
-    <DataGrid TItem="ConnectedServiceResource" Items="Filtered">
-        <Header><tr><th>@T("Name")</th><th>@T("Type")</th><th>@T("Status")</th><th>@T("Scope")</th></tr></Header>
-        <Row Context="item"><tr data-testid="connected-service-row"><td><strong><a class="resource-name-link" href="@DetailsUrl(item)" data-testid="connected-service-name-link">@item.Definition.DisplayName</a></strong><br /><code>@item.Name</code></td><td><strong>@item.Definition.Type.Type.Name</strong><br /><small>@item.Definition.Type.Version</small></td><td><StatusBadge Text="@StatusLabel(Availability(item))" Status="@StatusColor(Availability(item))" /></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td></tr></Row>
-    </DataGrid>
-}
+<ResourceCollectionTemplate TItem="ConnectedServiceResource" Title="@T("ConnectedServices")" Description="@T("List.Description")"
+                            TestId="connected-services" RowTestId="connected-service-row" ContextKey="@contextKey" IconName="puzzle"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@T("Search")"
+                            EmptyTitle="@T("Empty")" EmptyMessage="@T("Empty.Message")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<ConnectedServiceResource> items = [];
-    private bool loading = true;
-    private Exception? error;
-    private string search = string.Empty, typeFilter = string.Empty, statusFilter = string.Empty;
-    private IReadOnlyList<string> Types => items.Select(value => value.Definition.Type.Type.Name).Distinct(StringComparer.Ordinal).Order().ToArray();
-    private IReadOnlyList<ConnectedServiceResource> Filtered => items.Where(item =>
-        (string.IsNullOrWhiteSpace(search) || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || item.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)) &&
-        (string.IsNullOrWhiteSpace(typeFilter) || item.Definition.Type.Type.Name == typeFilter) &&
-        (string.IsNullOrWhiteSpace(statusFilter) || Availability(item).ToString() == statusFilter)).ToArray();
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/connected-services/new", Services)" data-testid="connected-service-create">@T("Create")</a></PermissionGate> : null;
+    private CollectionColumn<ConnectedServiceResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@DetailsUrl(item)" IconName="puzzle" Domain="tools" data-testid="connected-service-name-link">
+        <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(Availability(item))" Status="@StatusColor(Availability(item))" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("availability", T("StatusFilter"), CollectionFilterKind.Choice)
+        {
+            Placeholder = T("AllStatuses"),
+            Options = Enum.GetValues<ConnectedServiceAvailability>().Select(status => new CollectionFilterOption(status.ToString(), StatusLabel(status))).ToArray()
+        }]
+    };
+    private IReadOnlyList<CollectionColumn<ConnectedServiceResource>> Columns =>
+    [
+        new("type", T("Type"), item => @<span><strong>@item.Definition.Type.Type.Name</strong><br /><small>@item.Definition.Type.Version</small></span>)
+        {
+            Filters = [new("type", T("TypeFilter"), CollectionFilterKind.Choice)
+            {
+                Placeholder = T("AllTypes"),
+                Options = (items ?? []).Select(item => item.Definition.Type.Type.Name).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+            }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(item => item.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
+    private string DetailsUrl(ConnectedServiceResource resource) => ResourceOwnershipContext.Resource(Services, "/connected-services", resource.Name, resource.Namespace, resource.ScopeRef);
     private string StatusLabel(ConnectedServiceAvailability status) => T($"Availability.{status}");
     private static ConnectedServiceAvailability Availability(ConnectedServiceResource item) => item.ObservedState?.Availability ?? (item.Definition.Enabled ? ConnectedServiceAvailability.Stale : ConnectedServiceAvailability.Disabled);
     private static UiStatus StatusColor(ConnectedServiceAvailability status) => status switch { ConnectedServiceAvailability.Ready => UiStatus.Success, ConnectedServiceAvailability.Stale => UiStatus.Warning, ConnectedServiceAvailability.Unavailable => UiStatus.Danger, _ => UiStatus.Neutral };
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetConnectedServicesAsync(cancellation.Token); } catch (Exception exception) { error = exception; } finally { loading = false; } }
-    private static string DetailsUrl(ConnectedServiceResource resource) => $"/connected-services/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

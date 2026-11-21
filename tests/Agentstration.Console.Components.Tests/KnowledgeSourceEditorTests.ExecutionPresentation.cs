@@ -51,6 +51,8 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.DoesNotContain("orchestration · 1.0.0", rendered.Markup);
         Assert.Contains("step=agent", rendered.Find("a").GetAttribute("href")!);
         Assert.AreEqual("_blank", rendered.Find("a").GetAttribute("target"));
+        Assert.AreEqual("child", rendered.Find(".execution-progress-location .collection-qualified-name code").TextContent);
+        Assert.HasCount(0, rendered.FindAll(".execution-progress-location a button"));
     }
 
     [TestMethod]
@@ -80,7 +82,7 @@ public sealed partial class KnowledgeSourceEditorTests
         client.Projections.Clear();
         client.ProjectionStarter = (_, _) => { client.Projections.Add(failed); return Task.FromResult(new ResourceSnapshot<KnowledgeProjectionResource>(failed, "failed")); };
         await using var context = CreateContext(client);
-        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "?view=projections");
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo("/knowledge-sources/" + source.Name + "#projections");
         var rendered = context.Render<KnowledgeSourceDetails>(parameters => parameters.Add(value => value.Name, source.Name));
         await rendered.Find("[data-testid='knowledge-start-projection']").ClickAsync(new MouseEventArgs());
         rendered.WaitForAssertion(() => Assert.Contains(explanation, rendered.Markup));

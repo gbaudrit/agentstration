@@ -1,9 +1,29 @@
 @page "/agent-runs"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IRuntimeApiClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentRunsStrings> Localizer
-<PageTitle>@T("PageTitle")</PageTitle><PageHeader Title="@T("Title")" Description="@T("Description")" />
-<div data-testid="flow-observability-agent-runs">
-@if(items is null){<LoadingState Message="@T("Loading")"/>}else if(items.Count == 0){<EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")"/>}else{<DataGrid TItem="ExecutionSummary" Items="items"><Header><tr><th>@T("Run")</th><th>@T("Agent")</th><th>@T("Status")</th><th>@T("Started")</th><th>@T("Duration")</th><th>@T("Outcome")</th></tr></Header><Row Context="item"><tr><td><a href="/runs/@Uri.EscapeDataString(item.Id)"><code>@item.Id</code></a></td><td><strong>@item.Agent</strong></td><td><StatusBadge Text="@T($"RunState.{item.Status}")" Status="@PlatformDashboardService.ToStatus(item.Status)" /></td><td>@item.StartedAt.LocalDateTime.ToString("g")</td><td>@(item.Duration?.ToString("g")??T("Live"))</td><td>@(item.Error??item.Result??"—")</td></tr></Row></DataGrid>}
-</div>
-@code{private readonly CancellationTokenSource cancellation=new();private IReadOnlyList<ExecutionSummary>? items;protected override async Task OnInitializedAsync()=>items=await Client.GetExecutionsAsync(cancellation.Token);private string T(string key)=>Localizer[key];public void Dispose(){cancellation.Cancel();cancellation.Dispose();}}
+
+<PageTitle>@T("PageTitle")</PageTitle>
+<ResourceCollectionTemplate TItem="ExecutionSummary" Title="@T("Title")" Description="@T("Description")" TestId="flow-observability-agent-runs"
+                            IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="ReloadAsync" OnRetry="RetryAsync" />
+
+@code {
+    private string T(string key) => Localizer[key].Value;
+    private CollectionColumn<ExecutionSummary> IdentityColumn => new("identity", T("Run"), item => @<CollectionIdentity DisplayName="@item.Id" Name="@item.Id" Href="@RunUrl(item)" IconName="agent">
+        <IconBadges><StatusBadge Text="@StatusText(item.Status)" Status="@PlatformDashboardService.ToStatus(item.Status)" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    // No global search/filter contract exists for this server page; the total is unknown.
+    private IReadOnlyList<CollectionColumn<ExecutionSummary>> Columns =>
+    [
+        new("agent", T("Agent"), item => @<strong>@item.Agent</strong>),
+        new("started", T("Started"), item => @<time datetime="@item.StartedAt.ToString("O")">@item.StartedAt.LocalDateTime.ToString("g")</time>),
+        new("duration", T("Duration"), item => @<span>@(item.Duration?.ToString("g") ?? T("Live"))</span>),
+        new("outcome", T("Outcome"), item => @<span>@(item.Error ?? item.Result ?? "—")</span>)
+    ];
+    private string StatusText(string status) => T($"RunState.{(Enum.TryParse<RuntimeRunState>(status, true, out var value) && Enum.IsDefined(value) ? value.ToString() : "Unknown")}");
+    private string RunUrl(ExecutionSummary item) => ResourceOwnershipContext.PreserveNavigation($"/runs/{Uri.EscapeDataString(item.Id)}?scopeRef={Uri.EscapeDataString(Context.Current!.SelectedScopeRef)}", Services);
+}

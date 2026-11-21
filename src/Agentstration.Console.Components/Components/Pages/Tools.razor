@@ -1,38 +1,52 @@
 @page "/tools"
+@implements IDisposable
 @inject IToolsClient Client
 @inject IServiceProvider Services
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> ExtensionLocalizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tools">
-    <Actions><a class="button-secondary" href="/tools/providers">@T("Providers")</a><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button></Actions>
-</PageHeader>
-<ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="/tools">@T("Catalog")</a><a href="/tools/sets">@T("ToolSets")</a><a href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (tools.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <div class="tool-catalog-grid"><DataGrid TItem="ToolResource" Items="tools">
-        <Header><tr><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Availability")</th><th>@T("Enabled")</th><th></th></tr></Header>
-        <Row Context="tool"><tr><td data-label="@T("Tool")"><div class="tool-catalog-identity"><span class="tool-catalog-icon" aria-hidden="true"><UiIcon Name="wrench" /></span><div><span class="resource-name-with-scope"><strong>@tool.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span><code>@tool.Definition.ExternalId</code></div></div></td><td data-label="@T("Provider")">
-            @if (ManagingExtension(tool) is { } extension)
-            {
-                <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@(tool.Governance.Origin.Version ?? extension.Version)</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div></div>
-            }
-            else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }
-            </td><td data-label="@T("Availability")"><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" /></td><td data-label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</td><td><a class="text-button" href="@ToolUrl(tool)">@T("Details")</a></td></tr></Row>
-    </DataGrid></div>
-}
+<ResourceCollectionTemplate TItem="ToolResource" Title="@T("Title")" Description="@T("Description")" TestId="resource-tools"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation><ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs></Navigation>
+</ResourceCollectionTemplate>
 
 @code {
-    private IReadOnlyList<ToolResource> tools = []; private IReadOnlyList<ToolProviderResource> providers = []; private IReadOnlyList<ExtensionInventoryItemResponse> extensions = []; private bool loading = true; private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { var toolsTask = Client.GetToolsAsync(); var providersTask = Client.GetProvidersAsync(default); await Task.WhenAll(toolsTask, providersTask); tools = toolsTask.Result; providers = providersTask.Result; if (Services.GetService<IExtensionsClient>() is { } client) extensions = await client.GetExtensionInventoryAsync(default); } catch (Exception ex) { error = ex.Message; } finally { loading = false; } }
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private CollectionColumn<ToolResource> IdentityColumn => new("identity", T("Tool"), tool => @<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench">
+        <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>)
+    {
+        Filters = [new("availability", T("Availability"), CollectionFilterKind.Choice) { Options = [new("available", T("Available")), new("unavailable", T("Unavailable"))] }]
+    };
+    private IReadOnlyList<CollectionColumn<ToolResource>> Columns =>
+    [
+        new("provider", T("Provider"), tool => @<text>@if (ManagingExtension(tool) is { } extension) {
+            <div class="tool-catalog-owner"><a class="tool-catalog-extension" href="@ExtensionUrl(extension)">@extension.DisplayName</a><div class="tool-catalog-provenance"><code>@extension.ExtensionId</code><span>@ExtensionLocalizer["ExtensionVersion"]: @extension.Version</span><ResourceScopeBadge ScopeRef="extension.RegistrationScopeRef" Compact /></div>
+            @if (tool.Governance.Origin.Version is { } originVersion) { <small>@T("OriginVersion"): @originVersion</small> }</div>
+        } else { <div class="tool-catalog-owner"><strong>@ProviderDisplayName(tool)</strong></div> }</text>)
+
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("enabled", T("Enabled"), CollectionFilterKind.Choice) { Options = [new("true", BooleanLabel(true)), new("false", BooleanLabel(false))] },
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(tool => tool.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        },
+        new("scope", ExtensionLocalizer["Scope"], CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(tool => tool.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
     private string ProviderDisplayName(ToolResource tool)
     {
         return ManagingExtension(tool)?.DisplayName ?? providers.FirstOrDefault(value =>

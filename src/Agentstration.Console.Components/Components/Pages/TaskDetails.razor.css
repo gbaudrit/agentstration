@@ -1,0 +1,6 @@
+::deep .resource-details dd { min-width: 0; overflow-wrap: anywhere; }
+::deep .operations-list, ::deep .operations-list > li { min-width: 0; }
+::deep .operations-list p, ::deep .operations-list small, ::deep .task-error { overflow-wrap: anywhere; }
+::deep .result-preview { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }
+::deep .metric-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); }
+::deep .metric-card strong { overflow-wrap: anywhere; }

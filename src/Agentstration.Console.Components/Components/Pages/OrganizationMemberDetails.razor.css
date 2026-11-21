@@ -1,0 +1,3 @@
+.member-details dd { min-width: 0; overflow-wrap: anywhere; }
+.member-details code, .member-scope { white-space: normal; overflow-wrap: anywhere; }
+.metric-grid ::deep strong { overflow-wrap: anywhere; }

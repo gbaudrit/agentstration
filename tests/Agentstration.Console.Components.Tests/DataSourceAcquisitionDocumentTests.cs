@@ -63,18 +63,18 @@ public sealed class DataSourceAcquisitionDocumentTests
         var editor = context.Render<StructuredDocumentQueryEditor>(p => p.Add(c => c.Description, handler.Description.Documents)
             .Add(c => c.RunRequested, _ => calls++));
         await editor.Find("textarea").InputAsync("[]");
-        await editor.Find("button").ClickAsync();
+        await editor.Find("[data-testid=document-query-run]").ClickAsync();
         Assert.AreEqual(0, calls);
         Assert.IsNotNull(editor.Find("[role=alert]"));
         await editor.Find("textarea").InputAsync("{}");
         await editor.Find("input[type=number]").ChangeAsync("51");
-        await editor.Find("button").ClickAsync();
+        await editor.Find("[data-testid=document-query-run]").ClickAsync();
         Assert.AreEqual(0, calls);
         await editor.Find("input[type=number]").ChangeAsync("5");
-        await editor.Find("button").ClickAsync();
+        await editor.Find("[data-testid=document-query-run]").ClickAsync();
         Assert.AreEqual(1, calls);
         editor.Render(p => p.Add(c => c.CanExecute, false));
-        Assert.IsTrue(editor.Find("button").HasAttribute("disabled"));
+        Assert.IsTrue(editor.Find("[data-testid=document-query-run]").HasAttribute("disabled"));
     }
 
     private sealed class ContextProvider : IConsoleContextProvider

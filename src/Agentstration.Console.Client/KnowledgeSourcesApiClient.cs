@@ -7,6 +7,7 @@ namespace Agentstration.Web.Console;
 
 public interface IKnowledgeSourcesClient
 {
+    IKnowledgeSourcesClient WithOwner(ResourceScopeRef? owner) => this;
     Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeSourceResource>> CreateAsync(CreateKnowledgeSourceRequest request, CancellationToken cancellationToken = default);
@@ -40,6 +41,8 @@ public interface IKnowledgeSourcesClient
 
 public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledgeSourcesClient
 {
+    private ResourceScopeRef? Owner { get; init; }
+    public IKnowledgeSourcesClient WithOwner(ResourceScopeRef? owner) => new KnowledgeSourcesApiClient(httpClient) { Owner = owner };
     public Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default) =>
         ApiResponse.ReadAsync<IReadOnlyList<KnowledgeSourceResource>>(httpClient, "api/knowledgesources", cancellationToken);
 
@@ -163,7 +166,7 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
         PostAsync<KnowledgeAccessResult>(ChildPath(ns, name, "content/query-documents"), request, ct);
     public Task<StorageDocumentDescription> DescribeDocumentsAsync(ResourceNamespace ns, string name, string? snapshotId, CancellationToken ct = default) =>
         ApiResponse.ReadAsync<StorageDocumentDescription>(httpClient, ChildPath(ns, name, "content/document-capabilities")
-            + (snapshotId is null ? "" : ((ns.IsDefault ? "?" : "&") + "snapshotId=" + Uri.EscapeDataString(snapshotId))), ct);
+            + (snapshotId is null ? "" : ((ns.IsDefault && Owner is null ? "?" : "&") + "snapshotId=" + Uri.EscapeDataString(snapshotId))), ct);
 
     public Task<KnowledgeAccessResult> ReadContentAsync(ResourceNamespace @namespace, string name, KnowledgeReadRequest request, CancellationToken cancellationToken = default) =>
         PostAsync<KnowledgeAccessResult>(ChildPath(@namespace, name, "content/read"), request, cancellationToken);
@@ -194,16 +197,17 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
         return (await response.Content.ReadFromJsonAsync<T>(cancellationToken))!;
     }
 
-    private static string Path(ResourceNamespace @namespace, string name)
+    private string Qualify(string path) => Owner is null ? path : $"{path}{(path.Contains('?') ? "&" : "?")}scopeRef={Uri.EscapeDataString(Owner.Value.Value)}";
+    private string Path(ResourceNamespace @namespace, string name)
     {
         var path = $"api/knowledgesources/{Uri.EscapeDataString(name)}";
-        return @namespace.IsDefault ? path : $"{path}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+        return Qualify(@namespace.IsDefault ? path : $"{path}?namespace={Uri.EscapeDataString(@namespace.Value)}");
     }
 
-    private static string ChildPath(ResourceNamespace @namespace, string name, string child)
+    private string ChildPath(ResourceNamespace @namespace, string name, string child)
     {
         var path = $"api/knowledgesources/{Uri.EscapeDataString(name)}/{child}";
-        return @namespace.IsDefault ? path : $"{path}?namespace={Uri.EscapeDataString(@namespace.Value)}";
+        return Qualify(@namespace.IsDefault ? path : $"{path}?namespace={Uri.EscapeDataString(@namespace.Value)}");
     }
 
 }

@@ -2,196 +2,57 @@
 @page "/modelprofiles/{Name}"
 @implements IDisposable
 @inject IModelProfilesClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfilesStrings> CollectionLabels
 @inject IModelProvidersClient ProvidersClient
 @inject IExtensionsClient ExtensionsClient
+@inject IResourceScopeInventoryClient Scopes
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLabels
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings> ModelLabels
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
 
-<PageTitle>@(IsNew ? T("CreateModelProfile") : $"{Name} · {T("ModelProfile")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateModelProfile") : model?.DisplayName ?? Name)" Description="@T("Description")" TestId="resource-model-profile-editor">
-    <Actions>@if (!IsNew && CanManage) { <button class="button-danger" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }<a class="button-secondary" href="/modelprofiles">@T("Back")</a></Actions>
-</PageHeader>
-
-@if (loading || model is null)
+<PageTitle>@(IsNew ? T("CreateModelProfile") : resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{
+    var presentations = Presentations;
+    RenderFragment definition = @<text>@if (model is not null) {
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="model-profile-resource-form" FormName="model-profile-editor"
+            Sections="presentations" SectionState="@(IsNew ? null : sectionState)" SectionContent="@(IsNew ? null : DefinitionSection)" SectionRequested="ShowSection"
+            OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmitAsync" InvalidInputChanged="value => invalidInput = value" ReadOnly="@(!CanManage)" Busy="saving"
+            FieldsTestId="model-profile-definition-fields" data-testid="model-profile-form" data-interactive="@interactive.ToString().ToLowerInvariant()" data-resource-etag="@etag" @oninput="MarkDirty" @onchange="MarkDirty">
+            <ChildContent>@if (IsNew) {
+                <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+                <CreationWizard @ref="wizard" Steps="Steps" OnFinish="FinishAsync" Disabled="@(!CanManage || loading)" Busy="saving" FinishLabel="@T("CreateProfile")" FinishTestId="model-profile-save" TestId="model-profile-creation-wizard" />
+            }</ChildContent>
+        </ResourceDefinitionForm>
+    }</text>;
+}
+@if (IsNew)
 {
-    <LoadingState Message="@T("Loading")" />
+    <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Title="@T("CreateModelProfile")" Description="@T("Description")" TestId="resource-model-profile-editor"></PageHeader>
+    @if (model is null || loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" /> }
+    else { @Feedback @definition }
 }
 else
 {
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSave"))</strong><span>@error.Message</span>@if (error.IsConcurrencyConflict) { <button class="text-button" @onclick="LoadAsync">@T("ReloadCurrentVersion")</button> }</div> }
-    @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
-    @if (!IsNew && selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
-    @if (!IsNew && CanManage && usages.Count > 0)
-    {
-        <div class="model-profile-impact-banner" role="status" data-testid="model-profile-impact-banner">
-            <span class="model-profile-impact-icon" aria-hidden="true"><TablerIcon Name="alert-triangle" /></span>
-            <span class="model-profile-impact-copy"><strong>@T("ChangingProfileAffects", AgentCount(usages.Count))</strong><span>@T("ImpactBannerDescription")</span></span>
-            <button type="button" class="model-profile-impact-action" data-testid="model-profile-review-usages" @onclick="() => SelectTab(ModelProfileTab.Usages)">@T("ReviewUsages") <span aria-hidden="true">→</span></button>
-        </div>
-    }
-
-    @if (!IsNew)
-    {
-        <ResourceTabs Label="@T("ModelProfile")"><button type="button" class="@(activeTab == ModelProfileTab.Definition ? "active" : null)" @onclick="() => SelectTab(ModelProfileTab.Definition)">@T("Definition")</button>@if (CanManage) { <button type="button" class="@(activeTab == ModelProfileTab.Access ? "active" : null)" data-testid="model-profile-access-tab" @onclick="() => SelectTab(ModelProfileTab.Access)">@T("Access")</button> }<button type="button" class="@(activeTab == ModelProfileTab.Usages ? "active" : null)" data-testid="model-profile-usages-tab" @onclick="() => SelectTab(ModelProfileTab.Usages)">@T("Usages")</button></ResourceTabs>
-    }
-
-    @if (CanManage && activeTab == ModelProfileTab.Access && resource is not null && selectedScope is { } ownerScope)
-    {
-        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@ModelResourceKinds.ModelProfile" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
-    }
-    else if (activeTab == ModelProfileTab.Usages)
-    {
-        <section class="panel resource-section model-profile-usages-panel" data-testid="model-profile-usages-panel">
-            <div class="model-profile-usages-heading">
-                <div><p class="eyebrow">@T("Impact")</p><h2>@T("AgentUsages")</h2><p>@T("AgentUsagesDescription")</p></div>
-                <span class="model-profile-usage-count">@AgentCount(usages.Count)</span>
-            </div>
-            @if (usages.Count == 0)
-            {
-                <EmptyState Title="@T("NoUsages")" Message="@T("NoAgentReferences")" />
-            }
-            else
-            {
-                <ul class="model-profile-usage-list" data-testid="model-profile-usages-list">
-                    @foreach (var usage in usages)
-                    {
-                        <li class="model-profile-usage-card" data-testid="model-profile-usage">
-                            <a href="@AgentUrl(usage)">
-                                <span class="model-profile-usage-icon" aria-hidden="true"><TablerIcon Name="robot" /></span>
-                                <span class="model-profile-usage-identity"><strong>@usage.DisplayName</strong><code>@usage.Namespace/@usage.Name</code></span>
-                                <span class="model-profile-usage-scope"><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact />@if (!string.IsNullOrWhiteSpace(usage.ScopeDisplayName)) { <small>@usage.ScopeDisplayName</small> }</span>
-                                <span class="model-profile-usage-arrow" aria-hidden="true">→</span>
-                            </a>
-                        </li>
-                    }
-                </ul>
-            }
-        </section>
-    }
-    else
-    {
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="model-profile-editor" class="resource-form" data-testid="model-profile-form" data-interactive="@(interactive ? "true" : "false")" data-resource-etag="@etag">
-        <DataAnnotationsValidator /><ValidationSummary />
-        <fieldset class="model-profile-definition-fields" disabled="@(!CanManage)" data-testid="model-profile-definition-fields">
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ProfileResource")</h2></div>@if (resolution is not null) { <StatusBadge Text="@StatusLabel(resolution.Status)" Status="@ModelManagementUi.Status(resolution.Status)" /> }</div>
-            <div class="form-grid">
-                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="model-profile-display-name" TechnicalNameTestId="model-profile-name" />
-                <label><span>@T("Namespace")</span><InputText @bind-Value="model.Namespace" disabled="@(!IsNew)" /><ValidationMessage For="() => model.Namespace" /></label>
-                <ResourceScopeFormField ResourceKind="@ModelResourceKinds.ModelProfile" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-                <label class="form-span-2"><span>@T("DescriptionLabel")</span><InputTextArea @bind-Value="model.Description" rows="3" /></label>
-            </div>
-        </section>
-
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("ModelSelection")</p><h2>@T("ProviderAndModel")</h2></div></div>
-            <div class="form-grid">
-                <label><span>@T("Provider")</span><select value="@SelectedProvider" @onchange="ProviderChangedAsync" data-testid="model-profile-provider"><option value="">@T("SelectProvider")</option>@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</select><ValidationMessage For="() => model.ProviderName" /></label>
-                <label><span>@T("Model")</span><select @bind="model.ModelName" disabled="@loadingModels" data-testid="model-profile-model"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(model.ModelName) && models.All(item => !string.Equals(item.Name, model.ModelName, StringComparison.Ordinal))) { <option value="@model.ModelName">@model.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</select><ValidationMessage For="() => model.ModelName" /></label>
-            </div>
-            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(model.ProviderName)) { <p class="inline-warning">@T("NoModelsReported")</p> }
-        </section>
-
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Defaults")</p><h2>@T("Generation")</h2></div><span>@T("Canonical")</span></div>
-            <div class="form-grid">
-                <label><span>@T("Temperature") <HelpTooltip Text="@T("TemperatureHelp")" /></span><InputNumber @bind-Value="model.Temperature" step="0.1" /><ValidationMessage For="() => model.Temperature" /></label>
-                <label><span>@T("TopP") <HelpTooltip Text="@T("TopPHelp")" /></span><InputNumber @bind-Value="model.TopP" step="0.05" /><ValidationMessage For="() => model.TopP" /></label>
-                <label><span>@T("TopK") <HelpTooltip Text="@T("TopKHelp")" /></span><InputNumber @bind-Value="model.TopK" /><ValidationMessage For="() => model.TopK" /></label>
-                <label><span>@T("MaximumOutputTokens") <HelpTooltip Text="@T("MaximumOutputTokensHelp")" /></span><InputNumber @bind-Value="model.MaxOutputTokens" /><ValidationMessage For="() => model.MaxOutputTokens" /></label>
-                <label><span>@T("Seed") <HelpTooltip Text="@T("SeedHelp")" /></span><InputNumber @bind-Value="model.Seed" /></label>
-                <label class="form-span-2"><span>@T("StopSequences") <HelpTooltip Text="@T("StopSequencesHelp")" /></span><InputTextArea @bind-Value="model.StopSequences" rows="3" /></label>
-            </div>
-        </section>
-
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Inference")</p><h2>@T("ReasoningAndOutput")</h2></div></div>
-            <div class="form-grid">
-                <label><span>@T("ReasoningMode")</span><InputSelect @bind-Value="model.ReasoningMode">@foreach (var value in Enum.GetValues<ReasoningMode>()) { <option value="@value">@value</option> }</InputSelect></label>
-                <label><span>@T("ReasoningEffort")</span><InputSelect @bind-Value="model.ReasoningEffort"><option value="">@T("ProviderDefault")</option>@foreach (var value in Enum.GetValues<ReasoningEffort>()) { <option value="@value">@value</option> }</InputSelect><small>@T("ReasoningEffortHelp")</small></label>
-                <label><span>@T("OutputFormat")</span><InputSelect @bind-Value="model.OutputFormat">@foreach (var value in Enum.GetValues<ModelOutputFormat>()) { <option value="@value">@value</option> }</InputSelect></label>
-                <label class="checkbox-field"><InputCheckbox @bind-Value="model.StrictOutput" /><span>@T("StrictStructuredOutput")</span></label>
-                @if (model.OutputFormat == ModelOutputFormat.JsonSchema)
-                {
-                    <label class="form-span-2"><span>@T("JsonSchema")</span><InputTextArea @bind-Value="model.JsonSchema" rows="10" class="runner-json" /><small>@T("JsonSchemaRequired")</small></label>
-                }
-            </div>
-        </section>
-
-        <section class="panel form-section"><div class="panel-header"><div><p class="eyebrow">@T("Adapter")</p><h2>@T("ProviderOptions")</h2></div><span>@(optionEditor is null ? T("Advanced") : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></div>
-            @if (optionEditor is { CanGuide: true } && !rawOptions)
-            {
-                <div class="form-grid">
-                    <label class="checkbox-field form-span-2"><input type="checkbox" checked="@optionEditor.Enabled" @onchange="SetProviderOptionsEnabled" /><span>@T("ConfigureProviderOptions")</span></label>
-                    @if (optionEditor.Enabled)
-                    {
-                        @foreach (var field in optionEditor.Fields)
-                        {
-                            @if (field.Kind == ExtensionOptionFieldKind.Toggle)
-                            {
-                                <label class="checkbox-field"><input type="checkbox" checked="@BooleanValue(field)" @onchange="args => SetBooleanOption(field, args)" /><span>@FieldLabel(field)</span></label>
-                            }
-                            else if (field.AllowedValues.Count > 0)
-                            {
-                                <label><span>@FieldLabel(field)</span><select value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"><option value="">@T("ProviderDefault")</option>@foreach (var value in field.AllowedValues) { <option value="@value">@value</option> }</select>@FieldHelp(field)</label>
-                            }
-                            else if (field.Kind is ExtensionOptionFieldKind.JsonObject or ExtensionOptionFieldKind.JsonValue)
-                            {
-                                <label class="form-span-2"><span>@FieldLabel(field)</span><textarea rows="5" class="runner-json form-code-editor" value="@field.Value" @onchange="args => SetOption(field, args.Value?.ToString())"></textarea>@FieldHelp(field)</label>
-                            }
-                            else
-                            {
-                                <label><span>@FieldLabel(field)</span><input type="@(field.Kind is ExtensionOptionFieldKind.WholeNumber or ExtensionOptionFieldKind.DecimalNumber ? "number" : "text")" value="@field.Value" min="@field.Minimum" max="@field.Maximum" step="@(field.Kind == ExtensionOptionFieldKind.WholeNumber ? "1" : "any")" @onchange="args => SetOption(field, args.Value?.ToString())" />@FieldHelp(field)</label>
-                            }
-                        }
-                    }
-                </div>
-                <div class="panel-actions"><button class="button-secondary" type="button" @onclick="() => rawOptions = true">@T("EditRawJson")</button><a class="text-button" href="/extensions">@T("InspectContract")</a></div>
-            }
-            else
-            {
-                @if (optionEditor?.UnavailableReason is { } reason) { <p class="inline-warning">@reason</p> }
-                <div class="form-grid"><label class="form-span-2"><span>@T("ProviderSpecificJson")</span><InputTextArea @bind-Value="model.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("ProviderJsonHelpPrefix") <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code> @T("And") <code>values</code>.</small></label></div>
-                @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">@T("ReturnToGuidedEditor")</button></div> }
-            }
-        </section>
-        </fieldset>
-
-        @if (CanManage)
-        {
-            <div class="form-actions"><a class="button-secondary" href="/modelprofiles">@T("Cancel")</a><button class="button-primary" type="submit" disabled="@saving" data-testid="model-profile-save">@(saving ? T("Saving") : IsNew ? T("CreateProfile") : T("SaveChanges"))</button></div>
-        }
-    </EditForm>
-
-    @if (!IsNew)
-    {
-        <section class="resource-section">
-            <article class="panel"><div class="panel-header"><div><p class="eyebrow">@T("Overview")</p><h2>@T("EffectiveResolution")</h2></div><button class="button-secondary" type="button" @onclick="RefreshResolutionAsync" disabled="@diagnosing">@(diagnosing ? T("Checking") : T("RefreshDiagnosis"))</button></div>
-                @if (resolution is null) { <p>@T("ResolutionUnavailable")</p> } else { <dl class="resource-details"><dt>@T("DeclaredProfile")</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>@T("ResolvedProvider")</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("ProviderConnection")</dt><dd>@StatusLabel(resolution.Provider?.Status)</dd><dt>@T("ResolvedModel")</dt><dd>@resolution.Model.Name</dd><dt>@T("ModelStatus")</dt><dd>@StatusLabel(resolution.Model.Status)</dd><dt>@T("ProfileStatus")</dt><dd>@StatusLabel(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
-            </article>
-        </section>
-        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Compatibility")</p><h2>@T("EffectiveCapabilities")</h2></div><span>@T("CapabilitySources")</span></div>
-            @if (resolution?.Capabilities is not { Count: > 0 })
-            {
-                <EmptyState Title="@T("CapabilitiesUnavailable")" Message="@T("CapabilitiesUnavailableMessage")" />
-            }
-            else
-            {
-                <DataGrid TItem="ModelCapabilityResponse" Items="resolution.Capabilities"><Header><tr><th>@T("Capability")</th><th>@T("Provider")</th><th>@T("Model")</th><th>@T("Adapter")</th><th>@T("Effective")</th><th>@T("Values")</th></tr></Header><Row Context="capability"><tr><td><strong>@capability.Name</strong></td><td>@SupportLabel(capability.ProviderSupport)</td><td>@SupportLabel(capability.ModelSupport)</td><td>@SupportLabel(capability.AdapterSupport)</td><td><strong>@SupportLabel(capability.EffectiveSupport)</strong></td><td>@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</td></tr></Row></DataGrid>
-            }
-            @if (resolution?.Incompatibilities is { Count: > 0 })
-            {
-                <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProfileIncompatible")</strong>@foreach (var issue in resolution.Incompatibilities) { <span><code>@issue.Capability</code> — @issue.Message</span> }</div>
-            }
-            else if (resolution?.Capabilities is { Count: > 0 })
-            {
-                <p class="inline-info">@T("ProfileCompatible")</p>
-            }
-        </section>
-        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("DeclarativeResource")</h2></div><span>@T("ReadOnly")</span></div><pre class="runner-json">@Definition</pre></section>
-    }
-    }
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@CollectionLabels["Title"]" Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name ?? string.Empty)" ResourceType="@T("ModelProfile")" Domain="model" IconName="adjustments"
+        Description="@resource?.Definition.Description" StatusText="@(resolution is null ? null : StatusLabel(resolution.Status))" Status="@(resolution is null ? UiStatus.Neutral : ModelManagementUi.Status(resolution.Status))"
+        ResourceIdentity="@(loadedKey ?? Name ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections"
+        AllowAccess="OwnScope" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="Busy" HasDraft="HasDraft" DefinitionReadOnlyReason="ExplicitReadOnlyReason" Yaml="@(resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(resource))"
+        SectionTestIdPrefix="model-profile" TestId="resource-model-profile-editor">
+        <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }</Actions>
+        <Feedback>@Feedback</Feedback>
+        <OverviewMetrics><MetricCard Label="@T("ProfileStatus")" Value="@StatusLabel(resolution?.Status)" Status="@ModelManagementUi.Status(resolution?.Status)" /><MetricCard Label="@T("AgentUsages")" Value="@(usageOverallTotal is { } count ? AgentCount(count) : "—")" Detail="@T("AgentUsagesDescription")" /></OverviewMetrics>
+        <OverviewConfiguration>@SavedConfiguration</OverviewConfiguration>
+        <DefinitionContent Context="path">@definition</DefinitionContent>
+        <AdditionalContent Context="path">@if (path == "usages") { @Usages } else if (path == "resolution") { @Resolution }</AdditionalContent>
+        <DraftActions><button class="button-secondary" type="button" disabled="@Busy" @onclick="Discard">@Shared["Discard"]</button><button class="button-primary" type="submit" form="model-profile-resource-form" disabled="@(Busy || !CanManage)" data-testid="model-profile-save">@(saving ? T("Saving") : T("SaveChanges"))</button></DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
-
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-profile-delete-dialog" />
+<ConfirmationDialog IsOpen="confirmDelete" Title="@T("DeleteDialogTitle")" Message="@T("DeleteDialogMessage", resource?.Name ?? Name ?? string.Empty)" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" TestId="model-profile-delete-dialog" />
 
 @code {
     [Parameter] public string? Name { get; set; }
@@ -200,165 +61,452 @@ else
     [SupplyParameterFromQuery(Name = "provider")] public string? SuggestedProvider { get; set; }
     [SupplyParameterFromQuery(Name = "providerNamespace")] public string? SuggestedProviderNamespace { get; set; }
     [SupplyParameterFromQuery(Name = "model")] public string? SuggestedModel { get; set; }
-    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
     [SupplyParameterFromQuery(Name = "context")] public string? Context { get; set; }
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
     private readonly CancellationTokenSource cancellation = new();
-    private ModelProfileEditorModel? model; private ModelProfileResource? resource; private IReadOnlyList<ModelProviderResponse> providers = []; private IReadOnlyList<AvailableModelResponse> models = []; private IReadOnlyList<ExtensionResponse> extensions = [];
-    private IReadOnlyList<ModelProfileUsageResponse> usages = []; private ModelProfileResolutionResponse? resolution;
-    private ExtensionOptionsEditorModel? optionEditor; private bool rawOptions;
-    private AgentstrationApiException? error; private string? etag; private string? warning; private bool loading = true; private bool loadingModels; private bool saving; private bool diagnosing; private bool confirmDelete; private bool interactive;
-    private ModelProfileTab activeTab;
-    private ResourceScopeRef? selectedScope;
-    private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
+    private readonly CancellationToken lifetimeToken;
+    public ModelProfileEditor() => lifetimeToken = cancellation.Token;
+    private readonly ResourceSectionState sectionState = new();
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private ModelProfileEditorModel? model;
+    private ModelProfileResource? resource;
+    private ProfileBundle? savedBundle, newerBundle;
+    private IReadOnlyList<ModelProviderResponse> providers = [];
+    private IReadOnlyList<AvailableModelResponse> models = [];
+    private IReadOnlyList<ExtensionResponse> extensions = [];
+    private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
+    private ModelProfileResolutionResponse? resolution;
+    private ExtensionOptionsEditorModel? optionEditor;
+    private bool rawOptions, disposed, hydrated, loading, saving, diagnosing, loadingModels, confirmDelete, invalidInput, touched, persisted;
+    private string? loadedKey, etag, baseline, warning, pendingNavigation, invalidOptionName;
+    private AgentstrationApiException? error;
+    private long loadVersion, modelVersion;
+    private EditContext? editContext;
+    private ValidationMessageStore? messages;
+    private ResourceDefinitionForm? definitionForm;
+    private CreationWizard? wizard;
+    private readonly List<string?> usageCursors = [null];
+    private string usageSearch = string.Empty;
+    private string? usageNextCursor;
+    private int usagePage, usageDisplayPage, usageVersion;
+    private int? usageTotal, usageOverallTotal;
+    private bool usageLoading, usageKnownSome;
+    private AgentstrationApiException? usageError;
+    private IReadOnlyList<ModelProfileUsageResponse> usages = [];
+    private CancellationTokenSource? pendingUsage;
+    private bool IsNew => !persisted;
+    private bool interactive => hydrated && !loading;
+    private bool Busy => loading || saving || diagnosing || loadingModels;
     private ResourceScopeRef? RequestedScope => string.IsNullOrWhiteSpace(ScopeRef) ? null : ResourceScopeRef.Parse(ScopeRef);
     private ResourceScopeRef? RequestedContext => string.IsNullOrWhiteSpace(Context) ? null : ResourceScopeRef.Parse(Context);
     private ResourceScopeRef? CurrentContext => RequestedContext ?? ResourceOwnershipContext.TryGetCurrent(Services);
-    private bool CanManage => IsNew || selectedScope is { } ownerScope &&
-        (RequestedContext is { } requestedContext ? ownerScope == requestedContext : ResourceOwnershipContext.CanManage(ownerScope, Services));
+    private ResourceScopeRef? selectedScope => model?.ScopeRef ?? resource?.ScopeRef;
+    private ResourceNamespace SelectedNamespace => ResourceNamespace.Parse(Namespace);
+    private bool CanWrite => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    private bool OwnScope => resource?.ScopeRef is { } owner && (CurrentContext is { } current ? owner == current : ResourceOwnershipContext.CanManage(owner, Services));
+    private bool CanManage => hydrated && CanWrite && (IsNew ? scopeTargets.Any(target => target.CanWrite && target.ScopeRef == selectedScope) : OwnScope && resource?.Governance.IsManaged == false);
+    private bool CanDelete => hydrated && resource is not null && OwnScope && !resource.Governance.IsManaged
+        && (Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(AuthorizationPermissions.ResourcesDelete));
+    private ResourceReadOnlyReason? ExplicitReadOnlyReason => !CanWrite ? ResourceReadOnlyReason.InsufficientPermissions : resource is not null && !OwnScope ? ResourceReadOnlyReason.Inherited : null;
+    private string Fingerprint => JsonSerializer.Serialize(new { model, OptionsEnabled = optionEditor?.Enabled, Options = optionEditor?.Fields.Select(option => new { option.Name, option.Value }) });
+    private bool HasDraft => model is not null && baseline is not null && (Fingerprint != baseline || invalidInput || touched);
+    private EditContext FormContext => editContext ??= NewContext();
+    private EditContext NewContext()
+    {
+        var context = new EditContext(model!); messages = new(context);
+        context.OnValidationRequested += (_, _) => ValidateSpecialized(context);
+        return context;
+    }
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/modelprofiles", Services);
     private string SelectedProvider => model is null || string.IsNullOrWhiteSpace(model.ProviderName) ? string.Empty : $"{model.ProviderNamespace}:{model.ProviderName}";
-    private string Definition
+    private IReadOnlyList<ResourceNavigationItem> DefinitionSections => [new("definition/generation", T("Generation"), "adjustments"), new("definition/provider-options", T("ProviderOptions"), "settings")];
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("usages", T("Usages"), "users"), new("resolution", T("EffectiveResolution"), "activity")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(ModelProfileEditorModel.Name), nameof(ModelProfileEditorModel.Namespace), nameof(ModelProfileEditorModel.DisplayName), nameof(ModelProfileEditorModel.Description), nameof(ModelProfileEditorModel.Tags), nameof(ModelProfileEditorModel.ScopeRef)] },
+        ["definition/configuration"] = new() { HasRequiredFields = true, Fields = [nameof(ModelProfileEditorModel.ProviderNamespace), nameof(ModelProfileEditorModel.ProviderName), nameof(ModelProfileEditorModel.ModelName)] },
+        ["definition/generation"] = new() { Fields = [nameof(ModelProfileEditorModel.Temperature), nameof(ModelProfileEditorModel.TopP), nameof(ModelProfileEditorModel.TopK), nameof(ModelProfileEditorModel.MaxOutputTokens), nameof(ModelProfileEditorModel.Seed), nameof(ModelProfileEditorModel.StopSequences), nameof(ModelProfileEditorModel.ReasoningMode), nameof(ModelProfileEditorModel.ReasoningEffort), nameof(ModelProfileEditorModel.OutputFormat), nameof(ModelProfileEditorModel.JsonSchema), nameof(ModelProfileEditorModel.StrictOutput)] },
+        ["definition/provider-options"] = new() { Fields = [nameof(ModelProfileEditorModel.ProviderOptionsJson)] },
+        ["resolution"] = new() { ReadOnly = true, ReadOnlyActions = DiagnosisAction }, ["yaml"] = new() { ReadOnly = true }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(ModelProfileEditorModel.Name)] = T("Name"), [nameof(ModelProfileEditorModel.Namespace)] = T("Namespace"), [nameof(ModelProfileEditorModel.DisplayName)] = T("DisplayName"), [nameof(ModelProfileEditorModel.Description)] = T("DescriptionLabel"), [nameof(ModelProfileEditorModel.Tags)] = Shared["Labels"], [nameof(ModelProfileEditorModel.ScopeRef)] = Shared["Scope"],
+        [nameof(ModelProfileEditorModel.ProviderNamespace)] = T("Namespace"), [nameof(ModelProfileEditorModel.ProviderName)] = T("Provider"), [nameof(ModelProfileEditorModel.ModelName)] = T("Model"), [nameof(ModelProfileEditorModel.Temperature)] = T("Temperature"), [nameof(ModelProfileEditorModel.TopP)] = T("TopP"), [nameof(ModelProfileEditorModel.TopK)] = T("TopK"), [nameof(ModelProfileEditorModel.MaxOutputTokens)] = T("MaximumOutputTokens"), [nameof(ModelProfileEditorModel.Seed)] = T("Seed"), [nameof(ModelProfileEditorModel.StopSequences)] = T("StopSequences"),
+        [nameof(ModelProfileEditorModel.ReasoningMode)] = T("ReasoningMode"), [nameof(ModelProfileEditorModel.ReasoningEffort)] = T("ReasoningEffort"), [nameof(ModelProfileEditorModel.OutputFormat)] = T("OutputFormat"), [nameof(ModelProfileEditorModel.JsonSchema)] = T("JsonSchema"), [nameof(ModelProfileEditorModel.StrictOutput)] = T("StrictStructuredOutput"), [nameof(ModelProfileEditorModel.ProviderOptionsJson)] = T("ProviderOptions")
+    };
+    private RenderFragment Feedback => @<div>
+        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert"><strong>@(error.IsConcurrencyConflict ? T("ConcurrencyConflict") : T("UnableToSave"))</strong><span>@error.Message</span></div> }
+        @if (!string.IsNullOrWhiteSpace(warning)) { <div class="form-alert form-alert-warning" role="status">@warning</div> }
+        @if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+        @if (!IsNew && CanManage && (usageKnownSome || usageOverallTotal is null)) { <div class="model-profile-impact-banner" role="status" data-testid="model-profile-impact-banner"><span class="model-profile-impact-icon" aria-hidden="true"><TablerIcon Name="alert-triangle" /></span><span class="model-profile-impact-copy"><strong>@(usageOverallTotal is { } total ? T("ChangingProfileAffects", AgentCount(total)) : Shared["MayAffect"])</strong><span>@T("ImpactBannerDescription")</span></span><button type="button" class="model-profile-impact-action" data-testid="model-profile-review-usages" @onclick='() => ShowSection("usages")'>@T("ReviewUsages") <span aria-hidden="true">→</span></button></div> }
+    </div>;
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@ModelResourceKinds.ModelProfile" DisplayName="@model!.DisplayName" DisplayNameChanged="value => model!.DisplayName = value" DisplayNameExpression="@(() => model!.DisplayName)"
+        TechnicalName="@model!.Name" TechnicalNameChanged="value => model!.Name = value" TechnicalNameExpression="@(() => model!.Name)" Namespace="@model!.Namespace" NamespaceChanged="value => model!.Namespace = value" NamespaceExpression="@(() => model!.Namespace)" NamespaceEditable="IsNew"
+        ScopeRef="model!.ScopeRef" ScopeRefChanged="ScopeChangedAsync" ScopeTargets="scopeTargets" IsNew="IsNew" ReadOnly="@(!CanManage)" Description="@model!.Description" DescriptionChanged="value => model!.Description = value" DescriptionExpression="@(() => model!.Description)" Labels="@model!.Tags" LabelsExpression="@(() => model!.Tags)" LabelsReadOnly="true"
+        DisplayNameTestId="model-profile-display-name" TechnicalNameTestId="model-profile-name" TestId="model-profile-identity-editor"><ScopeValidation><ValidationMessage For="() => model!.ScopeRef" /></ScopeValidation></ResourceIdentityEditor>;
+    private RenderFragment Defaults => @<div class="resource-editor-view">@Generation @Reasoning</div>;
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => Identity, "definition/configuration" => Provider, "definition/generation" => Defaults, "definition/provider-options" => Options, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
+    private RenderFragment DiagnosisAction => @<button class="button-secondary" type="button" disabled="@Busy" @onclick="RefreshResolutionAsync">@(diagnosing ? T("Checking") : T("RefreshDiagnosis"))</button>;
+    private IReadOnlyList<CreationWizardStep> Steps => [new("identity", T("Identity"), Identity) { IsComplete = Complete("definition/identity") }, new("model", T("ProviderAndModel"), Provider) { IsComplete = Complete("definition/configuration") }, new("generation", T("Generation"), Defaults) { IsComplete = Complete("definition/generation") }, new("options", T("ProviderOptions"), Options) { IsComplete = OptionsComplete }, new("review", Shared["Verification"], Review) { IsComplete = model is not null && model.InvalidFields().Count == 0 && !invalidInput && OptionsComplete }];
+    private bool Complete(string path) => model is not null && !(path == "definition/generation" && invalidInput) && !Presentations[path].Fields.Any(model.InvalidFields().Contains);
+    private bool OptionsComplete
     {
         get
         {
-            if (model is null) return string.Empty;
-            try { return JsonSerializer.Serialize(new { apiVersion = ResourceApiVersions.CoreV1, kind = ModelResourceKinds.ModelProfile, metadata = new { name = model.Name, @namespace = model.Namespace }, definition = model.ToProperties() }, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }); }
-            catch (ArgumentException) { return T("DeclarativeDefinitionUnavailable"); }
+            if (model is null || model.InputIssues().Any(issue => issue.Field == nameof(model.ProviderOptionsJson))) return false;
+            if (!rawOptions && optionEditor?.CanGuide == true)
+            {
+                try { optionEditor.ToProviderOptionsJson(); }
+                catch (ArgumentException) { return false; }
+            }
+            return true;
         }
     }
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details"><dt>@T("DisplayName")</dt><dd>@model?.DisplayName</dd><dt>@T("Name")</dt><dd><code>@model?.Namespace/@model?.Name</code></dd><dt>@T("Provider")</dt><dd><code>@model?.ProviderNamespace/@model?.ProviderName</code></dd><dt>@T("Model")</dt><dd>@model?.ModelName</dd></dl></FormSection>;
+    private RenderFragment SavedConfiguration => @<CollectionView TItem="ProfileSetting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (entry.Href is { } href) { <a href="@href">@entry.Value</a> } else { @entry.Value }</span></CollectionValue></Information></CollectionView>;
+    private sealed record ProfileSetting(string Label, string Value, string? Href = null);
+    private IEnumerable<ProfileSetting> SavedEntries
+    {
+        get
+        {
+            if (resource is not { } saved) yield break;
+            var definition = saved.Definition;
+            var providerNamespace = definition.Provider.Namespace ?? saved.Namespace;
+            var owner = definition.Provider.ScopeRef ?? providers.SingleOrDefault(provider => provider.Name == definition.Provider.Name && provider.Namespace == providerNamespace.Value)?.ScopeRef;
+            yield return new(T("Provider"), $"{providerNamespace}/{definition.Provider.Name}", owner is { } scope ? ResourceOwnershipContext.Resource(Services, "/modelproviders", definition.Provider.Name, providerNamespace, scope) : null);
+            yield return new(T("Model"), definition.Model.Name);
+            yield return new(T("Temperature"), Number(definition.Generation.Temperature));
+            yield return new(T("TopP"), Number(definition.Generation.TopP));
+            yield return new(T("TopK"), Number(definition.Generation.TopK));
+            yield return new(T("MaximumOutputTokens"), Number(definition.Generation.MaxOutputTokens));
+            yield return new(T("Seed"), Number(definition.Generation.Seed));
+            yield return new(T("StopSequences"), definition.Generation.StopSequences is { Count: > 0 } stops ? string.Join(Environment.NewLine, stops) : "—");
+            yield return new(T("ReasoningMode"), EnumLabel(definition.Reasoning.Mode));
+            yield return new(T("ReasoningEffort"), definition.Reasoning.Effort is { } effort ? EnumLabel(effort) : T("ProviderDefault"));
+            yield return new(T("OutputFormat"), EnumLabel(definition.Output.Format));
+            yield return new(T("StrictStructuredOutput"), T(definition.Output.Strict ? "ReasoningMode.Enabled" : "ReasoningMode.Disabled"));
+            if (definition.Output.JsonSchema is { } schema) yield return new(T("JsonSchema"), schema.GetRawText());
+            yield return new(T("ProviderOptions"), definition.ProviderOptions.Count == 0 ? "—" : JsonSerializer.Serialize(definition.ProviderOptions));
+        }
+    }
+    private static string Number<T>(T? value) where T : struct, IFormattable => value?.ToString(null, System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+    private sealed record ProfileBundle(ResourceSnapshot<ModelProfileResource> Snapshot, IReadOnlyList<ModelProviderResponse> Providers, IReadOnlyList<ExtensionResponse> Extensions, IReadOnlyList<AvailableModelResponse> Models, IReadOnlyList<ResourceScopeTargetResponse> Targets, ModelProfileResolutionResponse? Resolution, string? Warning, bool CatalogueDenied = false);
+    private bool catalogueDenied;
     protected override Task OnParametersSetAsync()
     {
-        activeTab = Tab?.ToLowerInvariant() switch
-        {
-            "access" => ModelProfileTab.Access,
-            "usages" => ModelProfileTab.Usages,
-            _ => ModelProfileTab.Definition
-        };
-        return LoadAsync();
+        var key = $"{Name}|{Namespace}|{ScopeRef}|{Context}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (key == loadedKey) return Task.CompletedTask;
+        loadedKey = key; persisted = !string.IsNullOrWhiteSpace(Name); ClearPrivate(); sectionState.Reset(key);
+        return LoadAsync(false);
     }
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
-    private async Task LoadAsync()
+    protected override void OnAfterRender(bool firstRender)
     {
-        loading = true; error = null; warning = null;
+        if (firstRender) { hydrated = true; StateHasChanged(); }
+        if (pendingNavigation is { } target) { pendingNavigation = null; Navigation.NavigateTo(target); }
+    }
+    private void ClearPrivate()
+    {
+        model = null; resource = null; optionEditor = null; resolution = null; providers = []; models = []; extensions = []; scopeTargets = [];
+        savedBundle = newerBundle = null; editContext = null; messages = null; baseline = etag = warning = null; error = null;
+        invalidInput = touched = rawOptions = saving = diagnosing = loadingModels = confirmDelete = catalogueDenied = false;
+        usageVersion++; pendingUsage?.Cancel(); usages = []; usageCursors.Clear(); usageCursors.Add(null); usageSearch = string.Empty;
+        usagePage = usageDisplayPage = 0; usageTotal = usageOverallTotal = null; usageNextCursor = null; usageError = null; usageLoading = usageKnownSome = false;
+    }
+    private Task RetryAsync() => Busy ? Task.CompletedTask : LoadAsync(resource is not null);
+    private Task RefreshAsync() => Busy ? Task.CompletedTask : LoadAsync(true);
+    private async Task LoadAsync(bool refresh)
+    {
+        var request = ++loadVersion; var expected = resource; loading = true;
+        loadState = new(refresh && resource is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = resource is not null };
         try
         {
             if (IsNew)
             {
-                model = new ModelProfileEditorModel
-                {
-                    Namespace = SelectedNamespace.Value,
-                    ProviderName = SuggestedProvider ?? string.Empty,
-                    ProviderNamespace = SuggestedProviderNamespace ?? SelectedNamespace.Value,
-                    ModelName = SuggestedModel ?? string.Empty
-                };
+                var targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProfile, lifetimeToken);
+                if (request != loadVersion) return;
+                scopeTargets = targets;
+                var owner = targets.FirstOrDefault(target => target.CanWrite && target.ScopeRef == CurrentContext)?.ScopeRef ?? targets.FirstOrDefault(target => target.CanWrite)?.ScopeRef;
+                model = new() { Namespace = SelectedNamespace.Value, ScopeRef = owner, ProviderName = SuggestedProvider ?? string.Empty, ProviderNamespace = SuggestedProviderNamespace ?? SelectedNamespace.Value, ModelName = SuggestedModel ?? string.Empty };
+                await LoadDependenciesAsync(request, owner ?? RequestedContext);
+                if (request != loadVersion) return;
+                ConfigureOptionEditor(); ResetForm(); loadState = new(ResourceLoadStatus.Ready) { HasContent = true }; return;
             }
-            else
+            var snapshot = RequestedScope is { } scope && RequestedContext is { } context
+                ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, scope, context, lifetimeToken)
+                : RequestedScope is { } exact ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, exact, lifetimeToken)
+                : await Client.GetModelProfileAsync(SelectedNamespace, Name!, lifetimeToken);
+            if (request != loadVersion) return;
+            if (!Matches(snapshot.Value, expected)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            await LoadUsagePageAsync(false, snapshot.Value);
+            lifetimeToken.ThrowIfCancellationRequested();
+            if (request != loadVersion) return;
+            var bundle = await ReadBundleAsync(snapshot, request);
+            if (request != loadVersion) return;
+            if (HasDraft)
             {
-                var snapshot = RequestedScope is { } requestedScope && RequestedContext is { } requestedContext
-                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, requestedScope, requestedContext, cancellation.Token)
-                    : RequestedScope is { } exactScope
-                    ? await Client.GetModelProfileAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
-                    : await Client.GetModelProfileAsync(SelectedNamespace, Name!, cancellation.Token);
-                resource = snapshot.Value; model = ModelProfileEditorModel.FromResource(snapshot.Value); selectedScope = snapshot.Value.ScopeRef; etag = snapshot.ETag;
-                if (activeTab == ModelProfileTab.Access && !CanManage) activeTab = ModelProfileTab.Definition;
-                usages = selectedScope is { } ownerScope && RequestedContext is { } usageContext
-                    ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, ownerScope, usageContext, cancellation.Token)).Value
-                    : selectedScope is { } exactUsageScope
-                    ? (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, exactUsageScope, cancellation.Token)).Value
-                    : (await Client.GetModelProfileUsagesAsync(SelectedNamespace, Name!, cancellation.Token)).Value;
-                resolution = selectedScope is { } resolutionScope && RequestedContext is { } resolutionContext
-                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, resolutionScope, resolutionContext, cancellation.Token)
-                    : selectedScope is { } exactResolutionScope
-                    ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactResolutionScope, cancellation.Token)
-                    : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
+                warning = bundle.Warning;
+                if (bundle.CatalogueDenied)
+                {
+                    providers = []; extensions = []; models = []; scopeTargets = []; optionEditor = null; rawOptions = catalogueDenied = true;
+                    newerBundle = null;
+                    if (savedBundle is not null) savedBundle = savedBundle with { Providers = [], Extensions = [], Models = [], Targets = [], CatalogueDenied = true, Warning = bundle.Warning };
+                }
+                if (snapshot.ETag != etag || snapshot.Value.Generation != resource?.Generation) newerBundle = bundle;
             }
-            var dependencyScope = selectedScope ?? RequestedContext;
-            providers = dependencyScope is { } consumerScope
-                ? await ProvidersClient.GetModelProvidersAsync(consumerScope, cancellation.Token)
-                : await ProvidersClient.GetModelProvidersAsync(cancellation.Token);
-            extensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token);
-            if (!string.IsNullOrWhiteSpace(model.ProviderName)) await LoadModelsAsync(clearSelection: false);
-            ConfigureOptionEditor();
+            else Adopt(bundle);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (AgentstrationApiException exception) { error = exception; model ??= new ModelProfileEditorModel(); }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            if (request != loadVersion) return;
+            var state = exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden, System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
+            if (state is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) ClearPrivate();
+            loadState = new(state) { HasContent = resource is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+        }
+        finally { if (request == loadVersion) loading = false; }
     }
-    private async Task ProviderChangedAsync(ChangeEventArgs args)
+    private bool Matches(ModelProfileResource candidate, ModelProfileResource? previous) => candidate.Name == Name && candidate.Namespace == SelectedNamespace && candidate.ScopeRef is not null
+        && (RequestedScope is null || candidate.ScopeRef == RequestedScope) && (previous is null || candidate.Uid == previous.Uid && candidate.ScopeRef == previous.ScopeRef);
+    private async Task LoadDependenciesAsync(long request, ResourceScopeRef? owner)
     {
-        if (model is null) return;
-        var value = args.Value?.ToString() ?? string.Empty;
-        var separator = value.IndexOf(':');
-        model.ProviderNamespace = separator > 0 ? value[..separator] : ResourceNamespace.DefaultValue;
-        model.ProviderName = separator > 0 ? value[(separator + 1)..] : value;
-        await LoadModelsAsync(clearSelection: true);
-        ConfigureOptionEditor();
+        var availableProviders = owner is { } scope ? await ProvidersClient.GetModelProvidersAsync(scope, lifetimeToken) : await ProvidersClient.GetModelProvidersAsync(lifetimeToken);
+        if (request != loadVersion) return;
+        var availableExtensions = await ExtensionsClient.GetExtensionsAsync(lifetimeToken);
+        if (request != loadVersion) return;
+        providers = availableProviders; extensions = availableExtensions;
+        await LoadModelsAsync(false);
     }
-    private async Task LoadModelsAsync(bool clearSelection)
+    private async Task<ProfileBundle> ReadBundleAsync(ResourceSnapshot<ModelProfileResource> snapshot, long request)
     {
-        if (model is null) return; if (clearSelection) model.ModelName = string.Empty; models = []; warning = null;
-        if (string.IsNullOrWhiteSpace(model.ProviderName)) return;
-        loadingModels = true;
+        IReadOnlyList<ModelProviderResponse> availableProviders = []; IReadOnlyList<ExtensionResponse> availableExtensions = [];
+        IReadOnlyList<AvailableModelResponse> availableModels = []; IReadOnlyList<ResourceScopeTargetResponse> targets = [];
+        ModelProfileResolutionResponse? observed = null; string? note = null; var denied = false;
+        var saved = snapshot.Value;
         try
         {
-            var dependencyScope = selectedScope ?? RequestedContext;
-            models = dependencyScope is { } consumerScope
-                ? await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, consumerScope, cancellation.Token)
-                : await ProvidersClient.GetProviderModelsAsync(ResourceNamespace.Parse(model.ProviderNamespace), model.ProviderName, cancellation.Token);
+            availableProviders = await ProvidersClient.GetModelProvidersAsync(saved.ScopeRef!.Value, lifetimeToken);
+            if (request != loadVersion) return new(snapshot, [], [], [], [], null, null);
+            availableExtensions = await ExtensionsClient.GetExtensionsAsync(lifetimeToken);
+            if (request != loadVersion) return new(snapshot, [], [], [], [], null, null);
+            targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProfile, lifetimeToken);
+            if (request != loadVersion) return new(snapshot, [], [], [], [], null, null);
+            availableModels = await ProvidersClient.GetProviderModelsAsync(saved.Definition.Provider.Namespace ?? saved.Namespace, saved.Definition.Provider.Name, saved.ScopeRef.Value, lifetimeToken);
         }
-        catch (AgentstrationApiException exception) { warning = T("ModelsCannotBeDiscovered", exception.Message); }
-        finally { loadingModels = false; }
+        catch (AgentstrationApiException exception)
+        {
+            note = T("ModelsCannotBeDiscovered", exception.Message);
+            if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            { availableProviders = []; availableExtensions = []; availableModels = []; targets = []; denied = true; }
+            else if (resource?.Uid == saved.Uid) { availableProviders = providers; availableExtensions = extensions; availableModels = models; targets = scopeTargets; }
+        }
+        if (request != loadVersion) return new(snapshot, [], [], [], [], null, null);
+        try { observed = await ReadResolutionAsync(saved); }
+        catch (AgentstrationApiException exception) { note = exception.Message; if (exception.StatusCode is not (System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound) && resource?.Uid == saved.Uid) observed = resolution; }
+        return new(snapshot, availableProviders, availableExtensions, availableModels, targets, observed, note, denied);
     }
-    private async Task SaveAsync()
+    private Task<ModelProfileResolutionResponse> ReadResolutionAsync(ModelProfileResource saved) => RequestedContext is { } context
+        ? Client.GetModelProfileResolutionAsync(saved.Namespace, saved.Name, saved.ScopeRef!.Value, context, lifetimeToken)
+        : Client.GetModelProfileResolutionAsync(saved.Namespace, saved.Name, saved.ScopeRef!.Value, lifetimeToken);
+    private void Adopt(ProfileBundle bundle)
     {
-        if (!CanManage || model is null || saving) return; saving = true; error = null;
+        savedBundle = bundle; resource = bundle.Snapshot.Value; etag = bundle.Snapshot.ETag; model = ModelProfileEditorModel.FromResource(resource);
+        providers = bundle.Providers; extensions = bundle.Extensions; models = bundle.Models; scopeTargets = bundle.Targets; resolution = bundle.Resolution;
+        warning = bundle.Warning; catalogueDenied = bundle.CatalogueDenied; newerBundle = null; ConfigureOptionEditor(); ResetForm();
+    }
+    private void ResetForm() { editContext = null; messages = null; invalidInput = touched = false; invalidOptionName = null; baseline = Fingerprint; }
+    private void MarkDirty() { if (CanManage) touched = true; }
+    private void Discard() { if (Busy || savedBundle is null) return; Adopt(newerBundle ?? savedBundle); error = null; }
+    private async Task ScopeChangedAsync(ResourceScopeRef? value)
+    {
+        if (!IsNew || !CanWrite || !hydrated || model is null || selectedScope == value || value is { } target && !scopeTargets.Any(scope => scope.ScopeRef == target && scope.CanWrite)) return;
+        model.ScopeRef = value; FormContext.NotifyFieldChanged(FormContext.Field(nameof(model.ScopeRef)));
+        var request = ++loadVersion; ++modelVersion; loadingModels = false;
+        providers = []; models = []; extensions = []; optionEditor = null;
+        MarkDirty();
+        if (value is null) return;
+        try { await LoadDependenciesAsync(request, value); if (request == loadVersion) ConfigureOptionEditor(); }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) warning = T("ModelsCannotBeDiscovered", exception.Message); }
+    }
+    private Task ShowSection(string path)
+    {
+        var target = Navigation.Uri.Split('#')[0] + "#" + path;
+        if (target != Navigation.Uri) Navigation.NavigateTo(target);
+        return Task.CompletedTask;
+    }
+    private void ValidateSpecialized(EditContext context)
+    {
+        if (model is null || !ReferenceEquals(context.Model, model)) return;
+        messages ??= new(context); messages.Clear(); invalidOptionName = null;
+        foreach (var issue in model.InputIssues()) messages.Add(context.Field(issue.Field), T(issue.Code == ModelProfileInputIssueCode.JsonSchemaInvalid ? "JsonSchemaRequired" : "ProviderOptionsInvalid"));
+        if (!rawOptions && optionEditor?.CanGuide == true)
+        {
+            try { optionEditor.ToProviderOptionsJson(); }
+            catch (ArgumentException exception) { invalidOptionName = exception.ParamName; messages.Add(context.Field(nameof(model.ProviderOptionsJson)), OptionError(exception)); }
+        }
+        context.NotifyValidationStateChanged();
+    }
+    private Task InvalidSubmitAsync(EditContext context) => IsNew ? RevealCreationErrorAsync() : Task.CompletedTask;
+    private async Task RevealCreationErrorAsync()
+    {
+        var section = ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations);
+        if (wizard is not null) await wizard.GoToStepAsync(StepFor(section));
+        definitionForm?.RequestValidationFocus();
+    }
+    private static string StepFor(string? section) => section switch { "definition/identity" => "identity", "definition/configuration" => "model", "definition/generation" => "generation", _ => "options" };
+    private async Task FinishAsync(CreationWizardFinish finish)
+    {
+        if (!CanManage || Busy || model is null) return;
+        if (!FormContext.Validate()) { finish.ReturnToStepId = StepFor(ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations)); definitionForm?.RequestValidationFocus(); return; }
+        await SaveAsync(FormContext);
+    }
+    private async Task SaveAsync(EditContext context)
+    {
+        if (!CanManage || Busy || model is null) return;
+        if (!context.Validate()) { if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return; }
+        var request = loadVersion; var wasNew = IsNew; var expected = resource;
+        saving = true; error = null;
         try
         {
             if (!rawOptions && optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson();
-            ResourceSnapshot<ModelProfileResource> snapshot = IsNew
-                ? await Client.CreateModelProfileAsync(model.ToCreateRequest() with { ScopeRef = selectedScope }, cancellation.Token)
-                : await Client.UpdateModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, model.ToPutRequest(), etag!, cancellation.Token);
-            etag = snapshot.ETag; Notifications.Add(new NotificationItem(Guid.NewGuid(), IsNew ? T("CreatedNotification") : T("UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            Navigation.NavigateTo(DetailsUrl(snapshot.Value.Namespace, snapshot.Value.Name, snapshot.Value.ScopeRef));
+            var ns = wasNew ? ResourceNamespace.Parse(model.Namespace) : resource!.Namespace; var name = wasNew ? model.Name.Trim() : resource!.Name; var owner = model.ScopeRef;
+            var snapshot = wasNew ? await Client.CreateModelProfileAsync(model.ToCreateRequest(), lifetimeToken)
+                : await Client.UpdateModelProfileAsync(ns, name, resource!.ScopeRef!.Value, model.ToPutRequest(), etag!, lifetimeToken);
+            if (request != loadVersion) return;
+            if (snapshot.Value.Name != name || snapshot.Value.Namespace != ns || snapshot.Value.ScopeRef != owner || expected is not null && snapshot.Value.Uid != expected.Uid)
+            { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            persisted = true;
+            Adopt(new(snapshot, providers, extensions, models, scopeTargets, resolution, warning, catalogueDenied));
+            Notifications.Add(new(Guid.NewGuid(), T(wasNew ? "CreatedNotification" : "UpdatedNotification"), snapshot.Value.Name, DateTimeOffset.Now, UiStatus.Success));
+            if (wasNew) Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/modelprofiles", snapshot.Value.Name, snapshot.Value.Namespace, snapshot.Value.ScopeRef));
         }
-        catch (ArgumentException exception) { error = new AgentstrationApiException(exception.Message, Guid.NewGuid().ToString("N")); }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { saving = false; }
+        catch (ArgumentException exception) { if (request == loadVersion) error = new(exception.Message, Guid.NewGuid().ToString("N")); }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) error = exception; }
+        finally { if (request == loadVersion) saving = false; }
     }
     private async Task RefreshResolutionAsync()
     {
-        if (IsNew || diagnosing) return; diagnosing = true; error = null;
-        try
-        {
-            resolution = selectedScope is { } scope && CurrentContext is { } currentContext
-                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, scope, currentContext, cancellation.Token)
-                : selectedScope is { } exactScope
-                ? await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, exactScope, cancellation.Token)
-                : await Client.GetModelProfileResolutionAsync(SelectedNamespace, Name!, cancellation.Token);
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { diagnosing = false; }
+        if (Busy || resource is not { } saved) return;
+        var request = loadVersion; diagnosing = true;
+        try { var observed = await ReadResolutionAsync(saved); if (request == loadVersion) resolution = observed; }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) { warning = exception.Message; if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound) resolution = null; } }
+        finally { if (request == loadVersion) diagnosing = false; }
     }
-    private void RequestDelete() { if (!CanManage) return; if (usages.Count > 0) { warning = T("CannotDeleteUsedProfile", AgentCount(usages.Count), string.Join(", ", usages.Select(item => item.DisplayName))); return; } confirmDelete = true; }
+    private void RequestDelete()
+    {
+        if (!CanDelete || Busy) return;
+        if (usageKnownSome || usageOverallTotal > 0) { warning = T("CannotDeleteUsedProfile", usageOverallTotal is { } total ? AgentCount(total) : Shared["UsedBy"].Value, string.Join(", ", usages.Select(item => item.DisplayName))); return; }
+        confirmDelete = true;
+    }
     private async Task DeleteAsync()
     {
-        if (!CanManage || model is null || etag is null) return; confirmDelete = false;
-        try { await Client.DeleteModelProfileAsync(ResourceNamespace.Parse(model.Namespace), model.Name, selectedScope!.Value, etag, cancellation.Token); Notifications.Add(new NotificationItem(Guid.NewGuid(), T("DeletedNotification"), model.Name, DateTimeOffset.Now, UiStatus.Success)); Navigation.NavigateTo("/modelprofiles"); }
-        catch (AgentstrationApiException exception) { error = exception; }
+        if (!CanDelete || Busy || resource is not { } saved || etag is null) return;
+        var request = loadVersion; confirmDelete = false; saving = true;
+        try
+        {
+            await Client.DeleteModelProfileAsync(saved.Namespace, saved.Name, saved.ScopeRef!.Value, etag, lifetimeToken);
+            if (request != loadVersion) return;
+            Notifications.Add(new(Guid.NewGuid(), T("DeletedNotification"), saved.Name, DateTimeOffset.Now, UiStatus.Success));
+            ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); pendingNavigation = BackUrl;
+        }
+        catch (AgentstrationApiException exception) { if (request == loadVersion) error = exception; }
+        finally { if (request == loadVersion) saving = false; }
+    }
+    private async Task ProviderChangedAsync(ChangeEventArgs args)
+    {
+        if (!CanManage || model is null || catalogueDenied) return;
+        var value = args.Value?.ToString() ?? string.Empty; var separator = value.IndexOf(':');
+        model.ProviderNamespace = separator > 0 ? value[..separator] : ResourceNamespace.DefaultValue;
+        model.ProviderName = separator > 0 ? value[(separator + 1)..] : value;
+        MarkDirty(); await LoadModelsAsync(true); ConfigureOptionEditor();
+    }
+    private async Task LoadModelsAsync(bool clearSelection)
+    {
+        if (model is not { } editor) return;
+        var request = loadVersion; var choice = ++modelVersion; var providerName = editor.ProviderName; var providerNamespace = ResourceNamespace.Parse(editor.ProviderNamespace); var owner = editor.ScopeRef ?? RequestedContext;
+        if (clearSelection) { editor.ModelName = string.Empty; models = []; }
+        if (string.IsNullOrWhiteSpace(providerName)) { models = []; return; }
+        loadingModels = true;
+        try
+        {
+            var found = owner is { } scope ? await ProvidersClient.GetProviderModelsAsync(providerNamespace, providerName, scope, lifetimeToken) : await ProvidersClient.GetProviderModelsAsync(providerNamespace, providerName, lifetimeToken);
+            if (request == loadVersion && choice == modelVersion && ReferenceEquals(model, editor)) models = found;
+        }
+        catch (AgentstrationApiException exception) { if (request == loadVersion && choice == modelVersion) { warning = T("ModelsCannotBeDiscovered", exception.Message); if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound) models = []; } }
+        finally { if (request == loadVersion && choice == modelVersion) loadingModels = false; }
+    }
+    private string OptionError(ArgumentException exception)
+    {
+        var option = optionEditor?.Fields.SingleOrDefault(value => value.Name == exception.ParamName);
+        return option is null ? T("ProviderOptionsInvalid")
+            : T(option.Required && string.IsNullOrWhiteSpace(option.Value) ? "ProviderOptionRequired" : "ProviderOptionInvalid." + option.Kind, option.Name);
+    }
+    private void NotifyOptionsChanged()
+    {
+        if (model is null) return;
+        invalidOptionName = null; messages?.Clear(FormContext.Field(nameof(model.ProviderOptionsJson)));
+        FormContext.NotifyFieldChanged(FormContext.Field(nameof(model.ProviderOptionsJson))); MarkDirty();
+    }
+    private void UseRawOptions()
+    {
+        if (!CanManage || model is null) return;
+        try { if (optionEditor?.CanGuide == true) model.ProviderOptionsJson = optionEditor.ToProviderOptionsJson(); rawOptions = true; NotifyOptionsChanged(); }
+        catch (ArgumentException exception) { messages ??= new(FormContext); messages.Add(FormContext.Field(nameof(model.ProviderOptionsJson)), OptionError(exception)); FormContext.NotifyValidationStateChanged(); definitionForm?.RequestValidationFocus(); }
+    }
+    private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
+    public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; ++modelVersion; ++usageVersion; pendingUsage?.Cancel(); cancellation.Cancel(); cancellation.Dispose(); }
+
+    private async Task UsageSearchChanged(string? value) { usageSearch = value ?? string.Empty; await LoadUsagePageAsync(true); }
+    private async Task UsagePageChanged(int value)
+    {
+        if (usageLoading) return;
+        if (value > usagePage + 1 && usageNextCursor is { } next) { if (usageCursors.Count == usagePage + 1) usageCursors.Add(next); else usageCursors[usagePage + 1] = next; }
+        usagePage = Math.Clamp(value - 1, 0, usageCursors.Count - 1);
+        await LoadUsagePageAsync(false);
+    }
+    private async Task LoadUsagePageAsync(bool reset, ModelProfileResource? target = null)
+    {
+        if (disposed) return;
+        if (IsNew) return;
+        if (reset) { usagePage = 0; usageCursors.Clear(); usageCursors.Add(null); usageNextCursor = null; usageTotal = null; }
+        var version = ++usageVersion;
+        pendingUsage?.Cancel(); pendingUsage?.Dispose();
+        var currentRequest = CancellationTokenSource.CreateLinkedTokenSource(lifetimeToken);
+        pendingUsage = currentRequest;
+        usageLoading = true; usageError = null;
+        try
+        {
+            var response = await Client.GetModelProfileUsagePageAsync(target?.Namespace ?? resource?.Namespace ?? SelectedNamespace, target?.Name ?? resource?.Name ?? Name!, target?.ScopeRef ?? resource?.ScopeRef, RequestedContext, usageSearch, usageCursors[usagePage], currentRequest.Token);
+            if (version != usageVersion) return;
+            usages = response.Value; usageDisplayPage = usagePage; usageNextCursor = response.NextCursor; usageTotal = response.Count;
+            usageKnownSome |= usages.Count > 0;
+            if (string.IsNullOrWhiteSpace(usageSearch) && response.Count is { } knownTotal) { usageOverallTotal = knownTotal; usageKnownSome = knownTotal > 0; }
+        }
+        catch (OperationCanceledException) when (currentRequest.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception)
+        {
+            if (version != usageVersion) return;
+            usageError = exception;
+            if (exception.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+            { usages = []; usageNextCursor = null; usageTotal = usageOverallTotal = null; usageKnownSome = false; }
+        }
+        finally { if (version == usageVersion) usageLoading = false; if (ReferenceEquals(pendingUsage, currentRequest)) pendingUsage = null; currentRequest.Dispose(); }
     }
     private static bool IsUnavailable(AvailableModelResponse model) => string.Equals(model.Status, "unavailable", StringComparison.OrdinalIgnoreCase);
     private void ConfigureOptionEditor()
     {
         optionEditor = null;
         rawOptions = false;
-        if (model is null) return;
+        if (model is null || catalogueDenied) return;
         var provider = providers.SingleOrDefault(value => string.Equals(value.Name, model.ProviderName, StringComparison.Ordinal)
             && string.Equals(value.Namespace, model.ProviderNamespace, StringComparison.Ordinal));
         if (provider is null) return;
-        var extension = extensions.SingleOrDefault(value => value.Providers.Any(binding =>
-            string.Equals(binding.Name, provider.Name, StringComparison.Ordinal)
-            && string.Equals(binding.Namespace, provider.Namespace, StringComparison.Ordinal)));
+        var candidates = extensions.Where(value => value.RegistrationName == provider.Properties.ExtensionName
+            && value.RegistrationNamespace == provider.Properties.ExtensionNamespace
+            && (value.RegistrationScopeRef is null || value.RegistrationScopeRef == ResourceScopeRef.Instance)).ToArray();
+        var extension = candidates.Length == 1 ? candidates[0] : null;
         var contract = extension?.OptionSets.SingleOrDefault(value =>
             string.Equals(value.ContributionKind, "model-provider", StringComparison.Ordinal)
             && string.Equals(value.ContributionId, provider.Properties.ContributionId, StringComparison.OrdinalIgnoreCase)
@@ -367,15 +515,17 @@ else
     }
     private void UseGuidedOptions()
     {
+        if (!CanManage) return;
         ConfigureOptionEditor();
-        rawOptions = false;
+        rawOptions = optionEditor?.CanGuide != true;
+        NotifyOptionsChanged();
     }
     private void SetProviderOptionsEnabled(ChangeEventArgs args)
     {
-        if (optionEditor is not null) optionEditor.Enabled = args.Value is true;
+        if (!CanManage || optionEditor is null) return; optionEditor.Enabled = args.Value is true; NotifyOptionsChanged();
     }
-    private static void SetOption(ExtensionOptionFieldEditor field, string? value) => field.Value = value;
-    private static void SetBooleanOption(ExtensionOptionFieldEditor field, ChangeEventArgs args) => field.Value = args.Value is true ? "true" : "false";
+    private void SetOption(ExtensionOptionFieldEditor field, string? value) { if (!CanManage) return; field.Value = value; NotifyOptionsChanged(); }
+    private void SetBooleanOption(ExtensionOptionFieldEditor field, ChangeEventArgs args) { if (!CanManage) return; field.Value = args.Value is true ? "true" : "false"; NotifyOptionsChanged(); }
     private static bool BooleanValue(ExtensionOptionFieldEditor field) => bool.TryParse(field.Value, out var value) && value;
     private static string FieldLabel(ExtensionOptionFieldEditor field) => field.Required ? $"{field.Name} *" : field.Name;
     private Microsoft.AspNetCore.Components.RenderFragment FieldHelp(ExtensionOptionFieldEditor field) => builder =>
@@ -412,21 +562,177 @@ else
         var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
         return $"/{relative}";
     }
-    private void SelectTab(ModelProfileTab tab)
-    {
-        activeTab = tab;
-        var value = tab switch
-        {
-            ModelProfileTab.Access => "access",
-            ModelProfileTab.Usages => "usages",
-            _ => null
-        };
-        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("tab", value), replace: true);
-    }
-    private static string ProviderKey(ModelProviderResponse provider) => $"{provider.Namespace}:{provider.Name}";
-    private static string DetailsUrl(ResourceNamespace @namespace, string name, ResourceScopeRef? scopeRef) =>
-        ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(@namespace, ModelResourceKinds.ModelProfile, name), scopeRef);
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 
-    private enum ModelProfileTab { Definition, Access, Usages }
+    private RenderFragment Provider
+    {
+        get
+        {
+            var editor = model ?? throw new InvalidOperationException("Profile editing requires a loaded model.");
+            return @<FormSection Title="@T("ProviderAndModel")" Eyebrow="@T("ModelSelection")"><ChildContent>
+            <FormGrid>
+                <FormField Required="true" Label="@T("Provider")"><ChildContent><ClearableSelect TValue="string" Value="@SelectedProvider" ValueChanged="value => ProviderChangedAsync(new ChangeEventArgs { Value = value })" ValueExpression="() => editor.ProviderName" data-testid="model-profile-provider"><option value="">@T("SelectProvider")</option>@if (!string.IsNullOrWhiteSpace(editor.ProviderName) && providers.All(item => ProviderKey(item) != SelectedProvider)) { <option value="@SelectedProvider">@editor.ProviderNamespace/@editor.ProviderName — @T("NotCurrentlyDiscovered")</option> }@foreach (var provider in providers) { <option value="@ProviderKey(provider)">@provider.Properties.DisplayName — @provider.Namespace/@provider.Name</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => editor.ProviderName" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Model")"><ChildContent><ClearableSelect @bind-Value="editor.ModelName" disabled="@loadingModels" data-testid="model-profile-model"><option value="">@(loadingModels ? T("LoadingModels") : T("SelectModel"))</option>@if (!string.IsNullOrWhiteSpace(editor.ModelName) && models.All(item => !string.Equals(item.Name, editor.ModelName, StringComparison.Ordinal))) { <option value="@editor.ModelName">@editor.ModelName — @T("NotCurrentlyDiscovered")</option> }@foreach (var available in models) { <option value="@available.Name" disabled="@IsUnavailable(available)">@available.DisplayName — @available.Name · @StatusLabel(available.Status)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => editor.ModelName" /></Validation></FormField>
+            </FormGrid>
+            @if (models.Count == 0 && !loadingModels && !string.IsNullOrWhiteSpace(editor.ProviderName)) { <p class="inline-warning">@T("NoModelsReported")</p> }
+        </ChildContent></FormSection>;
+        }
+    }
+
+    private RenderFragment Generation
+    {
+        get
+        {
+            var editor = model ?? throw new InvalidOperationException("Profile editing requires a loaded model.");
+            return @<FormSection Title="@T("Generation")" Eyebrow="@T("Defaults")"><Actions><span>@T("Canonical")</span></Actions><ChildContent>
+            <FormGrid>
+                <FormField Label="@T("Temperature")" Tooltip="@T("TemperatureHelp")"><ChildContent><ClearableNumber @bind-Value="editor.Temperature" step="0.1" /></ChildContent><Validation><ValidationMessage For="() => editor.Temperature" /></Validation></FormField>
+                <FormField Label="@T("TopP")" Tooltip="@T("TopPHelp")"><ChildContent><ClearableNumber @bind-Value="editor.TopP" step="0.05" /></ChildContent><Validation><ValidationMessage For="() => editor.TopP" /></Validation></FormField>
+                <FormField Label="@T("TopK")" Tooltip="@T("TopKHelp")"><ChildContent><ClearableNumber @bind-Value="editor.TopK" /></ChildContent><Validation><ValidationMessage For="() => editor.TopK" /></Validation></FormField>
+                <FormField Label="@T("MaximumOutputTokens")" Tooltip="@T("MaximumOutputTokensHelp")"><ChildContent><ClearableNumber @bind-Value="editor.MaxOutputTokens" /></ChildContent><Validation><ValidationMessage For="() => editor.MaxOutputTokens" /></Validation></FormField>
+                <FormField Label="@T("Seed")" Tooltip="@T("SeedHelp")"><ChildContent><ClearableNumber @bind-Value="editor.Seed" /></ChildContent><Validation><ValidationMessage For="() => editor.Seed" /></Validation></FormField>
+                <FormField Label="@T("StopSequences")" Class="form-span-2" Tooltip="@T("StopSequencesHelp")"><ChildContent><ClearableText Multiline @bind-Value="editor.StopSequences" rows="3" /></ChildContent><Validation><ValidationMessage For="() => editor.StopSequences" /></Validation></FormField>
+            </FormGrid>
+        </ChildContent></FormSection>;
+        }
+    }
+
+    private RenderFragment Reasoning
+    {
+        get
+        {
+            var editor = model ?? throw new InvalidOperationException("Profile editing requires a loaded model.");
+            return @<FormSection Title="@T("ReasoningAndOutput")" Eyebrow="@T("Inference")"><ChildContent>
+            <FormGrid>
+                <FormField Required="true" Label="@T("ReasoningMode")"><ChildContent><ClearableSelect @bind-Value="editor.ReasoningMode">@foreach (var value in Enum.GetValues<ReasoningMode>()) { <option value="@value">@EnumLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => editor.ReasoningMode" /></Validation></FormField>
+                <FormField Label="@T("ReasoningEffort")"><ChildContent><ClearableSelect @bind-Value="editor.ReasoningEffort"><option value="">@T("ProviderDefault")</option>@foreach (var value in Enum.GetValues<ReasoningEffort>()) { <option value="@value">@EnumLabel(value)</option> }</ClearableSelect><small>@T("ReasoningEffortHelp")</small></ChildContent><Validation><ValidationMessage For="() => editor.ReasoningEffort" /></Validation></FormField>
+                <FormField Required="true" Label="@T("OutputFormat")"><ChildContent><ClearableSelect @bind-Value="editor.OutputFormat">@foreach (var value in Enum.GetValues<ModelOutputFormat>()) { <option value="@value">@EnumLabel(value)</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => editor.OutputFormat" /></Validation></FormField>
+                <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="editor.StrictOutput" /><span>@T("StrictStructuredOutput")</span></label>
+                @if (editor.OutputFormat == ModelOutputFormat.JsonSchema || !string.IsNullOrWhiteSpace(editor.JsonSchema))
+                {
+                    <FormField Label="@T("JsonSchema")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="editor.JsonSchema" rows="10" class="runner-json" /><small>@T("JsonSchemaRequired")</small></ChildContent><Validation><ValidationMessage For="() => editor.JsonSchema" /></Validation></FormField>
+                }
+            </FormGrid>
+        </ChildContent></FormSection>;
+        }
+    }
+
+    private RenderFragment Options
+    {
+        get
+        {
+            var editor = model ?? throw new InvalidOperationException("Profile editing requires a loaded model.");
+            return @<FormSection Title="@T("ProviderOptions")" Eyebrow="@T("Adapter")"><Actions><span>@(optionEditor is null ? T("Advanced") : $"{optionEditor.Contract.Id}@{optionEditor.Version.Version}")</span></Actions><ChildContent>
+            @if (optionEditor is { CanGuide: true } && !rawOptions)
+            {
+                <FormGrid>
+                    <label class="resource-enabled-toggle form-span-2"><FormCheckbox role="switch" Value="@optionEditor.Enabled" ValueChanged="changed => SetProviderOptionsEnabled(new ChangeEventArgs { Value = changed })" /><span>@T("ConfigureProviderOptions")</span></label>
+                    @if (optionEditor.Enabled)
+                    {
+                        @foreach (var optionField in optionEditor.Fields)
+                        {
+                            @if (optionField.Kind == ExtensionOptionFieldKind.Toggle)
+                            {
+                                <label class="resource-enabled-toggle" aria-invalid="@(invalidOptionName == optionField.Name ? "true" : null)"><FormCheckbox role="switch" Value="@BooleanValue(optionField)" ValueChanged="changed => SetBooleanOption(optionField, new ChangeEventArgs { Value = changed })" /><span>@FieldLabel(optionField)</span></label>
+                            }
+                            else if (optionField.AllowedValues.Count > 0)
+                            {
+                                <FormField aria-invalid="@(invalidOptionName == optionField.Name ? "true" : null)" Label="@FieldLabel(optionField)"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(optionField.Value, System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="changed => SetOption(optionField, (new ChangeEventArgs { Value = changed }).Value?.ToString())"><option value="">@T("ProviderDefault")</option>@foreach (var value in optionField.AllowedValues) { <option value="@value">@value</option> }</ClearableSelect>@FieldHelp(optionField)</ChildContent></FormField>
+                            }
+                            else if (optionField.Kind is ExtensionOptionFieldKind.JsonObject or ExtensionOptionFieldKind.JsonValue)
+                            {
+                                <FormField aria-invalid="@(invalidOptionName == optionField.Name ? "true" : null)" Label="@FieldLabel(optionField)" Class="form-span-2"><ChildContent><ClearableText UpdateOnInput="false" Multiline="true" rows="5" class="runner-json form-code-editor" Value="@optionField.Value" ValueChanged="changed => SetOption(optionField, (new ChangeEventArgs { Value = changed }).Value?.ToString())"></ClearableText>@FieldHelp(optionField)</ChildContent></FormField>
+                            }
+                            else
+                            {
+                                <FormField aria-invalid="@(invalidOptionName == optionField.Name ? "true" : null)" Label="@FieldLabel(optionField)"><ChildContent><ClearableText UpdateOnInput="false" Type="@(optionField.Kind is ExtensionOptionFieldKind.WholeNumber or ExtensionOptionFieldKind.DecimalNumber ? "number" : "text")" Value="@optionField.Value" min="@optionField.Minimum" max="@optionField.Maximum" step="@(optionField.Kind == ExtensionOptionFieldKind.WholeNumber ? "1" : "any")" ValueChanged="changed => SetOption(optionField, (new ChangeEventArgs { Value = changed }).Value?.ToString())" />@FieldHelp(optionField)</ChildContent></FormField>
+                            }
+                        }
+                    }
+                </FormGrid>
+                <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseRawOptions">@T("EditRawJson")</button><a class="text-button" href="/extensions">@T("InspectContract")</a></div>
+            }
+            else
+            {
+                @if (optionEditor is { CanGuide: false }) { <p class="inline-warning">@T("GuidedOptionsUnavailable")</p> }
+                <FormGrid><FormField Label="@T("ProviderSpecificJson")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="editor.ProviderOptionsJson" rows="8" class="runner-json form-code-editor" /><small>@T("ProviderJsonHelpPrefix") <code>optionSet</code>, <code>version</code>, <code>schemaDigest</code> @T("And") <code>values</code>.</small></ChildContent><Validation><ValidationMessage For="() => editor.ProviderOptionsJson" /></Validation></FormField></FormGrid>
+                @if (optionEditor?.CanGuide == true) { <div class="panel-actions"><button class="button-secondary" type="button" @onclick="UseGuidedOptions">@T("ReturnToGuidedEditor")</button></div> }
+            }
+        @if (optionEditor is { CanGuide: true } && !rawOptions) { <ValidationMessage For="() => editor.ProviderOptionsJson" /> }</ChildContent></FormSection>;
+        }
+    }
+
+    private RenderFragment Usages => @<section class="panel resource-section model-profile-usages-panel" data-testid="model-profile-usages-panel">
+            <div class="model-profile-usages-heading">
+                <div><p class="eyebrow">@T("Impact")</p><h2>@T("AgentUsages")</h2><p>@T("AgentUsagesDescription")</p></div>
+                <span class="model-profile-usage-count">@(usageTotal is { } total ? AgentCount(total) : Shared["UsedBy"])</span>
+            </div>
+            <ResourceToolbar Label="@Shared["SearchUsages"]"><FormField Label="@Shared["SearchUsages"]"><ClearableText Type="search" Value="@usageSearch" ValueChanged="UsageSearchChanged" data-testid="model-profile-usage-search" /></FormField></ResourceToolbar>
+            @if (usageLoading) { <LoadingState Message="@T("Loading")" /> }
+            @if (usageError is not null) { <div class="form-alert form-alert-danger" role="alert">@Shared["UsageError"] <code>@usageError.ErrorId</code> <button type="button" class="text-button" @onclick="() => LoadUsagePageAsync(false)">@T("ReloadCurrentVersion")</button></div> }
+            @if (!usageLoading && usageError is null && usages.Count == 0 && usageTotal == 0 && string.IsNullOrWhiteSpace(usageSearch))
+            {
+                <EmptyState Title="@T("NoUsages")" Message="@T("NoAgentReferences")" />
+            }
+            else if (!usageLoading && usageError is null && usages.Count == 0)
+            {
+                <p role="status">@Shared[usageNextCursor is not null ? "ContinueSearch" : "NoMatchesPage"]</p>
+            }
+            else if (usages.Count > 0)
+            {
+                <ul class="model-profile-usage-list" data-testid="model-profile-usages-list">
+                    @foreach (var usage in usages)
+                    {
+                        <li class="model-profile-usage-card" data-testid="model-profile-usage">
+                            <CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@usage.Namespace" Name="@usage.Name" Href="@AgentUrl(usage)" IconName="agent" Domain="agent">
+                                <IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" DisplayName="@usage.ScopeDisplayName" IconOnly /><ManagedResourceBadge IsManaged="@usage.IsManaged" IconOnly /></IconBadges>
+                            </CollectionIdentity>
+                        </li>
+                    }
+                </ul>
+            }
+            <CollectionPager Page="@((usageLoading || usageError is not null ? usageDisplayPage : usagePage) + 1)" Total="usageTotal" HasMore="@(usageNextCursor is not null)" Busy="@(usageLoading || usageError is not null)" PageChanged="UsagePageChanged" />
+        </section>;
+
+    private RenderFragment Resolution => @<div class="resource-editor-view"><section class="resource-section">
+            <article class="panel"><div class="panel-header"><div><p class="eyebrow">@T("Overview")</p><h2>@T("EffectiveResolution")</h2></div></div>
+                @if (resolution is null) { <p>@T("ResolutionUnavailable")</p> } else { <dl class="resource-details"><dt>@T("DeclaredProfile")</dt><dd>@resolution.Profile.DisplayName <code>@resolution.Profile.Name</code></dd><dt>@T("ResolvedProvider")</dt><dd>@(resolution.Provider?.DisplayName ?? resolution.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("ProviderConnection")</dt><dd>@StatusLabel(resolution.Provider?.Status)</dd><dt>@T("ResolvedModel")</dt><dd>@resolution.Model.Name</dd><dt>@T("ModelStatus")</dt><dd>@StatusLabel(resolution.Model.Status)</dd><dt>@T("ProfileStatus")</dt><dd>@StatusLabel(resolution.Status)</dd></dl>@foreach (var item in resolution.Warnings) { <p class="inline-warning">@item</p> } }
+            </article>
+        </section>
+        <section class="panel resource-section"><div class="panel-header"><div><p class="eyebrow">@T("Compatibility")</p><h2>@T("EffectiveCapabilities")</h2></div><span>@T("CapabilitySources")</span></div>
+            @if (resolution?.Capabilities is not { Count: > 0 })
+            {
+                <EmptyState Title="@T("CapabilitiesUnavailable")" Message="@T("CapabilitiesUnavailableMessage")" />
+            }
+            else
+            {
+                <CollectionView TItem="ModelCapabilityResponse" Items="resolution.Capabilities" InformationLabels="@(new string[] { T("Provider"), T("Model"), T("Adapter"), T("Effective"), T("Values") })" IdentityLabel="@T("Capability")">
+        <Identity Context="capability">
+<strong>@capability.Name</strong></Identity>
+        <Information Context="capability">
+            <CollectionValue Label="@T("Provider")">@SupportLabel(capability.ProviderSupport)</CollectionValue>
+            <CollectionValue Label="@T("Model")">@SupportLabel(capability.ModelSupport)</CollectionValue>
+            <CollectionValue Label="@T("Adapter")">@SupportLabel(capability.AdapterSupport)</CollectionValue>
+            <CollectionValue Label="@T("Effective")"><strong>@SupportLabel(capability.EffectiveSupport)</strong></CollectionValue>
+            <CollectionValue Label="@T("Values")">@(capability.SupportedValues.Count == 0 ? "—" : string.Join(", ", capability.SupportedValues))</CollectionValue>
+        </Information>
+    </CollectionView>
+            }
+            @if (resolution?.Incompatibilities is { Count: > 0 })
+            {
+                <div class="form-alert form-alert-danger" role="alert"><strong>@T("ProfileIncompatible")</strong>@foreach (var issue in resolution.Incompatibilities) { <span><code>@issue.Capability</code> — @issue.Message</span> }</div>
+            }
+            else if (resolution?.Capabilities is { Count: > 0 })
+            {
+                <p class="inline-info">@T("ProfileCompatible")</p>
+            }
+        </section>
+        </div>;
+
+    private string EnumLabel<TEnum>(TEnum value) where TEnum : struct, Enum => value switch
+    {
+        ReasoningMode mode => T("ReasoningMode." + mode),
+        ReasoningEffort effort => ModelLabels["ReasoningEffort." + effort],
+        ModelOutputFormat format => T("OutputFormat." + format),
+        _ => value.ToString()
+    };
 }

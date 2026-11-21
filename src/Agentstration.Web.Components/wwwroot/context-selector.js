@@ -22,9 +22,9 @@ export async function selectContext(scopeRef, confirmationMessage) {
     return true;
 }
 
-export function ensureContextUrl(scopeRef) {
+export function ensureContextUrl(scopeRef, historyEntryState) {
     const url = new URL(window.location.href);
     if (url.searchParams.get('context') === scopeRef) return;
     url.searchParams.set('context', scopeRef);
-    window.history.replaceState(window.history.state, '', url.toString());
+    window.Blazor.navigateTo(url.toString(), { replaceHistoryEntry: true, historyEntryState });
 }

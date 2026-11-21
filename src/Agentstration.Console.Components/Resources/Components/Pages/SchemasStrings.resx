@@ -18,6 +18,15 @@
   <data name="ImmutableVersion"><value>Immutable version</value></data><data name="VersionDetails"><value>Version {0}</value></data><data name="Published"><value>Published</value></data><data name="SourceGeneration"><value>Source generation</value></data><data name="ImmutableContent"><value>Published native content</value></data><data name="ImmutableContentHelp"><value>Explore this immutable definition in read-only mode.</value></data>
   <data name="ScopeKind.Instance"><value>Instance</value></data><data name="ScopeKind.Tenant"><value>Tenant</value></data><data name="ScopeKind.Workspace"><value>Workspace</value></data>
 <data name="SourceEvidence" xml:space="preserve"><value>Discovery source evidence</value></data>
+<data name="Configuration" xml:space="preserve"><value>Configuration</value></data>
+<data name="SettingName" xml:space="preserve"><value>Name</value></data>
+<data name="SettingValue" xml:space="preserve"><value>Value</value></data>
+<data name="DiscardDraft" xml:space="preserve"><value>Discard draft</value></data>
+<data name="RefreshDraftConflict" xml:space="preserve"><value>A newer version is available. Your draft is retained until you explicitly discard it.</value></data>
+<data name="NamespaceInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
+<data name="ApplySourceFirst" xml:space="preserve"><value>Apply the source content before creating the schema.</value></data>
+<data name="DefinitionSource" xml:space="preserve"><value>Schema content</value></data>
+
   <data name="ExposeAsFunction" xml:space="preserve"><value>Expose as function</value></data>
   <data name="ExposureHelp" xml:space="preserve"><value>Create a named function pinned to this published declaration, its engine and its input/output contracts. Publishing a declaration alone creates no function.</value></data>
   <data name="ExposureFailed" xml:space="preserve"><value>The function could not be exposed. Check the name, version, dependencies and permissions.</value></data>

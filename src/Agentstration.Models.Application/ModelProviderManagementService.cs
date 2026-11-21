@@ -153,7 +153,7 @@ public sealed class ModelProviderManagementService(
         (await store.ListAllAsync<ModelProfileResource>(ModelResourceKinds.ModelProfile, cancellationToken))
             .Where(profile => profile.Value.Definition.Provider.Resolve(profile.Value.Namespace, ModelResourceKinds.ModelProvider).Namespace == @namespace
                 && profile.Value.Definition.Provider.Name == providerName)
-            .Select(profile => new ModelProviderUsage(profile.Value.Kind, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName))
+            .Select(profile => new ModelProviderUsage(profile.Value.Kind, profile.Value.Metadata.Name, profile.Value.Definition.DisplayName) { Namespace = profile.Value.Namespace, ScopeRef = profile.Value.ScopeRef })
             .ToArray();
 
     public Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken) =>

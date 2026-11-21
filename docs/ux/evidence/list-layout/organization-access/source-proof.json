@@ -1,0 +1,17 @@
+{
+  "baseCommit": "eb2016ea85ca4655f2f3663c268907578bfcfc5d",
+  "route": "/settings/organization/access",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor": "bcca1eba0edae05aa8595f82ae08444f75e2d1fd",
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor.cs": "8fc254be6cdf50c0e0475764cba2de8ccfc05481",
+    "src/Agentstration.Identity/IdentityExperienceServices.cs": "a88ad1ce853aaa0b27b54c4cc154ebe1131f369e",
+    "src/Agentstration.Identity.Api/Api/IdentityEndpoints.cs": "d98743d91b3d4a12d25ae2f6b4b79d7ce398fb3a",
+    "src/Agentstration.ResourceManagement.Storage.Sqlite/SqliteIdentityStore.cs": "c52b99fdbf5d27bb2878e3f0948a8e1fc2139135",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

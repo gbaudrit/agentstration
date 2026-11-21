@@ -72,4 +72,4 @@ XSD content is XML text, carried as a JSON string. Published mappings are expose
 explicitly as named TransformationFunctions; publication alone creates no named
 function. Input XML validation and output JSON validation retain separate exact
 contract evidence. See [Transformation Schemas](../reference/transformation-schemas.md)
-and [ADR-0238](../decisions/0238-transformation-schemas-have-explicit-function-exposure.md).
+and [ADR-0239](../decisions/0239-transformation-schemas-have-explicit-function-exposure.md).

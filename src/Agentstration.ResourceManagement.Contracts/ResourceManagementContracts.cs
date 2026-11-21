@@ -20,7 +20,10 @@ public sealed record ResourceScopeInventoryItemResponse(
     ResourceNamespace Namespace,
     string Kind,
     string Name,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public bool IsManaged { get; init; }
+}
 public sealed record ResourceScopeInventoryNodeResponse(
     ResourceScopeRef ScopeRef,
     ResourceScopeKind Kind,

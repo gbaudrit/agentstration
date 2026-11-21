@@ -24,7 +24,9 @@ public sealed class ModelProfileManagementService(
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
     ReadableResourceScopeService readableScopes,
-    IIdentityStore identities) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
+    IIdentityStore identities,
+    IModelProfileLookupQueries? profileLookup = null,
+    IAgentProfileUsageQueries? usageQueries = null) : IModelProfileStore, IModelDeploymentStore, IModelProfileReferenceValidator
 {
     public static string ProfileId(string name) => name;
     public async Task ValidateForCreateAsync(ModelProfileResource resource, CancellationToken cancellationToken)
@@ -78,6 +80,71 @@ public sealed class ModelProfileManagementService(
         scopeRef is { } exact ? GetExactAsync(exact, @namespace, name, cancellationToken) : GetAsync(@namespace, name, cancellationToken);
     public Task<StoredResource<ModelProfileResource>?> GetExactAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         store.GetExactAsync<ModelProfileResource>(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProfile, name), cancellationToken);
+
+    public async Task<ModelProfileLookupResult> LookupPageAsync(string? search, string? provider, string? ownerKind, int offset, CancellationToken cancellationToken)
+    {
+        search = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        provider = string.IsNullOrWhiteSpace(provider) ? null : provider.Trim();
+        if (profileLookup is not null) return await profileLookup.LookupProfilesAsync(search, provider, ownerKind, offset, 20, cancellationToken);
+        var page = await store.ListDiscoveryWindowAsync<ModelProfileResource>(ModelResourceKinds.ModelProfile, null, offset, 20, cancellationToken);
+        var values = page.Value.Where(item =>
+            (string.IsNullOrWhiteSpace(ownerKind) || string.Equals(item.Value.ScopeRef?.Kind.ToString(), ownerKind, StringComparison.OrdinalIgnoreCase))
+            && (string.IsNullOrWhiteSpace(provider) || item.Value.Definition.Provider.Name.Contains(provider, StringComparison.OrdinalIgnoreCase))
+            && (string.IsNullOrWhiteSpace(search) || new[] { item.Value.Name, item.Value.Namespace.Value, item.Value.Definition.DisplayName, item.Value.Definition.Provider.Name, item.Value.Definition.Model.Name }
+                .Any(value => value.Contains(search, StringComparison.OrdinalIgnoreCase)))).ToArray();
+        return new(values.Select(value => value.Value).ToArray(), page.NextOffset);
+    }
+
+    public async Task<ModelProfileUsagePage> GetUsagePageAsync(ModelProfileResource profile, string? search, string? cursor, CancellationToken cancellationToken)
+    {
+        search = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        var parts = (cursor ?? "0:0").Split(':');
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var scopeIndex) || !int.TryParse(parts[1], out var offset) || scopeIndex < 0 || offset < 0 || offset > int.MaxValue - 100)
+            throw new ArgumentException("Invalid usage continuation.");
+        var ownerScope = profile.ScopeRef ?? throw Invalid("scopeRef", "The model profile has no ownership scope.");
+        var scopes = (await readableScopes.GetAsync(cancellationToken)).Where(scope => IsSameOrDescendant(ownerScope, scope))
+            .OrderBy(scope => scope.ScopeRef.Value, StringComparer.Ordinal).ToArray();
+        const int maximumScopeChecks = 8;
+        for (var inspected = 0; scopeIndex < scopes.Length && inspected < maximumScopeChecks; inspected++, scopeIndex++, offset = 0)
+        {
+            var scope = scopes[scopeIndex];
+            var targetContext = await GetUsageScopeContextAsync(scope.ScopeRef, cancellationToken);
+            using var targetScope = EnterUsageScope(scope.ScopeRef, targetContext);
+            IReadOnlyList<AgentResource> candidates;
+            int? nextOffset;
+            if (usageQueries is not null)
+            {
+                var scopeSearch = !string.IsNullOrWhiteSpace(search) && scope.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase) ? null : search;
+                var page = await usageQueries.FindProfileCandidatesAsync(scope.ScopeRef, profile.Name, scopeSearch, offset, 20, cancellationToken);
+                candidates = page.Value; nextOffset = page.NextOffset;
+            }
+            else
+            {
+                var page = await store.ListDiscoveryWindowAsync<AgentResource>(AgentResourceKinds.Agent, scope.ScopeRef, offset, 20, cancellationToken);
+                candidates = page.Value.Select(value => value.Value).ToArray(); nextOffset = page.NextOffset;
+            }
+            var result = new List<ModelProfileUsage>();
+            foreach (var agent in candidates)
+            {
+                if (!string.IsNullOrWhiteSpace(search) && !new[] { agent.Name, agent.Namespace.Value, agent.Definition.DisplayName, scope.DisplayName }
+                    .Any(value => value.Contains(search, StringComparison.OrdinalIgnoreCase))) continue;
+                StoredResource<ModelProfileResource>? resolved;
+                try
+                {
+                    resolved = await references.ResolveAsync<ModelProfileResource>(agent.Definition.ModelProfile, agent.Namespace, ModelResourceKinds.ModelProfile, scope.ScopeRef, cancellationToken);
+                }
+                catch (ResourceReferenceAmbiguousException) { continue; }
+                if (resolved?.Value.Uid == profile.Uid)
+                    result.Add(new(agent.Kind, agent.Namespace, agent.Name, agent.Definition.DisplayName, scope.ScopeRef, scope.DisplayName) { IsManaged = agent.Governance.IsManaged });
+            }
+            if (result.Count > 0 || nextOffset is not null)
+            {
+                var next = nextOffset is { } following ? $"{scopeIndex}:{following}" : scopeIndex + 1 < scopes.Length ? $"{scopeIndex + 1}:0" : null;
+                return new(result, next);
+            }
+        }
+        return new([], scopeIndex < scopes.Length ? $"{scopeIndex}:0" : null);
+    }
 
     public Task DeleteAsync(string name, string? ifMatch, CancellationToken cancellationToken) =>
         DeleteAsync(ResourceNamespace.Default, name, ifMatch, cancellationToken);
@@ -155,7 +222,8 @@ public sealed class ModelProfileManagementService(
                         agent.Value.Metadata.Name,
                         agent.Value.Definition.DisplayName,
                         agentScopeRef,
-                        scope.DisplayName));
+                        scope.DisplayName)
+                    { IsManaged = agent.Value.Governance.IsManaged });
             }
         }
         return usages.ToDictionary(
@@ -539,3 +607,4 @@ public sealed class ModelProfileManagementService(
     }
 }
 
+public sealed record ModelProfileUsagePage(IReadOnlyList<ModelProfileUsage> Value, string? NextCursor);

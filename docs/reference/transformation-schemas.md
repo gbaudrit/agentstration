@@ -3,7 +3,7 @@
 An XML-to-JSON mapping is a normal, independent `Schema` with format
 `xml-json-transformation`. Its draft and published versions are available through
 the Schema Console/API before any named function exists. See
-[ADR-0238](../decisions/0238-transformation-schemas-have-explicit-function-exposure.md).
+[ADR-0239](../decisions/0239-transformation-schemas-have-explicit-function-exposure.md).
 
 The local implementation supports standalone XSD 1.0 (`xml-xsd`, native content
 is an XML string), JSON Schema, and a bounded XML child/attribute mapping format.

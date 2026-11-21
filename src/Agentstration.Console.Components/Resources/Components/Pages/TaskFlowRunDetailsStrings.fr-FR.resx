@@ -8,4 +8,7 @@
   <data name="Status.Pending" xml:space="preserve"><value>En attente</value></data><data name="Status.Running" xml:space="preserve"><value>En cours</value></data><data name="Status.WaitingForInput" xml:space="preserve"><value>En attente d’une saisie</value></data><data name="Status.WaitingForChild" xml:space="preserve"><value>En attente d’un Flow enfant</value></data><data name="Status.Succeeded" xml:space="preserve"><value>Réussie</value></data><data name="Status.Failed" xml:space="preserve"><value>Échec</value></data><data name="Status.Cancelled" xml:space="preserve"><value>Annulée</value></data><data name="DefinitionState.Published" xml:space="preserve"><value>Publiée</value></data><data name="DefinitionState.Draft" xml:space="preserve"><value>Brouillon</value></data>
   <data name="Error.ModelOutputTokenLimit"><value>Le modèle a atteint sa limite de tokens de génération sans produire de réponse finale. Augmentez le budget de sortie ou vérifiez les réglages du raisonnement.</value></data>
   <data name="Error.ModelEmptyResponse"><value>Le modèle a terminé sans produire de réponse finale. Vérifiez sa réponse et ses paramètres de génération.</value></data>
+  <data name="RunId"><value>ID de l’exécution</value></data>
+  <data name="Task"><value>Tâche</value></data>
+  <data name="ExecutionScope"><value>Périmètre d’exécution</value></data>
 </root>

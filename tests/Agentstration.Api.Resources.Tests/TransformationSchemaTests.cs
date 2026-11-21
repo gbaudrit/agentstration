@@ -152,8 +152,15 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () => await function.ExecuteAsync(JsonSerializer.SerializeToElement(new { value = "<catalog />", rules }), cancelled.Token));
-        var scanRules = JsonSerializer.SerializeToElement(new { root = new { path = "/catalog", type = "object",
-            fields = Enumerable.Range(0, 100).ToDictionary(i => "field" + i, _ => new { path = "absent", type = "string", optional = true }) } });
+        var scanRules = JsonSerializer.SerializeToElement(new
+        {
+            root = new
+            {
+                path = "/catalog",
+                type = "object",
+                fields = Enumerable.Range(0, 100).ToDictionary(i => "field" + i, _ => new { path = "absent", type = "string", optional = true })
+            }
+        });
         var excessiveScan = JsonSerializer.SerializeToElement(new { value = "<catalog>" + string.Concat(Enumerable.Repeat("<unrelated />", 4000)) + "</catalog>", rules = scanRules });
         Assert.AreEqual("xml_mapping_limit", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(async () => await function.ExecuteAsync(excessiveScan, default))).Code);
         var provider = new TransformationSchemaFormatHandler();

@@ -1,0 +1,40 @@
+.resource-collection-page { display: grid; gap: var(--space-4); min-width: 0; }
+.resource-collection-page ::deep .page-header { margin: 0; }
+.collection-page-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: var(--space-3); }
+.collection-page-navigation,.collection-page-feedback,.collection-page-controls { min-width: 0; }
+.collection-page-navigation ::deep .section-tabs { margin: 0; }
+.collection-page-controls { flex: 1 1 30rem; }
+.resource-collection-page ::deep .collection-toolbar { margin: 0 0 var(--space-3); align-items: end; gap: var(--space-3); }
+.resource-collection-page ::deep .resource-toolbar { padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; align-items: end; flex-wrap: wrap; gap: var(--space-3); }
+.resource-collection-page ::deep .resource-toolbar-filters { flex: 1 1 28rem; min-width: 0; align-items: end; gap: var(--space-3); }
+.resource-collection-page ::deep .resource-toolbar-actions { flex: 0 0 auto; align-items: end; flex-wrap: nowrap; }
+.resource-collection-page ::deep .search-box { flex: 1 1 14rem; min-width: min(100%, 12rem); }
+.resource-collection-page ::deep .collection-filter-field { min-width: min(100%, 10rem); flex: 1 1 10rem; }
+.resource-collection-page ::deep .form-field { margin: 0; min-width: 0; }
+.resource-collection-page ::deep .resource-toolbar input,.resource-collection-page ::deep .resource-toolbar select { height: 2.625rem; }
+.resource-collection-page ::deep .collection-view-switch { flex-wrap: wrap; }
+.resource-collection-page ::deep .collection-advanced-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: var(--space-3); padding: var(--space-4); margin-bottom: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.resource-collection-page ::deep [hidden] { display: none !important; }
+.resource-collection-page ::deep .collection-date-filter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); min-width: 0; margin: 0; border: 0; padding: 0; }
+.resource-collection-page ::deep .collection-date-filter legend { font-weight: 600; font-size: var(--font-size-sm); margin-bottom: var(--space-2); }
+.resource-collection-page ::deep .collection-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-block: 0 var(--space-3); }
+.resource-collection-page ::deep .collection-filter-chip { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; max-width: 100%; overflow-wrap: anywhere; padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); color: var(--text); font-size: var(--font-size-sm); }
+.resource-collection-page ::deep .collection-filter-chip svg { flex: 0 0 auto; width: 1rem; height: 1rem; }
+.resource-collection-page ::deep .collection-result-count { color: var(--muted); font-size: var(--font-size-sm); margin: 0 0 var(--space-3); }
+.resource-collection-page ::deep .resource-refresh-status,.resource-collection-page ::deep .resource-refresh-error { margin-bottom: var(--space-3); }
+.resource-collection-page ::deep .collection-pager { margin: 0; gap: var(--space-3); }
+.resource-collection-page ::deep .collection-page-size { margin-inline-end: auto; display: flex; align-items: center; gap: var(--space-2); }
+.resource-collection-page ::deep .collection-page-size .clearable-field { width: 6rem; }
+.resource-collection-page ::deep .collection-page-size .clearable-field > select { padding-inline-end: 2rem; }
+.resource-collection-page ::deep .collection-filter-field .clearable-field:not(:has(.field-clear)) > select { padding-inline-end: 2rem; }
+.resource-collection-page ::deep .collection-page-size label { white-space: nowrap; }
+.resource-collection-page ::deep .collection-page-number[aria-current=page] { border-color: var(--accent); background: var(--surface-2); font-weight: 700; }
+@media (max-width: 820px) {
+    .collection-page-controls { flex-basis: 100%; }
+    .resource-collection-page ::deep .resource-toolbar { align-items: stretch; }
+    .resource-collection-page ::deep .resource-toolbar-filters { flex: 0 1 auto; }
+    .resource-collection-page ::deep .resource-toolbar-actions { flex-wrap: wrap; }
+    .resource-collection-page ::deep .collection-view-switch { margin-inline-start: 0; }
+    .resource-collection-page ::deep .collection-pager { justify-content: flex-start; }
+    .resource-collection-page ::deep .collection-page-size { flex-basis: 100%; }
+}

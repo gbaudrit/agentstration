@@ -10,4 +10,32 @@
   <data name="RunStatus.Pending" xml:space="preserve"><value>Pending</value></data><data name="RunStatus.Running" xml:space="preserve"><value>Running</value></data><data name="RunStatus.WaitingForInput" xml:space="preserve"><value>Waiting for input</value></data><data name="RunStatus.WaitingForChild" xml:space="preserve"><value>Waiting for child Flow</value></data><data name="RunStatus.Succeeded" xml:space="preserve"><value>Succeeded</value></data><data name="RunStatus.Failed" xml:space="preserve"><value>Failed</value></data><data name="RunStatus.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="ActionStatus.Pending" xml:space="preserve"><value>Pending</value></data><data name="ActionStatus.Resolved" xml:space="preserve"><value>Resolved</value></data><data name="ActionStatus.Expired" xml:space="preserve"><value>Expired</value></data><data name="ActionStatus.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
   <data name="Role.User" xml:space="preserve"><value>User</value></data><data name="Role.Assistant" xml:space="preserve"><value>Assistant</value></data><data name="Role.System" xml:space="preserve"><value>System</value></data><data name="Role.Tool" xml:space="preserve"><value>Tool</value></data>
+  <data name="Task" xml:space="preserve"><value>Task</value></data>
+  <data name="Status" xml:space="preserve"><value>Status</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer task view is available. Your response is retained. Discard it to review the latest state.</value></data>
+  <data name="OperationUnconfirmed" xml:space="preserve"><value>The operation could not be confirmed. Your response is retained; refresh to check its outcome.</value></data>
+  <data name="ActionStatus.Completed" xml:space="preserve"><value>Completed</value></data>
+  <data name="ActionKind.InputRequired" xml:space="preserve"><value>Input required</value></data>
+  <data name="ActionKind.ConfirmationRequired" xml:space="preserve"><value>Confirmation required</value></data>
+  <data name="ActionKind.ChoiceRequired" xml:space="preserve"><value>Choice required</value></data>
+  <data name="ActionKind.FileRequired" xml:space="preserve"><value>File required</value></data>
+  <data name="ActionKind.ApprovalRequired" xml:space="preserve"><value>Approval required</value></data>
+  <data name="ResultKind.Text" xml:space="preserve"><value>Text</value></data>
+  <data name="ResultKind.Structured" xml:space="preserve"><value>Structured result</value></data>
+  <data name="ResultKind.Table" xml:space="preserve"><value>Table</value></data>
+  <data name="ResultKind.Json" xml:space="preserve"><value>JSON</value></data>
+  <data name="ResultKind.Status" xml:space="preserve"><value>Status</value></data>
+  <data name="ActivityType.TaskCreated" xml:space="preserve"><value>Task created</value></data>
+  <data name="ActivityType.TaskStarted" xml:space="preserve"><value>Task started</value></data>
+  <data name="ActivityType.ProgressStarted" xml:space="preserve"><value>Activity started</value></data>
+  <data name="ActivityType.ProgressCompleted" xml:space="preserve"><value>Activity completed</value></data>
+  <data name="ActivityType.TaskPaused" xml:space="preserve"><value>Task paused</value></data>
+  <data name="ActivityType.TaskResumed" xml:space="preserve"><value>Task resumed</value></data>
+  <data name="ActivityType.TaskCancelled" xml:space="preserve"><value>Task cancelled</value></data>
+  <data name="ActivityType.ActionRequired" xml:space="preserve"><value>Action required</value></data>
+  <data name="ActivityType.ActionResolved" xml:space="preserve"><value>Action resolved</value></data>
+  <data name="ActivityType.ResultProduced" xml:space="preserve"><value>Result produced</value></data>
+  <data name="ActivityType.ArtifactProduced" xml:space="preserve"><value>Artifact produced</value></data>
+  <data name="ActivityType.TaskCompleted" xml:space="preserve"><value>Task completed</value></data>
+  <data name="ActivityType.TaskFailed" xml:space="preserve"><value>Task failed</value></data>
 </root>

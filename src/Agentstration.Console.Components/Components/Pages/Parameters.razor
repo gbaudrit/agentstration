@@ -1,41 +1,50 @@
 @page "/parameters"
 @implements IDisposable
+@inject IServiceProvider Services
 @inject IParametersClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ParameterStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Parameters") · Agentstration</PageTitle>
-<PageHeader Title="@T("Parameters")" Description="@T("Parameters.Description")" TestId="resource-parameters">
-    <Actions><button class="button-secondary" @onclick="LoadAsync">@T("Refresh")</button><a class="button-primary" href="/parameters/new" data-testid="parameter-create">@T("CreateParameter")</a></Actions>
-</PageHeader>
-<div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div>
-<div class="toolbar"><input @bind="search" @bind:event="oninput" placeholder="@T("SearchParameters")" aria-label="@T("SearchParameters")" /></div>
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
-else if (Filtered.Count == 0) { <EmptyState Title="@T("NoParameters")" Message="@T("NoParametersMessage")" /> }
-else
-{
-    <DataGrid TItem="ParameterResource" Items="Filtered">
-        <Header><tr><th>@T("Name")</th><th>@T("ValueType")</th><th>@T("Value")</th><th>@T("Scope")</th><th></th></tr></Header>
-        <Row Context="item"><tr data-testid="parameter-row"><td><strong>@item.Definition.DisplayName</strong><br /><code>@item.Name</code></td><td>@TypeLabel(item.Definition.ValueType)</td><td><code>@VisibleValue(item)</code></td><td><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></td><td><a class="text-button" href="@ResourceUrl(item)">@T("ManageArrow")</a></td></tr></Row>
-    </DataGrid>
-}
+<ResourceCollectionTemplate TItem="ParameterResource" Title="@T("Parameters")" Description="@T("Parameters.Description")" TestId="resource-parameters" RowTestId="parameter-row"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
+                            SearchEnabled SearchLabel="@T("SearchParameters")" SearchPlaceholder="@T("SearchParameters")"
+                            EmptyTitle="@T("NoParameters")" EmptyMessage="@T("NoParametersMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Feedback><div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div></Feedback>
+</ResourceCollectionTemplate>
 
 @code {
-    private readonly CancellationTokenSource cancellation = new();
-    private IReadOnlyList<ParameterResource> items = [];
-    private bool loading = true;
-    private Exception? error;
-    private string search = string.Empty;
-    private IReadOnlyList<ParameterResource> Filtered => items.Where(item => string.IsNullOrWhiteSpace(search)
-        || item.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
-        || item.Definition.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string TypeLabel(ParameterValueType type) => T($"ValueType.{type}");
-    private static string VisibleValue(ParameterResource item) => item.Definition.Value.ValueKind == System.Text.Json.JsonValueKind.String
-        ? item.Definition.Value.GetString() ?? string.Empty
-        : item.Definition.Value.GetRawText();
-    protected override Task OnInitializedAsync() => LoadAsync();
-    private async Task LoadAsync() { loading = true; error = null; try { items = await Client.GetParametersAsync(cancellation.Token); } catch (Exception exception) { error = exception; } finally { loading = false; } }
-    private static string ResourceUrl(ParameterResource resource) => $"/parameters/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/parameters/new", Services)" data-testid="parameter-create">@T("CreateParameter")</a></PermissionGate> : null;
+    private CollectionColumn<ParameterResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@ResourceUrl(item)" IconName="settings" Domain="neutral">
+        <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    private IReadOnlyList<CollectionColumn<ParameterResource>> Columns =>
+    [
+        new("type", T("ValueType"), item => @<span>@TypeLabel(item.Definition.ValueType)</span>)
+        {
+            Filters = [new("type", T("ValueType"), CollectionFilterKind.Choice)
+            {
+                Options = Enum.GetValues<ParameterValueType>().Select(value => new CollectionFilterOption(value.ToString(), TypeLabel(value))).ToArray()
+            }]
+        },
+        new("value", T("Value"), item => @<code>@VisibleValue(item)</code>)
+        {
+            Filters = [new("value", T("Value"), CollectionFilterKind.Text) { Advanced = true }]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("scope", T("Scope"), CollectionFilterKind.Choice)
+        {
+            Options = (items ?? []).Select(item => item.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, Context.Current?.Contexts.FirstOrDefault(context => context.ScopeRef == value)?.DisplayName ?? value)).ToArray()
+        }
+    ];
+    private static string VisibleValue(ParameterResource item) => item.Definition.Value.ValueKind == System.Text.Json.JsonValueKind.String ? item.Definition.Value.GetString() ?? string.Empty : item.Definition.Value.GetRawText();
+    private string ResourceUrl(ParameterResource resource) => ResourceOwnershipContext.PreserveNavigation($"/parameters/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}", Services);
 }

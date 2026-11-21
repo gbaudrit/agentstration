@@ -1,3 +1,4 @@
+import { selectResourceSection } from './resource-sections.js';
 import { expect, request as playwrightRequest, type APIResponse, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 
@@ -29,11 +30,12 @@ export class SchemaAdministrationPage {
       await this.page.getByTestId(TestIds.schemaAdministration.displayName).blur();
       await expect(this.page.getByTestId(TestIds.schemaAdministration.name)).toHaveValue(name, { timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    await this.definition().getByLabel('Namespace').fill(namespace);
+    await this.definition().getByRole('textbox', { name: 'Namespace', exact: true }).fill(namespace);
     const scope = this.page.getByTestId(TestIds.schemaAdministration.scopePicker);
     await scope.selectOption({ index: await this.workspaceOptionIndex(scope) });
     const scopeRef = await scope.inputValue();
     expect(scopeRef).toMatch(/^\/workspaces\//);
+    await this.page.locator("[data-wizard-step=configuration]").click();
 
     await this.page.getByTestId(TestIds.schemaAdministration.addProperty).click();
     await this.renameSelectedProperty('profile');
@@ -58,11 +60,24 @@ export class SchemaAdministrationPage {
     await expect(this.page).toHaveURL(new RegExp(`/schemas/${name}\\?`));
     await expect(this.page.getByTestId(TestIds.schemaAdministration.overview)).toBeVisible();
 
-    await this.openListAndFilter(consoleUrl, namespace, displayName);
+    const createdOwnerContext = this.page.getByTestId('switch-to-owner-context');
+    if (await createdOwnerContext.isVisible()) {
+      await createdOwnerContext.click();
+      await expect(this.page).toHaveURL(url => url.searchParams.get('context') === scopeRef);
+      await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-scope', scopeRef);
+      await expect(this.page.getByTestId(TestIds.schemaAdministration.overview)).toBeVisible();
+    }
+    await this.openListAndFilter(consoleUrl, namespace, displayName, scopeRef);
     await this.page.getByTestId(TestIds.schemaAdministration.detailsLink).click();
     await expect(this.page.getByTestId(TestIds.schemaAdministration.overview)).toBeVisible();
-    await this.page.getByTestId(TestIds.schemaAdministration.definitionTab).click();
-    await this.definition().getByLabel('Description').fill('Reusable browser-tested contract.');
+    const ownerContext = this.page.getByTestId("switch-to-owner-context");
+    if (await ownerContext.isVisible()) {
+      await ownerContext.click();
+      await expect(this.page).toHaveURL(url => url.searchParams.get("context") === scopeRef);
+      await expect(this.page.getByTestId(TestIds.schemaAdministration.overview)).toBeVisible();
+    }
+    await selectResourceSection(this.page, "definition/identity");
+    await this.definition().getByRole('textbox', { name: 'Description' }).fill('Reusable browser-tested contract.');
     await this.page.getByTestId(TestIds.schemaAdministration.save).click();
     await expect(this.page.locator('.form-alert-success[role="status"]').filter({ hasText: /saved/i })).toBeVisible();
 
@@ -86,21 +101,26 @@ export class SchemaAdministrationPage {
       .toBeLessThanOrEqual(result.viewportWidth);
   }
 
-  private async openListAndFilter(consoleUrl: string, namespace: string, displayName: string): Promise<void> {
+  private async openListAndFilter(consoleUrl: string, namespace: string, displayName: string, scopeRef: string): Promise<void> {
     await this.open(`${consoleUrl}/schemas`, TestIds.schemaAdministration.list);
-    await this.page.getByTestId(TestIds.schemaAdministration.namespaceFilter).fill(namespace);
+    const list = this.page.getByTestId(TestIds.schemaAdministration.list);
+    await list.getByRole('button', { name: 'More filters', exact: true }).click();
+    await list.locator('[data-filter-key="namespace"] input').fill(namespace);
+    const apply = list.getByRole('button', { name: 'Apply filters', exact: true });
+    if (await apply.count()) await apply.click();
     const row = this.page.getByTestId(TestIds.schemaAdministration.row);
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(displayName);
-    const scopeRef = await this.page.getByTestId(TestIds.schemaAdministration.scopeFilter)
-      .locator('option').filter({ hasText: '/workspaces/' }).first().getAttribute('value');
-    if (!scopeRef) throw new Error('The Schema list did not expose its Workspace scope filter.');
-    await this.page.getByTestId(TestIds.schemaAdministration.scopeFilter).selectOption(scopeRef);
+    const scope = list.locator('[data-filter-key="scope"] select');
+    if (!await scope.isVisible()) await list.getByRole('button', { name: 'More filters', exact: true }).click();
+    await scope.selectOption(scopeRef);
+    if (await apply.count()) await apply.click();
     await expect(row).toHaveCount(1);
+    await expect(row).toContainText(displayName);
   }
 
   private async exercisePreview(): Promise<void> {
-    await this.page.getByTestId(TestIds.schemaAdministration.designerTab).click();
+    await selectResourceSection(this.page, "definition/configuration");
     await this.page.getByTestId(TestIds.schemaAdministration.previewMode).click();
     const preview = this.page.getByTestId(TestIds.schemaAdministration.preview);
     await preview.getByRole('button', { name: 'Validate instance' }).click();
@@ -112,7 +132,7 @@ export class SchemaAdministrationPage {
   }
 
   private async exerciseSourceFallback(): Promise<void> {
-    await this.page.getByTestId(TestIds.schemaAdministration.designerTab).click();
+    await selectResourceSection(this.page, "definition/configuration");
     await this.page.getByTestId(TestIds.schemaAdministration.sourceMode).click();
     await this.replaceMonaco(JSON.stringify({
       type: 'object', properties: { value: { not: { type: 'string' } } },
@@ -146,7 +166,7 @@ export class SchemaAdministrationPage {
   }
 
   private async exerciseStaleWrite(consoleUrl: string, scopeRef: string, namespace: string, name: string): Promise<void> {
-    await this.page.getByTestId(TestIds.schemaAdministration.definitionTab).click();
+    await selectResourceSection(this.page, "definition/identity");
     const response = await this.page.request.get(this.schemaUrl(consoleUrl, scopeRef, namespace, name));
     await expectStatus(response, 200, 'read Schema before the competing update');
     const schema = await response.json() as SchemaWire;
@@ -200,8 +220,20 @@ export class SchemaAdministrationPage {
   }
 
   private async reloadEditor(consoleUrl: string, scopeRef: string, namespace: string, name: string, view: string): Promise<void> {
-    await this.open(`${consoleUrl}/schemas/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}`
-      + `&namespace=${encodeURIComponent(namespace)}&view=${view}`, TestIds.schemaAdministration.editor);
+    const discard = this.page.locator('.unsaved-changes-bar .text-button');
+    if (await discard.isVisible()) await discard.click();
+    const current = new URL(this.page.url());
+    const target = new URL(current);
+    target.pathname = `/schemas/${encodeURIComponent(name)}`;
+    target.searchParams.set('scopeRef', scopeRef);
+    target.searchParams.set('namespace', namespace);
+    target.hash = view === 'definition' ? 'definition/identity' : view === 'designer' ? 'definition/configuration' : view;
+    if (target.origin === new URL(consoleUrl).origin && current.pathname === target.pathname && current.search === target.search) {
+      await selectResourceSection(this.page, target.hash.slice(1));
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
+      await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+      await selectResourceSection(this.page, target.hash.slice(1));
+    } else await this.open(target.toString(), TestIds.schemaAdministration.editor);
   }
 
   private schemaUrl(consoleUrl: string, scopeRef: string, namespace: string, name: string): string {
@@ -260,9 +292,15 @@ export class SchemaAdministrationPage {
   }
 
   private async open(url: string, marker: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const target = new URL(url);
+    const currentContext = new URL(this.page.url()).searchParams.get('context')
+      ?? await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
+    if (currentContext && !target.searchParams.has('context')) target.searchParams.set('context', currentContext);
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Schema route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute("data-preferences-ready", "true");
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute("data-context-scope", /^\//);
   }
 }
 

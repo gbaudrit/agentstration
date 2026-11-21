@@ -1,8 +1,8 @@
-<a class="task-card" href="@($"/tasks/{Task.Id}")">
-    <span class="task-status status-@Task.Status.ToString().ToLowerInvariant()">@Label(Task.Status)</span>
-    <strong>@Task.Title</strong>
+<article class="task-card">
+    <CollectionIdentity DisplayName="@Task.Title" Name="@Task.Id.ToString()" Href="@($"/tasks/{Task.Id}")" IconName="tasks"  ><IconBadges><ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Task.WorkspaceId.Value)" IconOnly /><TaskStatusBadge Value="Task.Status" IconOnly /></IconBadges></CollectionIdentity>
     <small>@Localizer["UpdatedAt", Task.UpdatedAt.LocalDateTime.ToString("g")]</small>
-</a>
+    <CollectionActions ResourceName="@Task.Title"><a href="@($"/tasks/{Task.Id}")">@Localizer["ViewTaskDetails", Task.Title]</a></CollectionActions>
+</article>
 @code {
     [Parameter, EditorRequired] public required WorkTask Task { get; set; }
     private string Label(WorkTaskStatus status) => Localizer[$"TaskStatus.{status}"];

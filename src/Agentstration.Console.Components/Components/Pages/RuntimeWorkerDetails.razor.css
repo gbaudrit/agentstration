@@ -1,25 +1,18 @@
-.worker-detail-tabs { margin-top: -8px; }
-.worker-tab-count,
 .worker-count { display: inline-grid; place-items: center; min-width: 1.7rem; height: 1.7rem; padding: 0 .45rem; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 700; }
-.worker-tab-count { height: 1.35rem; margin-left: .45rem; }
-.worker-detail-tabs .active .worker-tab-count { background: var(--primary-soft); color: var(--primary); }
 .worker-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .worker-metrics ::deep .metric-card { min-height: 108px; }
 .worker-metrics ::deep .metric-card strong { overflow-wrap: anywhere; font-size: 1.35rem; }
-.worker-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-.worker-detail-grid .panel { min-width: 0; }
-.worker-detail-grid .details-list { grid-template-columns: minmax(7rem, 28%) minmax(0, 1fr); margin-bottom: 0; }
-.worker-detail-card .panel-header { align-items: flex-start; }
-.worker-detail-card .panel-header .eyebrow { margin: 0 0 .35rem; }
-.worker-detail-grid code,
-.worker-detail-grid dd { overflow-wrap: anywhere; }
+.worker-overview .details-list { grid-template-columns: minmax(7rem, 28%) minmax(0, 1fr); margin-bottom: 0; }
+.worker-overview .details-list dt,
+.worker-overview .details-list dd { min-width: 0; overflow-wrap: anywhere; }
+.worker-overview .details-list code { overflow-wrap: anywhere; }
 .worker-build { display: block; max-width: 100%; margin-top: .3rem; overflow: hidden; color: var(--muted); font-family: var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
 .worker-assignments .panel-header { align-items: flex-start; }
 .worker-assignments .panel-header p { margin: .35rem 0 0; color: var(--muted); font-size: .82rem; }
 .worker-assignments-grid ::deep .data-grid-wrap { border: 0; border-radius: 0; box-shadow: none; }
 .worker-assignments-grid ::deep .data-grid { table-layout: fixed; white-space: normal; }
 .worker-assignments-grid ::deep th:first-child { width: 36%; }
-.worker-assignments-grid ::deep td { overflow-wrap: anywhere; vertical-align: top; }
+.worker-assignments-grid ::deep td { overflow-wrap: anywhere; }
 .worker-assignments-grid ::deep td small { display: block; margin-top: .25rem; color: var(--muted); }
 .worker-run-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .worker-empty { padding: 2rem; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); text-align: center; }
@@ -30,7 +23,6 @@
 
 @media (max-width: 860px) {
     .worker-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .worker-detail-grid { grid-template-columns: 1fr; }
     .worker-assignments-grid ::deep .data-grid-wrap { overflow: visible; }
     .worker-assignments-grid ::deep .data-grid,
     .worker-assignments-grid ::deep .data-grid tbody { display: grid; gap: .75rem; }
@@ -42,6 +34,6 @@
 
 @media (max-width: 520px) {
     .worker-metrics { grid-template-columns: 1fr; }
-    .worker-detail-grid .details-list,
+    .worker-overview .details-list,
     .worker-assignments-grid ::deep .data-grid td { grid-template-columns: 1fr; gap: .35rem; }
 }

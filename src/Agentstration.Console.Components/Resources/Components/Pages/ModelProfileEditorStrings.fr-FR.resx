@@ -129,4 +129,20 @@
   <data name="Status.Unknown"><value>Inconnu</value></data>
   <data name="Range"><value>Plage : de {0} à {1}.</value></data>
   <data name="Access"><value>Accès</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version plus récente est disponible. Votre brouillon et sa version d’origine sont conservés. Abandonnez le brouillon pour charger la nouvelle version.</value></data>
+  <data name="ProviderOptionsInvalid" xml:space="preserve"><value>Saisissez un objet JSON valide contenant les options versionnées du fournisseur.</value></data>
+  <data name="ReasoningMode.Automatic" xml:space="preserve"><value>Automatique</value></data>
+  <data name="ReasoningMode.Enabled" xml:space="preserve"><value>Activé</value></data>
+  <data name="ReasoningMode.Disabled" xml:space="preserve"><value>Désactivé</value></data>
+  <data name="OutputFormat.Text" xml:space="preserve"><value>Texte</value></data>
+  <data name="OutputFormat.JsonObject" xml:space="preserve"><value>Objet JSON</value></data>
+  <data name="OutputFormat.JsonSchema" xml:space="preserve"><value>Schéma JSON</value></data>
+  <data name="GuidedOptionsUnavailable" xml:space="preserve"><value>Les options enregistrées ou leur schéma ne peuvent pas être représentés par l’éditeur guidé. Modifiez explicitement le JSON brut pour préserver leur contrat, leur version et leurs valeurs.</value></data>
+  <data name="ProviderOptionRequired" xml:space="preserve"><value>L’option fournisseur « {0} » est obligatoire.</value></data>
+  <data name="ProviderOptionInvalid.Text" xml:space="preserve"><value>Saisissez une valeur valide pour l’option fournisseur « {0} ».</value></data>
+  <data name="ProviderOptionInvalid.Toggle" xml:space="preserve"><value>Saisissez true ou false pour l’option fournisseur « {0} ».</value></data>
+  <data name="ProviderOptionInvalid.WholeNumber" xml:space="preserve"><value>Saisissez un nombre entier pour l’option fournisseur « {0} ».</value></data>
+  <data name="ProviderOptionInvalid.DecimalNumber" xml:space="preserve"><value>Saisissez un nombre JSON pour l’option fournisseur « {0} ».</value></data>
+  <data name="ProviderOptionInvalid.JsonObject" xml:space="preserve"><value>Saisissez un objet JSON valide pour l’option fournisseur « {0} ».</value></data>
+  <data name="ProviderOptionInvalid.JsonValue" xml:space="preserve"><value>Saisissez une valeur JSON valide et non nulle pour l’option fournisseur « {0} ».</value></data>
 </root>

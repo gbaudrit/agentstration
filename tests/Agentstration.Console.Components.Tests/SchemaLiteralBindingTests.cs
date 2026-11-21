@@ -26,17 +26,17 @@ public sealed partial class ModelProviderNavigationTests
 
         var input = rendered.Find("textarea.schema-long-text");
         Assert.AreEqual("3", input.GetAttribute("rows"));
-        StringAssert.Contains(input.ParentElement!.TextContent, label);
+        StringAssert.Contains(rendered.Find($"label[for='{input.GetAttribute("id")}']").TextContent, label);
         Assert.AreEqual(1, rendered.Markup.Split("Notification body", StringSplitOptions.None).Length - 1);
         Assert.AreEqual(advanced, rendered.Find("[data-testid='schema-raw-mode']").TextContent);
         StringAssert.Contains(rendered.Markup, hint);
         Assert.HasCount(0, rendered.FindAll("[data-testid='schema-form-mode']"));
         Assert.HasCount(0, rendered.FindAll("[role='alert']"));
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
 
         input.Input("A useful message");
         Assert.AreEqual("A useful message", selected!.Literal!.Value.GetString());
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("[data-testid='schema-raw-mode']").Click();
         Assert.AreEqual("\"A useful message\"", rendered.Find("textarea").GetAttribute("value"));
         rendered.Find("[data-testid='schema-form-mode']").Click();
@@ -53,13 +53,13 @@ public sealed partial class ModelProviderNavigationTests
         ValueBindingSelection? selected = null;
         var rendered = RenderSchemaLiteral(context, editContext, """{"type":"boolean"}""", value => selected = value);
         Assert.IsNull(selected);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("[data-schema-path='$'] select").Change(choice);
         Assert.AreEqual(expected, selected!.Literal!.Value.ValueKind);
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("[data-schema-path='$'] select").Change(string.Empty);
         Assert.IsNull(selected.Literal);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -71,13 +71,13 @@ public sealed partial class ModelProviderNavigationTests
         ValueBindingSelection? selected = null;
         var rendered = RenderSchemaLiteral(context, editContext, """{"type":"string","default":"do not configure automatically"}""", value => selected = value);
         Assert.IsNull(selected);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.FindAll("button").Single(button => button.TextContent == "Use empty text").Click();
         Assert.AreEqual(string.Empty, selected!.Literal!.Value.GetString());
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.FindAll("button").Single(button => button.TextContent == "Clear value").Click();
         Assert.IsNull(selected.Literal);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -92,10 +92,10 @@ public sealed partial class ModelProviderNavigationTests
         rendered.FindComponent<ValueBindingRequirementEditor>().Render(parameters => parameters.Add(value => value.Requirement,
             new("choice", true, "string", AllowedValues: [ParseLiteral("\"ok\"")], LiteralSchema: ParseLiteral(schema))));
         EnterSchemaJson(rendered, "\"invalid\"");
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.HasCount(1, rendered.FindAll("[role='alert']"));
         rendered.Find("textarea").Input("\"ok\"");
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.HasCount(0, rendered.FindAll("[role='alert']"));
     }
 
@@ -106,10 +106,10 @@ public sealed partial class ModelProviderNavigationTests
         var editContext = new EditContext(new object());
         var rendered = RenderSchemaLiteral(context, editContext, """{"type":"string","minLength":3}""", _ => { });
         rendered.Find("[data-schema-path='$'] input").Input("x");
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.HasCount(1, rendered.FindAll("[role='alert']"));
         rendered.Find("[data-schema-path='$'] input").Input("valid");
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.HasCount(0, rendered.FindAll("[role='alert']"));
     }
 
@@ -122,7 +122,7 @@ public sealed partial class ModelProviderNavigationTests
         var editContext = new EditContext(new object());
         ValueBindingSelection? selected = null;
         var rendered = RenderSchemaLiteral(context, editContext, schema, value => selected = value);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
 
         EnterSchemaJson(rendered, json);
 
@@ -130,7 +130,7 @@ public sealed partial class ModelProviderNavigationTests
         Assert.IsTrue(selected.IsConfigured);
         Assert.IsNull(selected.Resource);
         Assert.IsTrue(JsonElement.DeepEquals(ParseLiteral(json), selected.Literal!.Value));
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("[data-testid='schema-form-mode']").Click();
         Assert.HasCount(0, rendered.FindAll("textarea"));
     }
@@ -145,23 +145,23 @@ public sealed partial class ModelProviderNavigationTests
         ValueBindingSelection? selected = null;
         var rendered = RenderSchemaLiteral(context, editContext, """{"type":["string","null"]}""", value => selected = value, required: required);
         Assert.IsNull(rendered.FindComponent<ValueBindingRequirementEditor>().Instance.Selection.Literal);
-        Assert.AreEqual(!required, editContext.Validate());
+        Assert.AreEqual(!required, context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
 
         EnterSchemaJson(rendered, "\"\"");
         Assert.IsTrue(selected!.IsConfigured);
         Assert.AreEqual(JsonValueKind.String, selected.Literal!.Value.ValueKind);
         Assert.AreEqual(string.Empty, selected.Literal.Value.GetString());
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
 
         rendered.Find("textarea").Input("null");
         Assert.IsTrue(selected.IsConfigured);
         Assert.AreEqual(JsonValueKind.Null, selected.Literal!.Value.ValueKind);
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
 
         rendered.Find("textarea").Input(string.Empty);
         Assert.IsFalse(selected.IsConfigured);
         Assert.IsNull(selected.Literal);
-        Assert.AreEqual(!required, editContext.Validate());
+        Assert.AreEqual(!required, context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -180,10 +180,10 @@ public sealed partial class ModelProviderNavigationTests
         var rendered = RenderSchemaLiteral(context, editContext, schema, _ => { });
 
         EnterSchemaJson(rendered, invalid);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.IsTrue(rendered.FindAll("[role='alert']").Count > 0);
         rendered.Find("textarea").Input(valid);
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -197,9 +197,9 @@ public sealed partial class ModelProviderNavigationTests
         var previous = selected;
         rendered.Find("textarea").Input("[broken");
         Assert.AreEqual(previous, selected);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.Find("textarea").Input("[2]");
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.AreEqual(2, selected!.Literal!.Value[0].GetInt32());
     }
 
@@ -222,7 +222,7 @@ public sealed partial class ModelProviderNavigationTests
         rendered.Find("[data-testid='value-binding-binding-kind']").Change("Literal");
         Assert.IsNull(selected.Literal);
         Assert.IsFalse(selected.IsConfigured);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -231,10 +231,10 @@ public sealed partial class ModelProviderNavigationTests
         using var context = CreateContext(out _);
         var editContext = new EditContext(new object());
         var rendered = RenderSchemaLiteral(context, editContext, """{"type":"string","minLength":1}""", _ => { }, initial: ParseLiteral("\"ok\""));
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         rendered.FindComponent<ValueBindingRequirementEditor>().Render(parameters => parameters.Add(value => value.Requirement,
             new("payload", true, "string", LiteralSchema: ParseLiteral("""{"type":"string","minLength":3}"""))));
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -251,7 +251,7 @@ public sealed partial class ModelProviderNavigationTests
         rendered.FindComponent<ValueBindingRequirementEditor>().Render(parameters => parameters.Add(value => value.Requirement,
             new("payload", true, "string", Secured: true, LiteralSchema: ParseLiteral("""{"type":["string","null"]}"""))));
         Assert.HasCount(0, rendered.FindAll("[data-testid='schema-input-editor']"));
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -268,12 +268,12 @@ public sealed partial class ModelProviderNavigationTests
         StringAssert.Contains(setButton.GetAttribute("aria-label"), set);
         setButton.Click();
         Assert.AreEqual(JsonValueKind.Null, selected!.Literal!.Value.ValueKind);
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         var clearButton = rendered.FindAll("button").Single(button => button.TextContent == clear);
         StringAssert.Contains(clearButton.GetAttribute("aria-label"), clear);
         clearButton.Click();
         Assert.IsNull(selected.Literal);
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -290,7 +290,7 @@ public sealed partial class ModelProviderNavigationTests
                 .Add(value => value.Requirement, new("endpoint", true, "string"))
                 .Add(value => value.AllowedSources, [ValueBindingSourceKind.Literal])
                 .Add(value => value.Selection, new(ValueBindingSourceKind.Literal, Literal: ParseLiteral(json)))));
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.HasCount(0, rendered.FindAll("[data-testid='schema-input-editor']"));
     }
 
@@ -307,7 +307,7 @@ public sealed partial class ModelProviderNavigationTests
                 .Add(value => value.Requirement, new("text", true, "string", LiteralSchema: withSchema ? ParseLiteral("""{"type":"string"}""") : null))
                 .Add(value => value.AllowedSources, [ValueBindingSourceKind.Literal])
                 .Add(value => value.Selection, new(ValueBindingSourceKind.Literal, Literal: default(JsonElement)))));
-        Assert.IsFalse(editContext.Validate());
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
         Assert.IsFalse(rendered.FindComponent<ValueBindingRequirementEditor>().Instance.Selection.IsConfigured);
     }
 
@@ -321,7 +321,7 @@ public sealed partial class ModelProviderNavigationTests
         rendered.Find("[data-testid='schema-input-editor'] select").Change("\"\"");
         Assert.IsTrue(selected!.IsConfigured);
         Assert.AreEqual(string.Empty, selected.Literal!.Value.GetString());
-        Assert.IsTrue(editContext.Validate());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
     }
 
     [TestMethod]
@@ -336,7 +336,7 @@ public sealed partial class ModelProviderNavigationTests
             .Add(value => value.AllowedSources, [ValueBindingSourceKind.Literal])
             .Add(value => value.Selection, new(ValueBindingSourceKind.Literal))
             .Add(value => value.SelectionChanged, value => selected = value));
-        rendered.Find("[data-testid='value-binding-binding-literal']").Change(string.Empty);
+        rendered.Find("[data-testid='value-binding-binding-literal']").Change(allowedValues ? "\"\"" : string.Empty);
         Assert.IsTrue(selected!.IsConfigured);
         Assert.AreEqual(string.Empty, selected.Literal!.Value.GetString());
         rendered.Find("[data-testid='value-binding-binding-literal-clear']").Click();

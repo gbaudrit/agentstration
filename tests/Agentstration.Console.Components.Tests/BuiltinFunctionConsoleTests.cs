@@ -18,7 +18,7 @@ public sealed partial class KnowledgeSourceEditorTests
     public async Task BuiltinFunctionsAreIdentifiedAndReadOnlyEvenForAnInstanceAdministrator(string locale, string badge, string help)
     {
         using var culture = new TestCultureScope(locale);
-        using var context = CreateContext(new KnowledgeClientStub());
+        using var context = CreateContext(new KnowledgeClientStub()).WithCollectionPresentation();
         var owner = new ConsoleContextState(new BuiltinFunctionContextProvider());
         await owner.EnsureLoadedAsync(default);
         context.Services.AddSingleton(owner);
@@ -30,10 +30,16 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.Contains(locale == "fr-FR" ? "Extrait une valeur JSON" : "Select a JSON value", catalogue.Find("[data-testid=function-description]").TextContent);
         Assert.IsEmpty(catalogue.FindAll("[data-testid=function-native-kind-create]"));
         Assert.IsFalse(catalogue.FindAll("button").Any(button => button.TextContent == (locale == "fr-FR" ? "Désactiver" : "Disable")));
+        var navigation = context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
+        module.Mode = JSRuntimeMode.Loose;
+        module.Setup<string>("navigate", _ => true).SetResult(navigation.Uri.Split('#')[0] + "#definition/identity");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var editor = context.Render<TransformationFunctionEditor>(parameters => parameters.Add(value => value.Name, "json-select-builtin"));
         Assert.Contains(help, editor.Find("[role=note]").TextContent);
-        Assert.IsTrue(editor.Find("fieldset").HasAttribute("disabled"));
         Assert.Contains(locale == "fr-FR" ? "Extrait une valeur JSON" : "Select a JSON value", editor.Find("[data-testid=function-description]").TextContent);
+        await editor.InvokeAsync(() => editor.FindComponent<Agentstration.Web.Components.ResourceNavigation>().Instance.NavigateSection("definition/identity"));
+        Assert.IsTrue(editor.Find("form > fieldset").HasAttribute("disabled"));
         await editor.Find("form").SubmitAsync();
         Assert.AreEqual(0, client.SaveCount);
     }
@@ -66,6 +72,8 @@ public sealed partial class KnowledgeSourceEditorTests
             Definition = new("json.select", [new("1.0.0", new("native", "1.0.0", ResourceScopeRef.Instance),
                 JsonSerializer.Deserialize<JsonElement>("""{"implementation":{"id":"json.select","version":"1.0.0"}}"""))])
         };
+        public Task<FunctionCatalogPage<TransformationFunctionResource>> ListPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) => Task.FromResult(new FunctionCatalogPage<TransformationFunctionResource>(skip == 0 ? [Function] : [], false));
+        public Task<FunctionCatalogPage<FunctionKindResource>> ListKindsPageAsync(ResourceScopeRef? scope, int skip, int take, CancellationToken ct) => Task.FromResult(new FunctionCatalogPage<FunctionKindResource>(skip == 0 ? [Kind] : [], false));
         public Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) => Task.FromResult<IReadOnlyList<TransformationFunctionResource>>([Function]);
         public Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct) => Task.FromResult<IReadOnlyList<FunctionKindResource>>([Kind]);
         public Task<IReadOnlyList<NativeFunctionDescriptor>> ImplementationsAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<NativeFunctionDescriptor>>([

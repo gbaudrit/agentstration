@@ -24,6 +24,9 @@ public sealed record ToolSetProperties
 public sealed record ToolSetResource : Resource
 {
     public ToolSetProperties Definition { get; init; } = null!;
+    // Collection projection from immutable publications; never inferred from the draft.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? PublishedVersion { get; init; }
 }
 
 public sealed record PublishedToolSetMember

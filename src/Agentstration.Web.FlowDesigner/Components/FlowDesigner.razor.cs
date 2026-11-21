@@ -33,6 +33,7 @@ public partial class FlowDesigner
     private IReadOnlyList<FlowDesignerTool> tools = [];
     private IReadOnlyList<FlowDesignerFunction> functions = [];
     private bool loadingResources = true;
+    private bool disposed;
     private IReadOnlyList<FlowDesignerSchemaVersion> schemaVersions = [];
     private string? loadedResource;
     private string transitionFrom = string.Empty;
@@ -69,6 +70,7 @@ public partial class FlowDesigner
     [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
     [Parameter] public string? PublishedVersion { get; set; }
     [Parameter] public bool IsReadOnly { get; set; }
+    [Parameter] public bool? ExecutionAllowed { get; set; }
     [Parameter] public ResourceNamespace Namespace { get; set; } = ResourceNamespace.Default;
 
     private string WorkspaceClasses => string.Join(' ', new[]
@@ -96,9 +98,9 @@ public partial class FlowDesigner
         : null;
     private InspectorResourceSummary? SelectedInspectorResource => SelectedStep switch
     {
-        AgentFlowStepDefinition when SelectedAgent is { } agent => new(agent.DisplayName, agent.Name, AgentUrl(agent), "OpenAgentInNewTab"),
-        FlowCallStepDefinition when SelectedFlow is { } flow => new(flow.DisplayName, flow.Name, FlowUrl(flow), "OpenFlowInNewTab"),
-        ToolFlowStepDefinition when SelectedTool is { } tool => new(tool.DisplayName, tool.Name, ToolUrl(tool), "OpenToolInNewTab"),
+        AgentFlowStepDefinition when SelectedAgent is { } agent => new(agent.DisplayName, agent.Name, PreserveNavigationContext(AgentUrl(agent), Navigation.Uri), "OpenAgentInNewTab"),
+        FlowCallStepDefinition when SelectedFlow is { } flow => new(flow.DisplayName, flow.Name, PreserveNavigationContext(FlowUrl(flow), Navigation.Uri), "OpenFlowInNewTab"),
+        ToolFlowStepDefinition when SelectedTool is { } tool => new(tool.DisplayName, tool.Name, PreserveNavigationContext(ToolUrl(tool), Navigation.Uri), "OpenToolInNewTab"),
         _ => null
     };
     private InputFlowStepDefinition? ParentInputStep => Editor.State.Resource?.Definition.Steps.OfType<InputFlowStepDefinition>().SingleOrDefault();
@@ -143,7 +145,10 @@ public partial class FlowDesigner
     private FlowDesignerTarget Target => new(Namespace, ResourceId, ScopeRef, PublishedVersion);
     private ResourceScopeRef OwnerScope => Editor.State.Resource?.ScopeRef ?? ScopeRef
         ?? throw new InvalidOperationException("The Flow owner scope is unavailable.");
-    private bool ReadOnly => loadingTarget || IsReadOnly || Editor.State.IsReadOnly;
+    private bool ReadOnly => disposed || loadingTarget || IsReadOnly || Editor.State.IsReadOnly;
+    private bool CanRunDraft => !disposed && !loadingTarget && !loadingResources && Editor.State.Resource is not null && !Editor.State.IsReadOnly
+        && (ExecutionAllowed ?? !IsReadOnly) && (!ReadOnly || !Editor.State.IsDirty && !Editor.State.HasSourceChanges);
+    private string FlowListUrl => PreserveNavigationContext("/flows", Navigation.Uri);
     private string DraftUrl => Navigation.GetUriWithQueryParameter("version", (string?)null);
 
     private int resourceLoadRevision;
@@ -164,6 +169,7 @@ public partial class FlowDesigner
         var token = targetCancellation.Token;
         var targetLoaded = false;
         loadingTarget = true;
+        Editor.Clear();
         saving = publishing = runningDraft = false;
         publication = null;
         try
@@ -172,6 +178,10 @@ public partial class FlowDesigner
             flowVersionCatalog.Clear();
             var loaded = await Backend.LoadAsync(target, token);
             token.ThrowIfCancellationRequested();
+            if (loaded.Resource.FlowId.Value != target.ResourceId || loaded.Resource.FlowId.Namespace != target.Namespace
+                || loaded.Resource.ScopeRef is null || target.ScopeRef is not null && loaded.Resource.ScopeRef != target.ScopeRef
+                || target.PublishedVersion is not null && loaded.PublishedVersion != target.PublishedVersion)
+                throw new InvalidOperationException(T("IdentityMismatch"));
             Editor.Load(loaded, target);
             targetLoaded = true;
             var owner = OwnerScope;
@@ -217,12 +227,20 @@ public partial class FlowDesigner
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
+        if (!firstRender || disposed) return;
 
-        workspaceModule = await JS.InvokeAsync<IJSObjectReference>(
+        var imported = await JS.InvokeAsync<IJSObjectReference>(
             "import", "./_content/Agentstration.Web.FlowDesigner/js/flow-designer-workspace.js?v=20261013-1");
+        if (disposed) { if (imported is not null) await imported.DisposeAsync(); return; }
+        workspaceModule = imported;
         selfReference = DotNetObjectReference.Create(this);
-        keyboardRegistration = await workspaceModule.InvokeAsync<IJSObjectReference>("registerKeyboardShortcuts", selfReference);
+        var registration = await workspaceModule!.InvokeAsync<IJSObjectReference>("registerKeyboardShortcuts", selfReference);
+        if (disposed)
+        {
+            if (registration is not null) { await registration.InvokeVoidAsync("dispose"); await registration.DisposeAsync(); }
+            return;
+        }
+        keyboardRegistration = registration;
     }
 
     private async Task DispatchAsync(IFlowEditorCommand command)
@@ -352,32 +370,40 @@ public partial class FlowDesigner
         }
         finally { if (!token.IsCancellationRequested) publishing = false; }
     }
-    private void OpenRun() { if (ReadOnly) return; showRun = true; error = null; runError = null; runInputValid = true; runInput = ParseInput("{}"); }
+    private void OpenRun() { if (!CanRunDraft) return; showRun = true; error = null; runError = null; runInputValid = true; runInput = ParseInput("{}"); }
     private Task UpdateRunInputValidation(JsonSchemaInputValidationState value) { runInputValid = value.IsValid; return Task.CompletedTask; }
     private async Task RunDraftAsync()
     {
-        if (ReadOnly || !runInputValid || runningDraft) return;
-        runningDraft = true;
-        runError = null;
+        if (!CanRunDraft || !runInputValid || runningDraft) return;
+        runningDraft = true; runError = null;
         var token = targetCancellation!.Token;
         var input = runInput.Clone();
+        var target = Target with { ScopeRef = OwnerScope };
         try
         {
-            await WithSavedDraftAsync(async (target, operationToken) =>
+            if (ReadOnly)
             {
-                try
-                {
-                    var run = await Backend.RunDraftAsync(target, new(input, Trigger: FlowRunTrigger.Manual), operationToken);
-                    operationToken.ThrowIfCancellationRequested();
-                    Navigation.NavigateTo($"/flow-runs/{run.Id}");
-                }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    if (!operationToken.IsCancellationRequested) runError = exception.Message;
-                }
-            });
+                // Execution of the saved draft has its own capability. It must not save pending
+                // changes after definition write access was lost.
+                if (CanRunDraft) await ExecuteDraftAsync(target, input, token);
+            }
+            else await WithSavedDraftAsync((savedTarget, operationToken) => ExecuteDraftAsync(savedTarget, input, operationToken));
         }
         finally { if (!token.IsCancellationRequested) runningDraft = false; }
+    }
+    private async Task ExecuteDraftAsync(FlowDesignerTarget target, JsonElement input, CancellationToken token)
+    {
+        try
+        {
+            var run = await Backend.RunDraftAsync(target, new(input, Trigger: FlowRunTrigger.Manual), token);
+            token.ThrowIfCancellationRequested();
+            if (run.FlowId.Value != target.ResourceId || run.FlowId.Namespace != target.Namespace
+                || (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef) != target.ScopeRef)
+                throw new InvalidOperationException(T("IdentityMismatch"));
+            Navigation.NavigateTo(PreserveNavigationContext($"/flow-runs/{Uri.EscapeDataString(run.Id)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}", Navigation.Uri));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { if (!token.IsCancellationRequested) runError = exception.Message; }
     }
     private static JsonElement ParseInput(string value) { try { using var document = JsonDocument.Parse(value); return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.Clone() : JsonSerializer.SerializeToElement(new { }); } catch (JsonException) { return JsonSerializer.SerializeToElement(new { }); } }
     private static bool TryParseJson(string value, out JsonElement parsed)
@@ -597,6 +623,7 @@ public partial class FlowDesigner
 
     public async ValueTask DisposeAsync()
     {
+        disposed = true;
         GC.SuppressFinalize(this);
         resourceLoadRevision++;
         Editor.StateChanged -= EditorChanged;

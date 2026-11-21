@@ -1,0 +1,11 @@
+{
+  "baseCommit": "6561ceb3077775e4be786e8d2eca55940ee54215",
+  "route": "/tools",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Tools.razor": "8f80ffa5a8d522db2e421bf6edb602f3e41a943c"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png"
+  ]
+}

@@ -11,7 +11,7 @@
     }
     <div class="state-comparison-grid">
         <article><p class="eyebrow">@T("DesiredState")</p><strong>@T("Generation", DesiredGeneration)</strong><span>@DesiredStatus</span></article>
-        <article><p class="eyebrow">@T("ActiveDeployment")</p><strong>@ActiveGenerationLabel</strong><span>@ActiveStatus</span>@if (!string.IsNullOrWhiteSpace(RuntimeLabel)) { <code>@RuntimeLabel</code> }</article>
+        <article><p class="eyebrow">@T("ActiveDeployment")</p><strong>@ActiveGenerationLabel</strong><span>@ActiveStatus</span>@if (!string.IsNullOrWhiteSpace(RuntimeLabel)) { @if (!string.IsNullOrWhiteSpace(RuntimeUrl)) { <a class="resource-name-link" href="@RuntimeUrl"><code>@RuntimeLabel</code></a> } else { <code>@RuntimeLabel</code> } }</article>
     </div>
     @if (Actions is not null) { <div class="state-comparison-actions">@Actions</div> }
 </section>
@@ -21,6 +21,7 @@
     [Parameter] public long? ActiveGeneration { get; set; }
     [Parameter] public string DesiredStatus { get; set; } = string.Empty;
     [Parameter] public string ActiveStatus { get; set; } = string.Empty;
+    [Parameter] public string? RuntimeUrl { get; set; }
     [Parameter] public string? RuntimeLabel { get; set; }
     [Parameter] public string Summary { get; set; } = string.Empty;
     [Parameter] public bool IsSynchronized { get; set; }

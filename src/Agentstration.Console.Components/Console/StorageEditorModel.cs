@@ -3,6 +3,7 @@ using Agentstration.ConnectedServices.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Agentstration.Web.Console;
 
@@ -13,6 +14,17 @@ public sealed class StorageEditorModel
     public string DisplayName { get; set; } = string.Empty;
     public string? Description { get; set; }
     public bool Enabled { get; set; } = true;
+    public string Namespace { get; set; } = ResourceNamespace.Default.Value;
+    public ResourceScopeRef? ScopeRef { get; set; }
+    public string Tags { get; set; } = string.Empty;
+    public bool ValidName => Name.Length is >= 1 and <= 128 && char.IsAsciiLetterOrDigit(Name[0]) && Name.All(value => char.IsAsciiLetterLower(value) || char.IsAsciiDigit(value) || value is '.' or '-');
+    public IReadOnlyList<string> InvalidIdentityFields()
+    {
+        var fields = new List<string>();
+        if (string.IsNullOrWhiteSpace(DisplayName)) fields.Add(nameof(DisplayName));
+        if (!ValidName) fields.Add(nameof(Name));
+        return fields;
+    }
     public StorageTypeReference? Type { get; private set; }
     public ConnectedServiceRevisionReference? ConnectedService { get; private set; }
     public ConnectedServiceTypeReference? ConnectedServiceType { get; private set; }
@@ -21,6 +33,15 @@ public sealed class StorageEditorModel
     public JsonElement Envelope { get; set; } = JsonSerializer.SerializeToElement(new { });
     public List<StorageDocumentCollection> Collections { get; set; } = [];
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
+
+    public bool HasBindingChange(StorageResource? original) => original is null || Type is not null && StorageDigests.Binding(original.Definition) != StorageDigests.Binding(Properties());
+    public bool HasValidBinding(StorageTypeChoice? choice, ConnectedServiceResource? service, IReadOnlyList<ConnectedServiceExportDescriptor> exports) => choice is not null && Available(choice)
+        && (!choice.Version.RequiresConnectedService || service is not null && ServiceAvailable(service))
+        && choice.Version.Requirements.Where(value => value.Required).All(requirement => Bindings.Any(binding => binding.RequirementId == requirement.Id && exports.Contains(binding.Export) && Compatible(requirement, binding.Export)));
+    public static bool Compatible(StorageRequirementDescriptor requirement, ConnectedServiceExportDescriptor export) => requirement.Type == export.Type && requirement.Protection == export.Protection && (requirement.Format is null || requirement.Format == export.Format);
+    public static bool ServiceAvailable(ConnectedServiceResource service) => service.Definition.Enabled && service.ObservedState?.Availability == ConnectedServiceAvailability.Ready;
+    public static StorageAvailability TypeAvailability(StorageTypeChoice choice) => choice.Resource.ObservedVersions.FirstOrDefault(value => value.Version == choice.Version.Version)?.Availability ?? StorageAvailability.Unavailable;
+    public static bool Available(StorageTypeChoice choice) => choice.Resource.Definition.Enabled && choice.Resource.ObservedUse?.Use.Allowed == true && TypeAvailability(choice) == StorageAvailability.Ready;
 
     public void SelectType(StorageTypeChoice? choice)
     {
@@ -67,6 +88,9 @@ public sealed class StorageEditorModel
     public static StorageEditorModel From(StorageResource resource) => new()
     {
         Name = resource.Name,
+        Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key}={p.Value}")),
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         Enabled = resource.Definition.Enabled,
@@ -98,6 +122,29 @@ public sealed record StorageTypeChoice(StorageTypeResource Resource, StorageType
 public static class StorageLinks
 {
     public static string FromApi(string url) => url.StartsWith("/api/storages/", StringComparison.Ordinal) ? url[4..] : url;
+
+    // Usage URLs are already authorized by their family provider. Only expose metadata
+    // explicitly present in that local destination; absent values remain unknown.
+    public static (string? Namespace, ResourceScopeRef? ScopeRef) UsageIdentity(StorageUsage usage)
+    {
+        var url = usage.Url;
+        if (!url.StartsWith('/') || url.StartsWith("//", StringComparison.Ordinal)
+            || url.Contains('\\') || url.Any(char.IsControl)) return (null, null);
+        var question = url.IndexOf('?');
+        if (question < 0) return (null, null);
+        var fragment = url.IndexOf('#');
+        if (fragment >= 0 && fragment < question) return (null, null);
+        var query = QueryHelpers.ParseQuery(fragment < 0 ? url[question..] : url[question..fragment]);
+        string? resourceNamespace = null;
+        if (query.TryGetValue("namespace", out var values) && values.Count == 1 && !string.IsNullOrWhiteSpace(values[0]))
+        {
+            try { resourceNamespace = ResourceNamespace.Parse(values[0]).Value; }
+            catch (ArgumentException) { }
+        }
+        ResourceScopeRef? scope = query.TryGetValue("scopeRef", out var scopes) && scopes.Count == 1
+            && ResourceScopeRef.TryParse(scopes[0], out var parsed) ? parsed : null;
+        return (resourceNamespace, scope);
+    }
 
     public static ScopedResourceAddress Address(StorageResource resource) =>
         ScopedResourceAddress.Create(resource.ScopeRef!.Value, resource.Namespace, StorageResourceKinds.Storage, resource.Name);

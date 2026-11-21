@@ -1,6 +1,7 @@
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,10 +12,29 @@ namespace Agentstration.Web.Tests;
 public sealed class ResourceScopeFormFieldTests
 {
     [TestMethod]
+    public void ReadOnlyScopeNeverBorrowsAnotherOwnersNameOrInventsInstanceOwnership()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var workplace = new WorkplaceContextState();
+        var workspaceId = Guid.NewGuid();
+        workplace.SetWorkspace("current", "Current workspace", workspaceId: workspaceId);
+        context.Services.AddSingleton(workplace);
+        var page = context.Render<ResourceScopeReadOnlyField>(p => p.Add(c => c.ScopeRef, ResourceScopeRef.Workspace(workspaceId)));
+        Assert.AreEqual("Workspace · Current workspace", page.Find("input").GetAttribute("value"));
+        page.Render(p => p.Add(c => c.ScopeRef, ResourceScopeRef.Workspace(Guid.NewGuid())));
+        Assert.AreEqual("Workspace", page.Find("input").GetAttribute("value"));
+        page.Render(p => p.Add(c => c.ScopeRef, (ResourceScopeRef?)null));
+        Assert.AreEqual(string.Empty, page.Find("input").GetAttribute("value"));
+    }
+
+    [TestMethod]
     public void CompactBadgeKeepsScopeAsInlineMetadata()
     {
+        using var culture = new TestCultureScope("en-US");
         var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
         var rendered = context.Render<ResourceScopeBadge>(parameters => parameters
@@ -32,7 +52,7 @@ public sealed class ResourceScopeFormFieldTests
         var tenant = new ResourceScopeTargetResponse(ResourceScopeRef.Tenant(Guid.NewGuid()), ResourceScopeKind.Tenant, "Development", true);
         var workspace = new ResourceScopeTargetResponse(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceScopeKind.Workspace, "Default", true);
         ResourceScopeRef? selected = null;
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient([tenant, workspace]));
 

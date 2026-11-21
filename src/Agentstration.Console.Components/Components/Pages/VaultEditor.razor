@@ -3,98 +3,249 @@
 @implements IDisposable
 @inject ISecretsClient Client
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SecretStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
+@if (IsNew) { <UnsavedNavigationGuard IsDirty="@HasDraft" HasUnsavedChanges="@(() => HasDraft)" /> }
 <PageTitle>@(IsNew ? T("CreateVault") : $"{Name} · {T("Vault")}") · Agentstration</PageTitle>
-<PageHeader Title="@(IsNew ? T("CreateVault") : model.DisplayName)" Description="@T("VaultEditor.Description")" TestId="resource-vault-editor"><Actions>@if (!IsNew) { <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button> }<a class="button-secondary" href="/vaults">@T("Back")</a></Actions></PageHeader>
-<ResourceTabs Label="@T("SecretManagement")"><a href="/secrets">@T("Secrets")</a><a class="active" href="/vaults">@T("Vaults")</a></ResourceTabs>
-@if (error is not null) { <div class="form-alert form-alert-danger">@error.Message</div> }
-@if (!IsNew)
-{
-    <ResourceTabs Label="@T("Vault")"><button type="button" class="@(!accessMode ? "active" : null)" @onclick="() => accessMode = false">@T("Definition")</button><button type="button" class="@(accessMode ? "active" : null)" data-testid="vault-access-tab" @onclick="() => accessMode = true">@T("Access")</button></ResourceTabs>
+@{
+    RenderFragment feedback = @<div>
+        @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
+        @if (newerResource is not null) { <div class="form-alert form-alert-warning" role="status">@T("VaultRefreshDraftConflict")</div> }
+    </div>;
+    var presentations = Presentations;
 }
-@if (accessMode && resource?.ScopeRef is { } ownerScope)
+@if (IsNew)
 {
-    <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="resource.Namespace" Kind="@SecretResourceKinds.Vault" Name="@resource.Name" Generation="resource.Generation" Governance="resource.Governance" />
+    <PageHeader CollectionHref="@BackUrl" CollectionLabel="@T("Vaults")" Title="@T("CreateVault")" Description="@T("VaultEditor.Description")" TestId="resource-vault-editor"></PageHeader>
+    @if (loading) { <LoadingState Message="@T("LoadingVaults")" /> }
+    else
+    {
+        @feedback
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="vault-resource-form" FormName="vault-editor"
+            Busy="busy" InvalidInputChanged="value => invalidInput = value" data-interactive="@(interactive ? "true" : "false")">
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="busy" FinishLabel="@T("SaveVault")" />
+        </ResourceDefinitionForm>
+    }
 }
 else
 {
-<EditForm Model="model" OnValidSubmit="SaveAsync" FormName="vault-editor" class="resource-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirtyFromForm" @onchange="MarkDirtyFromForm"><DataAnnotationsValidator /><ValidationSummary />
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("VaultResource")</h2></div>@if (status is not null) { <StatusBadge Text="@StatusText(status)" Status="@(status == "available" ? UiStatus.Success : UiStatus.Danger)" /> }</div>
-        <div class="form-grid"><ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="vault-display-name" TechnicalNameTestId="vault-name" /><label><span>@T("Provider")</span><InputSelect @bind-Value="model.ProviderType" disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></InputSelect></label>@if (IsNew) { <ResourceScopePicker Targets="scopeTargets" @bind-Value="selectedScope" /> } else { <label><span>@T("Scope")</span><ResourceScopeBadge ScopeRef="selectedScope" /></label> }</div>
-    </section>
-    <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" OnChanged="MarkDirty" />
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Bootstrap")</p><h2>@T("MasterKey")</h2></div>@if (!IsNew && model.ProviderType == "local" && status != "available") { <button type="button" class="button-primary" @onclick="() => confirmInitialize = true" disabled="@busy">@T("InitializeLocalVault")</button> }</div>
-        <p>@T("MasterKeyHelp")</p>
-        @if (keyFilePath is not null) { <div class="form-alert form-alert-warning"><strong>@T("BackUpMasterKey")</strong><span><code>@keyFilePath</code></span></div> }
-    </section>
-    @if (saveError && error is not null) { <div class="form-alert form-alert-danger" role="alert">@error.Message</div> }
-    @if (IsNew)
-    {
-        <div class="form-actions"><a class="button-secondary" href="/vaults">@T("Cancel")</a><button type="submit" class="button-primary" disabled="@busy">@(busy ? T("Saving") : T("SaveVault"))</button></div>
-    }
-    else
-    {
-        <UnsavedChangesBar IsVisible="@dirty" Title="@T("UnsavedChangesTitle")" Message="@T("UnsavedChangesMessage")">
-            <Actions><button type="button" class="button-secondary" disabled="@busy" @onclick="DiscardAsync">@T("Discard")</button><button type="submit" class="button-primary" disabled="@busy">@(busy ? T("Saving") : T("SaveVault"))</button></Actions>
-        </UnsavedChangesBar>
-    }
-</EditForm>
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("Vaults")" Resource="resource" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Default, SecretResourceKinds.Vault, Name!)"
+        Name="@(resource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Vault")" Domain="vault" IconName="lock"
+        StatusText="@(status is null ? null : StatusText(status))" Status="StatusTone" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
+        ResourceIdentity="@(loadedKey ?? Name!)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
+        Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
+        Yaml="@SavedYaml" Busy="busy" TestId="resource-vault-editor" SectionTestIdPrefix="vault">
+        <OverviewMetrics><MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusText(status))" Status="StatusTone" /></OverviewMetrics>
+        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+        </CollectionView></OverviewConfiguration>
+        <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="vault-resource-form" FormName="vault-editor"
+            Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
+            OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
+        <AdditionalContent Context="path">@MasterKey</AdditionalContent>
+        <Actions>@if (CanManage) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true" disabled="@(busy || refreshing)">@T("Delete")</button> }</Actions>
+        <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@T("Discard")</button>@if (!sectionState.Is("yaml")) { <button type="submit" form="vault-resource-form" class="button-primary" disabled="@(busy || refreshing)">@(busy ? T("Saving") : T("SaveVault"))</button> }</DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteVault")" Message="@T("DeleteVaultMessage", Name ?? string.Empty)" ConfirmLabel="@T("DeleteVault")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 <ConfirmationDialog IsOpen="@confirmInitialize" Title="@T("InitializeLocalVault")" Message="@T("InitializeLocalVaultMessage")" ConfirmLabel="@T("GenerateMasterKey")" OnConfirm="InitializeAsync" OnCancel="() => confirmInitialize = false" />
 
 @code {
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@SecretResourceKinds.Vault"
+        DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
+        Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="selectedScope" ScopeRefChanged="value => selectedScope = value" ScopeTargets="scopeTargets"
+        DescriptionExpression="@(() => model.Description)" DescriptionReadOnly="true" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true"
+        IsNew="IsNew" ReadOnly="@(!CanManage)" DisplayNameTestId="vault-display-name" TechnicalNameTestId="vault-name">
+        <AdditionalPanels><FormSection Title="@T("Provider")"><FormField Label="@T("Provider")" Required="true"><ChildContent><ClearableSelect TValue="string" @bind-Value="model.ProviderType" Disabled="@(!IsNew)"><option value="local">@T("Provider.local")</option></ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ProviderType" /></Validation></FormField></FormSection></AdditionalPanels>
+    </ResourceIdentityEditor>;
+    private RenderFragment Grants => @<div class="resource-editor-view"><DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" OnChanged="GrantsChanged" /></div>;
+    private RenderFragment MasterKey => @<div class="resource-editor-view"><FormSection Title="@T("MasterKey")" Eyebrow="@T("Bootstrap")"><p>@T("MasterKeyHelp")</p>
+        @if (keyFilePath is not null) { <div class="form-alert form-alert-warning"><span class="resource-text"><strong>@T("BackUpMasterKey")</strong><br /><code>@keyFilePath</code></span></div> }
+    </FormSection></div>;
+    private RenderFragment InitializeAction => @<text>@if (CanInitialize) { <button type="button" class="button-primary" @onclick="() => confirmInitialize = true" disabled="@(busy || refreshing)" data-testid="vault-initialize">@T("InitializeLocalVault")</button> }</text>;
+    private RenderFragment EditAction => @<button type="button" class="button-secondary" @onclick="() => ShowSection(ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations) ?? sectionState.DefinitionPath)">@Shared["Edit"]</button>;
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => IdentityFields, "definition/configuration" => Grants, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@T("Identity")</dt><dd>@model.DisplayName<br /><code>@model.Name</code></dd><dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd><dt>@T("Provider")</dt><dd>@T($"Provider.{model.ProviderType}")</dd></dl><p>@T("MasterKeyHelp")</p></ChildContent></FormSection>;
+
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
     private VaultEditorModel model = new();
-    private VaultResource? resource;
-    private string? etag, status, keyFilePath;
+    private VaultResource? resource, newerResource;
+    private string? etag, newerEtag, status, keyFilePath, loadedKey;
     private ResourceScopeRef? selectedScope;
     private IReadOnlyList<ResourceScopeTargetResponse> scopeTargets = [];
     private Exception? error;
-    private bool busy, confirmDelete, confirmInitialize, saveError, dirty, interactive, accessMode;
+    private bool busy, refreshing, confirmDelete, confirmInitialize, interactive, loading, invalidInput;
+    private long loadVersion;
+    private string baseline = string.Empty;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private EditContext? editContext;
+    private ResourceDefinitionForm? definitionForm;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    private void GrantsChanged() => FormContext.NotifyFieldChanged(new FieldIdentifier(model, nameof(model.UseGrants)));
+    private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
+    private bool HasDraft => !loading && baseline.Length > 0 && (Fingerprint != baseline || invalidInput);
+    private bool CanManage => IsNew || resource is not null && !resource.Governance.IsManaged && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services)
+        && scopeTargets.Any(target => target.ScopeRef == selectedScope && target.CanWrite);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private bool CanInitialize => !IsNew && CanManage && resource?.Definition.ProviderType == "local" && status != "available";
+    private bool IdentityComplete => selectedScope is not null && System.ComponentModel.DataAnnotations.Validator.TryValidateObject(model, new(model), null, true);
+    private string? NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/vaults", Services);
+    private string SavedYaml => resource is null ? string.Empty : ResourceManifestSerializer.ToYaml(resource);
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private void MarkDirty() => dirty = true;
-    private void MarkDirtyFromForm(EventArgs _) => MarkDirty();
     private string StatusText(string value) => value.ToLowerInvariant() switch { "available" => T("Status.Available"), "unavailable" => T("Status.Unavailable"), "uninitialized" => T("Status.Uninitialized"), _ => T($"Status.{value}") };
-    protected override void OnAfterRender(bool firstRender) { if (!firstRender) return; interactive = true; StateHasChanged(); }
-    protected override async Task OnParametersSetAsync() { try { scopeTargets = await Client.GetScopeTargetsAsync(SecretResourceKinds.Vault, cancellation.Token); if (IsNew) { selectedScope ??= scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef; return; } var requestedScope = ParseScope(); var snapshot = requestedScope is null ? await Client.GetVaultAsync(Name!, cancellation.Token) : await Client.GetVaultAsync(Name!, requestedScope.Value, cancellation.Token); resource = snapshot.Value.Resource; model = VaultEditorModel.From(snapshot.Value.Resource); selectedScope = snapshot.Value.Resource.ScopeRef; status = snapshot.Value.Status; etag = snapshot.ETag; } catch (Exception ex) { error = ex; } }
-    private async Task SaveAsync()
+    private UiStatus StatusTone => status switch { "available" => UiStatus.Success, "uninitialized" => UiStatus.Warning, "unavailable" => UiStatus.Danger, _ => UiStatus.Neutral };
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("master-key", T("MasterKey"), "key")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
     {
-        busy = true;
-        error = null;
-        saveError = false;
+        ["definition/identity"] = new() { ReadOnly = !CanManage, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Description), nameof(model.Tags), nameof(model.ProviderType)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanManage, Fields = [nameof(model.ProviderOptions), nameof(model.UseGrants)] },
+        ["master-key"] = new() { ReadOnly = !CanManage, Actions = CanInitialize ? InitializeAction : null },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("ResourceYamlExport"), ReadOnlyActions = CanManage ? EditAction : null }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.ProviderType)] = T("Provider"),
+        [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"]
+    };
+    private IReadOnlyList<CreationWizardStep> Steps => [new("identity", T("Identity"), IdentityFields) { IsComplete = IdentityComplete }, new("grants", Shared["Configuration"], Grants), new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete }];
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => resource is null ? [] :
+        [new(T("Provider"), T($"Provider.{resource.Definition.ProviderType}")), new(Shared["Access"], resource.Definition.UsePolicy.Grants.Count == 0 ? Shared["NotProvided"] : string.Join("\n", resource.Definition.UsePolicy.Grants.Select(g => g.ScopeRef.Value)))];
+    private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
+    private async Task FinishAsync(CreationWizardFinish finish)
+    {
+        if (!FormContext.Validate() || selectedScope is null) { finish.ReturnToStepId = "identity"; definitionForm?.RequestValidationFocus(); return; }
+        await SaveAsync();
+    }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } if (!firstRender) return; interactive = true; StateHasChanged(); }
+    private void Apply(VaultResource value, string version)
+    {
+        resource = value; model = VaultEditorModel.From(value); selectedScope = value.ScopeRef; etag = version;
+        newerResource = null; newerEtag = null; invalidInput = false; error = null; baseline = Fingerprint;
+    }
+    private void Discard()
+    {
+        if (busy || refreshing || resource is null) return;
+        Apply(newerResource ?? resource, newerEtag ?? etag!);
+    }
+    protected override Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{ScopeRefValue}|{NavigationScope}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; return LoadAsync();
+    }
+    private void Clear()
+    {
+        resource = newerResource = null; etag = newerEtag = status = keyFilePath = null; selectedScope = null; model = new(); baseline = string.Empty;
+        busy = refreshing = false; invalidInput = false; confirmInitialize = confirmDelete = false;
+    }
+    private async Task LoadAsync()
+    {
+        var version = ++loadVersion; var addressKey = $"{Name}|{ScopeRefValue}";
+        loading = true; loadState = new(ResourceLoadStatus.Loading); error = null; Clear();
         try
         {
-            var snapshot = IsNew
-                ? await Client.CreateVaultAsync(new(model.Name, model.Properties(), selectedScope), cancellation.Token)
-                : await Client.UpdateVaultAsync(model.Name, selectedScope!.Value, new(model.Properties()), etag!, cancellation.Token);
-            if (IsNew) Navigation.NavigateTo(ResourceUrl(snapshot.Value));
-            else
+            if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
             {
-                resource = snapshot.Value;
-                model = VaultEditorModel.From(snapshot.Value);
-                etag = snapshot.ETag;
-                dirty = false;
+                await context.EnsureLoadedAsync(cancellation.Token); if (version != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
             }
+            loadedKey = $"{addressKey}|{NavigationScope}";
+            var targets = await Client.GetScopeTargetsAsync(SecretResourceKinds.Vault, cancellation.Token);
+            if (version != loadVersion) return;
+            scopeTargets = targets;
+            if (IsNew)
+            {
+                selectedScope = scopeTargets.FirstOrDefault(value => value.Kind == ResourceScopeKind.Workspace && value.CanWrite)?.ScopeRef ?? scopeTargets.FirstOrDefault(value => value.CanWrite)?.ScopeRef;
+                baseline = Fingerprint; loadState = new(ResourceLoadStatus.Ready); return;
+            }
+            var owner = string.IsNullOrWhiteSpace(ScopeRefValue) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(ScopeRefValue);
+            var snapshot = owner is null ? await Client.GetVaultAsync(Name!, cancellation.Token) : await Client.GetVaultAsync(Name!, owner.Value, cancellation.Token);
+            if (version != loadVersion) return;
+            if (snapshot.Value.Resource.Name != Name || owner is not null && snapshot.Value.Resource.ScopeRef != owner) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
+            Apply(snapshot.Value.Resource, snapshot.ETag); status = snapshot.Value.Status;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception ex) { error = ex; saveError = true; }
-        finally { busy = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (version == loadVersion) { Clear(); error = IsNew ? exception : null; loadState = Failure(exception); } }
+        finally { if (version == loadVersion) loading = false; }
     }
-    private async Task DiscardAsync()
+    private Task RetryAsync() => busy || loading || refreshing ? Task.CompletedTask : resource is null ? LoadAsync() : RefreshAsync();
+    private async Task RefreshAsync()
     {
-        error = null;
-        await OnParametersSetAsync();
-        if (error is null) { dirty = false; saveError = false; }
+        if (IsNew || resource is not { ScopeRef: { } owner } current || loading || refreshing || busy) return;
+        var version = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetVaultAsync(current.Name, owner, cancellation.Token);
+            if (version != loadVersion) return;
+            var value = snapshot.Value.Resource;
+            if (value.Uid != current.Uid || value.ScopeRef != owner || value.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            if (HasDraft)
+            {
+                if (etag != snapshot.ETag) { newerResource = value; newerEtag = snapshot.ETag; }
+                else resource = value;
+            }
+            else Apply(value, snapshot.ETag);
+            status = snapshot.Value.Status; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (version != loadVersion) return;
+            var failure = Failure(exception); if (failure.Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) Clear();
+            loadState = failure with { HasContent = resource is not null };
+        }
+        finally { if (version == loadVersion) refreshing = false; }
     }
-    private async Task InitializeAsync() { confirmInitialize = false; busy = true; error = null; try { var result = await Client.InitializeVaultAsync(model.Name, selectedScope!.Value, cancellation.Token); keyFilePath = result.KeyFilePath; status = "available"; } catch (Exception ex) { error = ex; } finally { busy = false; } }
-    private async Task DeleteAsync() { confirmDelete = false; try { await Client.DeleteVaultAsync(model.Name, selectedScope!.Value, etag!, cancellation.Token); Navigation.NavigateTo("/vaults"); } catch (Exception ex) { error = ex; } }
-    private ResourceScopeRef? ParseScope() => string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
-    private static string ResourceUrl(VaultResource resource) => $"/vaults/{Uri.EscapeDataString(resource.Name)}?scopeRef={Uri.EscapeDataString(resource.ScopeRef!.Value.Value)}";
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+        System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+        _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+    private async Task SaveAsync()
+    {
+        if (!CanManage || busy || refreshing) return;
+        var version = loadVersion; var current = resource; var wasNew = IsNew;
+        busy = true; error = null;
+        try
+        {
+            var snapshot = wasNew ? await Client.CreateVaultAsync(new(model.Name, model.Properties(), selectedScope), cancellation.Token)
+                : await Client.UpdateVaultAsync(current!.Name, current.ScopeRef!.Value, new(model.Properties()), etag!, cancellation.Token);
+            if (version != loadVersion) return;
+            if (snapshot.Value.Name != (wasNew ? model.Name : current!.Name) || snapshot.Value.ScopeRef != selectedScope || !wasNew && snapshot.Value.Uid != current!.Uid)
+                throw new InvalidOperationException(T("ResourceIdentityMismatch"));
+            if (wasNew) { baseline = Fingerprint; invalidInput = false; Navigation.NavigateTo(ResourceUrl(snapshot.Value)); }
+            else Apply(snapshot.Value, snapshot.ETag);
+        }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+        finally { if (version == loadVersion) busy = false; }
+    }
+    private async Task InitializeAsync()
+    {
+        if (!CanInitialize || busy || refreshing || resource is not { ScopeRef: { } owner } current) return;
+        var version = loadVersion; confirmInitialize = false; busy = true; error = null;
+        try { var result = await Client.InitializeVaultAsync(current.Name, owner, cancellation.Token); if (version != loadVersion) return; keyFilePath = result.KeyFilePath; status = "available"; }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+        finally { if (version == loadVersion) busy = false; }
+    }
+    private string? returnAfterDelete;
+    private async Task DeleteAsync()
+    {
+        if (!CanManage || busy || refreshing || resource is not { ScopeRef: { } owner } current) return;
+        var version = loadVersion; confirmDelete = false;
+        try { await Client.DeleteVaultAsync(current.Name, owner, etag!, cancellation.Token); if (version != loadVersion) return; Clear(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl; }
+        catch (Exception exception) { if (version == loadVersion) error = exception; }
+    }
+    private string ResourceUrl(VaultResource value) => ResourceOwnershipContext.Resource(Services, "/vaults", value.Name, value.Namespace, value.ScopeRef);
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

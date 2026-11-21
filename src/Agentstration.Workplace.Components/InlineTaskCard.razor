@@ -1,10 +1,9 @@
-<a class="inline-task-card task-@Task.Status.ToString().ToLowerInvariant()" href="@DetailsUrl" aria-label="@Localizer["ViewTaskDetails", Task.Title]" data-testid="workplace-inline-task" data-task-id="@Task.Id" data-task-status="@Task.Status">
-    <span class="task-card-icon"><UiIcon Name="tasks" /></span>
-    <span class="task-card-label"><small>@Localizer["Task"]</small><strong>@Task.Title</strong></span>
-    <span class="task-status">@StatusLabel</span>
-    <span class="task-card-arrow" aria-hidden="true">→</span>
-</a>
-
+<article class="inline-task-card">
+    <CollectionIdentity DisplayName="@Task.Title" Name="@Task.Id.ToString()" Href="@DetailsUrl" IconName="tasks" class="resource-name-link inline-task-link" data-testid="workplace-inline-task" data-task-id="@Task.Id" data-task-status="@Task.Status" ><IconBadges><ResourceScopeBadge ScopeRef="@Agentstration.Resources.ResourceScopeRef.Workspace(Task.WorkspaceId)" IconOnly /><TaskStatusBadge Value="Task.Status" IconOnly /></IconBadges></CollectionIdentity>
+    <small class="task-card-kind">@Localizer["Task"]</small>
+    <small>@Localizer["UpdatedAt", Task.UpdatedAt.LocalDateTime.ToString("g")]</small>
+    <CollectionActions ResourceName="@Task.Title"><a href="@DetailsUrl">@Localizer["ViewTaskDetails", Task.Title]</a></CollectionActions>
+</article>
 @code {
     [Parameter, EditorRequired] public required WorkTaskResponse Task { get; set; }
     [Parameter, EditorRequired] public required string DetailsUrl { get; set; }

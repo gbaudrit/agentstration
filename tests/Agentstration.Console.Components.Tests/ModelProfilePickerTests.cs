@@ -12,10 +12,145 @@ namespace Agentstration.Web.Tests;
 public sealed class ModelProfilePickerTests
 {
     [TestMethod]
+    public async Task SelectedProfileUsesOneSummaryAndChoosingAnotherRestoresTheDisclosureFocus()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var original = Summary("original", "Original profile", ResourceScopeRef.Instance);
+        var alternative = Summary("alternative", "Alternative profile", ResourceScopeRef.Instance);
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient([original, alternative]));
+        var changes = new List<string>();
+        var rendered = context.Render<ModelProfilePicker>(parameters => parameters
+            .Add(value => value.Value, original.Name)
+            .Add(value => value.ScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.ValueChanged, value => changes.Add(value)));
+        Assert.HasCount(1, rendered.FindAll(".model-summary-card"));
+        Assert.HasCount(1, rendered.FindAll(".model-profile-name strong"));
+        Assert.AreEqual("Model profile", rendered.Find("h3").TextContent);
+        StringAssert.Contains(rendered.Find(".model-profile-summary .model-profile-name a").GetAttribute("href")!, "/modelprofiles/original");
+        Assert.IsEmpty(rendered.FindAll(".model-profile-summary-footer a"));
+        StringAssert.Contains(rendered.Find(".model-profile-facts a").GetAttribute("href")!, "/modelproviders/");
+        await rendered.Find("[data-testid='model-profile-toggle']").ClickAsync(new());
+        var currentChoice = rendered.Find("[data-profile='/instance|default|original']");
+        Assert.IsTrue(currentChoice.HasAttribute("disabled"));
+        var description = currentChoice.GetAttribute("aria-describedby");
+        Assert.IsFalse(string.IsNullOrEmpty(description));
+        var describedRow = rendered.FindAll("[id]").Single(element => element.Id == description);
+        StringAssert.Contains(describedRow.TextContent, "Original profile");
+        Assert.AreEqual("/instance", describedRow.QuerySelector(".resource-owner-icon")!.GetAttribute("data-scope-ref"));
+        StringAssert.Contains(currentChoice.TextContent, "Selected");
+        Assert.IsEmpty(rendered.FindAll(".collection-pager"));
+        Assert.IsEmpty(changes);
+        Assert.IsEmpty(rendered.FindAll(".model-profile-choice-actions details"), "Choosing a profile is a primary action and must not require a menu.");
+        var focusRequests = context.JSInterop.Invocations.Count(call => call.Identifier == "Blazor._internal.domWrapper.focus");
+        await rendered.Find("[data-profile='/instance|default|alternative']").ClickAsync(new());
+        Assert.AreEqual(focusRequests + 1, context.JSInterop.Invocations.Count(call => call.Identifier == "Blazor._internal.domWrapper.focus"));
+        CollectionAssert.AreEqual(new[] { "alternative" }, changes);
+        Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-catalog']"));
+        Assert.AreEqual("false", rendered.Find("[data-testid='model-profile-toggle']").GetAttribute("aria-expanded"));
+    }
+
+    [TestMethod]
+    public async Task PagingAndFilteringRetainTheSelectedProfileOutsideTheVisiblePage()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var profiles = Enumerable.Range(0, 25).Select(index => Summary($"profile-{index:D2}", $"Profile {index:D2}", ResourceScopeRef.Instance)).ToArray();
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient(profiles));
+        var changes = 0;
+        var rendered = context.Render<ModelProfilePicker>(parameters => parameters
+            .Add(value => value.Value, profiles[24].Name)
+            .Add(value => value.ScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.ValueChanged, _ => changes++));
+        await rendered.Find("[data-testid='model-profile-toggle']").ClickAsync(new());
+        Assert.HasCount(20, rendered.FindAll("[data-testid='model-profile-choice']"));
+        await rendered.FindAll(".collection-pager button")[1].ClickAsync(new());
+        Assert.HasCount(5, rendered.FindAll("[data-testid='model-profile-choice']"));
+        Assert.IsTrue(rendered.Find("[data-profile='/instance|default|profile-24']").HasAttribute("disabled"));
+        rendered.Find("[data-testid='model-profile-search']").Input("No matching profile");
+        Assert.IsEmpty(rendered.FindAll("[data-testid='model-profile-choice']"));
+        Assert.IsEmpty(rendered.FindAll(".collection-pager"));
+        StringAssert.Contains(rendered.Find(".model-summary-card").TextContent, "Profile 24");
+        await rendered.Find("[data-testid='model-profile-search']").ParentElement!.QuerySelector("button")!.ClickAsync(new());
+        Assert.HasCount(20, rendered.FindAll("[data-testid='model-profile-choice']"));
+        StringAssert.Contains(rendered.Find(".model-summary-card").TextContent, "Profile 24");
+        Assert.AreEqual(0, changes);
+    }
+
+    [TestMethod]
+    public async Task DisposingDuringInitialLookupStopsTheSelectionContinuation()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var response = new TaskCompletionSource<ModelProfileLookupPageResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken lookupToken = default;
+        context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient
+        {
+            Lookup = (_, token) => { lookupToken = token; return response.Task; }
+        });
+        var changes = 0;
+        var rendered = context.Render<ObservedModelProfilePicker>(parameters => parameters
+            .Add(value => value.Value, "pending-profile")
+            .Add(value => value.ScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.ValueChanged, _ => changes++));
+        var completion = rendered.Instance.ParameterCompletion;
+        Assert.IsFalse(completion.IsCompleted);
+        await context.DisposeComponentsAsync();
+        response.SetResult(new([], null));
+        await completion;
+        Assert.IsTrue(lookupToken.IsCancellationRequested);
+        Assert.AreEqual(0, changes);
+    }
+
+    [TestMethod]
+    public async Task SupersededLookupIsCancelledAndCannotReplaceNewResultsOrTheSelection()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var original = Summary("selected", "Saved selection", ResourceScopeRef.Instance);
+        var oldResponse = new TaskCompletionSource<ModelProfileLookupPageResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var newResponse = new TaskCompletionSource<ModelProfileLookupPageResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken oldToken = default;
+        var client = new FakeModelProfilesClient([original])
+        {
+            Lookup = (search, token) =>
+            {
+                if (search == "old") { oldToken = token; return oldResponse.Task; }
+                return search == "new" ? newResponse.Task : Task.FromResult(new ModelProfileLookupPageResponse([original], null));
+            }
+        };
+        context.Services.AddSingleton<IModelProfilesClient>(client);
+        var changes = 0;
+        var rendered = context.Render<ModelProfilePicker>(parameters => parameters
+            .Add(value => value.Value, original.Name)
+            .Add(value => value.ScopeRef, ResourceScopeRef.Instance)
+            .Add(value => value.ValueChanged, _ => changes++)
+            .Add(value => value.SelectedChanged, _ => changes++));
+        await rendered.Find("[data-testid='model-profile-toggle']").ClickAsync(new());
+        var oldInput = rendered.Find("[data-testid='model-profile-search']").InputAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "old" });
+        var newInput = rendered.Find("[data-testid='model-profile-search']").InputAsync(new Microsoft.AspNetCore.Components.ChangeEventArgs { Value = "new" });
+        newResponse.SetResult(new([Summary("new-result", "New result", ResourceScopeRef.Instance)], null));
+        await newInput;
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-profile='/instance|default|new-result']")));
+        var renderedNewResponse = rendered.RenderCount;
+        oldResponse.SetResult(new([Summary("old-result", "Old result", ResourceScopeRef.Instance)], null));
+        await oldInput;
+        rendered.WaitForState(() => rendered.RenderCount > renderedNewResponse);
+
+        Assert.IsTrue(oldToken.IsCancellationRequested);
+        Assert.HasCount(1, rendered.FindAll("[data-profile='/instance|default|new-result']"));
+        Assert.IsEmpty(rendered.FindAll("[data-profile='/instance|default|old-result']"));
+        StringAssert.Contains(rendered.Find(".model-summary-card").TextContent, "Saved selection");
+        Assert.AreEqual(0, changes, "Lookup operations do not publish resource edits.");
+    }
+
+    [TestMethod]
     public void NewAgentSelectionReplacesAMissingDefaultWithTheDisplayedProfile()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient());
         string? selectedName = null;
@@ -41,7 +176,7 @@ public sealed class ModelProfilePickerTests
     public void HomonymousProfilesDisplayAndSelectTheirExactScope()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var workspaceScope = ResourceScopeRef.Workspace(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
         context.Services.AddSingleton<IModelProfilesClient>(new FakeModelProfilesClient([
@@ -58,14 +193,14 @@ public sealed class ModelProfilePickerTests
 
         rendered.WaitForAssertion(() =>
         {
-            Assert.AreEqual(ResourceScopeRef.Instance, selectedProfile?.ScopeRef);
-            StringAssert.Contains(rendered.Markup, "Instance reasoning — Instance");
-            StringAssert.Contains(rendered.Markup, "Workspace reasoning — Workspace");
+            Assert.IsNull(selectedProfile, "Loading a reference must not publish a business change.");
+            StringAssert.Contains(rendered.Markup, "Instance reasoning");
+
             StringAssert.Contains(rendered.Markup, "resource-scope-badge");
         });
 
-        rendered.Find("[data-testid='model-profile-select']")
-            .Change($"{workspaceScope.Value}|default|shared-reasoning");
+        rendered.Find("[data-testid='model-profile-toggle']").Click();
+        rendered.Find($"[data-profile='{workspaceScope.Value}|default|shared-reasoning']").Click();
 
         Assert.AreEqual(workspaceScope, selectedProfile?.ScopeRef);
     }
@@ -107,8 +242,23 @@ public sealed class ModelProfilePickerTests
                 0),
             ScopeRef: scopeRef);
 
+    private sealed class ObservedModelProfilePicker : ModelProfilePicker
+    {
+        public Task ParameterCompletion { get; private set; } = Task.CompletedTask;
+        protected override Task OnParametersSetAsync() => ParameterCompletion = base.OnParametersSetAsync();
+    }
+
     private sealed class FakeModelProfilesClient(IReadOnlyList<ModelProfileSummaryResponse>? profiles = null) : IModelProfilesClient
     {
+        public Func<string?, CancellationToken, Task<ModelProfileLookupPageResponse>>? Lookup { get; init; }
+        public async Task<ModelProfileLookupPageResponse> LookupModelProfilesAsync(string? search, string? provider, string? ownerKind, string? cursor, CancellationToken cancellationToken)
+        {
+            if (Lookup is not null) return await Lookup(search, cancellationToken);
+            var values = await GetModelProfilesAsync(search, provider, null, cancellationToken);
+            var filtered = values.Where(value => string.IsNullOrWhiteSpace(search) || value.Properties.DisplayName.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var offset = int.TryParse(cursor, out var parsed) ? parsed : 0;
+            return new(filtered.Skip(offset).Take(20).ToArray(), offset + 20 < filtered.Length ? (offset + 20).ToString(System.Globalization.CultureInfo.InvariantCulture) : null);
+        }
         public Task<IReadOnlyList<ModelProfileSummaryResponse>> GetModelProfilesAsync(string? search, string? provider, string? status, CancellationToken cancellationToken) =>
             Task.FromResult(profiles ?? (IReadOnlyList<ModelProfileSummaryResponse>)[
                 new(

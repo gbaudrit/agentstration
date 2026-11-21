@@ -1,114 +1,177 @@
 @page "/tools/sets/{Name}"
 @implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLabels
 @inject IToolSetsClient Client
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolSetsStrings> Localizer
 
 <PageTitle>@(toolSet?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-<PageHeader Title="@(toolSet?.Definition.DisplayName ?? Name)" Description="@(toolSet?.Definition.Description ?? T("DetailsDescription"))" TestId="resource-toolset-details">
-    <Actions><a class="button-secondary" href="/tools/sets">@T("Back")</a>@if (toolSet is not null && CanMutate) { <button class="button-danger" type="button" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
-</PageHeader>
-
-@if (loading) { <LoadingState Message="@T("LoadingDetails")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (toolSet is not null)
-{
-    @if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }
-    <InheritedResourceNotice OwnerScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" />
-    <ResourceTabs Label="@T("DetailsDescription")"><button type="button" class="@(activeTab == DetailsTab.Overview ? "active" : null)" @onclick="() => activeTab = DetailsTab.Overview">@T("Overview")</button>@if (CanManage) { <button type="button" class="@(activeTab == DetailsTab.Access ? "active" : null)" data-testid="toolset-access-tab" @onclick="() => activeTab = DetailsTab.Access">@T("Access")</button> }</ResourceTabs>
-    @if (activeTab == DetailsTab.Overview)
-    {
-    <section class="metric-grid" aria-label="@T("Overview")">
+@{ var presentations = Presentations; }
+<ConsoleResourceDetailsTemplate Resource="toolSet" Name="@(toolSet?.Definition.DisplayName ?? Name)" ResourceType="@T("ToolSet")" Domain="tool" IconName="layers" CollectionHref="@BackUrl" CollectionLabel="@T("Title")"
+    Description="@toolSet?.Definition.Description" Enabled="toolSet?.Definition.Enabled" EnabledDisabled="true" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync"
+    ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
+    AccessVersion="@toolSet?.Definition.Version" Yaml="@SavedYaml" Busy="busy" TestId="resource-toolset-details" SectionTestIdPrefix="toolset">
+    <Actions>@if (CanMutate) { <button class="button-danger" type="button" disabled="@(busy || refreshing)" @onclick="() => confirmDelete = true">@T("Delete")</button> }</Actions>
+    <Feedback>@if (message is not null) { <div class="form-alert form-alert-danger" role="alert">@message</div> }</Feedback>
+    <OverviewMetrics>@if (toolSet is not null) {
         <MetricCard Label="@T("DraftVersion")" Value="@toolSet.Definition.Version" Detail="@T(toolSet.Definition.Publish ? "PublishRequested" : "Draft")" Status="UiStatus.Info" />
         <MetricCard Label="@T("Members")" Value="@toolSet.Definition.Members.Count.ToString()" Detail="@T("GovernedIndividually")" Status="UiStatus.Neutral" />
         <MetricCard Label="@T("PublishedVersions")" Value="@versions.Count.ToString()" Detail="@T("Immutable")" Status="UiStatus.Success" />
-    </section>
-    <ExtensionManagedResourcePanel Governance="toolSet.Governance" ScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="toolSet.Namespace" Kind="@ToolResourceKinds.ToolSet" Name="@toolSet.Name" Uid="toolSet.Uid" />
-    <section class="panel form-section">
-        <div class="panel-header"><div><p class="eyebrow">@T("Metadata")</p><h2>@T("DescriptiveMetadata")</h2><p>@T("MetadataHelp")</p></div></div>
-        <dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@toolSet.Namespace/@toolSet.Name</code></dd><dt>@T("Category")</dt><dd>@(toolSet.Definition.Category?.Name ?? "—")</dd><dt>@T("Tags")</dt><dd>@Map(toolSet.Metadata.Tags)</dd><dt>@T("Annotations")</dt><dd>@Map(toolSet.Metadata.Annotations)</dd></dl>
-    </section>
-    <section class="panel form-section" data-testid="toolset-versions">
-        <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PinnedHelp")</p></div></div>
+    }</OverviewMetrics>
+    <OverviewConfiguration>@Configuration</OverviewConfiguration>
+    <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="toolset-inspection-form" FormName="toolset-inspection"
+        Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
+    <AdditionalContent Context="path">@Versions</AdditionalContent>
+</ConsoleResourceDetailsTemplate>
+<ConfirmationDialog IsOpen="confirmDelete" Title="@T("DeleteTitle")" Message="@T("DeleteHelp")" ConfirmLabel="@T("ConfirmDelete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+
+@code {
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.ToolSet" DisplayName="@model.DisplayName" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
+        ScopeRef="model.ScopeRef" Description="@model.Description" DescriptionExpression="@(() => model.Description)" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)"
+        ReadOnly="true" TestId="toolset-identity-editor" />;
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
+    private RenderFragment DefinitionSection(string path) => path switch
+    {
+        "definition/identity" => Identity,
+        "definition/configuration" => @<FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@Configuration</FormSection>,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
+    private RenderFragment Versions => @<div>
+    <FormSection Title="@T("PublishedVersions")" Eyebrow="@T("Publication")" Description="@T("PinnedHelp")" TestId="toolset-versions"><ChildContent>
         @if (versions.Count == 0) { <p class="muted">@T("NoVersions")</p> }
         @foreach (var version in versions.OrderByDescending(value => value.PublishedAt))
         {
             <article class="panel" data-testid="toolset-version">
-                <div class="panel-header"><div><h3>@T("VersionLabel", version.Version)</h3><code>@version.DefinitionHash</code></div><StatusBadge Text="@T("Immutable")" Status="UiStatus.Success" /></div>
-                <DataGrid TItem="PublishedToolSetMember" Items="version.Members">
-                    <Header><tr><th>@T("Capability")</th><th>@T("Route")</th><th>@T("Tool")</th><th>@T("Provider")</th><th>@T("Generation")</th><th>@T("Approval")</th></tr></Header>
-                    <Row Context="member"><tr><td><code>@member.Capability</code></td><td><code>@member.Route</code></td><td><a class="text-button" href="@ToolUrl(member)">@member.ToolNamespace/@member.ToolName</a></td><td>@member.ProviderNamespace/@member.ProviderName</td><td>@member.ToolGeneration</td><td>@T(member.RequiresApproval ? "Required" : "NotRequired")</td></tr></Row>
-                </DataGrid>
+                <div class="panel-header"><div><h3>@T("VersionLabel", version.Version)</h3><CopyableValue Value="@version.DefinitionHash" /></div><StatusBadge Text="@T("Immutable")" Status="UiStatus.Success" /></div>
+                <CollectionView TItem="PublishedToolSetMember" Items="version.Members" InformationLabels="@(new string[] { T("Capability"), T("Route"), T("Provider"), T("Generation"), T("Approval") })" IdentityLabel="@T("Tool")">
+        <Identity Context="member"><CollectionIdentity DisplayName="@member.ToolName" Namespace="@member.ToolNamespace.Value" Name="@member.ToolName" Href="@ToolUrl(member)" IconName="wrench" ><IconBadges><ResourceScopeBadge ScopeRef="member.ToolScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(member.ToolScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="member">
+            <CollectionValue Label="@T("Capability")"><code>@member.Capability</code></CollectionValue>
+            <CollectionValue Label="@T("Route")"><code>@member.Route</code></CollectionValue>
+            <CollectionValue Label="@T("Provider")">@member.ProviderNamespace/@member.ProviderName</CollectionValue>
+            <CollectionValue Label="@T("Generation")">@member.ToolGeneration</CollectionValue>
+            <CollectionValue Label="@T("Approval")">@T(member.RequiresApproval ? "Required" : "NotRequired")</CollectionValue>
+        </Information>
+    <Actions Context="member"><CollectionActions ResourceName="@($"{member.ToolNamespace}/{member.ToolName}, {member.ToolScopeRef}")"><a href="@ToolUrl(member)">@T("Inspect")</a></CollectionActions></Actions>
+                </CollectionView>
             </article>
         }
-    </section>
-    }
-    else if (CanManage)
-    {
-        <ResourceAccessPanel OwnerScopeRef="@(toolSet.ScopeRef ?? ResourceScopeRef.Instance)" Namespace="toolSet.Namespace" Kind="@ToolResourceKinds.ToolSet" Name="@toolSet.Name" Generation="toolSet.Generation" Version="toolSet.Definition.Version" Governance="toolSet.Governance" />
-    }
-}
+    </ChildContent></FormSection>
+    </div>;
 
-@if (confirmDelete)
-{
-    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-toolset-title"><h2 id="delete-toolset-title">@T("DeleteTitle")</h2><p>@T("DeleteHelp")</p><div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmDelete = false">@T("Cancel")</button><button class="button-danger" type="button" @onclick="DeleteAsync" disabled="@busy">@T("ConfirmDelete")</button></div></section>
-}
-
-@code {
     [Parameter] public string Name { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
     private ToolSetResource? toolSet;
+    private ToolSetInspectionModel model = new();
     private IReadOnlyList<ToolSetVersionResource> versions = [];
-    private string? etag, error, message;
-    private bool loading = true, busy, confirmDelete;
-    private DetailsTab activeTab;
-    private ResourceNamespace ResourceNamespace => Agentstration.Resources.ResourceNamespace.Parse(Namespace);
-    private bool CanManage => toolSet is not null && ResourceOwnershipContext.CanManage(toolSet.ScopeRef ?? ResourceScopeRef.Instance, Services);
-    private bool CanMutate => CanManage && toolSet?.Governance.IsManaged == false;
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override async Task OnParametersSetAsync()
+    private string? etag, message, loadedKey, returnAfterDelete;
+    private long loadVersion;
+    private bool busy, refreshing, loading = true, confirmDelete;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private EditContext? editContext;
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/tools/sets", Services);
+    private string? NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.Current?.SelectedScopeRef;
+    private string SavedYaml => toolSet is null ? string.Empty : ResourceManifestSerializer.ToYaml(toolSet);
+    private IReadOnlyList<ResourceNavigationItem> AdditionalSections => [new("versions", T("PublishedVersions"), "history")];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
     {
-        loading = true;
-        error = null;
+        ["definition/identity"] = new() { ReadOnly = true, ReadOnlyMessage = T("InspectionOnly"), Fields = [nameof(model.Name), nameof(model.Namespace), nameof(model.DisplayName), nameof(model.Description), nameof(model.Tags), nameof(model.ScopeRef)] },
+        ["definition/configuration"] = new() { ReadOnly = true, ReadOnlyMessage = T("InspectionOnly") },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("InspectionOnly") }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = IdentityLabels["TechnicalName"], [nameof(model.DisplayName)] = IdentityLabels["DisplayName"], [nameof(model.Namespace)] = Shared["Namespace"],
+        [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"], [nameof(model.ScopeRef)] = Shared["Scope"]
+    };
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => toolSet is null ? [] : [
+        new(Shared["Enabled"], T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")),
+        new(T("Category"), toolSet.Definition.Category is { } category ? ReferenceText(category) : "—"),
+        new(T("DraftVersion"), toolSet.Definition.Version), new(T("Publication"), T(toolSet.Definition.Publish ? "PublishRequested" : "Draft")),
+        new(T("Members"), string.Join("\n", toolSet.Definition.Members.Select(m => $"{m.Capability} · {m.Route} · {ReferenceText(m.Tool)}"))),
+        new(T("Annotations"), Map(toolSet.Metadata.Annotations))];
+
+    private bool CanMutate => toolSet is { ScopeRef: { } owner, Governance.IsManaged: false } && ResourceOwnershipContext.CanManage(owner, Services);
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    protected override Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{Namespace}|{ScopeRefValue}|{NavigationScope}";
+        if (key == loadedKey) return Task.CompletedTask;
+        loadedKey = key; return LoadAsync();
+    }
+    private void Clear() { toolSet = null; model = new(); editContext = null; versions = []; etag = null; message = null; confirmDelete = false; }
+    private void Apply(ResourceSnapshot<ToolSetResource> snapshot)
+    {
+        toolSet = snapshot.Value; model = ToolSetInspectionModel.From(snapshot.Value); etag = snapshot.ETag;
+    }
+    private async Task LoadAsync()
+    {
+        var request = ++loadVersion; loading = true; busy = refreshing = false; Clear(); loadState = new(ResourceLoadStatus.Loading);
         try
         {
-            var scopeRef = string.IsNullOrWhiteSpace(ScopeRefValue) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(ScopeRefValue);
-            var snapshotTask = scopeRef is { } exact
-                ? Client.GetToolSetAsync(exact, ResourceNamespace, Name, cancellation.Token)
-                : Client.GetToolSetAsync(ResourceNamespace, Name, cancellation.Token);
-            var versionsTask = scopeRef is { } owner
-                ? Client.GetVersionsAsync(owner, ResourceNamespace, Name, cancellation.Token)
-                : Client.GetVersionsAsync(ResourceNamespace, Name, cancellation.Token);
-            await Task.WhenAll(snapshotTask, versionsTask);
-            var snapshot = await snapshotTask;
-            toolSet = snapshot.Value;
-            etag = snapshot.ETag;
-            versions = await versionsTask;
+            if (Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState context)
+            {
+                await context.EnsureLoadedAsync(cancellation.Token); if (request != loadVersion) return;
+                if (context.Current is null) throw new InvalidOperationException(context.Error);
+            }
+            loadedKey = $"{Name}|{Namespace}|{ScopeRefValue}|{NavigationScope}";
+            var requestedName = Name; var ns = ResourceNamespace.Parse(Namespace);
+            var scope = string.IsNullOrWhiteSpace(ScopeRefValue) ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(ScopeRefValue);
+            var snapshot = await (scope is { } owner ? Client.GetToolSetAsync(owner, ns, requestedName, cancellation.Token) : Client.GetToolSetAsync(ns, requestedName, cancellation.Token));
+            if (request != loadVersion) return;
+            if (snapshot.Value.Name != requestedName || snapshot.Value.Namespace != ns || snapshot.Value.ScopeRef is not { } exact || scope is { } expected && exact != expected) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
+            var history = await Client.GetVersionsAsync(exact, ns, requestedName, cancellation.Token); if (request != loadVersion) return;
+            Apply(snapshot); versions = history; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) { Clear(); loadState = Failure(exception); } }
+        finally { if (request == loadVersion) loading = false; }
     }
+    private Task RetryAsync() => busy || loading || refreshing ? Task.CompletedTask : toolSet is null ? LoadAsync() : RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        if (busy || loading || refreshing || toolSet is not { ScopeRef: { } owner } current) return;
+        var request = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetToolSetAsync(owner, current.Namespace, current.Name, cancellation.Token); if (request != loadVersion) return;
+            var next = snapshot.Value;
+            if (next.Uid != current.Uid || next.Address != current.Address || next.ScopeRef != owner) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            var history = await Client.GetVersionsAsync(owner, current.Namespace, current.Name, cancellation.Token); if (request != loadVersion) return;
+            Apply(snapshot); versions = history; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) { var failure = Failure(exception); if (failure.Status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) Clear(); loadState = failure with { HasContent = toolSet is not null }; } }
+        finally { if (request == loadVersion) refreshing = false; }
+    }
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch
+    {
+        System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, _ => ResourceLoadStatus.Failed
+    } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
     private async Task DeleteAsync()
     {
-        if (!CanMutate || etag is null || busy) return;
-        busy = true;
-        message = null;
+        if (!CanMutate || etag is null || busy || refreshing || toolSet is not { ScopeRef: { } owner } current) return;
+        busy = true; confirmDelete = false; message = null; var request = loadVersion;
         try
         {
-            if (ScopeRefValue is { Length: > 0 })
-                await Client.DeleteAsync(ResourceScopeRef.Parse(ScopeRefValue), ResourceNamespace, Name, etag, cancellation.Token);
-            else await Client.DeleteAsync(ResourceNamespace, Name, etag, cancellation.Token);
-            Navigation.NavigateTo("/tools/sets");
+            await Client.DeleteAsync(owner, current.Namespace, current.Name, etag, cancellation.Token);
+            if (request == loadVersion) { Clear(); loadState = new(ResourceLoadStatus.NotFound); returnAfterDelete = BackUrl; }
         }
-        catch (Exception exception) { message = exception.Message; confirmDelete = false; }
-        finally { busy = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (request == loadVersion) message = exception.Message; }
+        finally { if (request == loadVersion) busy = false; }
     }
-    private static string ToolUrl(PublishedToolSetMember member) =>
-        $"/tools/{Uri.EscapeDataString(member.ToolName)}?namespace={Uri.EscapeDataString(member.ToolNamespace.Value)}&scopeRef={Uri.EscapeDataString(member.ToolScopeRef.Value)}&context={Uri.EscapeDataString(member.ToolScopeRef.Value)}";
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); } }
+    private string ToolUrl(PublishedToolSetMember member) => ResourceOwnershipContext.Resource(Services, "/tools", member.ToolName, member.ToolNamespace, member.ToolScopeRef);
+    private string ReferenceText(ResourceReference reference) => $"{(reference.ScopeRef is { } owner ? owner.Value + " · " : "")}{reference.Namespace ?? toolSet!.Namespace}/{reference.Name}";
     private static string Map(IReadOnlyDictionary<string, string> values) => values.Count == 0 ? "—" : string.Join(" · ", values.Select(value => $"{value.Key}={value.Value}"));
-    private enum DetailsTab { Overview, Access }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

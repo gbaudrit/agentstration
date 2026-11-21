@@ -3,25 +3,25 @@
 <section class="panel form-section">
     <h2>@T("Type.VersionContract")</h2><p>@T("Type.ImmutableHelp")</p>
     <div class="form-grid">
-        <label><span>@T("Version")</span><InputText @bind-Value="Draft.Version" maxlength="64" data-testid="storage-type-version" /></label>
-        <label><span>@T("Type.RequiresService")</span><InputCheckbox @bind-Value="Draft.RequiresConnectedService" /></label>
-        <label class="form-span-2"><span>@T("Type.ConfigurationSchema")</span><InputTextArea @bind-Value="Draft.ConfigurationSchema" class="form-code-editor" rows="8" maxlength="262144" data-testid="storage-type-configuration-schema" /></label>
-        <label class="form-span-2"><span>@T("Type.EnvelopeSchema")</span><InputTextArea @bind-Value="Draft.EnvelopeSchema" class="form-code-editor" rows="8" maxlength="262144" /></label>
-        <label class="form-span-2"><span>@T("Type.Requirements")</span><InputTextArea @bind-Value="Draft.Requirements" class="form-code-editor" rows="5" maxlength="65536" /></label>
+        <FormField Required="true" Label="@T("Version")"><ChildContent><ClearableText @bind-Value="Draft.Version" maxlength="64" data-testid="storage-type-version" /></ChildContent><Validation><ValidationMessage For="() => Draft.Version" /></Validation></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.RequiresConnectedService" /><span>@T("Type.RequiresService")</span></label>
+        <FormField Required="true" Label="@T("Type.ConfigurationSchema")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="Draft.ConfigurationSchema" class="form-code-editor" rows="8" maxlength="262144" data-testid="storage-type-configuration-schema" /></ChildContent><Validation><ValidationMessage For="() => Draft.ConfigurationSchema" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.EnvelopeSchema")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="Draft.EnvelopeSchema" class="form-code-editor" rows="8" maxlength="262144" /></ChildContent><Validation><ValidationMessage For="() => Draft.EnvelopeSchema" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.Requirements")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="Draft.Requirements" class="form-code-editor" rows="5" maxlength="65536" /></ChildContent><Validation><ValidationMessage For="() => Draft.Requirements" /></Validation></FormField>
     </div>
     <p>@T("Type.RequirementsHelp")</p><h3>@T("Capabilities")</h3><p>@T("Type.CapabilitiesHelp")</p>
     <div class="form-grid">
-        <label><InputCheckbox @bind-Value="Draft.List" />@T("Capability.List")</label>
-        <label><InputCheckbox @bind-Value="Draft.Stat" />@T("Capability.Stat")</label>
-        <label><InputCheckbox @bind-Value="Draft.Read" />@T("Capability.Read")</label>
-        <label><InputCheckbox @bind-Value="Draft.Write" />@T("Capability.Write")</label>
-        <label><InputCheckbox @bind-Value="Draft.Delete" />@T("Capability.Delete")</label>
-        <label><InputCheckbox @bind-Value="Draft.StableVersions" />@T("Capability.StableVersions")</label>
-        <label><InputCheckbox @bind-Value="Draft.DurableRetention" />@T("Capability.DurableRetention")</label>
-        <label><InputCheckbox @bind-Value="Draft.Deprecated" />@T("Deprecated")</label>
-        <label><span>@T("Type.MaximumPageSize")</span><InputNumber @bind-Value="Draft.MaximumPageSize" min="1" /></label>
-        <label><span>@T("Type.MaximumReadBytes")</span><InputNumber @bind-Value="Draft.MaximumReadBytes" min="1" /></label>
-        <label><span>@T("Type.MaximumWriteBytes")</span><InputNumber @bind-Value="Draft.MaximumWriteBytes" min="1" /></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.List" /><span>@T("Capability.List")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Stat" /><span>@T("Capability.Stat")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Read" /><span>@T("Capability.Read")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Write" /><span>@T("Capability.Write")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Delete" /><span>@T("Capability.Delete")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.StableVersions" /><span>@T("Capability.StableVersions")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.DurableRetention" /><span>@T("Capability.DurableRetention")</span></label>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="Draft.Deprecated" /><span>@T("Deprecated")</span></label>
+        <FormField Required="true" Label="@T("Type.MaximumPageSize")"><ChildContent><ClearableNumber @bind-Value="Draft.MaximumPageSize" min="1" /></ChildContent><Validation><ValidationMessage For="() => Draft.MaximumPageSize" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.MaximumReadBytes")"><ChildContent><ClearableNumber @bind-Value="Draft.MaximumReadBytes" min="1" /></ChildContent><Validation><ValidationMessage For="() => Draft.MaximumReadBytes" /></Validation></FormField>
+        <FormField Required="true" Label="@T("Type.MaximumWriteBytes")"><ChildContent><ClearableNumber @bind-Value="Draft.MaximumWriteBytes" min="1" /></ChildContent><Validation><ValidationMessage For="() => Draft.MaximumWriteBytes" /></Validation></FormField>
     </div>
 </section>
 @code {

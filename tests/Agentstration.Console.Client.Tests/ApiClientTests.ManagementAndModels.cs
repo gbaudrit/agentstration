@@ -496,6 +496,16 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public void DiscoveredModelLinksCarryTheOwnerContextBeforeInteractiveNavigationStarts()
+    {
+        var address = ResourceAddress.Create(new ResourceNamespace("shared.models"), ModelResourceKinds.Model, "provider.model");
+        Assert.AreEqual("/models/provider.model?namespace=shared.models&context=%2Finstance",
+            ConsoleResourceUrls.Model(address, ResourceScopeRef.Instance));
+        Assert.AreEqual("/models/provider.model?context=%2Finstance",
+            ConsoleResourceUrls.Model(address with { Namespace = ResourceNamespace.Default }, ResourceScopeRef.Instance));
+    }
+
+    [TestMethod]
     public async Task SourceProvidersClientPreservesNamespaceAndETag()
     {
         var scopeRef = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
@@ -840,6 +850,25 @@ public sealed partial class ApiClientTests
 
         Assert.AreEqual("shared.models", actual.Declared.ModelProfile.Namespace);
         Assert.AreEqual("/api/namespaces/agentstration.daily-life-assistant/agents/concierge/model", requested!.AbsolutePath);
+    }
+
+    [TestMethod]
+    [DataRow("default")]
+    [DataRow("team.agents")]
+    public async Task AgentModelClientKeepsTheExactDefinitionOwner(string namespaceValue)
+    {
+        Uri? requested = null;
+        var owner = ResourceScopeRef.Tenant(Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"));
+        var response = new AgentModelResponse(new(new("reasoning", "reasoning")), new(null, new("local-model"), new(new(), new(), new())), "ready", []);
+        using var httpClient = new HttpClient(new StubHandler(request =>
+        {
+            requested = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(response) };
+        }))
+        { BaseAddress = new Uri("http://localhost/") };
+        await new AgentsModelApiClient(httpClient).GetAgentModelResolutionAsync(new(namespaceValue), "concierge", owner, default);
+        var expectedPath = namespaceValue == "default" ? "/api/agents/concierge/model" : $"/api/namespaces/{namespaceValue}/agents/concierge/model";
+        Assert.AreEqual(expectedPath + "?scopeRef=" + Uri.EscapeDataString(owner.Value), requested!.PathAndQuery);
     }
 
     [TestMethod]

@@ -1,0 +1,36 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject IManagementApiClient Client
+@inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<AgentsStrings> Localizer
+
+<div class="agent-resource-preview" aria-busy="@((loadState.Status == ResourceLoadStatus.Loading).ToString().ToLowerInvariant())" data-testid="agent-preview-body">
+    @if (resource is null)
+    {
+        <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" RetryTestId="agent-preview-retry" />
+    }
+    else
+    {
+        <AgentResourceSummary Resource="resource" Identity="SavedIdentity" RunHref="@RunHref" ShowModelResolution="false" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false">
+            <QuickActions>
+                <a class="button-secondary" href="@OverviewHref" data-testid="agent-preview-open"><UiIcon Name="arrow-up-right" />@Localizer["Open"]</a>
+                @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="agent-preview-edit"><UiIcon Name="pencil" />@Localizer["EditDefinition"]</a> }
+            </QuickActions>
+        </AgentResourceSummary>
+    }
+</div>
+
+@code {
+    private RenderFragment SavedIdentity => IdentityFor(resource!);
+    private RenderFragment IdentityFor(AgentResource saved) => @<ResourceIdentitySummary DisplayName="@saved.Definition.DisplayName" TechnicalName="@saved.Name" Namespace="@saved.Namespace.Value"
+        Description="@saved.Definition.Description" ResourceUid="saved.Uid" Labels="saved.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false"
+        Version="@saved.Generation.ToString(System.Globalization.CultureInfo.CurrentCulture)" VersionDescription="@Localizer["GenerationHeader"]" TestId="agent-preview-identity">
+        <Badges><ManagedResourceBadge IsManaged="saved.Governance.IsManaged" IsReadOnly="@(saved.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" /></Badges>
+        <Scope><ResourceScopeBadge ScopeRef="saved.ScopeRef" /></Scope>
+        <AdditionalContent>@if (saved.ScopeRef is { } owner)
+        {
+            <ExtensionManagedResourcePanel Governance="saved.Governance" ScopeRef="owner" Namespace="saved.Namespace" Kind="@saved.Kind" Name="@saved.Name" Uid="saved.Uid" Embedded />
+        }</AdditionalContent>
+    </ResourceIdentitySummary>;
+}

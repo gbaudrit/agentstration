@@ -5,7 +5,8 @@ public sealed record WorkplaceContextSnapshot(
     string WorkspaceDisplayName,
     string? OrganizationName,
     string? OrganizationDisplayName,
-    string? UserDisplayName);
+    string? UserDisplayName,
+    Guid? WorkspaceId = null);
 
 public sealed class WorkplaceContextState
 {
@@ -18,7 +19,8 @@ public sealed class WorkplaceContextState
         string workspaceDisplayName,
         string? organizationName = null,
         string? organizationDisplayName = null,
-        string? userDisplayName = null)
+        string? userDisplayName = null,
+        Guid? workspaceId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceName);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceDisplayName);
@@ -28,7 +30,8 @@ public sealed class WorkplaceContextState
             workspaceDisplayName,
             organizationName,
             organizationDisplayName,
-            userDisplayName);
+            userDisplayName,
+            workspaceId);
         if (next == Current) return;
 
         Current = next;

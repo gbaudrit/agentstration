@@ -1,0 +1,66 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Resources
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Localizer
+
+@if (EffectiveKind is { } kind)
+{
+    @if (IdentityScopeAsText)
+    {
+        <span class="resource-scope-text">@if (CopyIdentityFacts) { <CopyableValue Value="@TextLabel(kind)" PlainText /> } else { @TextLabel(kind) }</span>
+    }
+    else
+    {
+        <span class="resource-owner-scope @(IconOnly ? "resource-owner-icon" : null) @(JoinedName ? "resource-owner-joined" : null)" data-scope-ref="@ScopeRef?.Value">
+            @if (IconOnly)
+            {
+                <ValueDisclosure Value="@(ReadableName is { } name ? $"{Localizer[$"ResourceScope.{kind}"].Value} — {name}" : Localizer[$"ResourceScope.{kind}"].Value)" Marker="@(kind switch { ResourceScopeKind.Instance => "I", ResourceScopeKind.Tenant => "T", _ => "W" })" />
+            }
+            else
+            {
+                <span class="resource-scope-badge @(Compact ? "resource-scope-badge-compact" : null) @(JoinedName ? "resource-scope-badge-named" : null)" title="@(JoinedName ? TextLabel(kind) : ScopeRef?.Value)">@(JoinedName ? TextLabel(kind) : Localizer[$"ResourceScope.{kind}"].Value)</span>
+                @if (!JoinedName && ShowName && ReadableName is { } name)
+                {
+                    <ValueDisclosure Value="@name" />
+                }
+            }
+        </span>
+    }
+}
+
+@code {
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public ResourceScopeKind? Kind { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool ShowName { get; set; } = true;
+    [Parameter] public bool IconOnly { get; set; }
+    [Parameter] public bool JoinedName { get; set; }
+    [Parameter] public string? DisplayName { get; set; }
+    [CascadingParameter(Name = "ResourceIdentityScopeAsText")] private bool IdentityScopeAsText { get; set; }
+    [CascadingParameter(Name = "ResourceIdentityCopyFacts")] private bool CopyIdentityFacts { get; set; }
+    private ConsoleContextState? context;
+    private WorkplaceContextState? workplaceContext;
+    private ResourceScopeKind? EffectiveKind => ScopeRef?.Kind ?? Kind;
+    private string? ReadableName => ResourceScopeDisplayName.Resolve(ScopeRef, DisplayName, context?.Current, workplaceContext?.Current);
+    private string TextLabel(ResourceScopeKind kind)
+    {
+        var label = Localizer[JoinedName && kind == ResourceScopeKind.Workspace ? "ResourceScopeBadge.Workspace" : $"ResourceScope.{kind}"].Value;
+        return ShowName && kind != ResourceScopeKind.Instance && !string.IsNullOrWhiteSpace(ReadableName)
+            ? JoinedName ? Localizer["NamedResourceScope", label, ReadableName].Value : $"{label} · {ReadableName}"
+            : label;
+    }
+    protected override void OnInitialized()
+    {
+        context = Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
+        if (context is not null) context.Changed += ContextChanged;
+        workplaceContext = Services.GetService(typeof(WorkplaceContextState)) as WorkplaceContextState;
+        if (workplaceContext is not null) workplaceContext.Changed += ContextChanged;
+    }
+    private void ContextChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose()
+    {
+        if (context is not null) context.Changed -= ContextChanged;
+        if (workplaceContext is not null) workplaceContext.Changed -= ContextChanged;
+    }
+}

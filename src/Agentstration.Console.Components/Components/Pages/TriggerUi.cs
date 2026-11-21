@@ -1,5 +1,6 @@
 using Agentstration.Resources;
 using Agentstration.Triggers;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Microsoft.Extensions.Localization;
 
@@ -7,6 +8,10 @@ namespace Agentstration.Web.Components.Pages;
 
 public static class TriggerUi
 {
+    public static ResourceScopeRef? ContextScope(ConsoleContextSnapshot? context) => context is null
+        ? null
+        : ResourceScopeRef.Parse(context.SelectedScopeRef);
+
     public static ResourceScopeRef? DefinitionScope(TriggerResource value) => value.Definition.Target.Flow?.ScopeRef
         ?? value.Definition.ExecutionScope?.AccessScopeRef
         ?? value.ScopeRef;

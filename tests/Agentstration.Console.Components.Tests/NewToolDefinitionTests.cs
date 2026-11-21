@@ -14,8 +14,10 @@ using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Tests;
 
@@ -31,7 +33,7 @@ public sealed class NewToolDefinitionTests
     [DataRow("relay", "Tenant")]
     [DataRow("flow", "Workspace")]
     [DataRow("relay", "Workspace")]
-    public void BothKindsUseTheSelectedResourceOwnershipScope(string kind, string scopeKind)
+    public async Task BothKindsUseTheSelectedResourceOwnershipScope(string kind, string scopeKind)
     {
         var owner = scopeKind switch { "Instance" => ResourceScopeRef.Instance, "Tenant" => ResourceScopeRef.Tenant(Guid.Parse("22222222-2222-2222-2222-222222222222")), _ => Scope };
         using var api = new ApiHandler { OwnerScope = owner };
@@ -41,15 +43,15 @@ public sealed class NewToolDefinitionTests
         navigation.NavigateTo($"/tools/definitions/new?context={Uri.EscapeDataString(owner.Value)}&toolKind={kind}&source={(kind == "relay" ? "source.v2.4.0" : "")}");
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled")));
         var picker = rendered.Find("[data-testid='resource-scope-picker']");
         Assert.IsTrue(picker.QuerySelectorAll("option").Any(option => option.GetAttribute("value") == owner.Value));
         Assert.IsTrue(picker.QuerySelectorAll("option").Last().HasAttribute("disabled"));
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         if (kind == "flow") rendered.WaitForElement("[data-testid='tool-definition-flow']").Change($"{owner}|default|source-flow");
         else rendered.WaitForElement("[data-testid='relay-source']");
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled")));
-        rendered.Find("[data-testid='tool-definition-create-draft']").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete")));
+        await CreateAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(api.Created));
         Assert.AreEqual(kind, api.Created!.Properties is RelayToolDefinitionProperties ? "relay" : "flow");
         Assert.IsFalse(api.Created.Properties.Publish);
@@ -69,25 +71,25 @@ public sealed class NewToolDefinitionTests
         context.Services.AddSingleton(state);
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
-        Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled"));
 
         provider.Snapshot = SnapshotFor(Scope);
         await rendered.InvokeAsync(() => state.LoadAsync(default));
 
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled")));
         Assert.AreEqual("Search", rendered.Find("[data-testid='tool-definition-display-name']").GetAttribute("value"));
         Assert.HasCount(0, rendered.FindAll("[role='alert']"));
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         rendered.WaitForElement("[data-testid='tool-definition-flow']").Change($"{Scope}|default|source-flow");
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete")));
         provider.Snapshot = SnapshotFor(ResourceScopeRef.Instance);
         await rendered.InvokeAsync(() => state.LoadAsync(default));
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled")));
         Assert.HasCount(0, rendered.FindAll("[data-testid='tool-definition-create-draft']"));
 
         provider.Snapshot = SnapshotFor(Scope);
         await rendered.InvokeAsync(() => state.LoadAsync(default));
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         Assert.AreEqual("", rendered.WaitForElement("[data-testid='tool-definition-flow']").GetAttribute("value") ?? "");
         Assert.IsFalse(api.Requests.Any(request => request.Method == HttpMethod.Post && request.Path == "/api/tooldefinitions"));
     }
@@ -104,11 +106,14 @@ public sealed class NewToolDefinitionTests
         navigation.NavigateTo("/tools/definitions/new?context=%2Finstance");
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
-        Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled"));
+        Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled"));
 
         await rendered.InvokeAsync(() => navigation.NavigateTo($"/tools/definitions/new?context={Uri.EscapeDataString(Scope.Value)}"));
+        var dialog = rendered.WaitForElement("[role=alertdialog]");
+        Assert.Contains("context=%2Finstance", navigation.Uri);
+        await dialog.QuerySelector(".button-danger")!.ClickAsync(new());
 
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled")));
         Assert.AreEqual("Search", rendered.Find("[data-testid='tool-definition-display-name']").GetAttribute("value"));
         Assert.HasCount(0, rendered.FindAll("[role='alert']"));
     }
@@ -125,9 +130,9 @@ public sealed class NewToolDefinitionTests
         context.Services.AddSingleton<IConsoleNavigationContext>(navigation);
         context.Services.AddSingleton(new ConsoleContextState(provider));
         var rendered = context.Render<NewToolDefinition>();
-        Assert.HasCount(0, rendered.FindAll("[data-testid='tool-definition-continue']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='creation-wizard-next']"));
         provider.Completion.SetResult(SnapshotFor(Scope));
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled")));
         Assert.AreEqual(Scope.Value, navigation.ScopeRef);
         Assert.HasCount(0, api.Requests);
     }
@@ -135,7 +140,7 @@ public sealed class NewToolDefinitionTests
     [TestMethod]
     [DataRow("en-US", "From a Flow", "Tool relay", "Enter a display name", "Choose the ownership scope of this definition")]
     [DataRow("fr-FR", "À partir d’un Flow", "Relais d’un Tool", "Renseignez un nom d’affichage", "Choisissez le périmètre propriétaire de cette définition")]
-    public void CreationStartsWithIdentityAndKindWithoutWritingOrLoadingSources(string culture, string flowLabel, string relayLabel, string invalidLabel, string scopeHelp)
+    public async Task CreationStartsWithIdentityAndKindWithoutWritingOrLoadingSources(string culture, string flowLabel, string relayLabel, string invalidLabel, string scopeHelp)
     {
         using var locale = new TestCultureScope(culture);
         using var api = new ApiHandler();
@@ -144,18 +149,24 @@ public sealed class NewToolDefinitionTests
         StringAssert.Contains(rendered.Markup, flowLabel);
         StringAssert.Contains(rendered.Markup, relayLabel);
         StringAssert.Contains(rendered.Markup, scopeHelp);
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("review"));
+        Assert.AreEqual("false", rendered.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await CreateAsync(rendered);
+        Assert.AreEqual("identity", rendered.FindComponent<CreationWizard>().Instance.CurrentStepId);
         StringAssert.Contains(rendered.Find("[role='alert']").TextContent, invalidLabel);
         Assert.IsTrue(rendered.FindAll("[data-testid='tool-definition-identity']").Count == 1);
         Assert.HasCount(0, api.Requests);
         Identity(rendered);
+        Assert.HasCount(0, rendered.FindAll("[role='alert']"));
         rendered.Find("[data-testid='tool-definition-initial-version']").Change("2.01.0");
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await CreateAsync(rendered);
+        Assert.AreEqual("identity", rendered.FindComponent<CreationWizard>().Instance.CurrentStepId);
         Assert.HasCount(0, api.Requests);
+
     }
 
     [TestMethod]
-    public void FlowDraftPinsItsOwnVersionAndExactFlowVersionWithoutPublishing()
+    public async Task FlowDraftPinsItsOwnVersionAndExactFlowVersionWithoutPublishing()
     {
         using var locale = new TestCultureScope("en-US");
         using var api = new ApiHandler();
@@ -163,12 +174,12 @@ public sealed class NewToolDefinitionTests
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
         rendered.Find("[data-testid='tool-definition-initial-version']").Change("4.2.0");
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         rendered.WaitForElement("[data-testid='tool-definition-flow']").Change($"{Scope}|default|source-flow");
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled")));
+        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete")));
         rendered.Find("[data-testid='tool-definition-version']").Change("2.3.0");
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "published Flow version 2.3.0"));
-        rendered.Find("[data-testid='tool-definition-create-draft']").Click();
+        await CreateAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(api.Created));
         var flow = (FlowToolDefinitionProperties)api.Created!.Properties;
         Assert.AreEqual("4.2.0", flow.Version);
@@ -182,7 +193,7 @@ public sealed class NewToolDefinitionTests
     }
 
     [TestMethod]
-    public void RelayConfigurationAndIdentitySurviveBackAndKindChangesAndCreateOnlyADraft()
+    public async Task RelayConfigurationAndIdentitySurviveBackAndKindChangesAndCreateOnlyADraft()
     {
         using var locale = new TestCultureScope("en-US");
         using var api = new ApiHandler();
@@ -190,25 +201,25 @@ public sealed class NewToolDefinitionTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/tools/definitions/new?toolKind=relay&source=source.v2.4.0");
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         rendered.WaitForElement("[data-testid='relay-source']");
         Assert.HasCount(0, rendered.FindAll("[data-testid='relay-publish-review']"));
         Assert.HasCount(0, rendered.FindAll(".section-tabs"));
         rendered.Find("[data-testid='relay-binding-kind']").Change("Literal");
         rendered.WaitForElement(".relay-binding [data-testid='schema-raw-mode']").Click();
         rendered.Find(".relay-binding textarea").Input("\"hr\"");
-        rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled")));
-        rendered.Find("[data-testid='tool-definition-back']").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete")));
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("identity"));
         Assert.AreEqual("Search", rendered.Find("[data-testid='tool-definition-display-name']").GetAttribute("value"));
         rendered.Find("[data-testid='tool-definition-kind-flow'] input").Change("flow");
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
-        Assert.HasCount(1, rendered.FindAll("[data-testid='tool-definition-back']"));
-        rendered.Find("[data-testid='tool-definition-back']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
+        Assert.AreEqual("configuration", rendered.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("identity"));
         rendered.Find("[data-testid='tool-definition-kind-relay'] input").Change("relay");
         rendered.Find("[data-testid='tool-definition-initial-version']").Change("1.1.0");
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         Assert.AreEqual("\"hr\"", rendered.Find(".relay-binding textarea").GetAttribute("value"));
-        rendered.Find("[data-testid='tool-definition-create-draft']").Click();
+        await CreateAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(api.Created));
         var relay = (RelayToolDefinitionProperties)api.Created!.Properties;
         Assert.AreEqual("1.1.0", relay.Version);
@@ -220,7 +231,7 @@ public sealed class NewToolDefinitionTests
     }
 
     [TestMethod]
-    public void MultipleSourcePublicationsRequireAnExplicitVersionChoice()
+    public async Task MultipleSourcePublicationsRequireAnExplicitVersionChoice()
     {
         using var locale = new TestCultureScope("en-US");
         using var api = new ApiHandler();
@@ -228,13 +239,13 @@ public sealed class NewToolDefinitionTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/tools/definitions/new?toolKind=relay");
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         var select = rendered.WaitForElement("[data-testid='relay-source-tool']");
         select.Change(select.QuerySelectorAll("option")[1].GetAttribute("value"));
         Assert.AreEqual("", rendered.Find("[data-testid='relay-source']").GetAttribute("value"));
-        Assert.IsTrue(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled"));
+        Assert.AreEqual("false", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete"));
         rendered.Find("[data-testid='relay-source']").Change($"{api.Source.Uid:D}:{api.Source.Generation}");
-        Assert.IsFalse(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled"));
+        Assert.AreEqual("true", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete"));
         var sourceGroup = rendered.Find("[data-testid='relay-source-tool']").GetAttribute("value");
         rendered.Find("[data-testid='relay-source']").Change("");
         Assert.AreEqual(sourceGroup, rendered.Find("[data-testid='relay-source-tool']").GetAttribute("value"));
@@ -242,7 +253,7 @@ public sealed class NewToolDefinitionTests
     }
 
     [TestMethod]
-    public void WriteFailureRetainsRelayInputsAndAllowsAnExplicitRetry()
+    public async Task WriteFailureRetainsRelayInputsAndAllowsAnExplicitRetry()
     {
         using var locale = new TestCultureScope("en-US");
         using var api = new ApiHandler { RejectNextCreate = true };
@@ -250,13 +261,13 @@ public sealed class NewToolDefinitionTests
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/tools/definitions/new?source=source.v2.4.0");
         var rendered = context.Render<NewToolDefinition>();
         Identity(rendered);
-        rendered.Find("[data-testid='tool-definition-continue']").Click();
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
         rendered.WaitForElement("[data-testid='relay-source']");
-        rendered.Find("[data-testid='tool-definition-create-draft']").Click();
+        await CreateAsync(rendered);
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "Already exists"));
         Assert.IsNull(api.Created);
-        Assert.IsFalse(rendered.Find("[data-testid='tool-definition-create-draft']").HasAttribute("disabled"));
-        rendered.Find("[data-testid='tool-definition-create-draft']").Click();
+        Assert.AreEqual("true", rendered.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete"));
+        await CreateAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(api.Created));
         Assert.AreEqual(api.Source.Uid, ((RelayToolDefinitionProperties)api.Created!.Properties).Target.Uid);
     }
@@ -269,15 +280,110 @@ public sealed class NewToolDefinitionTests
         context.Services.RemoveAll<ConsoleContextState>();
         context.Services.AddSingleton(new ConsoleContextState(new UnavailableContextProvider()));
         var rendered = context.Render<NewToolDefinition>();
-        Assert.IsTrue(rendered.Find("[data-testid='tool-definition-continue']").HasAttribute("disabled"));
+        Assert.IsTrue(rendered.Find("[data-testid='creation-wizard-next']").HasAttribute("disabled"));
         Assert.HasCount(0, api.Requests);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SourceHomonymsRequireAnExactOwnerBeforeAutomaticSelection(bool exactOwner)
+    {
+        using var api = new ApiHandler { IncludeSourceHomonym = true };
+        using var context = Context(api);
+        var query = "/tools/definitions/new?toolKind=relay&source=source.v2.4.0" + (exactOwner ? "&sourceScopeRef=" + Uri.EscapeDataString(Scope.Value) : "");
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo(query);
+        var cut = context.Render<NewToolDefinition>();
+        Identity(cut);
+        await cut.InvokeAsync(() => cut.FindComponent<CreationWizard>().Instance.GoToStepAsync("configuration"));
+        var selector = cut.WaitForElement("[data-testid=relay-source]");
+        if (exactOwner) Assert.AreEqual($"{api.Source.Uid:D}:{api.Source.Generation}", selector.GetAttribute("value"));
+        else Assert.AreEqual("", selector.GetAttribute("value"));
+        Assert.IsNull(api.Created);
+        Assert.AreEqual(exactOwner.ToString().ToLowerInvariant(), cut.Find("[data-wizard-step=configuration]").GetAttribute("data-step-complete"));
+    }
+
+    [TestMethod]
+    [DataRow("flow")]
+    [DataRow("relay")]
+    public async Task NextAndHeaderAllowIncompleteStepsButFinishStillValidatesTheIdentity(string kind)
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/tools/definitions/new?toolKind=" + kind);
+        var cut = context.Render<NewToolDefinition>();
+        var form = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance;
+        await cut.InvokeAsync(() => cut.FindComponent<CreationWizard>().Instance.ContinueAsync());
+        Assert.AreEqual("configuration", cut.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.AreEqual("false", cut.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await CreateAsync(cut);
+        Assert.AreEqual("identity", cut.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.AreSame(form, cut.FindComponent<Microsoft.AspNetCore.Components.Forms.EditForm>().Instance);
+        Assert.IsNull(api.Created);
+        Assert.IsFalse(api.Requests.Any(r => r.Method != HttpMethod.Get));
+    }
+
+    [TestMethod]
+    public async Task RelayCreatorDialogsRemainOutsideTheWizardFormAndCancelKeepsItsState()
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/tools/definitions/new?toolKind=relay&source=source.v2.4.0");
+        var cut = context.Render<NewToolDefinition>(); Identity(cut);
+        var wizard = cut.FindComponent<CreationWizard>().Instance;
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("configuration"));
+        cut.Find("[data-requirement-id='/collection'] [data-testid=relay-binding-kind]").Change("Parameter");
+        cut.Find("[data-testid=relay-binding-create]").Click();
+        var dialog = cut.Find("[role=dialog]");
+        Assert.IsNull(dialog.Closest("form"));
+        Assert.IsEmpty(cut.FindAll("form form"));
+        await dialog.QuerySelector(".dialog-actions .button-secondary")!.ClickAsync(new());
+        Assert.IsEmpty(cut.FindAll("[role=dialog]"));
+        await cut.InvokeAsync(() => wizard.GoToStepAsync("identity"));
+        Assert.AreEqual("Search", cut.Find("[data-testid=tool-definition-display-name]").GetAttribute("value"));
+        Assert.IsNull(api.Created);
+    }
+
+    [TestMethod]
+    public async Task PrerenderKeepsTheWizardAndNativeFormLocked()
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        await using var renderer = new HtmlRenderer(context.Services, context.Services.GetRequiredService<ILoggerFactory>());
+        var markup = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<NewToolDefinition>()).ToHtmlString());
+        var document = new AngleSharp.Html.Parser.HtmlParser().ParseDocument(markup);
+        Assert.IsTrue(document.QuerySelector("form > fieldset")!.HasAttribute("disabled"));
+        Assert.IsTrue(document.QuerySelectorAll(".creation-wizard-progress button, .creation-wizard-actions button").All(button => button.HasAttribute("disabled")));
+        Assert.IsNull(api.Created);
+    }
+
+    [TestMethod]
+    public async Task AReaderCannotCreateWithAValidSelectedScope()
+    {
+        using var api = new ApiHandler(); using var context = Context(api);
+        context.Services.RemoveAll<ConsoleContextState>();
+        context.Services.AddSingleton(new ConsoleContextState(new MutableContextProvider
+        {
+            Snapshot = SnapshotFor(Scope) with { Permissions = new HashSet<string> { "resources/read" } }
+        }));
+        var cut = context.Render<NewToolDefinition>();
+        Assert.IsTrue(cut.WaitForElement("form > fieldset").HasAttribute("disabled"));
+        Assert.IsTrue(cut.FindComponent<CreationWizard>().Instance.Disabled);
+        Assert.IsNotNull(cut.FindComponent<ResourceReadOnlyNotice>());
+        await cut.InvokeAsync(cut.FindComponent<CreationWizard>().Instance.FinishAsync);
+        Assert.IsNull(api.Created);
+        Assert.HasCount(0, api.Requests);
+    }
+
+    private static async Task CreateAsync(IRenderedComponent<NewToolDefinition> rendered)
+    {
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.GoToStepAsync("review"));
+        await rendered.InvokeAsync(() => rendered.FindComponent<CreationWizard>().Instance.FinishAsync());
     }
 
     private static void Identity(IRenderedComponent<NewToolDefinition> rendered) => rendered.WaitForElement("[data-testid='tool-definition-display-name']").Change("Search");
 
     private static BunitContext Context(ApiHandler handler, ResourceScopeRef? owner = null)
     {
-        var context = new BunitContext();
+        var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var navigation = new CreationContext(owner ?? Scope);
         context.Services.AddSingleton<IConsoleNavigationContext>(navigation);
@@ -294,7 +400,7 @@ public sealed class NewToolDefinitionTests
 
     internal static ConsoleContextSnapshot SnapshotFor(ResourceScopeRef scope) => new(
         Guid.Empty, "Fixture administrator", scope.Value, scope.Kind switch { ResourceScopeKind.Workspace => ConsoleContextKind.Workspace, ResourceScopeKind.Tenant => ConsoleContextKind.Tenant, _ => ConsoleContextKind.Instance },
-        Guid.Empty, "dev", "Development", scope.TargetId ?? Guid.Empty, "default", "Default workspace", new HashSet<string>(), [], []);
+        Guid.Empty, "dev", "Development", scope.TargetId ?? Guid.Empty, "default", "Default workspace", new HashSet<string> { "resources/read", "resources/write" }, [], []);
 
     private sealed class UnavailableContextProvider : IConsoleContextProvider
     {
@@ -332,6 +438,7 @@ public sealed class NewToolDefinitionTests
         public ResourceScopeRef OwnerScope { get; set; } = Scope;
         public CreateToolDefinitionRequest? Created { get; private set; }
         public bool RejectNextCreate { get; set; }
+        public bool IncludeSourceHomonym { get; set; }
         public List<(HttpMethod Method, string Path, string? Context)> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -347,7 +454,12 @@ public sealed class NewToolDefinitionTests
             if (path == "/api/flows") return Ok(new FlowPageResponse([new("source-flow", "Source Flow", null, FlowKind.Workflow, "2.4.0", true, "2.4.0", DateTimeOffset.UnixEpoch) { ScopeRef = OwnerScope }], null));
             if (path.EndsWith("/versions", StringComparison.Ordinal)) return Ok(new[] { Version("2.4.0"), Version("2.3.0") });
             if (path.Contains("/versions/", StringComparison.Ordinal)) return Ok(Version(path.Split('/')[^1]));
-            if (path == "/api/tools") return Ok(new { value = new[] { Source with { ScopeRef = OwnerScope }, Tool("2.3.0") with { ScopeRef = OwnerScope } } });
+            if (path == "/api/tools")
+            {
+                var catalog = new List<ToolResource> { Source with { ScopeRef = OwnerScope }, Tool("2.3.0") with { ScopeRef = OwnerScope } };
+                if (IncludeSourceHomonym) catalog.Add(Tool("2.4.0") with { ScopeRef = ResourceScopeRef.Instance });
+                return Ok(new { value = catalog });
+            }
             if (path is "/api/parameters" or "/api/secrets") return Ok(Array.Empty<object>());
             if (path == "/api/schemas") return Ok(new { value = Array.Empty<object>() });
             if (path == "/api/schemas/formats/validate-definition") return Ok(SchemaFormatValidationResult.Valid);

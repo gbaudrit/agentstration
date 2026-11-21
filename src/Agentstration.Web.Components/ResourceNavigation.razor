@@ -1,0 +1,229 @@
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceNavigationStrings> Localizer
+
+<div class="resource-navigation" @ref="root" data-testid="@TestId" data-navigation-ready="@ready.ToString().ToLowerInvariant()">
+    @if (ExternalTriggerId is null) { <ResourceNavigationTrigger IsOpen="drawerOpen" OnOpen="OpenDrawerAsync" /> }
+    <nav class="resource-navigation-rail" aria-label="@LabelText">@Entries("rail")</nav>
+    @if (unavailable && CurrentPath is not null) { <p role="status" class="resource-navigation-feedback">@Localizer["Unavailable"]</p> }
+    @if (CurrentPath is null) { <p role="status">@Localizer["Empty"]</p> }
+    <ModalFrame IsOpen="drawerOpen" TitleId="@(id + "-title")" Class="resource-navigation-drawer" OnClose="CloseDrawer">
+        <header class="resource-navigation-drawer-header"><h2 id="@(id + "-title")">@LabelText</h2><button type="button" class="button-secondary" aria-label="@Localizer["Close"]" @onclick="CloseDrawer"><TablerIcon Name="x" /></button></header>
+        <nav aria-label="@LabelText">@Entries("drawer")</nav>
+    </ModalFrame>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ResourceNavigationItem> Items { get; set; } = [];
+    [Parameter] public string? DefaultPath { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public EventCallback<string?> SelectionChanged { get; set; }
+    [Parameter] public string? ExternalTriggerId { get; set; }
+    [Parameter] public EventCallback<bool> DrawerOpenChanged { get; set; }
+    [Parameter] public bool ExpandGroupsInitially { get; set; }
+    public string? CurrentPath { get; private set; }
+
+    private readonly string id = $"resource-navigation-{Guid.NewGuid():N}";
+    private readonly HashSet<string> expanded = new(StringComparer.Ordinal);
+    private readonly HashSet<string> initializedGroups = new(StringComparer.Ordinal);
+    private Dictionary<string, ResourceNavigationItem> entries = new(StringComparer.Ordinal);
+    private string identity = string.Empty;
+    private string? canonicalPending, correctedTarget, observedLocation;
+    private bool disposed, initializing, ready, notifyPending = true, unavailable, drawerOpen, focusRail, focusTrigger, drawerChanged;
+    private ElementReference root;
+    private IJSObjectReference? module, registration;
+    private DotNetObjectReference<ResourceNavigation>? reference;
+    private string LabelText => Label ?? Localizer["Sections"];
+
+    private RenderFragment Entries(string location) => @<ul class="resource-navigation-list">
+        @foreach (var item in Items.Where(item => !item.Path.Contains('/') && IsVisible(item.Path)))
+        {
+            var children = Items.Where(child => Parent(child.Path) == item.Path && IsVisible(child.Path)).ToArray();
+            var open = expanded.Contains(item.Path);
+            var active = CurrentPath == item.Path || CurrentPath?.StartsWith(item.Path + "/", StringComparison.Ordinal) == true;
+            <li @key="item.Path" class="@(active ? "active-branch" : null)">
+                <div class="resource-navigation-row">
+                    @if (item.Navigable) { @Entry(item) }
+                    else { <button type="button" class="resource-navigation-entry" disabled="@(!IsEnabled(item.Path))" aria-expanded="@open.ToString().ToLowerInvariant()" aria-controls="@(id + "-" + location + "-" + item.Path)" @onclick="() => Toggle(item.Path)"><TablerIcon Name="@item.Icon" /><span>@item.Label</span></button> }
+                    @if (children.Length > 0 && item.Navigable)
+                    {
+                        <button type="button" class="resource-navigation-expand" disabled="@(!IsEnabled(item.Path))" aria-label="@Localizer[open ? "Collapse" : "Expand", item.Label]" aria-expanded="@open.ToString().ToLowerInvariant()" aria-controls="@(id + "-" + location + "-" + item.Path)" @onclick="() => Toggle(item.Path)"><TablerIcon Name="@(open ? "chevron-up" : "chevron-down")" /></button>
+                    }
+                    else if (children.Length > 0) { <span class="resource-navigation-chevron" aria-hidden="true"><TablerIcon Name="@(open ? "chevron-up" : "chevron-down")" /></span> }
+                </div>
+                @if (children.Length > 0)
+                {
+                    <ul id="@(id + "-" + location + "-" + item.Path)" hidden="@(!open)" class="resource-navigation-children">
+                        @foreach (var child in children) { <li @key="child.Path">@Entry(child)</li> }
+                    </ul>
+                }
+            </li>
+        }
+    </ul>;
+
+    private RenderFragment Entry(ResourceNavigationItem item) => @<text>
+        @if (IsEnabled(item.Path))
+        {
+            <a class="resource-navigation-entry" href="@Link(item.Path)" data-resource-section="@item.Path" aria-current="@(CurrentPath == item.Path ? "page" : null)"><TablerIcon Name="@item.Icon" /><span>@item.Label</span></a>
+        }
+        else { <span class="resource-navigation-entry" aria-disabled="true"><TablerIcon Name="@item.Icon" /><span>@item.Label</span></span> }
+    </text>;
+
+    protected override void OnInitialized()
+    {
+        identity = BaseUri(Navigation.Uri);
+        Navigation.LocationChanged += LocationChanged;
+    }
+    protected override void OnParametersSet()
+    {
+        entries = new(StringComparer.Ordinal);
+        foreach (var item in Items)
+        {
+            if (!ValidPath(item.Path) || string.IsNullOrWhiteSpace(item.Label) || !TablerIconCatalog.TryNormalize(item.Icon, out _) || !entries.TryAdd(item.Path, item))
+                throw new ArgumentException("Navigation requires unique valid paths, labels and catalog icons.", nameof(Items));
+        }
+        foreach (var item in Items)
+        {
+            var parent = Parent(item.Path);
+            if (parent is not null && (!entries.ContainsKey(parent) || !item.Navigable) || !item.Navigable && !Items.Any(child => Parent(child.Path) == item.Path))
+                throw new ArgumentException("Only a primary item with children can be grouping-only; children require a primary parent.", nameof(Items));
+            if (Items.Any(child => Parent(child.Path) == item.Path) && initializedGroups.Add(item.Path) && ExpandGroupsInitially)
+                expanded.Add(item.Path);
+        }
+        if (DefaultPath is not null && (!entries.TryGetValue(DefaultPath, out var configured) || !configured.Navigable))
+            throw new ArgumentException("The configured default must name a navigable item.", nameof(DefaultPath));
+        ApplyLocation(observedLocation ?? Navigation.Uri);
+    }
+    private static string? Parent(string path) => path.IndexOf('/') is var slash && slash >= 0 ? path[..slash] : null;
+    private static bool ValidPath(string? path) => path is { Length: > 0 and <= 129 } && path.Split('/') is var parts && parts.Length <= 2 && parts.All(part => part.Length is > 0 and <= 64 && part[0] is >= 'a' and <= 'z' && part[^1] != '-' && !part.Contains("--", StringComparison.Ordinal) && part.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'));
+    private bool IsVisible(string path) => entries.TryGetValue(path, out var item) && item.Visible && (Parent(path) is not { } parent || entries[parent].Visible) && (item.Navigable || Items.Any(child => Parent(child.Path) == path && child.Visible));
+    private bool IsEnabled(string path) => entries.TryGetValue(path, out var item) && item.Enabled && (Parent(path) is not { } parent || entries[parent].Enabled);
+    private bool CanSelect(string path) => entries.TryGetValue(path, out var item) && item.Navigable && IsVisible(path) && IsEnabled(path);
+    internal static string BaseUri(string location)
+    {
+        var uri = new Uri(location);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        query.Remove("view"); query.Remove("tab");
+        return QueryHelpers.AddQueryString(uri.GetLeftPart(UriPartial.Path), query);
+    }
+    private string Link(string path) => identity + "#" + path;
+    private void ApplyLocation(string location)
+    {
+        if (disposed || BaseUri(location) != identity) return;
+        var uri = new Uri(location);
+        var requested = uri.Fragment.Length > 0 ? uri.Fragment[1..] : string.Empty;
+        string? selected = ValidPath(requested) && CanSelect(requested) ? requested : null;
+        if (selected is null && entries.TryGetValue(requested, out var group) && !group.Navigable && IsVisible(requested) && IsEnabled(requested))
+            selected = Items.FirstOrDefault(item => Parent(item.Path) == requested && CanSelect(item.Path))?.Path;
+        var invalid = requested.Length > 0 && selected is null;
+        selected ??= DefaultPath is not null && CanSelect(DefaultPath) ? DefaultPath : Items.FirstOrDefault(item => CanSelect(item.Path))?.Path;
+        if (invalid) unavailable = true;
+        else if (location != correctedTarget && location != observedLocation) unavailable = false;
+        observedLocation = location;
+        correctedTarget = null;
+        if (selected != CurrentPath)
+        {
+            CurrentPath = selected; notifyPending = true; SetDrawerOpen(false);
+            if (selected is not null && Parent(selected) is { } parent) expanded.Add(parent);
+        }
+        canonicalPending = selected is not null && location != Link(selected) ? Link(selected) : null;
+    }
+    private void LocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(() => { if (!disposed) { ApplyLocation(args.Location); StateHasChanged(); } });
+    private void Toggle(string path) { if (IsEnabled(path) && !expanded.Remove(path)) expanded.Add(path); }
+    private void SetDrawerOpen(bool value) { if (drawerOpen == value) return; drawerOpen = value; drawerChanged = true; }
+    public Task OpenDrawerAsync() => InvokeAsync(() => { SetDrawerOpen(true); StateHasChanged(); });
+    private void CloseDrawer() => SetDrawerOpen(false);
+
+    [JSInvokable]
+    public async Task NavigateSection(string path)
+    {
+        if (disposed || module is null || BaseUri(Navigation.Uri) != identity || !CanSelect(path)) return;
+        unavailable = false;
+        var actual = await module.InvokeAsync<string>("navigate", Link(path), false, Navigation.HistoryEntryState);
+        if (disposed) return;
+        ApplyLocation(actual);
+        if (CurrentPath == path) SetDrawerOpen(false);
+        await InvokeAsync(StateHasChanged);
+    }
+    [JSInvokable]
+    public async Task NavigateLocation(string location)
+    {
+        if (disposed || module is null || BaseUri(Navigation.Uri) != identity || BaseUri(location) != identity) return;
+        var actual = await module.InvokeAsync<string>("navigate", location, false, Navigation.HistoryEntryState);
+        if (disposed) return;
+        ApplyLocation(actual);
+        await InvokeAsync(StateHasChanged);
+    }
+    [JSInvokable]
+    public Task ObserveLocation(string location) => InvokeAsync(() => { if (!disposed) { ApplyLocation(location); StateHasChanged(); } });
+    [JSInvokable]
+    public Task BreakpointChanged(bool desktop, bool railFocused) => InvokeAsync(() =>
+    {
+        if (disposed) return;
+        focusRail |= desktop && drawerOpen;
+        focusTrigger |= !desktop && railFocused;
+        if (desktop) SetDrawerOpen(false);
+        StateHasChanged();
+    });
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (disposed || BaseUri(Navigation.Uri) != identity) return;
+        if (!ready && !initializing)
+        {
+            initializing = true;
+            try
+            {
+                var imported = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/resource-navigation.js");
+                if (disposed) { await imported.DisposeAsync(); return; }
+                module = imported; reference = DotNetObjectReference.Create(this);
+                var observed = ExternalTriggerId is null
+                    ? await module.InvokeAsync<IJSObjectReference>("observe", root, reference)
+                    : await module.InvokeAsync<IJSObjectReference>("observe", root, reference, ExternalTriggerId);
+                if (disposed) { if (observed is not null) { await observed.InvokeVoidAsync("dispose"); await observed.DisposeAsync(); } return; }
+                registration = observed;
+                var location = await module.InvokeAsync<string?>("currentLocation");
+                if (disposed) return;
+                if (location is not null) ApplyLocation(location);
+                ready = true;
+                StateHasChanged();
+            }
+            catch (Exception exception) when (disposed && exception is JSException or TaskCanceledException or ObjectDisposedException) { }
+            finally { initializing = false; if (disposed) reference?.Dispose(); }
+        }
+        if (disposed || !ready || BaseUri(Navigation.Uri) != identity) return;
+        if (drawerChanged) { drawerChanged = false; await DrawerOpenChanged.InvokeAsync(drawerOpen); }
+        if (notifyPending) { notifyPending = false; await SelectionChanged.InvokeAsync(CurrentPath); }
+        if (disposed || BaseUri(Navigation.Uri) != identity) return;
+        if (canonicalPending is { } canonical)
+        {
+            canonicalPending = null; correctedTarget = canonical;
+            var actual = await module!.InvokeAsync<string>("navigate", canonical, true, Navigation.HistoryEntryState);
+            if (disposed) return;
+            ApplyLocation(actual);
+            StateHasChanged();
+        }
+        if (registration is not null && (focusRail || focusTrigger))
+        {
+            var target = focusRail ? "focusRail" : "focusTrigger";
+            focusRail = focusTrigger = false;
+            await registration.InvokeVoidAsync(target);
+        }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed) return;
+        disposed = true;
+        Navigation.LocationChanged -= LocationChanged;
+        try
+        {
+            if (registration is not null) { await registration.InvokeVoidAsync("dispose"); await registration.DisposeAsync(); }
+            if (module is not null) await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        finally { if (!initializing) reference?.Dispose(); }
+    }
+}

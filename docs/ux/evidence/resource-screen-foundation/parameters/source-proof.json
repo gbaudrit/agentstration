@@ -1,0 +1,17 @@
+{
+  "base": "7e4a53f24eb6322f267d75c15424b8cabafcc752",
+  "sourceHashes": {
+    "automation/playwright/src/pages/resource-naming.page.ts": "414bcbfd0861aec9ef6bd6dd9c7e1858c12cc63bd184778ceb4f6723ffad8780",
+    "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor": "d3d5ac5d435585f891949e16540cf226343401f9acc3a65a2bfd6382b3e4f13c",
+    "src/Agentstration.Console.Components/Components/ResourceIdentityEditor.razor": "2dd483e29558165c8273442440baa653d9e59177db2b988b3ce602b1a6956a2a",
+    "src/Agentstration.Console.Components/Console/ParameterEditorModel.cs": "cceb6924984adb3e424d8933e1782a43c096c1c98cb2fb7709f267941d2feac7",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ParameterStrings.fr-FR.resx": "edb2233ecdbc046946e0b2dd78e44bd5d6db58d0e2a3c31320dbecde254c31b9",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ParameterStrings.resx": "7ecda27889bd9e0af65d195f437a83f4f7a26d8ff30680d38f7c0de7f79e4822",
+    "tests/Agentstration.Console.Components.Tests/ParameterResourceScreenTests.cs": "15be39c2c4a6325c5ed1315d97870fc816e17d58db07bde2f6bc8f6269eb8739",
+    "tests/Agentstration.Console.Components.Tests/ResourceIdentityEditorTests.cs": "63a0be19229ac050aa42d708704b99a426073f1220372609e236ca29074a5e03"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "43252cbe3d2fb1879ff75186e9d9a89580d6c2e0d16e2d2e9b68b676a4e2b03b",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "43252cbe3d2fb1879ff75186e9d9a89580d6c2e0d16e2d2e9b68b676a4e2b03b"
+  }
+}

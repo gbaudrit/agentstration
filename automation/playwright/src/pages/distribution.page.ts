@@ -1,6 +1,8 @@
+import { FlowCollectionPage } from './flow-collection.page.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
+import { CollectionVersionTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 
 type DistributionMarker = keyof Pick<typeof TestIds.distribution,
   'extensions' | 'extensionDetails' | 'sourceProviders' | 'sourceProviderDetails' |
@@ -14,9 +16,11 @@ export interface PackProjectDefinition {
   displayName: string;
   resourceKind?: string;
   resourceName?: string;
+  resourceNamespace?: string;
 }
 
 export class DistributionPage {
+  private referenceContext: string | null = null;
   public constructor(private readonly page: Page) {}
 
   public async open(consoleUrl: string, path: string, marker: DistributionMarker): Promise<void> {
@@ -25,11 +29,173 @@ export class DistributionPage {
     await this.page.getByTestId(TestIds.distribution[marker]).waitFor({ state: 'visible' });
   }
 
+  public async inspectVersionPlacement(consoleUrl: string, route: string, locale: SupportedTestLocale): Promise<void> {
+    const response = await this.page.goto(`${consoleUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    expect(response?.ok()).toBe(true);
+    const frame = this.page.locator('.resource-collection').first();
+    await expect(frame).toBeVisible();
+    if (route === '/flows') {
+      const flows = new FlowCollectionPage(this.page);
+      await flows.assertCompactStructure(locale);
+      await flows.table();
+      await flows.assertCompactStructure(locale);
+      await flows.cards();
+      await flows.assertCompactStructure(locale);
+      return;
+    }
+    const labels = CollectionVersionTextByLocale[locale];
+    const expected = route.startsWith('/data-source-profiles') ? [labels.active]
+      : route.startsWith('/agents') ? [labels.generation] : [labels.version];
+    const assertIdentity = async () => {
+      const identity = frame.locator('.collection-identity').first();
+      const icon = identity.locator('.resource-icon');
+      await expect(icon).toHaveCount(1);
+      await expect.poll(() => icon.evaluate(element => {
+        const style = getComputedStyle(element);
+        return element.isConnected && parseFloat(style.borderTopWidth) >= 1
+          && style.borderTopStyle === 'solid' && style.borderTopColor.length > 0
+          && !/^(transparent|rgba\(0, 0, 0, 0\))$/.test(style.borderTopColor);
+      }), { message: 'Every resource family retains one visible icon frame after interactive rendering.' }).toBe(true);
+      await expect(identity.locator('.collection-version-label')).toHaveText(expected);
+      await expect.poll(async () => {
+        const text = await identity.locator('.collection-identity-text').boundingBox();
+        const version = await identity.locator('.collection-identity-versions').boundingBox();
+        return text && version ? Math.abs(text.x - version.x) : Infinity;
+      }, { message: 'Versions align with identity text rather than the family icon after interactive rendering' }).toBeLessThan(1);
+      await expect(identity.locator('.collection-qualified-name code')).toBeVisible();
+      expect(await identity.locator('.collection-qualified-name code').textContent()).not.toMatch(/\s\/|\/\s/);
+      expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    };
+    await assertIdentity();
+    await frame.locator('.collection-view-switch button').first().click();
+    for (const label of expected) await expect(frame.getByRole('columnheader', { name: label, exact: true })).toHaveCount(0);
+    await assertIdentity();
+    await frame.locator('.collection-view-switch button').nth(1).click();
+    await assertIdentity();
+  }
+
+  public async showCollectionTable(): Promise<void> {
+    const frame = this.page.locator('.resource-collection').first();
+    await frame.locator('.collection-view-switch button').first().click();
+    await expect(frame.locator('table')).toBeVisible();
+  }
+
+  public async inspectToolCollectionAlignment(consoleUrl: string, layout: 'columns' | 'stacked'): Promise<void> {
+    expect((await this.page.goto(`${consoleUrl}/tools`))?.ok()).toBe(true);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    const frame = this.page.locator('.resource-collection').first();
+    if (layout === 'columns') {
+      await this.showCollectionTable();
+      const row = frame.locator('tbody tr').first();
+      await expect(row.locator('.collection-identity')).toBeVisible();
+      await expect(row.locator(':scope > td')).toHaveCount(2);
+      await expect.poll(() => row.locator(':scope > td').evaluateAll(cells => {
+        if (cells.length !== 2 || cells.some(cell => !cell.isConnected)) return Infinity;
+        return Math.max(...cells.map(cell => {
+          const range = document.createRange();
+          range.selectNodeContents(cell);
+          const content = cell.firstElementChild?.getBoundingClientRect() ?? range.getBoundingClientRect();
+          const bounds = cell.getBoundingClientRect();
+          return Math.abs(content.y + content.height / 2 - bounds.y - bounds.height / 2);
+        }));
+      }), { message: 'Tool identity and provider share the vertical center of each row.' }).toBeLessThan(2);
+    }
+    await frame.locator('.collection-view-switch button').last().click();
+    const card = frame.locator('.collection-card').first();
+    await expect(card.locator('.collection-identity')).toBeVisible();
+    await expect(card.locator('.collection-value')).toHaveCount(1);
+    await expect(frame.locator('.collection-actions')).toHaveCount(0);
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+
+  public async inspectCompactProjectCard(consoleUrl: string, locale: SupportedTestLocale, displayName: string): Promise<void> {
+    await this.open(consoleUrl, '/packs', 'packs');
+    const project = this.page.locator('.pack-resource-list article').filter({ hasText: displayName });
+    await expect(project).toBeVisible();
+    await expect(project.locator('.collection-version-label')).toHaveText(CollectionVersionTextByLocale[locale].targetArchive);
+    await expect(project.locator('.collection-version code')).toHaveText('2.3.4');
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  }
+
+  public async inspectCompactEntryCards(consoleUrl: string, locale: SupportedTestLocale, workspaceId: string): Promise<void> {
+    expect((await this.page.goto(`${consoleUrl}/entries`))?.ok()).toBe(true);
+    const entry = this.page.locator('.entry-card').first();
+    await expect(entry).toBeVisible();
+    await expect(entry.locator('.collection-version-label')).toHaveText(CollectionVersionTextByLocale[locale].active);
+    await expect(entry.locator('.resource-owner-icon')).toHaveAttribute('data-scope-ref', `/workspaces/${workspaceId}`);
+    const configure = entry.locator('.collection-primary-actions').getByRole('link', { name: CollectionVersionTextByLocale[locale].configure, exact: true });
+    await expect(configure).toBeVisible();
+    await expect(configure.locator('xpath=ancestor::details')).toHaveCount(0);
+    await expect(entry.locator('details')).toHaveCount(0);
+    expect(await configure.getAttribute('href')).toBe(await entry.locator('.resource-name-link').getAttribute('href'));
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+  }
+
+  public async inspectDirectEnrollmentActions(consoleUrl: string): Promise<void> {
+    await this.open(consoleUrl, '/extensions?tab=enrollments&context=%2Finstance', 'extensions');
+    await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
+    if ((this.page.viewportSize()?.width ?? 0) <= 760) await expect(this.page.locator('.collection-card').first()).toBeVisible();
+    const command = this.page.getByTestId(TestIds.distribution.extensionEnrollmentOpen).first();
+    await expect(command).toHaveAttribute('aria-expanded', 'true');
+    const shortcut = this.page.getByTestId(TestIds.distribution.extensionEnrollmentShortcut).first();
+    await expect(shortcut).toBeVisible();
+    await expect(shortcut.locator('xpath=ancestor::details')).toHaveCount(0);
+    await shortcut.click();
+    await expect(command).toHaveAttribute('aria-expanded', 'false');
+    await shortcut.click();
+    await expect(command).toHaveAttribute('aria-expanded', 'true');
+    const rowActions = command.locator('xpath=ancestor::details');
+    await rowActions.locator('summary').click();
+    await expect(command).toBeVisible();
+    await command.click();
+    await rowActions.locator('summary').click();
+    await command.click();
+    await expect(this.page.getByTestId(TestIds.distribution.extensionEnrollmentCard)).toBeVisible();
+    const primary = this.page.locator('.enrollment-actions .collection-primary-actions button').first();
+    await expect(primary).toBeVisible();
+    await expect(primary.locator('xpath=ancestor::details')).toHaveCount(0);
+    await primary.focus(); await expect(primary).toBeFocused();
+    const menu = this.page.locator('.enrollment-actions .collection-actions-menu').first();
+    if (await menu.count()) {
+      const trigger = menu.locator('summary');
+      await trigger.focus(); await trigger.press('ArrowDown');
+      await expect(menu.locator('.collection-actions-panel button').first()).toBeFocused();
+      await this.page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+      await expect(menu).not.toHaveAttribute('open', '');
+    }
+    const identity = this.page.getByTestId(TestIds.distribution.extensionInventoryRow).locator('.collection-identity').first();
+    await expect(identity.locator('.collection-version')).toBeVisible();
+    const viewport = await this.page.evaluate(() => ({
+      width: innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      overflow: [...document.querySelectorAll('body *')].map(element => ({ element, rect: element.getBoundingClientRect() }))
+        .filter(({ element, rect }) => rect.right > innerWidth + 1 && getComputedStyle(element).display !== 'none')
+        .map(({ element, rect }) => ({ tag: element.tagName, classes: element.className.toString(), right: rect.right, text: element.textContent?.trim().slice(0, 80) })).slice(0, 12),
+    }));
+    expect(viewport.scrollWidth, JSON.stringify(viewport)).toBeLessThanOrEqual(viewport.width + 1);
+  }
+
+  public async inspectDirectProfileChoice(consoleUrl: string): Promise<void> {
+    await this.page.goto(`${consoleUrl}/agents/new?context=${encodeURIComponent(this.referenceContext ?? '/instance')}`, { waitUntil: 'domcontentloaded' });
+    await expect(this.page.getByTestId(TestIds.agentEditor.form)).toHaveAttribute('data-interactive', 'true');
+    await this.page.locator('[data-wizard-step="model-execution"]').click();
+    const toggle = this.page.getByTestId(TestIds.agentEditor.modelProfileToggle);
+    await expect(toggle).toBeVisible();
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const choice = this.page.getByTestId(TestIds.agentEditor.modelProfileChoice).first();
+    await expect(choice).toBeVisible();
+    await expect(choice.locator('xpath=ancestor::details')).toHaveCount(0);
+    await choice.scrollIntoViewIfNeeded();
+    expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+
   public async openFirstExtensionDetails(consoleUrl: string): Promise<void> {
     await this.open(consoleUrl, '/extensions', 'extensions');
     await this.page.locator(`[data-testid="${TestIds.distribution.extensions}"][data-interactive="true"]`).waitFor({ state: 'visible' });
-    await this.page.getByTestId(TestIds.distribution.extensionCatalogTab).click();
-    const detail = this.page.locator('#extensions-panel-catalog a.text-button[href^="/extensions/"]').first();
+    this.referenceContext = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope');
+    const detail = this.page.getByTestId(TestIds.distribution.extensionCatalog).locator('a.resource-name-link[href^="/extensions/"]').first();
     await detail.waitFor({ state: 'visible' });
     await detail.click();
     await this.page.getByTestId(TestIds.distribution.extensionDetails).waitFor({ state: 'visible' });
@@ -39,12 +205,14 @@ export class DistributionPage {
     await this.open(consoleUrl, '/sourceproviders/new', 'sourceProviderDetails');
     await this.page.locator(`[data-testid="${TestIds.distribution.sourceProviderDetails}"][data-interactive="true"]`).waitFor({ state: 'visible' });
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerDisplayName), displayName);
+    await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerName), name);
+    await this.page.locator('[data-wizard-step=extension]').click();
     const extension = this.page.getByTestId(TestIds.distribution.providerExtension);
     await extension.selectOption({ index: 1 });
     const contribution = this.page.getByTestId(TestIds.distribution.providerContribution);
     await expect(contribution.locator('option')).toHaveCount(2);
     await contribution.selectOption({ index: 1 });
-    await fillAndCommit(this.page.getByTestId(TestIds.distribution.providerName), name);
+    await this.page.locator('[data-wizard-step=review]').click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/sourceproviders/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.providerSubmit).click(),
@@ -58,6 +226,9 @@ export class DistributionPage {
     await this.page.getByTestId(TestIds.distribution.sourceImportOpen).click();
     await this.page.getByTestId(TestIds.distribution.sourceImportYamlMode).click();
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.sourceImportYaml), yaml);
+    await this.page.locator('[data-wizard-step="destination"]').click();
+    await expect(this.page.locator('[data-step-id=destination] select')).not.toHaveValue('');
+    await this.page.locator('[data-wizard-step="review"]').click();
     await Promise.all([
       this.page.waitForURL(url => url.pathname === `/settings/sources/${encodeURIComponent(publisher)}/${encodeURIComponent(name)}`),
       this.page.getByTestId(TestIds.distribution.sourceImportSubmit).click(),
@@ -73,10 +244,23 @@ export class DistributionPage {
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectVersion), project.version);
     await fillAndCommit(this.page.getByTestId(TestIds.distribution.packProjectDisplayName), project.displayName);
     await expect(this.page.getByTestId(TestIds.distribution.packProjectName)).toHaveValue(project.name);
-    const add = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${project.resourceName ?? 'system-direct-agent-dotnet-expert'}"]`)
-      .getByTestId(TestIds.distribution.packProjectAddResource);
+    const resourceName = project.resourceName ?? 'system-direct-agent-dotnet-expert';
+    let resource = this.page.locator(`[data-resource-kind="${project.resourceKind ?? 'Flow'}"][data-resource-name="${resourceName}"]`);
+    if (project.resourceNamespace) {
+      resource = resource.filter({ has: this.page.getByText(`${project.resourceNamespace}/${resourceName}`, { exact: true }) });
+    }
+    const add = resource.getByTestId(TestIds.distribution.packProjectAddResource);
+    await this.page.locator('[data-wizard-step=resources]').click();
+    await expect(this.page.locator('[data-step-id=resources]')).toBeVisible();
+    await expect(resource).toHaveCount(1);
+    if (project.resourceNamespace) {
+      await expect(resource.locator('.collection-qualified-name code')).toHaveText(`${project.resourceNamespace}/${resourceName}`);
+    }
     await add.waitFor({ state: 'visible' });
+    await expect(add).toBeEnabled();
     await add.click();
+    await this.page.locator('[data-wizard-step=review]').click();
+    await expect(this.page.locator('[data-step-id=review]')).toBeVisible();
     const create = this.page.getByTestId(TestIds.distribution.packProjectCreate);
     await expect(create).toBeEnabled();
     await Promise.all([
@@ -84,7 +268,7 @@ export class DistributionPage {
       create.click(),
     ]);
     await this.page.getByTestId(TestIds.distribution.packProjectDetails).waitFor({ state: 'visible' });
-    return this.page.url().split('/').at(-1)!;
+    return new URL(this.page.url()).pathname.split('/').at(-1)!;
   }
 
   public async openSourceDetailsFromList(publisher: string, name: string): Promise<void> {
@@ -100,9 +284,25 @@ export class DistributionPage {
     await this.page.locator(`[data-testid="${TestIds.distribution.packProjectStatus}"][data-state="success"]`).waitFor({ state: 'visible' });
   }
 
-  public async installPackProject(): Promise<string> {
-    await this.page.getByTestId(TestIds.distribution.packProjectInstall).click();
-    await this.page.getByTestId(TestIds.distribution.packProjectStatus).waitFor({ state: 'visible' });
+  public async installPackProject(bindings: readonly { name: string; namespace: string; scopeRef: string | null }[] = []): Promise<string> {
+    for (const target of bindings) {
+      const value = `${target.scopeRef ? target.scopeRef + '|' : ''}${target.namespace}:${target.name}`;
+      const selection = this.page.locator('.studio-bindings select').filter({
+        has: this.page.locator(`option[value="${value}"]`),
+      });
+      await expect(selection).toHaveCount(1);
+      await expect(selection).toBeEnabled();
+      await selection.selectOption(value);
+      await expect(selection).toHaveValue(value);
+    }
+    const install = this.page.getByTestId(TestIds.distribution.packProjectInstall);
+    await expect(install).toBeEnabled();
+    const status = this.page.getByTestId(TestIds.distribution.packProjectStatus);
+    const buildStatus = await status.innerText();
+    await install.click();
+    await status.waitFor({ state: 'visible' });
+    await expect(status).not.toHaveText(buildStatus);
+    await expect(status).toHaveAttribute('data-state', 'success');
     return this.page.getByTestId(TestIds.distribution.packProjectNamespace).innerText();
   }
 

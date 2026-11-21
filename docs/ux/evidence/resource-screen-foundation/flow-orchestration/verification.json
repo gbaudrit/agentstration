@@ -1,0 +1,151 @@
+{
+  "screen": "Flow orchestration \u2014 retained delegated definition editor",
+  "nativeCases": [
+    {
+      "title": "Orchestration uses retained Identity and Configuration with explicit publication ",
+      "project": "desktop-chromium",
+      "durationMs": 17619
+    },
+    {
+      "title": "Orchestration uses retained Identity and Configuration with explicit publication @responsive",
+      "project": "mobile-chromium",
+      "durationMs": 18842
+    }
+  ],
+  "nativeProofs": [
+    {
+      "testedBase": "c325a34bdb108f5ab2215deb0673553068c7e6ba",
+      "reportSha256": "8b799719f0e3cbfe13992a78cb426e2f0b55fde5b000dd67c4f6ca881a338e16",
+      "sourceHashes": {
+        "src/Agentstration.Console.Components/Components/Pages/FlowOrchestrationEditor.razor": "19bc6765d21c4a5cc8302cab9e92c984d2dfb7a7ba2f4f65a276489f9fd3d60b",
+        "src/Agentstration.Console.Components/Console/OrchestrationEditorModel.cs": "4ecf742b0d687b7ef8f90244c40a59c61fb258c84ee1ea805e3a5b426364c135",
+        "tests/Agentstration.Console.Components.Tests/FlowDetailsDesignerTests.OrchestrationFoundation.cs": "79192c6a09d1cf0a6171e71a2ecc8be30df28dcc4b65e1326c45c5a867a14d99",
+        "tests/Agentstration.Console.Components.Tests/FlowOrchestrationEditorTests.cs": "e2d815e51bf1c7eaa259dc9572fcbbe4a3177c6af23add02415bcfd4048c714c"
+      },
+      "hostHashes": {
+        "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "49ec1f22e47688956ddca70c060e0776d5ab64823bf9889f0c6df904b2f254d3",
+        "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "bec4a8c2554753e07fa4cc58414fe1e855f409f522e3ece29abce846da5d894e",
+        "src/Agentstration.Web.FlowDesigner/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.FlowDesigner.dll": "179c944a13c9a87594dc05d78055ce00689d1a0f457c52988f637ed49fe5c6e8",
+        "src/Agentstration.Workplace.Components/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada",
+        "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Workplace.Components.dll": "51d6e35e12f2fd94fd174c303a4f20615f425cc7ecbda73559514b92a3a4eada"
+      },
+      "campaign": "screens-05"
+    }
+  ],
+  "targetedGroupChecks": {
+    "flows": {
+      "passed": 96,
+      "sha256": "bddbb27eefb1e79bfbbe79f061a763d7571deb8111c4d5ae7fc66af3bf44ca15"
+    },
+    "extensions": {
+      "passed": 46,
+      "sha256": "25f11fe7bd20746e9e88b201370f0cc84baadb8ade6943d05c5bfcd1f527ab5b"
+    },
+    "plans-sources": {
+      "passed": 33,
+      "sha256": "4983498101a266de6d00eaa4b35be233ec83dce741a3b625ceab3cb79185c637"
+    },
+    "entries-tools": {
+      "passed": 97,
+      "sha256": "f25530e8c6c5ab9d2dae00a75cfe23db78f840105efbcb089d7df3fd5072d92c"
+    },
+    "shared": {
+      "passed": 21,
+      "sha256": "d2080edbba5044c99767b3c100890a548b14a437dfb8e50c2d52d9f8264af0a8"
+    },
+    "designer": {
+      "passed": 104,
+      "sha256": "ef349b17eeff1254af0665734233e38d998401e3e18a21826b439b37121473ce"
+    }
+  },
+  "protectedAgentSources": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "maintainedChecks": [
+    {
+      "file": "flows-agent-regression",
+      "passed": 6,
+      "sha256": "a8162993379ffcd399c9fedabb1f9d6aaac6226d7531ea0c5ff238e994347b65"
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "flow-orchestration-overview-desktop-en.png",
+      "sha256": "dc8e1343da2afc813aec6dad17c89b703eaa1de4c2f606653ebab05643f3163a"
+    },
+    {
+      "file": "flow-orchestration-invalid-identity-desktop-en.png",
+      "sha256": "08ab64a152a513579d63bf1601046da4b610a798f3aba38b63a7b5094961e4e3"
+    },
+    {
+      "file": "flow-orchestration-configuration-desktop-en.png",
+      "sha256": "4ea307b6592f4aa7fe19149ddfab32da6b05a1cd6449b9855d096b6c64789944"
+    },
+    {
+      "file": "flow-orchestration-retained-refresh-activation-desktop-en.png",
+      "sha256": "21f06b6a1bfd9fd3763798b503cb25f15ce3f402dc536a8056c7728402ab9bbe"
+    },
+    {
+      "file": "flow-orchestration-saved-with-publication-draft-desktop-en.png",
+      "sha256": "6f0c7bcb21b17af456853132573c006e8a8e57a0d40d007b5806744be1d811e6"
+    },
+    {
+      "file": "flow-orchestration-published-desktop-en.png",
+      "sha256": "d4fcb83f0cd0a27434737c8ca6fe7b2593713971d2241486f4911f1c9a392de3"
+    },
+    {
+      "file": "flow-orchestration-yaml-desktop-en.png",
+      "sha256": "f8799d5d437bc331b4816ebc343c7bd6ffba852326cca15132dba7fa621defc9"
+    },
+    {
+      "file": "flow-orchestration-overview-mobile-fr.png",
+      "sha256": "3e3d57e11eb63419c0c45e948b13a9ca464849fd910c8eed2df88469df154605"
+    },
+    {
+      "file": "flow-orchestration-invalid-identity-mobile-fr.png",
+      "sha256": "8bbc424a45d95916361f457dc2ae9f260d81546769c77c85b2200ad0585ac5c3"
+    },
+    {
+      "file": "flow-orchestration-configuration-mobile-fr.png",
+      "sha256": "6ca2d2263d79994b07cb2a563cab179a537e7516222bd7bcac0538d000a01c8e"
+    },
+    {
+      "file": "flow-orchestration-retained-refresh-activation-mobile-fr.png",
+      "sha256": "62612691264d05eee9d5804a4490b043a240b0bcaae049ea890cb6ba37b0d1a4"
+    },
+    {
+      "file": "flow-orchestration-saved-with-publication-draft-mobile-fr.png",
+      "sha256": "e38b709fe958443761330a26b4526d34d00b0a085ae6121964be1fee0db634cf"
+    },
+    {
+      "file": "flow-orchestration-published-mobile-fr.png",
+      "sha256": "73c6fd85c0ed2ada5c93c9f27d5112b78ce39cca14c26e5cc19cc0ba2b1a4f85"
+    },
+    {
+      "file": "flow-orchestration-yaml-mobile-fr.png",
+      "sha256": "bab90a6be69d168d1de0ee93144c79c1d87b31141ec402669942f9d72d1b695a"
+    }
+  ],
+  "limits": [
+    "This delegated preparation is paired with the owning FlowDetails migration in the working tree; each screen has a separate commit.",
+    "Metadata tags stay read-only because this existing definition update command does not write them.",
+    "The specialized shared topology retains its existing generated English description and raw technical statuses; the standard controls and the new save caption are localized."
+  ],
+  "finalDeltaChecks": {
+    "passed": 121,
+    "overlapsEarlierGroupChecks": true,
+    "sha256": "0bb660e41b6f539e5ac21f1504a56763dc6c2330ae6d5d552eed50bdbe1553c4"
+  }
+}

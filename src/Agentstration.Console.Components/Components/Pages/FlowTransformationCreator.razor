@@ -10,14 +10,14 @@
     @if (createdUrl is null)
     {
         <p>@T("SequenceCreateHelp")</p>
-        <div class="form-grid">
+        <FormGrid>
             <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" Policy="ResourceNamePolicy.Flow" IsNew="true" DisplayNameTestId="flow-transformation-display-name" TechnicalNameTestId="flow-transformation-name" />
-        </div>
+        </FormGrid>
         @if (error is not null) { <p role="alert">@error</p> }
-        <div class="form-actions">
+        <FormActions>
             <button type="button" class="button-secondary" @onclick="() => Close.InvokeAsync()">@T("SequenceCancel")</button>
             <button type="button" class="button-primary" disabled="@(scope is null || string.IsNullOrWhiteSpace(displayName) || string.IsNullOrWhiteSpace(technicalName))" @onclick="CreateAsync" data-action="create-transformation" data-testid="flow-transformation-create">@T("SequenceCreateDraft")</button>
-        </div>
+        </FormActions>
     }
     else
     {

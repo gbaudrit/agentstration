@@ -1,95 +1,64 @@
 @page "/artifacts/staged/{Id}"
 @implements IDisposable
 @inject IArtifactsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject TimeProvider TimeProvider
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
 
 <PageTitle>@(artifact?.FileName ?? Id) · Agentstration</PageTitle>
-<div class="artifact-header">
-<PageHeader Title="@(artifact?.FileName ?? Id)" Description="@T("DetailsDescription")" TestId="staged-artifact-details">
-    <Actions>
-        @if (artifact is not null)
-        {
-            <button class="button-danger" type="button" disabled="@(busy || !PurgeEligible)" title="@(!PurgeEligible ? T("PurgeIneligible") : null)" data-testid="staged-artifact-delete" @onclick="() => confirmPurge = true">@T("Delete")</button>
-        }
-        <a class="button-secondary" href="/artifacts">@T("Back")</a>
-    </Actions>
-</PageHeader>
-</div>
+<ConfirmationDialog IsOpen="confirmPurge" Title="@T("DeleteTitle")" Message="@T("PurgeHelp")" ConfirmLabel="@T("ConfirmDelete")" CancelLabel="@T("Cancel")" TestId="staged-artifact-purge-confirmation" OnConfirm="PurgeAsync" OnCancel="() => confirmPurge = false" />
 
-@if (confirmPurge)
-{
-    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="delete-artifact-title">
-        <h2 id="delete-artifact-title">@T("DeleteTitle")</h2>
-        <p>@T("PurgeHelp")</p>
-        <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => confirmPurge = false">@T("Cancel")</button><button class="button-danger" type="button" disabled="@busy" @onclick="PurgeAsync">@T("ConfirmDelete")</button></div>
-    </section>
-}
-
-@if (loading)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (error is not null)
-{
-    <ErrorState Message="@error" />
-}
-else if (artifact is not null)
-{
-    @if (message is not null)
-    {
-        <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div>
-    }
-
-    <ResourceTabs Label="@T("DetailsSections")">
-        @foreach (var tab in Enum.GetValues<DetailsTab>())
-        {
-            <button id="@TabId(tab)" type="button" role="tab"
-                    aria-selected="@(activeTab == tab ? "true" : "false")"
-                    aria-controls="staged-artifact-tab-panel"
-                    class="@(activeTab == tab ? "active" : null)"
-                    data-testid="@TabId(tab)"
-                    @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
-        }
-    </ResourceTabs>
-
-    <main id="staged-artifact-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-        @if (activeTab == DetailsTab.Overview)
-        {
+<UnsavedNavigationGuard IsDirty="@HasRetentionDraft" HasUnsavedChanges="@(() => HasRetentionDraft)" />
+<ResourceDetailsTemplate Name="@(artifact?.FileName ?? Id)" ResourceType="@T("Staged")" Domain="artifact" IconName="file" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)" CollectionLabel="@T("Back")"
+    Description="@T("DetailsDescription")" StatusText="@(artifact is null ? null : T($"Status.{artifact.Status}"))" Status="@(artifact is null ? UiStatus.Neutral : Tone(artifact.Status))"
+    Sections="Sections" SelectionChanged="SelectSection" ResourceIdentity="@loadedKey" SectionState="sectionState" DefaultSection="overview" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
+    Busy="IsBusy" HasDraft="HasRetentionDraft" SectionTestIdPrefix="staged-artifact" TestId="staged-artifact-details">
+        <Metadata>@if (artifact is not null) { <CopyableValue Value="@artifact.ArtifactId.ToString()" /> }</Metadata>
+        <Actions><button class="button-danger" type="button" disabled="@(IsBusy || !CanDelete || !PurgeEligible)" title="@(!PurgeEligible ? T("PurgeIneligible") : null)" data-testid="staged-artifact-delete" @onclick="() => confirmPurge = true">@T("Delete")</button></Actions>
+        <Feedback>@if (message is not null) { <div class="form-alert @(failed ? "form-alert-danger" : "form-alert-success")" role="status">@message</div> }@if (newerArtifact is not null) { <div class="form-alert form-alert-warning" role="status">@T("RetentionRefreshDraft")</div> }</Feedback>
+        <Content>@if (artifact is not null) {
+        <div data-artifact-section="overview" hidden="@(!sectionState.Is("overview"))">
             <section class="metric-grid artifact-overview-metrics">
                 <MetricCard Label="@T("State")" Value="@T($"Status.{artifact.Status}")" Detail="@artifact.MediaType" HelpText="@T($"StatusHelp.{artifact.Status}")" Status="@Tone(artifact.Status)" />
                 <MetricCard Label="@T("Size")" Value="@SizeInMegabytes(artifact.Length)" Detail="@ExactSize(artifact.Length)" />
                 <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
             </section>
 
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Provenance")</p><h2>@T("Producer")</h2></div></div>
+            <FormSection Title="@Shared["Identity"]" Class="resource-identity-summary"><dl class="resource-details artifact-details-grid"><dt>@T("Artifact")</dt><dd>@artifact.FileName</dd><dt>@T("Identifier")</dt><dd><CopyableValue Value="@artifact.ArtifactId.ToString()" /></dd><dt>@T("Created")</dt><dd>@artifact.CreatedAt.ToLocalTime().ToString("g")</dd></dl></FormSection>
+
+            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+                <Identity Context="row"><strong class="configuration-key">@row.Label</strong></Identity>
+                <Information Context="row"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@row.Value</span></CollectionValue></Information>
+            </CollectionView></FormSection>
+
+            <FormSection Title="@T("Producer")" Eyebrow="@T("Provenance")"><ChildContent>
                 <dl class="resource-details artifact-details-grid">
-                    <dt>@T("ProducerKind")</dt><dd>@artifact.Producer.Kind</dd>
-                    <dt>@T("ProducerId")</dt><dd>@if (ProducerUrl(artifact.Producer) is { } producerUrl) { <a class="text-button" href="@producerUrl"><code>@artifact.Producer.Id</code></a> } else { <code>@artifact.Producer.Id</code> }</dd>
+                    <dt>@T("ProducerKind")</dt><dd>@T($"ProducerKind.{artifact.Producer.Kind}")</dd>
+                    <dt>@T("ProducerId")</dt><dd>@if (ProducerUrl(artifact.Producer) is { } producerUrl) { <a class="text-button" href="@NavigationUrl(producerUrl)"><code>@artifact.Producer.Id</code></a> } else { <code>@artifact.Producer.Id</code> }</dd>
                     <dt>SHA-256</dt><dd><code>@(artifact.Sha256 ?? T("NotSealed"))</code></dd>
-                    <dt>@T("FlowRun")</dt><dd>@if (artifact.Producer.FlowRunId is { } flowRunId) { <a class="text-button" href="@FlowRunUrl(flowRunId)" data-testid="artifact-producer-flow-run">@flowRunId</a> } else { <text>—</text> }</dd>
+                    <dt>@T("FlowRun")</dt><dd>@if (artifact.Producer.FlowRunId is { } flowRunId) { <a class="text-button" href="@NavigationUrl(FlowRunUrl(flowRunId))" data-testid="artifact-producer-flow-run">@flowRunId</a> } else { <text>—</text> }</dd>
                     <dt>@T("FlowStep")</dt><dd>@(artifact.Producer.FlowStepId ?? "—")</dd>
-                    <dt>@T("Agent")</dt><dd>@if (artifact.Producer.AgentId is { } agentId) { <a class="text-button" href="@AgentUrl(agentId)">@agentId</a> } else { <text>—</text> }</dd>
-                    <dt>@T("ToolCall")</dt><dd>@if (ToolCallUrl(artifact.Producer) is { } toolCallUrl) { <a class="text-button" href="@toolCallUrl">@artifact.Producer.ToolCallId</a> } else { <text>@(artifact.Producer.ToolCallId ?? "—")</text> }</dd>
+                    <dt>@T("Agent")</dt><dd>@if (artifact.Producer.AgentId is { } agentId) { <a class="text-button" href="@NavigationUrl(AgentUrl(agentId))">@agentId</a> } else { <text>—</text> }</dd>
+                    <dt>@T("ToolCall")</dt><dd>@if (ToolCallUrl(artifact.Producer) is { } toolCallUrl) { <a class="text-button" href="@NavigationUrl(toolCallUrl)">@artifact.Producer.ToolCallId</a> } else { <text>@(artifact.Producer.ToolCallId ?? "—")</text> }</dd>
                     <dt>@T("Correlation")</dt><dd>@(artifact.Producer.CorrelationId ?? "—")</dd>
-                    <dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · <a class="text-button" href="@ToolSetUrl(artifact)">@artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</a></dd>
+                    <dt>@T("StagingService")</dt><dd>@artifact.BindingNamespace/@artifact.BindingName · <a class="text-button" href="@NavigationUrl(ToolSetUrl(artifact))">@artifact.ToolSetNamespace/@artifact.ToolSetName:@artifact.ToolSetVersion</a></dd>
                 </dl>
-            </section>
+            </ChildContent></FormSection>
 
             @if (artifact.FailureCode is not null)
             {
                 <section class="panel form-section"><h2>@T("Failure")</h2><p><code>@artifact.FailureCode</code> — @artifact.FailureMessage</p></section>
             }
-        }
-        else if (activeTab == DetailsTab.Content)
+        </div>
+        <div data-artifact-section="content" hidden="@(!sectionState.Is("content"))">
+        @if (sectionState.HasVisited("content"))
         {
-            <StagedArtifactContent @key="ArtifactId" ArtifactId="ArtifactId" Metadata="artifact" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" />
+            <StagedArtifactContent @key="ContentIdentity" ArtifactId="ArtifactId" Metadata="ContentMetadata" ContextScope="@ResourceOwnershipContext.TryGetCurrent(Services)" />
         }
-        else
-        {
+        </div>
+        <div data-artifact-section="retention" hidden="@(!sectionState.Is("retention"))">
             <section class="panel form-section artifact-retention-panel">
                 <div class="panel-header"><div><p class="eyebrow">@T("Retention")</p><h2>@T("RetentionAndLeases")</h2><p>@T("RetentionHelp")</p></div></div>
                 <div class="artifact-retention-summary">
@@ -97,8 +66,8 @@ else if (artifact is not null)
                     <div><span>@T("ConsumerLeases")</span><strong>@artifact.Leases.Count</strong></div>
                 </div>
                 <div class="artifact-retention-editor">
-                    <label><span>@T("NewExpiration")</span><input type="datetime-local" value="@expiration" @onchange="SetExpiration" aria-describedby="retention-help" /></label>
-                    <button class="button-primary" type="button" disabled="@(busy || !CanExtendRetention)" @onclick="ExtendAsync">@T("ExtendRetention")</button>
+                    <FormField Label="@T("NewExpiration")"><ChildContent><ClearableText UpdateOnInput="false" Type="datetime-local" Value="@expiration" Disabled="@(busy || !CanWrite)" aria-describedby="retention-help" ValueChanged="changed => SetExpiration(new ChangeEventArgs { Value = changed })" /></ChildContent></FormField>
+                    <button class="button-primary" type="button" disabled="@(IsBusy || !CanWrite || !CanExtendRetention)" @onclick="ExtendAsync">@T("ExtendRetention")</button>
                 </div>
                 <small id="retention-help" class="artifact-retention-help">@T(CanExtendRetention ? "RetentionReady" : "RetentionMustExtend")</small>
                 @if (artifact.Leases.Count == 0)
@@ -107,32 +76,56 @@ else if (artifact is not null)
                 }
                 else
                 {
-                    <DataGrid TItem="ArtifactLease" Items="artifact.Leases">
-                        <Header><tr><th>@T("Consumer")</th><th>@T("Operations")</th><th>@T("Expires")</th><th>@T("State")</th></tr></Header>
-                        <Row Context="lease"><tr><td>@lease.ConsumerKind · <code>@lease.ConsumerId</code></td><td>@string.Join(", ", lease.Operations)</td><td>@lease.ExpiresAt.ToLocalTime().ToString("g")</td><td>@(lease.RevokedAt is null ? T("Active") : T("Revoked"))</td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="ArtifactLease" Items="artifact.Leases" InformationLabels="@(new string[] { T("Operations"), T("Expires") })" IdentityLabel="@T("Consumer")" StateLabel="@T("State")">
+        <Identity Context="lease">
+@lease.ConsumerKind · <code>@lease.ConsumerId</code></Identity>
+        <State Context="lease">
+<StatusBadge Text="@(lease.RevokedAt is null ? T("Active") : T("Revoked"))" Status="@(lease.RevokedAt is null ? UiStatus.Success : UiStatus.Neutral)" /></State>
+        <Information Context="lease">
+            <CollectionValue Label="@T("Operations")">@string.Join(", ", lease.Operations)</CollectionValue>
+            <CollectionValue Label="@T("Expires")">@lease.ExpiresAt.ToLocalTime().ToString("g")</CollectionValue>
+        </Information>
+    </CollectionView>
                 }
             </section>
-        }
-    </main>
-}
+        </div>
+        }</Content>
+        <DraftActions><button type="button" class="button-secondary" disabled="@IsBusy" @onclick="DiscardRetention">@Shared["Discard"]</button></DraftActions>
+</ResourceDetailsTemplate>
 
 @code {
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private StagedArtifactView? artifact;
-    private DetailsTab activeTab;
-    private bool loading = true, busy, failed, confirmPurge;
-    private string expiration = string.Empty;
-    private string? error, message;
+    private readonly ResourceSectionState sectionState = new();
+    private readonly CancellationToken lifetimeToken;
+    public StagedArtifactDetails() => lifetimeToken = cancellation.Token;
+    private StagedArtifactView? newerArtifact;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private string? loadedKey;
+    private long loadVersion;
+    private bool busy, loading, failed, confirmPurge, disposed;
+    private readonly StagedArtifactRetentionModel retention = new();
+    private string expiration { get => retention.Expiration; set => retention.Expiration = value; }
+    private string? message;
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("overview", T("Tab.Overview"), "home"), new("content", T("Tab.Content"), "file"), new("retention", T("Tab.Retention"), "history")];
+    private void SelectSection(string? path) { if (path is not null) sectionState.Select(path); }
+    private bool IsBusy => busy || loading;
+    private bool HasRetentionDraft => artifact is not null && retention.IsDirty;
+    private bool HasPermission(string permission) => Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.Current is null || context.HasPermission(permission);
+    private bool CanWrite => HasPermission(AuthorizationPermissions.ResourcesWrite) && HasPermission(AuthorizationPermissions.ArtifactsManageRetention);
+    private bool CanDelete => HasPermission(AuthorizationPermissions.ResourcesDelete) && HasPermission(AuthorizationPermissions.ArtifactsPurge);
     private StagedArtifactId ArtifactId => StagedArtifactId.Parse(Id);
-    private bool CanExtendRetention => artifact is not null && TryGetExpiration(out var value) && value > artifact.ExpiresAt;
-    private bool PurgeEligible => artifact is not null
-        && artifact.Status is not (StagedArtifactStatus.Open or StagedArtifactStatus.Persisting or StagedArtifactStatus.Purging or StagedArtifactStatus.Purged)
-        && !artifact.Leases.Any(value => value.RevokedAt is null && value.ExpiresAt > TimeProvider.GetUtcNow());
+    private StagedArtifactView? ContentMetadata => newerArtifact ?? artifact;
+    private string ContentIdentity => $"{ContentMetadata?.ArtifactId}|{ContentMetadata?.Status}|{ContentMetadata?.Sha256}|{ContentMetadata?.Length}";
+    private bool CanExtendRetention => artifact is not null && retention.CanExtend(artifact.ExpiresAt);
+    private bool PurgeEligible => StagedArtifactRetentionModel.CanPurge(artifact, TimeProvider.GetUtcNow());
+    private sealed record SavedSetting(string Label, string Value);
+    private IReadOnlyList<SavedSetting> SavedConfiguration => artifact is null ? [] : [new(T("MediaType"), artifact.MediaType), new(T("Size"), ExactSize(artifact.Length)), new("SHA-256", artifact.Sha256 ?? T("NotSealed"))];
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
     private string ExactSize(long value) => T("ExactBytes", value);
+    private string NavigationUrl(string uri) => ResourceOwnershipContext.PreserveNavigation(uri, Services);
     private static string FlowRunUrl(string id) => $"/flow-runs/{Uri.EscapeDataString(id)}";
     private static string AgentUrl(string id) => $"/agents/{Uri.EscapeDataString(id)}";
     private static string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
@@ -154,70 +147,103 @@ else if (artifact is not null)
         _ => UiStatus.Info
     };
 
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync()
     {
-        loading = true;
-        error = null;
+        var key = $"{Id}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; ClearPrivate(); sectionState.Reset(key);
+        return LoadAsync();
+    }
+    private void ClearPrivate()
+    {
+        artifact = newerArtifact = null; retention.Clear(); message = null; busy = confirmPurge = failed = false;
+    }
+    private Task RefreshAsync() => IsBusy ? Task.CompletedTask : LoadAsync();
+    private async Task LoadAsync()
+    {
+        var request = ++loadVersion; var previous = artifact; loading = true;
+        loadState = new(previous is null ? ResourceLoadStatus.Loading : ResourceLoadStatus.Refreshing) { HasContent = previous is not null };
         try
         {
-            artifact = await Client.GetStagedAsync(ArtifactId, cancellation.Token);
-            if (artifact is null) error = T("NotFound");
-            else expiration = artifact.ExpiresAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm");
+            var id = ArtifactId;
+            var saved = await Client.GetStagedAsync(id, lifetimeToken);
+            if (request != loadVersion || disposed) return;
+            if (saved is null || saved.ArtifactId != id)
+            { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            if (HasRetentionDraft)
+            {
+                if (JsonSerializer.Serialize(saved) != JsonSerializer.Serialize(artifact)) newerArtifact = saved;
+            }
+            else Adopt(saved);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
-
-    private void SetExpiration(ChangeEventArgs value) => expiration = value.Value?.ToString() ?? string.Empty;
-
-    private bool TryGetExpiration(out DateTimeOffset value)
-    {
-        if (DateTime.TryParse(expiration, System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var parsed))
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }
+        catch (Exception exception)
         {
-            value = new DateTimeOffset(DateTime.SpecifyKind(parsed, DateTimeKind.Local));
-            return true;
+            if (request != loadVersion || disposed) return;
+            var status = exception is AgentstrationApiException api ? api.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                _ => ResourceLoadStatus.Failed
+            } : ResourceLoadStatus.Failed;
+            if (status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) ClearPrivate();
+            loadState = new(status) { HasContent = artifact is not null, ErrorId = (exception as AgentstrationApiException)?.ErrorId };
         }
-
-        value = default;
-        return false;
+        finally { if (request == loadVersion && !disposed) loading = false; }
     }
+    private void Adopt(StagedArtifactView saved)
+    {
+        artifact = saved; newerArtifact = null;
+        retention.Reset(saved.ExpiresAt);
+    }
+    private void DiscardRetention()
+    {
+        if (IsBusy || artifact is null) return;
+        Adopt(newerArtifact ?? artifact); message = null;
+    }
+    private void SetExpiration(ChangeEventArgs value) { if (!busy && CanWrite) expiration = value.Value?.ToString() ?? string.Empty; }
+
+    private bool TryGetExpiration(out DateTimeOffset value) => retention.TryGetExpiration(out value);
 
     private async Task ExtendAsync()
     {
-        if (busy || artifact is null || !TryGetExpiration(out var requestedExpiration) || requestedExpiration <= artifact.ExpiresAt) return;
+        if (IsBusy || !CanWrite || artifact is null || !TryGetExpiration(out var requestedExpiration) || requestedExpiration <= artifact.ExpiresAt) return;
+        var request = loadVersion; var id = ArtifactId;
         busy = true;
         failed = false;
         message = null;
         try
         {
-            artifact = await Client.ExtendRetentionAsync(ArtifactId, requestedExpiration, cancellation.Token);
-            expiration = artifact.ExpiresAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm");
+            var saved = await Client.ExtendRetentionAsync(id, requestedExpiration, lifetimeToken);
+            if (request != loadVersion || disposed) return;
+            if (saved.ArtifactId != id) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            Adopt(saved);
             message = T("RetentionExtended");
         }
-        catch (Exception exception) { failed = true; message = exception.Message; }
-        finally { busy = false; }
+        catch (Exception exception) { if (request == loadVersion && !disposed) { failed = true; message = exception.Message; } }
+        finally { if (request == loadVersion && !disposed) busy = false; }
     }
 
     private async Task PurgeAsync()
     {
-        if (busy) return;
+        if (IsBusy || !CanDelete || !PurgeEligible) return;
+        var request = loadVersion; var id = ArtifactId;
         busy = true;
         failed = false;
         message = null;
         try
         {
-            await Client.PurgeAsync(ArtifactId, cancellation.Token);
-            Navigation.NavigateTo("/artifacts");
+            await Client.PurgeAsync(id, lifetimeToken);
+            if (request == loadVersion && !disposed) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); Navigation.NavigateTo(ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)); }
         }
-        catch (Exception exception) { failed = true; message = exception.Message; busy = false; }
+        catch (Exception exception) { if (request == loadVersion && !disposed) { failed = true; message = exception.Message; busy = false; confirmPurge = false; } }
     }
-
-    private static string TabId(DetailsTab tab) => $"staged-artifact-{tab.ToString().ToLowerInvariant()}-tab";
-    private enum DetailsTab { Overview, Content, Retention }
 
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true; ++loadVersion;
         cancellation.Cancel();
         cancellation.Dispose();
     }

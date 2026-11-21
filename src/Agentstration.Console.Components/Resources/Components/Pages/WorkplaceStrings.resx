@@ -33,4 +33,24 @@
 <data name="AgentIdentities"><value>Agent identities</value></data>
 <data name="ParticipantVisibilityHelp"><value>Hidden presents one Agentstration assistant and keeps handoff participants private.</value></data>
 <data name="Exposure"><value>Exposure</value></data><data name="EntryExposure"><value>Surfaces and placement</value></data><data name="EntryExposureHelp"><value>Choose where this published Entry may be presented. Its owning Workspace and execution boundary never change.</value></data><data name="Exposure.Workplace"><value>Workplace</value></data><data name="Exposure.Workplace.Help"><value>Allow this Entry on end-user Workplace surfaces.</value></data><data name="Exposure.Console"><value>Console</value></data><data name="Exposure.Console.Help"><value>Allow this Entry on Console assistant surfaces.</value></data><data name="ConsoleRole.Fallback"><value>Command fallback</value></data><data name="ConsoleRole.Fallback.Help"><value>Offer this Entry when Console search has no matching page, command, or resource.</value></data><data name="Placement.OwningSpace"><value>Owning space</value></data><data name="Placement.OwningSpace.Help"><value>Present the Entry inside its owning Workspace space.</value></data><data name="Placement.TenantHome"><value>Tenant home</value></data><data name="Placement.TenantHome.Help"><value>Promote the Entry on the Tenant home for authorized users.</value></data>
+<data name="EntryForm" xml:space="preserve"><value>Form</value></data>
+<data name="EntryPreview" xml:space="preserve"><value>Entry preview</value></data>
+<data name="EntryRequestLabel" xml:space="preserve"><value>Request</value></data>
+<data name="EntryExecutionWorkspace" xml:space="preserve"><value>Execution workspace</value></data>
+<data name="EntryRefreshDraftConflict" xml:space="preserve"><value>A newer saved Entry is available. Your pending form and YAML inputs are retained until you explicitly discard them.</value></data>
+<data name="EntryDraftInvalid" xml:space="preserve"><value>Correct this section before saving the Entry ({0}).</value></data>
+<data name="EntryFieldsInvalid" xml:space="preserve"><value>Correct the invalid input-field configuration.</value></data>
+<data name="EntryUsageUnavailable" xml:space="preserve"><value>Entry dependencies and dashboard usages could not be loaded. Their counts are unknown.</value></data>
+<data name="EntryValidation.entry_id_invalid" xml:space="preserve"><value>Use 1 to 128 letters, digits, hyphens or underscores, beginning with a letter or digit.</value></data>
+<data name="EntryValidation.entry_binding_invalid" xml:space="preserve"><value>Select an Agent or a Flow target with a valid technical name.</value></data>
+<data name="EntryValidation.entry_exposure_surfaces_invalid" xml:space="preserve"><value>Select at least one supported exposure surface.</value></data>
+<data name="EntryValidation.entry_workplace_placement_required" xml:space="preserve"><value>Select at least one placement for the Workplace exposure.</value></data>
+<data name="EntryValidation.entry_field_duplicate" xml:space="preserve"><value>Input-field names must be unique.</value></data>
+<data name="EntryValidation.entry_field_name_required" xml:space="preserve"><value>Give every input field a technical name.</value></data>
+<data name="EntryValidation.entry_primary_input_required" xml:space="preserve"><value>Select exactly one primary input field.</value></data>
+<data name="EntryValidation.entry_field_options_required" xml:space="preserve"><value>Provide at least one option for each choice field.</value></data>
+<data name="EntryValidation.entry_field_options_invalid" xml:space="preserve"><value>Choice options need unique, nonempty values and labels.</value></data>
+<data name="EntryValidation.entry_field_options_not_supported" xml:space="preserve"><value>Only Choice and MultiChoice fields support options.</value></data>
+<data name="EntryValidation.entry_field_validation_invalid" xml:space="preserve"><value>The minimum field length cannot exceed its maximum.</value></data>
+<data name="EntryValidation.entry_suggestions_invalid" xml:space="preserve"><value>Prompt starters need unique, nonempty labels and nonempty values.</value></data>
 </root>

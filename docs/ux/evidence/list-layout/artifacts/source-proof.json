@@ -1,0 +1,19 @@
+{
+  "baseCommit": "b6eb38f46b1e4bf244aefdda60e147289338d3e8",
+  "route": "/artifacts",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor": "899c7cee7782379d88487328a7e7e4f855842635",
+    "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor.cs": "d11f11e2593bb34b54a73f4b5c0fe488101e6295",
+    "src/Agentstration.Artifacts/ArtifactManagementService.cs": "af0d99343e4dcd5b2089abcc0304381839675529",
+    "src/Agentstration.Artifacts.Api/ArtifactEndpoints.cs": "39285c8d4255a0975aef256013edc4c5cc79f44a",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "durable-desktop-en.png",
+    "durable-mobile-fr.png",
+    "durable-mobile-fr-results.png",
+    "local-desktop-en.png",
+    "local-mobile-fr.png",
+    "local-mobile-fr-results.png"
+  ]
+}

@@ -1,7 +1,8 @@
+@implements IDisposable
 <div class="conversation-composer" aria-busy="@(Busy || submitting)">
     <form @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
         <label class="sr-only" for="conversation-message">@Localizer["ContinueConversation"]</label>
-        <textarea id="conversation-message" @ref="composer" @bind="message" @bind:event="oninput" @onkeydown="HandleKeyDown" placeholder="@EffectivePlaceholder" disabled="@IsDisabled" aria-describedby="composer-help composer-reason" data-testid="workplace-composer-input"></textarea>
+        <ClearableText Multiline="true" id="conversation-message" @ref="composer" @bind-Value="message" @bind-Value:after="ReportDraftAsync" @onkeydown="HandleKeyDown" placeholder="@EffectivePlaceholder" Disabled="@IsDisabled" aria-describedby="composer-help composer-reason" data-testid="workplace-composer-input"></ClearableText>
         <button type="submit" disabled="@(IsDisabled || string.IsNullOrWhiteSpace(message))" aria-label="@Localizer["SendMessage"]" data-testid="workplace-composer-submit"><UiIcon Name="send" /><span>@(Busy || submitting ? Localizer["Sending"] : Localizer["Send"])</span></button>
     </form>
     <div class="composer-meta">
@@ -15,20 +16,29 @@
     [Parameter] public bool Busy { get; set; }
     [Parameter] public string? DisabledReason { get; set; }
     [Parameter] public EventCallback<string> OnSubmit { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    [Parameter] public Func<string, Task<bool>>? TrySubmit { get; set; }
+    private Task ReportDraftAsync() => disposed ? Task.CompletedTask : DraftChanged.InvokeAsync(message.Length > 0);
     private string message = string.Empty;
-    private bool submitting;
-    private ElementReference composer;
-    private bool IsDisabled => Busy || submitting || !string.IsNullOrWhiteSpace(DisabledReason);
+    private bool submitting, disposed;
+    private ClearableText composer = null!;
+    private bool IsDisabled => disposed || Busy || submitting || !string.IsNullOrWhiteSpace(DisabledReason);
     private string EffectivePlaceholder => Placeholder ?? Localizer["ComposerPlaceholder"];
 
+    public void Dispose() { disposed = true; GC.SuppressFinalize(this); }
     private async Task HandleKeyDown(KeyboardEventArgs args) { if ((args.CtrlKey || args.MetaKey) && args.Key == "Enter") await SubmitAsync(); }
     private async Task SubmitAsync()
     {
         if (IsDisabled || string.IsNullOrWhiteSpace(message)) return;
         submitting = true;
         var content = message.Trim();
-        try { await OnSubmit.InvokeAsync(content); message = string.Empty; }
+        try
+        {
+            var accepted = true;
+            if (TrySubmit is not null) accepted = await TrySubmit(content); else await OnSubmit.InvokeAsync(content);
+            if (accepted && !disposed) { message = string.Empty; await ReportDraftAsync(); }
+        }
         finally { submitting = false; }
-        await composer.FocusAsync();
+        if (!disposed) await composer.FocusAsync();
     }
 }

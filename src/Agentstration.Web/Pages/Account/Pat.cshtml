@@ -1,5 +1,9 @@
 @page "/account/pat"
 @model Agentstration.Web.Pages.Account.PatModel
+@using Agentstration.Web.Components
+@using Agentstration.Web.Components.Models
+@using Agentstration.Resources
+@inject IStringLocalizer<SharedFormStrings> Shared
 @{
     ViewData["Title"] = Auth["PersonalAccessTokens"];
 }
@@ -24,24 +28,26 @@
     <form method="post" asp-page-handler="Create" class="auth-form" data-testid="pat-create-form">
         <div asp-validation-summary="ModelOnly" class="validation-summary" role="alert"></div>
         <label asp-for="Input.Name">@Auth["Name"]</label>
-        <input asp-for="Input.Name" autocomplete="off" placeholder="@Auth["TokenNamePlaceholder"]" data-testid="pat-name" />
-        <span asp-validation-for="Input.Name" class="field-error"></span>
+        <input asp-for="Input.Name" autocomplete="off" placeholder="@Auth["TokenNamePlaceholder"]" data-testid="pat-name" clear-label="@Auth["Name"]" validation-id="Input_Name-error" />
+        <span id="Input_Name-error" asp-validation-for="Input.Name" class="field-error"></span>
 
         <label asp-for="Input.WorkspaceId">@Auth["Workspace"]</label>
-        <select asp-for="Input.WorkspaceId">
+        <select asp-for="Input.WorkspaceId" clear-label="@Auth["Workspace"]" validation-id="Input_WorkspaceId-error">
             @foreach (var workspace in Model.Workspaces)
             {
                 <option value="@workspace.Id">@workspace.DisplayName</option>
             }
         </select>
+        <span id="Input_WorkspaceId-error" asp-validation-for="Input.WorkspaceId" class="field-error"></span>
 
         <label asp-for="Input.ExpiresInDays">@Auth["ExpiresIn"]</label>
-        <select asp-for="Input.ExpiresInDays">
+        <select asp-for="Input.ExpiresInDays" clear-label="@Auth["ExpiresIn"]" validation-id="Input_ExpiresInDays-error">
             <option value="30">@Auth["Days", 30]</option>
             <option value="90">@Auth["Days", 90]</option>
             <option value="180">@Auth["Days", 180]</option>
             <option value="365">@Auth["Days", 365]</option>
         </select>
+        <span id="Input_ExpiresInDays-error" asp-validation-for="Input.ExpiresInDays" class="field-error"></span>
 
         <fieldset class="permission-grid">
             <legend>@Auth["Permissions"]</legend>
@@ -53,7 +59,7 @@
                 </label>
             }
         </fieldset>
-        <span asp-validation-for="Input.Permissions" class="field-error"></span>
+        <span id="Input_Permissions-error" asp-validation-for="Input.Permissions" class="field-error"></span>
         <button type="submit" class="primary-action" data-testid="pat-create">@Auth["CreateToken"]</button>
     </form>
 </section>
@@ -78,22 +84,27 @@
     }
     else
     {
-        <div class="token-list">
+        <div class="token-list" role="list">
             @foreach (var token in Model.Tokens)
             {
                 var status = Model.Status(token);
-                <article class="token-row" data-testid="pat-token-row">
+                <article class="token-row" role="listitem" data-testid="pat-token-row">
                     <div>
-                        <strong>@token.Name</strong>
+                        <div class="collection-identity"><component type="typeof(ResourceIcon)" render-mode="Static" param-IconName='"key"' /><strong>@token.Name</strong></div>
+                        <component type="typeof(ResourceScopeBadge)" render-mode="Static" param-ScopeRef="ResourceScopeRef.Workspace(token.WorkspaceId)" param-DisplayName="Model.Workspaces.FirstOrDefault(workspace => workspace.Id == token.WorkspaceId)?.DisplayName" />
+                        <component type="typeof(StatusBadge)" render-mode="Static" param-Text='@(Auth[$"TokenStatus.{status}"].Value)' param-Status='@(status == "Active" ? UiStatus.Success : UiStatus.Neutral)'  />
                         <code>@token.TokenPrefix…</code>
-                        <small>@Auth[$"TokenStatus.{status}"] · @Auth["ExpiresAt", token.ExpiresAt.ToLocalTime().ToString("g")] · @Auth["LastUsed", token.LastUsedAt?.ToLocalTime().ToString("g") ?? Auth["Never"]]</small>
+                        <small>@Auth["ExpiresAt", token.ExpiresAt.ToLocalTime().ToString("g")] · @Auth["LastUsed", token.LastUsedAt?.ToLocalTime().ToString("g") ?? Auth["Never"]]</small>
                     </div>
                     @if (status == "Active")
                     {
+                        <details class="collection-actions-menu">
+                            <summary class="button-secondary" aria-label="@Shared["ActionsFor", token.Name]">@Shared["CollectionActions"]</summary>
+                            <div class="collection-actions-panel" popover="manual">
                         <form method="post" asp-page-handler="Revoke">
                             <input type="hidden" name="tokenId" value="@token.Id" />
                             <button type="submit" class="danger-action" data-testid="pat-revoke">@Auth["Revoke"]</button>
-                        </form>
+                        </form></div></details>
                     }
                 </article>
             }
@@ -102,3 +113,5 @@
 </section>
 
 <a href="/account/security" class="auth-back-link">← @Auth["AccountSecurity"]</a>
+
+<script type="module" src="/_content/Agentstration.Web.Components/collection-static.js"></script>

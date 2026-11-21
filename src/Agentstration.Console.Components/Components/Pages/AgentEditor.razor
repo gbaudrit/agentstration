@@ -10,92 +10,145 @@
 @inject IToolSetsClient ToolSetsClient
 @inject NavigationManager Navigation
 @inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject NotificationState Notifications
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLocalizer
 
+@if (IsNew)
+{
+    <UnsavedNavigationGuard IsDirty="@isDirty" HasUnsavedChanges="@(() => isDirty)" ViewQueryParameters="@(new[] { "view", "tab" })" />
+}
 <PageTitle>@(IsNew ? T("CreateAgent") : Name) · Agentstration</PageTitle>
 
 @if (IsNew)
 {
-    <PageHeader Eyebrow="@T("Agent")" Title="@T("CreateAgent")" Description="@T("CreateDescription")">
-        <Actions><a class="button-secondary" href="/agents">@T("BackToAgents")</a></Actions>
+    <PageHeader CollectionHref="/agents" CollectionLabel="@T("BackToAgents")" Eyebrow="@T("Agent")" Title="@T("CreateAgent")" Description="@T("CreateDescription")">
     </PageHeader>
 }
 
-@if (loading || model is null)
+@if (IsNew && (loading || model is null))
 {
     <LoadingState Message="@T("Loading")" />
 }
 else
 {
-    @if (!IsNew)
-    {
-        <ResourceHeader ResourceType="@T("Agent")" Domain="agent" Icon="◎" Name="@model.DisplayName" Description="@model.Description" StatusText="@HeaderStatus" Status="@HeaderStatusTone">
-            <Metadata><span><code>@model.Name</code></span><span>@T("Generation", generation)</span></Metadata>
-            <Actions>@if (AgentResourceNamespace.IsDefault) { <a class="button-primary" href="@RunUrl">@T("Run")</a> }@if (CanManage) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@(saving || isDirty)">@T("ReconcileDeployment")</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
-        </ResourceHeader>
-        @if (selectedScope is { } inheritedOwner) { <InheritedResourceNotice OwnerScopeRef="inheritedOwner" /> }
-        <ResourceTabs Label="@T("AgentSections")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode && !accessMode ? "active" : null)" @onclick="ShowDefinition">@T("Definition")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><span>@T("Deployments")</span>@if (AgentResourceNamespace.IsDefault) { <a href="@RunUrl">@T("Runs")</a> } else { <span>@T("Runs")</span> }<span>@T("Metrics")</span><span>@T("Events")</span>@if (CanManage) { <button type="button" class="@(accessMode ? "active" : null)" data-testid="agent-access-tab" @onclick="ShowAccess">@T("Access")</button> }<button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
-        <StateComparison DesiredGeneration="@generation" ActiveGeneration="@ActiveGeneration" DesiredStatus="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" ActiveStatus="@ActiveStatus" RuntimeLabel="@ActiveRuntime" IsSynchronized="@IsStateSynchronized" Summary="@StateSummary">
-                <Actions>@if (CanManage && !IsStateSynchronized && !isDirty) { <button class="button-secondary" type="button" @onclick="ReconcileAsync" disabled="@saving">@T("ApplyGeneration")</button> }</Actions>
-        </StateComparison>
-        @if (activeRevision?.Definition.ToolSetAssignments.Count > 0)
-        {
-            <section class="panel form-section" data-testid="agent-active-toolsets">
-                <div class="panel-header"><div><p class="eyebrow">@T("ActiveRevision")</p><h2>@T("PinnedToolSetAssignments")</h2><p>@T("PinnedToolSetAssignmentsHelp")</p></div><code>@activeRevision.Metadata.Name</code></div>
-                <div class="table-shell"><table class="resource-table"><thead><tr><th>@T("ToolSet")</th><th>@T("Version")</th><th>@T("DefinitionHash")</th><th>@T("EffectiveMembers")</th></tr></thead><tbody>
-                @foreach (var assignment in activeRevision.Definition.ToolSetAssignments.OrderBy(value => value.ToolSetName, StringComparer.Ordinal))
-                {
-                    <tr><td><code>@assignment.ToolSetNamespace/@assignment.ToolSetName</code></td><td><code>@assignment.Version</code></td><td><code>@assignment.DefinitionHash</code></td><td>@string.Join(", ", assignment.Members)</td></tr>
-                }
-                </tbody></table></div>
-            </section>
-        }
-    }
-
+    RenderFragment feedback = @<div class="agent-feedback">
     @if (!string.IsNullOrWhiteSpace(errorMessage))
     {
         <div class="form-alert form-alert-danger" role="alert"><strong>@T("UnableToApply")</strong><span>@errorMessage</span>@if (!string.IsNullOrWhiteSpace(errorId)) { <code>@errorId</code> }</div>
     }
-    @if (!string.IsNullOrWhiteSpace(successMessage))
+    @if (newerResource is not null)
     {
-        <div class="form-alert form-alert-success" role="status">@successMessage</div>
+        <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div>
     }
-    @if (IsNew)
+    <PageNotification Message="@successMessage" OnDismiss="() => successMessage = null" />
+    @if (!IsNew && !IsOverview && !IsAccess && !IsStateSynchronized && !isDirty)
     {
-        <ResourceTabs Label="@T("AgentEditorMode")"><button type="button" class="@(!sourceMode && !toolsMode && !contractsMode ? "active" : null)" @onclick="ShowDefinition">@T("Form")</button><button type="button" class="@(contractsMode ? "active" : null)" data-testid="agent-contracts-tab" @onclick="ShowContracts">@T("Contracts")</button><button type="button" class="@(toolsMode ? "active" : null)" data-testid="agent-tools-tab" @onclick="ShowTools">@T("Tools")</button><button type="button" class="@(sourceMode ? "active" : null)" data-testid="agent-source-tab" @onclick="ShowSource">@T("Yaml")</button></ResourceTabs>
+        <div class="form-alert form-alert-warning" role="status">@T("CurrentGenerationNotActive")</div>
     }
+    @if (HasRawDraft && !IsSource)
+    {
+        <div class="form-alert form-alert-warning" role="status"><span>@Shared["YamlConflict"]</span><button class="text-button" type="button" @onclick="ShowSource">@T("Yaml")</button><button class="text-button" type="button" @onclick="DiscardRawDraft">@Shared["DiscardYaml"]</button></div>
+    }
+    </div>;
+    RenderFragment yamlFeedback = @<text>@if (invalidInput || rawUsesSavedDefinition)
+    {
+        <div class="form-alert form-alert-info" role="status" data-testid="agent-yaml-form-warning"><span>@T("YamlFormInvalid")</span><button type="button" class="text-button" @onclick="ShowDefinition">@Shared["Edit"]</button></div>
+    }</text>;
+    RenderFragment yamlActions = @<text><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@(saving || refreshing || !CanEditRaw)">@T("ApplyToForm")</button>@if (IsNew) { <button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@(saving || !CanEditRaw)">@(saving ? T("Saving") : T("CreateFromYaml"))</button> }</text>;
+    var presentations = AgentSectionPresentations(yamlActions);
+    RenderFragment definitionContent = @<div class="resource-editor-view">@if (model is not null)
+    {
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="ValidationFieldLabels"
+            OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" OnInvalidSubmit="HandleInvalidSubmit" InvalidInputChanged="value => invalidInput = value"
+            Id="agent-resource-form" FormName="agent-editor" FieldsTestId="agent-definition-fields" Busy="saving" ReadOnly="@(!CanManage)" Disabled="HasRawDraft"
+            Sections="presentations" SectionState="@(IsNew ? null : sectionState)" SectionContent="@(IsNew ? null : DefinitionSectionContent)" SectionRequested="ShowSection"
+            data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
+            <ChildContent>@if (IsNew)
+            {
+                <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+                <CreationWizard @ref="creationWizard" Steps="CreationSteps" OnStepChanging="CreationStepChanging" OnFinish="FinishCreationAsync" Busy="saving" FinishLabel="@T("CreateAndDeploy")" FinishTestId="agent-create-and-deploy" />
+            }</ChildContent>
+        </ResourceDefinitionForm>
+    }</div>;
+    if (IsNew)
+    {
+        @feedback
+        <FormActions><button type="button" class="button-secondary" data-testid="agent-source-tab" @onclick="() => { if (IsSource) ShowDefinition(); else ShowSource(); }">@(IsSource ? T("Form") : T("Yaml"))</button></FormActions>
 
-    @if (CanManage && accessMode && selectedScope is { } ownerScope)
-    {
-        <ResourceAccessPanel OwnerScopeRef="ownerScope" Namespace="AgentResourceNamespace" Kind="@AgentResourceKinds.Agent" Name="@model.Name" Generation="generation" Governance="governance" />
-    }
-    else if (sourceMode)
-    {
-        <section class="panel form-section" data-testid="agent-yaml-editor">
-            <div class="panel-header"><div><p class="eyebrow">@T("RawResource")</p><h2>@T("AgentYaml")</h2><p>@T("AgentYamlHelp")</p></div></div>
-            @if (!string.IsNullOrWhiteSpace(rawError)) { <div class="form-alert form-alert-danger" role="alert">@rawError</div> }
-            <label class="agent-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="28" @bind="rawYaml" @bind:event="oninput" readonly="@(!CanManage)"></textarea></label>
-            @if (CanManage) { <div class="form-actions"><button class="button-secondary" type="button" @onclick="() => { ApplyRawYaml(); }" disabled="@saving">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@saving">@(saving ? T("Saving") : IsNew ? T("CreateFromYaml") : T("SaveYaml"))</button></div> }
-        </section>
-
+        <div id="agent-page-panel" role="region" aria-label="@CurrentSectionLabel" tabindex="-1">
+            @if (IsSource) { <FormSection Title="@T("AgentYaml")" Description="@T("AgentYamlHelp")" TestId="agent-yaml-editor"><ResourceYamlEditor @bind-Value="rawYaml" ReadOnly="@(!CanEditRaw)" Busy="saving" Error="@rawError" Label="@T("ResourceManifest")" Feedback="@yamlFeedback" Actions="@(CanManage ? yamlActions : null)" /></FormSection> }
+            <div hidden="@IsSource">@definitionContent</div>
+        </div>
     }
     else
     {
-    <EditForm Model="model" OnValidSubmit="() => SaveAsync(applyRuntimeOnSubmit)" FormName="agent-editor" class="resource-form" data-testid="agent-editor-form" data-interactive="@(interactive ? "true" : "false")" @oninput="MarkDirty" @onchange="MarkDirty">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-        <fieldset class="resource-definition-fields" disabled="@(!CanManage)" data-testid="agent-definition-fields">
+        <ConsoleResourceDetailsTemplate CollectionHref="/agents" CollectionLabel="@T("BackToAgents")" Resource="savedResource" RequestedAddress="@ResourceAddress.Create(AgentResourceNamespace, AgentResourceKinds.Agent, Name!)" Name="@(savedResource?.Definition.DisplayName ?? Name!)" ResourceType="@T("Agent")" Domain="agent" Icon="◎"
+                                 Description="@(savedResource?.Definition.Description)" StatusText="@(savedResource is null ? null : HeaderStatus)" Status="HeaderStatusTone"
+                                 Feedback="@feedback" LoadState="loadState" OnRetry="RetryLoadAsync" OnRefresh="RefreshAsync" ShowRefreshAction HasDraft="@isDirty" TestId="agent-resource-details"
+                                 DefinitionSections="AgentDefinitionSections" SectionState="sectionState" ResourceIdentity="@($"{loadedKey}|{selectedScope}|{ContextScopeRef}")" NavigationLabel="@T("AgentSections")"
+                                 NavigationTestId="agent-sections" SelectionChanged="SectionSelected" SectionTestIdPrefix="agent"
+                                 YamlTitle="@T("AgentYaml")" YamlDescription="@T("AgentYamlHelp")"
+                                 @bind-Yaml="rawYaml" YamlReadOnly="@(!CanEditRaw)" Busy="saving" YamlError="@rawError" YamlLabel="@T("ResourceManifest")"
+                                 SectionPresentations="presentations">
+            <OverviewMetrics>
+                <MetricCard Label="@T("DesiredGeneration")" Value="@generation.ToString(System.Globalization.CultureInfo.CurrentCulture)" Detail="@(isDirty ? T("ModifiedNotSaved") : T("SavedDefinition"))" />
+                <MetricCard Label="@T("ActiveGeneration")" Value="@(ActiveGeneration?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? T("NoActiveGeneration"))"
+                            Detail="@ActiveRuntime" Url="@ActiveRuntimeUrl" Status="@(readiness?.Ready == true ? UiStatus.Success : UiStatus.Neutral)" />
+                <MetricCard Label="@T("Deployment")" Value="@DeploymentMetricValue" Detail="@DeploymentMetricDetail"
+                            Status="@DeploymentMetricTone" />
+            </OverviewMetrics>
+            <OverviewSummary Context="identity">
+                @if (savedResource is not null)
+                {
+                    <AgentResourceSummary Resource="savedResource" Identity="identity" RunHref="@RunUrl" ActiveRevision="activeRevision" AgentModel="agentModel"
+                                          ModelResolutionWarning="@modelResolutionWarning" CanReconcile="CanManage" Busy="@(saving || refreshing)" HasDraft="isDirty" OnReconcile="ReconcileAsync" />
+                }
+            </OverviewSummary>
+            <DefinitionContent Context="section">@definitionContent</DefinitionContent>
+            <Metadata>@if (savedResource is not null) { <ResourceMetadataBadge Value="@T("Generation", generation)" /> }</Metadata>
+            <Actions>@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="agent-context-return">@T("ReturnToSource")</a> }</Actions>
+            <DraftActions>
+                <button class="text-button" type="button" data-testid="agent-discard" @onclick="DiscardAsync" disabled="@(saving || refreshing)">@T("Discard")</button>
+                @if (IsSource)
+                {
+                    <button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@(saving || refreshing || !CanEditRaw)">@(saving ? T("Saving") : T("SaveYaml"))</button>
+                }
+                else
+                {
+                    <button class="button-secondary" type="submit" form="agent-resource-form" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@(saving || refreshing || HasRawDraft)">@T("SaveDraft")</button>
+                    <button class="button-primary" type="submit" form="agent-resource-form" @onclick="() => applyRuntimeOnSubmit = true" disabled="@(saving || refreshing || HasRawDraft)">@(saving ? T("Applying") : T("SaveAndApply"))</button>
+                }
+            </DraftActions>
+        </ConsoleResourceDetailsTemplate>
+    }
+}
 
-        @if (toolsMode)
-        {
-            <AgentToolSetConfiguration Versions="VisibleToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
-            <AgentToolConfiguration Tools="VisibleTools" Providers="VisibleProviders" Categories="VisibleCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" />
-        }
-        else if (contractsMode)
-        {
-            <section class="panel form-section" data-testid="agent-contracts-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("Contracts")</p><h2>@T("InvocationContracts")</h2><p>@T("InvocationContractsHelp")</p></div></div>
+@code {
+    private RenderFragment IdentityFields { get { var model = this.model!; return @<ResourceIdentityEditor
+        ResourceKind="@AgentResourceKinds.Agent" DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
+        Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="selectedScope" ScopeRefChanged="ScopeChanged"
+        @bind-Description="model.Description" @bind-Labels="model.Tags" IsNew="IsNew" ReadOnly="@(!CanManage)"
+        TestId="agent-identity-section" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" DescriptionTestId="agent-description" />; } }
+    private RenderFragment ConfigurationFields { get { var model = this.model!; return @<div class="resource-editor-view">        <FormSection Title="@T("Configuration")" TestId="agent-behavior-section">
+            <FormGrid>
+                <FormField Required="true" Label="@T("Handler")"><ChildContent><ClearableText @bind-Value="model.Handler" data-testid="agent-handler" /></ChildContent><Validation><ValidationMessage For="() => model.Handler" /></Validation></FormField>
+                <FormField Required="true" Label="@T("Instructions")" Class="form-span-2"><ChildContent><ClearableText Multiline @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /></ChildContent><Validation><ValidationMessage For="() => model.Instructions" /></Validation></FormField>
+            </FormGrid>
+        </FormSection>
+
+</div>; } }
+    private RenderFragment ExecutionFields { get { var model = this.model!; return @<div class="resource-editor-view">        <FormSection Title="@T("ModelConfiguration")" TestId="agent-model-section">
+                <FormField Required="true" Label="@T("ModelProfile")" Class="form-span-2"><ChildContent><ModelProfilePicker ShowHeading="false" Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" @key="selectedScope" /></ChildContent><Validation><ValidationMessage For="() => model.ModelProfileName" /><ValidationMessage For="() => model.ModelProfileNamespace" /></Validation></FormField>
+        </FormSection>
+        <FormSection Title="@T("Execution")" TestId="agent-runtime-section">
+                <FormField Required="true" Label="@T("RuntimeProfile")" Class="form-span-2"><ChildContent><ClearableSelect TValue="string" Value="@RuntimeProfileValue" ValueChanged="value => RuntimeProfileChanged(new ChangeEventArgs { Value = value })" ValueExpression="() => model.RuntimeProfileName" data-testid="agent-runtime-profile"><option value="">@Shared["NoSelection"]</option>@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</ClearableSelect><small>@T("RuntimeProfileHelp")</small></ChildContent><Validation><ValidationMessage For="() => model.RuntimeProfileName" /></Validation></FormField>
+        </FormSection></div>; } }
+    private RenderFragment ToolsFields { get { return @<div class="resource-editor-view">            <AgentToolSetConfiguration Versions="VisibleToolSetVersions" Selected="SelectedToolSets" SelectedChanged="UpdateSelectedToolSets" />
+            <AgentToolConfiguration Tools="VisibleTools" Providers="VisibleProviders" Categories="VisibleCategories" SelectedToolIds="SelectedToolIds" ToolSetGrantedTools="ToolSetGrantedTools" SelectedToolIdsChanged="UpdateSelectedTools" /></div>; } }
+    private RenderFragment ContractsFields { get { var model = this.model!; return @<div class="resource-editor-view">            <FormSection Title="@T("InvocationContracts")" Eyebrow="@T("Contracts")" Description="@T("InvocationContractsHelp")" TestId="agent-contracts-section"><ChildContent>
                 <ContractDirectionTabs Label="@T("InvocationContracts")" InputLabel="@T("InputContract")"
                     OutputLabel="@T("OutputContract")" TestId="agent-contract">
                     <InputContent>
@@ -104,95 +157,107 @@ else
                     </InputContent>
                     <OutputContent>
                         <p class="muted">@T("OutputInstructionHelp")</p>
-                        <label>@T("OutputResolution")
-                            <select disabled="@(model.OutputSchema is not null || model.OutputSchemaBinding is not null)" value="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic ? model.OutputContract.Source : model.OutputSchema is not null || model.OutputSchemaBinding is not null || model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Fixed ? "fixed" : "absent")" @onchange="UpdateOutputResolution">
+                        <FormField Label="@T("OutputResolution")">
+                            <ClearableSelect TValue="string" AllowClear="false" disabled="@(model.OutputSchema is not null || model.OutputSchemaBinding is not null)" Value="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic ? model.OutputContract.Source : model.OutputSchema is not null || model.OutputSchemaBinding is not null || model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Fixed ? "fixed" : "absent")" ValueChanged="value => UpdateOutputResolution(new ChangeEventArgs { Value = value })">
                                 <option value="fixed" disabled>@T("OutputResolution.Fixed")</option>
                                 <option value="absent">@T("OutputResolution.Absent")</option>
                                 <option value="input">@T("OutputResolution.Input")</option>
                                 <option value="parent">@T("OutputResolution.Parent")</option>
-                            </select>
-                        </label>
-                        <label>@T("OutputMediaType")<input disabled="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic)" value="@model.OutputContract?.MediaType" @onchange="UpdateOutputMediaType" /></label>
+                            </ClearableSelect>
+                        </FormField>
+                        <FormField Label="@T("OutputMediaType")"><ClearableText Disabled="@(model.OutputContract?.Mode == Agentstration.Schemas.DataContractMode.Dynamic)" Value="@model.OutputContract?.MediaType" ValueChanged="value => UpdateOutputMediaType(new ChangeEventArgs { Value = value })" /></FormField>
                         <ReusableSchemaBindingEditor Title="@T("OutputContract")" TestId="agent-output-schema"
                             Binding="model.OutputSchemaBinding" LegacySchema="model.OutputSchema" ValueChanged="UpdateAgentOutputSchemaAsync" />
                     </OutputContent>
                 </ContractDirectionTabs>
-            </section>
-        }
-        else
+            </ChildContent></FormSection></div>; } }
+    private RenderFragment CreationTools => @<div>@if (ToolsVisited) { @ToolsFields }</div>;
+    private RenderFragment CreationContracts => @<div>@if (ContractsVisited) { @ContractsFields }</div>;
+    private RenderFragment CreationReview => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@T("Identity")</dt><dd>@model!.DisplayName<br /><code>@model.Namespace/@model.Name</code></dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="selectedScope" /></dd><dt>@T("Instructions")</dt><dd class="configuration-value">@model.Instructions</dd><dt>@T("ModelProfile")</dt><dd>@model.ModelProfileNamespace/@model.ModelProfileName</dd><dt>@T("RuntimeProfile")</dt><dd>@model.RuntimeProfileNamespace/@model.RuntimeProfileName</dd><dt>@T("Tools")</dt><dd>@string.Join(", ", SelectedToolIds)</dd><dt>@T("GovernedToolSets")</dt><dd>@string.Join(", ", model.ToolSets.Select(t => t.ToolSet.Name))</dd></dl></ChildContent></FormSection>;
+    private ResourceDefinitionForm? definitionForm;
+    private RenderFragment<string> DefinitionSectionContent => path => path switch
+    {
+        "definition/identity" => IdentityFields,
+        "definition/configuration" => ConfigurationFields,
+        "definition/model-execution" => ExecutionFields,
+        "definition/tools" => ToolsFields,
+        "definition/contracts" => ContractsFields,
+        _ => throw new ArgumentOutOfRangeException(nameof(path))
+    };
+    private EditContext? editContext;
+    private IReadOnlyDictionary<string, string> ValidationFieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(AgentEditorModel.Name)] = IdentityLocalizer["TechnicalName"],
+        [nameof(AgentEditorModel.Namespace)] = Shared["Namespace"],
+        [nameof(AgentEditorModel.DisplayName)] = IdentityLocalizer["DisplayName"],
+        [nameof(AgentEditorModel.Handler)] = T("Handler"),
+        [nameof(AgentEditorModel.Instructions)] = T("Instructions"),
+        [nameof(AgentEditorModel.ModelProfileName)] = T("ModelProfile"),
+        [nameof(AgentEditorModel.ModelProfileNamespace)] = $"{T("ModelProfile")} / {Shared["Namespace"]}",
+        [nameof(AgentEditorModel.RuntimeProfileName)] = T("RuntimeProfile"),
+        [nameof(AgentEditorModel.RuntimeProfileNamespace)] = $"{T("RuntimeProfile")} / {Shared["Namespace"]}"
+    };
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model!);
+    private CreationWizard? creationWizard;
+    private bool ValidCreationFields(params string[] fields) => model is not null && fields.All(field => System.ComponentModel.DataAnnotations.Validator.TryValidateProperty(typeof(AgentEditorModel).GetProperty(field)!.GetValue(model), new(model) { MemberName = field }, null));
+    private bool CreationIdentityComplete => selectedScope is not null && ValidCreationFields(nameof(AgentEditorModel.Name), nameof(AgentEditorModel.DisplayName), nameof(AgentEditorModel.Namespace))
+        && ValidTags && !FormContext.GetValidationMessages(new FieldIdentifier(model!, nameof(AgentEditorModel.Tags))).Any();
+    private bool CreationConfigurationComplete => ValidCreationFields(nameof(AgentEditorModel.Handler), nameof(AgentEditorModel.Instructions));
+    private bool ValidTags { get { try { if (model is not null) _ = model.ToRequest(); return true; } catch (ArgumentException) { return false; } } }
+    private bool CreationExecutionComplete => ValidCreationFields(nameof(AgentEditorModel.ModelProfileName), nameof(AgentEditorModel.RuntimeProfileName));
+    private IReadOnlyList<CreationWizardStep> CreationSteps =>
+    [
+        new("identity", T("Identity"), IdentityFields) { IsComplete = CreationIdentityComplete },
+        new("configuration", T("Configuration"), ConfigurationFields) { IsComplete = CreationConfigurationComplete },
+        new("model-execution", T("ModelAndExecution"), ExecutionFields) { IsComplete = CreationExecutionComplete },
+        new("tools", T("Tools"), CreationTools),
+        new("contracts", T("Contracts"), CreationContracts),
+        new("review", Shared["Verification"], CreationReview) { IsComplete = CreationIdentityComplete && CreationConfigurationComplete && CreationExecutionComplete }
+    ];
+    private void CreationStepChanging(CreationWizardStepChange step) { if (step.To is "tools" or "contracts") sectionState.Visit("definition/" + step.To); }
+    private async Task FinishCreationAsync(CreationWizardFinish finish)
+    {
+        var valid = FormContext.Validate();
+        if (!valid || !CreationIdentityComplete || !CreationConfigurationComplete || !CreationExecutionComplete)
         {
-        <section class="panel form-section" id="definition" data-testid="agent-identity-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Identity")</p><h2>@T("ResourceCoordinates")</h2></div>@if (!IsNew) { <StatusBadge Text="@T("Generation", generation)" Status="UiStatus.Info" /> }</div>
-            <div class="form-grid">
-                <ResourceIdentityFields @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" IsNew="@IsNew" DisplayNameTestId="agent-display-name" TechnicalNameTestId="agent-name" />
-                <label><span>@T("Handler")</span><InputText @bind-Value="model.Handler" data-testid="agent-handler" /><ValidationMessage For="() => model.Handler" /></label>
-                <ResourceScopeFormField ResourceKind="@AgentResourceKinds.Agent" @bind-Value="selectedScope" Disabled="@(!IsNew)" />
-            </div>
-            @if (!string.IsNullOrWhiteSpace(resourceId)) { <p class="resource-hint">@T("Uid"): <code>@resourceId</code></p> }
-        </section>
-
-        <section class="panel form-section" data-testid="agent-behavior-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Definition")</p><h2>@T("BehaviorAndModel")</h2></div></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("Description")</span><InputTextArea @bind-Value="model.Description" rows="3" data-testid="agent-description" /></label>
-                <div class="form-span-2"><ModelProfilePicker Value="@model.ModelProfileName" Namespace="@model.ModelProfileNamespace" ScopeRef="@model.ModelProfileScopeRef" ValueChanged="ModelProfileChanged" SelectedChanged="ModelProfileSelectionChanged" SelectFirstWhenMissing="@IsNew" /><ValidationMessage For="() => model.ModelProfileName" /></div>
-                <label class="form-span-2"><span>@T("RuntimeProfile")</span><select value="@RuntimeProfileValue" @onchange="RuntimeProfileChanged" data-testid="agent-runtime-profile">@foreach (var profile in runtimeProfiles) { <option value="@RuntimeProfileValueFor(profile)">@profile.Properties.DisplayName — @(profile.ScopeRef?.Value ?? "?") · @profile.Namespace/@profile.Name</option> }</select><small>@T("RuntimeProfileHelp")</small></label>
-                <label class="form-span-2"><span>@T("Instructions")</span><InputTextArea @bind-Value="model.Instructions" rows="6" data-testid="agent-instructions" /><ValidationMessage For="() => model.Instructions" /></label>
-            </div>
-        </section>
-
-        @if (!IsNew)
-        {
-            <section class="panel form-section">
-                <div class="panel-header"><div><p class="eyebrow">@T("ModelConfiguration")</p><h2>@T("DeclaredAndResolved")</h2></div>@if (agentModel is not null) { <StatusBadge Text="@ModelStatusLabel(agentModel.Status)" Status="@ModelManagementUi.Status(agentModel.Status)" /> }</div>
-                <div class="declaration-resolution-grid">
-                    <article><h3>@T("DeclaredConfiguration")</h3><dl class="resource-details"><dt>@T("ModelProfile")</dt><dd>@(agentModel?.Declared.ModelProfile.DisplayName ?? model.ModelProfileName)</dd><dt>@T("Name")</dt><dd><code>@model.ModelProfileName</code></dd></dl>@if (agentModel is not null) { <a class="text-button" href="@ProfileUrl(agentModel)">@T("OpenModelProfile") →</a> }</article>
-                    <article><h3>@T("ResolvedConfiguration")</h3>@if (agentModel is null) { <p class="inline-warning">@modelResolutionWarning</p> } else { <dl class="resource-details"><dt>@T("Provider")</dt><dd>@(agentModel.Resolved.Provider?.DisplayName ?? agentModel.Resolved.Provider?.Name ?? T("NotResolved"))</dd><dt>@T("Contribution")</dt><dd>@(agentModel.Resolved.Provider?.ContributionId ?? T("NotResolved"))</dd><dt>@T("Model")</dt><dd><code>@agentModel.Resolved.Model.Name</code></dd><dt>@T("Status")</dt><dd>@ModelStatusLabel(agentModel.Status)</dd></dl>@if (agentModel.Resolved.Provider is not null) { <a class="text-button" href="@ProviderUrl(agentModel)">@T("OpenProvider") →</a> }}</article>
-                </div>
-            </section>
+            definitionForm?.RequestValidationFocus();
+            finish.ReturnToStepId = !CreationIdentityComplete ? "identity" : !CreationConfigurationComplete ? "configuration" : "model-execution";
+            if (selectedScope is null) errorMessage = T("CreationScopeRequired");
+            else if (!ValidTags) errorMessage = T("CreationIdentityInvalid");
+            return;
         }
-
-        <section class="panel form-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("References")</p><h2>@T("Tags")</h2></div></div>
-            <div class="form-grid">
-                <label class="form-span-2"><span>@T("Tags")</span><InputTextArea @bind-Value="model.Tags" rows="7" /><small>@T("TagsHelp")</small></label>
-            </div>
-        </section>
-        }
-
-        </fieldset>
-        @if (CanManage && IsNew)
-        {
-            <div class="form-actions"><a class="button-secondary" href="/agents">@T("Cancel")</a><button class="button-primary" type="submit" data-testid="agent-create-and-deploy" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Creating") : T("CreateAndDeploy"))</button></div>
-        }
-        else if (CanManage)
-        {
-            <UnsavedChangesBar IsVisible="@isDirty">
-                <Actions><button class="button-secondary" type="button" @onclick="DiscardAsync" disabled="@saving">@T("Discard")</button><button class="button-secondary" type="submit" data-testid="agent-save-draft" @onclick="() => applyRuntimeOnSubmit = false" disabled="@saving">@T("SaveDraft")</button><button class="button-primary" type="submit" @onclick="() => applyRuntimeOnSubmit = true" disabled="@saving">@(saving ? T("Applying") : T("SaveAndApply"))</button></Actions>
-            </UnsavedChangesBar>
-        }
-    </EditForm>
+        await SaveAsync(applyRuntime: true);
     }
-}
 
-@code {
     [Parameter] public string? Name { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? AgentNamespace { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "context")] public string? ContextScopeRef { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")] public string? ReturnUrl { get; set; }
 
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
 
     private readonly CancellationTokenSource cancellation = new();
+    private string? loadedKey;
+    private long loadVersion;
     private AgentEditorModel? model;
+    private AgentResource? savedResource;
+    private readonly ResourceSectionState sectionState = new();
+    private bool IsOverview => sectionState.Is("overview");
+    private bool IsSource => sectionState.Is("yaml");
+    private bool IsTools => sectionState.Is("definition/tools");
+    private bool IsContracts => sectionState.Is("definition/contracts");
+    private bool IsAccess => sectionState.Is("access");
+    private bool IsModel => sectionState.Is("definition/model-execution");
+    private bool ToolsVisited => sectionState.HasVisited("definition/tools");
+    private bool ContractsVisited => sectionState.HasVisited("definition/contracts");
     private IReadOnlyList<ToolResource> catalogTools = [];
     private IReadOnlyList<ToolProviderResource> catalogProviders = [];
     private IReadOnlyList<ToolCategoryResource> catalogCategories = [];
     private IReadOnlyList<ToolSetVersionResource> catalogToolSetVersions = [];
     private IReadOnlyList<RuntimeProfileSummaryResponse> runtimeProfiles = [];
     private string? etag;
-    private string? resourceId;
     private string? errorMessage;
     private string? errorId;
     private string? successMessage;
@@ -205,24 +270,39 @@ else
     private string provisioningStatus = "Valid";
     private long generation;
     private bool loading = true;
+    private bool refreshing;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private AgentResource? newerResource;
+    private string? newerEtag;
     private bool saving;
-    private bool isDirty;
+    private bool invalidInput;
+    private string savedFingerprint = string.Empty;
+    private string rawBaseline = string.Empty;
+    private string rawModelFingerprint = string.Empty;
+    private bool rawInitialized;
+    private bool rawUsesSavedDefinition;
+    private bool CanEditRaw => CanManage && !invalidInput && !rawUsesSavedDefinition;
+    private bool HasRawDraft => rawInitialized && rawYaml != rawBaseline;
+    private void ScopeChanged(ResourceScopeRef? value)
+    {
+        var initializing = IsNew && selectedScope is null && Fingerprint == savedFingerprint;
+        selectedScope = value;
+        if (initializing) savedFingerprint = Fingerprint;
+    }
+    private string Fingerprint => JsonSerializer.Serialize(new { model, selectedScope });
+    private bool isDirty => !loading && model is not null && CanManage && (Fingerprint != savedFingerprint || HasRawDraft || invalidInput);
     private bool applyRuntimeOnSubmit = true;
-    private bool sourceMode;
-    private bool toolsMode;
-    private bool accessMode;
-    private bool contractsMode;
     private bool interactive;
     private ResourceScopeRef? selectedScope;
     private ResourceGovernance governance = ResourceGovernance.User;
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private bool CanManage => IsNew || ResourceOwnershipContext.CanManage(selectedScope, Services);
+    private bool CanManage => IsNew || !governance.IsManaged && ResourceOwnershipContext.CanManage(selectedScope, Services);
     private string? SafeReturnUrl => ConsoleResourceUrls.LocalReturnUrl(ReturnUrl);
     private ResourceNamespace AgentResourceNamespace => string.IsNullOrWhiteSpace(AgentNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(AgentNamespace);
     private string OverviewUrl => AgentResourceNamespace.IsDefault
         ? $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}"
         : $"/agents/{Uri.EscapeDataString(Name ?? string.Empty)}?namespace={Uri.EscapeDataString(AgentResourceNamespace.Value)}";
-    private string RunUrl => $"{OverviewUrl}/run";
+    private string RunUrl => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.WithOwnerScope($"/agents/{Uri.EscapeDataString(Name!)}/run", savedResource?.ScopeRef), Services);
     private bool IsStateSynchronized => !isDirty && readiness?.Ready == true && readiness.Generation == generation;
     private long? ActiveGeneration => readiness?.Ready == true ? readiness.Generation : null;
     private string ActiveStatus => readiness switch
@@ -235,16 +315,48 @@ else
         _ => T("NotDeployed")
     };
     private string? ActiveRuntime => readiness?.RuntimeProfileId is null ? readiness?.DeploymentId : ResourceName(readiness.RuntimeProfileId);
+    private string? ActiveRuntimeUrl => activeRevision is null ? null : ConsoleResourceUrls.RuntimeProfile(ResourceAddress.Create(
+        activeRevision.Definition.RuntimeProfileNamespace,
+        RuntimeProfileResourceKinds.RuntimeProfile, activeRevision.Definition.RuntimeProfileName));
     private string StateSummary => IsStateSynchronized ? T("GenerationReady", generation) : isDirty ? T("SaveOrApplyModified") : T("CurrentGenerationNotActive");
+    private string DeploymentMetricValue => readiness switch
+    {
+        { Ready: true } => IsStateSynchronized ? T("Ready") : T("ApplyPending"),
+        { State: "agent_version_not_found" or "agent_deployment_not_found" } => T("NotDeployed"),
+        { Error: { Length: > 0 } } => T("DeploymentFailed"),
+        { State: { Length: > 0 } state } => StatusPresentation.Label(state),
+        _ => T("NotDeployed")
+    };
+    private string DeploymentMetricDetail => IsStateSynchronized || isDirty || readiness?.Ready == true ? StateSummary : ActiveStatus;
+    private UiStatus DeploymentMetricTone => readiness switch
+    {
+        { Ready: true } => IsStateSynchronized ? UiStatus.Success : UiStatus.Warning,
+        { State: "agent_version_not_found" or "agent_deployment_not_found" } => UiStatus.Neutral,
+        { Error: { Length: > 0 } } => UiStatus.Danger,
+        _ => HeaderStatusTone
+    };
     private string HeaderStatus => readiness?.Ready == true ? T("Ready") : StatusPresentation.Label(provisioningStatus);
-    private string RuntimeProfileValue => model is null ? string.Empty :
+    private string RuntimeProfileValue => model is null || string.IsNullOrWhiteSpace(model.RuntimeProfileName) ? string.Empty :
         $"{model.RuntimeProfileScopeRef?.Value ?? string.Empty}|{model.RuntimeProfileNamespace}|{model.RuntimeProfileName}";
     private UiStatus HeaderStatusTone => readiness?.Ready == true ? UiStatus.Success : StatusPresentation.Tone(provisioningStatus);
 
     protected override async Task OnParametersSetAsync()
     {
-        loading = true;
-        errorMessage = null;
+        var contextScope = ContextScopeRef ?? ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? ScopeRefValue;
+        var key = $"{AgentResourceNamespace.Value}|{Name}|{ScopeRefValue ?? contextScope}|{contextScope}";
+        if (loadedKey == key) return;
+        loadedKey = key;
+        await LoadInitialAsync(key);
+    }
+
+    private async Task LoadInitialAsync(string key)
+    {
+        var version = ++loadVersion;
+        loading = true; refreshing = false;
+        ClearLoadedResource();
+        loadState = new(ResourceLoadStatus.Loading);
+        sectionState.Reset(key);
+        var fetchingResource = false;
         try
         {
             var toolsTask = ToolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
@@ -253,6 +365,7 @@ else
             var toolSetVersionsTask = LoadToolSetVersionsAsync();
             var runtimeProfilesTask = RuntimeProfilesClient.GetRuntimeProfilesAsync(cancellation.Token);
             await Task.WhenAll(toolsTask, providersTask, categoriesTask, toolSetVersionsTask, runtimeProfilesTask);
+            if (version != loadVersion) return;
             catalogTools = await toolsTask;
             catalogProviders = await providersTask;
             catalogCategories = await categoriesTask;
@@ -260,6 +373,7 @@ else
             runtimeProfiles = await runtimeProfilesTask;
             if (IsNew)
             {
+                savedResource = null; selectedScope = null; etag = null; readiness = null; activeRevision = null; agentModel = null;
                 model = new AgentEditorModel { Namespace = AgentResourceNamespace.Value };
                 var runtimeProfile = runtimeProfiles.FirstOrDefault();
                 if (runtimeProfile is not null)
@@ -272,33 +386,169 @@ else
             else
             {
                 ResourceScopeRef? requestedScope = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+                fetchingResource = true;
                 var snapshot = requestedScope is null
                     ? await Client.GetAgentAsync(AgentResourceNamespace, Name!, cancellation.Token)
                     : await Client.GetAgentAsync(AgentResourceNamespace, Name!, requestedScope.Value, cancellation.Token);
+                if (version != loadVersion) return;
+                fetchingResource = false;
                 if (snapshot.Value.Governance.IsManaged)
                 {
                     Navigation.NavigateTo(ConsoleResourceUrls.Agent(AgentResourceNamespace, Name!, snapshot.Value.ScopeRef), replace: true);
                     return;
                 }
+                savedResource = snapshot.Value;
                 model = AgentEditorModel.FromResource(snapshot.Value);
                 selectedScope = snapshot.Value.ScopeRef;
                 etag = snapshot.ETag;
-                resourceId = snapshot.Value.Uid.ToString("D");
                 generation = snapshot.Value.Generation;
                 governance = snapshot.Value.Governance;
                 provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
                 await LoadAgentModelAsync(Name!);
+                if (version != loadVersion) return;
                 await LoadReadinessAsync(Name!, generation);
+                if (version != loadVersion) return;
             }
-            isDirty = false;
+            savedFingerprint = Fingerprint;
+            rawInitialized = false;
+            if (IsNew) sectionState.Select("definition/configuration");
+            invalidInput = false;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = !IsNew };
         }
         catch (AgentstrationApiException exception)
         {
-            errorMessage = exception.Message;
-            errorId = exception.ErrorId;
-            model ??= new AgentEditorModel();
+            if (version == loadVersion)
+            {
+                if (IsNew) { errorMessage = exception.Message; errorId = exception.ErrorId; model ??= new AgentEditorModel(); savedFingerprint = Fingerprint; }
+                else { ClearLoadedResource(); loadState = LoadFailure(exception, fetchingResource); }
+            }
         }
-        finally { loading = false; }
+        catch (HttpRequestException)
+        {
+            if (version == loadVersion) InitialTransportFailure();
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            if (version == loadVersion) InitialTransportFailure();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally { if (version == loadVersion) loading = false; }
+    }
+
+    private Task RetryLoadAsync()
+    {
+        if (loading || refreshing || saving) return Task.CompletedTask;
+        return savedResource is not null && !loadState.BlocksContent
+            ? RefreshAsync() : LoadInitialAsync(loadedKey!);
+    }
+
+    private void InitialTransportFailure()
+    {
+        ClearLoadedResource();
+        loadState = new(ResourceLoadStatus.Failed);
+        if (IsNew)
+        {
+            model = new AgentEditorModel { Namespace = AgentResourceNamespace.Value };
+            errorMessage = Shared["ResourceLoadFailedMessage"];
+            savedFingerprint = Fingerprint;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (IsNew || savedResource is not { ScopeRef: { } owner } current || loading || refreshing || saving) return;
+        var version = ++loadVersion;
+        refreshing = true;
+        loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var snapshot = await Client.GetAgentAsync(current.Namespace, current.Name, owner, cancellation.Token);
+            if (version != loadVersion) return;
+            if (snapshot.Value.Uid != current.Uid || snapshot.Value.ScopeRef != owner || snapshot.Value.Address != current.Address)
+            {
+                ClearLoadedResource();
+                loadState = new(ResourceLoadStatus.NotFound);
+                return;
+            }
+            if (snapshot.Value.Governance.IsManaged)
+            {
+                ClearLoadedResource();
+                loadState = new(ResourceLoadStatus.Loading);
+                Navigation.NavigateTo(ConsoleResourceUrls.Agent(current.Namespace, current.Name, owner), replace: true);
+                return;
+            }
+            if (isDirty && !string.Equals(etag, snapshot.ETag, StringComparison.Ordinal))
+            {
+                // Keep the draft's original baseline and ETag so a later save still detects concurrency.
+                newerResource = snapshot.Value;
+                newerEtag = snapshot.ETag;
+            }
+            else
+            {
+                newerResource = null; newerEtag = null;
+                if (isDirty) savedResource = snapshot.Value;
+                else ApplySnapshot(snapshot.Value, snapshot.ETag);
+            }
+            await LoadAgentModelAsync(current.Name);
+            if (version != loadVersion) return;
+            await LoadReadinessAsync(current.Name, generation);
+            if (version != loadVersion) return;
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (AgentstrationApiException exception)
+        {
+            if (version != loadVersion) return;
+            var failure = LoadFailure(exception, resourceFailure: true);
+            if (failure.Status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) ClearLoadedResource();
+            loadState = failure with { HasContent = savedResource is not null };
+        }
+        catch (HttpRequestException)
+        {
+            if (version == loadVersion) loadState = new(ResourceLoadStatus.Failed) { HasContent = savedResource is not null };
+        }
+        catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+        {
+            if (version == loadVersion) loadState = new(ResourceLoadStatus.Failed) { HasContent = savedResource is not null };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally { if (version == loadVersion) refreshing = false; }
+    }
+
+    private static ResourceLoadState LoadFailure(AgentstrationApiException exception, bool resourceFailure) =>
+        new(resourceFailure ? exception.StatusCode switch
+        {
+            System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+            System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden,
+            _ => ResourceLoadStatus.Failed
+        } : ResourceLoadStatus.Failed) { ErrorId = exception.ErrorId };
+
+    private void ApplySnapshot(AgentResource resource, string? responseEtag)
+    {
+        savedResource = resource;
+        model = AgentEditorModel.FromResource(resource);
+        selectedScope = resource.ScopeRef;
+        etag = responseEtag;
+        generation = resource.Generation;
+        governance = resource.Governance;
+        provisioningStatus = resource.Status.ProvisioningState.ToString();
+        savedFingerprint = Fingerprint;
+        rawInitialized = rawUsesSavedDefinition = invalidInput = false;
+        rawYaml = rawBaseline = rawModelFingerprint = string.Empty;
+        rawError = null;
+        if (IsSource) InitializeSource();
+    }
+
+    private void ClearLoadedResource()
+    {
+        savedResource = newerResource = null;
+        model = null; editContext = null; selectedScope = null;
+        etag = newerEtag = null;
+        readiness = null; activeRevision = null; agentModel = null;
+        generation = 0; governance = ResourceGovernance.User; provisioningStatus = "Valid";
+        rawInitialized = rawUsesSavedDefinition = invalidInput = false;
+        rawYaml = rawBaseline = rawModelFingerprint = savedFingerprint = string.Empty;
+        rawError = errorMessage = errorId = successMessage = modelResolutionWarning = null;
+        catalogTools = []; catalogProviders = []; catalogCategories = []; catalogToolSetVersions = []; runtimeProfiles = [];
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -310,33 +560,98 @@ else
 
     private Task ModelProfileChanged(string value)
     {
-        if (model is not null) { model.ModelProfileName = value; isDirty = true; }
+        if (model is not null) { model.ModelProfileName = value; FormContext.NotifyFieldChanged(new(model, nameof(AgentEditorModel.ModelProfileName))); }
         return Task.CompletedTask;
     }
 
     private Task ModelProfileSelectionChanged(ModelProfileSummaryResponse? profile)
     {
-        if (model is not null && profile is not null && model.SelectModelProfile(profile)) isDirty = true;
+        if (model is not null && profile is not null && model.SelectModelProfile(profile))
+        {
+            FormContext.NotifyFieldChanged(new(model, nameof(AgentEditorModel.ModelProfileName)));
+            FormContext.NotifyFieldChanged(new(model, nameof(AgentEditorModel.ModelProfileNamespace)));
+        }
         return Task.CompletedTask;
     }
 
-    private void MarkDirty(EventArgs _) { if (CanManage) isDirty = true; }
-    private void ShowDefinition() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, false);
-    private void ShowContracts() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, true, false);
-    private void ShowTools() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, true, false, false);
-    private void ShowAccess() => (sourceMode, toolsMode, contractsMode, accessMode) = (false, false, false, true);
-    private void ShowSource()
+    private void MarkDirty(EventArgs _) { }
+    private string CurrentSectionLabel => sectionState.CurrentPath switch { "overview" => T("Overview"), "yaml" => T("Yaml"), "definition/tools" => T("Tools"), "definition/contracts" => T("Contracts"), "access" => T("Access"), "definition/model-execution" => T("ModelAndExecution"), _ => T("Configuration") };
+    private IReadOnlyList<ResourceNavigationItem> AgentDefinitionSections =>
+    [
+        new("definition/model-execution", T("ModelAndExecution"), "server"),
+        new("definition/tools", T("Tools"), "tool"),
+        new("definition/contracts", T("Contracts"), "file-text")
+    ];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> AgentSectionPresentations(RenderFragment? yamlActions) =>
+        new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+        {
+            ["definition/identity"] = new() { HasRequiredFields = true, ReadOnly = !CanManage, Fields = [nameof(AgentEditorModel.DisplayName), nameof(AgentEditorModel.Name), nameof(AgentEditorModel.Namespace), nameof(AgentEditorModel.Description), nameof(AgentEditorModel.Tags)] },
+            ["definition/configuration"] = new() { HasRequiredFields = true, ReadOnly = !CanManage, Fields = [nameof(AgentEditorModel.Handler), nameof(AgentEditorModel.Instructions)] },
+            ["definition/model-execution"] = new() { HasRequiredFields = true, ReadOnly = !CanManage, Fields = [nameof(AgentEditorModel.ModelProfileName), nameof(AgentEditorModel.ModelProfileNamespace), nameof(AgentEditorModel.RuntimeProfileName), nameof(AgentEditorModel.RuntimeProfileNamespace)] },
+            ["definition/tools"] = new() { ReadOnly = !CanManage, Fields = [nameof(AgentEditorModel.ToolNames), nameof(AgentEditorModel.ToolSets)] },
+            ["definition/contracts"] = new() { ReadOnly = !CanManage, Fields = [nameof(AgentEditorModel.InputSchema), nameof(AgentEditorModel.InputSchemaBinding), nameof(AgentEditorModel.OutputSchema), nameof(AgentEditorModel.OutputSchemaBinding), nameof(AgentEditorModel.OutputContract)] },
+            ["yaml"] = new() { ReadOnly = !CanEditRaw, ReadOnlyMessage = invalidInput || rawUsesSavedDefinition ? T("YamlFormInvalid") : null, Actions = CanManage ? yamlActions : null, ReadOnlyActions = CanManage && (invalidInput || rawUsesSavedDefinition) ? YamlReadOnlyActions : null }
+        };
+    private RenderFragment YamlReadOnlyActions => @<button type="button" class="button-secondary" @onclick="ShowDefinition">@Shared["Edit"]</button>;
+    private void SectionSelected(string? path)
+    {
+        if (path == "yaml") InitializeSource();
+    }
+    private void ShowSection(string path)
+    {
+        if (IsNew)
+        {
+            sectionState.Select(path);
+            SectionSelected(path);
+        }
+        else if (sectionState.Is(path)) SectionSelected(path);
+        else Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
+    }
+    private void ShowDefinition() => ShowSection(InvalidDefinitionSection());
+    private void ShowContracts() => ShowSection("definition/contracts");
+    private void ShowTools() => ShowSection("definition/tools");
+    private void ShowSource() => ShowSection("yaml");
+    private async Task HandleInvalidSubmit(EditContext editContext)
+    {
+        if (IsNew && creationWizard is not null) { await creationWizard.GoToStepAsync(!CreationIdentityComplete ? "identity" : !CreationConfigurationComplete ? "configuration" : "model-execution"); return; }
+    }
+    private string InvalidDefinitionSection() => ResourceDefinitionForm.FirstInvalidSection(FormContext, AgentSectionPresentations(null))
+        ?? (IsNew ? "definition/configuration" : sectionState.DefinitionPath);
+    private AgentResourceRequest SavedRequest() => new()
+    {
+        ApiVersion = savedResource!.ApiVersion, Kind = savedResource.Kind,
+        Metadata = savedResource.Metadata, Definition = savedResource.Definition, ScopeRef = savedResource.ScopeRef
+    };
+    private void InitializeRawYaml(AgentResourceRequest request, bool savedDefinition)
+    {
+        rawYaml = ResourceManifestSerializer.ToYaml(request);
+        rawBaseline = rawYaml;
+        rawModelFingerprint = Fingerprint;
+        rawInitialized = true;
+        rawUsesSavedDefinition = savedDefinition;
+    }
+    private void InitializeSource()
     {
         if (model is null) return;
         rawError = null;
-        try { rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest()); }
-        catch (Exception exception) { rawError = exception.Message; }
-        (sourceMode, toolsMode, contractsMode, accessMode) = (true, false, false, false);
+        try
+        {
+            if (!rawInitialized || !HasRawDraft && (rawModelFingerprint != Fingerprint || rawUsesSavedDefinition != invalidInput))
+            {
+                if (invalidInput && savedResource is not null) InitializeRawYaml(SavedRequest(), true);
+                else InitializeRawYaml(Request(), false);
+            }
+        }
+        catch (ArgumentException)
+        {
+            if (savedResource is not null) InitializeRawYaml(SavedRequest(), true);
+            else rawError = T("YamlNeedsValidForm");
+        }
     }
 
     private bool ApplyRawYaml()
     {
-        if (!CanManage || model is null) return false;
+        if (!CanEditRaw || model is null || saving || refreshing) return false;
         rawError = null;
         try
         {
@@ -345,10 +660,14 @@ else
             if (!string.Equals(request.Kind, AgentResourceKinds.Agent, StringComparison.Ordinal)) throw new ArgumentException(T("KindRequired", AgentResourceKinds.Agent));
             if (request.Metadata.Namespace != AgentResourceNamespace) throw new ArgumentException(T("AgentNamespaceImmutable"));
             if (!IsNew && !string.Equals(request.Metadata.Name, Name, StringComparison.Ordinal)) throw new ArgumentException(T("AgentNameImmutable"));
-            model = AgentEditorModel.FromRequest(request);
-            _ = model.ToRequest();
-            rawYaml = ResourceManifestSerializer.ToYaml(model.ToRequest());
-            isDirty = true;
+            if (!IsNew && request.ScopeRef != selectedScope) throw new ArgumentException(T("ScopeImmutable"));
+            var parsedModel = AgentEditorModel.FromRequest(request);
+            _ = parsedModel.ToRequest();
+            model = parsedModel;
+            if (IsNew && request.ScopeRef is not null) selectedScope = request.ScopeRef;
+            rawYaml = ResourceManifestSerializer.ToYaml(Request());
+            rawBaseline = rawYaml;
+            rawModelFingerprint = Fingerprint;
             successMessage = T("YamlApplied");
             return true;
         }
@@ -421,7 +740,7 @@ else
         if (model is not null)
         {
             model.ToolNames = string.Join(Environment.NewLine, values);
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -430,7 +749,7 @@ else
         if (model is not null)
         {
             model.ToolSets = values;
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -440,7 +759,7 @@ else
         {
             model.InputSchemaBinding = value.Binding;
             model.InputSchema = value.EffectiveContent?.Clone();
-            isDirty = true;
+
         }
         return Task.CompletedTask;
     }
@@ -463,7 +782,6 @@ else
             model.OutputSchemaBinding = value.Binding;
             model.OutputSchema = value.EffectiveContent?.Clone();
             if (model.OutputSchema is not null) model.OutputContract = null;
-            isDirty = true;
         }
         return Task.CompletedTask;
     }
@@ -474,63 +792,76 @@ else
         await Task.WhenAll(tasks);
         return tasks.SelectMany(task => task.Result).ToArray();
     }
-    private Task DiscardAsync() => OnParametersSetAsync();
+    private void DiscardAsync()
+    {
+        if (saving || refreshing || savedResource is null) return;
+        if (newerResource is not null) { ApplySnapshot(newerResource, newerEtag); newerResource = null; newerEtag = null; }
+        model = AgentEditorModel.FromResource(savedResource);
+        selectedScope = savedResource.ScopeRef;
+        rawInitialized = rawUsesSavedDefinition = false; rawYaml = string.Empty; rawError = errorMessage = errorId = successMessage = null;
+        invalidInput = false; savedFingerprint = Fingerprint;
+        if (IsSource) InitializeSource();
+    }
+    private void DiscardRawDraft() { rawInitialized = false; ShowSource(); }
 
     private static string ResourceName(string name) => name;
-    private static string ProfileUrl(AgentModelResponse value)
-    {
-        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId), value.Declared.ModelProfile.ScopeRef);
-    }
-
     private void RuntimeProfileChanged(ChangeEventArgs args)
     {
         if (!CanManage || model is null) return;
+        if (string.IsNullOrEmpty(args.Value?.ToString())) { model.RuntimeProfileName = string.Empty; model.RuntimeProfileScopeRef = null; return; }
         var parts = args.Value?.ToString()?.Split('|', 3);
         if (parts is not { Length: 3 }) return;
         model.RuntimeProfileScopeRef = string.IsNullOrWhiteSpace(parts[0]) ? null : ResourceScopeRef.Parse(parts[0]);
         model.RuntimeProfileNamespace = parts[1];
         model.RuntimeProfileName = parts[2];
-        isDirty = true;
+
     }
 
     private static string RuntimeProfileValueFor(RuntimeProfileSummaryResponse profile) =>
         $"{profile.ScopeRef?.Value ?? string.Empty}|{profile.Namespace}|{profile.Name}";
-    private static string ProviderUrl(AgentModelResponse value)
-    {
-        var provider = value.Resolved.Provider!;
-        return $"/modelproviders/{Uri.EscapeDataString(provider.ResourceId)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
-    }
-
     private async Task LoadAgentModelAsync(string name)
     {
+        var version = loadVersion;
         agentModel = null;
         modelResolutionWarning = null;
-        try { agentModel = await AgentsModelClient.GetAgentModelResolutionAsync(AgentResourceNamespace, name, cancellation.Token); }
-        catch (AgentstrationApiException exception) { modelResolutionWarning = exception.Message; }
+        try
+        {
+            var result = await AgentsModelClient.GetAgentModelResolutionAsync(AgentResourceNamespace, name, cancellation.Token);
+            if (version == loadVersion) agentModel = result;
+        }
+        catch (AgentstrationApiException exception) { if (version == loadVersion) modelResolutionWarning = exception.Message; }
     }
 
     private async Task LoadReadinessAsync(string name, long desiredGeneration)
     {
+        var version = loadVersion;
         readiness = null;
         activeRevision = null;
         try
         {
-            readiness = selectedScope is { } scopeRef
+            var result = selectedScope is { } scopeRef
                 ? await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, scopeRef, desiredGeneration, cancellation.Token)
                 : await RuntimeClient.GetAgentReadinessAsync(AgentResourceNamespace, name, desiredGeneration, cancellation.Token);
+            if (version != loadVersion) return;
+            readiness = result;
             if (readiness.Ready && !string.IsNullOrWhiteSpace(readiness.RevisionId))
-                activeRevision = (await Client.GetAgentRevisionAsync(
+            {
+                var revision = (await Client.GetAgentRevisionAsync(
                     AgentResourceNamespace,
                     name,
                     readiness.RevisionId,
                     cancellation.Token)).Value;
+                if (version == loadVersion) activeRevision = revision;
+            }
         }
         catch (AgentstrationApiException) { }
     }
 
     private async Task SaveAsync(bool applyRuntime)
     {
-        if (!CanManage || model is null) return;
+        if (!CanManage || model is null || saving || refreshing) return;
+        if (HasRawDraft) { ShowSource(); return; }
+        if (IsNew && selectedScope is null) { errorMessage = T("CreationScopeRequired"); return; }
         saving = true;
         errorMessage = null;
         errorId = null;
@@ -541,12 +872,16 @@ else
             var request = Request();
             var snapshot = await Client.PutAgentAsync(request, etag, wasNew, cancellation.Token);
             etag = snapshot.ETag;
-            resourceId = snapshot.Value.Uid.ToString("D");
             generation = snapshot.Value.Generation;
             governance = snapshot.Value.Governance;
             provisioningStatus = snapshot.Value.Status.ProvisioningState.ToString();
+            selectedScope = snapshot.Value.ScopeRef;
+            successMessage = T("GenerationSavedWithoutDeployment", generation);
+            savedResource = snapshot.Value;
+            newerResource = null; newerEtag = null;
             model = AgentEditorModel.FromResource(snapshot.Value);
-            isDirty = false;
+            savedFingerprint = Fingerprint;
+            rawInitialized = false;
             if (applyRuntime)
             {
                 var activation = snapshot.Value.ScopeRef is { } scopeRef
@@ -585,7 +920,7 @@ else
 
     private async Task ReconcileAsync()
     {
-        if (!CanManage || model is null || IsNew || isDirty) return;
+        if (!CanManage || model is null || IsNew || saving || refreshing || isDirty) return;
         saving = true;
         errorMessage = null;
         try

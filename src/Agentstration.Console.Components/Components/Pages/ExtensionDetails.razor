@@ -7,69 +7,90 @@
 @inject IServiceProvider Services
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLocalizer
 
-<PageTitle>@(item?.DisplayName ?? T("Extension")) · Agentstration</PageTitle>
-<PageHeader Title="@(item?.DisplayName ?? T("Extension"))" Description="@(item?.Extension?.Extension?.Description ?? T("ExtensionDetails.Description"))">
-    <Actions><a class="button-secondary" href="/extensions">@T("BackToExtensions")</a></Actions>
-</PageHeader>
-
-<div data-testid="distribution-extension-details">
-@if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
+<PageTitle>@SavedDisplayName · Agentstration</PageTitle>
+@{
+    var presentations = SectionPresentations;
+    RenderFragment feedback = @<div>
+        @if (commandError is not null) { <div class="form-alert form-alert-danger" role="alert">@commandError</div> }
+        @if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+    </div>;
+    RenderFragment? actions = !CanDeleteRegistration ? null : @<button type="button" class="button-danger" @onclick="() => confirmDelete = true" disabled="@Busy">@T("Delete")</button>;
+    RenderFragment metrics = @<text><MetricCard Label="@T("Availability")" Value="@(item is null ? "—" : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))" />
+        @if (item?.Extension is { } extension) { <MetricCard Label="@T("Contributions")" Value="@extension.Contributions.Count.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("BundleInstallations")" Value="@((extension.BundleInstallations?.Count ?? 0).ToString(System.Globalization.CultureInfo.CurrentCulture))" /> }</text>;
 }
-else if (loading)
+@if (SavedResource is not null || loadState.BlocksContent)
 {
-    <LoadingState Message="@T("LoadingExtension")" />
-}
-else if (item is null)
-{
-    <EmptyState Title="@T("ExtensionNotFound")" Message="@T("ExtensionNotFound.Description")" />
+    <ConsoleResourceDetailsTemplate Resource="SavedResource" Name="@SavedDisplayName" ResourceType="@(RegistrationName is null ? T("Enrollment") : T("Extension"))" Domain="extension" IconName="puzzle" Version="@item?.Version" VersionDescription="@T("ObservedVersion")"
+        CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")"
+        Description="@item?.Extension?.Extension?.Description" StatusText="@(item is null ? null : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))"
+        ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" AdditionalContent="FamilySection"
+        NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" SectionTestIdPrefix="extension" TestId="distribution-extension-details"
+        HasDraft="HasDefinitionDraft" HasAdditionalDraft="@(migrationPreview is not null)" Busy="Busy" Feedback="feedback" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" ShowRefreshAction="true"
+        DefinitionReadOnlyReason="@(CanEditRegistration ? null : RegistrationName is null ? ResourceReadOnlyReason.Unspecified : registration?.Value.Definition.Source is ExtensionRegistrationSource.Configuration or ExtensionRegistrationSource.Aspire ? ResourceReadOnlyReason.Managed : ResourceReadOnlyReason.InsufficientPermissions)" AllowAccess="@(RegistrationName is not null && registration is not null)"
+        Enabled="@(RegistrationName is null ? null : registration?.Value.Definition.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanEditRegistration || Busy)" EnabledTestId="extension-enabled"
+        Yaml="@SavedYaml" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("YamlReadOnlyProjection")" YamlReadOnly="true" MoreActions="actions">
+        <OverviewMetrics>@metrics</OverviewMetrics>
+        <OverviewSummary Context="identity"><ExtensionResourceSummary Resource="SavedResource" Item="item" Identity="identity"><OperationalContent>@FamilySection("connections")</OperationalContent></ExtensionResourceSummary></OverviewSummary>
+        <IdentityDetails>@if (item is not null) { <dt>@T("ExtensionId")</dt><dd><CopyableValue Value="@item.ExtensionId" PlainText /></dd> }</IdentityDetails>
+        <DefinitionContent Context="path">
+            <ResourceDefinitionForm @key="form" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="extension-registration-form" FormName="extension-registration"
+                Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
+                OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="Busy" ReadOnly="@(!CanEditRegistration)" data-testid="extension-registration-form" />
+        </DefinitionContent>
+        <DraftActions><button class="text-button" type="button" @onclick="Discard" disabled="@Busy">@Shared["Discard"]</button><button type="submit" form="extension-registration-form" class="button-primary" disabled="@Busy">@T("SaveChanges")</button></DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
 else
 {
-    <ResourceTabs Label="@T("ExtensionDetailsTabs")">
-        @foreach (var tab in Enum.GetValues<DetailTab>())
+    <UnsavedNavigationGuard IsDirty="@(migrationPreview is not null)" />
+    <ResourceDetailsTemplate Name="@(item?.DisplayName ?? T("Extension"))" ResourceType="@T("Extension")" IconName="puzzle" CollectionHref="@BackUrl" CollectionLabel="@T("BackToExtensions")" Description="@item?.Extension?.Extension?.Description"
+        ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" Sections="OperationalSections" SelectionChanged="OperationalSectionSelected" DefaultSection="overview"
+        NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" TestId="distribution-extension-details" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" Feedback="feedback" MoreActions="actions">
+        <Content>@if (item is not null)
         {
-            <button type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" class="@(activeTab == tab ? "active" : null)" @onclick="() => activeTab = tab">@T($"DetailTab.{tab}")</button>
-        }
-    </ResourceTabs>
+            <div class="resource-editor-view" hidden="@(!sectionState.Is("overview"))">
+                <div class="resource-overview-metrics">@metrics</div>
+                <ExtensionResourceSummary Resource="SavedResource" Item="item" />
+            </div>
+            @foreach (var section in AdditionalSections.Where(value => sectionState.HasVisited(value.Path))) { <div hidden="@(!sectionState.Is(section.Path))">@FamilySection(section.Path)</div> }
+        }</Content>
+    </ResourceDetailsTemplate>
+}
+<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteExtensionRegistration")" Message="@T("DeleteRegistrationMessage", registration?.Value.Namespace.Value ?? string.Empty, registration?.Value.Name ?? string.Empty)" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
+<ConfirmationDialog IsOpen="@confirmUnenroll" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="() => confirmUnenroll = false" />
 
-    @if (activeTab == DetailTab.Summary)
+@code {
+    private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@(SavedResource?.Kind ?? ExtensionKinds.ExtensionRegistration)"
+        DisplayName="@form.DisplayName" DisplayNameChanged="value => form.DisplayName = value" DisplayNameExpression="@(() => form.DisplayName)"
+        TechnicalName="@form.Name" TechnicalNameExpression="@(() => form.Name)" Namespace="@form.Namespace" NamespaceExpression="@(() => form.Namespace)"
+        ScopeRef="SavedResource?.ScopeRef" Description="@form.Description" DescriptionExpression="@(() => form.Description)" DescriptionReadOnly="true"
+        Labels="@form.Tags" LabelsExpression="@(() => form.Tags)" LabelsReadOnly="true" ReadOnly="@(!CanEditRegistration)" TestId="extension-identity" DisplayNameTestId="extension-display-name" />;
+    private RenderFragment ConfigurationFields => @<FormSection Title="@Shared["Configuration"]"><ChildContent>@if (RegistrationName is null)
     {
-        <section class="panel resource-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("AepExtension")</p><h2>@item.DisplayName</h2><p>@(item.Extension?.Details ?? item.Extension?.Extension?.Description ?? T("ExtensionIdentityUnavailable"))</p></div><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></div>
-            <dl class="resource-details">
-                <dt>@T("ExtensionId")</dt><dd><code>@item.ExtensionId</code></dd>
-                <dt>@T("ObservedVersion")</dt><dd>@(item.Version ?? "—")</dd>
-                <dt>@T("Enrollment")</dt><dd>@if (item.EnrollmentStatus is { } state) { <StatusBadge Text="@EnrollmentStatusLabel(state)" Status="@EnrollmentStatus(state)" /> } else { <span>—</span> }</dd>
-                <dt>@T("Availability")</dt><dd><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></dd>
-                <dt>@T("Connection")</dt><dd><code>@item.Endpoint</code></dd>
-                <dt>@T("Origin")</dt><dd>@SourceLabel(item.RegistrationSource)</dd>
-                <dt>@T("Contributions")</dt><dd>@(item.Extension?.Contributions.Count > 0 ? string.Join(", ", item.Extension.Contributions.Select(value => $"{value.Kind}:{value.Id}")) : "—")</dd>
-            </dl>
-        </section>
+        <CollectionView TItem="ConfigurationEntry" Items="EnrollmentConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
+            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity>
+            <Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+        </CollectionView>
     }
-
-    @if (activeTab == DetailTab.Connection)
+    else
+    {
+    <FormGrid>
+        <FormField Label="@T("AepEndpoint")" Required><ChildContent><ClearableText @bind-Value="form.Endpoint" data-testid="extension-endpoint" /></ChildContent><Validation><ValidationMessage For="() => form.Endpoint" /></Validation></FormField>
+        <FormField Label="@T("ExpectedExtensionId")"><ChildContent><ClearableText @bind-Value="form.ExpectedExtensionId" data-testid="extension-expected-id" /></ChildContent><Validation><ValidationMessage For="() => form.ExpectedExtensionId" /></Validation></FormField>
+        <FormField Label="@T("AuthenticationMode")"><span>@(registration is null ? "—" : T($"Authentication.{registration.Value.Definition.AuthenticationMode}"))</span></FormField>
+        <FormField Label="@T("Origin")"><span>@(registration is null ? "—" : SourceLabel(registration.Value.Definition.Source.ToString()))</span></FormField>
+    </FormGrid>
+    }</ChildContent></FormSection>;
+    private RenderFragment DefinitionSection(string path) => path == "definition/identity" ? IdentityFields : ConfigurationFields;
+    private RenderFragment FamilySection(string path) => @<div class="resource-editor-view">@if (item is not null)
+    {
+    @if (path == "connections")
     {
         <section class="panel resource-section">
             <div class="panel-header"><div><p class="eyebrow">@T("Connection")</p><h2>@T("ConnectionDetails")</h2><p>@T("ConnectionDetails.Description")</p></div></div>
-            @if (editing && registration is not null)
-            {
-                <EditForm Model="form" OnValidSubmit="SaveAsync">
-                    <DataAnnotationsValidator /><ValidationSummary />
-                    <div class="form-grid">
-                        <ResourceIdentityFields @bind-DisplayName="form.DisplayName" TechnicalName="@registration.Value.Name" IsNew="false" />
-                        <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" /></label>
-                        <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /></label>
-                        <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-                    </div>
-                    <div class="panel-actions"><button class="button-primary" type="submit" disabled="@saving">@T("SaveChanges")</button><button class="button-secondary" type="button" @onclick="() => editing = false" disabled="@saving">@T("Cancel")</button></div>
-                </EditForm>
-            }
-            else
-            {
                 <dl class="resource-details">
                     <dt>@T("AepEndpoint")</dt><dd><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a></dd>
                     <dt>@T("Registration")</dt><dd>@(item.RegistrationName is null ? "—" : $"{item.RegistrationNamespace}/{item.RegistrationName}")</dd>
@@ -82,26 +103,23 @@ else
                 @if (item.Connections.Count > 0)
                 {
                     <div class="panel-header"><div><h3>@T("Connections")</h3><p>@T("Connections.Description")</p></div><span>@T("ConnectionCount", item.Connections.Count)</span></div>
-                    <DataGrid TItem="ExtensionInventoryConnectionResponse" Items="item.Connections">
-                        <Header><tr><th>@T("Registration")</th><th>@T("Endpoint")</th><th>@T("Origin")</th><th>@T("Availability")</th></tr></Header>
-                        <Row Context="connection"><tr><td><strong>@connection.DisplayName</strong><br /><code>@connection.RegistrationNamespace/@connection.RegistrationName</code></td><td><a href="@connection.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@connection.Endpoint</a></td><td>@SourceLabel(connection.Source)</td><td><StatusBadge Text="@StatusLabel(connection.AvailabilityStatus)" Status="@ModelManagementUi.Status(connection.AvailabilityStatus)" /></td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="ExtensionInventoryConnectionResponse" Items="item.Connections" InformationLabels="@(new string[] { T("Endpoint"), T("Origin") })" IdentityLabel="@T("Registration")" StateLabel="@T("Availability")">
+        <Identity Context="connection">
+<strong>@connection.DisplayName</strong><br /><code>@connection.RegistrationNamespace/@connection.RegistrationName</code></Identity>
+        <State Context="connection">
+<StatusBadge Text="@StatusLabel(connection.AvailabilityStatus)" Status="@ModelManagementUi.Status(connection.AvailabilityStatus)" /></State>
+        <Information Context="connection">
+            <CollectionValue Label="@T("Endpoint")"><a href="@connection.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@connection.Endpoint</a></CollectionValue>
+            <CollectionValue Label="@T("Origin")">@SourceLabel(connection.Source)</CollectionValue>
+        </Information>
+    </CollectionView>
                 }
-                <div class="panel-actions">
-                    @if (CanEditRegistration)
-                    {
-                        <button class="button-secondary" @onclick="StartEdit">@T("Edit")</button>
-                        <button class="button-secondary" @onclick="ToggleAsync">@(registration!.Value.Definition.Enabled ? T("Disable") : T("Enable"))</button>
-                        <button class="button-danger" @onclick="() => confirmDelete = true">@T("Delete")</button>
-                    }
-                    else if (registration is not null) { <span>@T("ManagedBy", registration.Value.Definition.Source)</span> }
-                    @if (item.EnrollmentInstanceId.HasValue && CanAdminister) { <a class="button-primary" href="/extensions?tab=enrollments">@T("ManageEnrollment")</a> }
-                </div>
-            }
+                @if (item.EnrollmentInstanceId.HasValue && CanAdminister) { <FormActions><a class="button-primary" href="@EnrollmentManagementUrl">@T("ManageEnrollment")</a></FormActions> }
+
         </section>
     }
 
-    @if (activeTab == DetailTab.Enrollment)
+    @if (path == "enrollment")
     {
         <section class="panel resource-section">
             <div class="panel-header">
@@ -111,7 +129,11 @@ else
                     <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" />
                 }
             </div>
-            @if (enrollment is not null)
+            @if (enrollmentLoadState is { } enrollmentFailure)
+            {
+                <ResourceLoadFeedback State="enrollmentFailure" OnRetry="RefreshAsync" RetryTestId="extension-enrollment-retry" />
+            }
+            else if (enrollment is not null)
             {
                 <dl class="resource-details">
                     <dt>@T("EnrollmentInstance")</dt><dd><code>@enrollment.Definition.InstanceId</code></dd>
@@ -126,7 +148,7 @@ else
                     <dt>@T("Outcome")</dt><dd>@(enrollment.Definition.Outcome ?? "—")</dd>
                 </dl>
                 <div class="panel-actions">
-                    <a class="button-primary" href="/extensions?tab=enrollments">@T("ManageEnrollment")</a>
+                    <a class="button-primary" href="@EnrollmentManagementUrl">@T("ManageEnrollment")</a>
                     @if (CanAdminister && CanUnenroll(enrollment.Definition.State))
                     {
                         <button class="button-danger" @onclick="() => confirmUnenroll = true">@T("UnenrollExtension")</button>
@@ -148,10 +170,10 @@ else
         </section>
     }
 
-    @if (activeTab == DetailTab.Contributions)
+    @if (path == "contributions")
     {
         <section class="panel resource-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Contributions")</p><h2>@T("Contributions")</h2><p>@T("Contributions.Description")</p></div><span>@T("ContributionCount", item.Extension?.Contributions.Count ?? 0)</span></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("Contributions")</p><h2>@T("Contributions")</h2><p>@T("Contributions.Description")</p></div><span>@(item.Extension is { } discovered ? T("ContributionCount", discovered.Contributions.Count) : "—")</span></div>
             @if (item.Extension?.Contributions.Count > 0)
             {
                 <div class="extension-contribution-list" data-testid="extension-contribution-list">
@@ -183,11 +205,17 @@ else
                                     <ul class="resource-links">
                                         @foreach (var tool in tools)
                                         {
-                                            <li>@if (toolState != "Conflict") { <a href="@ToolUrl(tool)"><span><strong>@tool.Definition.DisplayName</strong><code>@tool.Definition.ExternalId</code></span><span class="extension-resource-meta"><span>@T("ContributionKind.tool")</span><ResourceScopeBadge ScopeRef="tool.ScopeRef" Compact /></span></a> } else { <code>@tool.Namespace/@tool.Name</code> }</li>
+                                            <li><CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(toolState != "Conflict" ? ToolUrl(tool) : null)" IconName="wrench">
+                                                <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
+                                                <Badges><small>@T("ContributionKind.tool") · @tool.Definition.ExternalId</small></Badges>
+                                            </CollectionIdentity></li>
                                         }
                                         @foreach (var resource in resources)
                                         {
-                                            <li>@if (ManagedResourceUrl(resource) is { } url) { <a href="@url"><span><strong>@resource.Name</strong><code>@resource.Namespace/@resource.Name</code></span><span class="extension-resource-meta"><span>@ManagedResourceKindLabel(resource.Kind)</span><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></span></a> }</li>
+                                            <li><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@ManagedResourceUrl(resource)" IconName="layers">
+                                                <IconBadges><ResourceScopeBadge ScopeRef="resource.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IconOnly /></IconBadges>
+                                                <Badges><small>@ManagedResourceKindLabel(resource.Kind)</small></Badges>
+                                            </CollectionIdentity></li>
                                         }
                                     </ul>
                                 </div>
@@ -200,10 +228,10 @@ else
         </section>
     }
 
-    @if (activeTab == DetailTab.Resources)
+    @if (path == "resources")
     {
         <section class="panel resource-section extension-managed-resources" data-testid="extension-governed-inventory">
-            <div class="panel-header"><div><p class="eyebrow">@T("ManagedResources")</p><h2>@T("ManagedResources")</h2><p>@T("ManagedResources.Description")</p></div><span>@T("InstallationCount", item.Extension?.BundleInstallations?.Count ?? 0)</span></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("ManagedResources")</p><h2>@T("ManagedResources")</h2><p>@T("ManagedResources.Description")</p></div><span>@(item.Extension?.BundleInstallations is { } installations ? T("InstallationCount", installations.Count) : "—")</span></div>
             @if (item.Extension?.BundleInstallations?.Count > 0)
             {
                 @foreach (var installation in item.Extension.BundleInstallations)
@@ -212,10 +240,12 @@ else
                     var publications = installation.ManagedResources.Where(resource => resource.Published).ToArray();
                     <article class="resource-section extension-bundle-card" data-testid="extension-bundle-installation" data-bundle-id="@installation.BundleId">
                         <div class="extension-bundle-heading">
-                            <div class="extension-bundle-title"><span class="extension-bundle-icon" aria-hidden="true"><UiIcon Name="layers" /></span><div><p class="eyebrow">@T("Bundle")</p><h3>@installation.BundleId</h3></div></div>
-                            <StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" />
+                            <CollectionIdentity DisplayName="@installation.BundleId" Name="@installation.BundleId" IconName="layers" HeadingLevel="3">
+                                <IconBadges><ResourceScopeBadge ScopeRef="installation.ScopeRef" IconOnly /><StatusBadge Text="@T($"InstallationState.{installation.State}")" Status="@InstallationStatus(installation.State)" IconOnly /></IconBadges>
+                                <Badges><small>@T("Bundle")</small></Badges>
+                            </CollectionIdentity>
                         </div>
-                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><ResourceScopeBadge ScopeRef="installation.ScopeRef" /><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
+                        <div class="extension-bundle-meta"><span>@T("BundleVersion") <strong>@installation.BundleVersion</strong></span><span>@T("ExtensionVersion") <strong>@installation.ExtensionVersion</strong></span></div>
                         @if (installation.ToolBindings.Count > 0)
                         {
                             <div class="extension-bundle-bindings"><p class="field-label">@T("ToolBindings")</p><div class="extension-bundle-binding-list">@foreach (var binding in installation.ToolBindings) { <a href="@ToolReferenceUrl(installation.ScopeRef, binding.Value)" title="@binding.Value.Name">@binding.Key</a> }</div></div>
@@ -223,16 +253,12 @@ else
                         @if (!string.IsNullOrWhiteSpace(installation.Diagnostic)) { <div class="extension-bundle-diagnostic"><strong>@T("Diagnostics")</strong><p>@installation.Diagnostic</p></div> }
                         @if (resources.Length > 0)
                         {
-                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><DataGrid TItem="ExtensionManagedResourceResponse" Items="resources">
-                                <Header><tr><th>@T("Type")</th><th>@T("Identity")</th><th>@T("Scope")</th><th>@T("Version")</th><th>@T("State")</th></tr></Header>
-                                <Row Context="resource"><tr>
-                                    <td data-label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></td>
-                                    <td data-label="@T("Identity")">@if (installation.State != ExtensionBundleInstallationState.Degraded && ManagedResourceUrl(resource) is { } url) { <a class="text-button" href="@url">@resource.Namespace/@resource.Name</a> } else { <code>@resource.Namespace/@resource.Name</code> }</td>
-                                    <td data-label="@T("Scope")"><ResourceScopeBadge ScopeRef="resource.ScopeRef" Compact /></td>
-                                    <td data-label="@T("Version")"><code>@(resource.Version ?? "—")</code></td>
-                                    <td data-label="@T("State")"><StatusBadge Text="@T("ManagedReadOnly")" Status="UiStatus.Neutral" /></td>
-                                </tr></Row>
-                            </DataGrid></div>
+                            <div class="extension-bundle-grid" data-testid="extension-managed-resources"><CollectionView TItem="ExtensionManagedResourceResponse" Items="resources" InformationLabels="@(new string[] { T("Type") })" IdentityLabel="@T("Identity")" ScopeLabel="@T("Scope")" StateLabel="@T("State")">
+        <Identity Context="resource"><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace" Name="@resource.Name" Href="@(installation.State != ExtensionBundleInstallationState.Degraded ? ManagedResourceUrl(resource) : null)" IconName="layers"><Versions><CollectionVersion Label="@T("Version")" Value="@(resource.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="resource.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="true" IsReadOnly="@(!ResourceOwnershipContext.CanManage(resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+        <Information Context="resource">
+            <CollectionValue Label="@T("Type")"><span class="extension-bundle-kind">@ManagedResourceKindLabel(resource.Kind)</span></CollectionValue>
+        </Information>
+    </CollectionView></div>
                         }
                         else { <p>@T("NoManagedResources")</p> }
                         <details class="extension-bundle-evidence" data-testid="extension-technical-details"><summary>@T("TechnicalDetails")</summary><dl class="resource-details"><dt>@T("Identity")</dt><dd><code>@installation.Name</code></dd><dt>@T("ManagingExtension")</dt><dd><code>@installation.ExtensionId</code></dd><dt>@T("BundleDigest")</dt><dd><code>@installation.BundleDigest</code></dd><dt>@T("ToolBindings")</dt><dd>@foreach (var binding in installation.ToolBindings) { <div><code>@binding.Key</code><br /><code>@binding.Value.Name</code></div> }</dd></dl>
@@ -242,7 +268,10 @@ else
                                 <ul class="extension-bundle-publications" data-testid="extension-published-versions">
                                     @foreach (var publication in publications)
                                     {
-                                        <li><div><strong>@ManagedResourceKindLabel(publication.Kind)</strong><code>@publication.Namespace/@publication.Name</code></div><div><ResourceScopeBadge ScopeRef="publication.ScopeRef" Compact /><span>@T("Version") <code>@(publication.Version ?? "—")</code></span></div></li>
+                                        <li><CollectionIdentity DisplayName="@ManagedResourceKindLabel(publication.Kind)" Namespace="@publication.Namespace" Name="@publication.Name" IconName="layers">
+                                            <Versions><CollectionVersion Label="@T("Version")" Value="@publication.Version" /></Versions>
+                                            <IconBadges><ResourceScopeBadge ScopeRef="publication.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IconOnly /></IconBadges>
+                                        </CollectionIdentity></li>
                                     }
                                 </ul>
                             }
@@ -254,31 +283,42 @@ else
         </section>
     }
 
-    @if (activeTab == DetailTab.Options)
+    @if (path == "options")
     {
         <section class="panel resource-section">
             <div class="panel-header"><div><p class="eyebrow">@T("OptionContracts")</p><h2>@T("OptionContracts")</h2><p>@T("OptionContracts.Description")</p></div><span>@T("SetCount", item.Extension?.OptionSets.Count ?? 0)</span></div>
             @if (item.Extension?.OptionSets.Count > 0)
             {
-                <DataGrid TItem="ExtensionOptionSetResponse" Items="item.Extension.OptionSets">
-                    <Header><tr><th>@T("OptionSet")</th><th>@T("Target")</th><th>@T("Preferred")</th><th>@T("SupportedVersions")</th></tr></Header>
-                    <Row Context="optionSet"><tr><td><code>@optionSet.Id</code></td><td>@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</td><td>@optionSet.PreferredVersion</td><td>@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@JsonSerializer.Serialize(version.Schema, IndentedJsonOptions)</pre></details></div> }</td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="ExtensionOptionSetResponse" Items="item.Extension.OptionSets" InformationLabels="@(new string[] { T("Target"), T("Preferred"), T("SupportedVersions") })" IdentityLabel="@T("OptionSet")">
+        <Identity Context="optionSet">
+<code>@optionSet.Id</code></Identity>
+        <Information Context="optionSet">
+            <CollectionValue Label="@T("Target")">@optionSet.ContributionKind · <code>@optionSet.ContributionId</code> · @optionSet.Scope</CollectionValue>
+            <CollectionValue Label="@T("Preferred")">@optionSet.PreferredVersion</CollectionValue>
+            <CollectionValue Label="@T("SupportedVersions")">@foreach (var version in optionSet.Versions) { <div><strong>@version.Version</strong>@(version.Deprecated ? T("DeprecatedSuffix") : null)<br /><code>@version.SchemaDigest</code><details><summary>@T("JsonSchema")</summary><pre class="runner-json">@JsonSerializer.Serialize(version.Schema, IndentedJsonOptions)</pre></details></div> }</CollectionValue>
+        </Information>
+    </CollectionView>
             }
             else { <p class="inline-warning">@(item.AvailabilityStatus == "available" ? T("NoVersionedOptionContract") : T("ContractsUnavailable"))</p> }
         </section>
     }
 
-    @if (activeTab == DetailTab.Usages)
+    @if (path == "usages")
     {
         <section class="panel resource-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("PersistedUsage")</p><h2>@T("PersistedUsage")</h2><p>@T("PersistedUsage.Description")</p></div><span>@T("ProfileCount", item.Extension?.Usages.Count ?? 0)</span></div>
+            <div class="panel-header"><div><p class="eyebrow">@T("PersistedUsage")</p><h2>@T("PersistedUsage")</h2><p>@T("PersistedUsage.Description")</p></div><span>@(item.Extension is { } discovered ? T("ProfileCount", discovered.Usages.Count) : "—")</span></div>
             @if (item.Extension?.Usages.Count > 0)
             {
-                <DataGrid TItem="ExtensionOptionUsageResponse" Items="item.Extension.Usages">
-                    <Header><tr><th>@T("ModelProfile")</th><th>@T("Contract")</th><th>@T("Status")</th><th>@T("Diagnostics")</th></tr></Header>
-                    <Row Context="usage"><tr><td><a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></td><td>@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code> }</td><td><StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />@if (MigrationTarget(item.Extension, usage) is { } targetVersion) { <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@migrating">@T("MigrateTo", targetVersion)</button> }</td><td>@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</td></tr></Row>
-                </DataGrid>
+                <CollectionView TItem="ExtensionOptionUsageResponse" Items="item.Extension.Usages" InformationLabels="@(new string[] { T("Contract"), T("Diagnostics") })" IdentityLabel="@T("ModelProfile")" StateLabel="@T("Status")">
+        <Identity Context="usage">
+<a href="@ProfileUrl(usage)">@usage.ProfileName</a><br /><small>@usage.ProfileNamespace</small></Identity>
+        <State Context="usage">
+<StatusBadge Text="@StatusLabel(usage.Status)" Status="@ModelManagementUi.Status(usage.Status)" />@if (CanAdminister && MigrationTarget(item.Extension, usage) is { } targetVersion) { <br /><button class="button-secondary" @onclick="() => PreviewMigrationAsync(usage, targetVersion)" disabled="@Busy">@T("MigrateTo", targetVersion)</button> }</State>
+        <Information Context="usage">
+            <CollectionValue Label="@T("Contract")">@if (string.IsNullOrWhiteSpace(usage.OptionSet)) { <span>@T("LegacyUnversionedOptions")</span> } else { <code>@usage.OptionSet@@@usage.Version</code> }</CollectionValue>
+            <CollectionValue Label="@T("Diagnostics")">@(usage.Issues.Count == 0 ? T("Compatible") : string.Join(" ", usage.Issues))</CollectionValue>
+        </Information>
+    </CollectionView>
             }
             else { <p>@T("NoPersistedUsage")</p> }
         </section>
@@ -287,263 +327,9 @@ else
             <section class="panel resource-section">
                 <div class="panel-header"><div><p class="eyebrow">@T("ExplicitMigrationPreview")</p><h2>@migrationPreview.Value.ProfileNamespace/@migrationPreview.Value.ProfileName</h2><p>@T("NoProfileChanged")</p></div><span>@migrationPreview.Value.Source.Version → @migrationPreview.Value.Target.Version</span></div>
                 <div class="details-grid"><article><h3>@T("CurrentOptions")</h3><pre class="runner-json">@JsonSerializer.Serialize(migrationPreview.Value.Source, IndentedJsonOptions)</pre></article><article><h3>@T("ProposedOptions")</h3><pre class="runner-json">@JsonSerializer.Serialize(migrationPreview.Value.Target, IndentedJsonOptions)</pre></article></div>
-                <div class="panel-actions"><button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@migrating">@(migrating ? T("Applying") : T("ApplyMigration"))</button><button class="button-secondary" @onclick="() => migrationPreview = null" disabled="@migrating">@T("Cancel")</button></div>
+                <div class="panel-actions"><button class="button-primary" @onclick="ApplyMigrationAsync" disabled="@Busy">@(migrating ? T("Applying") : T("ApplyMigration"))</button><button class="button-secondary" @onclick="CancelMigration" disabled="@Busy">@T("Cancel")</button></div>
             </section>
         }
     }
-}
-
-<ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteExtensionRegistration")" Message="@T("DeleteRegistrationMessage", item?.RegistrationNamespace ?? string.Empty, item?.RegistrationName ?? string.Empty)" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
-<ConfirmationDialog IsOpen="@confirmUnenroll" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="() => confirmUnenroll = false" />
-
-</div>
-
-@code {
-    private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
-    [Parameter] public string? RegistrationName { get; set; }
-    [Parameter] public Guid? EnrollmentInstanceId { get; set; }
-    [SupplyParameterFromQuery(Name = "namespace")] public string? ResourceNamespaceValue { get; set; }
-    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
-    private readonly CancellationTokenSource cancellation = new();
-    private ExtensionInventoryItemResponse? item;
-    private AepEnrollmentRequestResource? enrollment;
-    private ResourceSnapshot<ExtensionRegistrationResource>? registration;
-    private AgentstrationApiException? error;
-    private bool loading = true;
-    private bool editing;
-    private bool saving;
-    private bool confirmDelete;
-    private bool confirmUnenroll;
-    private bool migrating;
-    private IReadOnlyList<ToolResource> extensionTools = [];
-    private ToolProviderResource? extensionToolProvider;
-    private ResourceSnapshot<ModelProfileOptionMigrationPreviewResponse>? migrationPreview;
-    private RegistrationEditForm form = new();
-    private DetailTab activeTab;
-    private bool CanAdminister => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state
-        && state.HasPermission(AuthorizationPermissions.ResourcesWrite);
-    private bool CanEditRegistration => CanAdminister && registration?.Value.Definition.Source == ExtensionRegistrationSource.Manual
-        && ResourceOwnershipContext.CanManage(registration.Value.ScopeRef ?? ResourceScopeRef.Instance, Services);
-    private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
-    private string StatusLabel(string status) => T($"Status.{status}");
-    private string EnrollmentStatusLabel(AepEnrollmentState status) => T($"EnrollmentStatus.{status}");
-    private string SourceLabel(string source) => T($"Source.{source}");
-
-    protected override Task OnParametersSetAsync() => LoadAsync();
-    private async Task LoadAsync()
-    {
-        loading = true; error = null;
-        try
-        {
-            var inventory = await Client.GetExtensionInventoryAsync(cancellation.Token);
-            item = RegistrationName is not null
-                ? inventory.SingleOrDefault(value => string.Equals(value.RegistrationName, RegistrationName, StringComparison.Ordinal)
-                    && string.Equals(value.RegistrationNamespace, ResourceNamespaceValue ?? ResourceNamespace.DefaultValue, StringComparison.Ordinal)
-                    && (ScopeRefValue is null || value.RegistrationScopeRef == ResourceScopeRef.Parse(ScopeRefValue)))
-                : inventory.SingleOrDefault(value => value.EnrollmentInstanceId == EnrollmentInstanceId);
-            registration = item?.RegistrationName is null ? null : ScopeRefValue is not null && item.RegistrationScopeRef is { } scope
-                ? await Client.GetRegistrationAsync(scope, ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token)
-                : await Client.GetRegistrationAsync(ResourceNamespace.Parse(item.RegistrationNamespace), item.RegistrationName, cancellation.Token);
-            extensionTools = [];
-            extensionToolProvider = null;
-            if (item?.RegistrationName is not null && Services.GetService<IToolsClient>() is { } toolsClient)
-            {
-                try
-                {
-                    var candidates = item.RegistrationScopeRef is { } scopeRef
-                        ? await toolsClient.GetToolsAsync(scopeRef, cancellationToken: cancellation.Token)
-                        : await toolsClient.GetToolsAsync(cancellationToken: cancellation.Token);
-                    extensionTools = candidates.Where(ToolBelongsToExtension).ToArray();
-                    extensionToolProvider = (await toolsClient.GetProvidersAsync(cancellation.Token)).SingleOrDefault(provider =>
-                        provider.Name == item.RegistrationName && provider.Namespace.Value == item.RegistrationNamespace
-                        && provider.ScopeRef == item.RegistrationScopeRef
-                        && provider.Definition.Aep?.Extension.Name == item.RegistrationName
-                        && (provider.Definition.Aep.Extension.Namespace ?? provider.Namespace).Value == item.RegistrationNamespace
-                        && (provider.Definition.Aep.Extension.ScopeRef ?? provider.ScopeRef) == item.RegistrationScopeRef);
-                }
-                catch (AgentstrationApiException) { }
-            }
-            enrollment = null;
-            if (CanAdminister && item?.EnrollmentInstanceId is { } instanceId)
-            {
-                var enrollmentRequests = await Client.GetEnrollmentsAsync(cancellation.Token);
-                enrollment = enrollmentRequests.SingleOrDefault(value => value.Definition.InstanceId == instanceId);
-            }
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
-    }
-    private void StartEdit()
-    {
-        if (registration is null) return;
-        form = new RegistrationEditForm { DisplayName = registration.Value.Definition.DisplayName, Endpoint = registration.Value.Definition.Endpoint.AbsoluteUri, ExpectedExtensionId = registration.Value.Definition.ExpectedExtensionId, Enabled = registration.Value.Definition.Enabled };
-        editing = true;
-    }
-    private async Task SaveAsync()
-    {
-        if (registration is null || !Uri.TryCreate(form.Endpoint, UriKind.Absolute, out var endpoint)) return;
-        saving = true;
-        try
-        {
-            _ = await Client.UpdateRegistrationAsync(registration.Value.Namespace, registration.Value.Name, new(registration.Value.Definition with { DisplayName = form.DisplayName, Endpoint = endpoint, ExpectedExtensionId = form.ExpectedExtensionId, Enabled = form.Enabled }), registration.ETag, cancellation.Token);
-            editing = false; await LoadAsync();
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { saving = false; }
-    }
-    private async Task ToggleAsync()
-    {
-        if (registration is null) return;
-        try { _ = await Client.UpdateRegistrationAsync(registration.Value.Namespace, registration.Value.Name, new(registration.Value.Definition with { Enabled = !registration.Value.Definition.Enabled }), registration.ETag, cancellation.Token); await LoadAsync(); }
-        catch (AgentstrationApiException exception) { error = exception; }
-    }
-    private async Task DeleteAsync()
-    {
-        if (registration is null) return;
-        try { await Client.DeleteRegistrationAsync(registration.Value.Namespace, registration.Value.Name, registration.ETag, cancellation.Token); Navigation.NavigateTo("/extensions"); }
-        catch (AgentstrationApiException exception) { error = exception; confirmDelete = false; }
-    }
-    private async Task UnenrollAsync()
-    {
-        if (enrollment is null) return;
-        try
-        {
-            await Client.UnenrollExtensionAsync(enrollment.Definition.InstanceId, cancellation.Token);
-            confirmUnenroll = false;
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ExtensionUnenrolled"), T("ExtensionUnenrolled.Description"), DateTimeOffset.Now, UiStatus.Success));
-            await LoadAsync();
-        }
-        catch (AgentstrationApiException exception) { error = exception; confirmUnenroll = false; }
-    }
-    private async Task PreviewMigrationAsync(ExtensionOptionUsageResponse usage, string targetVersion)
-    {
-        migrating = true;
-        try { migrationPreview = await ProfilesClient.PreviewOptionMigrationAsync(ResourceNamespace.Parse(usage.ProfileNamespace), usage.ProfileName, targetVersion, cancellation.Token); }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { migrating = false; }
-    }
-    private async Task ApplyMigrationAsync()
-    {
-        if (migrationPreview is null) return;
-        migrating = true;
-        try
-        {
-            _ = await ProfilesClient.ApplyOptionMigrationAsync(ResourceNamespace.Parse(migrationPreview.Value.ProfileNamespace), migrationPreview.Value.ProfileName, migrationPreview.Value.Target.Version, migrationPreview.ETag, cancellation.Token);
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ExtensionOptionsMigrated"), $"{migrationPreview.Value.ProfileName}: {migrationPreview.Value.Source.Version} → {migrationPreview.Value.Target.Version}", DateTimeOffset.Now, UiStatus.Success));
-            migrationPreview = null; await LoadAsync();
-        }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { migrating = false; }
-    }
-    private static string? MigrationTarget(ExtensionResponse extension, ExtensionOptionUsageResponse usage)
-    {
-        var optionSet = extension.OptionSets.SingleOrDefault(value => string.Equals(value.Id, usage.OptionSet, StringComparison.Ordinal));
-        if (optionSet is null || string.Equals(optionSet.PreferredVersion, usage.Version, StringComparison.Ordinal)) return null;
-        var pending = new Queue<string>(); var visited = new HashSet<string>(StringComparer.Ordinal) { usage.Version }; pending.Enqueue(usage.Version);
-        while (pending.TryDequeue(out var current)) foreach (var migration in optionSet.Migrations.Where(value => string.Equals(value.FromVersion, current, StringComparison.Ordinal))) { if (string.Equals(migration.ToVersion, optionSet.PreferredVersion, StringComparison.Ordinal)) return optionSet.PreferredVersion; if (visited.Add(migration.ToVersion)) pending.Enqueue(migration.ToVersion); }
-        return null;
-    }
-    private static bool CanUnenroll(AepEnrollmentState state) => state is AepEnrollmentState.Available or AepEnrollmentState.Disabled or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Unenrolling;
-    private static UiStatus EnrollmentStatus(AepEnrollmentState state) => state switch { AepEnrollmentState.Available => UiStatus.Success, AepEnrollmentState.CodeIssued or AepEnrollmentState.CredentialIssued or AepEnrollmentState.Verifying or AepEnrollmentState.Unenrolling => UiStatus.Warning, AepEnrollmentState.Rejected or AepEnrollmentState.Cancelled or AepEnrollmentState.Expired or AepEnrollmentState.AttemptsExceeded or AepEnrollmentState.VerificationFailed or AepEnrollmentState.Revoked => UiStatus.Danger, _ => UiStatus.Neutral };
-    private static string FormatDate(DateTimeOffset value) => value.ToLocalTime().ToString("g");
-    private static string FormatDate(DateTimeOffset? value) => value is { } date ? FormatDate(date) : "—";
-    private static string ProfileUrl(ExtensionOptionUsageResponse usage) => $"/modelprofiles/{Uri.EscapeDataString(usage.ProfileName)}?namespace={Uri.EscapeDataString(usage.ProfileNamespace)}";
-    private static string ProviderUrl(ExtensionProviderBindingResponse provider) => $"/modelproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
-    private static string ConfigureProviderUrl(ExtensionResponse extension, ExtensionContributionResponse contribution) => $"/modelproviders/new?extension={Uri.EscapeDataString(extension.RegistrationName)}&extensionNamespace={Uri.EscapeDataString(extension.RegistrationNamespace)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(extension.Extension?.Name ?? contribution.Id)}";
-    private bool ToolBelongsToExtension(ToolResource tool) => item?.RegistrationName is { } registrationName
-        && string.Equals(tool.Definition.Provider?.Name, registrationName, StringComparison.Ordinal)
-        && (tool.Definition.Provider?.Namespace ?? tool.Namespace).Value == item.RegistrationNamespace
-        && (tool.Definition.Provider?.ScopeRef ?? tool.ScopeRef) == item.RegistrationScopeRef
-        && (item.RegistrationScopeRef is null || tool.ScopeRef == item.RegistrationScopeRef);
-    private IReadOnlyList<ToolResource> MaterializedTools(ExtensionContributionResponse contribution) =>
-        string.Equals(contribution.Kind, "tool", StringComparison.Ordinal)
-            ? extensionTools.Where(tool => string.Equals(tool.Definition.ExternalId, contribution.Id, StringComparison.Ordinal)).ToArray()
-            : [];
-    private string ToolContributionState(IReadOnlyList<ToolResource> tools) => tools.Count switch
-    {
-        0 => "NotMaterialized",
-        > 1 => "Conflict",
-        _ => item?.AvailabilityStatus == "available" && item.RegistrationEnabled
-            && tools[0].Definition.Enabled && tools[0].Definition.Discovery?.Available == true ? "Available" : "Unavailable"
-    };
-    private IReadOnlyList<ExtensionManagedResourceResponse> MaterializedResources(ExtensionContributionResponse contribution) =>
-        string.Equals(contribution.Kind, "data-source-profile-bundle", StringComparison.Ordinal)
-            ? (item?.Extension?.BundleInstallations ?? [])
-                .Where(installation => string.Equals(installation.BundleId, contribution.Id, StringComparison.Ordinal))
-                .Where(installation => installation.State != ExtensionBundleInstallationState.Degraded)
-                .SelectMany(installation => installation.ManagedResources)
-                .Where(resource => resource.Kind is ToolResourceKinds.ToolSet or FlowResourceKinds.Flow or DataSourceResourceKinds.DataSourceProfile)
-                .DistinctBy(resource => (resource.Kind, resource.Namespace, resource.Name, resource.ScopeRef))
-                .OrderBy(resource => ManagedResourceKindOrder(resource.Kind))
-                .ThenBy(resource => resource.Name, StringComparer.Ordinal)
-                .ToArray()
-            : [];
-    private string BundleContributionState(ExtensionContributionResponse contribution)
-    {
-        var installations = (item?.Extension?.BundleInstallations ?? [])
-            .Where(value => value.BundleId == contribution.Id).ToArray();
-        if (installations.Length == 0) return "NotMaterialized";
-        if (installations.Any(value => value.State == ExtensionBundleInstallationState.Degraded)) return "Conflict";
-        foreach (var installation in installations)
-        foreach (var binding in installation.ToolBindings)
-        {
-            var tools = extensionTools.Where(value => value.Definition.ExternalId == binding.Key).ToArray();
-            if (tools.Length > 1) return "Conflict";
-            if (tools.Length == 0 || tools[0].Name != binding.Value.Name
-                || tools[0].Namespace != (binding.Value.Namespace ?? ResourceNamespace.Default)
-                || tools[0].ScopeRef != (binding.Value.ScopeRef ?? installation.ScopeRef)
-                || !tools[0].Definition.Enabled || tools[0].Definition.Discovery?.Available != true) return "Unavailable";
-        }
-        return installations.All(value => value.State == ExtensionBundleInstallationState.Installed)
-            && item?.AvailabilityStatus == "available" && item.RegistrationEnabled ? "Available" : "Unavailable";
-    }
-    private string ContributionKindLabel(string kind)
-    {
-        var localized = Localizer[$"ContributionKind.{kind}"];
-        return localized.ResourceNotFound ? kind : localized.Value;
-    }
-    private string ContributionDescription(ExtensionContributionResponse contribution, int resourceCount) =>
-        contribution.Kind == "data-source-profile-bundle" && BundleContributionState(contribution) == "Conflict"
-            ? T("ContributionState.Conflict") : resourceCount > 0
-            ? T("ContributionMaterialized", resourceCount)
-            : T(string.Equals(contribution.Kind, "data-source-profile-bundle", StringComparison.Ordinal) ? "ContributionAwaitingMaterialization" : "ContributionDeclared");
-    private string ManagedResourceKindLabel(string kind)
-    {
-        var value = Localizer[$"ManagedResourceKind.{kind}"];
-        return value.ResourceNotFound ? kind : value.Value;
-    }
-    private static int ManagedResourceKindOrder(string kind) => kind switch
-    {
-        ToolResourceKinds.ToolSet => 0,
-        DataSourceResourceKinds.DataSourceProfile => 1,
-        FlowResourceKinds.Flow => 2,
-        _ => 3
-    };
-    private static string ToolUrl(ToolResource tool) => ToolReferenceUrl(tool.ScopeRef ?? ResourceScopeRef.Instance, new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace));
-    private static string ToolProviderUrl(ToolProviderResource provider) => $"/tools/providers/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}";
-    private static string ToolReferenceUrl(ResourceScopeRef scopeRef, ResourceReference reference)
-    {
-        var @namespace = reference.Namespace ?? ResourceNamespace.Default;
-        return $"/tools/{Uri.EscapeDataString(reference.Name)}?namespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}&context={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}";
-    }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
-    private sealed class RegistrationEditForm { [System.ComponentModel.DataAnnotations.Required] public string DisplayName { get; set; } = string.Empty; [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.Url] public string Endpoint { get; set; } = string.Empty; public string? ExpectedExtensionId { get; set; } public bool Enabled { get; set; } }
-    private static UiStatus InstallationStatus(ExtensionBundleInstallationState state) => state switch
-    {
-        ExtensionBundleInstallationState.Installed => UiStatus.Success,
-        ExtensionBundleInstallationState.Installing or ExtensionBundleInstallationState.Degraded => UiStatus.Warning,
-        ExtensionBundleInstallationState.Failed => UiStatus.Danger,
-        _ => UiStatus.Neutral
-    };
-    private static string? ManagedResourceUrl(ExtensionManagedResourceResponse resource) => resource.Kind switch
-    {
-        ToolResourceKinds.ToolSet => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        FlowResourceKinds.Flow => (resource.Namespace == ResourceNamespace.DefaultValue
-            ? $"/flows/{Uri.EscapeDataString(resource.Name)}"
-            : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}")
-            + $"?scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        DataSourceResourceKinds.DataSourceProfile => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        _ => null
-    };
-    private enum DetailTab { Summary, Connection, Enrollment, Contributions, Resources, Options, Usages }
+    }</div>;
 }

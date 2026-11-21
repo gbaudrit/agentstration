@@ -6,16 +6,18 @@ using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class DataSourceDatasetEditorTests
+public sealed partial class DataSourceDatasetEditorTests
 {
     [TestMethod]
     [DataRow("en-US", "Freshness duration (hh:mm:ss)")]
@@ -26,21 +28,24 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler();
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
-        rendered.WaitForElement("[data-testid='dataset-service']");
+        var serviceSelection = rendered.WaitForElement("[data-testid='dataset-service']");
+        Assert.IsNotNull(rendered.Find($"label[for='{serviceSelection.Id}']"));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(serviceSelection.GetAttribute("aria-describedby")));
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.Service.Uid.ToString());
         await rendered.Find("[data-testid='dataset-operation']").ChangeAsync($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}");
         await rendered.Find("[data-testid='data-source-display-name']").ChangeAsync("Direct inventory");
         await rendered.Find("[data-testid='data-source-name']").ChangeAsync("direct-inventory");
-        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         await rendered.Find("[data-testid='dataset-allow-direct']").ChangeAsync(true);
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Markup));
         await rendered.Find("[data-testid='lifecycle-ttl']").ChangeAsync("01:00:00");
-        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsNull(handler.Created);
         await rendered.Find("[data-testid='lifecycle-ttl']").ChangeAsync("");
-        Assert.IsFalse(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
-        await rendered.Find("form").SubmitAsync();
+        Assert.IsTrue(ConfigurationComplete(rendered));
+        await CompleteCreationAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
         Assert.IsNull(handler.Created!.Properties.Dataset!.Storage);
         Assert.IsTrue(handler.Created.Properties.Dataset.Lifecycle!.AllowDirect);
@@ -54,6 +59,7 @@ public sealed class DataSourceDatasetEditorTests
     {
         using var culture = new TestCultureScope(cultureName);
         using var context = new BunitContext();
+        context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
         using var handler = new DatasetHandler();
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://agentstration.test/") };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
@@ -67,6 +73,7 @@ public sealed class DataSourceDatasetEditorTests
         context.Services.AddSingleton<IConnectedServiceOperationsClient>(new ConnectedServiceOperationsApiClient(http));
         context.Services.AddSingleton<IResourceAccessPolicyClient>(new ResourceAccessPolicyApiClient(http));
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new ResourceScopeInventoryApiClient(http));
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(parameters => parameters.Add(component => component.ScopeRef, "/instance"));
         rendered.WaitForElement("[data-testid='dataset-operation']");
         var storage = handler.Storage;
@@ -79,7 +86,7 @@ public sealed class DataSourceDatasetEditorTests
         Assert.IsNull(handler.Created);
         await rendered.Find("[data-testid='data-source-display-name']").ChangeAsync("Inventory");
         await rendered.Find("[data-testid='data-source-name']").ChangeAsync("inventory");
-        await rendered.Find("form").SubmitAsync();
+        await CompleteCreationAsync(rendered);
         rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
         Assert.IsNull(handler.Created!.Properties.Profile);
         Assert.AreEqual(storage.Uid, handler.Created.Properties.Dataset!.Storage!.StorageUid);
@@ -90,6 +97,8 @@ public sealed class DataSourceDatasetEditorTests
         Assert.AreEqual(0, handler.Activations);
         Assert.AreEqual(0, handler.Discoveries);
         Assert.IsEmpty(rendered.FindAll("[data-testid='connected-service-start-discovery'], [data-testid='dataset-operation-enabled']"));
+        handler.Existing = true;
+        rendered.Render(p => p.Add(c => c.Name, "inventory"));
         rendered.WaitForAssertion(() => Assert.IsFalse(rendered.Find("[data-testid='data-source-start-acquisition']").HasAttribute("disabled")));
     }
 
@@ -99,6 +108,7 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler(withParameters: true);
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         rendered.WaitForElement("[data-testid='dataset-service']");
         Assert.IsTrue(rendered.Find("[data-testid='dataset-operation']").HasAttribute("disabled"));
@@ -115,7 +125,7 @@ public sealed class DataSourceDatasetEditorTests
         await rendered.Find("[data-testid='dataset-parameters'] [data-schema-path='$.query'] input").InputAsync("first-service-query");
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.OtherService.Uid.ToString());
         Assert.AreEqual("", rendered.Find("[data-testid='dataset-operation']").GetAttribute("value"));
-        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsEmpty(rendered.FindAll($"[data-testid='dataset-operation'] option[value='{operationKey}']"));
         Assert.HasCount(1, rendered.FindAll($"[data-testid='dataset-operation'] option[value='{otherKey}']"));
         await rendered.Find("[data-testid='dataset-operation']").ChangeAsync(otherKey);
@@ -130,12 +140,14 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler { Existing = true, NewerOperation = true };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.Name, "inventory").Add(c => c.ScopeRef, "/instance"));
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         rendered.WaitForAssertion(() =>
         {
             Assert.AreEqual(handler.Service.Uid.ToString(), rendered.Find("[data-testid='dataset-service']").GetAttribute("value"));
             Assert.AreEqual($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}", rendered.Find("[data-testid='dataset-operation']").GetAttribute("value"));
-            Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+            Assert.IsFalse(ConfigurationComplete(rendered));
             Assert.IsNull(handler.Created);
         });
     }
@@ -149,10 +161,11 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler { MissingAdapter = true };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
         rendered.WaitForAssertion(() => Assert.Contains(expected, rendered.Find("[data-testid='dataset-operation-ineligible']").TextContent));
-        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         await rendered.Find("form").SubmitAsync();
         Assert.IsNull(handler.Created);
     }
@@ -163,9 +176,10 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler { StaleType = true };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
-        Assert.IsTrue(rendered.Find("[data-testid='data-source-save']").HasAttribute("disabled"));
+        Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsNotNull(rendered.Find("[data-testid='dataset-operation-ineligible']"));
         Assert.IsNull(handler.Created);
     }
@@ -181,9 +195,10 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler { FailSave = true, SaveFailureCode = code };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
-        await rendered.Find("form").SubmitAsync();
+        await CompleteCreationAsync(rendered);
         rendered.WaitForAssertion(() => Assert.AreEqual(code, rendered.Find("[data-testid='dataset-error-code']").TextContent));
         Assert.Contains(expected, rendered.Find("[role='alert']").TextContent);
         Assert.Contains("fixture-error-reference", rendered.Find("[role='alert']").TextContent);
@@ -200,30 +215,33 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler(withParameters: true) { Existing = true };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.Name, "inventory").Add(c => c.ScopeRef, "/instance"));
-        rendered.WaitForAssertion(() => Assert.HasCount(6, rendered.FindAll("[role=tab]")));
-        Assert.AreEqual(overview, rendered.Find("[data-testid=dataset-overview-tab]").TextContent);
-        Assert.AreEqual(definition, rendered.Find("[data-testid=dataset-definition-tab]").TextContent);
-        Assert.AreEqual(content, rendered.Find("[data-testid=dataset-content-tab]").TextContent);
-        Assert.IsTrue(rendered.Find("#dataset-panel-definition").HasAttribute("hidden"));
-        await rendered.Find("[data-testid=dataset-definition-tab]").ClickAsync();
-        Assert.IsFalse(rendered.Find("#dataset-panel-definition").HasAttribute("hidden"));
+        rendered.WaitForElement("[data-resource-section=overview]");
+        Assert.HasCount(9, rendered.FindAll("[data-resource-section]"));
+        Assert.AreEqual(overview, rendered.Find("[data-resource-section='overview']").TextContent);
+        Assert.AreEqual(definition, rendered.Find(".resource-navigation-entry[aria-expanded]").TextContent.Trim());
+        Assert.AreEqual(content, rendered.Find("[data-resource-section='content']").TextContent);
+        Assert.IsEmpty(rendered.FindAll("#data-source-dataset-definition"));
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
+        Assert.IsNotNull(rendered.Find("#data-source-dataset-definition"));
         await rendered.Find("[data-testid=data-source-display-name]").ChangeAsync("Unsaved draft");
+        DataSourceScreenTestSupport.Select(rendered, "definition/configuration");
         await rendered.Find("[data-testid=dataset-prefix]").ChangeAsync("draft/");
         await rendered.Find("[data-testid=dataset-parameters] [data-schema-path='$.query'] input").InputAsync("saved-call-draft");
-        await rendered.Find("[data-testid=dataset-overview-tab]").ClickAsync();
-        Assert.DoesNotContain("Unsaved draft", rendered.Find("#dataset-panel-overview").TextContent);
-        Assert.DoesNotContain("draft/", rendered.Find("[data-testid=dataset-saved-configuration]").TextContent);
-        await rendered.Find("[data-testid=dataset-yaml-tab]").ClickAsync();
-        Assert.Contains("Inventory", rendered.Find("[data-testid=dataset-yaml]").TextContent);
-        Assert.DoesNotContain("Unsaved draft", rendered.Find("[data-testid=dataset-yaml]").TextContent);
-        await rendered.Find("[data-testid=dataset-definition-tab]").ClickAsync();
+        DataSourceScreenTestSupport.Select(rendered, "overview");
+        Assert.DoesNotContain("Unsaved draft", rendered.Find("[data-testid=dataset-overview]").TextContent);
+        Assert.DoesNotContain("draft/", rendered.Find("[data-testid=dataset-configuration-summary]").TextContent);
+        DataSourceScreenTestSupport.Select(rendered, "yaml");
+        Assert.Contains("Inventory", rendered.Find("[data-testid=dataset-yaml]").GetAttribute("value")!);
+        Assert.DoesNotContain("Unsaved draft", rendered.Find("[data-testid=dataset-yaml]").GetAttribute("value")!);
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
         Assert.AreEqual("Unsaved draft", rendered.Find("[data-testid=data-source-display-name]").GetAttribute("value"));
         Assert.AreEqual("draft/", rendered.Find("[data-testid=dataset-prefix]").GetAttribute("value"));
         Assert.AreEqual("saved-call-draft", rendered.Find("[data-testid=dataset-parameters] [data-schema-path='$.query'] input").GetAttribute("value"));
-        await rendered.Find("#dataset-panel-definition button[type=button]").ClickAsync();
-        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-testid=dataset-overview-tab]").GetAttribute("aria-selected")));
-        await rendered.Find("[data-testid=dataset-definition-tab]").ClickAsync();
+        await rendered.Find(".unsaved-changes-bar button[type=button]").ClickAsync();
+        rendered.WaitForAssertion(() => Assert.AreEqual("page", rendered.Find("[data-resource-section='definition/identity']").GetAttribute("aria-current")));
+        DataSourceScreenTestSupport.Select(rendered, "definition/identity");
         Assert.AreEqual("Inventory", rendered.Find("[data-testid=data-source-display-name]").GetAttribute("value"));
         Assert.AreEqual("", rendered.Find("[data-testid=dataset-prefix]").GetAttribute("value"));
         Assert.IsNull(handler.Created);
@@ -236,17 +254,23 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler { Existing = true, WithHistory = true };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.Name, "inventory").Add(c => c.ScopeRef, "/instance"));
-        rendered.WaitForAssertion(() => Assert.HasCount(3, rendered.FindAll("[data-testid=data-source-acquisition-row]")));
-        Assert.Contains("flow-3", rendered.FindAll("[data-testid=data-source-acquisition-row]")[0].TextContent);
+        rendered.WaitForAssertion(() => Assert.HasCount(3, rendered.FindAll(".resource-overview [data-testid=data-source-acquisition-row]")));
+        Assert.Contains("flow-3", rendered.FindAll(".resource-overview [data-testid=data-source-acquisition-row]")[0].TextContent);
         Assert.Contains("flow-3", rendered.Find("[data-testid=dataset-latest-acquisition] a").GetAttribute("href")!);
-        await rendered.Find("[data-testid=dataset-acquisitions-tab]").ClickAsync();
-        Assert.HasCount(4, rendered.FindAll("[data-testid=data-source-acquisition-row]"));
-        await rendered.FindAll("[data-testid=dataset-read-content]")[1].ClickAsync();
-        rendered.WaitForAssertion(() => Assert.AreEqual("true", rendered.Find("[data-testid=dataset-content-tab]").GetAttribute("aria-selected")));
+        DataSourceScreenTestSupport.Select(rendered, "acquisitions");
+        Assert.HasCount(4, rendered.FindAll(".resource-details-section:not([hidden]) [data-testid=data-source-acquisition-row]"));
+        await rendered.InvokeAsync(() => rendered.FindComponents<CollectionView<DataSourceAcquisitionResource>>().Last().Instance.SetNarrow(true));
+        Assert.HasCount(4, rendered.FindAll(".resource-details-section:not([hidden]) li[data-testid=data-source-acquisition-row]"));
+        Assert.Contains("acq-3", rendered.FindAll(".resource-details-section:not([hidden]) [data-testid=data-source-acquisition-row]")[0].TextContent);
+        Assert.AreEqual("Succeeded", rendered.FindAll(".resource-details-section:not([hidden]) [data-testid=data-source-acquisition-row]")[0].GetAttribute("data-state"));
+        Assert.IsNotNull(rendered.Find("[data-testid=data-source-acquisition-row] .collection-actions [data-testid=dataset-read-content]"));
+        await rendered.FindAll(".resource-details-section:not([hidden]) [data-testid=dataset-read-content]")[1].ClickAsync();
+        rendered.WaitForAssertion(() => Assert.AreEqual("page", rendered.Find("[data-resource-section='content']").GetAttribute("aria-current")));
         Assert.Contains("acq-2", rendered.Find("[data-testid=dataset-content]").TextContent);
         Assert.AreEqual(1, handler.ContentReads);
-        Assert.IsEmpty(rendered.FindAll("[data-testid=data-source-acquisition-row]"));
+        Assert.IsEmpty(rendered.FindAll(".resource-details-section:not([hidden]) [data-testid=data-source-acquisition-row]"));
         await rendered.Find("[data-testid=dataset-content] button").ClickAsync();
         Assert.IsEmpty(rendered.FindAll("[data-testid=dataset-content]"));
         await rendered.Find(".dataset-content-picker select").ChangeAsync(handler.Acquisitions[0].Uid.ToString());
@@ -267,26 +291,146 @@ public sealed class DataSourceDatasetEditorTests
         using var handler = new DatasetHandler { Storage = documents.Storage, StorageTypes = [documents.Type] };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
         var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(page, handler);
         await page.Find("[data-testid=data-source-display-name]").ChangeAsync("Acquired alerts");
         await page.Find("[data-testid=data-source-name]").ChangeAsync("acquired-alerts");
-        Assert.IsTrue(page.Find("[data-testid=data-source-save]").HasAttribute("disabled"));
-        Assert.IsNotNull(page.Find("[data-testid=dataset-document-collection-required] a[href*='view=definition']"));
+        Assert.IsFalse(ConfigurationComplete(page));
+        Assert.IsNotNull(page.Find("[data-testid=dataset-document-collection-required] a[href$='#definition/configuration']"));
         Assert.IsNull(handler.Created);
         if (!hasCollection) return;
         await page.Find("[data-testid=dataset-document-collection]").ChangeAsync(documents.Collection.ToString());
+        Assert.IsTrue(ConfigurationComplete(page));
+        await CompleteCreationAsync(page);
+        page.WaitForAssertion(() => Assert.AreEqual(documents.Collection, handler.Created?.Properties.Dataset?.DocumentCollectionUid));
+        handler.Existing = true;
+        page.Render(p => p.Add(c => c.Name, "inventory"));
+        page.WaitForAssertion(() => Assert.HasCount(11, page.FindAll("[data-resource-section]")));
+        Assert.IsNotNull(page.Find("[data-resource-section='queries']"));
+        Assert.IsNotNull(page.Find("[data-resource-section='tools']"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public async Task IncompleteStepsAllowNavigationButCreationReturnsToTheFirstInvalidStep(string cultureName)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var handler = new DatasetHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        page.WaitForElement("[data-testid=data-source-creation-wizard]");
+        Assert.AreEqual("false", page.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await page.Find("form").SubmitAsync();
+        Assert.AreEqual("acquisition", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsNull(handler.Created);
+        await page.Find("[data-wizard-step=review]").ClickAsync();
+        Assert.AreEqual("review", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
         Assert.IsFalse(page.Find("[data-testid=data-source-save]").HasAttribute("disabled"));
         await page.Find("form").SubmitAsync();
-        page.WaitForAssertion(() => Assert.AreEqual(documents.Collection, handler.Created?.Properties.Dataset?.DocumentCollectionUid));
-        page.WaitForAssertion(() => Assert.HasCount(8, page.FindAll("[role=tab]")));
-        Assert.IsNotNull(page.Find("[data-testid=dataset-queries-tab]"));
-        Assert.IsNotNull(page.Find("[data-testid=dataset-tools-tab]"));
+        Assert.AreEqual("identity", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsNotNull(page.Find("[role=alert]"));
+        Assert.IsNull(handler.Created);
+        await page.Find("[data-testid=data-source-display-name]").ChangeAsync("Inventory");
+        await page.Find("[data-testid=data-source-name]").ChangeAsync("inventory");
+        Assert.AreEqual("true", page.Find("[data-wizard-step=identity]").GetAttribute("data-step-complete"));
+        await page.Find("[data-wizard-step=review]").ClickAsync();
+        await page.Find("form").SubmitAsync();
+        Assert.AreEqual("acquisition", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsNotNull(page.Find("[role=alert]"));
+        Assert.IsNull(handler.Created);
+        await page.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        Assert.AreEqual("storage", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsNull(handler.Created);
+    }
+
+    [TestMethod]
+    public async Task ReviewEditsPreserveParametersAndPinnedSelectionsWithoutCreating()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var handler = new DatasetHandler(withParameters: true);
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(page, handler);
+        await page.Find("[data-testid=dataset-parameters] [data-schema-path='$.query'] input").InputAsync("reviewed-query");
+        var composition = page.FindComponent<SourceFlowCompositionEditor>().Instance;
+        for (var index = 0; index < 5; index++) await page.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        Assert.AreEqual("review", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.Contains("default/inventory", page.Find("[data-testid=data-source-creation-review]").TextContent);
+        Assert.Contains("reviewed-query", page.Find("[data-testid=data-source-creation-review]").TextContent);
+        Assert.IsNull(handler.Created);
+        await page.Find("button[aria-label='Edit acquisition']").ClickAsync();
+        Assert.AreEqual("acquisition", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.AreEqual("reviewed-query", page.Find("[data-testid=dataset-parameters] [data-schema-path='$.query'] input").GetAttribute("value"));
+        Assert.AreEqual(handler.Service.Uid.ToString(), page.Find("[data-testid=dataset-service]").GetAttribute("value"));
+        Assert.AreEqual($"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}", page.Find("[data-testid=dataset-operation]").GetAttribute("value"));
+        Assert.AreSame(composition, page.FindComponent<SourceFlowCompositionEditor>().Instance);
+        Assert.IsNull(handler.Created);
+    }
+
+    [TestMethod]
+    [DataRow("", "default")]
+    [DataRow(" Ventes.Europe ", "ventes.europe")]
+    public async Task ReviewQualifiedIdentityMatchesTheNormalizedCreationNamespace(string typedNamespace, string expectedNamespace)
+    {
+        using var handler = new DatasetHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(page, handler);
+        await page.Find("[data-testid=dataset-namespace]").ChangeAsync(typedNamespace);
+        for (var index = 0; index < 5; index++) await page.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        Assert.Contains($"{expectedNamespace}/inventory", page.Find("[data-testid=data-source-creation-review]").TextContent);
+        Assert.IsNull(handler.Created);
+        await page.Find("form").SubmitAsync();
+        page.WaitForAssertion(() => Assert.AreEqual(expectedNamespace, handler.Created?.Namespace));
+    }
+
+    [TestMethod]
+    public async Task TheExplicitReviewCommandRetainsEditFormValidationBeforeCreating()
+    {
+        using var handler = new DatasetHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var page = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(page, handler);
+        for (var index = 0; index < 5; index++) await page.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        var editContext = page.FindComponent<EditForm>().Instance.EditContext!;
+        var validation = new ValidationMessageStore(editContext);
+        validation.Add(new FieldIdentifier(page.Instance, "parameters"), "Invalid entered draft");
+        await page.Find("[data-testid=data-source-save]").ClickAsync();
+        Assert.IsNull(handler.Created);
+        Assert.AreEqual("review", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        validation.Clear();
+        await page.Find("[data-testid=data-source-save]").ClickAsync();
+        page.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
+    }
+
+    private static bool ConfigurationComplete(IRenderedComponent<DataSourceDatasetEditor> page) =>
+        page.FindComponents<CreationWizard>().FirstOrDefault()?.Instance.Steps.All(step => step.IsComplete != false)
+            ?? page.Find("form").GetAttribute("data-definition-complete") == "true";
+
+    private static async Task CompleteCreationAsync(IRenderedComponent<DataSourceDatasetEditor> page)
+    {
+        for (var index = 0; index < 5 && page.FindComponent<CreationWizard>().Instance.CurrentStepId != "review"; index++)
+            await page.Find("[data-testid=creation-wizard-next]").ClickAsync();
+        Assert.AreEqual("review", page.FindComponent<CreationWizard>().Instance.CurrentStepId);
+        Assert.IsFalse(page.Find("[data-testid=data-source-save]").HasAttribute("disabled"));
+        await page.Find("form").SubmitAsync();
     }
 
     private static async Task SelectAsync(IRenderedComponent<DataSourceDatasetEditor> rendered, DatasetHandler handler)
     {
         rendered.WaitForElement("[data-testid='dataset-storage']");
+        await rendered.Find("[data-testid=data-source-display-name]").ChangeAsync("Inventory");
+        await rendered.Find("[data-testid=data-source-name]").ChangeAsync("inventory");
         var storage = handler.Storage;
         await rendered.Find("[data-testid='dataset-storage']").ChangeAsync($"{storage.Uid}:{storage.Generation}:{storage.ObservedState!.BindingDigest}");
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.Service.Uid.ToString());
@@ -297,7 +441,11 @@ public sealed class DataSourceDatasetEditorTests
     private static async Task<BunitContext> SetupAsync(HttpClient http)
     {
         var context = new BunitContext();
+        context.JSInterop.SetupVoid("Blazor._internal.domWrapper.focus", _ => true).SetVoidResult();
         context.JSInterop.SetupVoid("agentstrationDataSources.focusTab", _ => true).SetVoidResult();
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
+        foreach (var method in new[] { "observeCollection", "releaseCollection", "attachDisclosure", "releaseDisclosure" })
+            module.SetupVoid(method, _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);
@@ -359,6 +507,9 @@ public sealed class DataSourceDatasetEditorTests
         public int Discoveries { get; private set; }
         public bool NewerOperation { get; set; }
         public bool Existing { get; set; }
+        public string SavedName { get; set; } = "Inventory";
+        public string ReadEtag { get; set; } = "\"fixture\"";
+        public HttpStatusCode? ReadFailure { get; set; }
         public bool WithHistory { get; set; }
         public int ContentReads { get; private set; }
         public IReadOnlyList<DataSourceAcquisitionResource> Acquisitions => Enumerable.Range(0, 4).Select(index => new DataSourceAcquisitionResource
@@ -414,7 +565,12 @@ public sealed class DataSourceDatasetEditorTests
                 { ServiceUid = OtherService.Uid, Generation = 1, Service = new(OtherService.Address, OtherService.ScopeRef!.Value) }
             }
         };
-        public DataSourceResource Source => new()
+        public DataSourceResource? SourceOverride { get; set; }
+        public int SourceReads { get; private set; }
+        public int SourceUpdates { get; private set; }
+        public string? LastUpdatePath { get; private set; }
+        public string? LastUpdateEtag { get; private set; }
+        public DataSourceResource Source => SourceOverride ?? new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = "DataSource",
@@ -422,9 +578,9 @@ public sealed class DataSourceDatasetEditorTests
             ScopeRef = ResourceScopeRef.Instance,
             Metadata = new() { Name = "inventory" },
             Generation = 1,
-            Definition = new()
+            Definition = Created?.Properties ?? new()
             {
-                DisplayName = "Inventory",
+                DisplayName = SavedName,
                 Dataset = new(
                 new(new(Storage.ScopeRef!.Value, Storage.Namespace, Storage.Kind, Storage.Name), Storage.Uid, Storage.Generation, Storage.ObservedState!.BindingDigest!),
                 new(Write: true), new(new(new(Operation.ScopeRef!.Value, Operation.Namespace, Operation.Kind, Operation.Name), Operation.Uid, Operation.Generation, Operation.Definition.DefinitionDigest), JsonSerializer.SerializeToElement(new { })))
@@ -502,7 +658,12 @@ public sealed class DataSourceDatasetEditorTests
             else if (path == "/api/connected-services/fixture/operations") body = new[] { NewerOperation ? Operation with { Generation = Operation.Generation + 1 } : Operation, OtherOperation };
             else if (path == "/api/connected-services/other/operations") body = new[] { OtherOperation, Operation };
             else if (path == "/api/connected-services") body = new[] { Service, OtherService };
-            else if (path == "/api/datasources/inventory" && Existing) body = Source;
+            else if (path == "/api/datasources/inventory" && Existing)
+            {
+                if (request.Method == HttpMethod.Put) { SourceUpdates++; LastUpdatePath = request.RequestUri!.PathAndQuery; LastUpdateEtag = request.Headers.IfMatch.Single().ToString(); var update = await request.Content!.ReadFromJsonAsync<PutDataSourceRequest>(cancellationToken); SourceOverride = Source with { Definition = update!.Properties }; }
+                else { SourceReads++; if (ReadFailure is { } status) return new(status); }
+                body = Source;
+            }
             else if (path.EndsWith("/operation-discoveries", StringComparison.Ordinal)) { Discoveries++; body = Array.Empty<ConnectedServiceOperationDiscoveryResource>(); }
             else if (path == "/api/storage-types") body = new { value = StorageTypes };
             else if (path == "/api/storages") body = new { value = new[] { Storage } };
@@ -517,7 +678,7 @@ public sealed class DataSourceDatasetEditorTests
             else if (path.EndsWith("/enabled", StringComparison.Ordinal)) { Activations++; body = Operation; }
             else return new(HttpStatusCode.NotFound);
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) };
-            response.Headers.ETag = new("\"fixture\"");
+            response.Headers.ETag = new(ReadEtag);
             return response;
         }
     }

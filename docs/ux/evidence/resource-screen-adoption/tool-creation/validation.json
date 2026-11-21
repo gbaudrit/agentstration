@@ -1,0 +1,60 @@
+{
+  "capturedAt": "2026-11-19",
+  "productCommit": "c27c8c821b82bb1faf43a36c72e781b6d2cb85fa",
+  "implementationCommit": "c27c8c82",
+  "origin": "Original real-application screenshots. Temporary local probes, no generated images. Assemblies remained fixed throughout the campaign.",
+  "verified": "Create a real unpublished Flow-backed ToolDefinition through Identity, Configure and Review. Verify the exact saved Flow owner/version and publication flag through the API.",
+  "results": {
+    "realApplicationProbes": {
+      "passed": 2,
+      "failed": 0
+    },
+    "consoleComponentSuite": {
+      "passed": 795,
+      "failed": 0
+    },
+    "releaseBuild": {
+      "warnings": 0,
+      "errors": 0
+    },
+    "maintainedSchemaContractsRegression": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "limits": "Desktop English dark and mobile French light in a touch-enabled browser. These captures establish rendering and the stated operations; they do not certify real touch events for every control, all keyboard/owner combinations, the complete smoke suite or final Fast/Integration lanes. No CI run is claimed.",
+  "captures": [
+    {
+      "file": "tool-creation-review-desktop-en.png",
+      "sha256": "c54d6e68e9260ece8a7f983a949e629e7fad8a51bd40e66a49c20fdee0ef9457",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false,
+      "fullPage": true,
+      "pngSize": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "file": "tool-creation-review-mobile-fr.png",
+      "sha256": "f8a614c732acac239a9fcfa27e6b38d62613ac90680e83eea17c79bc01eca9b5",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true,
+      "fullPage": true,
+      "pngSize": {
+        "width": 390,
+        "height": 1254
+      }
+    }
+  ]
+}

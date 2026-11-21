@@ -37,7 +37,7 @@ else
         try
         {
             var workspace = await Api.GetWorkspaceAsync(WorkspaceName, lifetime.Token);
-            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName);
+            WorkplaceContext.SetWorkspace(workspace.Name, workspace.DisplayName, workspace.OrganizationName, workspace.OrganizationDisplayName, workspace.UserDisplayName, workspace.Id);
             items = await Api.ListNotificationsAsync(WorkspaceName, false, lifetime.Token);
         }
         catch when (!lifetime.IsCancellationRequested) { error = T("NotificationsLoadError"); }

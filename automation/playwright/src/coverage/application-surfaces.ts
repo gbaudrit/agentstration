@@ -1,3 +1,5 @@
+import { formAdoptionCoverage, type FormAdoptionCoverage } from './form-adoption-coverage.js';
+
 export type ProductHost = 'console' | 'workplace';
 export type SurfaceCoverageState = 'covered' | 'partial' | 'planned';
 
@@ -12,6 +14,10 @@ export interface ApplicationSurface {
   specification: string;
   coverage: SurfaceCoverageState;
   trackingIssue?: number;
+  /** Independent field-contract evidence; does not upgrade business journey coverage. */
+  formContract?: FormAdoptionCoverage;
+  /** Additional maintained assertions on this route; never another route declaration. */
+  relatedSpecifications?: readonly string[];
 }
 
 const consolePages = 'src/Agentstration.Console.Components/Components/Pages';
@@ -141,21 +147,38 @@ function lifecycleSurface(id: string, component: string, routes: readonly string
   };
 }
 
-export const applicationSurfaces: readonly ApplicationSurface[] = [
+const baseApplicationSurfaces: readonly ApplicationSurface[] = [
   {
-    id: 'source-content-lifecycle', host: 'console', source: `${consolePages}/DataSourceDatasetEditor.razor`,
-    routes: ['/data-sources/new', '/data-sources/{Name}', '/knowledge-sources/{Name}'],
-    fixtureKeys: ['source-policy-clock', 'native-read-only-operation', 'builtin-storage'],
-    pageObject: 'src/pages/source-policies.page.ts', journey: 'exercise-source-policies',
-    specification: 'tests/source-policies.spec.ts', coverage: 'covered', trackingIssue: 1116,
+    id: 'console-conversations', host: 'console', source: `${consolePages}/ConsoleConversations.razor`,
+    routes: ['/conversations'], fixtureKeys: [], pageObject: 'src/pages/console-entry-interaction.page.ts',
+    specification: 'tests/console-entry-interaction.spec.ts', coverage: 'covered',
   },
   {
-    id: 'source-flow-composition', host: 'console', source: `${consolePages}/KnowledgeSourceEditor.razor`,
-    routes: ['/flows/{FlowId}/designer', '/data-sources/{Name}', '/knowledge-sources/{Name}'],
-    fixtureKeys: ['native-read-only-operation', 'composable-transformations', 'builtin-storage'],
-    pageObject: 'src/pages/source-composition.page.ts', journey: 'exercise-source-composition',
-    specification: 'tests/source-policies.spec.ts', coverage: 'covered', trackingIssue: 1118,
+    id: 'console-entry-interaction', host: 'console', source: `${consolePages}/ConsoleEntryInteraction.razor`,
+    routes: ['/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}'], fixtureKeys: ['workspaceId', 'entryNamespace', 'entryName'],
+    pageObject: 'src/pages/console-entry-interaction.page.ts', specification: 'tests/console-entry-interaction.spec.ts', coverage: 'covered',
   },
+  coveredModelAdministration('model-details', `${consolePages}/ModelDetails.razor`, ['/models/{Name}'], ['name']),
+  {
+    id: 'parameter-editor', host: 'console', source: `${consolePages}/ParameterEditor.razor`,
+    routes: ['/parameters/new', '/parameters/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/shared-forms.page.ts', specification: 'tests/shared-forms.spec.ts', coverage: 'partial', trackingIssue: 1128,
+  },
+  {
+    id: 'parameters', host: 'console', source: `${consolePages}/Parameters.razor`, routes: ['/parameters'], fixtureKeys: [],
+    pageObject: 'src/pages/resource-administration.page.ts', specification: 'tests/resource-administration.spec.ts', coverage: 'partial', trackingIssue: 1121,
+  },
+  {
+    id: 'tool-category-editor', host: 'console', source: `${consolePages}/ToolCategoryEditor.razor`,
+    routes: ['/tools/categories/new', '/tools/categories/{Name}'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/shared-forms.page.ts', specification: 'tests/shared-forms.spec.ts', coverage: 'partial', trackingIssue: 1128,
+  },
+  {
+    id: 'tool-categories', host: 'console', source: `${consolePages}/ToolCategories.razor`, routes: ['/tools/categories'], fixtureKeys: [],
+    pageObject: 'src/pages/resource-administration.page.ts', specification: 'tests/resource-administration.spec.ts', coverage: 'partial', trackingIssue: 1121,
+  },
+  coveredDistribution('resource-plans', `${consolePages}/ResourcePlans.razor`, ['/resource-plans']),
+  coveredDistribution('resource-plan-details', `${consolePages}/ResourcePlanDetails.razor`, ['/resource-plans/{Id:guid}'], ['id']),
   {
     id: 'console-home', host: 'console', source: `${consolePages}/Home.razor`, routes: ['/'], fixtureKeys: [],
     pageObject: 'src/pages/product.pages.ts', journey: 'authenticate-console',
@@ -266,36 +289,36 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('secret-editor', `${consolePages}/SecretEditor.razor`, ['/secrets/new', '/secrets/{Name}'], 417, ['name']),
   partialResourceAdministration('vaults', `${consolePages}/Vaults.razor`, ['/vaults'], 418),
   partialResourceAdministration('vault-editor', `${consolePages}/VaultEditor.razor`, ['/vaults/new', '/vaults/{Name}'], 419, ['name']),
-  {
-    id: 'console-conversations', host: 'console', source: `${consolePages}/ConsoleConversations.razor`,
-    routes: ['/conversations'], fixtureKeys: [],
-    pageObject: 'src/pages/console-entry-interaction.page.ts',
-    specification: 'tests/console-entry-interaction.spec.ts', coverage: 'covered',
-  },
-  {
-    id: 'console-entry-interaction', host: 'console', source: `${consolePages}/ConsoleEntryInteraction.razor`,
-    routes: ['/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}'],
-    fixtureKeys: ['workspaceId', 'entryNamespace', 'entryName'],
-    pageObject: 'src/pages/console-entry-interaction.page.ts',
-    specification: 'tests/console-entry-interaction.spec.ts', coverage: 'covered',
-  },
-  coveredModelAdministration('model-details', `${consolePages}/ModelDetails.razor`, ['/models/{Name}'], ['name']),
   // Existing administration routes retain their owning feature as the coverage-gap tracker.
-  planned('parameters', `${consolePages}/Parameters.razor`, ['/parameters'], 495),
-  planned('parameter-editor', `${consolePages}/ParameterEditor.razor`, ['/parameters/new', '/parameters/{Name}'], 495, ['name']),
-  planned('resource-plans', `${consolePages}/ResourcePlans.razor`, ['/resource-plans'], 329),
-  planned('resource-plan-details', `${consolePages}/ResourcePlanDetails.razor`, ['/resource-plans/{Id:guid}'], 329, ['id']),
-  planned('tool-categories', `${consolePages}/ToolCategories.razor`, ['/tools/categories'], 742),
-  planned('tool-category-editor', `${consolePages}/ToolCategoryEditor.razor`, ['/tools/categories/new', '/tools/categories/{Name}'], 742, ['name']),
-  partialResourceAdministration('storages', `${consolePages}/Storages.razor`, ['/storages'], 1033),
+  {
+    id: 'storages', host: 'console', source: `${consolePages}/Storages.razor`, routes: ['/storages'], fixtureKeys: [],
+    pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
+    coverage: 'partial', trackingIssue: 1122,
+  },
   partialResourceAdministration('storage-details', `${consolePages}/StorageDetails.razor`, ['/storages/{Name}'], 1033, ['name']),
-  partialResourceAdministration('storage-editor', `${consolePages}/StorageEditor.razor`, ['/storages/new', '/storages/{Name}/edit'], 1033, ['name']),
-  planned('storage-types', `${consolePages}/StorageTypes.razor`, ['/storage-types'], 1065),
+  {
+    id: 'storage-editor', host: 'console', source: `${consolePages}/StorageEditor.razor`, routes: ['/storages/new', '/storages/{Name}/edit'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
+    coverage: 'partial', trackingIssue: 1122,
+  },
+  {
+    id: 'storage-types', host: 'console', source: `${consolePages}/StorageTypes.razor`, routes: ['/storage-types'], fixtureKeys: [],
+    pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
+    coverage: 'partial', trackingIssue: 1122,
+  },
   planned('storage-type-details', `${consolePages}/StorageTypeDetails.razor`, ['/storage-types/{Name}'], 1065, ['name']),
   planned('storage-type-editor', `${consolePages}/StorageTypeEditor.razor`, ['/storage-types/new', '/storage-types/{Name}/edit', '/storage-types/{Name}/versions/new'], 1065, ['name']),
-  partialResourceAdministration('connected-services', `${consolePages}/ConnectedServices.razor`, ['/connected-services'], 1048),
+  {
+    id: 'connected-services', host: 'console', source: `${consolePages}/ConnectedServices.razor`, routes: ['/connected-services'], fixtureKeys: [],
+    pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
+    coverage: 'partial', trackingIssue: 1122,
+  },
   partialResourceAdministration('connected-service-details', `${consolePages}/ConnectedServiceDetails.razor`, ['/connected-services/{Name}'], 1048, ['name']),
-  partialResourceAdministration('connected-service-editor', `${consolePages}/ConnectedServiceEditor.razor`, ['/connected-services/new', '/connected-services/{Name}/edit'], 1048, ['name']),
+  {
+    id: 'connected-service-editor', host: 'console', source: `${consolePages}/ConnectedServiceEditor.razor`, routes: ['/connected-services/new', '/connected-services/{Name}/edit'], fixtureKeys: ['name'],
+    pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
+    coverage: 'partial', trackingIssue: 1122,
+  },
   partialResourceAdministration('tools', `${consolePages}/Tools.razor`, ['/tools'], 420),
   {
     id: 'tool-sets', host: 'console', source: `${consolePages}/ToolSets.razor`, routes: ['/tools/sets'], fixtureKeys: [],
@@ -315,16 +338,20 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
   partialResourceAdministration('tool-providers', `${consolePages}/ToolProviders.razor`, ['/tools/providers'], 422),
   partialResourceAdministration('tool-provider-editor', `${consolePages}/ToolProviderEditor.razor`, ['/tools/providers/new', '/tools/providers/{Name}'], 423, ['name']),
   partialResourceAdministration('tool-definitions', `${consolePages}/ToolDefinitions.razor`, ['/tools/definitions'], 424),
+  planned('tool-definition-editor', `${consolePages}/ToolDefinitionEditor.razor`, ['/tools/definitions/{Name}'], 1122, ['name']),
   {
-    id: 'tool-definition-editor', host: 'console', source: `${consolePages}/ToolDefinitionEditor.razor`,
-    routes: ['/tools/definitions/new', '/tools/definitions/{Name}'], fixtureKeys: ['name'],
+    id: 'new-tool-definition', host: 'console', source: `${consolePages}/NewToolDefinition.razor`,
+    routes: ['/tools/definitions/new'], fixtureKeys: [],
     pageObject: 'src/pages/schema-contracts.page.ts', journey: 'exercise-schema-contract-bindings',
-    specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'covered',
+    specification: 'tests/schema-contract-bindings.spec.ts', coverage: 'partial', trackingIssue: 1122,
+    relatedSpecifications: ['tests/shared-forms.spec.ts'],
   },
+  planned('transformation-functions', `${consolePages}/TransformationFunctions.razor`, ['/transformation-functions', '/function-kinds'], 1122),
+  planned('transformation-function-editor', `${consolePages}/TransformationFunctionEditor.razor`, ['/transformation-functions/{Name}'], 1122, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
   coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
-  coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}'], ['name']),
-  coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new', '/triggers/{Name}/edit'], ['name']),
+  coveredOperationalTriggers('trigger-details', `${consolePages}/TriggerDetails.razor`, ['/triggers/{Name}', '/triggers/{Name}/edit'], ['name']),
+  coveredOperationalTriggers('trigger-editor', `${consolePages}/TriggerEditor.razor`, ['/triggers/new'], []),
 
   coveredDistribution('extensions', `${consolePages}/Extensions.razor`, ['/extensions']),
   {
@@ -424,6 +451,13 @@ export const applicationSurfaces: readonly ApplicationSurface[] = [
     specification: 'tests/workplace.spec.ts', coverage: 'covered',
   },
 ] as const;
+
+export const applicationSurfaces: readonly ApplicationSurface[] = baseApplicationSurfaces.map(surface => {
+  const formContract = formAdoptionCoverage.find(form => form.source === surface.source);
+  const relatedSpecifications = ['data-source-editor', 'knowledge-source-details', 'knowledge-source-editor', 'flow-designer'].includes(surface.id)
+    ? ['tests/source-policies.spec.ts'] : [];
+  return { ...surface, ...(formContract ? { formContract } : {}), ...(relatedSpecifications.length ? { relatedSpecifications } : {}) };
+});
 
 export interface CoverageSummary {
   surfaces: number;

@@ -38,4 +38,9 @@
   <data name="DeleteMessage"><value>Delete model profile '{0}'? This action cannot be undone.</value></data>
   <data name="DeletedNotification"><value>Model profile deleted</value></data>
   <data name="Scope"><value>Scope</value></data>
+<data name="Status.Available" xml:space="preserve"><value>Available</value></data>
+<data name="Status.Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+<data name="Status.Incompatible" xml:space="preserve"><value>Incompatible</value></data>
+<data name="OperationFailedTitle"><value>Profile operation failed</value></data>
+<data name="OperationFailedMessage"><value>Refresh the list and try again.</value></data>
 </root>

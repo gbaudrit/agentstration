@@ -1,0 +1,17 @@
+{
+  "baseCommit": "67784be20fe5099e6a456d08645402d76465dd8c",
+  "route": "/extensions?tab=catalog&context=%2Finstance",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Extensions.razor": "c0d9ff3b5c2ea1a0e4ecdc7ba5c2737c870572a5",
+    "src/Agentstration.Console.Components/Components/Pages/Extensions.razor.cs": "851f3d0eb05018f4abb3e5e25ffc353e8f80d7ee",
+    "src/Agentstration.Extensions/ExtensionInventoryService.cs": "f9dfa7dbfa1cf32e74014933a3037195a16ce5f6",
+    "src/Agentstration.Extensions/ExtensionManagementService.cs": "f0c1993739f6e791159258d58320314d29318a91",
+    "src/Agentstration.Extensions/ExtensionRegistrationManagementService.cs": "d6f9625997945ff66ebc5a24440fcf0155caa7b3",
+    "src/Agentstration.Extensions.Api/Api/Models/ExtensionEndpoints.cs": "96c56464d415b1a89194473e68407ad3f5d9e706"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

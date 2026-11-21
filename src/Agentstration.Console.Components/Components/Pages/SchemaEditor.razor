@@ -2,89 +2,291 @@
 @page "/schemas/{Name}"
 @using System.Text.Json
 @using Agentstration.Schemas
-@using Agentstration.Schemas.Contracts
 @using Agentstration.Functions.Contracts
-@inject IServiceProvider Services
+@using Agentstration.Schemas.Contracts
 @implements IDisposable
 @inject ISchemasClient Client
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SchemasStrings> Localizer
 
 <PageTitle>@(IsNew ? T("CreateTitle") : schema?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
-
+@{ var presentations = Presentations; }
 @if (IsNew)
 {
-    <PageHeader Eyebrow="@T("Schema")" Title="@T("CreateTitle")" Description="@T("EditorDescription")" TestId="schema-editor">
-        <Actions><a class="button-secondary" href="/schemas">@T("Back")</a></Actions>
-    </PageHeader>
-}
-
-@if (loading)
-{
-    <LoadingState Message="@T("LoadingDetails")" />
-}
-else if (error is not null && schema is null && !IsNew)
-{
-    <ErrorState Message="@error" />
+    <PageHeader CollectionHref="/schemas" CollectionLabel="@T("Title")" Title="@T("CreateTitle")" Description="@T("EditorDescription")" TestId="schema-editor"></PageHeader>
+    <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+    @Feedback
+    @if (loading) { <LoadingState Message="@T("LoadingDetails")" /> } else { @DefinitionForm(presentations) }
 }
 else
 {
-    @if (!IsNew && schema is not null)
+    <ConsoleResourceDetailsTemplate CollectionHref="/schemas" CollectionLabel="@T("Title")" Resource="schema" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(NamespaceQuery), SchemaResourceKinds.Schema, Name!)"
+        ResourceIdentity="@($"{loadedKey}|{schema?.Uid}")" Name="@(schema?.Definition.DisplayName ?? Name!)" ResourceType="@T("Schema")" Domain="schema" IconName="file-text" Description="@schema?.Definition.Description"
+        SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="BusinessSections" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
+        HasDraft="HasDraft" HasAdditionalDraft="publicationTouched" Busy="@(busy || refreshing)" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Feedback="Feedback"
+        Yaml="@rawYaml" YamlChanged="value => rawYaml = value" YamlReadOnly="@(!CanEdit || FormDirty || sourceDirty)" YamlError="@error" YamlInputTestId="schema-yaml-source"
+        YamlTitle="@T("YamlManifest")" YamlDescription="@T("YamlHelp")" TestId="schema-editor" SectionTestIdPrefix="schema">
+
+        <OverviewMetrics>@if (schema is not null) {
+            <MetricCard Label="@T("Generation")" Value="@schema.Generation.ToString()" />
+            <MetricCard Label="@T("Format")" Value="@schema.Definition.Format" Detail="@(schema.Definition.Dialect ?? "—")" Status="@(SavedFormatAvailable ? UiStatus.Success : UiStatus.Warning)" />
+        }</OverviewMetrics>
+        <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
+        <OverviewContent>@if (schema?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><details><summary>@T("SourceEvidence")</summary><pre class="runner-json">@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details></FormSection> }</OverviewContent>
+        <DefinitionContent Context="path">@DefinitionForm(presentations)</DefinitionContent>
+        <AdditionalContent Context="path"><div @oninput="() => publicationTouched = true" @onchange="() => publicationTouched = true">@VersionsContent</div></AdditionalContent>
+        <DraftActions><button class="text-button" type="button" @onclick="Discard" disabled="@(busy || refreshing)">@T("DiscardDraft")</button>
+            @if (sectionState.Is("yaml")) { <button class="button-primary" type="button" data-testid="schema-yaml-save" @onclick="SaveRawAsync" disabled="@(busy || refreshing || !CanEdit || FormDirty || sourceDirty)">@T("SaveYaml")</button> }
+            else { <button class="button-primary" type="submit" form="schema-definition-form" data-testid="schema-save" disabled="@(busy || refreshing || !CanEdit)">@T("SaveDraft")</button> }
+        </DraftActions>
+    </ConsoleResourceDetailsTemplate>
+}
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "version")] public string? Version { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
+    private SchemaEditorModel model = new();
+    private EditContext? formContext;
+    private ValidationMessageStore? specialErrors;
+    private ResourceDefinitionForm? form;
+    private CreationWizard? wizard;
+    private SchemaResource? schema;
+    private ResourceSnapshot<SchemaResource>? latestSnapshot;
+    private IReadOnlyList<SchemaFormatDescriptor> formats = [];
+    private IReadOnlyList<SchemaVersionResource> versions = [];
+    private SchemaVersionResource? selectedVersion;
+    private string? etag, yamlEtag, error, message, loadedKey, destination, loadedVersion, observedVersionQuery;
+    private string baseline = "", rawYaml = "", yamlBaseline = "", publishVersion = "1.0.0";
+    private bool loading = true, busy, refreshing, touched, sourceDirty, invalidInput, publicationTouched, disposed, validationFocus, interactive;
+    private long revision;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string functionName = string.Empty, functionDisplayName = string.Empty, functionVersion = "1.0.0";
+    private bool CanExpose => interactive && CanManage && (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.HasPermission("resources/write") == true;
+    private bool CanManage => schema?.ScopeRef is not null && ResourceOwnershipContext.CanManage(schema.ScopeRef, Services);
+    private bool CanEdit => IsNew || CanManage && schema is { Governance.IsManaged: false };
+    private bool CanPublish => schema?.ScopeRef is not null;
+    private bool FormDirty => touched || invalidInput || JsonSerializer.Serialize(model) != baseline;
+    private bool YamlDirty => rawYaml != yamlBaseline;
+    private bool HasDraft => !loading && (IsNew ? touched || invalidInput || sourceDirty : schema is not null && (FormDirty || sourceDirty || YamlDirty));
+    private EditContext FormContext
     {
-        <ResourceHeader ResourceType="@T("Schema")" Domain="schema" IconName="document" Name="@schema.Definition.DisplayName" Description="@schema.Definition.Description" StatusText="@(versions.Count == 0 ? T("Draft") : T("PublishedVersionsCount", versions.Count))" Status="@(versions.Count == 0 ? UiStatus.Neutral : UiStatus.Success)" TestId="schema-editor">
-            <Metadata><span><code>@schema.Namespace/@schema.Name</code></span><span>@T("Generation") @schema.Generation</span></Metadata>
-            <Actions><a class="button-secondary" href="/schemas">@T("Back")</a></Actions>
-        </ResourceHeader>
-        <ResourceTabs Label="@T("SchemaSections")">
-            @foreach (var tab in Enum.GetValues<SchemaTab>())
+        get
+        {
+            if (formContext is null) { formContext = new(model); specialErrors = new(formContext); formContext.OnFieldChanged += (_, _) => { specialErrors.Clear(); formContext.NotifyValidationStateChanged(); }; }
+            return formContext;
+        }
+    }
+    private IReadOnlyDictionary<string,string> FieldLabels => new Dictionary<string,string> { [nameof(model.Name)] = T("TechnicalName"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Namespace)] = T("Namespace"), [nameof(model.Scope)] = T("Scope"), [nameof(model.Description)] = T("DescriptionLabel"), [nameof(model.Format)] = T("Format"), [nameof(model.Content)] = T("DesignerTitle") };
+    private IReadOnlyDictionary<string,ResourceSectionPresentation> Presentations => new Dictionary<string,ResourceSectionPresentation>
+    {
+        ["definition/identity"] = new() { ReadOnly = !CanEdit, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.Scope), nameof(model.Tags), nameof(model.Description)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanEdit, HasRequiredFields = true, Fields = [nameof(model.Format), nameof(model.Dialect), nameof(model.Content)] },
+        ["yaml"] = new() { ReadOnly = !CanEdit || FormDirty || sourceDirty, Actions = YamlActions, ReadOnlyActions = FormDirty || sourceDirty ? ReturnToDefinition : null }
+    };
+    private IReadOnlyList<ResourceNavigationItem> BusinessSections => [new("versions", T("Tab.Versions"), "history")];
+    private IReadOnlyList<CreationWizardStep> Steps => [new("identity", T("Identity"), IdentityContent) { IsComplete = model.IdentityComplete }, new("configuration", T("Configuration"), ConfigurationContent) { IsComplete = FormatAvailable && !sourceDirty }];
+    private IReadOnlyList<SchemaFormatDescriptor> AvailableFormats => formats.Where(value => value.IsAvailable).GroupBy(value => value.Format, StringComparer.Ordinal).Select(value => value.First()).ToArray();
+    private SchemaFormatDescriptor? SelectedFormatDescriptor => FormatDescriptor(model.Format);
+    private SchemaFormatDescriptor? FormatDescriptor(string format) => formats.FirstOrDefault(value => value.IsAvailable && value.IsDefault && value.Format == format) ?? formats.FirstOrDefault(value => value.IsAvailable && value.Format == format);
+    private SchemaFormatDescriptor? VersionFormatDescriptor(SchemaVersionResource value) => FormatDescriptor(value.Format);
+    private bool FormatAvailable => SelectedFormatDescriptor is not null;
+    private bool SavedFormatAvailable => schema is not null && FormatDescriptor(schema.Definition.Format) is not null;
+    private string FormatLabel(SchemaFormatDescriptor descriptor) => descriptor.Format switch
+    {
+        "xml-xsd" => T("Format.XmlXsd"),
+        "xml-json-transformation" => T("Format.XmlJsonTransformation"),
+        _ => descriptor.DisplayName
+    };
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private string CurrentKey => $"{Name}|{NamespaceQuery}|{ScopeRefQuery}|{Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).GetValueOrDefault("context")}";
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedKey == CurrentKey) { if (!IsNew && Version != observedVersionQuery) { observedVersionQuery = Version; await InspectVersionAsync(Version); } return; }
+        loadedKey = CurrentKey; ClearPrivate(); loading = true; loadState = new(ResourceLoadStatus.Loading);
+        var request = revision;
+        try
+        {
+            var available = await Client.GetFormatsAsync(cancellation.Token); if (request != revision || disposed) return; formats = available;
+            if (IsNew)
             {
-                <button id="@TabId(tab)" type="button" role="tab" aria-selected="@(activeTab == tab ? "true" : "false")" aria-controls="schema-tab-panel" class="@(activeTab == tab ? "active" : null)" data-testid="@TabId(tab)" @onclick="() => activeTab = tab">@T($"Tab.{tab}")</button>
+                var preferred = formats.FirstOrDefault(value => value.IsAvailable && value.IsDefault) ?? formats.FirstOrDefault(value => value.IsAvailable);
+                if (preferred is not null) { model.Format = preferred.Format; model.Dialect = preferred.Dialects.FirstOrDefault() ?? ""; }
+                baseline = JsonSerializer.Serialize(model); return;
             }
-        </ResourceTabs>
+            await ReadSavedAsync(request, false);
+        }
+        catch (Exception exception) { HandleFailure(exception, request); }
+        finally { if (request == revision) loading = false; }
+    }
+    private Task RefreshAsync() => busy || refreshing ? Task.CompletedTask : ReadSavedAsync(revision, true);
+    private async Task ReadSavedAsync(long request, bool refresh)
+    {
+        if (!ResourceScopeRef.TryParse(ScopeRefQuery, out var owner)) { error = T("ScopeRequired"); loadState = new(ResourceLoadStatus.Failed) { Message = error }; loading = false; return; }
+        refreshing = refresh;
+        if (schema is not null) loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var saved = await Client.GetSchemaAsync(owner, ResourceNamespace.Parse(NamespaceQuery), Name!, cancellation.Token);
+            if (request != revision || disposed) return;
+            if (saved.Value.Name != Name || saved.Value.Namespace != ResourceNamespace.Parse(NamespaceQuery) || saved.Value.ScopeRef != owner || schema is not null && schema.Uid != saved.Value.Uid)
+            { ClearPrivate(); loading = false; loadState = new(ResourceLoadStatus.NotFound); return; }
+            var history = await Client.GetVersionsAsync(owner, saved.Value.Namespace, saved.Value.Name, cancellation.Token);
+            if (request != revision || disposed) return;
+            var initial = schema is null;
+            if (!initial && (FormDirty || sourceDirty || YamlDirty) && etag != saved.ETag) latestSnapshot = saved;
+            Adopt(saved, !initial && (FormDirty || sourceDirty));
+            versions = history;
+            if (initial) publishVersion = SchemaEditorModel.NextVersion(history);
+            if (Version != observedVersionQuery) { observedVersionQuery = Version; await InspectVersionAsync(Version); }
+            if (request == revision) loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (Exception exception) { HandleFailure(exception, request); }
+        finally { if (request == revision) { loading = false; refreshing = false; } }
+    }
+    private void Adopt(ResourceSnapshot<SchemaResource> saved, bool keepForm)
+    {
+        var keepYaml = YamlDirty; schema = saved.Value;
+        if (!keepForm) { model.Load(schema); etag = saved.ETag; baseline = JsonSerializer.Serialize(model); touched = invalidInput = false; }
+        if (!keepYaml) { rawYaml = yamlBaseline = ResourceManifestSerializer.ToYaml(SchemaManifest.From(schema)); yamlEtag = saved.ETag; }
+    }
+    private void ClearPrivate()
+    {
+        revision++; busy = refreshing = false; schema = null; latestSnapshot = null; selectedVersion = null; versions = []; model = new(); formContext = null;
+        etag = yamlEtag = error = message = loadedVersion = observedVersionQuery = null; rawYaml = yamlBaseline = ""; baseline = JsonSerializer.Serialize(model);
+        touched = sourceDirty = invalidInput = publicationTouched = false; publishVersion = "1.0.0";
+    }
+    private void HandleFailure(Exception exception, long request)
+    {
+        if (request != revision || disposed) return;
+        var status = exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
+        if (status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) { ClearPrivate(); loading = refreshing = false; }
+        else error = exception.Message;
+        loadState = new(status) { HasContent = schema is not null };
+    }
+    private void Discard()
+    {
+        if (schema is null || busy || refreshing) return;
+        var accepted = latestSnapshot ?? new(schema, etag!); latestSnapshot = null;
+        model = new(); formContext = null; sourceDirty = touched = invalidInput = false; rawYaml = yamlBaseline = "";
+        Adopt(accepted, false); error = message = null;
+    }
+    private void MarkDirty() { touched = true; specialErrors?.Clear(); }
+    private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
+    private void ValidateSpecialized()
+    {
+        _ = FormContext; specialErrors!.Clear();
+        if (!model.NamespaceValid) specialErrors.Add(FormContext.Field(nameof(model.Namespace)), T("NamespaceInvalid"));
+        if (IsNew && sourceDirty) specialErrors.Add(FormContext.Field(nameof(model.Content)), T("ApplySourceFirst"));
+        FormContext.NotifyValidationStateChanged();
+    }
+    private async Task FinishAsync(CreationWizardFinish finish)
+    {
+        ValidateSpecialized();
+        if (!FormContext.Validate()) { finish.ReturnToStepId = ResourceDefinitionForm.FirstInvalidSection(FormContext, Presentations) == "definition/identity" ? "identity" : "configuration"; validationFocus = true; return; }
+        await SaveAsync();
+    }
+    private void StepReady(string _) { if (validationFocus) { validationFocus = false; form?.RequestValidationFocus(); } }
+    private async Task SaveAsync()
+    {
+        if (!CanEdit || busy || refreshing) return;
+        ValidateSpecialized(); if (!FormContext.Validate()) { await form!.RevealValidationAsync(); return; }
+        var request = revision; busy = true; error = message = null;
+        try
+        {
+            var properties = model.Properties(schema);
+            var saved = IsNew ? await Client.CreateAsync(new(model.Name.Trim(), properties, ResourceNamespace.Parse(model.Namespace), model.Scope), cancellation.Token)
+                : await Client.UpdateAsync(schema!.ScopeRef!.Value, schema.Namespace, schema.Name, new(properties), etag!, cancellation.Token);
+            if (request != revision || disposed) return;
+            var creating = IsNew; Adopt(saved, false); latestSnapshot = null;
+            message = T("Saved"); if (creating) { sourceDirty = false; destination = EditUrl(saved.Value); }
+        }
+        catch (Exception exception) { HandleFailure(exception, request); }
+        finally { if (request == revision) busy = false; }
+    }
+    protected override void OnAfterRender(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } if (destination is { } url) { destination = null; Navigation.NavigateTo(url); } }
+    private SchemaManifest? ParseYaml()
+    {
+        try { var value = ResourceManifestSerializer.FromYaml<SchemaManifest>(rawYaml); if (value.IdentityError(schema!) is { } key) throw new ArgumentException(T(key)); return value; }
+        catch (Exception exception) { error = exception.Message; return null; }
+    }
+    private void ApplyRawYaml()
+    {
+        if (!CanEdit || busy || FormDirty || sourceDirty || ParseYaml() is not { } raw) return;
+        model = new(); model.Load(schema! with { Definition = raw.Definition }); formContext = null; touched = true; etag = yamlEtag;
+        yamlBaseline = rawYaml; error = null; ShowSection("definition/identity");
+    }
+    private async Task SaveRawAsync()
+    {
+        if (!CanEdit || busy || refreshing || FormDirty || sourceDirty || ParseYaml() is not { } raw) return;
+        var request = revision; busy = true; error = message = null;
+        try { var saved = await Client.UpdateAsync(schema!.ScopeRef!.Value, schema.Namespace, schema.Name, new(raw.Definition), yamlEtag!, cancellation.Token); if (request != revision || disposed) return; rawYaml = yamlBaseline = ""; Adopt(saved, false); latestSnapshot = null; message = T("Saved"); }
+        catch (Exception exception) { HandleFailure(exception, request); }
+        finally { if (request == revision) busy = false; }
+    }
+    private async Task ExposeAsync()
+    {
+        if (!CanExpose || busy || schema is null || selectedVersion is null) return;
+        busy = true; error = null; message = null;
+        try
+        {
+            var client = (ITransformationFunctionsClient)Services.GetService(typeof(ITransformationFunctionsClient))!;
+            var exposed = await client.ExposeAsync(new(functionName.Trim(), functionDisplayName.Trim(), functionVersion.Trim(),
+                new() { Name = schema.Name, Version = selectedVersion.Version, ScopeRef = schema.ScopeRef, Namespace = schema.Namespace },
+                schema.ScopeRef!.Value, schema.Namespace), cancellation.Token);
+            Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/transformation-functions", exposed.Name, exposed.Namespace, exposed.ScopeRef));
+        }
+        catch (Exception) { error = T("ExposureFailed"); }
+        finally { busy = false; }
     }
 
-    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
-    @if (message is not null) { <div class="form-alert form-alert-success" role="status">@message</div> }
-    @if (!FormatAvailable) { <div class="form-alert form-alert-warning" role="status">@T("UnavailableFormat", format)</div> }
-
-    @if (!IsNew && activeTab == SchemaTab.Overview && schema is not null)
+    private async Task PublishAsync()
     {
-        <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-            <section class="metric-grid" aria-label="@T("Overview")">
-                <MetricCard Label="@T("Generation")" Value="@schema.Generation.ToString()" Detail="@T("Draft")" Status="UiStatus.Info" />
-                <MetricCard Label="@T("Format")" Value="@schema.Definition.Format" Detail="@(schema.Definition.Dialect ?? "—")" Status="@(FormatAvailable ? UiStatus.Success : UiStatus.Warning)" />
-                <MetricCard Label="@T("Scope")" Value="@T($"ScopeKind.{schema.ScopeRef!.Value.Kind}")" Detail="@schema.Namespace.Value" Status="UiStatus.Neutral" />
-            </section>
-            <section class="panel form-section" data-testid="schema-overview">
-                <div class="panel-header"><div><p class="eyebrow">@T("Overview")</p><h2>@T("ResourceIdentity")</h2><p>@T("OverviewHelp")</p></div></div>
-                <dl class="resource-details">
-                    <dt>@T("DisplayName")</dt><dd>@schema.Definition.DisplayName</dd>
-                    <dt>@T("TechnicalName")</dt><dd><code>@schema.Name</code></dd>
-                    <dt>@T("Namespace")</dt><dd><code>@schema.Namespace.Value</code></dd>
-                    <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="schema.ScopeRef" /></dd>
-                    <dt>@T("Format")</dt><dd><code>@schema.Definition.Format</code></dd>
-                    <dt>@T("Dialect")</dt><dd><code>@(schema.Definition.Dialect ?? "—")</code></dd>
-                </dl>
-                @if (schema.Definition.SourceEvidence is { } evidence)
-                {
-                    <details><summary>@T("SourceEvidence")</summary><pre>@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details>
-                }
-            </section>
-        </main>
+        if (!CanPublish || busy || schema is null) return;
+        var request = revision; var resource = schema; busy = true; error = message = null;
+        try { var published = await Client.PublishAsync(resource.ScopeRef!.Value, resource.Namespace, resource.Name, new(publishVersion.Trim()), cancellation.Token); var history = await Client.GetVersionsAsync(resource.ScopeRef.Value, resource.Namespace, resource.Name, cancellation.Token); if (request != revision || disposed) return; versions = history; selectedVersion = published; publishVersion = SchemaEditorModel.NextVersion(history); publicationTouched = false; message = T("VersionPublished", published.Version); }
+        catch (Exception exception) { HandleFailure(exception, request); }
+        finally { if (request == revision) busy = false; }
     }
-    else if (!IsNew && activeTab == SchemaTab.Yaml && schema is not null)
+    private async Task InspectVersionAsync(string? version)
     {
-        <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-            <section class="panel form-section" data-testid="schema-yaml">
-                <div class="panel-header"><div><p class="eyebrow">@T("ResourceManifest")</p><h2>@T("YamlManifest")</h2><p>@T("YamlHelp")</p></div><StatusBadge Text="@T("Draft")" Status="UiStatus.Neutral" /></div>
-                <label class="schema-yaml-field"><span>@T("ResourceManifest")</span><textarea class="form-code-editor runner-json" rows="30" aria-label="@T("ResourceManifest")" data-testid="schema-yaml-source" @bind="rawYaml" @bind:event="oninput"></textarea></label>
-                <div class="form-actions"><button class="button-secondary" type="button" @onclick="ApplyRawYaml" disabled="@busy">@T("ApplyToForm")</button><button class="button-primary" type="button" @onclick="SaveRawAsync" disabled="@busy" data-testid="schema-yaml-save">@(busy ? T("Saving") : T("SaveYaml"))</button></div>
-            </section>
-        </main>
+        loadedVersion = version; if (schema is null || string.IsNullOrWhiteSpace(version)) { selectedVersion = null; return; }
+        var request = revision; var resource = schema;
+        try { var inspected = await Client.GetVersionAsync(resource.ScopeRef!.Value, resource.Namespace, resource.Name, version, cancellation.Token); if (request == revision && !disposed && loadedVersion == version) selectedVersion = inspected; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound) { if (request == revision && !disposed) { selectedVersion = null; error = exception.Message; } }
+        catch (Exception exception) { HandleFailure(exception, request); }
     }
-    else if (!IsNew && activeTab == SchemaTab.Versions && schema is not null)
-    {
-        <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
+    private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) => Client.ValidateDefinitionAsync(request, cancellation.Token);
+    private Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request) => Client.ValidateInstanceAsync(request, cancellation.Token);
+    private void ChangeFormat(string format) { model.Format = format; model.Dialect = SelectedFormatDescriptor?.Dialects.FirstOrDefault() ?? ""; if (format == BuiltinXmlSchemaFormatHandler.Format) model.Content = JsonSerializer.SerializeToElement("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" />"); MarkDirty(); }
+    private Task ChangeContent(SchemaEditorModel observed, long request, JsonElement value) { if (disposed || request != revision || !ReferenceEquals(observed, model) || !CanEdit || busy) return Task.CompletedTask; model.Content = value.Clone(); FormContext.NotifyFieldChanged(FormContext.Field(nameof(model.Content))); return Task.CompletedTask; }
+    private void SourceDraftChanged(SchemaEditorModel observed, long request, bool value) { if (!disposed && request == revision && ReferenceEquals(observed, model) && CanEdit && !busy) sourceDirty = value; }
+    private string EditUrl(SchemaResource value) => ResourceOwnershipContext.Resource(Services, "/schemas", value.Name, value.Namespace, value.ScopeRef);
+    private string VersionUrl(string version) => EditUrl(schema!) + "&version=" + Uri.EscapeDataString(version) + "#versions";
+    private IReadOnlyList<KeyValuePair<string,string>> SavedSettings => schema is null ? [] : [new(T("Format"), schema.Definition.Format), new(T("Dialect"), schema.Definition.Dialect ?? "—"), new(T("DefinitionSource"), schema.Definition.Content.GetRawText())];
+    private RenderFragment Feedback => @<div>@if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }@if (message is not null) { <div class="form-alert form-alert-success" role="status">@message</div> }@if (latestSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }@if (!loading && !FormatAvailable) { <div class="form-alert form-alert-warning" role="status">@T("UnavailableFormat", model.Format)</div> }</div>;
+    private RenderFragment YamlActions => @<button class="button-secondary" type="button" @onclick="ApplyRawYaml" disabled="@(busy || !CanEdit || FormDirty || sourceDirty)">@T("ApplyToForm")</button>;
+    private RenderFragment ReturnToDefinition => @<button class="button-secondary" type="button" @onclick='() => ShowSection("definition/identity")'>@T("Tab.Definition")</button>;
+    private RenderFragment DefinitionForm(IReadOnlyDictionary<string,ResourceSectionPresentation> presentations) => @<ResourceDefinitionForm @key="model" @ref="form" EditContext="FormContext" Id="schema-definition-form" FormName="schema-definition" FieldLabels="FieldLabels" Sections="presentations"
+        SectionState="@(IsNew ? null : sectionState)" SectionContent="@(IsNew ? null : DefinitionContent)" SectionRequested="ShowSection" OnValidSubmit="SaveAsync" Busy="busy" Disabled="@(!interactive)" FieldsTestId="schema-definition-fields" ReadOnly="@(!CanEdit)" InvalidInputChanged="value => invalidInput = value" @oninput="MarkDirty" @onchange="MarkDirty">
+        <ChildContent>@if (IsNew) { <CreationWizard @ref="wizard" Steps="Steps" OnFinish="FinishAsync" OnStepReady="StepReady" Busy="busy" Disabled="@(!interactive)" FinishTestId="schema-save" FinishLabel="@T("SaveDraft")" /> }</ChildContent>
+    </ResourceDefinitionForm>;
+    private RenderFragment<string> DefinitionContent => path => path == "definition/identity" ? IdentityContent : ConfigurationContent;
+    private RenderFragment IdentityContent => @<ResourceIdentityEditor ResourceKind="@SchemaResourceKinds.Schema" IsNew="IsNew" NamespaceEditable="IsNew" ReadOnly="@(!CanEdit)" @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" @bind-Namespace="model.Namespace" @bind-ScopeRef="model.Scope" @bind-Description="model.Description" @bind-Labels="model.Tags" LabelsReadOnly="true"
+        DisplayNameTestId="schema-display-name" TechnicalNameTestId="schema-name" NamespaceTestId="schema-namespace" TestId="schema-definition"><AdditionalPanels>@if (schema?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><pre class="runner-json">@JsonSerializer.Serialize(evidence)</pre></FormSection> }</AdditionalPanels></ResourceIdentityEditor>;
+    private RenderFragment ConfigurationContent { get { var observed = model; var request = revision; return @<FormSection Title="@T("Configuration")"><FormGrid>
+        <FormField Label="@T("Format")"><ClearableSelect TValue="string" Value="@model.Format" ValueExpression="@(() => model.Format)" ValueChanged="ChangeFormat" disabled="@(!IsNew || busy)">@foreach (var available in AvailableFormats) { <option value="@available.Format">@FormatLabel(available) (@available.Format)</option> }@if (!FormatAvailable) { <option value="@model.Format">@model.Format</option> }</ClearableSelect></FormField>
+        <FormField Label="@T("Dialect")"><ClearableSelect TValue="string" @bind-Value="model.Dialect" disabled="@(!IsNew || busy)">@foreach (var value in SelectedFormatDescriptor?.Dialects ?? []) { <option value="@value">@value</option> }@if (!FormatAvailable) { <option value="@model.Dialect">@model.Dialect</option> }</ClearableSelect></FormField>
+    </FormGrid><section class="panel schema-designer-panel" data-testid="schema-designer" tabindex="-1" aria-invalid="@(IsNew && sourceDirty ? "true" : null)">
+        <SchemaDocumentEditor Format="@model.Format" Dialect="@model.Dialect" Descriptor="SelectedFormatDescriptor" Value="model.Content" ValueChanged="value => ChangeContent(observed, request, value)" DraftChanged="value => SourceDraftChanged(observed, request, value)" Disabled="busy" ReadOnly="@(!CanEdit)" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
+        <ValidationMessage For="@(() => model.Content)" />
+    </section></FormSection>; } }
+    private RenderFragment VersionsContent => @<div class="resource-editor-view">@if (schema is not null) {
             <section class="panel form-section" data-testid="schema-versions">
                 <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PublishedVersionsHelp")</p></div></div>
                 <section class="schema-publish-card" aria-labelledby="schema-publish-title">
@@ -93,18 +295,22 @@ else
                         <div><h3 id="schema-publish-title">@T("PublishDraft")</h3><p>@T("PublishDraftHelp", schema.Generation)</p></div>
                     </div>
                     <div class="schema-publish-controls">
-                        <label><span>@T("Version")</span><input @bind="publishVersion" disabled="@busy" aria-describedby="schema-version-help" data-testid="schema-publish-version" /></label>
-                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@busy" data-testid="schema-publish">@(busy ? T("Publishing") : T("Publish"))</button>
+                        <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="publishVersion" Disabled="@(busy || !CanPublish)" aria-describedby="schema-version-help" data-testid="schema-publish-version" /></FormField>
+                        <button class="button-primary" type="button" @onclick="PublishAsync" disabled="@(busy || !CanPublish)" data-testid="schema-publish">@(busy ? T("Publishing") : T("Publish"))</button>
                     </div>
                     <p id="schema-version-help" class="muted schema-version-help">@T("VersionHelp")</p>
                 </section>
                 @if (versions.Count == 0) { <p class="muted">@T("NoPublishedVersions")</p> }
                 else
                 {
-                    <DataGrid TItem="SchemaVersionResource" Items="versions.OrderByDescending(value => value.PublishedAt).ToArray()">
-                        <Header><tr><th>@T("Version")</th><th>@T("PublishedAt")</th><th>@T("DefinitionHash")</th></tr></Header>
-                        <Row Context="version"><tr><td><a class="text-button" href="@VersionUrl(version.Version)" data-testid="schema-version-link"><code>@version.Version</code></a></td><td>@version.PublishedAt.ToLocalTime().ToString("g")</td><td><code>@version.DefinitionHash</code></td></tr></Row>
-                    </DataGrid>
+                    <CollectionView TItem="SchemaVersionResource" Items="versions.OrderByDescending(value => value.PublishedAt).ToArray()" InformationLabels="@(new string[] { T("PublishedAt"), T("DefinitionHash") })" IdentityLabel="@T("Version")">
+        <Identity Context="version">
+<a class="text-button" href="@VersionUrl(version.Version)" data-testid="schema-version-link" @onclick="() => InspectVersionAsync(version.Version)" @onclick:preventDefault><code>@version.Version</code></a></Identity>
+        <Information Context="version">
+            <CollectionValue Label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
+            <CollectionValue Label="@T("DefinitionHash")"><code>@version.DefinitionHash</code></CollectionValue>
+        </Information>
+    </CollectionView>
                     @if (selectedVersion is not null)
                     {
                         <section class="schema-version-details" data-testid="schema-version-details">
@@ -118,7 +324,7 @@ else
                             </dl>
                             <div class="schema-version-editor">
                                 <div><h4>@T("ImmutableContent")</h4><p class="muted">@T("ImmutableContentHelp")</p></div>
-                                <SchemaDocumentEditor Format="@selectedVersion.Format" Dialect="@selectedVersion.Dialect"
+                                <SchemaDocumentEditor @key="selectedVersion.Version" Format="@selectedVersion.Format" Dialect="@selectedVersion.Dialect"
                                     Descriptor="@VersionFormatDescriptor(selectedVersion)" Value="@selectedVersion.Content"
                                     ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
                             </div>
@@ -127,9 +333,9 @@ else
                                 <section class="panel form-section" data-testid="schema-exposure">
                                     <h4>@T("ExposeAsFunction")</h4><p>@T("ExposureHelp")</p>
                                     <fieldset class="schema-exposure-fields" disabled="@(!CanExpose || busy)">
-                                        <label><span>@T("TechnicalName")</span><input @bind="functionName" data-testid="exposure-name" /></label>
-                                        <label><span>@T("DisplayName")</span><input @bind="functionDisplayName" data-testid="exposure-display-name" /></label>
-                                        <label><span>@T("Version")</span><input @bind="functionVersion" data-testid="exposure-version" /></label>
+                                        <FormField Label="@T("TechnicalName")" Required="true"><ClearableText @bind-Value="functionName" Disabled="@(!CanExpose || busy)" data-testid="exposure-name" /></FormField>
+                                        <FormField Label="@T("DisplayName")" Required="true"><ClearableText @bind-Value="functionDisplayName" Disabled="@(!CanExpose || busy)" data-testid="exposure-display-name" /></FormField>
+                                        <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="functionVersion" Disabled="@(!CanExpose || busy)" data-testid="exposure-version" /></FormField>
                                         <button type="button" class="button-primary" @onclick="ExposeAsync" data-testid="schema-expose">@T("ExposeAsFunction")</button>
                                     </fieldset>
                                 </section>
@@ -138,328 +344,7 @@ else
                     }
                 }
             </section>
-        </main>
-    }
-    else if (!IsNew && activeTab == SchemaTab.Designer && schema is not null)
-    {
-        <main id="schema-tab-panel" role="tabpanel" aria-labelledby="@TabId(activeTab)" tabindex="0">
-            <section class="schema-definition-sheet">
-                <div class="schema-definition-heading">
-                    <p class="eyebrow">@T("DesignerEyebrow")</p>
-                    <h2>@T("DesignerTitle")</h2>
-                    <p>@T("DesignerHelp")</p>
-                </div>
-                <section class="panel schema-designer-panel" data-testid="schema-designer">
-                    <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
-                    <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
-                </section>
-            </section>
-        </main>
-    }
-    else
-    {
-        <main id="@(!IsNew ? "schema-tab-panel" : null)" role="@(!IsNew ? "tabpanel" : null)" aria-labelledby="@(!IsNew ? TabId(activeTab) : null)" tabindex="@(!IsNew ? "0" : null)">
-            <section class="schema-definition-sheet">
-                <div class="schema-definition-heading">
-                    <p class="eyebrow">@T("DefinitionIdentityEyebrow")</p>
-                    <h2>@T("DefinitionIdentityTitle")</h2>
-                    <p>@T("DefinitionIdentityHelp")</p>
-                </div>
-                <section class="panel schema-definition-form" data-testid="schema-definition">
-                    <div class="panel-header"><div><h3>@T("IdentityAndDescription")</h3><p>@T("DefinitionDraftHelp")</p></div>@if (!IsNew) { <StatusBadge Text="@T("Draft")" Status="UiStatus.Neutral" /> }</div>
-                    <div class="schema-definition-fields">
-                        <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="technicalName" IsNew="@IsNew" DisplayNameTestId="schema-display-name" TechnicalNameTestId="schema-name" />
-                        <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(!IsNew || busy)" /></label>
-                        @if (IsNew) { <ResourceScopeFormField ResourceKind="@SchemaResourceKinds.Schema" @bind-Value="selectedScope" Disabled="@busy" /> }
-                        else { <label><span>@T("Scope")</span><span class="schema-scope-field"><ResourceScopeBadge ScopeRef="selectedScope" /></span></label> }
-                    @if (FormatAvailable)
-                    {
-                        <label><span>@T("Format")</span><select value="@format" disabled="@(!IsNew || busy)" @onchange="ChangeFormat">@foreach (var descriptor in AvailableFormats) { <option value="@descriptor.Format">@FormatLabel(descriptor) (@descriptor.Format)</option> }</select></label>
-                        <label><span>@T("Dialect")</span><select value="@dialect" disabled="@(!IsNew || busy)" @onchange="ChangeDialect">@foreach (var value in SelectedFormatDescriptor?.Dialects ?? []) { <option value="@value">@value</option> }</select></label>
-                    }
-                    else
-                    {
-                        <label><span>@T("Format")</span><input value="@format" disabled /></label>
-                        <label><span>@T("Dialect")</span><input value="@dialect" disabled /></label>
-                    }
-                        <label class="schema-definition-description"><span>@T("DescriptionLabel")</span><textarea rows="4" @bind="description" disabled="@busy"></textarea></label>
-                    </div>
-                    @if (!IsNew)
-                    {
-                        <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
-                    }
-                </section>
-                @if (IsNew)
-                {
-                    <section class="panel schema-designer-panel" data-testid="schema-designer">
-                        <div class="panel-header"><div><p class="eyebrow">@T("DesignerEyebrow")</p><h3>@T("DesignerTitle")</h3><p>@T("DesignerHelp")</p></div></div>
-                        <SchemaDocumentEditor Format="@format" Dialect="@dialect" Descriptor="SelectedFormatDescriptor" Value="content" ValueChanged="ChangeContent" Disabled="busy" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
-                        <div class="form-actions"><button class="button-primary" type="button" @onclick="SaveAsync" disabled="@busy" data-testid="schema-save">@(busy ? T("Saving") : T("SaveDraft"))</button></div>
-                    </section>
-                }
-            </section>
-        </main>
-    }
-}
 
-@code {
-    [Parameter] public string? Name { get; set; }
-    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceQuery { get; set; }
-    [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefQuery { get; set; }
-    [SupplyParameterFromQuery(Name = "view")] public string? View { get; set; }
-    [SupplyParameterFromQuery(Name = "version")] public string? Version { get; set; }
-    private readonly CancellationTokenSource cancellation = new();
-    private SchemaResource? schema;
-    private ResourceScopeRef? selectedScope;
-    private string? etag, error, message;
-    private string displayName = string.Empty, technicalName = string.Empty;
-    private string resourceNamespace = ResourceNamespace.DefaultValue;
-    private string format = SchemaFormatIds.JsonSchema;
-    private string dialect = "https://json-schema.org/draft/2020-12/schema";
-    private string? description;
-    private JsonElement content = JsonSerializer.SerializeToElement(new { type = "object", properties = new { } });
-    private string rawYaml = string.Empty, publishVersion = "1.0.0";
-    private IReadOnlyList<SchemaFormatDescriptor> formats = [];
-    private IReadOnlyList<SchemaVersionResource> versions = [];
-    private SchemaVersionResource? selectedVersion;
-    private bool loading = true, busy, interactive;
-    private string functionName = string.Empty, functionDisplayName = string.Empty, functionVersion = "1.0.0";
-    private bool CanExpose => interactive && (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.HasPermission("resources/write") == true;
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (firstRender) { interactive = true; StateHasChanged(); }
-    }
-    private SchemaTab activeTab = SchemaTab.Overview;
-    private bool IsNew => string.IsNullOrWhiteSpace(Name);
-    private IReadOnlyList<SchemaFormatDescriptor> AvailableFormats => formats.Where(value => value.IsAvailable)
-        .GroupBy(value => value.Format, StringComparer.Ordinal).Select(value => value.First()).ToArray();
-    private SchemaFormatDescriptor? SelectedFormatDescriptor => formats.FirstOrDefault(value => value.IsAvailable
-        && value.IsDefault && string.Equals(value.Format, format, StringComparison.Ordinal))
-        ?? formats.FirstOrDefault(value => value.IsAvailable && string.Equals(value.Format, format, StringComparison.Ordinal));
-    private bool FormatAvailable => SelectedFormatDescriptor is not null;
-    private string FormatLabel(SchemaFormatDescriptor descriptor) => descriptor.Format switch
-    {
-        "xml-xsd" => T("Format.XmlXsd"),
-        "xml-json-transformation" => T("Format.XmlJsonTransformation"),
-        _ => descriptor.DisplayName
-    };
-    private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) =>
-        Client.ValidateDefinitionAsync(request, cancellation.Token);
-    private Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request) =>
-        Client.ValidateInstanceAsync(request, cancellation.Token);
-    private static string TabId(SchemaTab tab) => $"schema-tab-{tab.ToString().ToLowerInvariant()}";
-
-    protected override async Task OnParametersSetAsync()
-    {
-        loading = true;
-        error = null;
-        try
-        {
-            formats = await Client.GetFormatsAsync(cancellation.Token);
-            if (IsNew)
-            {
-                var descriptor = formats.FirstOrDefault(value => value.IsAvailable && value.IsDefault)
-                    ?? formats.FirstOrDefault(value => value.IsAvailable);
-                if (descriptor is not null)
-                {
-                    format = descriptor.Format;
-                    dialect = descriptor.Dialects.FirstOrDefault() ?? string.Empty;
-                }
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(ScopeRefQuery)) throw new InvalidOperationException(T("ScopeRequired"));
-            var snapshot = await Client.GetSchemaAsync(ResourceScopeRef.Parse(ScopeRefQuery), ResourceNamespace.Parse(NamespaceQuery), Name!, cancellation.Token);
-            schema = snapshot.Value;
-            etag = snapshot.ETag;
-            selectedScope = schema.ScopeRef;
-            displayName = schema.Definition.DisplayName;
-            technicalName = schema.Name;
-            resourceNamespace = schema.Namespace.Value;
-            format = schema.Definition.Format;
-            dialect = schema.Definition.Dialect ?? string.Empty;
-            description = schema.Definition.Description;
-            content = schema.Definition.Content.Clone();
-            versions = await Client.GetVersionsAsync(schema.ScopeRef!.Value, schema.Namespace, schema.Name, cancellation.Token);
-            publishVersion = NextVersion(versions);
-            PrepareRawYaml();
-            activeTab = View?.ToLowerInvariant() switch { "definition" => SchemaTab.Definition, "designer" => SchemaTab.Designer, "yaml" => SchemaTab.Yaml, "versions" => SchemaTab.Versions, _ => SchemaTab.Overview };
-            selectedVersion = activeTab == SchemaTab.Versions && !string.IsNullOrWhiteSpace(Version)
-                ? await Client.GetVersionAsync(schema.ScopeRef.Value, schema.Namespace, schema.Name, Version, cancellation.Token)
-                : null;
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
-
-    private async Task SaveAsync()
-    {
-        if (busy) return;
-        busy = true;
-        error = null;
-        message = null;
-        try
-        {
-            var properties = new SchemaProperties
-            {
-                SourceEvidence = schema?.Definition.SourceEvidence,
-                DisplayName = displayName.Trim(),
-                Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-                Format = format.Trim(),
-                Dialect = string.IsNullOrWhiteSpace(dialect) ? null : dialect.Trim(),
-                Content = content.Clone(),
-                UsePolicy = schema?.Definition.UsePolicy ?? new()
-            };
-            ResourceSnapshot<SchemaResource> saved;
-            if (IsNew)
-            {
-                if (selectedScope is null) throw new InvalidOperationException(T("ScopeRequired"));
-                saved = await Client.CreateAsync(new(technicalName.Trim(), properties, ResourceNamespace.Parse(resourceNamespace), selectedScope), cancellation.Token);
-                Navigation.NavigateTo(EditUrl(saved.Value));
-                return;
-            }
-            saved = await Client.UpdateAsync(selectedScope!.Value, ResourceNamespace.Parse(resourceNamespace), technicalName, new(properties), etag!, cancellation.Token);
-            schema = saved.Value;
-            etag = saved.ETag;
-            PrepareRawYaml();
-            message = T("Saved");
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
-    }
-
-    private void PrepareRawYaml()
-    {
-        if (schema is not null) rawYaml = ResourceManifestSerializer.ToYaml(RawResource());
-    }
-
-    private void ApplyRawYaml()
-    {
-        error = null;
-        try
-        {
-            var raw = ResourceManifestSerializer.FromYaml<RawSchemaResource>(rawYaml);
-            if (schema is null || raw.Metadata.Name != schema.Name || raw.Metadata.Namespace != schema.Namespace
-                || raw.ScopeRef != schema.ScopeRef)
-                throw new ArgumentException(T("IdentityImmutable"));
-            displayName = raw.Definition.DisplayName;
-            description = raw.Definition.Description;
-            format = raw.Definition.Format;
-            dialect = raw.Definition.Dialect ?? string.Empty;
-            content = raw.Definition.Content.Clone();
-            rawYaml = ResourceManifestSerializer.ToYaml(raw);
-            activeTab = SchemaTab.Definition;
-        }
-        catch (Exception exception) { error = exception.Message; }
-    }
-
-    private async Task SaveRawAsync()
-    {
-        if (busy) return;
-        busy = true;
-        error = null;
-        message = null;
-        try
-        {
-            var raw = ResourceManifestSerializer.FromYaml<RawSchemaResource>(rawYaml);
-            if (schema is null || raw.Metadata.Name != schema.Name || raw.Metadata.Namespace != schema.Namespace
-                || raw.ScopeRef != schema.ScopeRef)
-                throw new ArgumentException(T("IdentityImmutable"));
-            var saved = await Client.UpdateAsync(schema.ScopeRef!.Value, schema.Namespace, schema.Name,
-                new(raw.Definition), etag!, cancellation.Token);
-            schema = saved.Value;
-            etag = saved.ETag;
-            displayName = schema.Definition.DisplayName;
-            description = schema.Definition.Description;
-            format = schema.Definition.Format;
-            dialect = schema.Definition.Dialect ?? string.Empty;
-            content = schema.Definition.Content.Clone();
-            PrepareRawYaml();
-            message = T("Saved");
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
-    }
-
-    private async Task PublishAsync()
-    {
-        if (busy || schema is null) return;
-        busy = true;
-        error = null;
-        message = null;
-        try
-        {
-            var published = await Client.PublishAsync(schema.ScopeRef!.Value, schema.Namespace, schema.Name,
-                new(publishVersion.Trim()), cancellation.Token);
-            versions = await Client.GetVersionsAsync(schema.ScopeRef.Value, schema.Namespace, schema.Name, cancellation.Token);
-            selectedVersion = published;
-            publishVersion = NextVersion(versions);
-            message = T("VersionPublished", published.Version);
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
-    }
-
-    private async Task ExposeAsync()
-    {
-        if (!CanExpose || busy || schema is null || selectedVersion is null) return;
-        busy = true; error = null; message = null;
-        try
-        {
-            var client = (ITransformationFunctionsClient)Services.GetService(typeof(ITransformationFunctionsClient))!;
-            var exposed = await client.ExposeAsync(new(functionName.Trim(), functionDisplayName.Trim(), functionVersion.Trim(),
-                new() { Name = schema.Name, Version = selectedVersion.Version, ScopeRef = schema.ScopeRef, Namespace = schema.Namespace },
-                schema.ScopeRef!.Value, schema.Namespace), cancellation.Token);
-            Navigation.NavigateTo($"/transformation-functions/{Uri.EscapeDataString(exposed.Name)}?scopeRef={Uri.EscapeDataString(exposed.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(exposed.Namespace.Value)}");
-        }
-        catch (Exception) { error = T("ExposureFailed"); }
-        finally { busy = false; }
-    }
-
-    private RawSchemaResource RawResource() => new()
-    {
-        ApiVersion = schema!.ApiVersion,
-        Kind = schema.Kind,
-        Metadata = schema.Metadata,
-        ScopeRef = schema.ScopeRef,
-        Definition = schema.Definition
-    };
-
-    private static string NextVersion(IReadOnlyList<SchemaVersionResource> values)
-    {
-        var latest = values.OrderByDescending(value => value.PublishedAt).FirstOrDefault()?.Version;
-        var parts = latest?.Split('.');
-        return parts is { Length: 3 }
-            && int.TryParse(parts[0], out var major)
-            && int.TryParse(parts[1], out var minor)
-            && int.TryParse(parts[2], out var patch)
-                ? $"{major}.{minor}.{patch + 1}"
-                : "1.0.0";
-    }
-
-    private static string EditUrl(SchemaResource value) => $"/schemas/{Uri.EscapeDataString(value.Name)}"
-        + $"?scopeRef={Uri.EscapeDataString(value.ScopeRef!.Value.Value)}"
-        + $"&namespace={Uri.EscapeDataString(value.Namespace.Value)}";
-    private string VersionUrl(string version) => $"{EditUrl(schema!)}&view=versions&version={Uri.EscapeDataString(version)}";
-    private SchemaFormatDescriptor? VersionFormatDescriptor(SchemaVersionResource version) => formats.FirstOrDefault(value => value.IsAvailable
-        && value.IsDefault && string.Equals(value.Format, version.Format, StringComparison.Ordinal))
-        ?? formats.FirstOrDefault(value => value.IsAvailable && string.Equals(value.Format, version.Format, StringComparison.Ordinal));
-    private void ChangeFormat(ChangeEventArgs args)
-    {
-        format = args.Value?.ToString() ?? string.Empty;
-        dialect = SelectedFormatDescriptor?.Dialects.FirstOrDefault() ?? string.Empty;
-        if (format == BuiltinXmlSchemaFormatHandler.Format) content = JsonSerializer.SerializeToElement("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" />");
-    }
-    private void ChangeDialect(ChangeEventArgs args) => dialect = args.Value?.ToString() ?? string.Empty;
-    private Task ChangeContent(JsonElement value) { content = value.Clone(); return Task.CompletedTask; }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
-    private enum SchemaTab { Overview, Definition, Designer, Versions, Yaml }
-    private sealed record RawSchemaResource
-    {
-        public required string ApiVersion { get; init; }
-        public required string Kind { get; init; }
-        public required ResourceMetadata Metadata { get; init; }
-        public ResourceScopeRef? ScopeRef { get; init; }
-        public required SchemaProperties Definition { get; init; }
-    }
+    }</div>;
+    public void Dispose() { disposed = true; revision++; cancellation.Cancel(); cancellation.Dispose(); }
 }

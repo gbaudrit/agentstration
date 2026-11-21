@@ -26,4 +26,7 @@
   <data name="Status.notDiscovered"><value>Non découvert</value></data>
   <data name="Categories" xml:space="preserve"><value>Catégories</value></data>
   <data name="ToolSets" xml:space="preserve"><value>ToolSets</value></data>
+  <data name="Status.unknown"><value>Inconnu</value></data>
+  <data name="Type.Aep"><value>AEP</value></data>
+  <data name="Type.Mcp"><value>MCP</value></data>
 </root>

@@ -4,172 +4,287 @@
 @implements IDisposable
 @inject IFlowApiClient Client
 @inject IManagementApiClient Management
+@inject IServiceProvider Services
 @inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLocalizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowOrchestrationEditorStrings> Localizer
-@if (!Embedded)
-{
-    <PageTitle>@(model?.Name ?? T("Orchestration")) · Agentstration</PageTitle>
-}
-
-@if (loading)
-{
-    <LoadingState Message="@T("Loading")" />
-}
-else if (model is null)
-{
-    <ErrorState Title="@T("Unavailable")" Message="@(error ?? T("CouldNotLoad"))" />
-}
+@if (!Embedded) { <PageTitle>@(model?.Name ?? T("Orchestration")) · Agentstration</PageTitle> }
+@if (loading || !Embedded && redirectedKey is not null) { <LoadingState Message="@T("Loading")" /> }
+else if (model is null) { <ErrorState Title="@T("Unavailable")" Message="@(error ?? T("CouldNotLoad"))" /> }
 else
 {
-    @if (!Embedded)
+    @if (SectionState is null && IsReadOnly)
     {
-        <PageHeader Title="@model.Name" Description="@(IsReadOnly ? T("ReadOnlyDescription") : T("EditDescription"))">
-            <Actions><a class="button-secondary" href="@DetailsUrl">@T("FlowDetails")</a></Actions>
-        </PageHeader>
+        <ResourceReadOnlyNotice Reason="@(original?.Value.Governance.IsManaged == true ? ResourceReadOnlyReason.Managed : ResourceReadOnlyReason.InsufficientPermissions)" />
     }
-    @if (IsReadOnly)
-    {
-        <p class="muted"><span class="read-only-badge">@T("ReadOnly")</span> @T("Namespace") <code>@FlowResourceNamespace.Value</code> · @T("PublishedVersion") <strong>@publishedVersion</strong></p>
-    }
-    <EditForm Model="model" OnValidSubmit="SaveAsync" data-testid="flow-orchestration-editor">
-        <fieldset class="panel orchestration-metadata" disabled="@IsReadOnly">
-            <div class="form-columns"><label>@T("TechnicalName")<input value="@model.Name" readonly /></label><label>@T("CurrentDefinitionVersion")<InputText @bind-Value="model.Version" /></label><ResourceScopeFormField ResourceKind="@FlowResourceKinds.Flow" @bind-Value="selectedScope" Disabled="true" /></div>
-            <label>@T("Description")<InputTextArea @bind-Value="model.Description" /></label>
-            <label class="check-option"><InputCheckbox @bind-Value="model.Enabled" /> @T("Enabled")</label>
-        </fieldset>
-        <OrchestrationDefinitionEditor Model="model" Agents="agents" IsReadOnly="@IsReadOnly" />
-        @if (error is not null) { <p class="error-panel orchestration-message">@error</p> }
-        @if (message is not null) { <p class="success-panel orchestration-message" data-testid="flow-status-message" data-published-version="@lastPublishedVersion">@message</p> }
-        @if (!IsReadOnly)
-        {
-            <div class="orchestration-actions">
-                <span class="save-state">@T("EtagProtected") · @(saving ? T("Saving") : T("Ready"))</span>
-                <button type="submit" class="button-secondary" disabled="@saving">@T("Save")</button>
-                <label>@T("PublishVersion")<input @bind="publishVersion" /></label>
-                <button type="button" class="button-primary" disabled="@saving" @onclick="PublishAsync" data-testid="flow-publish-and-activate">@T("PublishAndActivate")</button>
-            </div>
-        }
-    </EditForm>
+    @if (publishedVersion is not null) { <p class="muted">@T("PublishedVersion") <strong>@publishedVersion</strong></p> }
+    <ResourceDefinitionForm @key="formContext" @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels"
+        OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value"
+        Id="@FormId" FormName="flow-orchestration-editor" Busy="@(saving || ExternalBusy)" ReadOnly="IsReadOnly"
+        SectionState="SectionState" Sections="Presentations" SectionContent="@(SectionState is null ? null : DefinitionSection)"
+        SectionRequested="RequestSection" data-testid="flow-orchestration-editor">
+        <ChildContent>@if (SectionState is null) { @IdentityFields @ConfigurationFields }</ChildContent>
+    </ResourceDefinitionForm>
+    @if (error is not null) { <p class="error-panel orchestration-message" role="alert">@error</p> }
+    @if (message is not null) { <p class="success-panel orchestration-message" role="status" data-testid="flow-status-message" data-published-version="@lastPublishedVersion">@message</p> }
 }
 
 @code {
+    private RenderFragment IdentityFields { get { var model = this.model!; return @<ResourceIdentityEditor ResourceKind="@FlowResourceKinds.Flow" NamePolicy="ResourceNamePolicy.Flow"
+        DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
+        ScopeRef="selectedScope" @bind-Description="model.Description" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" LabelsReadOnly="true"
+        ReadOnly="IsReadOnly" TestId="flow-orchestration-identity" DisplayNameTestId="flow-definition-display-name" TechnicalNameTestId="flow-definition-name" DescriptionTestId="flow-definition-description" />; } }
+    private RenderFragment ConfigurationFields { get { var model = this.model!; return @<div class="resource-editor-view">
+        <FormSection Title="@Shared["Configuration"]">
+            <FormField Label="@T("CurrentDefinitionVersion")" Required><Validation><ValidationMessage For="() => model.Version" /></Validation><ChildContent><ClearableText @bind-Value="model.Version" data-testid="flow-definition-version" /></ChildContent></FormField>
+        </FormSection>
+        <div class="form-field" role="group" aria-label="@T("Participants")">
+            <ValidationMessage For="() => model.ParticipantIds" />
+            <OrchestrationDefinitionEditor Model="model" Agents="agents" OwnerNamespace="FlowResourceNamespace" OwnerScope="selectedScope" IsReadOnly="@(IsReadOnly || saving || ExternalBusy)" Changed="DefinitionChanged" />
+        </div>
+        @if (!IsReadOnly)
+        {
+            <FormSection Title="@T("PublishVersion")" Description="@T("EtagProtected")">
+                <FormField Label="@T("PublishVersion")" Required><Validation><ValidationMessage For="() => model.PublishVersion" /></Validation><ChildContent><ClearableText @bind-Value="model.PublishVersion" data-testid="flow-publish-version" /></ChildContent></FormField>
+                <FormActions Busy="@(saving || ExternalBusy)">
+                    @if (!ExternalActions) { <button type="submit" class="button-secondary" disabled="@(!CanSubmit)">@T("Save")</button> }
+                    <button type="button" class="button-primary" disabled="@(!CanSubmit)" @onclick="PublishAsync" data-testid="flow-publish-and-activate">@T("PublishAndActivate")</button>
+                </FormActions>
+            </FormSection>
+        }
+    </div>; } }
+    private RenderFragment DefinitionSection(string path) => path == "definition/identity" ? IdentityFields : ConfigurationFields;
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
     [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [Parameter] public bool Embedded { get; set; }
+    [Parameter] public FlowResourceSnapshot? InitialSnapshot { get; set; }
+    [Parameter] public bool ExternalActions { get; set; }
+    [Parameter] public bool ExternalBusy { get; set; }
+    [Parameter] public ResourceSectionState? SectionState { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation>? SectionPresentations { get; set; }
+    [Parameter] public EventCallback<string> SectionRequested { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    [Parameter] public EventCallback<bool> SavingChanged { get; set; }
+    [Parameter] public EventCallback<FlowResourceSnapshot> Saved { get; set; }
+    public string FormId { get; } = $"flow-orchestration-form-{Guid.NewGuid():N}";
+    public bool IsDirty => !loading && model is not null && baseline is not null && (Fingerprint != baseline || invalidInput);
+    public bool HasUnsavedChanges => IsDirty || !loading && model is not null && model.PublishVersion != publicationBaseline;
+    public bool CanSubmit => !disposed && !loading && model is not null && !IsReadOnly && !saving && !ExternalBusy;
+    public static IReadOnlyDictionary<string, ResourceSectionPresentation> CreateSectionPresentations(bool readOnly) => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
+    {
+        ["definition/identity"] = new() { ReadOnly = readOnly, HasRequiredFields = true, Fields = [nameof(OrchestrationEditorModel.Name), nameof(OrchestrationEditorModel.DisplayName), nameof(OrchestrationEditorModel.Namespace), nameof(OrchestrationEditorModel.Description), nameof(OrchestrationEditorModel.Tags)] },
+        ["definition/configuration"] = new() { ReadOnly = readOnly, HasRequiredFields = true, Fields = [nameof(OrchestrationEditorModel.Version), nameof(OrchestrationEditorModel.PublishVersion), nameof(OrchestrationEditorModel.Enabled), nameof(OrchestrationEditorModel.Strategy), nameof(OrchestrationEditorModel.ParticipantIds), nameof(OrchestrationEditorModel.ParticipantReferences), nameof(OrchestrationEditorModel.ManagerReference), nameof(OrchestrationEditorModel.IncludeFullHistory), nameof(OrchestrationEditorModel.InitialParticipant), nameof(OrchestrationEditorModel.Handoffs), nameof(OrchestrationEditorModel.Autonomous), nameof(OrchestrationEditorModel.MaximumTurnsPerParticipant), nameof(OrchestrationEditorModel.TerminationPhrase), nameof(OrchestrationEditorModel.MaximumIterations), nameof(OrchestrationEditorModel.ManagerId), nameof(OrchestrationEditorModel.MaximumRounds), nameof(OrchestrationEditorModel.MaximumStalls), nameof(OrchestrationEditorModel.MaximumResets)] }
+    };
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => SectionPresentations ?? CreateSectionPresentations(IsReadOnly);
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(OrchestrationEditorModel.Name)] = IdentityLocalizer["TechnicalName"], [nameof(OrchestrationEditorModel.DisplayName)] = IdentityLocalizer["DisplayName"],
+        [nameof(OrchestrationEditorModel.Description)] = Shared["Description"], [nameof(OrchestrationEditorModel.Namespace)] = Shared["Namespace"], [nameof(OrchestrationEditorModel.Tags)] = Shared["Labels"],
+        [nameof(OrchestrationEditorModel.Version)] = T("CurrentDefinitionVersion"), [nameof(OrchestrationEditorModel.PublishVersion)] = T("PublishVersion"), [nameof(OrchestrationEditorModel.ParticipantIds)] = T("Participants")
+    };
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private readonly CancellationTokenSource cancellation = new();
+    private ResourceDefinitionForm? definitionForm;
     private OrchestrationEditorModel? model;
+    private FlowResourceSnapshot? original;
+    private FlowResponse? effectiveOriginal;
+    private EditContext formContext = null!;
+    private ValidationMessageStore messages = null!;
     private ResourceScopeRef? selectedScope;
     private IReadOnlyList<AgentSummary> agents = [];
-    private string? etag;
-    private string publishVersion = "0.1.0";
-    private string? error;
-    private string? message;
-    private bool loading = true;
-    private bool saving;
-    private bool isReadOnly;
-    private string? publishedVersion;
-    private string? lastPublishedVersion;
+    private string publicationBaseline = string.Empty;
+    private string? etag, error, message, publishedVersion, lastPublishedVersion, baseline, loadedKey, redirectedKey;
+    private long loadVersion;
+    private bool loading = true, saving, isReadOnly, invalidInput, reportedDirty, reportedCanSubmit, disposed, revealValidation;
     private ResourceNamespace FlowResourceNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
-    private bool IsReadOnly => isReadOnly;
+    private bool IsReadOnly => original is null ? isReadOnly : !CanEdit(original.Value);
     private ResourceScopeRef? RequestedScope => ScopeRef ?? (string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue));
-    private string DetailsUrl
+    private string DetailsUrl => ResourceOwnershipContext.PreserveNavigation(
+        $"{(FlowResourceNamespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows")}/{Uri.EscapeDataString(FlowId)}?scopeRef={Uri.EscapeDataString(selectedScope!.Value.Value)}", Services);
+    private string Fingerprint => JsonSerializer.Serialize(model);
+    private static string SavedFingerprint(FlowResponse flow) => JsonSerializer.Serialize(OrchestrationEditorModel.From(flow));
+    private bool CanEdit(FlowResponse flow) => !flow.Governance.IsManaged && ResourceOwnershipContext.CanManage(flow.ScopeRef, Services)
+        && (Services.GetService(typeof(ConsoleContextState)) is not ConsoleContextState context || context.HasPermission("resources/write"));
+    private static bool SameIdentity(FlowResponse actual, FlowResponse expected) => actual.Id == expected.Id && actual.Namespace == expected.Namespace && actual.ScopeRef == expected.ScopeRef
+        && (expected.Uid is not { } uid || uid == Guid.Empty || actual.Uid == uid);
+    private void ValidateIdentity(FlowResponse flow)
     {
-        get
-        {
-            var path = FlowResourceNamespace.IsDefault
-                ? $"/flows/{Uri.EscapeDataString(FlowId)}"
-                : $"/namespaces/{Uri.EscapeDataString(FlowResourceNamespace.Value)}/flows/{Uri.EscapeDataString(FlowId)}";
-            return selectedScope is null ? path : $"{path}?scopeRef={Uri.EscapeDataString(selectedScope.Value.Value)}";
-        }
+        if (flow.Id != FlowId || flow.Namespace != FlowResourceNamespace || flow.ScopeRef is null || RequestedScope is { } scope && flow.ScopeRef != scope)
+            throw new InvalidOperationException(T("IdentityMismatch"));
     }
-
+    private bool Current(long revision) => !disposed && revision == loadVersion;
     protected override async Task OnParametersSetAsync()
     {
+        var key = $"{FlowId}|{FlowNamespace}|{RequestedScope}|{ResourceOwnershipContext.TryGetCurrent(Services)}|{Embedded}";
+        if (loadedKey == key) return;
+        loadedKey = key; var revision = ++loadVersion;
+        loading = true; original = null; effectiveOriginal = null; model = null; baseline = null; error = message = publishedVersion = lastPublishedVersion = null;
+        saving = invalidInput = false; selectedScope = null; publicationBaseline = string.Empty;
         try
         {
-            loading = true; error = null;
-            var agentsTask = Management.GetAgentsAsync(cancellation.Token);
             var requestedScope = RequestedScope;
-            var snapshot = requestedScope is null
-                ? await Client.GetFlowSnapshotAsync(FlowId, cancellation.Token)
-                : await Client.GetFlowSnapshotAsync(FlowResourceNamespace, FlowId, requestedScope.Value, cancellation.Token);
-            selectedScope = snapshot.Value.ScopeRef;
-            isReadOnly = snapshot.Value.Governance.IsManaged;
-            if (IsReadOnly)
-            {
-                var flow = snapshot.Value;
-                if (string.IsNullOrWhiteSpace(flow.ActiveVersion))
-                    throw new InvalidOperationException(T("NoActivePublishedVersion", $"{FlowResourceNamespace.Value}/{FlowId}"));
-                var version = await Client.GetFlowVersionAsync(FlowResourceNamespace, FlowId, flow.ActiveVersion, flow.ScopeRef, cancellation.Token);
-                if (version.Definition is not OrchestrationFlowDefinition)
-                    throw new InvalidOperationException(T("NotOrchestration", version.Version));
-                model = OrchestrationEditorModel.From(flow with { Version = version.Version, Definition = version.Definition, Description = version.Description });
-                publishedVersion = version.Version;
-                etag = null;
-                agents = await agentsTask;
-            }
+            FlowResourceSnapshot snapshot;
+            if (InitialSnapshot is not null) snapshot = InitialSnapshot;
+            else if (requestedScope is { } owner) snapshot = await Client.GetFlowSnapshotAsync(FlowResourceNamespace, FlowId, owner, cancellation.Token);
             else
             {
-                model = OrchestrationEditorModel.From(snapshot.Value);
-                etag = snapshot.ETag;
-                agents = await agentsTask;
-                publishVersion = snapshot.Value.ActiveVersion is null ? snapshot.Value.Version : NextVersion(snapshot.Value.Version);
+                var visible = await Client.GetFlowAsync(FlowResourceNamespace, FlowId, null, cancellation.Token);
+                if (!Current(revision)) return;
+                ValidateIdentity(visible);
+                snapshot = await Client.GetFlowSnapshotAsync(visible.Namespace, visible.Id, visible.ScopeRef!.Value, cancellation.Token);
+                if (!SameIdentity(snapshot.Value, visible)) throw new InvalidOperationException(T("IdentityMismatch"));
             }
+            if (!Current(revision)) return;
+            ValidateIdentity(snapshot.Value); selectedScope = snapshot.Value.ScopeRef;
+            if (!Embedded)
+            {
+                if (redirectedKey != key) { redirectedKey = key; Navigation.NavigateTo(DetailsUrl + "#definition/configuration", replace: true); }
+                return;
+            }
+            await AdoptSnapshotAsync(snapshot, revision);
+            if (!Current(revision)) return;
+            var available = await Management.GetAgentsAsync(cancellation.Token);
+            if (!Current(revision)) return;
+            agents = available;
         }
-        catch (Exception exception) { error = exception.Message; model = null; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (Current(revision)) { error = exception.Message; model = null; loadedKey = null; } }
+        finally { if (Current(revision)) loading = false; }
     }
-
-    private async Task SaveAsync()
+    private async Task AdoptSnapshotAsync(FlowResourceSnapshot snapshot, long revision)
     {
-        if (IsReadOnly || model is null || etag is null) return;
-        try
+        ValidateIdentity(snapshot.Value);
+        if (original is not null && !SameIdentity(snapshot.Value, original.Value)) throw new InvalidOperationException(T("IdentityMismatch"));
+        var effective = snapshot.Value;
+        var readOnly = !CanEdit(effective);
+        string? activeVersion = null;
+        if (effective.Governance.IsManaged)
         {
-            saving = true; error = null; message = null;
-            var request = new UpdateFlowRequest(
-                model.Description,
-                model.Version,
-                model.Enabled,
-                model.CreateDefinition());
-            var saved = selectedScope is { } ownerScope
-                ? await Client.UpdateFlowAsync(FlowResourceNamespace, FlowId, ownerScope, request, etag, cancellation.Token)
-                : await Client.UpdateFlowAsync(FlowId, request, etag, cancellation.Token);
-            model = OrchestrationEditorModel.From(saved.Value);
-            etag = saved.ETag;
-            message = T("Saved");
+            if (string.IsNullOrWhiteSpace(effective.ActiveVersion)) throw new InvalidOperationException(T("NoActivePublishedVersion", $"{FlowResourceNamespace.Value}/{FlowId}"));
+            var version = await Client.GetFlowVersionAsync(FlowResourceNamespace, FlowId, effective.ActiveVersion, effective.ScopeRef, cancellation.Token);
+            if (!Current(revision)) return;
+            if (version.FlowId != effective.Id || version.Namespace != effective.Namespace || version.ScopeRef != effective.ScopeRef) throw new InvalidOperationException(T("IdentityMismatch"));
+            effective = effective with { Version = version.Version, Definition = version.Definition, Description = version.Description };
+            activeVersion = version.Version;
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { saving = false; }
+        if (effective.Definition is not OrchestrationFlowDefinition) throw new InvalidOperationException(T("NotOrchestration", effective.Version));
+        if (!Current(revision)) return;
+        isReadOnly = readOnly; original = snapshot; effectiveOriginal = effective; selectedScope = snapshot.Value.ScopeRef;
+        etag = snapshot.ETag; publishedVersion = activeVersion;
+        model = OrchestrationEditorModel.From(effective);
+        model.PublishVersion = snapshot.Value.ActiveVersion is null ? snapshot.Value.Version : NextVersion(snapshot.Value.Version);
+        publicationBaseline = model.PublishVersion; invalidInput = false; error = message = null; NewContext(); baseline = Fingerprint;
     }
-
+    public async Task ApplySavedSnapshotAsync(FlowResourceSnapshot snapshot)
+    {
+        if (disposed || saving || original is null) return;
+        var revision = ++loadVersion;
+        await AdoptSnapshotAsync(snapshot, revision);
+        if (Current(revision)) StateHasChanged();
+    }
+    private void NewContext()
+    {
+        if (formContext is not null) { formContext.OnFieldChanged -= FieldChanged; formContext.OnValidationRequested -= ValidationRequested; }
+        formContext = new(model!); messages = new(formContext); formContext.OnFieldChanged += FieldChanged; formContext.OnValidationRequested += ValidationRequested;
+    }
+    private void ValidationRequested(object? sender, ValidationRequestedEventArgs args) => messages.Clear();
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) { messages.Clear(args.FieldIdentifier); formContext.NotifyValidationStateChanged(); _ = InvokeAsync(StateHasChanged); }
+    private Task DefinitionChanged() => InvokeAsync(StateHasChanged);
+    private Task RequestSection(string path) => SectionRequested.HasDelegate ? SectionRequested.InvokeAsync(path) : Task.CompletedTask;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (disposed) return;
+        if (revealValidation && !saving && !ExternalBusy && definitionForm is { Busy: false }) { revealValidation = false; await definitionForm.RevealValidationAsync(); }
+        if (reportedDirty != HasUnsavedChanges || reportedCanSubmit != CanSubmit)
+        { reportedDirty = HasUnsavedChanges; reportedCanSubmit = CanSubmit; await DraftChanged.InvokeAsync(HasUnsavedChanges); }
+    }
+    public void Discard()
+    {
+        if (disposed || original is null || effectiveOriginal is null || saving || ExternalBusy) return;
+        model = OrchestrationEditorModel.From(effectiveOriginal); model.PublishVersion = publicationBaseline;
+        invalidInput = false; error = message = null; NewContext(); baseline = Fingerprint; StateHasChanged();
+    }
+    public void ApplyActivationSnapshot(FlowResourceSnapshot snapshot)
+    {
+        if (disposed || original is null || model is null || !SameIdentity(snapshot.Value, original.Value)) return;
+        original = snapshot; etag = snapshot.ETag; model.Enabled = snapshot.Value.Enabled;
+        effectiveOriginal = effectiveOriginal! with { Enabled = snapshot.Value.Enabled };
+        baseline = SavedFingerprint(snapshot.Value); StateHasChanged();
+    }
+    private bool Validate(string? publicationVersion = null)
+    {
+        messages.Clear(); error = null;
+        if (model is null || original is null || invalidInput) return false;
+        if (string.IsNullOrWhiteSpace(model.DisplayName) || model.DisplayName.Length > 200) messages.Add(new FieldIdentifier(model, nameof(model.DisplayName)), T("Validation.DisplayName"));
+        if (publicationVersion is null && string.IsNullOrWhiteSpace(model.Version)) messages.Add(new FieldIdentifier(model, nameof(model.Version)), T("Validation.Version"));
+        if (publicationVersion is not null && string.IsNullOrWhiteSpace(publicationVersion)) messages.Add(new FieldIdentifier(model, nameof(model.PublishVersion)), T("Validation.PublishVersion"));
+        if (!formContext.GetValidationMessages().Any())
+        {
+            try
+            {
+                FlowValidator.ValidateVersion(new FlowVersion(original.Value.ScopeRef!.Value, new(original.Value.Id, original.Value.Namespace), publicationVersion ?? model.Version,
+                    model.Description, model.CreateDefinition(), original.Value.Metadata, original.Value.UpdatedAt));
+            }
+            catch (FlowValidationException exception) when (exception.Code == "flow_version_invalid") { messages.Add(new FieldIdentifier(model, publicationVersion is null ? nameof(model.Version) : nameof(model.PublishVersion)), T("Validation.Version")); }
+            catch (Exception exception) when (exception is InvalidOperationException or ArgumentException) { messages.Add(new FieldIdentifier(model, nameof(model.ParticipantIds)), T("Validation.Configuration")); }
+        }
+        formContext.NotifyValidationStateChanged(); return !formContext.GetValidationMessages().Any() && error is null;
+    }
+    private async Task SetSavingAsync(bool value) { saving = value; await SavingChanged.InvokeAsync(value); }
+    private async Task SaveAsync(EditContext context)
+    {
+        if (!CanSubmit) return;
+        if (!Validate()) { revealValidation = true; return; }
+        var revision = loadVersion; await SetSavingAsync(true);
+        try { await PersistAsync(revision); }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (Current(revision)) error = exception.Message; }
+        finally { if (Current(revision)) await SetSavingAsync(false); }
+    }
+    private async Task<bool> PersistAsync(long revision, string? publicationVersion = null)
+    {
+        if (!Current(revision) || original is null || model is null || etag is null || IsReadOnly) return false;
+        var current = original; var publicationDraft = model.PublishVersion;
+        var request = new UpdateFlowRequest(model.Description, publicationVersion ?? model.Version, model.Enabled, model.CreateDefinition(), current.Value.Metadata) { DisplayName = model.DisplayName };
+        var saved = await Client.UpdateFlowAsync(current.Value.Namespace, current.Value.Id, current.Value.ScopeRef!.Value, request, etag, cancellation.Token);
+        if (!Current(revision)) return false;
+        if (!SameIdentity(saved.Value, current.Value)) throw new InvalidOperationException(T("IdentityMismatch"));
+        original = saved; effectiveOriginal = saved.Value; etag = saved.ETag; model = OrchestrationEditorModel.From(saved.Value); model.PublishVersion = publicationDraft;
+        invalidInput = false; NewContext(); baseline = Fingerprint; error = null; message = T("Saved");
+        await Saved.InvokeAsync(saved); return Current(revision);
+    }
     private async Task PublishAsync()
     {
-        if (IsReadOnly) return;
-        await SaveAsync();
-        if (error is not null || model is null) return;
+        if (!CanSubmit || model is null) return;
+        if (!formContext.Validate() || !Validate(model.PublishVersion)) { revealValidation = true; return; }
+        var revision = loadVersion; var version = model.PublishVersion; await SetSavingAsync(true);
         try
         {
-            saving = true; message = null;
-            var request = new CreateFlowVersionRequest(publishVersion, true);
-            var published = selectedScope is { } ownerScope
-                ? await Client.CreateFlowVersionAsync(FlowResourceNamespace, FlowId, ownerScope, request, cancellation.Token)
-                : await Client.CreateFlowVersionAsync(FlowId, request, cancellation.Token);
-            lastPublishedVersion = published.Version;
-            message = T("VersionPublished", published.Version);
-            publishVersion = NextVersion(published.Version);
+            if (!await PersistAsync(revision, version) || original is null) return;
+            var current = original;
+            var published = await Client.CreateFlowVersionAsync(current.Value.Namespace, current.Value.Id, current.Value.ScopeRef!.Value, new(version, true), cancellation.Token);
+            if (!Current(revision)) return;
+            var saved = await Client.GetFlowSnapshotAsync(current.Value.Namespace, current.Value.Id, current.Value.ScopeRef.Value, cancellation.Token);
+            if (!Current(revision)) return;
+            if (!SameIdentity(saved.Value, current.Value) || published.FlowId != current.Value.Id || published.Namespace != current.Value.Namespace || published.ScopeRef != current.Value.ScopeRef || published.Version != version)
+                throw new InvalidOperationException(T("IdentityMismatch"));
+            original = saved; effectiveOriginal = saved.Value; etag = saved.ETag; model = OrchestrationEditorModel.From(saved.Value);
+            invalidInput = false; NewContext(); baseline = Fingerprint; lastPublishedVersion = published.Version;
+            message = T("VersionPublished", published.Version); model.PublishVersion = publicationBaseline = NextVersion(published.Version);
+            await Saved.InvokeAsync(saved);
         }
-        catch (Exception exception) { error = exception.Message; }
-        finally { saving = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) { if (Current(revision)) error = exception.Message; }
+        finally { if (Current(revision)) await SetSavingAsync(false); }
     }
-
     private static string NextVersion(string version)
     {
         var parts = version.Split('.');
         return parts.Length == 3 && int.TryParse(parts[2], out var patch) ? $"{parts[0]}.{parts[1]}.{patch + 1}" : version;
     }
-
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { disposed = true; ++loadVersion; if (formContext is not null) { formContext.OnFieldChanged -= FieldChanged; formContext.OnValidationRequested -= ValidationRequested; } cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
 }

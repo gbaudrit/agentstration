@@ -1,0 +1,223 @@
+@typeparam TItem
+@using System.Globalization
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<section class="resource-collection-page" data-testid="@TestId" aria-busy="@IsBusy.ToString().ToLowerInvariant()">
+    <PageHeader Title="@Title" Description="@Description" Actions="HeaderActions" />
+    @if (Navigation is not null) { <div class="collection-page-navigation">@Navigation</div> }
+    @if (Metrics is not null) { <div class="collection-page-metrics">@Metrics</div> }
+    @if (Feedback is not null) { <div class="collection-page-feedback">@Feedback</div> }
+
+    <CollectionView TItem="TItem" @key="ContextKey" Items="Items" Compact="Compact" RowTestId="@RowTestId" ItemAttributes="ItemAttributes"
+                    Identity="IdentityColumn.Content" IdentityLabel="@IdentityColumn.Label" InformationLabels="@(Columns.Select(column => column.Label).ToArray())"
+                    Actions="ItemActions" Details="Details" IsExpanded="IsExpanded" ShowItems="ShowItems" ShowViewSwitch="ShowItems">
+        <Toolbar>
+            <div class="collection-page-controls" @ref="controlsRoot" tabindex="-1" role="group" aria-label="@Shared["Filters"]">
+                <ResourceToolbar>
+                    <ChildContent>
+                        @if (ShowFilterControls)
+                        {
+                            @if (SearchEnabled)
+                            {
+                                <SearchBox Value="@draft.Search" ValueChanged="ChangeSearchAsync" Label="@(SearchLabel ?? Shared["Search"])" Placeholder="@SearchPlaceholder" Disabled="ControlsDisabled" />
+                            }
+                            @foreach (var filter in DirectFilters)
+                            {
+                                <CollectionFilterField @key="filter.Key" Filter="filter" Value="@draft.Filter(filter.Key)" ValueChanged="value => ChangeFilterAsync(filter.Key, value)" Disabled="ControlsDisabled" />
+                            }
+                        }
+                    </ChildContent>
+                    <Actions>
+                        @if (ShowFilterControls && AdvancedFilters.Count > 0)
+                        {
+                            <button type="button" class="button-secondary" aria-expanded="@advancedOpen.ToString().ToLowerInvariant()" aria-controls="@advancedId" disabled="@ControlsDisabled" @onclick="() => advancedOpen = !advancedOpen"><UiIcon Name="filter" /> @Shared["MoreFilters"]</button>
+                        }
+                        @if (ApplyMode == CollectionFilterApplyMode.Explicit && ShowFilterControls)
+                        {
+                            <button type="button" class="button-primary" disabled="@(ControlsDisabled || draft.HasSameCriteria(Query))" @onclick="ApplyAsync">@Shared["ApplyFilters"]</button>
+                        }
+                        @if (OnRefresh.HasDelegate)
+                        {
+                            <button type="button" class="button-secondary" data-testid="@ChildTestId("refresh")" disabled="@(Disabled || IsBusy)" @onclick="OnRefresh"><UiIcon Name="refresh" /> @Shared["RefreshResource"]</button>
+                        }
+                    </Actions>
+                </ResourceToolbar>
+            </div>
+        </Toolbar>
+        <BeforeResults>
+            @if (AdvancedFilters.Count > 0 && ShowFilterControls)
+            {
+                <div class="collection-advanced-filters" id="@advancedId" hidden="@(!advancedOpen)" role="group" aria-label="@Shared["MoreFilters"]">
+                    @foreach (var filter in AdvancedFilters)
+                    {
+                        <CollectionFilterField @key="filter.Key" Filter="filter" Value="@draft.Filter(filter.Key)" ValueChanged="value => ChangeFilterAsync(filter.Key, value)" Disabled="ControlsDisabled" />
+                    }
+                </div>
+            }
+            @if (Query.HasFilters)
+            {
+                <div class="collection-active-filters" role="group" aria-label="@Shared["ActiveFilters"]">
+                    @if (!string.IsNullOrWhiteSpace(Query.Search))
+                    {
+                        <button type="button" class="collection-filter-chip" disabled="@ControlsDisabled" aria-label="@Shared["RemoveFilter", SearchLabel ?? Shared["Search"], Query.Search]" @onclick="RemoveSearchAsync">@(SearchLabel ?? Shared["Search"]): @Query.Search <UiIcon Name="x" /></button>
+                    }
+                    @foreach (var filter in AllFilters.Where(filter => Query.Filter(filter.Key).IsActive))
+                    {
+                        <button type="button" class="collection-filter-chip" disabled="@ControlsDisabled" aria-label="@Shared["RemoveFilter", filter.Label, DisplayValue(filter)]" @onclick="() => RemoveFilterAsync(filter.Key)">@filter.Label: @DisplayValue(filter) <UiIcon Name="x" /></button>
+                    }
+                    <button type="button" class="text-button" disabled="@ControlsDisabled" @onclick="ClearAsync">@Shared["ClearFilters"]</button>
+                </div>
+            }
+            @if (!LoadState.BlocksContent && LoadState.Status is ResourceLoadStatus.Refreshing or ResourceLoadStatus.Failed)
+            {
+                @LoadFeedback
+            }
+            @if (ShowItems && Pagination?.Total is null)
+            {
+                <p class="collection-result-count" role="status">@Shared["LoadedResults", Items.Count]</p>
+            }
+        </BeforeResults>
+        <ContentState>
+            @if (LoadState.BlocksContent) { @LoadFeedback }
+            else
+            {
+                <EmptyState Title="@(EmptyIsPage ? Shared["CollectionEmptyPage"] : Query.HasFilters ? Shared["NoMatches"] : EmptyTitle ?? Shared["CollectionEmpty"])"
+                            Message="@(EmptyIsPage ? Shared["CollectionContinuePages"] : Query.HasFilters ? Shared["NoMatchesHelp"] : EmptyMessage ?? Shared["CollectionEmptyHelp"])" IconName="@IconName">
+                    @if (Query.HasFilters) { <button type="button" class="button-secondary" disabled="@ControlsDisabled" @onclick="ClearAsync">@Shared["ClearFilters"]</button> }
+                    else if (!EmptyIsPage) { @EmptyActions }
+                </EmptyState>
+            }
+        </ContentState>
+        <InformationHeader>
+            @foreach (var column in Columns) { <th scope="col">@if (column.Heading is not null) { @column.Heading } else { @column.Label }</th> }
+        </InformationHeader>
+        <Information Context="item">
+            @foreach (var column in Columns) { <CollectionValue Label="@column.Label">@column.Content(item)</CollectionValue> }
+        </Information>
+    </CollectionView>
+    @if (!LoadState.BlocksContent && Pagination is { } pagination && (ShowItems || pagination.HasMore || pagination.HasPrevious))
+    {
+        <CollectionPager Page="pagination.Page" Total="pagination.Total" HasMore="pagination.HasMore" HasPrevious="pagination.HasPrevious" Busy="@(Disabled || IsBusy)"
+                         PageSize="pagination.PageSize" PageSizes="pagination.PageSizes" PageSizeId="@PageSizeId" PageSizeChanged="ChangePageSizeAsync"
+                         SupportsDirectNavigation="pagination.SupportsDirectNavigation" PageChanged="ChangePageAsync" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter, EditorRequired] public CollectionColumn<TItem> IdentityColumn { get; set; } = null!;
+    [Parameter] public IReadOnlyList<CollectionColumn<TItem>> Columns { get; set; } = [];
+    [Parameter] public IReadOnlyList<CollectionFilter> AdditionalFilters { get; set; } = [];
+    [Parameter] public IReadOnlyList<TItem> Items { get; set; } = [];
+    [Parameter] public CollectionQuery Query { get; set; } = new();
+    [Parameter] public EventCallback<CollectionQuery> QueryChanged { get; set; }
+    [Parameter] public CollectionFilterApplyMode ApplyMode { get; set; }
+    [Parameter] public CollectionPagination? Pagination { get; set; }
+    [Parameter] public ResourceLoadState LoadState { get; set; } = new(ResourceLoadStatus.Ready);
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool SearchEnabled { get; set; }
+    [Parameter] public string? SearchLabel { get; set; }
+    [Parameter] public string? SearchPlaceholder { get; set; }
+    [Parameter] public string? EmptyTitle { get; set; }
+    [Parameter] public string? EmptyMessage { get; set; }
+    [Parameter] public string IconName { get; set; } = "layers";
+    [Parameter] public string? TestId { get; set; }
+    [Parameter] public string? RowTestId { get; set; }
+    [Parameter] public string? PageSizeId { get; set; }
+    [Parameter] public string? ContextKey { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public RenderFragment? PrimaryActions { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? EmptyActions { get; set; }
+    [Parameter] public RenderFragment? Navigation { get; set; }
+    [Parameter] public RenderFragment? Metrics { get; set; }
+    [Parameter] public RenderFragment? Feedback { get; set; }
+    [Parameter] public RenderFragment<TItem>? ItemActions { get; set; }
+    [Parameter] public RenderFragment<TItem>? Details { get; set; }
+    [Parameter] public Func<TItem, bool>? IsExpanded { get; set; }
+    [Parameter] public Func<TItem, IReadOnlyDictionary<string, object>>? ItemAttributes { get; set; }
+
+    private readonly string advancedId = $"collection-filters-{Guid.NewGuid():N}";
+    private CollectionQuery draft = new();
+    private CollectionQuery? previousQuery;
+    private string? previousContext;
+    private bool advancedOpen;
+    private ElementReference controlsRoot;
+    private IReadOnlyList<CollectionFilter> columnFilters = [];
+    private IReadOnlyList<CollectionFilter> DirectFilters => columnFilters.Where(filter => !filter.Advanced).ToArray();
+    private IReadOnlyList<CollectionFilter> AdvancedFilters => columnFilters.Where(filter => filter.Advanced).Concat(AdditionalFilters).ToArray();
+    private IReadOnlyList<CollectionFilter> AllFilters => columnFilters.Concat(AdditionalFilters).ToArray();
+    private bool IsBusy => LoadState.Status is ResourceLoadStatus.Loading or ResourceLoadStatus.Refreshing;
+    private bool ShowItems => !LoadState.BlocksContent && Items.Count > 0;
+    private bool EmptyIsPage => Pagination is { HasMore: true } or { Page: > 1 };
+    private bool ControlsDisabled => Disabled || LoadState.Status is ResourceLoadStatus.Loading or ResourceLoadStatus.Forbidden;
+    private bool ShowFilterControls => LoadState.Status != ResourceLoadStatus.Ready || Items.Count > 0 || Query.HasFilters;
+    private string? ChildTestId(string suffix) => TestId is null ? null : $"{TestId}-{suffix}";
+    private RenderFragment? HeaderActions => LoadState.Status == ResourceLoadStatus.Forbidden || PrimaryActions is null && Actions is null
+        ? null : @<text>@PrimaryActions @Actions</text>;
+    private RenderFragment LoadFeedback => @<ResourceLoadFeedback State="@CollectionLoadState" OnRetry="OnRetry" RetryTestId="@ChildTestId("retry")"
+        Title="@(LoadState.Status == ResourceLoadStatus.Forbidden ? Shared["ResourceForbidden"] : Shared["CollectionLoadFailed"])"
+        RefreshingMessage="@Shared["CollectionRefreshing"]" RefreshFailureTitle="@Shared["CollectionRefreshFailed"]" />;
+    private ResourceLoadState CollectionLoadState => LoadState with { Message = LoadState.Message ?? Shared[LoadState.Status switch
+    {
+        ResourceLoadStatus.Loading => "CollectionLoading",
+        ResourceLoadStatus.Forbidden => "CollectionForbiddenMessage",
+        _ => "CollectionLoadFailedMessage"
+    }] };
+
+    protected override void OnParametersSet()
+    {
+        columnFilters = IdentityColumn.Filters.Concat(Columns.SelectMany(column => column.Filters)).ToArray();
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var column in new[] { IdentityColumn }.Concat(Columns))
+            if (string.IsNullOrWhiteSpace(column.Key) || !keys.Add(column.Key)) throw new InvalidOperationException("Collection columns require distinct nonempty keys.");
+        keys.Clear();
+        foreach (var filter in AllFilters)
+            if (string.IsNullOrWhiteSpace(filter.Key) || !keys.Add(filter.Key)) throw new InvalidOperationException("Collection filters require distinct nonempty keys.");
+        if (!ReferenceEquals(previousQuery, Query) || previousContext != ContextKey)
+        {
+            draft = Query;
+            if (previousContext != ContextKey) advancedOpen = false;
+            previousQuery = Query;
+            previousContext = ContextKey;
+        }
+    }
+
+    private async Task SetDraftAsync(CollectionQuery value)
+    {
+        if (ControlsDisabled) return;
+        draft = value;
+        if (ApplyMode == CollectionFilterApplyMode.Immediate) await QueryChanged.InvokeAsync(draft);
+    }
+    private Task ChangeSearchAsync(string value) => SetDraftAsync(draft with { Search = value, Page = 1 });
+    private Task ChangeFilterAsync(string key, CollectionFilterValue value) => SetDraftAsync(draft.WithFilter(key, value));
+    private Task ApplyAsync() => ControlsDisabled ? Task.CompletedTask : QueryChanged.InvokeAsync(draft with { Page = 1 });
+    private async Task RemoveSearchAsync() { await QueryChanged.InvokeAsync(Query with { Search = string.Empty, Page = 1 }); await controlsRoot.FocusAsync(true); }
+    private async Task RemoveFilterAsync(string key) { await QueryChanged.InvokeAsync(Query.WithFilter(key, new())); await controlsRoot.FocusAsync(true); }
+    private async Task ClearAsync()
+    {
+        if (ControlsDisabled) return;
+        draft = new() { PageSize = Query.PageSize };
+        await QueryChanged.InvokeAsync(draft);
+        await controlsRoot.FocusAsync(true);
+    }
+    private Task ChangePageAsync(int page) => QueryChanged.InvokeAsync(Query with { Page = page });
+    private Task ChangePageSizeAsync(int size) => Pagination?.PageSizes.Contains(size) == true
+        ? QueryChanged.InvokeAsync(Query with { Page = 1, PageSize = size }) : Task.CompletedTask;
+    private string DisplayValue(CollectionFilter filter)
+    {
+        var value = Query.Filter(filter.Key);
+        return filter.Kind switch
+        {
+            CollectionFilterKind.Choice => filter.Options.FirstOrDefault(option => option.Value == value.Value)?.Label ?? value.Value,
+            CollectionFilterKind.DateRange => Shared["FilterRange", FormatDate(value.Value), FormatDate(value.End)],
+            CollectionFilterKind.Number when decimal.TryParse(value.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) => number.ToString("G", CultureInfo.CurrentCulture),
+            _ => value.Value
+        };
+    }
+    private string FormatDate(string value) => value.Length == 0 ? Shared["FilterAnyDate"]
+        : DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date.ToString("d", CultureInfo.CurrentCulture) : value;
+}

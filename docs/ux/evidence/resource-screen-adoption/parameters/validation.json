@@ -1,0 +1,63 @@
+{
+  "capturedAt": "2026-11-18",
+  "productCommit": "708975004d30fd8f49dd4ca531aaef5e2069ca15",
+  "implementationCommit": "d8f9306d",
+  "origin": "Real standalone application; temporary probe reuses the maintained descendant-secrets journey and adds saved-overview/Parameter wizard-discard checks. No generated images.",
+  "results": {
+    "realApplicationProbes": {
+      "passed": 2,
+      "failed": 0
+    },
+    "maintainedBrowserRegressions": {
+      "passed": 2,
+      "failed": 0,
+      "specifications": [
+        "tests/descendant-secrets.spec.ts",
+        "tests/resource-access.spec.ts"
+      ]
+    }
+  },
+  "limits": "This capture set covers these screens on desktop English dark and mobile French light. Mobile uses a touch-capable context with a real wizard tap. It is not the complete browser suite, long-owner or exhaustive keyboard coverage. No GitHub CI run is claimed.",
+  "captures": [
+    {
+      "file": "parameter-overview-desktop-en.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false
+    },
+    {
+      "file": "parameter-overview-mobile-fr.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true
+    },
+    {
+      "file": "parameter-review-desktop-en.png",
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "hasTouch": false
+    },
+    {
+      "file": "parameter-review-mobile-fr.png",
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "hasTouch": true
+    }
+  ]
+}

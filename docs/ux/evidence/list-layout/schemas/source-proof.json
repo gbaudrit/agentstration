@@ -1,0 +1,14 @@
+{
+  "baseCommit": "a2421fd7077cf0b727d64cb97a0fa7cdf98674c0",
+  "route": "/schemas",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Schemas.razor": "498e5e745096923c355045d1d70f32fdfc926344",
+    "src/Agentstration.Console.Components/Components/Pages/Schemas.razor.cs": "2787322c0f466f665f538d853ecdf106432aeae2",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

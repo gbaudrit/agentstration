@@ -1,0 +1,7 @@
+.panel-heading-copy { min-width: 0; }
+.panel-collapsible > .panel-header { align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.panel-collapsible[data-panel-collapsed="true"] > .panel-header { margin-bottom: 0; }
+.panel-disclosure { display: inline-flex; align-items: center; gap: var(--space-2); max-width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.panel-disclosure:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 2px; }
+.panel-disclosure ::deep svg { flex: 0 0 auto; width: 1rem; height: 1rem; }
+.form-section-body[hidden] { display: none; }

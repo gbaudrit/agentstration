@@ -88,4 +88,8 @@
   <data name="AcquisitionTargetStale" xml:space="preserve"><value>A newer discovery is available. Open the source, reconcile the target in Discovery, then run this Tool again. If the selected operation changed, run a new acquisition and create a Tool from it.</value></data>
   <data name="NewDefinition" xml:space="preserve"><value>New definition</value></data>
   <data name="DataSourceQueryFailed" xml:space="preserve"><value>The Data Source query failed. Check its published version, arguments, contract and access.</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>The response does not match the requested resource identity.</value></data>
+  <data name="InspectionOnly"><value>This screen displays the catalog definition. Activation is controlled in the header; execution and access retain their own permissions.</value></data>
+  <data name="InputContractChanged"><value>The saved tool contract has changed. Your existing inputs are retained. Reset them explicitly to use the updated contract before running.</value></data>
+  <data name="ResetRunInput"><value>Reset inputs</value></data>
 </root>

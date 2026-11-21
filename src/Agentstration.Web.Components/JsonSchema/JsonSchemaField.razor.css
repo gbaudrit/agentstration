@@ -77,7 +77,7 @@
     cursor: default;
 }
 
-.schema-toggle-input {
+.schema-toggle ::deep .schema-toggle-input {
     position: absolute;
     width: 1px;
     height: 1px;

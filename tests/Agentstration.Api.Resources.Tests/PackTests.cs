@@ -40,6 +40,57 @@ namespace Agentstration.Management.Tests;
 public sealed class PackTests
 {
     [TestMethod]
+    public async Task ExplicitPackScopeDisambiguatesVisibleAncestorsAndPreservesEtags()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var environment = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        var workspace = ResourceScopeRef.Workspace(environment.WorkspaceId);
+        var tenant = ResourceScopeRef.Tenant(environment.TenantId);
+        var installations = new List<InstalledPackResource>();
+        foreach (var (owner, target, version) in new[] { (workspace, "workspace", "1.0.0"), (tenant, "tenant", "9.0.0") })
+        {
+            client.DefaultRequestHeaders.Remove("X-Agentstration-Context");
+            client.DefaultRequestHeaders.Add("X-Agentstration-Context", owner.Value);
+            await using var archive = CreateZip(new Dictionary<string, string>
+            {
+                ["pack.json"] = JsonSerializer.Serialize(new { apiVersion = ResourceApiVersions.CoreV1, kind = "Pack", metadata = new { name = "scope-inspection", publisher = "fixture", version }, definition = new { targetScope = target, resources = Array.Empty<string>() } })
+            });
+            using var content = ArchiveContent(archive.ToArray(), "scoped-inspection.zip");
+            using var response = await client.PostAsync("/api/packs", content);
+            Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
+            installations.Add((await response.Content.ReadFromJsonAsync<InstalledPackResource>())!);
+        }
+        var ancestor = installations[1];
+        using (var grant = await client.PutAsJsonAsync($"/api/resource-access-policies/{ancestor.Uid:D}", new ResourceAccessPolicy(
+            new(ancestor.Uid, tenant, ancestor.Namespace, PackKinds.InstalledPack), [new(workspace, [ResourceAccessAction.Discover])])))
+        {
+            Assert.AreEqual(HttpStatusCode.OK, grant.StatusCode, await grant.Content.ReadAsStringAsync());
+        }
+        client.DefaultRequestHeaders.Remove("X-Agentstration-Context");
+        client.DefaultRequestHeaders.Add("X-Agentstration-Context", workspace.Value);
+        using (var visible = await client.GetAsync("/api/packs"))
+        {
+            var items = await visible.Content.ReadFromJsonAsync<InstalledPackResource[]>();
+            Assert.HasCount(2, items!.Where(item => item.Definition.Publisher == "fixture" && item.Definition.PackName == "scope-inspection").ToArray());
+        }
+        foreach (var installed in installations)
+        {
+            using var response = await client.GetAsync($"/api/packs/fixture/scope-inspection?scopeRef={Uri.EscapeDataString(installed.ScopeRef!.Value.Value)}");
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
+            Assert.IsNotNull(response.Headers.ETag);
+            var actual = await response.Content.ReadFromJsonAsync<InstalledPackResource>();
+            Assert.AreEqual(installed.Uid, actual!.Uid);
+            Assert.AreEqual(installed.ScopeRef, actual.ScopeRef);
+            Assert.AreEqual(installed.Definition.Version, actual.Definition.Version);
+        }
+        using var missing = await client.GetAsync("/api/packs/fixture/scope-inspection?scopeRef=%2Finstance");
+        Assert.AreEqual(HttpStatusCode.NotFound, missing.StatusCode);
+        using var invalid = await client.GetAsync("/api/packs/fixture/scope-inspection?scopeRef=invalid");
+        Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [TestMethod]
     public void PackDefinitionDefaultsToWorkspaceScope()
     {
         Assert.AreEqual(ResourceScopeKind.Workspace, new PackDefinition().TargetScope);

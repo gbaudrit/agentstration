@@ -6,19 +6,24 @@
 }
 else
 {
-    <DataGrid TItem="WorkTaskOperationsSummary" Items="Items">
-        <Header><tr><th>@T("Status")</th><th>@T("Task")</th><th>@T("Workspace")</th><th>@T("Interaction")</th><th>@T("CurrentActivity")</th><th>@T("FlowRuns")</th><th>@T("Results")</th><th>@T("Artifacts")</th><th>@T("Updated")</th><th></th></tr></Header>
-        <Row Context="item"><tr>
-            <td><TaskStatusBadge Status="item.Status" /></td>
-            <td><strong>@item.Title</strong>@if(!string.IsNullOrWhiteSpace(item.Description)){<small class="table-secondary">@item.Description</small>}</td>
-            <td>@ShortResource(item.WorkspaceId)</td>
-            <td><code>@ShortId(item.InteractionId)</code></td>
-            <td>@(item.CurrentActivity ?? "—")@if(item.PendingActionCount > 0){<small class="attention-count">@F("PendingCount", item.PendingActionCount)</small>}</td>
-            <td>@item.FlowRunCount</td><td>@item.ResultCount</td><td>@item.ArtifactCount</td>
-            <td><time datetime="@item.UpdatedAt.ToString("O")" title="@item.UpdatedAt.ToLocalTime().ToString("F")">@Relative(item.UpdatedAt)</time></td>
-            <td><a class="text-button" href="/tasks/@item.Id">@T("Inspect")</a></td>
-        </tr></Row>
-    </DataGrid>
+    <CollectionView TItem="WorkTaskOperationsSummary" Items="Items" InformationLabels="@(new string[] { T("Interaction"), T("CurrentActivity"), T("FlowRuns"), T("Results"), T("Artifacts"), T("Updated") })" IdentityLabel="@T("Task")" ScopeLabel="@T("Workspace")" StateLabel="@T("Status")">
+        <Identity Context="item">
+<CollectionIdentity DisplayName="@item.Title" Name="@item.Id.ToString()" Href="@($"/tasks/{item.Id}")" IconName="tasks" />@if(!string.IsNullOrWhiteSpace(item.Description)){<small class="table-secondary">@item.Description</small>}</Identity>
+        <Scope Context="item">
+@ShortResource(item.WorkspaceId)</Scope>
+        <State Context="item">
+<TaskStatusBadge Status="item.Status" /></State>
+        <Information Context="item">
+            <CollectionValue Label="@T("Interaction")"><code>@ShortId(item.InteractionId)</code></CollectionValue>
+            <CollectionValue Label="@T("CurrentActivity")">@(item.CurrentActivity ?? "—")@if(item.PendingActionCount > 0){<small class="attention-count">@F("PendingCount", item.PendingActionCount)</small>}</CollectionValue>
+            <CollectionValue Label="@T("FlowRuns")">@item.FlowRunCount</CollectionValue>
+            <CollectionValue Label="@T("Results")">@item.ResultCount</CollectionValue>
+            <CollectionValue Label="@T("Artifacts")">@item.ArtifactCount</CollectionValue>
+            <CollectionValue Label="@T("Updated")"><time datetime="@item.UpdatedAt.ToString("O")" title="@item.UpdatedAt.ToLocalTime().ToString("F")">@Relative(item.UpdatedAt)</time></CollectionValue>
+        </Information>
+        <Actions Context="item">
+<CollectionActions ResourceName="@(item.Title)"><a class="text-button" href="/tasks/@item.Id">@T("Inspect")</a></CollectionActions></Actions>
+    </CollectionView>
 }
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<WorkTaskOperationsSummary> Items { get; set; } = [];

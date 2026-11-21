@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Resources;
 using Agentstration.Storage.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -22,6 +23,7 @@ public sealed class DataSourceQueryViewsTests
     {
         using var currentCulture = new TestCultureScope(culture);
         using var context = new BunitContext();
+        SetupCollectionInterop(context);
         using var handler = new QueryHandler();
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
@@ -30,7 +32,12 @@ public sealed class DataSourceQueryViewsTests
         context.Services.AddSingleton(state);
         var page = context.Render<DataSourceQueries>(p => p.Add(c => c.Source, handler.Source));
         page.WaitForElement("[data-testid=dataset-query-row]");
-        await page.Find("[data-testid=dataset-query-row] button").ClickAsync();
+        Assert.AreEqual("default/only-alpha", page.Find("[data-testid=dataset-query-row] .copyable-value code").TextContent);
+        Assert.Contains("Only alpha", page.Find("[data-testid=dataset-query-row] .collection-identity-button").TextContent);
+        await page.InvokeAsync(() => page.FindComponent<CollectionView<DataSourceQueryResource>>().Instance.SetNarrow(true));
+        Assert.HasCount(1, page.FindAll("li[data-testid=dataset-query-row]"));
+        Assert.AreEqual("default/only-alpha", page.Find("[data-testid=dataset-query-row] .copyable-value code").TextContent);
+        await page.Find("[data-testid=dataset-query-row] .collection-actions button").ClickAsync();
         page.WaitForElement("[data-testid=dataset-query-edit-json]");
         Assert.IsTrue(page.Find("[data-testid=dataset-query-edit-name]").HasAttribute("readonly"));
         await page.Find("[data-testid=dataset-query-edit-json]").ChangeAsync("{\"$filter\":\"dataset eq 'beta'\"}");
@@ -43,6 +50,10 @@ public sealed class DataSourceQueryViewsTests
         Assert.HasCount(0, page.FindAll("[data-testid=dataset-query-tool-row]"), "The shared generic executor does not belong to this Data Source's exposures.");
         await page.Find("[data-testid=dataset-tool-query]").ChangeAsync(handler.Query.Uid.ToString());
         Assert.Contains(label, page.Markup);
+        var versionSelection = page.Find("[data-testid=dataset-tool-query-version]");
+        Assert.IsNotNull(page.Find($"label[for='{versionSelection.Id}']"));
+        Assert.IsFalse(string.IsNullOrWhiteSpace(versionSelection.GetAttribute("aria-describedby")));
+        Assert.AreEqual("latest", page.Find("[data-testid=dataset-query-tool-mode]").GetAttribute("value"));
         await page.Find("[data-testid=dataset-query-tool-display-name]").InputAsync("Beta query tool");
         Assert.AreEqual("beta-query-tool", page.Find("[data-testid=dataset-query-tool-name]").GetAttribute("value"));
         await page.Find("[data-testid=dataset-query-tool-publish]").ClickAsync();
@@ -61,12 +72,19 @@ public sealed class DataSourceQueryViewsTests
         var edit = reloaded.Find("[data-testid=dataset-query-tool-edit]");
         Assert.AreEqual("/tools/definitions/beta-query-tool?namespace=default&scopeRef=%2Finstance", edit.GetAttribute("href"));
         Assert.AreEqual(culture == "fr-FR" ? "Modifier" : "Edit", edit.TextContent);
+        var destination = reloaded.Find("[data-testid=dataset-query-tool-row] .resource-name-link").GetAttribute("href");
+        await reloaded.InvokeAsync(() => reloaded.FindComponent<CollectionView<DataSourceQueryToolPublication>>().Instance.SetNarrow(true));
+        Assert.HasCount(1, reloaded.FindAll("li[data-testid=dataset-query-tool-row]"));
+        Assert.AreEqual(destination, reloaded.Find("[data-testid=dataset-query-tool-row] .resource-name-link").GetAttribute("href"));
+        Assert.AreEqual("default/agentstration.beta-query-tool.v2.0.0", reloaded.Find("[data-testid=dataset-query-tool-row] .copyable-value code").TextContent);
+        Assert.Contains("2.0.0", reloaded.Find("[data-testid=dataset-query-tool-row] .collection-version").TextContent);
     }
 
     [TestMethod]
     public async Task ToolDefinitionsCannotBeEditedWithoutWritePermission()
     {
         using var context = new BunitContext();
+        SetupCollectionInterop(context);
         using var handler = new QueryHandler { Publication = new("beta-query-tool", "Beta query tool", "1.0.0") };
         using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
         context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
@@ -77,6 +95,13 @@ public sealed class DataSourceQueryViewsTests
         page.WaitForElement("[data-testid=dataset-query-tool-row]");
         Assert.HasCount(1, page.FindAll("[data-testid=dataset-query-tool-row]"));
         Assert.HasCount(0, page.FindAll("[data-testid=dataset-query-tool-edit]"));
+    }
+
+    private static void SetupCollectionInterop(BunitContext context)
+    {
+        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
+        foreach (var method in new[] { "observeCollection", "releaseCollection", "attachDisclosure", "releaseDisclosure" })
+            module.SetupVoid(method, _ => true).SetVoidResult();
     }
 
     private sealed class ContextProvider(bool canWrite = true) : IConsoleContextProvider

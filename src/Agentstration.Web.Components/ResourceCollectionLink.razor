@@ -1,0 +1,14 @@
+@using Agentstration.Web.Components.State
+@inject IServiceProvider Services
+
+@if (!string.IsNullOrWhiteSpace(Href) && !string.IsNullOrWhiteSpace(Label))
+{
+    <a class="button-secondary resource-collection-link" href="@Destination" aria-label="@Label" title="@Label"><UiIcon Name="list" /></a>
+}
+
+@code {
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public string? Label { get; set; }
+    private string? Destination => Services.GetService(typeof(IConsoleNavigationContext)) is IConsoleNavigationContext context
+        ? context.AddToUri(Href!) : Href;
+}

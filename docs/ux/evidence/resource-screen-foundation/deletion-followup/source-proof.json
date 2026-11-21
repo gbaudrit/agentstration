@@ -1,0 +1,32 @@
+{
+  "base": "3c88db2c3fab957bf0f35724e0f33d6d715342bf",
+  "sourceHashes": {
+    "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor": "0a43ce7c44e277ca99874d0a16f4809e75e5db0f72c08ed7cdab3cb44a366082",
+    "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor": "20d2559031c13dc6081e90f7413a83db693261d321f8cf4400dfe36eae6ab4db",
+    "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor": "e15dd30596eddf057fbee3b2754c5c75f47d864678b5bed36d0ed2368ee7d51b",
+    "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor": "12f1a606d2c46f5c7d28e8ab85e0968d4f59c2035374e8678a500a5a07ec3141",
+    "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor": "cb492e1617f9b0c2768b5c72856ad182d2ac75b8f9567754685ea193419578e6",
+    "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor": "a88e355faf9f8c2626145c99c8214fb4f5cb74e05a197435e9c019eb3871a031",
+    "tests/Agentstration.Console.Components.Tests/ParameterResourceScreenTests.cs": "68761decc19ab01dd6386b037295dfc7200dd2e1e141c6a02504c761dd9a419a",
+    "tests/Agentstration.Console.Components.Tests/ResourceScreenDeletionAssertions.cs": "5236e3e18a4253b2093970cb38a0ef5c85f24a76f26e2849391f2213320fe206",
+    "tests/Agentstration.Console.Components.Tests/RuntimeProfileEditorTests.cs": "ef73391d8dad41661468d36a10d5c6bbed9efb6bb008405814f32ce9a6e586de",
+    "tests/Agentstration.Console.Components.Tests/SourceProviderConsoleTests.cs": "12454b620dc29e12b12206dd9745facace5b0fbedf189d6c918c42b4531fa6e9",
+    "tests/Agentstration.Console.Components.Tests/ToolCategoryConsoleTests.cs": "47db94c19a1e4ece9fa45c834063e5983573d73f903f537e85d467d421b5dbc7",
+    "tests/Agentstration.Console.Components.Tests/VaultGrantPersistenceTests.cs": "e10459d625a1573a6c3c28571e224d6af4f5dd402fbeb479edfbf3fb9747fd95"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "166ebf647dd2d943edeff6274ef21f05c7ff8a07bb071628114c83667f0866f2",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "166ebf647dd2d943edeff6274ef21f05c7ff8a07bb071628114c83667f0866f2",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "93e89eb9dea816d62ef76a3b18cd4be0a6949d43577da25736dd133938feab54",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "93e89eb9dea816d62ef76a3b18cd4be0a6949d43577da25736dd133938feab54"
+  },
+  "phases": [
+    {
+      "name": "deletion",
+      "exitCode": 0,
+      "seconds": 108.1
+    }
+  ],
+  "completed": true,
+  "running": null
+}

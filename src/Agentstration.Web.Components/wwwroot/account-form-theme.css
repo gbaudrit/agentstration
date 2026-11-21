@@ -1,0 +1,32 @@
+.native-form-page {
+    --background: var(--color-background-app);
+    --surface: var(--color-surface);
+    --text: var(--color-text-primary);
+    --muted: var(--color-text-muted);
+    --border: var(--color-border);
+    --primary: var(--color-action-primary);
+    --primary-hover: var(--color-action-primary);
+    --danger: var(--color-danger);
+    --focus: var(--color-action-primary-soft);
+    --form-radius: var(--radius-md);
+    --form-focus-color: var(--color-action-primary);
+    --form-action-size: var(--field-height);
+    --field-clear-size: 2.125rem;
+    background: var(--background);
+}
+.native-form-page .auth-form :is(input:not([type="checkbox"]), select, textarea),
+.native-form-page :is(.secondary-action, .danger-action),
+.native-form-page .token-secret code { background: var(--surface); color: var(--text); }
+.native-form-page .primary-action { color: var(--color-action-on-primary); }
+.native-form-page .token-secret, .native-form-page .status-message {
+    background: color-mix(in srgb, var(--color-success) 14%, var(--surface));
+    color: var(--color-success);
+    border-color: var(--color-success);
+}
+.native-form-page .token-secret p { color: var(--color-success); }
+.native-form-control .field-clear[hidden] { display: none; }
+.native-form-page .auth-card, .native-form-page .auth-form { min-width: 0; }
+.native-form-page .auth-form > label { margin-top: var(--space-2); }
+.native-form-page .auth-form textarea { width: 100%; }
+
+.native-form-page input[type="checkbox"] { accent-color: var(--primary); }

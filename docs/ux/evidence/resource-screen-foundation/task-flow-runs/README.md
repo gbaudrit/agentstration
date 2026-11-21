@@ -1,0 +1,20 @@
+# Task FlowRun: operational inspection reconciliation
+
+The route `/tasks/{TaskId}/flowruns/{RunId}` consumes FlowRun through the Work operations boundary. It is an execution record, not an editable Resource definition: no resource UID/metadata/namespace, definition-save contract, generic policy or YAML document exists here. WorkOperationsQueryService.GetFlowRunAsync explicitly checks the stored WorkTaskId against the requested Task in the authorized Workspace. Keep the existing operational ResourceDetailsTemplate and Overview/Execution topology/IO/step inspector; do not invent Definition/labels/Access/YAML or a creation wizard. Associated Flow IDs do contain a real namespace and now display it alongside the historical version; the execution scope remains business context rather than a resource-owner badge.
+
+Shared typed loading/refresh/error/retry states replace family-specific loading/error branches. One ResourceSectionState drives accepted fragments and visited execution content. Actual status/Flow-version metrics precede Identity and saved Configuration. The compact version is the metric value; the complete qualified Flow reference stays in its detail and Configuration, avoiding clipped large identity text on mobile. Refresh/retry retains loaded inspection, topology instance and selection after recoverable failure; 401/403/404 clear private input/output/step state. Responses for another Task/run or a changed execution scope cannot populate/replace the inspection; late/disposed reads are ignored. Parent Task links preserve the independent navigation context. API/query/authorization and execution semantics are unchanged; no write, loader or business counter is added.
+
+Validation:
+
+- **11 focused cases pass**, preserving the original identity, exact Task API path, fragment retention and no-activation assertions. New cases verify recoverable refresh/retry, forbidden/missing-data clearing, initial retry, wrong Task/execution scope and superseded reads. The HTTP fixture now supplies the WorkTaskId required by the real query contract, rather than relying on an impossible unbound Task response. Common-state assertions replace obsolete family-specific error markup assertions.
+- Actual component/test, Web, Workplace and GovernedInventoryHost Release builds complete with zero warnings/errors. TypeScript passes. No shared/protected Agent product files change.
+- Both EN/dark desktop and FR/light native-touch probes pass. They select the existing Development Workspace through its page object, publish a deterministic native input/output Flow, publish/submit an Entry and inspect the actual linked Task/FlowRun from ordinary APIs. They cover Overview/Execution navigation, qualified Flow identity, exact execution scope/parent context, retained IO on refresh, no activation, strict width bounds and touch drawer Escape/focus return. A real unrelated Task request produces shared not-found feedback without the prior IO. There is no fake production record, live model/provider or image generation. [Exact tested source/actual-host hashes and results](source-proof.json). The [initial layout proof](initial-layout-proof.json) is retained; displayed captures use the final compact metric presentation, whose version text is also checked for internal clipping.
+- Recoverable and access-loss fault injection is covered by component HTTP tests; no browser outage/retry is claimed. The actual browser smoke covers successful refresh and a real not-found relation. No CI failure is investigated and no full solution suite is claimed. The deferred reusable transverse scenario remains under open/blocked #1236.
+
+Real application captures:
+
+| State | Desktop EN/dark | Touch FR/light |
+| --- | --- | --- |
+| Saved operational overview | [Overview](task-run-overview-desktop-en.png) | [Overview](task-run-overview-mobile-fr.png) |
+| Topology and IO inspection | [Execution](task-run-execution-desktop-en.png) | [Execution](task-run-execution-mobile-fr.png) |
+| Unrelated Task/Run | [Not found](task-run-not-found-desktop-en.png) | [Not found](task-run-not-found-mobile-fr.png) |

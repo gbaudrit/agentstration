@@ -26,6 +26,79 @@ namespace Agentstration.Management.Tests;
 public sealed class ModelProfileApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
+    public async Task ProfileSearchFindsUnicodeDisplayNamesBeyondTheFirstStoragePage()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var store = factory.Services.GetRequiredService<IResourceStore>();
+        ModelProfileResource template;
+        using (scopes.Push(context))
+            template = (await profiles.GetAsync("reasoning-default", default))!.Value;
+        var owner = template.ScopeRef!.Value;
+        var targetContext = context;
+        if (owner.Kind == ResourceScopeKind.Workspace)
+        {
+            var workspace = await factory.Services.GetRequiredService<IIdentityStore>().GetWorkspaceAsync(owner.TargetId!.Value, default);
+            targetContext = new(context.PrincipalId, workspace!.TenantId, workspace.Id);
+        }
+        else if (owner.Kind == ResourceScopeKind.Tenant)
+            targetContext = new(context.PrincipalId, owner.TargetId!.Value, Guid.Empty);
+        using (owner == ResourceScopeRef.Instance ? scopes.PushInstance(context) : scopes.Push(targetContext))
+        {
+            for (var index = 0; index < 27; index++)
+                await store.PutExactAsync(owner, new ModelProfileResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ModelResourceKinds.ModelProfile,
+                    Metadata = new ResourceMetadata { Name = $"zz-lookup-{index:D2}", Namespace = template.Namespace },
+                    ScopeRef = owner,
+                    Definition = template.Definition with { DisplayName = index == 26 ? "RARE ÉLÉMENT" : $"Lookup profile {index}" }
+                }, null, true, default);
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, owner);
+        var result = await client.GetFromJsonAsync<ModelProfileLookupPageResponse>("/api/modelprofiles/queries/lookup?search=" + Uri.EscapeDataString("élément"));
+        Assert.IsNotNull(result);
+        Assert.HasCount(1, result.Value);
+        Assert.AreEqual("zz-lookup-26", result.Value.Single().Name);
+        Assert.IsNull(result.NextCursor);
+        var literalPercent = await client.GetFromJsonAsync<ModelProfileLookupPageResponse>("/api/modelprofiles/queries/lookup?search=%25");
+        Assert.IsNotNull(literalPercent);
+        Assert.IsEmpty(literalPercent.Value);
+    }
+
+    [TestMethod]
+    public async Task ProfileLookupAndUsagePagesUseBoundedResultsAndRejectInvalidCursors()
+    {
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        var lookup = await client.GetFromJsonAsync<ModelProfileLookupPageResponse>("/api/modelprofiles/queries/lookup?search=reasoning-default");
+        Assert.IsNotNull(lookup);
+        Assert.IsTrue(lookup.Value.Count <= 20);
+        Assert.IsTrue(lookup.Value.All(value => value.Properties.UsageCount is null));
+        Assert.IsTrue(lookup.Value.Any(value => value.Name == "reasoning-default"));
+        using var invalid = await client.GetAsync("/api/modelprofiles/queries/lookup?cursor=invalid");
+        Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+        var values = new List<ModelProfileUsageResponse>();
+        string? cursor = null;
+        for (var page = 0; page < 32; page++)
+        {
+            var path = "/api/modelprofiles/reasoning-default/usages/page" + (cursor is null ? "" : "?cursor=" + Uri.EscapeDataString(cursor));
+            var response = await client.GetFromJsonAsync<ModelProfileUsagePageResponse>(path);
+            Assert.IsNotNull(response);
+            Assert.IsTrue(response.Value.Count <= 20);
+            values.AddRange(response.Value);
+            cursor = response.NextCursor;
+            if (cursor is null) break;
+        }
+        Assert.IsNull(cursor, "The deterministic fixture must have a finite continuation sequence.");
+        Assert.IsTrue(values.Any(value => value.Name == "sql-expert"));
+    }
+
+    [TestMethod]
     public async Task InstanceProfileResolutionRemainsAvailableFromAnAuthorizedWorkspace()
     {
         await using var factory = DiagnosticFactory();
@@ -566,7 +639,19 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
 
         IReadOnlyList<ModelProfileUsage> usages;
         using (scopes.Push(new RequestContext(reader.Id, context.TenantId, context.WorkspaceId)))
+        {
             usages = await profiles.GetUsagesAsync(profile.Value, default);
+            var paged = new List<ModelProfileUsage>();
+            string? cursor = null;
+            do
+            {
+                var page = await profiles.GetUsagePageAsync(profile.Value, null, cursor, default);
+                paged.AddRange(page.Value);
+                cursor = page.NextCursor;
+            } while (cursor is not null);
+            Assert.HasCount(1, paged);
+            Assert.AreEqual("visible-workspace-consumer", paged.Single().Name);
+        }
 
         Assert.HasCount(1, usages);
         Assert.AreEqual("visible-workspace-consumer", usages.Single().Name);
@@ -615,6 +700,60 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         Assert.AreEqual(profileNamespace.Value, resolution.Declared.ModelProfile.Namespace);
     }
 
+    [TestMethod]
+    [DataRow("default")]
+    [DataRow("team.agents")]
+    public async Task ExactAgentModelResolutionDistinguishesHomonymsAcrossOwners(string namespaceValue)
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
+        var profiles = factory.Services.GetRequiredService<ModelProfileManagementService>();
+        var agents = factory.Services.GetRequiredService<AgentManagementService>();
+        var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+        AgentResource inheritedAgent = null!;
+        var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var resourceNamespace = new ResourceNamespace(namespaceValue);
+        var inheritedProfile = Profile("ancestor-reasoning", ResourceScopeRef.Instance);
+        var ownedProfile = Profile("owned-reasoning", workspace);
+        using (scopes.PushInstance(context))
+        {
+            inheritedProfile = (await profiles.CreateAsync(inheritedProfile, default)).Value;
+            var agent = Agent("owner-homonym", ResourceScopeRef.Instance, new(inheritedProfile.Name, ResourceScopeRef.Instance, inheritedProfile.Namespace)) with { Metadata = new() { Name = "owner-homonym", Namespace = resourceNamespace } };
+            inheritedAgent = (await agents.PutAgentAsync(agent, null, true, default)).Value;
+        }
+        using (scopes.Push(context))
+        {
+            ownedProfile = (await profiles.CreateAsync(ownedProfile, default)).Value;
+            var agent = Agent("owner-homonym", workspace, new(ownedProfile.Name, workspace, ownedProfile.Namespace)) with { Metadata = new() { Name = "owner-homonym", Namespace = resourceNamespace } };
+            await agents.PutAgentAsync(agent, null, true, default);
+        }
+        using var client = factory.CreateClient();
+        SelectConsoleContext(client, workspace);
+        var path = resourceNamespace.IsDefault ? "/api/agents/owner-homonym/model" : $"/api/namespaces/{resourceNamespace.Value}/agents/owner-homonym/model";
+        using var hidden = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
+        Assert.AreEqual(HttpStatusCode.NotFound, hidden.StatusCode, "An undiscoverable exact ancestor must not fall back to the visible homonym.");
+        using (scopes.PushInstance(context))
+        {
+            await policies.PutAsync(new ResourceAccessPolicy(new(inheritedAgent.Uid, ResourceScopeRef.Instance, inheritedAgent.Namespace, AgentResourceKinds.Agent, inheritedAgent.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId), [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]), null, default);
+            await policies.PutAsync(new ResourceAccessPolicy(new(inheritedProfile.Uid, ResourceScopeRef.Instance, inheritedProfile.Namespace, ModelResourceKinds.ModelProfile, inheritedProfile.Generation),
+                [new(ResourceScopeRef.Tenant(context.TenantId), [ResourceAccessAction.Discover, ResourceAccessAction.Use], IncludeDescendants: true)]), null, default);
+        }
+        using var inheritedReply = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Instance.Value));
+        Assert.AreEqual(HttpStatusCode.OK, inheritedReply.StatusCode, await inheritedReply.Content.ReadAsStringAsync());
+        var inherited = await inheritedReply.Content.ReadFromJsonAsync<AgentModelResponse>();
+        using var ownedReply = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(workspace.Value));
+        Assert.AreEqual(HttpStatusCode.OK, ownedReply.StatusCode, await ownedReply.Content.ReadAsStringAsync());
+        var owned = await ownedReply.Content.ReadFromJsonAsync<AgentModelResponse>();
+        Assert.AreEqual(inheritedProfile.Name, inherited!.Declared.ModelProfile.Name);
+        Assert.AreEqual(ResourceScopeRef.Instance, inherited.Declared.ModelProfile.ScopeRef);
+        Assert.AreEqual(ownedProfile.Name, owned!.Declared.ModelProfile.Name);
+        Assert.AreEqual(workspace, owned.Declared.ModelProfile.ScopeRef);
+        using var absent = await client.GetAsync(path + "?scopeRef=" + Uri.EscapeDataString(ResourceScopeRef.Workspace(Guid.NewGuid()).Value));
+        Assert.AreEqual(HttpStatusCode.NotFound, absent.StatusCode);
+    }
+
     private static ModelProfileResource Profile(string name, ResourceScopeRef scopeRef) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -643,7 +782,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
                 DisplayName = name,
                 Instructions = "Use the selected model profile.",
                 ModelProfile = modelProfile,
-                RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance)
+                RuntimeProfile = new ResourceReference("maf-builtin", ResourceScopeRef.Instance, ResourceNamespace.Default)
             }
         };
 

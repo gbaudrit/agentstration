@@ -1,0 +1,19 @@
+{
+  "baseCommit": "8500115ea33e3954a506ad0ac722d07de7255b6b",
+  "route": "/settings/organization/security-audit",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor": "1c630a6e094306ea38c9ba10fc58e0fcd9db521d",
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor.cs": "c2f1a7c751c33cdf364ad337adef17f48b85ff3a",
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor.css": "b11dc456519bb1abfc6d0820a6b81ee1315a12ec",
+    "src/Agentstration.Identity.Api/Api/IdentityEndpoints.cs": "d98743d91b3d4a12d25ae2f6b4b79d7ce398fb3a",
+    "src/Agentstration.ResourceManagement.Storage.Sqlite/SqliteIdentityStore.cs": "c52b99fdbf5d27bb2878e3f0948a8e1fc2139135",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ],
+  "synchronizedWith": "068c7af1",
+  "synchronizationReview": "Incoming observed Model detail/editor inspection changes do not alter the audit API, Organization catalogs or shared collection composition. No additional audit behavioral rerun justified."
+}

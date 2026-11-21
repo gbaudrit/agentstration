@@ -9,6 +9,12 @@ namespace Agentstration.Web.Console;
 
 public interface IToolDefinitionsClient
 {
+    Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact-scope ToolDefinition reads are not implemented by this client.");
+    Task<IReadOnlyList<ToolDefinitionVersionResource>> GetVersionsAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact-scope ToolDefinition publication reads are not implemented by this client.");
+    Task<IReadOnlyList<ToolDefinitionUsage>> GetUsagesAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("Exact-scope ToolDefinition consumer reads are not implemented by this client.");
     Task<IReadOnlyList<ToolDefinitionVersionResource>> GetVersionsAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ToolDefinitionVersionResource>>([]);
     Task<IReadOnlyList<ToolDefinitionUsage>> GetUsagesAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
@@ -28,6 +34,16 @@ public interface IToolDefinitionsClient
 
 public sealed class ToolDefinitionsApiClient(HttpClient httpClient) : IToolDefinitionsClient
 {
+    public async Task<ResourceSnapshot<ToolDefinitionResource>> GetAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync(Path(name, @namespace) + $"&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken);
+        return await ReadAsync(response, cancellationToken);
+    }
+    public async Task<IReadOnlyList<ToolDefinitionVersionResource>> GetVersionsAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ToolDefinitionVersionResource>>(httpClient, ChildPath(name, @namespace, "versions") + $"&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken)).Value;
+    public async Task<IReadOnlyList<ToolDefinitionUsage>> GetUsagesAsync(ResourceScopeRef scopeRef, string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
+        (await ApiResponse.ReadAsync<ValueResponse<ToolDefinitionUsage>>(httpClient, ChildPath(name, @namespace, "usages") + $"&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken)).Value;
+
     public async Task<IReadOnlyList<ToolDefinitionVersionResource>> GetVersionsAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ToolDefinitionVersionResource>>(httpClient, ChildPath(name, @namespace, "versions"), cancellationToken)).Value;
     public async Task<IReadOnlyList<ToolDefinitionUsage>> GetUsagesAsync(string name, ResourceNamespace @namespace, CancellationToken cancellationToken) =>

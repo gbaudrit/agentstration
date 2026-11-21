@@ -1,0 +1,25 @@
+{
+  "journey": "exercise-shared-form",
+  "locale": "fr-FR",
+  "theme": "dark",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "input": {
+    "definition": {
+      "id": "model-profile",
+      "path": "/modelprofiles/new",
+      "source": "ModelProfileEditor.razor"
+    },
+    "locale": "fr-FR",
+    "theme": "dark"
+  },
+  "captures": [
+    {
+      "checkpoint": "shared-form-editor-cleared",
+      "file": "model-profile-cleared-dark-fr.png",
+      "scope": "target"
+    }
+  ]
+}

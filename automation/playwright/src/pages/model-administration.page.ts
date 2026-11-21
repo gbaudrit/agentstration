@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 import { fillAndCommit } from './controls.js';
 
 export interface ModelAdministrationDefinition {
@@ -22,6 +23,7 @@ export class ModelAdministrationPage {
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.providerExtension), 'ollama-extension');
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.providerContribution));
     await expect(this.page.getByTestId(TestIds.modelAdministration.providerName)).toHaveValue(definition.providerName);
+    await this.page.locator('[data-wizard-step=review]').click();
     await this.page.getByTestId(TestIds.modelAdministration.providerSave).click();
     await this.page.waitForURL(url => url.pathname === `/modelproviders/${definition.providerName}`);
     const marker = this.page.getByTestId(TestIds.resourceAdministration.modelProviderEditor);
@@ -40,8 +42,10 @@ export class ModelAdministrationPage {
     await this.waitForInteractive(TestIds.modelAdministration.runtimeForm);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.runtimeName), definition.runtimeName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName), definition.runtimeDisplayName);
+    await this.page.locator('[data-wizard-step=review]').click();
     await this.page.getByTestId(TestIds.modelAdministration.runtimeSave).click();
     await this.page.waitForURL(url => url.pathname === `/runtimeprofiles/${definition.runtimeName}`);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.waitForPersisted(TestIds.modelAdministration.runtimeForm);
     return this.page.getByTestId(TestIds.resourceAdministration.runtimeProfileEditor);
   }
@@ -59,7 +63,11 @@ export class ModelAdministrationPage {
 
   public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {
     await this.open(consoleUrl, `/modelproviders/${encodeURIComponent(providerName)}`, TestIds.resourceAdministration.modelProviderEditor);
-    await this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first().click();
+    await selectResourceSection(this.page, 'models');
+    const modelLink = this.page.getByTestId(TestIds.modelAdministration.openModelDetails).first();
+    // This context must exist in the rendered URL before Blazor intercepts clicks.
+    await expect(modelLink).toHaveAttribute('href', /[?&]context=%2Finstance/);
+    await modelLink.click();
     await this.page.getByTestId(TestIds.resourceAdministration.modelDetails).waitFor({ state: 'visible' });
     await this.page.getByTestId(TestIds.modelAdministration.editModelOverride).click();
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.modelOverrideContextTokens), contextTokens.toString());
@@ -77,15 +85,19 @@ export class ModelAdministrationPage {
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileName), definition.profileName);
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.profileDisplayName), definition.profileDisplayName);
     await this.page.getByTestId(TestIds.secretGrants.scopePicker).selectOption(scopeRef);
+    await this.page.getByTestId(TestIds.modelAdministration.profileWizard).locator('[data-wizard-step="model"]').click();
     await selectMatchingOption(this.page.getByTestId(TestIds.modelAdministration.profileProvider), definition.providerName);
     await selectFirstOption(this.page.getByTestId(TestIds.modelAdministration.profileModel));
+    await this.page.getByTestId(TestIds.modelAdministration.profileWizard).locator('[data-wizard-step="review"]').click();
     await this.page.getByTestId(TestIds.modelAdministration.profileSave).click();
     await this.page.waitForURL(url => url.pathname === `/modelprofiles/${definition.profileName}`);
+    await this.openProfileEdit();
     await this.waitForPersisted(TestIds.modelAdministration.profileForm);
     return this.page.getByTestId(TestIds.resourceAdministration.modelProfileEditor);
   }
 
   public async updateProviderDisplayName(value: string): Promise<void> {
+    await selectResourceSection(this.page, 'definition/identity');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.providerDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.providerSave),
@@ -95,6 +107,7 @@ export class ModelAdministrationPage {
   }
 
   public async updateRuntimeDisplayName(value: string): Promise<void> {
+    await selectResourceSection(this.page, 'definition/identity');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.runtimeDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.runtimeSave),
@@ -104,6 +117,7 @@ export class ModelAdministrationPage {
   }
 
   public async updateProfileDisplayName(value: string): Promise<void> {
+    await selectResourceSection(this.page, 'definition/identity');
     await this.updateDisplayName(
       this.page.getByTestId(TestIds.modelAdministration.profileDisplayName),
       this.page.getByTestId(TestIds.modelAdministration.profileSave),
@@ -118,6 +132,7 @@ export class ModelAdministrationPage {
 
   public async openRuntime(consoleUrl: string, name: string): Promise<void> {
     await this.open(consoleUrl, `/runtimeprofiles/${name}`, TestIds.resourceAdministration.runtimeProfileEditor);
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.waitForPersisted(TestIds.modelAdministration.runtimeForm);
   }
 
@@ -136,14 +151,7 @@ export class ModelAdministrationPage {
       `/modelproviders/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}&context=${encodeURIComponent(scopeRef)}`,
       TestIds.resourceAdministration.modelProviderEditor,
     );
-    await this.page.locator(
-      `[data-testid="${TestIds.modelAdministration.providerConfigurationTab}"][data-interactive="true"]`,
-    ).waitFor({ state: 'visible' });
-    const tab = this.page.getByTestId(TestIds.modelAdministration.providerAccessTab);
-    await expect(async () => {
-      await tab.click();
-      await expect(tab).toHaveAttribute('aria-selected', 'true');
-    }).toPass();
+    await selectResourceSection(this.page, 'access');
     await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
   }
 
@@ -153,8 +161,9 @@ export class ModelAdministrationPage {
       `/modelprofiles/${encodeURIComponent(name)}?scopeRef=${encodeURIComponent(scopeRef)}&context=${encodeURIComponent(scopeRef)}`,
       TestIds.resourceAdministration.modelProfileEditor,
     );
+    await this.openProfileEdit();
     await this.waitForPersisted(TestIds.modelAdministration.profileForm);
-    await this.page.getByTestId(TestIds.modelAdministration.profileAccessTab).click();
+    await selectResourceSection(this.page, 'access');
     await this.page.getByTestId(TestIds.resourceAccess.panel).waitFor({ state: 'visible' });
   }
 
@@ -171,6 +180,11 @@ export class ModelAdministrationPage {
     await expect(input).toHaveValue(value);
   }
 
+  private async openProfileEdit(): Promise<void> {
+    await selectResourceSection(this.page, 'definition/identity');
+    await expect(this.page.getByTestId(TestIds.modelAdministration.profileForm)).toBeVisible();
+  }
+
   private async waitForInteractive(testId: string): Promise<void> {
     await this.page.locator(`[data-testid="${testId}"][data-interactive="true"]`).waitFor({ state: 'visible' });
   }
@@ -181,13 +195,7 @@ export class ModelAdministrationPage {
   }
 
   private async openProviderConfiguration(): Promise<void> {
-    const configurationTab = this.page.getByTestId(TestIds.modelAdministration.providerConfigurationTab);
-    const form = this.page.getByTestId(TestIds.modelAdministration.providerForm);
-    await expect(async () => {
-      await configurationTab.click();
-      await expect(configurationTab).toHaveAttribute('aria-selected', 'true');
-      await expect(form).toBeVisible();
-    }).toPass();
+    await selectResourceSection(this.page, 'definition/configuration');
     await this.waitForPersisted(TestIds.modelAdministration.providerForm);
   }
 
@@ -203,6 +211,7 @@ export class ModelAdministrationPage {
     if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
     const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Model administration route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(marker).waitFor({ state: 'visible' });
   }
 

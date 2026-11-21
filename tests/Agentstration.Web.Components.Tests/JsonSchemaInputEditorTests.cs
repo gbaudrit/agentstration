@@ -94,8 +94,10 @@ public sealed class JsonSchemaInputEditorTests
         StringAssert.Contains(textarea.GetAttribute("value") ?? textarea.TextContent, "Agentstration");
         textarea.Input("not-json");
         rendered.WaitForAssertion(() => Assert.IsFalse(validation?.IsValid));
+        Assert.IsNotNull(rendered.Find(".form-field[aria-invalid=true] textarea"));
         textarea.Input("{\"name\":\"Restored\",\"mode\":\"fast\"}");
         rendered.WaitForAssertion(() => Assert.IsTrue(validation?.IsValid));
+        Assert.IsEmpty(rendered.FindAll(".form-field[aria-invalid=true]"));
         rendered.Find("[data-testid='schema-form-mode']").Click();
         Assert.AreEqual("Restored", rendered.Find("input[type=text]").GetAttribute("value"));
     }
@@ -132,7 +134,7 @@ public sealed class JsonSchemaInputEditorTests
         StringAssert.Contains(prompt.QuerySelector(".metric-help")?.GetAttribute("aria-label"), "16");
         Assert.HasCount(1, rendered.Find("[data-schema-path='$.test']").QuerySelectorAll("input[type=text]"));
         var patternHelp = rendered.Find("[data-schema-path='$.reference'] .metric-help");
-        StringAssert.Contains(patternHelp.ClassName, "metric-help-start");
+        Assert.AreEqual("tooltip", patternHelp.QuerySelector("[role=tooltip]")?.GetAttribute("role"));
         StringAssert.Contains(patternHelp.GetAttribute("aria-label"), "^[A-Z]{3}-[0-9]{4}$");
     }
 

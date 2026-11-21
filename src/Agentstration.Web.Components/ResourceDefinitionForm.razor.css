@@ -1,0 +1,4 @@
+.resource-definition-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.resource-definition-fields[hidden] { display: none; }
+.resource-definition-fields ::deep .form-field,
+.resource-definition-fields ::deep .label-editor-row { scroll-margin-block: calc(var(--topbar-height) + var(--space-5)) calc(var(--mobile-navigation-height, 0px) + var(--space-5)); }

@@ -15,7 +15,7 @@
             <pre>@JsonSerializer.Serialize(effective, Pretty)</pre>
             @if (CanManage)
             {
-                <label><span>@Localizer["SchemaCandidate.Name"]</span><input @bind="name" maxlength="128" disabled="@busy" /></label>
+                <FormField Label="@Localizer["SchemaCandidate.Name"]"><ClearableText UpdateOnInput="false" @bind-Value="name" maxlength="128" Disabled="@busy" /></FormField>
                 <button type="button" class="button-secondary" disabled="@(busy || string.IsNullOrWhiteSpace(name))"
                     data-testid="operation-schema-create" @onclick="() => CreateAsync(effective, candidate)">@Localizer["SchemaCandidate.CreateDraft"]</button>
             }

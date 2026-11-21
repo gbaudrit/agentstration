@@ -17,17 +17,25 @@ public sealed class ModelProviderEditorModel
     [Required] public string DisplayName { get; set; } = string.Empty;
     [Required] public string ExtensionId { get; set; } = string.Empty;
     [Required] public string ContributionId { get; set; } = string.Empty;
+    public ResourceScopeRef? ScopeRef { get; set; }
+    public ResourceScopeRef? ExtensionScopeRef { get; set; }
+    public string? Description { get; set; }
+    public string Tags { get; set; } = string.Empty;
+    private ResourceReference? originalExtension;
+    private string? originalExtensionId;
+    public IReadOnlyList<string> MissingRequiredBindings(IEnumerable<string> ids) => ids.Where(id => !ValueBindings.Any(value => value.RequirementId == id && value.IsConfigured)).ToArray();
     public List<ModelProviderValueBindingEditorModel> ValueBindings { get; set; } = [];
     public IReadOnlyDictionary<string, ModelSpecificationOverride> SpecificationOverrides { get; set; }
         = new Dictionary<string, ModelSpecificationOverride>(StringComparer.Ordinal);
 
-    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value);
+    public CreateModelProviderRequest ToCreateRequest() => new(Name.Trim(), ToProperties(), ResourceNamespace.Parse(Namespace).Value, ScopeRef);
     public PutModelProviderRequest ToPutRequest() => new(ToProperties());
 
     public ModelProviderProperties ToProperties() => new()
     {
         DisplayName = DisplayName.Trim(),
-        Extension = ParseExtension(ExtensionId),
+        Extension = originalExtension is not null && ExtensionId == originalExtensionId && ExtensionScopeRef == originalExtension.ScopeRef
+            ? originalExtension : ParseExtension(ExtensionId) with { ScopeRef = ExtensionScopeRef },
         ContributionId = ContributionId.Trim(),
         ValueBindings = ValueBindings.Where(binding => binding.IsConfigured).Select(binding => binding.ToBinding()).ToArray(),
         SpecificationOverrides = new Dictionary<string, ModelSpecificationOverride>(SpecificationOverrides, StringComparer.Ordinal)
@@ -37,6 +45,11 @@ public sealed class ModelProviderEditorModel
     {
         Name = resource.Name,
         Namespace = resource.Namespace.Value,
+        ScopeRef = resource.ScopeRef,
+        ExtensionScopeRef = resource.Definition.Extension.ScopeRef,
+        Tags = string.Join(Environment.NewLine, resource.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}")),
+        originalExtension = resource.Definition.Extension,
+        originalExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",
         DisplayName = resource.Definition.DisplayName,
         ExtensionId = $"{(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}:{resource.Definition.Extension.Name}",
         ContributionId = resource.Definition.ContributionId,

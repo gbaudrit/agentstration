@@ -1,0 +1,9 @@
+{
+  "baseCommit": "7374116c86698c057aa9830fb8600ba552650af3",
+  "route": "/settings",
+  "uiChanged": false,
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Settings.razor": "af4c269b81a0a86c1c6d56981a9f5a8ae2e39377",
+    "src/Agentstration.Console.Client/AgentstrationWebOptions.cs": "d5867dbc17bf73978c74af9676ee2c8a502062c7"
+  }
+}

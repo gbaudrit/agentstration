@@ -9,6 +9,22 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class StateComparisonTests
 {
     [TestMethod]
+    public void RuntimeNameLinksToItsProfileOnlyWhenAnExactTargetIsProvided()
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var cut = context.Render<StateComparison>(parameters => parameters
+            .Add(value => value.RuntimeLabel, "maf-active")
+            .Add(value => value.RuntimeUrl, "/runtimeprofiles/maf-active?namespace=active.runtime"));
+        Assert.HasCount(1, cut.FindAll("a"));
+        Assert.AreEqual("maf-active", cut.Find("a").TextContent);
+        Assert.AreEqual("/runtimeprofiles/maf-active?namespace=active.runtime", cut.Find("a").GetAttribute("href"));
+        cut.Render(parameters => parameters.Add(value => value.RuntimeUrl, (string?)null));
+        Assert.IsEmpty(cut.FindAll("a"));
+        StringAssert.Contains(cut.Markup, "maf-active");
+    }
+
+    [TestMethod]
     public void ComparisonUsesTheSelectedFrenchCulture()
     {
         var originalUiCulture = CultureInfo.CurrentUICulture;

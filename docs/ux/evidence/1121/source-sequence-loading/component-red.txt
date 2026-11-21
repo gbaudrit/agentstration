@@ -1,0 +1,51 @@
+Running tests from /workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/bin/Release/net10.0/Agentstration.Console.Components.Tests.dll (net10.0|x64)
+failed AQueuedAddDuringCatalogRefreshCannotReadAPartialCatalogOrMutateTheSequence (582ms)
+  from /workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/bin/Release/net10.0/Agentstration.Console.Components.Tests.dll (net10.0|x64)
+  Assertion failed. Expected value to be null.
+  An in-flight Add must not index the cleared catalog during refresh.
+
+  actual: System.ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection. (Parameter 'index')
+             at System.Collections.Generic.List`1.get_Item(Int32 index)
+             at Agentstration.Web.Components.Pages.FlowSequenceEditor.AddAsync() in /workspace/agentstration-ux-main/src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor:line 168
+             at Microsoft.AspNetCore.Components.EventCallbackWorkItem.InvokeAsync[T](MulticastDelegate delegate, T arg)
+             at Microsoft.AspNetCore.Components.EventCallbackWorkItem.InvokeAsync(Object arg)
+             at Microsoft.AspNetCore.Components.ComponentBase.Microsoft.AspNetCore.Components.IHandleEvent.HandleEventAsync(EventCallbackWorkItem callback, Object arg)
+             at Microsoft.AspNetCore.Components.EventCallback.InvokeAsync(Object arg)
+             at Microsoft.AspNetCore.Components.RenderTree.Renderer.DispatchEventAsync(UInt64 eventHandlerId, EventFieldInfo fieldInfo, EventArgs eventArgs, Boolean waitForQuiescence)
+          --- End of stack trace from previous location ---
+             at Bunit.Rendering.BunitRenderer.AssertNoUnhandledExceptions() in /_/src/bunit/Rendering/BunitRenderer.cs:line 755
+             at Bunit.Rendering.BunitRenderer.DispatchEventAsync(UInt64 eventHandlerId, EventFieldInfo fieldInfo, EventArgs eventArgs, Boolean ignoreUnknownEventHandlers) in /_/src/bunit/Rendering/BunitRenderer.cs:line 249
+             at Bunit.TriggerEventDispatchExtensions.GetDispatchEventTasks(BunitRenderer renderer, IElement element, String eventName, EventArgs eventArgs) in /_/src/bunit/EventDispatchExtensions/TriggerEventDispatchExtensions.cs:line 135
+             at Bunit.TriggerEventDispatchExtensions.TriggerBubblingEventAsync(BunitRenderer renderer, IElement element, String eventName, EventArgs eventArgs) in /_/src/bunit/EventDispatchExtensions/TriggerEventDispatchExtensions.cs:line 110
+             at Bunit.TriggerEventDispatchExtensions.TriggerEventsAsync(BunitRenderer renderer, IElement element, String eventName, EventArgs eventArgs) in /_/src/bunit/EventDispatchExtensions/TriggerEventDispatchExtensions.cs:line 86
+             at Bunit.TriggerEventDispatchExtensions.<>c__DisplayClass3_0.<TriggerEventAsync>b__0() in /_/src/bunit/EventDispatchExtensions/TriggerEventDispatchExtensions.cs:line 73
+             at Microsoft.AspNetCore.Components.Rendering.RendererSynchronizationContext.<>c.<<InvokeAsync>b__10_0>d.MoveNext()
+          --- End of stack trace from previous location ---
+             at Bunit.TriggerEventDispatchExtensions.ThrowIfFailedSynchronously(Task result) in /_/src/bunit/EventDispatchExtensions/TriggerEventDispatchExtensions.cs:line 254
+             at Bunit.TriggerEventDispatchExtensions.TriggerEventAsync(IElement element, String eventName, EventArgs eventArgs) in /_/src/bunit/EventDispatchExtensions/TriggerEventDispatchExtensions.cs:line 75
+             at Bunit.EventHandlerDispatchExtensions.ClickAsync(IElement element, MouseEventArgs eventArgs) in /_/src/bunit/obj/Release/net10.0/bunit.generators.internal/Bunit.Blazor.EventDispatcherExtensionGenerator/EventHandlerDispatchExtensions.g.cs:line 1209
+             at Agentstration.Web.Tests.KnowledgeSourceEditorTests.AQueuedAddDuringCatalogRefreshCannotReadAPartialCatalogOrMutateTheSequence() in /workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/FlowSequenceLoadingTests.cs:line 36
+
+  Assert.IsNull(staleClickError)
+    at Agentstration.Web.Tests.KnowledgeSourceEditorTests.AQueuedAddDuringCatalogRefreshCannotReadAPartialCatalogOrMutateTheSequence() in /workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/FlowSequenceLoadingTests.cs:45
+    at Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Execution.TestMethodInfo.ExecuteInternalAsync(Object[] arguments, CancellationTokenSource timeoutTokenSource)
+failed AQueuedAddCannotMutateAReadOnlySequence (12ms)
+  from /workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/bin/Release/net10.0/Agentstration.Console.Components.Tests.dll (net10.0|x64)
+  Assertion failed. Expected values to be equal.
+
+  expected: 0
+  actual:   1
+
+  Assert.AreEqual(0, changes)
+    at Agentstration.Web.Tests.KnowledgeSourceEditorTests.AQueuedAddCannotMutateAReadOnlySequence() in /workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/FlowSequenceLoadingTests.cs:68
+    at Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Execution.TestMethodInfo.ExecuteInternalAsync(Object[] arguments, CancellationTokenSource timeoutTokenSource)
+/workspace/agentstration-ux-main/tests/Agentstration.Console.Components.Tests/bin/Release/net10.0/Agentstration.Console.Components.Tests.dll (net10.0|x64) failed with 2 error(s) (934ms)
+Exit code: 2
+
+Test run summary: Failed!
+  total: 2
+  failed: 2
+  succeeded: 0
+  skipped: 0
+  duration: 1s 148ms
+Test run completed with non-success exit code: 2 (see: https://aka.ms/testingplatform/exitcodes)

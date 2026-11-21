@@ -1,0 +1,15 @@
+{
+  "baseCommit": "62a491ca9106e9160ecc870e778d3bf37aeb7aa6",
+  "route": "/triggers",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/Triggers.razor": "937917316f324c657af786c67b75a1a97db27d39",
+    "src/Agentstration.Console.Components/Components/Pages/Triggers.razor.cs": "6ec396b5a0df8b3aec9727bfe33cfd5e059b2eec",
+    "src/Agentstration.Triggers/TriggerManagementService.cs": "cfdb19f24072e11941ce8eef06872bc70c2aa247",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

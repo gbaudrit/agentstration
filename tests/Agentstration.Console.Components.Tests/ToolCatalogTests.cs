@@ -13,7 +13,8 @@ public sealed class ToolCatalogTests
     [TestMethod]
     public void CatalogLoadsToolsAcrossAllProviders()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
         var client = new CatalogClient();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(client);
@@ -39,7 +40,7 @@ public sealed class ToolCatalogTests
             return Task.FromResult<IReadOnlyList<ToolResource>>([]);
         }
 
-        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ToolProviderResource>>([]);
         public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolProviderResource>> CreateProviderAsync(CreateToolProviderRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();

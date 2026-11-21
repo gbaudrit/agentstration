@@ -64,7 +64,7 @@ public sealed class JsonSchemaAnyValueEditorTests
         Assert.AreEqual(JsonValueKind.Null, state.Value.Value.GetProperty("note").ValueKind);
         rendered.Find("[data-schema-path='$.note'] > button").Click();
         Assert.IsFalse(state.Value.Value.TryGetProperty("note", out _));
-        rendered.Find("[data-schema-path='$.note'] > label select").Change("1");
+        rendered.Find("[data-schema-path='$.note'] select").Change("1");
         Assert.AreEqual(JsonValueKind.Null, state.Value.Value.GetProperty("note").ValueKind);
         Assert.AreEqual(string.Empty, state.Value.Value.GetProperty("name").GetString());
     }
@@ -82,7 +82,8 @@ public sealed class JsonSchemaAnyValueEditorTests
         var type = rendered.Find("select");
         type.Change("0");
         Assert.IsFalse(state!.IsValid);
-        StringAssert.Contains(rendered.Find("input[type='number']").ParentElement!.TextContent, "JSON");
+        var number = rendered.Find("input[type='number']");
+        StringAssert.Contains(rendered.Find($"label[for='{number.GetAttribute("id")}']").TextContent, "JSON");
         rendered.Find("input[type='number']").Input("2");
         Assert.IsTrue(state.IsValid);
         Assert.AreEqual(2, state.Value!.Value.GetInt32());

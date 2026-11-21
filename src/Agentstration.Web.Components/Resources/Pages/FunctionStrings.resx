@@ -38,6 +38,14 @@
   <data name="SchemaParameter" xml:space="preserve"><value>Schema for {0}</value></data>
   <data name="OptionalSchemaParameterHelp" xml:space="preserve"><value>Optional. Without a schema, produced values have no declared business structure validation. Choose an inline schema or an exact published shared schema and optional sub-schema. The choice is resolved and frozen when the Source is saved or the Flow is published.</value></data>
   <data name="Native.json.explode.Description" xml:space="preserve"><value>Select a non-empty array of JSON objects at a JSON Pointer path and validate each record against an exact itemSchema. Keeps one logical Artifact, with independently queryable JSONB rows in document Storage or separate JSON files in local Storage. Limits: 100 records and 64 KiB per Artifact. Accepts acquisition JSON or an Artifact manifest.</value></data>
+  <data name="Disabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="Function" xml:space="preserve"><value>Transformation function</value></data>
+  <data name="Versions" xml:space="preserve"><value>Versions</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer saved definition is available. Your draft and its original ETag are retained. Discard to load the saved definition.</value></data>
+  <data name="ResourceYamlExport" xml:space="preserve"><value>This YAML shows the saved function. Edit its definition using the form.</value></data>
+  <data name="ScopeRequired" xml:space="preserve"><value>An owner scope is required.</value></data>
+  <data name="ResourceIdentityMismatch" xml:space="preserve"><value>The returned function does not match the requested identity.</value></data>
+  <data name="SelectionUnavailable" xml:space="preserve"><value>The selected function kind or native implementation is no longer available.</value></data>
   <data name="Native.xml.to_json.Description" xml:space="preserve"><value>Convert bounded XML with explicit child/attribute paths, namespace aliases and stable arrays. Expose a transformation Schema to pin and validate the XSD input and JSON output contracts.</value></data>
   <data name="TransformationEvidence" xml:space="preserve"><value>Accepted transformation contracts</value></data>
   <data name="TransformationPinnedHelp" xml:space="preserve"><value>This version exposes an immutable transformation declaration. Adopt a new version from the Schema page; existing versions retain their exact contracts.</value></data>

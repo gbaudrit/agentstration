@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <data name="Sections" xml:space="preserve"><value>Sections</value></data>
+  <data name="Close" xml:space="preserve"><value>Fermer les sections</value></data>
+  <data name="Expand" xml:space="preserve"><value>Développer {0}</value></data>
+  <data name="Collapse" xml:space="preserve"><value>Réduire {0}</value></data>
+  <data name="Unavailable" xml:space="preserve"><value>Cette section est indisponible. Une section accessible est affichée.</value></data>
+  <data name="Empty" xml:space="preserve"><value>Aucune section n’est disponible.</value></data>
+</root>

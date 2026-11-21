@@ -6,236 +6,127 @@
 @inject IServiceProvider Services
 @inject IJSRuntime JavaScript
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceIdentityFieldsStrings> IdentityLocalizer
+
+@if (editing) { <UnsavedNavigationGuard IsDirty="HasRegistrationDraft" HasUnsavedChanges="@(() => HasRegistrationDraft)" ViewQueryParameters="@(new[] { "tab" })" /> }
 
 <PageTitle>@T("Extensions") · Agentstration</PageTitle>
-<PageHeader Title="@T("Extensions")" Description="@T("Extensions.Description")">
-    <Actions>
-        @if (activeTab == ExtensionTab.Catalog)
-        {
-            <button class="button-primary" @onclick="StartCreate" disabled="@loading">@T("RegisterEndpoint")</button>
-        }
-    </Actions>
-</PageHeader>
-
-<div data-testid="distribution-extensions" data-interactive="@(interactive ? "true" : "false")">
-<ResourceTabs Label="@T("ExtensionTabs")">
-    <button id="extensions-tab-summary" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Summary ? "true" : "false")" aria-controls="extensions-panel-summary" class="@(activeTab == ExtensionTab.Summary ? "active" : null)" data-testid="extensions-tab-summary" @onclick="() => activeTab = ExtensionTab.Summary">@T("Tab.Summary")</button>
-    <button id="extensions-tab-catalog" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Catalog ? "true" : "false")" aria-controls="extensions-panel-catalog" class="@(activeTab == ExtensionTab.Catalog ? "active" : null)" data-testid="extensions-tab-catalog" @onclick="() => activeTab = ExtensionTab.Catalog">@T("Tab.Extensions")</button>
-    @if (CanAdministerEnrollments)
-    {
-        <button id="extensions-tab-enrollments" type="button" role="tab" aria-selected="@(activeTab == ExtensionTab.Enrollments ? "true" : "false")" aria-controls="extensions-panel-enrollments" class="@(activeTab == ExtensionTab.Enrollments ? "active" : null)" data-testid="extensions-tab-enrollments" @onclick="() => activeTab = ExtensionTab.Enrollments">@T("Tab.Enrollments")</button>
-    }
-</ResourceTabs>
-
-@if (error is not null)
-{
-    <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState>
-}
-
-@if (activeTab == ExtensionTab.Summary)
-{
-    <div id="extensions-panel-summary" role="tabpanel" aria-labelledby="extensions-tab-summary">
-        <section class="metric-grid" aria-label="@T("SummaryMetrics")">
-            <MetricCard Label="@T("Tab.Extensions")" Value="@(inventory?.Count.ToString() ?? "—")" Detail="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" Url="/extensions?tab=catalog" />
-            @if (CanAdministerEnrollments)
+<div class="extensions-list" data-testid="distribution-extensions" data-interactive="@(interactive ? "true" : "false")">
+    <ResourceCollectionTemplate TItem="ExtensionInventoryItemResponse" Title="@T("Extensions")" Description="@T("UnifiedInventory.Description")" TestId="extensions-catalog" ContextKey="@catalogContextKey" RowTestId="extension-inventory-row"
+                                Items="@(inventory ?? [])" IdentityColumn="InventoryIdentity" Columns="InventoryColumns" LoadState="catalogLoadState" Disabled="@(!interactive)" OnRefresh="LoadAsync" OnRetry="LoadAsync"
+                                Metrics="@(inventory is null ? null : SummaryMetrics)" Details="EnrollmentDetails" IsExpanded="IsEnrollmentExpanded"
+                                ItemActions="InventoryActions" EmptyTitle="@T("NoExtensionsDiscovered")" EmptyMessage="@T("NoExtensionsDiscoveredMessage")">
+        <PrimaryActions>@if (CanRegister) { <button class="button-primary" @onclick="StartCreate" disabled="@(loading || editing)">@T("RegisterEndpoint")</button> }</PrimaryActions>
+        <Actions>@if (CanAdministerEnrollments && enrollmentSettings is not null) { <button class="button-secondary" type="button" data-testid="extension-enrollment-settings" @onclick="OpenEnrollmentSettings" disabled="@(loading || pairingBusy)"><UiIcon Name="settings" /> @T("EnrollmentModes")</button> }</Actions>
+        <EmptyActions>@if (CanRegister) { <button class="button-primary" @onclick="StartCreate" disabled="@(loading || editing)">@T("RegisterEndpoint")</button> }</EmptyActions>
+        <Feedback>
+            @if (catalogLoadState.Status == ResourceLoadStatus.Forbidden && CanRegister) { <FormActions><button type="button" class="button-primary" @onclick="StartCreate" disabled="@(loading || editing)">@T("RegisterEndpoint")</button></FormActions> }
+            @if (error is not null && !editing && !showEnrollmentSettings) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" /> }
+            @if (activePairingCode is not null)
             {
-                <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments is null ? "—" : ActiveEnrollmentCount.ToString())" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" Url="/extensions?tab=enrollments" />
+                <div class="inline-warning" role="status"><strong>@T("PairingCode")</strong> <code>@activePairingCode</code>@if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }@if (clipboardFallback) { <p>@T("ClipboardFallback")</p><button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button><button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button> }</div>
             }
-            <MetricCard Label="@T("Connections")" Value="@(registrations?.Count.ToString() ?? "—")" Detail="@T("EnabledEndpoints", EnabledRegistrationCount)" Status="@(EnabledRegistrationCount > 0 ? UiStatus.Info : UiStatus.Neutral)" Url="/extensions?tab=catalog" />
-            @if (CanAdministerEnrollments)
-            {
-                <MetricCard Label="@T("EnrollmentModes")" Value="@(enrollmentSettings is null ? "—" : $"{EnabledEnrollmentModeCount}/2")" Detail="@T("EnabledEnrollmentModes", EnabledEnrollmentModeCount)" Status="@(EnabledEnrollmentModeCount > 0 ? UiStatus.Info : UiStatus.Warning)" Url="/extensions?tab=enrollments" />
-            }
-        </section>
-        <section class="panel resource-section">
-            <div class="panel-header"><div><p class="eyebrow">@T("Summary")</p><h2>@T("OperationalOverview")</h2><p>@T("OperationalOverview.Description")</p></div></div>
-            <dl class="resource-details">
-                <dt>@T("ExtensionCatalog")</dt><dd><StatusBadge Text="@T("AvailableExtensions", AvailableExtensionCount)" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" /></dd>
-                @if (CanAdministerEnrollments)
-                {
-                    <dt>@T("EnrollmentQueue")</dt><dd><StatusBadge Text="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" /></dd>
-                    <dt>@T("PairingCodeMode")</dt><dd>@T(pairingCodeEnabled ? "Enabled" : "Disabled")</dd>
-                    <dt>@T("SharedKeyFileMode")</dt><dd>@T(sharedKeyFileEnabled ? "Enabled" : "Disabled")</dd>
-                }
-                <dt>@T("Connections")</dt><dd>@T("EnabledEndpoints", EnabledRegistrationCount)</dd>
-            </dl>
-        </section>
-    </div>
-}
+        </Feedback>
+    </ResourceCollectionTemplate>
 
-@if (activeTab == ExtensionTab.Enrollments && CanAdministerEnrollments)
-{
-    <div id="extensions-panel-enrollments" role="tabpanel" aria-labelledby="extensions-tab-enrollments">
-    <section class="panel resource-section">
-        <div class="panel-header">
-            <div><p class="eyebrow">@T("EnrollmentPolicy")</p><h2>@T("EnrollmentModes")</h2><p>@T("EnrollmentModes.Description")</p></div>
-        </div>
-        @if (enrollmentSettings is not null)
-        {
-            <div class="form-grid">
-                <label class="checkbox-field">
-                    <input type="checkbox" @bind="pairingCodeEnabled" disabled="@(!enrollmentSettings.PairingCodeConfigurable || savingEnrollmentSettings)" />
-                    @T("PairingCodeMode")
-                    <small>@(enrollmentSettings.PairingCodeConfigurable ? T("PairingCodeMode.Help") : T("ModeDisabledByConfiguration"))</small>
-                </label>
-                <label class="checkbox-field">
-                    <input type="checkbox" @bind="sharedKeyFileEnabled" disabled="@(!enrollmentSettings.SharedKeyFileConfigurable || savingEnrollmentSettings)" />
-                    @T("SharedKeyFileMode")
-                    <small>@(enrollmentSettings.SharedKeyFileConfigurable ? T("SharedKeyFileMode.Help") : T("ModeDisabledByConfiguration"))</small>
-                </label>
-            </div>
-            <div class="panel-actions">
-                <button class="button-primary" @onclick="SaveEnrollmentSettingsAsync" disabled="@savingEnrollmentSettings">@(savingEnrollmentSettings ? T("Saving") : T("SaveEnrollmentModes"))</button>
-            </div>
-        }
-    </section>
+    <ResourceCollectionPreview @ref="preview" ResourceKind="@ExtensionKinds.ExtensionRegistration" ContextKey="@catalogContextKey" Enabled="CanPreview" OnClosed="PreviewClosed">
+        <ChildContent Context="address"><ExtensionResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")"
+            CanManageEnrollment="@(PreviewEnrollment(address) is not null)" OnManageEnrollment="() => OpenPreviewEnrollment(address)" /></ChildContent>
+    </ResourceCollectionPreview>
 
-    <section class="panel resource-section">
-        <div class="panel-header">
-            <div><p class="eyebrow">@T("EnrollmentInbox")</p><h2>@T("PendingEnrollments")</h2><p>@T("PendingEnrollments.Description")</p></div>
-            <span>@T("EnrollmentCount", enrollments?.Count ?? 0)</span>
-        </div>
-        @if (enrollments?.Count > 0)
-        {
-            <div class="enrollment-list">
-                @foreach (var enrollment in enrollments)
-                {
-                    var requiresScope = enrollment.Definition.TargetScopeRef is null || enrollment.Definition.State == AepEnrollmentState.Unpaired;
-                    <article class="enrollment-card" data-testid="enrollment-card">
-                        <div class="enrollment-card-summary">
-                            <div class="enrollment-identity">
-                                <div><a class="text-button" href="@EnrollmentDetailUrl(enrollment)">@enrollment.Definition.ExtensionName</a> <span class="enrollment-version">@enrollment.Definition.ExtensionVersion</span></div>
-                                <code>@enrollment.Definition.ExtensionId</code>
-                                <small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small>
-                            </div>
-                            <div class="enrollment-status"><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" />
-                                @if (enrollment.Definition.TargetScopeRef is { } enrollmentScope && enrollment.Definition.State != AepEnrollmentState.Unpaired)
-                                { <ResourceScopeBadge ScopeRef="enrollmentScope" Compact /> }
-                                @if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued)
-                                { <small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }
-                            </div>
-                        </div>
-                        <div class="enrollment-endpoint">
-                            <span class="enrollment-label">@T("Endpoint")</span>
-                            <a href="@enrollment.Definition.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@enrollment.Definition.Endpoint</a>
-                            @if (enrollment.Definition.PairingUri is { } pairingUri)
-                            { <small>@T("PairingOriginLabel") <a href="@pairingUri.AbsoluteUri" target="_blank" rel="noopener noreferrer">@pairingUri.GetLeftPart(UriPartial.Authority)</a></small> }
-                        </div>
-                        <div class="enrollment-action-layout">
-                            @if (requiresScope)
-                            {
-                                <div class="enrollment-scope"><ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" Value="@EnrollmentScope(enrollment)" ValueChanged="scope => SetEnrollmentScope(enrollment, scope)" /></div>
-                            }
-                            @if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && CanRotate(enrollment.Definition.State))
-                            {
-                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => EnrollAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button><button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("Cancel")</button></div>
-                            }
-                            else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
-                                && (requiresScope || enrollment.Definition.State == AepEnrollmentState.Unpaired))
-                            {
-                                <div class="enrollment-actions"><button class="button-primary" @onclick="() => AssignSharedKeyAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button>@if (requiresScope) { <button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button> }</div>
-                            }
-                            else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && enrollment.Definition.State == AepEnrollmentState.Available)
-                            {
-                                <div class="enrollment-actions enrollment-management-actions"><button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button><button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button><button class="button-danger" @onclick="() => RequestUnenrollment(enrollment)" disabled="@pairingBusy">@T("ConfirmUnenrollExtension")</button></div>
-                            }
-                            else if (CanUnenroll(enrollment.Definition.State))
-                            {
-                                <div class="enrollment-actions enrollment-management-actions"><button class="button-danger" @onclick="() => RequestUnenrollment(enrollment)" disabled="@pairingBusy">@T("ConfirmUnenrollExtension")</button></div>
-                            }
-                        </div>
-                    </article>
-                }
-            </div>
-        }
-        else if (!loading)
-        {
-            <p>@T("NoPendingEnrollments")</p>
-        }
-        @if (activePairingCode is not null)
-        {
-            <div class="inline-warning" role="status">
-                <strong>@T("PairingCode")</strong> <code>@activePairingCode</code>
-                @if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }
-                @if (clipboardFallback)
-                {
-                    <p>@T("ClipboardFallback")</p>
-                    <button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button>
-                    <button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button>
-                }
-            </div>
-        }
-    </section>
-    </div>
-}
-
-@if (activeTab == ExtensionTab.Catalog && editing)
-{
-<section class="panel resource-section">
-    <div class="panel-header">
-        <div><p class="eyebrow">@T("Connection")</p><h2>@T("RegisterEndpoint")</h2><p>@T("RegisteredEndpoints.Description")</p></div>
-    </div>
-    <EditForm Model="form" OnValidSubmit="SaveAsync">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-        <div class="form-grid">
-            <ResourceIdentityFields @bind-DisplayName="form.DisplayName" @bind-TechnicalName="form.Name" IsNew="true" />
-            <label>@T("Namespace")<InputText @bind-Value="form.Namespace" /></label>
-            <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" @bind-Value="selectedScope" />
-            <label>@T("AepEndpoint")<InputText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" /></label>
-            <label>@T("ExpectedExtensionId")<InputText @bind-Value="form.ExpectedExtensionId" /><small>@T("ExpectedExtensionId.Help")</small></label>
-            <label>@T("AuthenticationMode")<InputSelect @bind-Value="form.AuthenticationMode"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></InputSelect></label>
-            @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer)
-            {
-                <label>@T("CredentialName")<InputText @bind-Value="form.CredentialName" /></label>
-                <label>@T("CredentialNamespace")<InputText @bind-Value="form.CredentialNamespace" /></label>
-                <label>@T("CredentialScopeRef")<InputText @bind-Value="form.CredentialScopeRef" /><small>@T("CredentialScopeRef.Help")</small></label>
-            }
-            <label class="checkbox-field"><InputCheckbox @bind-Value="form.Enabled" /> @T("EnabledForDiscovery")</label>
-        </div>
-        <div class="panel-actions">
-            <button class="button-primary" type="submit" disabled="@saving">@T("CreateRegistration")</button>
-            <button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button>
-        </div>
-    </EditForm>
-</section>
-}
-
-@if (activeTab == ExtensionTab.Catalog)
-{
-<div id="extensions-panel-catalog" role="tabpanel" aria-labelledby="extensions-tab-catalog">
-    <section class="panel resource-section">
-        <div class="panel-header">
-            <div><p class="eyebrow">@T("ExtensionInventory")</p><h2>@T("Tab.Extensions")</h2><p>@T("ExtensionInventory.Description")</p></div>
-            <span>@T("ExtensionCount", FilteredInventory.Count)</span>
-        </div>
-        <ResourceToolbar Label="@T("InventoryFilters")">
-            <SearchBox @bind-Value="search" Placeholder="@T("SearchExtensions")" />
-            <select aria-label="@T("Availability")" @bind="availabilityFilter"><option value="">@T("AllAvailability")</option>@foreach (var status in AvailabilityFilters) { <option value="@status">@StatusLabel(status)</option> }</select>
-            <select aria-label="@T("Enrollment")" @bind="enrollmentFilter"><option value="">@T("AllEnrollments")</option>@foreach (var status in EnrollmentFilters) { <option value="@status">@EnrollmentStatusLabel(status)</option> }</select>
-            <select aria-label="@T("Origin")" @bind="sourceFilter"><option value="">@T("AllOrigins")</option>@foreach (var source in SourceFilters) { <option value="@source">@SourceLabel(source)</option> }</select>
-        </ResourceToolbar>
-    @if (loading && inventory is null)
+    @if (editing)
     {
-        <LoadingState Message="@T("DiscoveringExtensions")" />
+        <ModalFrame IsOpen TitleId="extension-register-title" OnClose="CancelEdit" Busy="saving" Class="extension-settings-dialog">
+            <h2 id="extension-register-title">@T("RegisterEndpoint")</h2>
+            <div class="resource-editor-view" data-testid="extension-registration-creation">
+                @if (registrationError is not null) { <div class="form-alert form-alert-danger" role="alert">@registrationError</div> }
+                <ResourceDefinitionForm @key="form" @ref="registrationDefinitionForm" EditContext="RegistrationContext" FieldLabels="RegistrationFieldLabels" Id="extension-registration-create-form" FormName="extension-registration-create"
+                    Sections="RegistrationPresentations" OnValidSubmit="SubmitRegistrationAsync" OnInvalidSubmit="InvalidRegistrationAsync" InvalidInputChanged="value => registrationInvalidInput = value" Busy="saving" ReadOnly="@(!CanRegister)" data-testid="extension-registration-create-form">
+                    <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+                    <CreationWizard @ref="registrationWizard" Steps="RegistrationSteps" OnFinish="FinishRegistrationAsync" OnStepReady="RegistrationStepReady" Busy="saving" Disabled="@(!CanRegister)"
+                        FinishLabel="@(creating ? T("CreateRegistration") : T("SaveChanges"))" FinishTestId="extension-create-registration" TestId="extension-registration-wizard" />
+                </ResourceDefinitionForm>
+                <FormActions Busy="saving"><button class="button-secondary" type="button" @onclick="CancelEdit" disabled="@saving">@T("Cancel")</button></FormActions>
+            </div>
+        </ModalFrame>
     }
-    else if (FilteredInventory.Count == 0)
+    @if (showEnrollmentSettings && CanAdministerEnrollments && enrollmentSettings is not null)
     {
-        <EmptyState Title="@T("NoExtensionsDiscovered")" Message="@T("NoExtensionsDiscoveredMessage")" />
+        <ModalFrame IsOpen TitleId="extension-settings-title" OnClose="CloseEnrollmentSettings" Busy="savingEnrollmentSettings" Class="extension-policy-dialog">
+            <div class="extension-policy-header">
+                <h2 id="extension-settings-title">@T("EnrollmentModes")</h2>
+                <button type="button" class="icon-button" aria-label="@T("CloseEnrollmentModes")" title="@T("CloseEnrollmentModes")" @onclick="CloseEnrollmentSettings" disabled="@savingEnrollmentSettings"><UiIcon Name="x" /></button>
+            </div>
+            @if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId" /> }
+            <div class="extension-enrollment-modes">
+                <div class="extension-enrollment-mode">
+                    <label class="resource-enabled-toggle extension-enrollment-mode-heading">
+                        <span>@T("PairingCodeMode")</span>
+                        <FormCheckbox role="switch" aria-describedby="pairing-code-mode-help" @bind-Value="pairingCodeEnabled" disabled="@(!enrollmentSettings.PairingCodeConfigurable || savingEnrollmentSettings)" />
+                    </label>
+                    <p id="pairing-code-mode-help">@T("PairingCodeMode.Help")@if (!enrollmentSettings.PairingCodeConfigurable) { <span class="extension-mode-lock">@T("ModeDisabledByConfiguration")</span> }</p>
+                </div>
+                <div class="extension-enrollment-mode">
+                    <label class="resource-enabled-toggle extension-enrollment-mode-heading">
+                        <span>@T("SharedKeyFileMode")</span>
+                        <FormCheckbox role="switch" aria-describedby="shared-key-mode-help" @bind-Value="sharedKeyFileEnabled" disabled="@(!enrollmentSettings.SharedKeyFileConfigurable || savingEnrollmentSettings)" />
+                    </label>
+                    <p id="shared-key-mode-help">@T("SharedKeyFileMode.Help")@if (!enrollmentSettings.SharedKeyFileConfigurable) { <span class="extension-mode-lock">@T("ModeDisabledByConfiguration")</span> }</p>
+                </div>
+            </div>
+            <FormActions Busy="savingEnrollmentSettings">
+                <button class="button-secondary" type="button" @onclick="CloseEnrollmentSettings" disabled="@savingEnrollmentSettings">@Shared["Cancel"]</button>
+                <button class="button-primary" type="button" @onclick="SaveEnrollmentSettingsAsync" disabled="@savingEnrollmentSettings">@(savingEnrollmentSettings ? T("Saving") : T("SaveChanges"))</button>
+            </FormActions>
+        </ModalFrame>
     }
-    else
-    {
-        <DataGrid TItem="ExtensionInventoryItemResponse" Items="FilteredInventory">
-            <Header><tr><th>@T("Extension")</th><th>@T("Connection")</th><th>@T("Enrollment")</th><th>@T("Availability")</th><th>@T("Contributions")</th></tr></Header>
-            <Row Context="item"><tr>
-                <td><a class="text-button" href="@DetailUrl(item)">@item.DisplayName</a> <small>@(item.Version ?? "—")</small><br /><code>@item.ExtensionId</code></td>
-                <td><a href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><br /><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)@if (item.RegistrationName is not null) { <text> · @item.RegistrationNamespace/@item.RegistrationName</text> }</small></td>
-                <td><div class="enrollment-cell">@if (item.EnrollmentStatus is { } enrollmentState) { <StatusBadge Text="@EnrollmentStatusLabel(enrollmentState)" Status="@EnrollmentStatus(enrollmentState)" /> } else { <span>—</span> }</div></td>
-                <td><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" /></td>
-                <td>
-                    @ContributionSummary(item)
-                    @if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true)
-                    {
+    <ConfirmationDialog IsOpen="@(pendingUnenrollment is not null)" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="CancelUnenrollment" />
+</div>
+
+@code {
+    private RenderFragment RegistrationIdentity => @<FormSection Title="@Shared["Identity"]"><FormGrid>
+        <ResourceIdentityFields DisplayName="@form.DisplayName" DisplayNameChanged="value => form.DisplayName = value" DisplayNameExpression="@(() => form.DisplayName)"
+            TechnicalName="@form.Name" TechnicalNameChanged="value => form.Name = value" TechnicalNameExpression="@(() => form.Name)" IsNew="creating"
+            DisplayNameTestId="extension-registration-display-name" TechnicalNameTestId="extension-registration-name" />
+        <FormField Label="@T("Namespace")" Required><ChildContent><ClearableText UpdateOnInput="false" @bind-Value="form.Namespace" Disabled="@(!creating)" data-testid="extension-registration-namespace" /></ChildContent><Validation><ValidationMessage For="() => form.Namespace" /></Validation></FormField>
+        <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" RequiredKind="@ResourceScopeKind.Tenant" Value="form.ScopeRef" ValueChanged="RegistrationScopeChanged" Disabled="@(!creating || !CanRegister || saving)"><Validation><ValidationMessage For="() => form.ScopeRef" /></Validation></ResourceScopeFormField>
+    </FormGrid></FormSection>;
+    private RenderFragment RegistrationConnection => @<FormSection Title="@T("Connection")"><FormGrid>
+        <FormField Label="@T("AepEndpoint")" Required><ChildContent><ClearableText @bind-Value="form.Endpoint" placeholder="https://extension.example/aep/" data-testid="extension-registration-endpoint" /></ChildContent><Validation><ValidationMessage For="() => form.Endpoint" /></Validation></FormField>
+        <FormField Label="@T("ExpectedExtensionId")"><HelpContent>@T("ExpectedExtensionId.Help")</HelpContent><ChildContent><ClearableText @bind-Value="form.ExpectedExtensionId" data-testid="extension-registration-expected-id" /></ChildContent></FormField>
+        <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="form.Enabled" data-testid="extension-registration-enabled" /><span>@T("EnabledForDiscovery")</span></label>
+    </FormGrid></FormSection>;
+    private RenderFragment RegistrationAuthentication => @<FormSection Title="@T("AuthenticationMode")"><FormGrid>
+        <FormField Label="@T("AuthenticationMode")"><ChildContent><ClearableSelect @bind-Value="form.AuthenticationMode" data-testid="extension-registration-authentication"><option value="@AepTransportAuthenticationMode.None">@T("Authentication.None")</option><option value="@AepTransportAuthenticationMode.StaticBearer">@T("Authentication.StaticBearer")</option></ClearableSelect></ChildContent></FormField>
+        <div class="resource-editor-view form-span-2" hidden="@(form.AuthenticationMode != AepTransportAuthenticationMode.StaticBearer)">
+            <FormField Label="@T("CredentialName")" Required><ChildContent><ClearableText @bind-Value="form.CredentialName" data-testid="extension-registration-credential-name" /></ChildContent><Validation><ValidationMessage For="() => form.CredentialName" /></Validation></FormField>
+            <FormField Label="@T("CredentialNamespace")"><ChildContent><ClearableText @bind-Value="form.CredentialNamespace" data-testid="extension-registration-credential-namespace" /></ChildContent><Validation><ValidationMessage For="() => form.CredentialNamespace" /></Validation></FormField>
+            <FormField Label="@T("CredentialScopeRef")"><HelpContent>@T("CredentialScopeRef.Help")</HelpContent><ChildContent><ClearableText @bind-Value="form.CredentialScopeRef" data-testid="extension-registration-credential-scope" /></ChildContent><Validation><ValidationMessage For="() => form.CredentialScopeRef" /></Validation></FormField>
+        </div>
+    </FormGrid></FormSection>;
+    private RenderFragment RegistrationReview => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details">
+        <dt>@T("DisplayName")</dt><dd>@form.DisplayName</dd><dt>@T("Name")</dt><dd><code>@form.Namespace/@form.Name</code></dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="form.ScopeRef" /></dd>
+        <dt>@T("AepEndpoint")</dt><dd class="resource-text">@form.Endpoint</dd><dt>@T("ExpectedExtensionId")</dt><dd>@(form.ExpectedExtensionId ?? "—")</dd>
+        <dt>@T("AuthenticationMode")</dt><dd>@T($"Authentication.{form.AuthenticationMode}")</dd>
+        @if (form.AuthenticationMode == AepTransportAuthenticationMode.StaticBearer) { <dt>@T("CredentialName")</dt><dd><code>@form.CredentialScopeRef · @form.CredentialNamespace/@form.CredentialName</code></dd> }
+        <dt>@T("EnabledForDiscovery")</dt><dd>@T(form.Enabled ? "Enabled" : "Disabled")</dd>
+    </dl></FormSection>;
+
+    private RenderFragment SummaryMetrics => @<text>
+        <MetricCard Label="@T("LoadedExtensions")" Value="@(inventory?.Count.ToString() ?? "—")" Detail="@T("AvailableExtensions", AvailableExtensionCount)" HelpText="@T("InventorySnapshot.Help")" Status="@(AvailableExtensionCount > 0 ? UiStatus.Success : UiStatus.Neutral)" />
+        @if (CanAdministerEnrollments) { <MetricCard Label="@T("Tab.Enrollments")" Value="@(enrollments is null ? "—" : ActiveEnrollmentCount.ToString())" Detail="@T("ActiveEnrollments", ActiveEnrollmentCount)" Status="@(ActiveEnrollmentCount > 0 ? UiStatus.Warning : UiStatus.Success)" /> }
+        <MetricCard Label="@T("Connections")" Value="@(registrations?.Count.ToString() ?? "—")" Detail="@T("EnabledEndpoints", EnabledRegistrationCount)" Status="@(EnabledRegistrationCount > 0 ? UiStatus.Info : UiStatus.Neutral)" />
+        @if (CanAdministerEnrollments) { <MetricCard Label="@T("EnrollmentModes")" Value="@(enrollmentSettings is null ? "—" : $"{EnabledEnrollmentModeCount}/2")" Detail="@T("EnabledEnrollmentModes", EnabledEnrollmentModeCount)" Status="@(EnabledEnrollmentModeCount > 0 ? UiStatus.Info : UiStatus.Warning)" /> }
+    </text>;
+    private RenderFragment<ExtensionInventoryItemResponse> InventoryActions => item => @<CollectionActions ResourceName="@($"{item.DisplayName} ({item.RegistrationNamespace}/{item.RegistrationName ?? item.ExtensionId}, {item.RegistrationScopeRef})")">
+        <a href="@(DetailUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" /><span>@Shared["OpenItem"]</span></a>
+        @if (CanEditItem(item)) { <a href="@(DetailUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" /><span>@Shared["EditDefinition"]</span></a> }
+        @if (item.RegistrationName is not null && item.RegistrationScopeRef is not null) { <button type="button" data-testid="extension-preview" disabled="@(!CanPreview || loading || pairingBusy)" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" /><span>@Shared["Preview"]</span></button> }
+        @if (EnrollmentFor(item) is { } enrollment) { <button type="button" data-testid="extension-enrollment-open" aria-expanded="@IsEnrollmentExpanded(item).ToString().ToLowerInvariant()" aria-controls="@EnrollmentPanelId(enrollment)" disabled="@(loading || pairingBusy)" @onclick="() => ToggleEnrollment(item)"><UiIcon Name="key" /><span>@T(IsEnrollmentExpanded(item) ? "CloseEnrollment" : "ManageEnrollment")</span></button> }
+        @if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true) { @SourceActions(item) }
+    </CollectionActions>;
+    private RenderFragment SourceActions(ExtensionInventoryItemResponse item) => @<text>
                         <div class="inventory-contribution-actions">
                             @foreach (var provider in SourceProviders(item))
                             {
@@ -243,24 +134,59 @@
                             }
                             @if (item.RegistrationName is not null && item.RegistrationScopeRef is not null)
                             {
-                                @foreach (var contribution in item.Extension.Contributions.Where(value => value.Kind == "source-provider" && !SourceProviders(item).Any(provider => provider.ContributionId.Equals(value.Id, StringComparison.OrdinalIgnoreCase))))
+                                @foreach (var contribution in item.Extension!.Contributions.Where(value => value.Kind == "source-provider" && !SourceProviders(item).Any(provider => provider.ContributionId.Equals(value.Id, StringComparison.OrdinalIgnoreCase))))
                                 {
                                     <a class="text-button" href="@ConfigureSourceProviderUrl(item, contribution)">@T("ConfigureSourceProvider", contribution.Id)</a>
                                 }
                             }
                         </div>
-                    }
-                </td>
-            </tr></Row>
-        </DataGrid>
-    }
-    </section>
-    @if (activePairingCode is not null)
-    {
-        <div class="inline-warning" role="status"><strong>@T("PairingCode")</strong> <code>@activePairingCode</code>@if (activePairingExpiry is { } expiry) { <span> · @T("CodeExpiresIn", SecondsRemaining(expiry))</span> }@if (clipboardFallback) { <p>@T("ClipboardFallback")</p><button class="button-secondary" @onclick="CopyCodeAsync">@T("Copy")</button><button class="button-secondary" @onclick="OpenExtension">@T("OpenExtension")</button> }</div>
-    }
-</div>
-}
+    </text>;
+    private CollectionColumn<ExtensionInventoryItemResponse> InventoryIdentity => new("identity", T("Extension"), item => @<text><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.RegistrationName is null ? null : item.RegistrationNamespace)" Name="@(item.RegistrationName ?? item.ExtensionId)" Href="@DetailUrl(item)" IconName="puzzle"><Versions><CollectionVersion Label="@T("Version")" Value="@(item.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="item.RegistrationScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(item.AvailabilityStatus)" Status="@ModelManagementUi.Status(item.AvailabilityStatus)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.RegistrationScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></text>);
 
-<ConfirmationDialog IsOpen="@(pendingUnenrollment is not null)" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="CancelUnenrollment" />
-</div>
+    private IReadOnlyList<CollectionColumn<ExtensionInventoryItemResponse>> InventoryColumns =>
+    [
+        new("connection", T("Connection"), item => @<text><a class="text-button extension-endpoint" href="@item.Endpoint.AbsoluteUri" target="_blank" rel="noopener noreferrer">@item.Endpoint</a><small>@SourceLabel(item.RegistrationSource) · @T("ConnectionCount", item.Connections.Count)</small></text>),
+        new("enrollment", T("Enrollment"), item => @<div class="enrollment-cell">
+            @if (item.EnrollmentStatus is { } state) { <StatusBadge Text="@EnrollmentStatusLabel(state)" Status="@EnrollmentStatus(state)" /> } else { <span>—</span> }
+            @if (EnrollmentFor(item) is { } enrollment)
+            {
+                <button type="button" class="button-secondary enrollment-shortcut" data-testid="extension-enrollment-shortcut" title="@T(IsEnrollmentExpanded(item) ? "CloseEnrollment" : "ManageEnrollment")"
+                    aria-label="@T(IsEnrollmentExpanded(item) ? "CloseEnrollment" : "ManageEnrollment")" aria-expanded="@IsEnrollmentExpanded(item).ToString().ToLowerInvariant()"
+                    aria-controls="@EnrollmentPanelId(enrollment)" disabled="@(loading || pairingBusy)" @onclick="() => ToggleEnrollment(item)">
+                    <UiIcon Name="key" /><span>@T(IsEnrollmentExpanded(item) ? "CloseEnrollmentAction" : "ManageEnrollmentAction")</span>
+                </button>
+            }
+        </div>),
+        new("contributions", T("Contributions"), item => @<text>@if (item.Extension?.Contributions.Count is > 0) { <a class="text-button extension-contributions-link" href="@ContributionsUrl(item)" title="@ContributionSummary(item)">@T(item.Extension.Contributions.Count == 1 ? "ContributionCount.One" : "ContributionCount.Many", item.Extension.Contributions.Count)</a> } else { <span>—</span> }</text>)
+    ];
+    private RenderFragment<ExtensionInventoryItemResponse> EnrollmentDetails => item => @<text>@if (EnrollmentFor(item) is { } enrollment) {
+        var requiresScope = enrollment.Definition.TargetScopeRef is null || enrollment.Definition.State == AepEnrollmentState.Unpaired;
+        <div @ref="enrollmentPanel" class="enrollment-details" id="@EnrollmentPanelId(enrollment)" tabindex="-1" role="region" aria-labelledby="@(EnrollmentPanelId(enrollment) + "-title")" data-testid="enrollment-card">
+            <div class="enrollment-details-heading"><h3 id="@(EnrollmentPanelId(enrollment) + "-title")">@T("Enrollment")</h3><StatusBadge Text="@EnrollmentStatusLabel(enrollment.Definition.State)" Status="@EnrollmentStatus(enrollment.Definition.State)" /><small>@T("AnnouncedAgo", EnrollmentAge(enrollment))</small>@if (enrollment.Definition.CodeExpiresAt is { } expires && enrollment.Definition.State == AepEnrollmentState.CodeIssued) { <small>@T("CodeExpiresIn", SecondsRemaining(expires))</small> }</div>
+            <FormGrid Class="enrollment-fields">
+                <div class="enrollment-scope">@if (requiresScope) { <ResourceScopeFormField ResourceKind="@ExtensionKinds.ExtensionRegistration" Value="@EnrollmentScope(enrollment)" ValueChanged="scope => SetEnrollmentScope(enrollment, scope)" /> } else { <ResourceScopeReadOnlyField ScopeRef="enrollment.Definition.TargetScopeRef" /> }</div>
+                @if (enrollment.Definition.PairingUri is { } pairingUri) { <FormField Label="@T("PairingOriginLabel")"><div class="enrollment-origin-field"><ClearableText Value="@pairingUri.GetLeftPart(UriPartial.Authority)" ReadOnly AllowClear="false" /><a class="icon-button" href="@pairingUri.AbsoluteUri" target="_blank" rel="noopener noreferrer" aria-label="@T("OpenExtension")" title="@pairingUri.AbsoluteUri"><UiIcon Name="external-link" /></a></div></FormField> }
+            </FormGrid>
+            <FormActions Class="enrollment-action-layout" Busy="pairingBusy">
+        @if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && CanRotate(enrollment.Definition.State))
+        {
+            <div class="enrollment-actions"><CollectionActions ResourceName="@enrollment.Definition.ExtensionName"><Primary><button class="button-secondary" @onclick="() => CancelEnrollmentAsync(enrollment)" disabled="@pairingBusy">@T("CancelEnrollmentRequest")</button><button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button><button class="button-primary" @onclick="() => EnrollAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button></Primary></CollectionActions></div>
+        }
+        else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.SharedKeyFile
+            && (requiresScope || enrollment.Definition.State == AepEnrollmentState.Unpaired))
+        {
+            <div class="enrollment-actions"><CollectionActions ResourceName="@enrollment.Definition.ExtensionName"><Primary><button class="button-primary" @onclick="() => AssignSharedKeyAsync(enrollment)" disabled="@pairingBusy">@T("EnrollExtension")</button>@if (requiresScope) { <button class="button-secondary" @onclick="() => RejectAsync(enrollment)" disabled="@pairingBusy">@T("Reject")</button> }</Primary></CollectionActions></div>
+        }
+        else if (enrollment.Definition.EnrollmentMode == AepEnrollmentMode.PairingCode && enrollment.Definition.State == AepEnrollmentState.Available)
+        {
+            <div class="enrollment-actions enrollment-management-actions"><CollectionActions ResourceName="@enrollment.Definition.ExtensionName"><Primary><button class="button-secondary" @onclick="() => RotateCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RotateCredential")</button><button class="button-danger" @onclick="() => RequestUnenrollment(enrollment)" disabled="@pairingBusy">@T("ConfirmUnenrollExtension")</button></Primary><Secondary><button class="button-danger" @onclick="() => RevokeCredentialAsync(enrollment)" disabled="@pairingBusy">@T("RevokeCredential")</button></Secondary></CollectionActions></div>
+        }
+        else if (CanUnenroll(enrollment.Definition.State))
+        {
+            <div class="enrollment-actions enrollment-management-actions"><CollectionActions ResourceName="@enrollment.Definition.ExtensionName"><Primary><button class="button-danger" @onclick="() => RequestUnenrollment(enrollment)" disabled="@pairingBusy">@T("ConfirmUnenrollExtension")</button></Primary></CollectionActions></div>
+        }
+
+            </FormActions>
+        </div>
+    }</text>;
+}

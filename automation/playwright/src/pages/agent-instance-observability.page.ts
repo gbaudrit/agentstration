@@ -147,18 +147,18 @@ export class AgentInstanceObservabilityPage {
   }
 
   public async followAgentLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
-    await this.instanceRow(instance.instanceId).locator(`a[href="/agents/${instance.agentName}"]`).click();
+    await this.instanceRow(instance.instanceId).locator(`a[href^="/agents/${encodeURIComponent(instance.agentName)}?"]`).click();
     await this.expectContextualPath(consoleUrl, `/agents/${instance.agentName}`);
   }
 
   public async followRunLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
     const prefix = instance.runKind === 'FlowRun' ? 'flow-runs' : 'runs';
-    await this.instanceRow(instance.instanceId).locator(`a[href="/${prefix}/${instance.runId}"]`).click();
+    await this.instanceRow(instance.instanceId).locator(`a.instance-run-link[href^="/${prefix}/${instance.runId}"]`).click();
     await this.expectContextualPath(consoleUrl, `/${prefix}/${instance.runId}`);
   }
 
   public async followWorkerLink(consoleUrl: string, instance: AgentInstanceWire): Promise<void> {
-    await this.instanceRow(instance.instanceId).locator(`a[href="/settings/runtime-workers/${instance.workerId}"]`).click();
+    await this.instanceRow(instance.instanceId).locator(`a[href^="/settings/runtime-workers/${instance.workerId}?"]`).click();
     await this.expectContextualPath(consoleUrl, `/settings/runtime-workers/${instance.workerId}`);
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.details)).toBeVisible();
   }
@@ -211,6 +211,18 @@ export class AgentInstanceObservabilityPage {
     const viewportWidth = this.page.viewportSize()?.width ?? 0;
     const documentWidth = await this.page.evaluate(() => document.documentElement.scrollWidth);
     expect(documentWidth).toBeLessThanOrEqual(viewportWidth);
+    const views = this.instanceList.locator('.collection-view-switch button');
+    await expect(views.nth(1)).toHaveAttribute('aria-pressed', 'true');
+    const cards = this.instanceList.locator('.collection-cards');
+    await expect(cards).toBeVisible();
+    for (const card of await cards.locator('.collection-card').all()) {
+      const bounds = await card.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewportWidth);
+      await expect(card.locator('.collection-identity')).toBeVisible();
+    }
+    // The optional table still exposes every column through its bounded scroll area.
+    await views.first().click();
     const scrollContainer = this.instanceList.locator('.data-grid-wrap');
     await expect(scrollContainer).toBeVisible();
     const metrics = await scrollContainer.evaluate(element => ({
@@ -221,6 +233,8 @@ export class AgentInstanceObservabilityPage {
     expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
     await scrollContainer.evaluate(element => { element.scrollLeft = element.scrollWidth; });
     expect(await scrollContainer.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+    await views.nth(1).click();
+    await expect(cards).toBeVisible();
   }
 
   private instanceRow(instanceId: string): Locator {

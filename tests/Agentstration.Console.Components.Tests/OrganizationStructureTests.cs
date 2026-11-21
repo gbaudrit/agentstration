@@ -18,7 +18,7 @@ public sealed class OrganizationStructureTests
     [DataRow(ConsoleContextKind.Workspace, 1, 0, 0)]
     public void CurrentContextReplacesItsNavigationAction(ConsoleContextKind kind, int currentCount, int tenantLinks, int workspaceLinks)
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var tenant = new Tenant(Guid.NewGuid(), "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch);
         var handler = new StructureHandler(tenant)
         {
@@ -47,7 +47,7 @@ public sealed class OrganizationStructureTests
     [TestMethod]
     public void StructureShowsExplicitParentAndSubmitsWorkspaceCreation()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var tenant = new Tenant(Guid.NewGuid(), "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch);
         var handler = new StructureHandler(tenant);
         Register(context, handler, ConsoleContextKind.Tenant);
@@ -73,7 +73,7 @@ public sealed class OrganizationStructureTests
     [TestMethod]
     public void WorkspaceCreationDoesNotNavigateToAnUnavailableContext()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var tenant = new Tenant(Guid.NewGuid(), "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch);
         var handler = new StructureHandler(tenant);
         Register(context, handler, ConsoleContextKind.Workspace);
@@ -93,7 +93,7 @@ public sealed class OrganizationStructureTests
     [TestMethod]
     public void SearchCollapseAndReadOnlyActionsReflectTheStructureResponse()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var tenant = new Tenant(Guid.NewGuid(), "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch);
         var handler = new StructureHandler(tenant, writable: false)
         {
@@ -116,7 +116,7 @@ public sealed class OrganizationStructureTests
     [TestMethod]
     public void InstanceCanOpenTenantCreationAndCancelItWithoutWriting()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var tenant = new Tenant(Guid.NewGuid(), "acme", "Acme", TenantStatus.Active, DateTimeOffset.UnixEpoch);
         var handler = new StructureHandler(tenant, instance: true);
         Register(context, handler, ConsoleContextKind.Instance);

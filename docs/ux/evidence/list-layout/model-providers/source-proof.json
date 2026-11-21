@@ -1,0 +1,15 @@
+{
+  "baseCommit": "c93773c5a5c8a32ef3421e059d0007d47e5bac00",
+  "synchronizedThrough": "dff244285fac28c7f6dd5ed77a2f4f32c50aa20d",
+  "route": "/modelproviders",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor": "bcac8c2f3e40d0d668ab45e64f29c57bfde7727f",
+    "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor.cs": "75f3abe7a8447711be2cc5d46e05fcb545aa55cf",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

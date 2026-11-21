@@ -1,0 +1,18 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata:
+  name: assistant-diagnostics
+  namespace: agentstration.assistant
+definition:
+  displayName: Bootstrap provenance Agent
+  description: Deterministic browser fixture created through Bootstrap.
+  handler: prompt-agent
+  instructions: Return a concise deterministic response for the browser provenance fixture.
+  modelProfile: { binding: assistant-model }
+  runtimeProfile: { binding: assistant-runtime }
+  tools: []
+  toolSets: []
+  behaviors: []
+  middleware: []
+  contextProviders: []
+  settings: {}

@@ -3,53 +3,51 @@
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
     <p class="muted">@T("ArtifactProcessingHelp")</p>
-    <label>@T("ArtifactProcessingMode")
-        <select data-testid="artifact-processing-mode" disabled="@ReadOnly" value="@Step.Mode" @onchange="ModeChangedAsync">
+    <FormField Label="@T("ArtifactProcessingMode")">
+        <ClearableSelect TValue="string" AllowClear="false" data-testid="artifact-processing-mode" disabled="@ReadOnly" Value="@Step.Mode.ToString()" ValueChanged="value => ModeChangedAsync(new ChangeEventArgs { Value = value })">
             <option value="Content">@T("ArtifactProcessingMode.Content")</option>
             <option value="Access">@T("ArtifactProcessingMode.Access")</option>
-        </select>
-    </label>
+        </ClearableSelect>
+    </FormField>
     <p class="muted">@T(Step.Mode == ArtifactProcessingMode.Content ? "ArtifactContentHelp" : "ArtifactAccessHelp")</p>
-    <label>@T("ProcessConcurrency")<input data-testid="artifact-process-concurrency" type="number" min="1" max="16" disabled="@ReadOnly" value="@(Step.MaximumConcurrency ?? 1)" @onchange="ConcurrencyChangedAsync" /></label>
-    <small>@T("ProcessConcurrency.Help")</small>
-    <label>@T("ArtifactMaximumCount")<input type="number" min="1" max="128" disabled="@ReadOnly" value="@Step.MaximumArtifacts" @onchange="e => LimitChangedAsync(e, true)" /></label>
-    <label>@T("ArtifactMaximumInput")<input type="number" min="1" disabled="@ReadOnly" value="@Step.MaximumContentBytes" @onchange="e => LimitChangedAsync(e, false)" /></label>
-    <label>@T("ArtifactMaximumOutput")<input type="number" min="1" disabled="@ReadOnly" value="@Step.MaximumOutputBytes" @onchange="OutputLimitChangedAsync" /></label>
-    <label>@T("ArtifactOutputName")<input disabled="@ReadOnly" value="@Step.OutputFileName" @onchange="e => Changed.InvokeAsync(Step with { OutputFileName = Optional(e) })" /></label>
-    <label>@T("ArtifactOutputMediaType")<input list="@mediaTypesId" data-testid="artifact-output-media-type" disabled="@ReadOnly" value="@Step.OutputMediaType" @onchange="e => Changed.InvokeAsync(Step with { OutputMediaType = Optional(e) })" /></label>
+    <FormField Label="@T("ProcessConcurrency")" Help="@T("ProcessConcurrency.Help")"><ClearableText UpdateOnInput="false" data-testid="artifact-process-concurrency" Type="number" min="1" max="16" Disabled="@ReadOnly" Value="@((Step.MaximumConcurrency ?? 1).ToString(System.Globalization.CultureInfo.InvariantCulture))" ValueChanged="value => ConcurrencyChangedAsync(new ChangeEventArgs { Value = value })" /></FormField>
+    <FormField Label="@T("ArtifactMaximumCount")"><ClearableText UpdateOnInput="false" Type="number" min="1" max="128" Disabled="@ReadOnly" Value="@Step.MaximumArtifacts.ToString(System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="value => LimitChangedAsync(new ChangeEventArgs { Value = value }, true)" /></FormField>
+    <FormField Label="@T("ArtifactMaximumInput")"><ClearableText UpdateOnInput="false" Type="number" min="1" Disabled="@ReadOnly" Value="@Step.MaximumContentBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="value => LimitChangedAsync(new ChangeEventArgs { Value = value }, false)" /></FormField>
+    <FormField Label="@T("ArtifactMaximumOutput")"><ClearableText UpdateOnInput="false" Type="number" min="1" Disabled="@ReadOnly" Value="@Step.MaximumOutputBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)" ValueChanged="value => OutputLimitChangedAsync(new ChangeEventArgs { Value = value })" /></FormField>
+    <FormField Label="@T("ArtifactOutputName")"><ClearableText UpdateOnInput="false" Disabled="@ReadOnly" Value="@Step.OutputFileName" ValueChanged="value => Changed.InvokeAsync(Step with { OutputFileName = Optional(new ChangeEventArgs { Value = value }) })" /></FormField>
+    <FormField Label="@T("ArtifactOutputMediaType")" Help="@T("ArtifactOutputMediaTypeHelp")"><ClearableText UpdateOnInput="false" list="@mediaTypesId" data-testid="artifact-output-media-type" Disabled="@ReadOnly" Value="@Step.OutputMediaType" ValueChanged="value => Changed.InvokeAsync(Step with { OutputMediaType = Optional(new ChangeEventArgs { Value = value }) })" /></FormField>
     <datalist id="@mediaTypesId">@foreach (var media in SuggestedMediaTypes) { <option value="@media"></option> }</datalist>
-    <small>@T("ArtifactOutputMediaTypeHelp")</small>
 }
 @if (ActiveTab == FlowStepSettingsTab.Input)
 {
     <ContractHeading Direction="Input" Source="@T("ContractSource.ArtifactEnvelope")" />
     <SchemaDocumentEditor Value="ArtifactTransformContracts.Input" ReadOnly="true" />
     <p class="muted">@T("ArtifactInputContentContract")</p>
-    <label>@T("ArtifactManifestMapping")<textarea data-testid="artifact-manifest-mapping" disabled="@ReadOnly" value="@(Step.ArtifactsMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 0)"></textarea></label>
-    <label>@T("ArtifactProcessingInputMapping")<textarea data-testid="artifact-input-mapping" disabled="@ReadOnly" value="@(Step.ProcessingInputMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 1)"></textarea></label>
+    <FormField Label="@T("ArtifactManifestMapping")"><ClearableText UpdateOnInput="false" Multiline="true" data-testid="artifact-manifest-mapping" Disabled="@ReadOnly" Value="@(Step.ArtifactsMapping?.GetRawText() ?? "null")" ValueChanged="value => MappingChangedAsync(new ChangeEventArgs { Value = value }, 0)" /></FormField>
+    <FormField Label="@T("ArtifactProcessingInputMapping")"><ClearableText UpdateOnInput="false" Multiline="true" data-testid="artifact-input-mapping" Disabled="@ReadOnly" Value="@(Step.ProcessingInputMapping?.GetRawText() ?? "null")" ValueChanged="value => MappingChangedAsync(new ChangeEventArgs { Value = value }, 1)" /></FormField>
     <p class="muted">@T("ArtifactProcessingInputHelp")</p>
 }
 @if (ActiveTab == FlowStepSettingsTab.Output)
 {
     <ContractHeading Direction="Output" Source="@T("ContractSource.ArtifactEnvelope")" />
     <SchemaDocumentEditor Value="ArtifactTransformContracts.Manifest" ReadOnly="true" />
-    <label>@T("ArtifactResultMapping")<textarea data-testid="artifact-result-mapping" disabled="@ReadOnly" value="@(Step.ResultMapping?.GetRawText() ?? "null")" @onchange="e => MappingChangedAsync(e, 2)"></textarea></label>
+    <FormField Label="@T("ArtifactResultMapping")"><ClearableText UpdateOnInput="false" Multiline="true" data-testid="artifact-result-mapping" Disabled="@ReadOnly" Value="@(Step.ResultMapping?.GetRawText() ?? "null")" ValueChanged="value => MappingChangedAsync(new ChangeEventArgs { Value = value }, 2)" /></FormField>
     <p class="muted">@T("ArtifactResultHelp")</p>
-    <label>@T("DataContractMode")
-        <select disabled="@ReadOnly" value="@(Step.OutputContract?.Mode ?? DataContractMode.Absent)" @onchange="ContractModeChangedAsync">
+    <FormField Label="@T("DataContractMode")">
+        <ClearableSelect TValue="string" AllowClear="false" disabled="@ReadOnly" Value="@((Step.OutputContract?.Mode ?? DataContractMode.Absent).ToString())" ValueChanged="value => ContractModeChangedAsync(new ChangeEventArgs { Value = value })">
             @foreach (var mode in Enum.GetValues<DataContractMode>()) { <option value="@mode">@T($"DataContractMode.{mode}")</option> }
-        </select>
-    </label>
+        </ClearableSelect>
+    </FormField>
     <p class="muted">@T("ArtifactContractHelp")</p>
     @if (Step.OutputContract is { Mode: DataContractMode.Fixed } fixedContract)
     {
-        <label>@T("ArtifactDataSchema")<textarea disabled="@ReadOnly" value="@(fixedContract.Schema?.GetRawText() ?? "{}")" @onchange="ContractSchemaChangedAsync"></textarea></label>
+        <FormField Label="@T("ArtifactDataSchema")"><ClearableText UpdateOnInput="false" Multiline="true" Disabled="@ReadOnly" Value="@(fixedContract.Schema?.GetRawText() ?? "{}")" ValueChanged="value => ContractSchemaChangedAsync(new ChangeEventArgs { Value = value })" /></FormField>
     }
     @if (Step.OutputContract is { Mode: DataContractMode.Dynamic } dynamicContract)
     {
-        <label>@T("ContractSource")<select disabled="@ReadOnly" value="@dynamicContract.Source" @onchange="ContractSourceChangedAsync">
+        <FormField Label="@T("ContractSource")"><ClearableSelect TValue="string" AllowClear="false" disabled="@ReadOnly" Value="@dynamicContract.Source" ValueChanged="value => ContractSourceChangedAsync(new ChangeEventArgs { Value = value })">
             <option value="input">@T("ContractSource.Input")</option><option value="parent">@T("ContractSource.Parent")</option>
-        </select></label>
+        </ClearableSelect></FormField>
     }
 }
 @if (invalidJson) { <p class="validation-error" role="alert">@T("InvalidJson")</p> }

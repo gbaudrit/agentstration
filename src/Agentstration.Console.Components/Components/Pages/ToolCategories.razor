@@ -1,34 +1,46 @@
 @page "/tools/categories"
-@inject IToolCategoriesClient Categories
+@implements IDisposable
+@inject IServiceProvider Services
+@inject IToolCategoriesClient Client
+@inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolCategoriesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("Description")" TestId="resource-tool-categories">
-    <Actions><a class="button-primary" href="/tools/categories/new">@T("Create")</a></Actions>
-</PageHeader>
-<ResourceTabs Label="@T("SectionsLabel")"><a href="/tools">@T("Catalog")</a><a href="/tools/sets">@T("ToolSets")</a><a class="active" href="/tools/categories">@T("Categories")</a><a href="/tools/definitions">@T("Definitions")</a><a href="/tools/providers">@T("Providers")</a></ResourceTabs>
-
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
-else if (error is not null) { <ErrorState Message="@error" /> }
-else if (categories.Count == 0) { <EmptyState Title="@T("EmptyTitle")" Message="@T("EmptyMessage")" /> }
-else
-{
-    <DataGrid TItem="ToolCategoryResource" Items="categories">
-        <Header><tr><th>@T("Category")</th><th>@T("DescriptionColumn")</th><th>@T("Members")</th><th></th></tr></Header>
-        <Row Context="category"><tr data-testid="tool-category-row"><td><span class="resource-name-with-scope"><strong>@category.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="category.ScopeRef" Compact /></span><code>@category.Name</code></td><td>@(category.Definition.Description ?? "—")</td><td>@category.Definition.Tools.Count</td><td><a class="text-button" href="@CategoryUrl(category.Name)">@T("Manage")</a></td></tr></Row>
-    </DataGrid>
-}
+<ResourceCollectionTemplate TItem="ToolCategoryResource" Title="@T("Title")" Description="@T("Description")"
+                            TestId="resource-tool-categories" RowTestId="tool-category-row" ContextKey="@contextKey" IconName="layers"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems"
+                            Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
+                            SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <Navigation>
+        <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a class="active" href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
+    </Navigation>
+</ResourceCollectionTemplate>
 
 @code {
-    private IReadOnlyList<ToolCategoryResource> categories = [];
-    private bool loading = true;
-    private string? error;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override async Task OnInitializedAsync()
-    {
-        try { categories = await Categories.GetCategoriesAsync(); }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; }
-    }
-    private static string CategoryUrl(string name) => $"/tools/categories/{Uri.EscapeDataString(name)}";
+    private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
+        ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/tools/categories/new")">@T("Create")</a></PermissionGate> : null;
+    private CollectionColumn<ToolCategoryResource> IdentityColumn => new("identity", T("Category"), category => @<CollectionIdentity DisplayName="@category.Definition.DisplayName" Namespace="@category.Namespace.Value" Name="@category.Name" Href="@CategoryUrl(category)" IconName="layers">
+        <IconBadges><ResourceScopeBadge ScopeRef="category.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@category.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(category.ScopeRef, Services))" IconOnly /></IconBadges>
+    </CollectionIdentity>);
+    private IReadOnlyList<CollectionColumn<ToolCategoryResource>> Columns =>
+    [
+        new("description", T("DescriptionColumn"), category => @<span>@(category.Definition.Description ?? "—")</span>),
+        new("members", T("Members"), category => @<span>@category.Definition.Tools.Count</span>)
+        {
+            Filters = [new("members", T("Members"), CollectionFilterKind.Number)]
+        }
+    ];
+    private IReadOnlyList<CollectionFilter> ExtraFilters =>
+    [
+        new("namespace", Shared["Namespace"], CollectionFilterKind.Choice)
+        {
+            Options = (categories ?? []).Select(category => category.Namespace.Value).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
+        }
+    ];
+    private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
+    private string CategoryUrl(ToolCategoryResource value) => ResourceOwnershipContext.Resource(Services, "/tools/categories", value.Name, value.Namespace, value.ScopeRef);
 }

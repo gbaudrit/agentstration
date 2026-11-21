@@ -1,0 +1,6 @@
+.extension-resource-summary { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: var(--form-section-gap); }
+.extension-resource-summary ::deep .resource-configuration-summary .data-grid { table-layout: fixed; min-width: 0; }
+.extension-resource-summary ::deep .resource-configuration-summary .data-grid th:first-child { width: 40%; }
+.extension-resource-summary ::deep .resource-configuration-summary .data-grid th:last-child { width: 60%; }
+.extension-resource-summary ::deep .configuration-key { overflow-wrap: anywhere; }
+.extension-resource-summary ::deep .configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; line-height: 1.5; }

@@ -1,0 +1,99 @@
+{
+  "testedSource": "033d15fb3e60ed545169e97d2e80f6df8c05d0e5",
+  "productionCssCommit": "aca0a66bac06fd0bbe8dac4c0a14e0d1424f21d7",
+  "browser": "System Chromium 154.0.8037.57; CI retains pinned Playwright Chromium",
+  "dimensions": {
+    "en-US": "1440x1000 desktop",
+    "fr-FR": "390x844 mobile"
+  },
+  "results": {
+    "passed": 4,
+    "failed": 0
+  },
+  "captures": [
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "status": "passed",
+      "attachment": "data-source-profiles",
+      "file": "data-source-profiles-en-US-dark.png",
+      "sha256": "6275400a7ac0a859416721eab486cc8c902bd7ca8fbb31eecc7e6348d9783141"
+    },
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "status": "passed",
+      "attachment": "data-source-profiles-table",
+      "file": "data-source-profiles-table-en-US-dark.png",
+      "sha256": "6e567d6910b99cb8b640219a737ffebb940552870134c0378f565523d3951d7b"
+    },
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "status": "passed",
+      "attachment": "agents",
+      "file": "agents-en-US-dark.png",
+      "sha256": "080c1fa9d4e616921ca71f450c73a166390ca7f93afcff00c9f883cbdd49c890"
+    },
+    {
+      "case": "collection version identity and primary choice en-US dark desktop @smoke",
+      "status": "passed",
+      "attachment": "agents-table",
+      "file": "agents-table-en-US-dark.png",
+      "sha256": "3437bc3c3930fabb6632c1e63d22f62b85eab511634557389068419aaaf44747"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "status": "passed",
+      "attachment": "data-source-profiles",
+      "file": "data-source-profiles-en-US-light.png",
+      "sha256": "ab47e94e4bdcf7ec4c206c47c2928586aeb9050febb4f8c2c6cef570f215c385"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "status": "passed",
+      "attachment": "data-source-profiles-table",
+      "file": "data-source-profiles-table-en-US-light.png",
+      "sha256": "5ec374efad5e5653f9a6f6e2feb2802087de7f4a6c2344cc3316f5db37da43b8"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "status": "passed",
+      "attachment": "agents",
+      "file": "agents-en-US-light.png",
+      "sha256": "82102b240023280829e76bcc877dd54670670a056795c82f65a31c12d5548c88"
+    },
+    {
+      "case": "collection version identity and primary choice en-US light desktop @smoke",
+      "status": "passed",
+      "attachment": "agents-table",
+      "file": "agents-table-en-US-light.png",
+      "sha256": "3ac191d866835b6d698dc38089839fb4ffda4580bb7a60459937eae0af96c01c"
+    },
+    {
+      "case": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "status": "passed",
+      "attachment": "data-source-profiles",
+      "file": "data-source-profiles-fr-FR-dark.png",
+      "sha256": "6855d0ea0a4018324c069273d717d154ea3420586f0b9fe565827dd0efd9f5b6"
+    },
+    {
+      "case": "collection version identity and primary choice fr-FR dark mobile @responsive @smoke",
+      "status": "passed",
+      "attachment": "agents",
+      "file": "agents-fr-FR-dark.png",
+      "sha256": "5c02538263d1d51ff144e8651a909b66696c6fcf4fcb13ccf6f0290edc0bd72b"
+    },
+    {
+      "case": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "status": "passed",
+      "attachment": "data-source-profiles",
+      "file": "data-source-profiles-fr-FR-light.png",
+      "sha256": "eb4fbf53866fc5a7f3c8cc2e4647950e15f50ac8c4eace147b983e2b2817ca41"
+    },
+    {
+      "case": "collection version identity and primary choice fr-FR light mobile @responsive @smoke",
+      "status": "passed",
+      "attachment": "agents",
+      "file": "agents-fr-FR-light.png",
+      "sha256": "29c3662c504bf6fe8320505acff53eebc0502ee54d48e31b9aceded141e89236"
+    }
+  ]
+}

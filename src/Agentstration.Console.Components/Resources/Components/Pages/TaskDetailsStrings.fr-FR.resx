@@ -10,4 +10,32 @@
   <data name="RunStatus.Pending" xml:space="preserve"><value>En attente</value></data><data name="RunStatus.Running" xml:space="preserve"><value>En cours</value></data><data name="RunStatus.WaitingForInput" xml:space="preserve"><value>En attente d’une saisie</value></data><data name="RunStatus.WaitingForChild" xml:space="preserve"><value>En attente d’un Flow enfant</value></data><data name="RunStatus.Succeeded" xml:space="preserve"><value>Réussie</value></data><data name="RunStatus.Failed" xml:space="preserve"><value>Échec</value></data><data name="RunStatus.Cancelled" xml:space="preserve"><value>Annulée</value></data>
   <data name="ActionStatus.Pending" xml:space="preserve"><value>En attente</value></data><data name="ActionStatus.Resolved" xml:space="preserve"><value>Résolue</value></data><data name="ActionStatus.Expired" xml:space="preserve"><value>Expirée</value></data><data name="ActionStatus.Cancelled" xml:space="preserve"><value>Annulée</value></data>
   <data name="Role.User" xml:space="preserve"><value>Utilisateur</value></data><data name="Role.Assistant" xml:space="preserve"><value>Assistant</value></data><data name="Role.System" xml:space="preserve"><value>Système</value></data><data name="Role.Tool" xml:space="preserve"><value>Outil</value></data>
+  <data name="Task" xml:space="preserve"><value>Tâche</value></data>
+  <data name="Status" xml:space="preserve"><value>État</value></data>
+  <data name="RefreshDraftConflict" xml:space="preserve"><value>Une vue plus récente de la tâche est disponible. Votre réponse est conservée. Abandonnez-la pour consulter le dernier état.</value></data>
+  <data name="OperationUnconfirmed" xml:space="preserve"><value>L’opération n’a pas pu être confirmée. Votre réponse est conservée ; actualisez pour vérifier son résultat.</value></data>
+  <data name="ActionStatus.Completed" xml:space="preserve"><value>Terminée</value></data>
+  <data name="ActionKind.InputRequired" xml:space="preserve"><value>Saisie requise</value></data>
+  <data name="ActionKind.ConfirmationRequired" xml:space="preserve"><value>Confirmation requise</value></data>
+  <data name="ActionKind.ChoiceRequired" xml:space="preserve"><value>Choix requis</value></data>
+  <data name="ActionKind.FileRequired" xml:space="preserve"><value>Fichier requis</value></data>
+  <data name="ActionKind.ApprovalRequired" xml:space="preserve"><value>Approbation requise</value></data>
+  <data name="ResultKind.Text" xml:space="preserve"><value>Texte</value></data>
+  <data name="ResultKind.Structured" xml:space="preserve"><value>Résultat structuré</value></data>
+  <data name="ResultKind.Table" xml:space="preserve"><value>Tableau</value></data>
+  <data name="ResultKind.Json" xml:space="preserve"><value>JSON</value></data>
+  <data name="ResultKind.Status" xml:space="preserve"><value>État</value></data>
+  <data name="ActivityType.TaskCreated" xml:space="preserve"><value>Tâche créée</value></data>
+  <data name="ActivityType.TaskStarted" xml:space="preserve"><value>Tâche démarrée</value></data>
+  <data name="ActivityType.ProgressStarted" xml:space="preserve"><value>Activité démarrée</value></data>
+  <data name="ActivityType.ProgressCompleted" xml:space="preserve"><value>Activité terminée</value></data>
+  <data name="ActivityType.TaskPaused" xml:space="preserve"><value>Tâche mise en pause</value></data>
+  <data name="ActivityType.TaskResumed" xml:space="preserve"><value>Tâche reprise</value></data>
+  <data name="ActivityType.TaskCancelled" xml:space="preserve"><value>Tâche annulée</value></data>
+  <data name="ActivityType.ActionRequired" xml:space="preserve"><value>Action requise</value></data>
+  <data name="ActivityType.ActionResolved" xml:space="preserve"><value>Action résolue</value></data>
+  <data name="ActivityType.ResultProduced" xml:space="preserve"><value>Résultat produit</value></data>
+  <data name="ActivityType.ArtifactProduced" xml:space="preserve"><value>Artifact produit</value></data>
+  <data name="ActivityType.TaskCompleted" xml:space="preserve"><value>Tâche terminée</value></data>
+  <data name="ActivityType.TaskFailed" xml:space="preserve"><value>Échec de la tâche</value></data>
 </root>

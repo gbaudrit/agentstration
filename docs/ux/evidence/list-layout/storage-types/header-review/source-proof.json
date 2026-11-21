@@ -1,0 +1,14 @@
+{
+  "baseCommit": "68dc9b46fb213174c319018e90ecd214694593fb",
+  "route": "/storage-types",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor": "a3a2b0db56cc63530720d6d598fc2c7a5509a51a",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/StorageStrings.resx": "7c07993f00be7b42af7593c2a386fc4b4c3607c2",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/StorageStrings.fr-FR.resx": "65c91568f555d53dafe75a1754d4e8dc14e172cf"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png"
+  ],
+  "targetedComponentCases": 6
+}

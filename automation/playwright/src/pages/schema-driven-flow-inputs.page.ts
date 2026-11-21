@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
+import { selectResourceSection } from './resource-sections.js';
 
 interface DraftWire {
   value: { displayName: string; description?: string; tags?: Record<string, string> };
@@ -197,11 +198,7 @@ export class SchemaDrivenFlowInputsPage {
     const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Flow details route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(TestIds.flowObservability.flowDetails).waitFor({ state: 'visible' });
-    const runTab = this.page.locator('.section-tabs button').nth(2);
-    await expect(async () => {
-      await runTab.click();
-      await expect(runTab).toHaveClass(/active/, { timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+    await selectResourceSection(this.page, 'runs');
     await this.page.getByTestId(TestIds.flowObservability.runOpen).click();
     await expect(this.dialog).toBeVisible();
   }

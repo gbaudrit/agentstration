@@ -1,0 +1,115 @@
+@using Microsoft.AspNetCore.Components.Forms
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<EditForm @key="EditContext" EditContext="EditContext" OnValidSubmit="ValidSubmitAsync" OnInvalidSubmit="InvalidSubmitAsync" FormName="@FormName"
+          @attributes="AdditionalAttributes" novalidate id="@Id" class="resource-form" tabindex="-1" data-validation-context="@focusIdentity" aria-busy="@Busy.ToString().ToLowerInvariant()">
+    <LocalizedDataAnnotationsValidator FieldLabels="FieldLabels" />
+    <FormDraftMonitor InvalidInputChanged="InvalidInputChanged" />
+    <fieldset class="resource-definition-fields" disabled="@Locked" data-testid="@FieldsTestId">
+        @if (SectionContent is not null)
+        {
+            @foreach (var section in Sections.Where(item => item.Key.StartsWith("definition/", StringComparison.Ordinal) && SectionState!.HasVisited(item.Key)))
+            {
+                <fieldset @key="section.Key" class="resource-definition-fields resource-editor-view" hidden="@(!SectionState!.Is(section.Key))"
+                          disabled="@(section.Value.ReadOnly || section.Value.ReadOnlyReason is not null)" data-definition-section="@section.Key">
+                    @SectionContent(section.Key)
+                </fieldset>
+            }
+        }
+        else { @ChildContent }
+    </fieldset>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired] public EditContext EditContext { get; set; } = default!;
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> FieldLabels { get; set; } = new Dictionary<string, string>();
+    [Parameter, EditorRequired] public string Id { get; set; } = string.Empty;
+    [Parameter] public string? FormName { get; set; }
+    [Parameter] public string? FieldsTestId { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment<string>? SectionContent { get; set; }
+    [Parameter] public ResourceSectionState? SectionState { get; set; }
+    [Parameter] public IReadOnlyDictionary<string, ResourceSectionPresentation> Sections { get; set; } = new Dictionary<string, ResourceSectionPresentation>();
+    [Parameter] public EventCallback<string> SectionRequested { get; set; }
+    [Parameter] public EventCallback<EditContext> OnValidSubmit { get; set; }
+    [Parameter] public EventCallback<EditContext> OnInvalidSubmit { get; set; }
+    [Parameter] public EventCallback<bool> InvalidInputChanged { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+    [CascadingParameter] private ResourceReadOnlyReason? DefinitionReadOnlyReason { get; set; }
+    private bool Locked => Busy || ReadOnly || Disabled || DefinitionReadOnlyReason is not null;
+    private bool CurrentSectionReadOnly => SectionState is not null && Sections.TryGetValue(SectionState.CurrentPath, out var section)
+        && (section.ReadOnly || section.ReadOnlyReason is not null);
+    private EditContext? observed;
+    private string focusIdentity = Guid.NewGuid().ToString("N");
+    private bool focusPending, disposed;
+    private string? focusSection;
+    private IJSObjectReference? module;
+
+    protected override void OnParametersSet()
+    {
+        ArgumentNullException.ThrowIfNull(EditContext);
+        ArgumentException.ThrowIfNullOrWhiteSpace(Id);
+        if (SectionContent is not null && SectionState is null) throw new ArgumentException("Section content requires the resource's section state.");
+        var fields = Sections.Where(item => item.Key.StartsWith("definition/", StringComparison.Ordinal)).SelectMany(item => item.Value.Fields).ToArray();
+        if (fields.Any(field => string.IsNullOrWhiteSpace(field) || EditContext.Model.GetType().GetProperty(field) is null)
+            || fields.Distinct(StringComparer.Ordinal).Count() != fields.Length)
+            throw new ArgumentException("Each declared field must name a root model property and belong to one definition section.", nameof(Sections));
+        if (!ReferenceEquals(observed, EditContext))
+        {
+            if (observed is not null) observed.OnFieldChanged -= FieldChanged;
+            observed = EditContext;
+            observed.OnFieldChanged += FieldChanged;
+            focusIdentity = Guid.NewGuid().ToString("N");
+            focusPending = false; focusSection = null;
+        }
+        if (Locked) focusPending = false;
+    }
+    private void FieldChanged(object? sender, FieldChangedEventArgs args) => focusPending = false;
+
+    private Task ValidSubmitAsync(EditContext context) => Locked || CurrentSectionReadOnly ? Task.CompletedTask : OnValidSubmit.InvokeAsync(context);
+    private Task InvalidSubmitAsync(EditContext context) => RevealValidationAsync();
+
+    public static string? FirstInvalidSection(EditContext context, IReadOnlyDictionary<string, ResourceSectionPresentation> sections) =>
+        sections.FirstOrDefault(section => section.Key.StartsWith("definition/", StringComparison.Ordinal)
+            && section.Value.Fields.Any(field => context.GetValidationMessages(context.Field(field)).Any())).Key;
+
+    public async Task RevealValidationAsync()
+    {
+        if (Locked || CurrentSectionReadOnly) return;
+        var context = EditContext;
+        var destination = FirstInvalidSection(context, Sections);
+        focusSection = SectionState is null ? null : destination ?? SectionState.DefinitionPath;
+        focusPending = true;
+        if (SectionState is not null && focusSection is not null) await SectionRequested.InvokeAsync(focusSection);
+        await OnInvalidSubmit.InvokeAsync(context);
+        if (!disposed && ReferenceEquals(EditContext, context)) await InvokeAsync(StateHasChanged);
+    }
+
+    // Creation wizards own their accepted step transition; focus follows that render.
+    public void RequestValidationFocus() { if (!Locked) { focusPending = true; focusSection = null; } }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (disposed || !focusPending || Locked || focusSection is not null && !SectionState!.Is(focusSection)) return;
+        var context = EditContext;
+        if (module is null)
+        {
+            var imported = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/resource-form.js");
+            if (disposed) { if (imported is not null) await imported.DisposeAsync(); return; }
+            module = imported;
+        }
+        if (disposed || !ReferenceEquals(context, EditContext)) return;
+        if (module is not null && await module.InvokeAsync<bool>("focusFirstInvalid", Id, focusIdentity)) focusPending = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (observed is not null) observed.OnFieldChanged -= FieldChanged;
+        if (module is not null) { try { await module.DisposeAsync(); } catch (JSDisconnectedException) { } }
+    }
+}

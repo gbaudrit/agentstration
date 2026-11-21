@@ -6,14 +6,14 @@
 
 @if (ActiveTab == FlowStepSettingsTab.Configuration)
 {
-    <label>@T("TransformFunction")<select value="@(Step.Function is null ? string.Empty : FunctionKey(Step.Function))" @onchange="SelectFunctionAsync" disabled="@ReadOnly" data-testid="transform-function">
+    <FormField Label="@T("TransformFunction")"><ClearableSelect TValue="string" Value="@(Step.Function is null ? string.Empty : FunctionKey(Step.Function))" ValueChanged="changed => SelectFunctionAsync(new ChangeEventArgs { Value = changed })" disabled="@ReadOnly" data-testid="transform-function">
         <option value="">@T("TransformMappingOnly")</option>
         @if (Step.Function is { } saved && Functions.All(choice => FunctionKey(choice.Function.Reference) != FunctionKey(saved))) { <option value="@FunctionKey(saved)">@saved.Name · @saved.Version</option> }
         @foreach (var choice in Functions) { <option value="@FunctionKey(choice.Function.Reference)">@choice.DisplayName</option> }
-    </select></label>
+    </ClearableSelect></FormField>
     @if (SelectedFunction is { } function)
     { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
-    <label>@T("TransformMapping")<textarea data-testid="transform-mapping" disabled="@ReadOnly" value="@JsonText(Step.Mapping)" @onchange="UpdateTransformMappingAsync"></textarea></label>
+    <FormField Label="@T("TransformMapping")"><ClearableText UpdateOnInput="false" Multiline="true" data-testid="transform-mapping" Disabled="@ReadOnly" Value="@JsonText(Step.Mapping)" ValueChanged="changed => UpdateTransformMappingAsync.InvokeAsync(new ChangeEventArgs { Value = changed })" /></FormField>
     @if ((SelectedFunction?.Function.InputSchema ?? Step.FunctionInputSchema) is { } functionSchema)
     {
         @foreach (var parameter in FunctionInvocationSchemas.SchemaParameters(functionSchema))

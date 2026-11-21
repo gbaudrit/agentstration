@@ -379,7 +379,7 @@ public sealed class WorkplaceUxTests
             .Add(value => value.TaskDetailsUrl, task => $"/w/personal/tasks/{task.Id}")
             .Add(value => value.ArtifactContentUrl, _ => "/content"));
         Assert.AreEqual(1, explicitlyVisible.FindAll(".inline-task-card").Count);
-        var taskLink = explicitlyVisible.Find("a.inline-task-card");
+        var taskLink = explicitlyVisible.Find("a.inline-task-link");
         Assert.AreEqual($"/w/personal/tasks/{taskId}", taskLink.GetAttribute("href"));
         Assert.IsTrue(taskLink.TextContent.Contains("Prepare report", StringComparison.Ordinal));
         Assert.IsFalse(taskLink.TextContent.Contains("View details", StringComparison.Ordinal));
@@ -579,6 +579,9 @@ public sealed class WorkplaceUxTests
     private static BunitContext CreateContext()
     {
         var context = new BunitContext();
+        var collections = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
+        foreach (var method in new[] { "attachActions", "releaseActions", "attachDisclosure", "releaseDisclosure", "observeCollection", "releaseCollection" })
+            collections.SetupVoid(method, _ => true).SetVoidResult();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         var autoScroll = context.JSInterop.SetupModule("./_content/Agentstration.Workplace.Components/conversation-auto-scroll.js");
         autoScroll.SetupVoid("initialize", _ => true);

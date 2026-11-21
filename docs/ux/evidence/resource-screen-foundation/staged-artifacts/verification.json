@@ -1,0 +1,144 @@
+{
+  "base": "e94492bb41fed02d9472b74f1609f57113dee887",
+  "sourceHashes": {
+    "automation/playwright/src/contracts/test-ids.ts": "ae6e750388ef4c3282bafc2d0a917a46f90339f29497feae6356762129029acf",
+    "automation/playwright/src/pages/artifact-administration.page.ts": "0fc9310377f744ee4ad1386da32898f5d8641faaa921b0af51121866f61fe6a1",
+    "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor": "f180bb2a7fd92b3c58690c3602fe2168877881e9daba52d9a9745aa164ecdf68",
+    "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor.css": "b9420e03554e24dd5cbc0c038fd30106b8f5d014940f9d3794b817aeb439c2e6",
+    "src/Agentstration.Console.Components/Console/StagedArtifactRetentionModel.cs": "36ec983d256f7c633c97f495fa7d02c93ec5fd9042f0bdc85bfef2c58f206cbe",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ArtifactsStrings.fr-FR.resx": "1ef301a3db9091f8116b3e9c1f6bea353a2a4660ed27641774004d524a12b13f",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/ArtifactsStrings.resx": "8b695319c2f7e045f8b6f143bc882ee94e35b6a336e35eeb2ef2008c362face9",
+    "tests/Agentstration.Console.Components.Tests/ArtifactAdministrationComponentTests.StagedFoundation.cs": "d19a7c6f59c5951b085d3134678f86541751cdc57035f91b53c760ce1214c7f9",
+    "tests/Agentstration.Console.Components.Tests/ArtifactAdministrationComponentTests.cs": "a82be2939d29bca7f7300fbf807e9d8f29d23a120b44b829d8e999058a21296c"
+  },
+  "hostHashes": {
+    "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "8b34510cbc3e18d5fdebe0031962f8ecf9d5d331235a6ab1814922676736d802",
+    "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "8d32789ff882e272beede4f5633d1109e862f13419585097f36a786c65e2e93f",
+    "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "bfac2765543741ae6ea3d2f8c7885fbe442b4e4c2a3aff4b000556e9da1a31d9",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "8b34510cbc3e18d5fdebe0031962f8ecf9d5d331235a6ab1814922676736d802",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "8b34510cbc3e18d5fdebe0031962f8ecf9d5d331235a6ab1814922676736d802",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "8d32789ff882e272beede4f5633d1109e862f13419585097f36a786c65e2e93f",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "8d32789ff882e272beede4f5633d1109e862f13419585097f36a786c65e2e93f",
+    "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "bfac2765543741ae6ea3d2f8c7885fbe442b4e4c2a3aff4b000556e9da1a31d9",
+    "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "bfac2765543741ae6ea3d2f8c7885fbe442b4e4c2a3aff4b000556e9da1a31d9"
+  },
+  "phases": [
+    {
+      "name": "staged-artifact",
+      "exitCode": 0,
+      "seconds": 72.1
+    }
+  ],
+  "completed": true,
+  "running": [],
+  "screenshots": [
+    {
+      "file": "staged-artifact-overview-desktop-en.png",
+      "sha256": "357d1cc76431a32c714a6ed90576ddcdc506396b14851e7d175e51585196aa1f"
+    },
+    {
+      "file": "staged-artifact-retention-desktop-en.png",
+      "sha256": "aeecb9b347bfd7db24cbcf9b7aa41e87ccfe3915daec28027893b794ebc01203"
+    },
+    {
+      "file": "staged-artifact-content-desktop-en.png",
+      "sha256": "abc85afede40bb6598778cfff5cbd30c6ac6a23979cfd9b4f25ece4e5eccee16"
+    },
+    {
+      "file": "staged-artifact-retained-refresh-desktop-en.png",
+      "sha256": "1a2111ba0309d001406082961803c55717c5305c5c55ff1240fd467d26227b18"
+    },
+    {
+      "file": "staged-artifact-retention-saved-desktop-en.png",
+      "sha256": "576a841dcd0083a33d8bacce5d271cda39dfefbdc7b60f9320a503b5d034c4a3"
+    },
+    {
+      "file": "staged-artifact-purge-cancel-desktop-en.png",
+      "sha256": "6951edff1bc011efaf683105cb5f235d6cd6a2ec850bd7f73f400651ad48bd2f"
+    },
+    {
+      "file": "staged-artifact-purged-desktop-en.png",
+      "sha256": "5e8b592d82d39d4e71bc77366ac430c22c27dd29fcb6dcdf33b746a0cf744b42"
+    },
+    {
+      "file": "staged-artifact-overview-mobile-fr.png",
+      "sha256": "9ee191f7345500d5ff5406193cbdc96be3cf278035925795153d4d7399eda072"
+    },
+    {
+      "file": "staged-artifact-retention-mobile-fr.png",
+      "sha256": "92174f131d02083f511871cfe378f5f129087a07305bbb9918c851849156ce49"
+    },
+    {
+      "file": "staged-artifact-content-mobile-fr.png",
+      "sha256": "7881b4a66406216cbe3945f20ca054899de57fb84061643cbdaa808393b99df2"
+    },
+    {
+      "file": "staged-artifact-retained-refresh-mobile-fr.png",
+      "sha256": "94111befa32c6945579f8c5bb5507dd4744d6135d176de5ec7305dab169cdded"
+    },
+    {
+      "file": "staged-artifact-retention-saved-mobile-fr.png",
+      "sha256": "2c100df8c0b94e9ea5a3447fba852c44f4dac1215aeaf6aeaa4e8261452fc288"
+    },
+    {
+      "file": "staged-artifact-purge-cancel-mobile-fr.png",
+      "sha256": "f74bf284bdb8852f7c4290f8ca6316df18fd78db6832cb013e1f21e2205f297c"
+    },
+    {
+      "file": "staged-artifact-purged-mobile-fr.png",
+      "sha256": "2f6a03e4f975d37147c7dfd6fa5bed818c5701f85eb1fc6cc5766ef813952433"
+    }
+  ],
+  "protectedAgent": {
+    "src/Agentstration.Console.Components/Console/AgentEditorModel.cs": "3e7e0856e058ee4a7780ae3c9c7c1a7cf604ad3f8b16b3fc04b0d87f8f2bc250",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor": "942bc0f58e0827b27d78211d2edd7d288a8a0a20a5112d42c9fbbe487d6bcae2",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor.css": "6fbc40091951699dd77fcb771d533f967206c6dac4d825c7c638ac66b88f74f7",
+    "src/Agentstration.Console.Components/Components/Pages/AgentEditorStrings.cs": "87fa7578f9053a1a9d9af8c5cafe9672ecd7614a2cea8b26b5af017ad179c909",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.resx": "e44f3339772987a50fa2c131aea6978b3485bff85aeff5163fea0de5780c7eea",
+    "src/Agentstration.Console.Components/Resources/Components/Pages/AgentEditorStrings.fr-FR.resx": "ff0155f03dbfbb085ca508e2f55ab1c71ab97138eced4cae220da7ccfdc7da71"
+  },
+  "targetedTests": {
+    "passed": 45,
+    "logSha256": "09173c1306c62b83586bd7fa8cccd87ad84255cc4c8e5f39197b1041bbb1dc77"
+  },
+  "maintainedRegression": {
+    "base": "e94492bb41fed02d9472b74f1609f57113dee887",
+    "phase": {
+      "name": "artifact-content-regression",
+      "exitCode": 0,
+      "seconds": 107.8
+    },
+    "sourceHashes": {
+      "automation/playwright/src/contracts/test-ids.ts": "ae6e750388ef4c3282bafc2d0a917a46f90339f29497feae6356762129029acf",
+      "automation/playwright/src/pages/artifact-administration.page.ts": "0fc9310377f744ee4ad1386da32898f5d8641faaa921b0af51121866f61fe6a1",
+      "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor": "f180bb2a7fd92b3c58690c3602fe2168877881e9daba52d9a9745aa164ecdf68",
+      "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor.css": "b9420e03554e24dd5cbc0c038fd30106b8f5d014940f9d3794b817aeb439c2e6",
+      "src/Agentstration.Console.Components/Console/StagedArtifactRetentionModel.cs": "36ec983d256f7c633c97f495fa7d02c93ec5fd9042f0bdc85bfef2c58f206cbe",
+      "src/Agentstration.Console.Components/Resources/Components/Pages/ArtifactsStrings.fr-FR.resx": "1ef301a3db9091f8116b3e9c1f6bea353a2a4660ed27641774004d524a12b13f",
+      "src/Agentstration.Console.Components/Resources/Components/Pages/ArtifactsStrings.resx": "8b695319c2f7e045f8b6f143bc882ee94e35b6a336e35eeb2ef2008c362face9",
+      "tests/Agentstration.Console.Components.Tests/ArtifactAdministrationComponentTests.StagedFoundation.cs": "d19a7c6f59c5951b085d3134678f86541751cdc57035f91b53c760ce1214c7f9",
+      "tests/Agentstration.Console.Components.Tests/ArtifactAdministrationComponentTests.cs": "a82be2939d29bca7f7300fbf807e9d8f29d23a120b44b829d8e999058a21296c"
+    },
+    "hostHashes": {
+      "src/Agentstration.Console.Components/bin/Release/net10.0/Agentstration.Console.Components.dll": "8b34510cbc3e18d5fdebe0031962f8ecf9d5d331235a6ab1814922676736d802",
+      "src/Agentstration.Web.Components/bin/Release/net10.0/Agentstration.Web.Components.dll": "8d32789ff882e272beede4f5633d1109e862f13419585097f36a786c65e2e93f",
+      "src/Agentstration.Console.Client/bin/Release/net10.0/Agentstration.Console.Client.dll": "bfac2765543741ae6ea3d2f8c7885fbe442b4e4c2a3aff4b000556e9da1a31d9",
+      "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Components.dll": "8b34510cbc3e18d5fdebe0031962f8ecf9d5d331235a6ab1814922676736d802",
+      "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Components.dll": "8b34510cbc3e18d5fdebe0031962f8ecf9d5d331235a6ab1814922676736d802",
+      "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Web.Components.dll": "8d32789ff882e272beede4f5633d1109e862f13419585097f36a786c65e2e93f",
+      "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Web.Components.dll": "8d32789ff882e272beede4f5633d1109e862f13419585097f36a786c65e2e93f",
+      "src/Agentstration.Web/bin/Release/net10.0/Agentstration.Console.Client.dll": "bfac2765543741ae6ea3d2f8c7885fbe442b4e4c2a3aff4b000556e9da1a31d9",
+      "automation/playwright/fixtures/GovernedInventoryHost/bin/Release/net10.0/Agentstration.Console.Client.dll": "bfac2765543741ae6ea3d2f8c7885fbe442b4e4c2a3aff4b000556e9da1a31d9"
+    }
+  },
+  "nativeProbeSha256": "35d282aa42c491f9b171750058eb8b1f36eabfbddb8a0088693f945a5a93b064",
+  "limits": [
+    "No CI investigation/remediation.",
+    "Targeted component tests and affected desktop/mobile journeys; full solution lanes omitted at maintainer request.",
+    "New reusable #1236 scenario remains deferred until UX validation and implementation merge."
+  ],
+  "integrationHeads": [
+    "68f2ca6b272aa6f263c54f52bd6a10f81218e270"
+  ],
+  "integrationNote": "Parallel function catalog collection adoption was fast-forwarded after browser verification. The recorded tested base and unchanged migration source hashes identify the verified work; these captures do not claim validation of the parallel collection change."
+}

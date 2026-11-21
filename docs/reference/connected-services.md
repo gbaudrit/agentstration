@@ -123,11 +123,11 @@ is validated against the declared operation types before materialization.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/connected-services/{name}/operation-discoveries?scopeRef=...` | Start a durable discovery |
-| `GET` | `/api/connected-services/{name}/operation-discoveries?scopeRef=...` | List discoveries for a service |
+| `POST` | `/api/connected-services/{name}/operation-discoveries?scopeRef=...&namespace=...` | Start a durable discovery |
+| `GET` | `/api/connected-services/{name}/operation-discoveries?scopeRef=...&namespace=...` | List discoveries for a service |
 | `GET` | `/api/connected-service-operation-discoveries/{id}?namespace=...` | Observe and synchronize a discovery |
 | `POST` | `/api/connected-service-operation-discoveries/{id}/cancel?namespace=...` | Cancel an active discovery |
-| `GET` | `/api/connected-services/{name}/operations?scopeRef=...` | List materialized operations |
+| `GET` | `/api/connected-services/{name}/operations?scopeRef=...&namespace=...` | List materialized operations |
 | `GET` | `/api/connected-service-operations/{name}?scopeRef=...&namespace=...` | Read an exact materialized operation |
 
 Materialized operations are read-only. Rediscovery preserves their deterministic
@@ -136,18 +136,21 @@ latest successful manifest as unavailable instead of deleting them.
 
 ## Connected Services
 
-The following authorized endpoints manage configured external systems:
+The following authorized endpoints manage configured external systems. Service
+reads, usages, discovery and commands accept an optional `namespace` query value;
+omitting it retains the default namespace. Exact resource identity and `If-Match`
+remain independent of the selected navigation context:
 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/connected-services` | List visible resources |
-| `GET` | `/api/connected-services/{name}?scopeRef=...` | Read one exact resource |
-| `GET` | `/api/connected-services/{name}/usages?scopeRef=...` | List dependent resources reported by consumer verticals |
+| `GET` | `/api/connected-services/{name}?scopeRef=...&namespace=...` | Read one exact resource |
+| `GET` | `/api/connected-services/{name}/usages?scopeRef=...&namespace=...` | List dependent resources reported by consumer verticals |
 | `POST` | `/api/connected-services` | Create and validate a resource |
-| `PUT` | `/api/connected-services/{name}?scopeRef=...` | Replace desired configuration with `If-Match` |
-| `POST` | `/api/connected-services/{name}/reconcile?scopeRef=...` | Refresh observed compatibility |
-| `POST` | `/api/connected-services/{name}/deactivate?scopeRef=...` | Disable use with `If-Match` |
-| `DELETE` | `/api/connected-services/{name}?scopeRef=...` | Delete with `If-Match` |
+| `PUT` | `/api/connected-services/{name}?scopeRef=...&namespace=...` | Replace desired configuration with `If-Match` |
+| `POST` | `/api/connected-services/{name}/reconcile?scopeRef=...&namespace=...` | Refresh observed compatibility |
+| `POST` | `/api/connected-services/{name}/deactivate?scopeRef=...&namespace=...` | Disable use with `If-Match` |
+| `DELETE` | `/api/connected-services/{name}?scopeRef=...&namespace=...` | Delete with `If-Match` |
 
 A resource pins an exact type `ResourceReference`, `typeUid`, `version` and
 `schemaDigest`. It contains no Extension Registration reference: the type resource

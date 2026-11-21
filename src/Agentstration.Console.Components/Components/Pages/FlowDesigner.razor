@@ -1,19 +1,61 @@
 @page "/flows/{FlowId}/designer"
 @page "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
 @using Agentstration.Resources
+@using Agentstration.Web.FlowDesigner.State
 @rendermode InteractiveServer
+@implements IDisposable
+@inject ConsoleContextState ContextState
+@inject FlowEditorStore Editor
 @inject Microsoft.Extensions.Localization.IStringLocalizer<Agentstration.Web.FlowDesigner.Components.FlowDesignerStrings> Localizer
 
 <PageTitle>@Localizer["PageTitle"] · Agentstration</PageTitle>
+<UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
 <div class="flow-designer-page" data-testid="flow-observability-designer">
-    <Agentstration.Web.FlowDesigner.Components.FlowDesigner ResourceId="@FlowId" Namespace="@DesignerNamespace" ScopeRef="@DesignerScope" PublishedVersion="@PublishedVersion" />
+    @if (!contextLoaded) { <ResourceLoadFeedback State="@(new(ResourceLoadStatus.Loading))" /> }
+    else if (!ContextState.HasPermission("resources/read")) { <ResourceLoadFeedback State="@(new(ResourceLoadStatus.Forbidden))" /> }
+    else
+    {
+        <Agentstration.Web.FlowDesigner.Components.FlowDesigner @key="contextKey" ResourceId="@FlowId" Namespace="@DesignerNamespace"
+            ScopeRef="@DesignerScope" PublishedVersion="@PublishedVersion" IsReadOnly="@(!ContextState.HasPermission("resources/write"))" ExecutionAllowed="@(ContextState.HasPermission("runs/execute"))" />
+    }
 </div>
 
 @code {
     [Parameter] public string FlowId { get; set; } = string.Empty;
     [Parameter] public string? FlowNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "version")] public string? PublishedVersion { get; set; }
-    private ResourceNamespace DesignerNamespace => string.IsNullOrWhiteSpace(FlowNamespace) ? ResourceNamespace.Default : ResourceNamespace.Parse(FlowNamespace);
+    private ResourceNamespace DesignerNamespace => ResourceNamespace.Parse(FlowNamespace ?? NamespaceValue);
     private ResourceScopeRef? DesignerScope => string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+    private readonly CancellationTokenSource cancellation = new();
+    private bool contextLoaded, subscribed, disposed;
+    private string? contextKey;
+    private string CurrentContext => $"{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
+    private bool HasDraft => !disposed && contextLoaded && ContextState.HasPermission("resources/read") && contextKey == CurrentContext
+        && Editor.State.Resource is { } resource && resource.FlowId.Value == FlowId && resource.FlowId.Namespace == DesignerNamespace
+        && (DesignerScope is null || resource.ScopeRef == DesignerScope) && Editor.State.PublishedVersion == PublishedVersion
+        && (Editor.State.IsDirty || Editor.State.HasSourceChanges);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ContextState.EnsureLoadedAsync(cancellation.Token);
+        if (disposed) return;
+        if (!subscribed) { ContextState.Changed += ContextChanged; Editor.StateChanged += EditorChanged; subscribed = true; }
+        UpdateContext(); contextLoaded = true;
+    }
+    private void UpdateContext()
+    {
+        if (contextKey != CurrentContext || !ContextState.HasPermission("resources/read")) Editor.Clear();
+        contextKey = CurrentContext;
+    }
+    private void ContextChanged() => _ = InvokeAsync(() => { if (disposed) return; UpdateContext(); StateHasChanged(); });
+    private void EditorChanged(object? sender, EventArgs args) { if (!disposed) _ = InvokeAsync(StateHasChanged); }
+    public void Dispose()
+    {
+        disposed = true;
+        if (subscribed) { ContextState.Changed -= ContextChanged; Editor.StateChanged -= EditorChanged; }
+        cancellation.Cancel(); cancellation.Dispose();
+        GC.SuppressFinalize(this);
+    }
 }

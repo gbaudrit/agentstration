@@ -1,0 +1,16 @@
+{
+  "baseCommit": "63040fc5748e3248d7107ad5359254cd20423f67",
+  "route": "/settings/organization/members",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor": "0db98c5b2692396baa688cc0c296de2cbba12f1d",
+    "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor.cs": "de8b084a194d4f0973dc7768a2f778ed68fdf323",
+    "src/Agentstration.Identity/IdentityExperienceServices.cs": "a88ad1ce853aaa0b27b54c4cc154ebe1131f369e",
+    "src/Agentstration.Identity.Api/Api/IdentityEndpoints.cs": "d98743d91b3d4a12d25ae2f6b4b79d7ce398fb3a",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}

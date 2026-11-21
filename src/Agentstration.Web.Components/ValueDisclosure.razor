@@ -1,0 +1,28 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+<span class="value-disclosure" @ref="root" @onclick:stopPropagation="true">
+    <button type="button" class="disclosure-trigger @(IconName is null && Marker is null ? null : "disclosure-icon")" title="@Value" aria-label="@(IconName is null && Marker is null ? null : Value)" aria-expanded="false" aria-controls="@panelId">@if (Marker is not null) { <span class="scope-letter" aria-hidden="true">@Marker</span> } else if (IconName is { } icon) { <UiIcon Name="@icon" /> } else { @Value }</button>
+    <span id="@panelId" class="full-value-panel" popover="manual" role="tooltip">@Value</span>
+</span>
+@code {
+    [Parameter, EditorRequired] public string Value { get; set; } = string.Empty;
+    [Parameter] public string? IconName { get; set; }
+    [Parameter] public string? Marker { get; set; }
+    private readonly string panelId = $"full-value-{Guid.NewGuid():N}";
+    private ElementReference root;
+    private IJSObjectReference? module;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+        await module.InvokeVoidAsync("attachDisclosure", root);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("releaseDisclosure", root); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+    }
+}

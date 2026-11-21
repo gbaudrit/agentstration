@@ -1,4 +1,5 @@
 @using System.Text.Json.Nodes
+@using Microsoft.AspNetCore.Components.Sections
 @using Agentstration.Secrets.Abstractions
 @implements IDisposable
 @inject IToolDefinitionsClient Definitions
@@ -7,43 +8,63 @@
 @inject ISecretsClient Secrets
 @inject IConsoleNavigationContext NavigationContext
 @inject NavigationManager Navigation
+@inject IServiceProvider Services
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <div data-testid="tool-relay-editor" data-interactive="@((interactive && !loading).ToString().ToLowerInvariant())">
 @if (loading) { <LoadingState Message="@T("LoadingDefinitions")" /> }
-else
+else if (CreationIdentity is not null)
 {
     @if (error is not null) { <ErrorState Message="@error" /> }
-    @if (CreationIdentity is null)
-    {
-    <ResourceTabs Label="@T("RelayViews")">
-        <button class="@(view == "configuration" ? "active" : null)" @onclick='() => view = "configuration"'>@T("RelayConfiguration")</button>
-        <button class="@(view == "versions" ? "active" : null)" @onclick='() => view = "versions"'>@T("RelayVersions")</button>
-        <button class="@(view == "usages" ? "active" : null)" @onclick='() => view = "usages"'>@T("RelayUsages")</button>
-    </ResourceTabs>
-    }
-    @if (view == "versions")
-    {
-        <section class="panel"><h2>@T("RelayVersions")</h2>
-            <table class="data-table"><thead><tr><th>@T("RelayVersion")</th><th>@T("SourceToolVersion")</th><th>@T("PublishedAt")</th><th></th></tr></thead><tbody>
-                @foreach (var version in versions)
-                {
-                    <tr><td data-label="@T("RelayVersion")">@version.Definition.Version</td><td data-label="@T("SourceToolVersion")">@version.Source?.Tool.Name · @SourceVersion(version.Source?.Tool)</td><td data-label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</td><td><button class="button-secondary" disabled="@(!CanManage)" @onclick="() => NewDraft(version)">@T("NewVersion")</button></td></tr>
-                }
-            </tbody></table>
-        </section>
-    }
-    else if (view == "usages")
-    {
-        <section class="panel"><h2>@T("RelayUsages")</h2><p>@T("ConsumerAdoptionHelp")</p>
-            <table class="data-table"><thead><tr><th>@T("Tool")</th><th>@T("Version")</th><th>@T("RelayVersion")</th></tr></thead><tbody>
-                @foreach (var usage in usages)
-                { <tr><td data-label="@T("Tool")"><a href="@UsageUrl(usage)">@usage.Namespace/@usage.Name</a> <ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /> · @T($"UsageKind.{usage.Kind}")</td><td data-label="@T("Version")">@usage.Version</td><td data-label="@T("RelayVersion")">@usage.RelayVersion</td></tr> }
-            </tbody></table>
-        </section>
-    }
-    else
-    {
+    @ConfigurationFields @BindingFields @ContractFields
+        @if (CreationIdentity is not null)
+        {
+            @if (CreationActive && ShowCreationActions)
+            {
+            <div class="tool-create-actions"><span><strong>@T("CreationReady")</strong><small>@T("CreationDraftHelp")</small></span><div><button type="button" class="button-secondary" data-testid="tool-definition-back" disabled="@busy" @onclick="() => OnBack.InvokeAsync()">@T("CreationBack")</button><button type="button" class="button-primary" data-testid="tool-definition-create-draft" disabled="@(busy || !CanMutate || selected is null || HasInvalidBindings)" @onclick="CreateDraftAsync">@T(busy ? "CreationCreating" : "CreationCreateDraft")</button></div></div>
+            }
+        }
+
+}
+else if (snapshot is not null)
+{
+    var presentations = RelayPresentations;
+    <ConsoleResourceDetailsTemplate Resource="snapshot.Value" Name="@snapshot.Value.Definition.DisplayName" Description="@snapshot.Value.Definition.Description" ResourceType="@T("Definition")" Domain="tool" IconName="wrench" CollectionHref="@NavigationContext.AddToUri("/tools/definitions")" CollectionLabel="@T("DefinitionsTitle")"
+        Enabled="snapshot.Value.Definition.Enabled" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanMutate || busy || refreshing)"
+        ResourceIdentity="@($"{Name}|{NamespaceQuery}|{ScopeRefValue}|{NavigationContext.ScopeRef}|{snapshot.Value.Uid}")" SectionState="sectionState" SectionPresentations="presentations"
+        DefinitionSections="RelayDefinitionSections" AdditionalSections="RelayAdditionalSections" SelectionChanged="SelectSection" HasDraft="IsDirty" HasAdditionalDraft="creatorDirty"
+        OnRefresh="RefreshAsync" OnRetry="RefreshAsync" LoadState="loadState" DefinitionReadOnlyReason="DefinitionReadOnlyReason" Busy="busy" Yaml="@SavedYaml" YamlReadOnly="true" YamlTitle="@T("DefinitionYaml")" YamlDescription="@T("DefinitionYamlHelp")" TestId="resource-tool-definition-editor" SectionTestIdPrefix="relay">
+        <PrimaryActions>@if (CanMutate) { <button type="button" class="button-primary" data-testid="relay-publish-review" disabled="@(busy || refreshing || selected is null || HasInvalidBindings || invalidInput)" @onclick="ReviewPublication">@T("PublishVersion")</button> }</PrimaryActions>
+        <Actions>@if (CanMutate && !IsDirty) { <button type="button" class="button-secondary" data-testid="relay-save-draft" disabled="@(busy || refreshing || selected is null || HasInvalidBindings || invalidInput)" @onclick="SaveAsync">@T("SaveDraft")</button> }</Actions>
+        <Feedback>@if (error is not null) { <ErrorState Message="@error" /> }@if (newerSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("DefinitionRefreshDraftConflict")</div> }</Feedback>
+        <OverviewMetrics><MetricCard Label="@T("DefinitionGeneration")" Value="@snapshot.Value.Generation.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("RelayVersions")" Value="@(historyLoaded ? versions.Count.ToString(System.Globalization.CultureInfo.CurrentCulture) : "—")" /><MetricCard Label="@T("RelayUsages")" Value="@(historyLoaded ? usages.Count.ToString(System.Globalization.CultureInfo.CurrentCulture) : "—")" /></OverviewMetrics>
+        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
+        <DefinitionContent Context="path"><ResourceDefinitionForm @ref="definitionForm" EditContext="savedEditContext" FieldLabels="RelayFieldLabels" Id="relay-resource-form" FormName="relay-definition"
+            SectionState="sectionState" Sections="presentations" SectionContent="RelayDefinitionContent" SectionRequested="NavigateSection" OnValidSubmit="SaveAsync" OnInvalidSubmit="InvalidSubmitAsync"
+            ReadOnly="@(!CanMutate)" Busy="busy" InvalidInputChanged="value => invalidInput = value" /></DefinitionContent>
+        <AdditionalContent Context="path">@if (historyError is not null) { <ErrorState Message="@historyError" /><button class="button-secondary" type="button" disabled="@(busy || refreshing)" @onclick="ReloadHistoryAsync">@T("Refresh")</button> }@if (path == "versions") { @Versions } else { @Usages }</AdditionalContent>
+        <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button><button type="submit" form="relay-resource-form" class="button-secondary" data-testid="relay-save-draft" disabled="@(busy || refreshing || selected is null || HasInvalidBindings || invalidInput)">@T("SaveDraft")</button></DraftActions>
+    </ConsoleResourceDetailsTemplate>
+}
+else if (CreationIdentity is null) { <ResourceLoadFeedback State="loadState" OnRetry="RefreshAsync" /> }
+else if (error is not null) { <ErrorState Message="@error" /> }
+@if (reviewing)
+{
+    <ModalFrame IsOpen="true" TitleId="relay-publication-title" OnClose="() => reviewing = false"><section data-testid="relay-publication-review"><h2 id="relay-publication-title">@T("ReviewPublication")</h2><p>@T("ReviewVersionPair", model.Version, SourceVersion(selected))</p><p>@T("ConsumerAdoptionHelp")</p><FormActions><button type="button" class="button-secondary" @onclick="() => reviewing = false">@T("Cancel")</button><button type="button" class="button-primary" disabled="@(busy || !CanMutate || HasInvalidBindings || invalidInput)" @onclick="PublishAsync">@T("ConfirmPublication")</button></FormActions></section></ModalFrame>
+}
+@if (DialogSectionId is { } dialogs) { <SectionContent SectionId="@dialogs">@CreatorOutlets</SectionContent> }
+else { @CreatorOutlets }
+</div>
+
+@code {
+    private RenderFragment RelayIdentityFields => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.ToolDefinition" DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
+        TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
+        ScopeRef="snapshot!.Value.ScopeRef" @bind-Description="model.Description" @bind-Labels="model.Tags" LabelsReadOnly="true" ReadOnly="@(!CanMutate)" />;
+    private RenderFragment<string> RelayDefinitionContent => path => path switch { "definition/identity" => RelayIdentityFields, "definition/bindings" => RetainedBindings, "definition/contracts" => ContractFields, _ => ConfigurationFields };
+    private RenderFragment RetainedBindings => @<FormField Class="form-span-2" Label="@T("FixedInputBindings")"><ChildContent><div @key="editorKey">@BindingFields</div></ChildContent><Validation><ValidationMessage For="() => model.Bindings" /></Validation></FormField>;
+    private RenderFragment CreatorOutlets => @<div>@foreach (var row in rows) { <SectionOutlet SectionId="@row.DialogSectionId" /> }</div>;
+    private RenderFragment ConfigurationFields => @<div>
         <section class="panel">
         @if (CreationIdentity is { } identity)
         {
@@ -54,39 +75,37 @@ else
         <div class="form-grid">
             @if (CreationIdentity is null)
             {
-            <ResourceIdentityFields @bind-DisplayName="displayName" @bind-TechnicalName="name" IsNew="@(snapshot is null)" />
-            <label><span>@T("Namespace")</span><input @bind="resourceNamespace" disabled="@(snapshot is not null)" /></label>
-            <label><span>@T("RelayVersion")</span><input data-testid="relay-version" @bind="relayVersion" disabled="@(!CanManage)" /></label>
-            <label class="form-span-2"><span>@T("DefinitionDescription")</span><textarea @bind="description" disabled="@(!CanManage)"></textarea></label>
+            <FormField Required Label="@T("RelayVersion")"><ChildContent><ClearableText data-testid="relay-version" @bind-Value="model.Version" Disabled="@(!CanMutate)" /></ChildContent><Validation><ValidationMessage For="() => model.Version" /></Validation></FormField>
             }
             @if (CreationIdentity is not null)
             {
-                <label><span>@T("CreationSourceTool")</span><select data-testid="relay-source-tool" value="@SourceGroup" @onchange="SourceGroupChanged" disabled="@(!CanManage)"><option value="">@T("CreationSelectSource")</option>@foreach (var group in tools.GroupBy(SourceGroupKey)) { var tool = group.First(); <option value="@group.Key">@tool.Definition.DisplayName · @tool.ScopeRef · @tool.Namespace</option> }</select></label>
-                <label><span>@T("SourceToolVersion")</span><select data-testid="relay-source" value="@SelectedKey" @onchange="SourceChanged" disabled="@(!CanManage || string.IsNullOrEmpty(SourceGroup))"><option value="">@T("CreationSelectVersion")</option>@foreach (var tool in tools.Where(tool => SourceGroupKey(tool) == SourceGroup)) { <option value="@ToolKey(tool)">@SourceVersion(tool) · @tool.Namespace/@tool.Name</option> }</select></label>
+                <FormField Label="@T("CreationSourceTool")"><ClearableSelect TValue="string" data-testid="relay-source-tool" Value="@SourceGroup" ValueExpression="@(() => SourceGroup)" ValueChanged="value => SourceGroupChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanMutate)"><option value="">@T("CreationSelectSource")</option>@foreach (var group in tools.GroupBy(SourceGroupKey)) { var tool = group.First(); <option value="@group.Key">@tool.Definition.DisplayName · @tool.ScopeRef · @tool.Namespace</option> }</ClearableSelect></FormField>
+                <FormField Label="@T("SourceToolVersion")"><ClearableSelect TValue="string" data-testid="relay-source" Value="@SelectedKey" ValueExpression="@(() => model.SourceKey)" ValueChanged="value => SourceChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanMutate || string.IsNullOrEmpty(SourceGroup))"><option value="">@T("CreationSelectVersion")</option>@foreach (var tool in tools.Where(tool => SourceGroupKey(tool) == SourceGroup)) { <option value="@ToolKey(tool)">@SourceVersion(tool) · @tool.Namespace/@tool.Name</option> }</ClearableSelect></FormField>
             }
-            <label class="relay-toggle"><input type="checkbox" @bind="enabled" disabled="@(!CanManage)" />@T("Enabled")</label>
-            <label class="relay-toggle"><input type="checkbox" @bind="requiresApproval" disabled="@(!CanManage || selected?.Definition.RequiresApproval == true)" />@T("RequiresApproval")</label>
-            <label><span>@T("TimeoutSeconds")</span><input type="number" min="1" max="900" @bind="timeout" disabled="@(!CanManage)" /></label>
+            @if (CreationIdentity is not null) { <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.Enabled" disabled="@(!CanMutate)" /><span>@T("Enabled")</span></label> }
+            <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.RequiresApproval" disabled="@(!CanMutate || selected?.Definition.RequiresApproval == true)" /><span>@T("RequiresApproval")</span></label>
+            <FormField Required Label="@T("TimeoutSeconds")"><ChildContent><ClearableNumber TValue="int" min="1" max="900" @bind-Value="model.Timeout" disabled="@(!CanMutate)" /></ChildContent><Validation>@if (CreationIdentity is null || EnclosingEditContext is not null) { <ValidationMessage For="() => model.Timeout" /> }</Validation></FormField>
             @if (CreationIdentity is null)
             {
-            <label class="form-span-2"><span>@T("SourceToolVersion")</span>
-                <select data-testid="relay-source" value="@SelectedKey" @onchange="SourceChanged" disabled="@(!CanManage)">
+            <FormField Required Label="@T("SourceToolVersion")" Class="form-span-2"><Validation><ValidationMessage For="() => model.SourceKey" /></Validation><ChildContent>
+                <ClearableSelect TValue="string" data-testid="relay-source" Value="@SelectedKey" ValueExpression="@(() => model.SourceKey)" ValueChanged="value => SourceChanged(new ChangeEventArgs { Value = value })" Disabled="@(!CanMutate)">
                     <option value="">@T("SelectSourceTool")</option>
                     @if (selected is not null && !tools.Any(tool => tool.Uid == selected.Uid && tool.Generation == selected.Generation))
                     { <option value="@SelectedKey">@T("PinnedSourceUnavailable", selected.Name, SourceVersion(selected))</option> }
                     @foreach (var tool in tools)
                     { <option value="@ToolKey(tool)">@tool.Definition.DisplayName · @SourceVersion(tool) · @tool.ScopeRef · @tool.Namespace/@tool.Name</option> }
-                </select>
-            </label>
+                </ClearableSelect>
+            </ChildContent></FormField>
             }
         </div><p class="inline-info">@T(CreationIdentity is null ? "SourceSelectionHelp" : "CreationIndependentVersions")</p></section>
         @if (sourceUpdateRequested) { <p class="inline-info" role="status">@T("ChooseNewSource")</p> }
         @if (baseline is not null)
         {
-            <div class="page-actions"><button class="button-secondary" disabled="@(!CanManage)" @onclick="() => NewDraft(baseline)">@T("NewVersion")</button><button class="button-secondary" disabled="@(!CanManage)" @onclick="UpdateSource">@T("UpdateSource")</button></div>
+            <div class="page-actions"><button class="button-secondary" type="button" disabled="@(!CanMutate || busy || refreshing)" @onclick="() => NewDraft(baseline)">@T("NewVersion")</button><button class="button-secondary" type="button" disabled="@(!CanMutate || busy || refreshing)" @onclick="UpdateSource">@T("UpdateSource")</button></div>
         }
-        @if (selected is not null)
-        {
+    </div>;
+    private RenderFragment BindingFields => @<div>@if (selected is not null)
+    {
             <section class="panel"><h2>@T("FixedInputBindings")</h2><p>@T("LiveBindingHelp")</p>
                 <CascadingValue Value="bindingEditContext" IsFixed="true">
                 @foreach (var row in VisibleRows)
@@ -94,11 +113,15 @@ else
                     <div class="relay-binding" data-binding-path="@row.Path" @key="row.Path">
                         <ValueBindingRequirementEditor Requirement="@BindingRequirement(row)" AllowedSources="@BindingSources(row)"
                             Options="@BindingOptions(row)" Selection="@BindingSelection(row)" SelectionChanged="value => BindingChanged(row, value)"
-                            CreationContext="@BindingCreationContext(row)" ResourceCreated="ValueCreatedAsync" Disabled="@(!CanManage)" TestIdPrefix="relay" />
+                            CreationContext="@BindingCreationContext(row)" CreationChanged="value => CreatorChanged(row, value)" DialogSectionId="@row.DialogSectionId" ResourceCreated="ValueCreatedAsync" Disabled="@(!CanMutate)" TestIdPrefix="relay" />
                     </div>
                 }
                 </CascadingValue>
             </section>
+    }
+    </div>;
+    private RenderFragment ContractFields => @<div>@if (selected is not null)
+    {
             <section class="panel"><h2>@T("InputContract")</h2>
                 @if (HasInvalidBindings) { <p class="inline-warning" role="alert">@T("RelayBindingInvalid")</p> }
                 else { <pre data-testid="relay-public-schema">@preview</pre> }
@@ -107,7 +130,7 @@ else
             @if (baseline is not null)
             {
                 <section class="panel"><h2>@T("PublicationChanges")</h2><dl class="resource-details">
-                    <dt>@T("RelayVersion")</dt><dd>@baseline.Definition.Version → @relayVersion</dd>
+                    <dt>@T("RelayVersion")</dt><dd>@baseline.Definition.Version → @model.Version</dd>
                     <dt>@T("SourceToolVersion")</dt><dd>@SourceVersion(baseline.Source?.Tool) → @SourceVersion(selected)</dd>
                     <dt>@T("FixedInputBindings")</dt><dd>@T("ReviewFixedBindings")</dd>
                     <dt>@T("InputContract")</dt><dd>@T(ToolDefinitionService.SameSchema(baseline.Definition.InputSchema, PreviewSchema) ? "ContractUnchanged" : "ContractChanged")</dd>
@@ -122,34 +145,57 @@ else
                 </details></section>
             }
         }
-        @if (CreationIdentity is not null)
-        {
-            @if (CreationActive)
-            {
-            <div class="tool-create-actions"><span><strong>@T("CreationReady")</strong><small>@T("CreationDraftHelp")</small></span><div><button type="button" class="button-secondary" data-testid="tool-definition-back" disabled="@busy" @onclick="() => OnBack.InvokeAsync()">@T("CreationBack")</button><button type="button" class="button-primary" data-testid="tool-definition-create-draft" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="CreateDraftAsync">@T(busy ? "CreationCreating" : "CreationCreateDraft")</button></div></div>
-            }
-        }
-        else
-        {
-        <div class="page-actions">
-            <button class="button-secondary" data-testid="relay-save-draft" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="SaveAsync">@T("SaveDraft")</button>
-            <button class="button-primary" data-testid="relay-publish-review" disabled="@(busy || !CanManage || selected is null || HasInvalidBindings)" @onclick="ReviewPublication">@T("PublishVersion")</button>
-        </div>
-        }
-        @if (reviewing)
-        {
-            <section class="panel" data-testid="relay-publication-review"><h2>@T("ReviewPublication")</h2><p>@T("ReviewVersionPair", relayVersion, SourceVersion(selected))</p><p>@T("ConsumerAdoptionHelp")</p>
-                <button class="button-secondary" @onclick="() => reviewing = false">@T("Cancel")</button><button class="button-primary" disabled="@(busy || HasInvalidBindings)" @onclick="PublishAsync">@T("ConfirmPublication")</button>
-            </section>
-        }
-    }
-}
-</div>
+    </div>;
+    private RenderFragment Versions => @<div data-relay-section="versions">
+        <section class="panel"><h2>@T("RelayVersions")</h2>
+            <CollectionView TItem="ToolDefinitionVersionResource" Items="versions" Compact IdentityLabel="@T("RelayVersion")" InformationLabels="@(new[] { T("SourceToolVersion"), T("PublishedAt") })">
+                <Identity Context="version"><CollectionIdentity DisplayName="@version.Definition.Version" IconName="history" /></Identity>
+                <Information Context="version">
+                    <CollectionValue Label="@T("SourceToolVersion")">@if (version.Source is { } source) { <CopyableValue Value="@($"{source.Tool.Namespace}/{source.Tool.Name}")" /> }<span>@SourceVersion(version.Source?.Tool)</span></CollectionValue>
+                    <CollectionValue Label="@T("PublishedAt")">@version.PublishedAt.ToLocalTime().ToString("g")</CollectionValue>
+                </Information>
+                <Actions Context="version"><button type="button" class="button-secondary" disabled="@(!CanMutate || busy || refreshing)" @onclick="() => NewDraft(version)">@T("NewVersion")</button></Actions>
+            </CollectionView>
+        </section>
+    </div>;
+    private RenderFragment Usages => @<div data-relay-section="usages">
+        <section class="panel"><h2>@T("RelayUsages")</h2><p>@T("ConsumerAdoptionHelp")</p>
+            <CollectionView TItem="ToolDefinitionUsage" Items="usages" Compact IdentityLabel="@T("Tool")" InformationLabels="@(new[] { T("Version"), T("RelayVersion") })">
+                <Identity Context="usage"><CollectionIdentity DisplayName="@usage.Name" Namespace="@usage.Namespace.Value" Name="@usage.Name" Href="@UsageUrl(usage)" IconName="@(usage.Kind == "Agent" ? "robot" : usage.Kind == "Flow" ? "sitemap" : "tools")">
+                    <IconBadges><ResourceScopeBadge ScopeRef="usage.ScopeRef" Compact /></IconBadges>
+                    <Badges><small>@T($"UsageKind.{usage.Kind}")</small></Badges>
+                </CollectionIdentity></Identity>
+                <Information Context="usage">
+                    <CollectionValue Label="@T("Version")"><CollectionVersion Label="@T("Version")" Value="@usage.Version" Compact /></CollectionValue>
+                    <CollectionValue Label="@T("RelayVersion")"><CollectionVersion Label="@T("RelayVersion")" Value="@usage.RelayVersion" Compact /></CollectionValue>
+                </Information>
+            </CollectionView>
+        </section>
+    </div>;
 
-@code {
+    [CascadingParameter] private EditContext? EnclosingEditContext { get; set; }
+    [Parameter] public object? DialogSectionId { get; set; }
     [Parameter] public string? Name { get; set; }
+    [Parameter] public string? ScopeRefValue { get; set; }
+    [Parameter] public ResourceSnapshot<ToolDefinitionResource>? InitialSnapshot { get; set; }
     [Parameter] public string? NamespaceQuery { get; set; }
     [Parameter] public string? Source { get; set; }
+    [Parameter] public ResourceScopeRef? SourceScopeRef { get; set; }
+    [Parameter] public bool ShowCreationActions { get; set; } = true;
+    [Parameter] public EventCallback<bool> CreationCompletenessChanged { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    private bool? reportedComplete, reportedDraft;
+    private string? creationBaseline;
+    public bool CreationComplete => !loading && !busy && CanMutate && selected is not null && !HasInvalidBindings && model.Timeout is >= 1 and <= 900;
+    private string CreationFingerprint => JsonSerializer.Serialize(new { selected = SelectedKey, model.Enabled, model.RequiresApproval, model.Timeout, rows = rows.Select(r => new { r.Path, r.Kind, r.Resource, r.Literal }) });
+    public RenderFragment CreationReview => @<dl class="resource-details">
+        <dt>@T("CreationSourceTool")</dt><dd>@if (selected is not null) { <ResourceScopeBadge ScopeRef="selected.ScopeRef" /><code>@selected.Namespace/@selected.Name</code> }</dd>
+        <dt>@T("SourceToolVersion")</dt><dd>@SourceVersion(selected)</dd>
+        <dt>@T("Enabled")</dt><dd>@T(model.Enabled ? "Yes" : "No")</dd>
+        <dt>@T("RequiresApproval")</dt><dd>@T(model.RequiresApproval ? "Yes" : "No")</dd>
+        <dt>@T("TimeoutSeconds")</dt><dd>@model.Timeout</dd>
+        <dt>@T("FixedInputBindings")</dt><dd><pre>@DraftBindings</pre></dd>
+    </dl>;
     [Parameter] public ToolDefinitionCreationIdentity? CreationIdentity { get; set; }
     [Parameter] public bool CreationActive { get; set; } = true;
     [Parameter] public EventCallback OnBack { get; set; }
@@ -162,79 +208,88 @@ else
     private IReadOnlyList<ToolDefinitionVersionResource> versions = [];
     private IReadOnlyList<ToolDefinitionUsage> usages = [];
     private readonly List<BindingRow> rows = [];
-    private readonly EditContext bindingEditContext = new(new object());
+    private EditContext bindingEditContext = new(new object());
+    private EditContext savedEditContext = null!;
+    private int editorKey;
+    private string section => sectionState.CurrentPath;
+    private string savedFingerprint = "";
+    private bool invalidInput;
+    private RelayToolDefinitionProperties? draftBase;
     private bool editorValidationInvalid;
     private ToolResource? selected;
     private ToolDefinitionVersionResource? baseline;
-    private string name = "", resourceNamespace = "default", displayName = "", description = "", relayVersion = "1.0.0", view = "configuration", preview = "";
+    private readonly ToolRelayEditorModel model = new();
+    private string preview = "";
     private string? error, validationError, pendingSourceGroup;
-    private bool loading = true, busy, enabled = true, requiresApproval, reviewing, sourceUpdateRequested, interactive;
+    private bool loading = true, busy, reviewing, sourceUpdateRequested, interactive;
     private static readonly JsonSerializerOptions IndentedJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private bool HasInvalidBindings => validationError is not null || editorValidationInvalid;
     private IEnumerable<BindingRow> VisibleRows => rows.Where(row => !rows.Any(parent => parent.Kind == "omitted"
         && row.Path.StartsWith(parent.Path + "/", StringComparison.Ordinal)));
     private JsonElement? PreviewSchema => HasInvalidBindings || string.IsNullOrWhiteSpace(preview) ? null : JsonSerializer.Deserialize<JsonElement>(preview);
     private string DraftBindings { get { try { return HasInvalidBindings ? T("RelayBindingInvalid") : JsonSerializer.Serialize(BuildBindings(), IndentedJson); } catch (InvalidOperationException) { return T("RelayBindingInvalid"); } } }
-    private int timeout = 90;
-    private ResourceScopeRef? OwnerScope => CreationIdentity?.ScopeRef ?? snapshot?.Value.ScopeRef ?? (string.IsNullOrWhiteSpace(NavigationContext.ScopeRef) ? null : ResourceScopeRef.Parse(NavigationContext.ScopeRef));
+
+    private ResourceScopeRef? OwnerScope => CreationIdentity?.ScopeRef ?? snapshot?.Value.ScopeRef;
     private bool CanManage => OwnerScope is { } scope && (CreationIdentity is not null || ResourceOwnershipContext.CanManage(scope, NavigationContext));
+    private bool CanMutate => !disposed && CanManage && HasPermission("resources/write") && snapshot?.Value.Governance.IsManaged != true && (contextKey is null || contextKey == NavigationContext.ScopeRef);
+    private string Fingerprint => JsonSerializer.Serialize(new { model.Name, model.Namespace, model.DisplayName, model.Description, model.Version, model.InputEnvelope, state = CreationIdentity is null ? PersistentConfigFingerprint : CreationFingerprint });
+    private bool IsDirty => CreationIdentity is null && !loading && snapshot is not null && savedFingerprint.Length > 0 && (savedFingerprint != Fingerprint || HasInvalidBindings || invalidInput);
+
+    private void RestoreSavedFields()
+    {
+        if (snapshot?.Value.Definition is not RelayToolDefinitionProperties relay) return;
+        model.Tags = string.Join(Environment.NewLine, snapshot.Value.Metadata.Tags.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"));
+        draftBase = relay; model.Name = snapshot.Value.Name; model.Namespace = snapshot.Value.Namespace.Value; model.DisplayName = relay.DisplayName; model.Description = relay.Description ?? ""; model.Version = relay.Version;
+        model.Enabled = relay.Enabled; model.RequiresApproval = relay.RequiresApproval; model.Timeout = relay.InvocationTimeoutSeconds; model.InputEnvelope = relay.InputEnvelope;
+        selected = tools.FirstOrDefault(t => t.Uid == relay.Target.Uid && t.Generation == relay.Target.Generation) ?? versions.Select(v => v.Source?.Tool).FirstOrDefault(t => t?.Uid == relay.Target.Uid && t.Generation == relay.Target.Generation);
+        model.SourceKey = SelectedKey; BuildRows(relay.Bindings); savedFingerprint = Fingerprint; invalidInput = false;
+    }
+    private void Discard()
+    {
+        if (busy || snapshot is null || disposed) return;
+        snapshot = newerSnapshot ?? snapshot; newerSnapshot = null;
+        bindingEditContext.OnValidationStateChanged -= BindingValidationChanged;
+        bindingEditContext = new(new object()); bindingEditContext.OnValidationStateChanged += BindingValidationChanged;
+        savedEditContext = new(model); relayMessages = new(savedEditContext); editorValidationInvalid = false; editorKey++; error = validationError = null;
+        reviewing = sourceUpdateRequested = false; RestoreSavedFields();
+    }
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => snapshot?.Value.Definition is not RelayToolDefinitionProperties relay ? [] : [new(T("RelayVersion"), relay.Version), new(T("Enabled"), T(relay.Enabled ? "Yes" : "No")), new(T("RequiresApproval"), T(relay.RequiresApproval ? "Yes" : "No")), new(T("TimeoutSeconds"), relay.InvocationTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)), new(T("CreationSourceTool"), $"{relay.Target.ScopeRef} · {relay.Target.Namespace}/{relay.Target.Name}"), new(T("SourceToolVersion"), SavedSourceVersion(relay)), new(T("InputEnvelope"), relay.InputEnvelope ?? "—"), new(T("FixedInputBindings"), JsonSerializer.Serialize(new { relay.Bindings, relay.FixedArguments }, IndentedJson)), new(T("InputContract"), Pretty(relay.InputSchema)), new(T("OutputContract"), Pretty(relay.OutputSchema)), new(T("SchemaReferences"), JsonSerializer.Serialize(new { relay.InputSchemaBinding, relay.OutputSchemaBinding }, IndentedJson))];
+    private string SavedSourceVersion(RelayToolDefinitionProperties relay)
+    {
+        var source = tools.FirstOrDefault(t => t.Uid == relay.Target.Uid && t.Generation == relay.Target.Generation) ?? versions.Select(v => v.Source?.Tool).FirstOrDefault(t => t?.Uid == relay.Target.Uid && t.Generation == relay.Target.Generation);
+        return source is null ? T("CatalogRevision", relay.Target.Generation) : SourceVersion(source);
+    }
     private string SelectedKey => selected is null ? "" : ToolKey(selected);
     private string SourceGroup => selected is null ? pendingSourceGroup ?? "" : SourceGroupKey(selected);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        interactive = true;
-        StateHasChanged();
+        if (firstRender) { interactive = true; StateHasChanged(); }
+        if (CreationIdentity is null) return;
+        var complete = CreationComplete;
+        var dirty = !loading && creationBaseline is not null && (CreationFingerprint != creationBaseline || HasInvalidBindings);
+        if (reportedComplete != complete) { reportedComplete = complete; await CreationCompletenessChanged.InvokeAsync(complete); }
+        if (reportedDraft != dirty) { reportedDraft = dirty; await DraftChanged.InvokeAsync(dirty); }
     }
 
     protected override async Task OnInitializedAsync()
     {
+        contextState = Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
         bindingEditContext.OnValidationStateChanged += BindingValidationChanged;
-        try
-        {
-            tools = (CreationIdentity?.ScopeRef is { } creationScope
-                ? await Tools.GetToolsAsync(creationScope, cancellationToken: cancellation.Token)
-                : await Tools.GetToolsAsync(cancellationToken: cancellation.Token)).Where(tool => tool.Definition.Enabled && tool.Definition.Discovery?.Available == true).ToArray();
-            if (!string.IsNullOrWhiteSpace(Name))
-            {
-                snapshot = await Definitions.GetAsync(Name, ResourceNamespace.Parse(NamespaceQuery), cancellation.Token);
-                var relay = (RelayToolDefinitionProperties)snapshot.Value.Definition;
-                inputEnvelope = relay.InputEnvelope;
-                name = snapshot.Value.Name; resourceNamespace = snapshot.Value.Namespace.Value; displayName = relay.DisplayName;
-                description = relay.Description ?? ""; relayVersion = relay.Version; enabled = relay.Enabled; requiresApproval = relay.RequiresApproval; timeout = relay.InvocationTimeoutSeconds;
-                versions = await Definitions.GetVersionsAsync(name, snapshot.Value.Namespace, cancellation.Token);
-                usages = await Definitions.GetUsagesAsync(name, snapshot.Value.Namespace, cancellation.Token);
-                baseline = versions.FirstOrDefault();
-                selected = tools.FirstOrDefault(tool => tool.Uid == relay.Target.Uid && tool.Generation == relay.Target.Generation)
-                    ?? versions.Select(version => version.Source?.Tool).FirstOrDefault(tool => tool?.Uid == relay.Target.Uid && tool.Generation == relay.Target.Generation);
-                BuildRows(relay.Bindings);
-            }
-            else if (Source is not null)
-            {
-                selected = tools.FirstOrDefault(tool => ToolResourceIdentity.CatalogId(tool.Namespace, tool.Name) == Source);
-                BuildRows([]);
-            }
-            if (OwnerScope is { } owner)
-            {
-                parameters = await Parameters.GetParametersAsync(owner, cancellation.Token);
-                secrets = await Secrets.GetSecretsInContextAsync(owner, cancellation.Token);
-            }
-            if (selected?.Definition.RequiresApproval == true) requiresApproval = true;
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { loading = false; Preview(); }
+        await InitializeAsync();
     }
 
     private void SourceChanged(ChangeEventArgs args)
     {
+        if (!CanMutate || busy || refreshing) return;
         try
         {
             var bindings = BuildBindings();
             var previousGroup = SourceGroup;
             selected = tools.FirstOrDefault(tool => ToolKey(tool) == args.Value?.ToString());
-            pendingSourceGroup = selected is null ? previousGroup : SourceGroupKey(selected);
-            if (selected?.Definition.RequiresApproval == true) requiresApproval = true;
+            pendingSourceGroup = selected is null ? previousGroup : SourceGroupKey(selected); model.SourceKey = SelectedKey; relayMessages?.Clear(savedEditContext.Field(nameof(model.SourceKey)));
+            if (selected?.Definition.RequiresApproval == true) model.RequiresApproval = true;
             BuildRows(bindings); reviewing = false;
         }
         catch (Exception exception) { error = exception.Message; }
@@ -242,10 +297,11 @@ else
 
     private void SourceGroupChanged(ChangeEventArgs args)
     {
+        if (!CanMutate || busy || refreshing) return;
         pendingSourceGroup = args.Value?.ToString();
         var candidates = tools.Where(tool => SourceGroupKey(tool) == pendingSourceGroup).ToArray();
         if (candidates.Length == 1) { SourceChanged(new ChangeEventArgs { Value = ToolKey(candidates[0]) }); return; }
-        selected = null; preview = ""; reviewing = false;
+        selected = null; model.SourceKey = ""; preview = ""; reviewing = false;
     }
 
     private static string SourceGroupKey(ToolResource tool) => tool.Definition.Metadata.TryGetValue("agentstration.toolDefinitionUid", out var uid)
@@ -293,7 +349,7 @@ else
         _ => throw new InvalidOperationException(T("RelayBindingInvalid"))
     }).ToArray();
 
-    private string? inputEnvelope;
+
 
     private void Preview()
     {
@@ -301,73 +357,42 @@ else
         try
         {
             if (VisibleRows.Any(row => row.Missing && row.Kind != "caller")) throw new InvalidOperationException(T("RelayBindingInvalid"));
-            if (selected?.Definition.Schema is { } schema) preview = Pretty(ToolRelayArguments.PublicSchema(schema.Input, BuildBindings(), inputEnvelope));
+            if (selected?.Definition.Schema is { } schema) { model.Bindings = BuildBindings(); preview = Pretty(ToolRelayArguments.PublicSchema(schema.Input, model.Bindings, model.InputEnvelope)); }
         }
         catch (Exception exception) { validationError = exception.Message; preview = ""; }
+        BridgeBindingValidation();
     }
 
-    private async Task SaveAsync()
-    {
-        if (busy || !CanManage || selected is null || HasInvalidBindings || !bindingEditContext.Validate()) return;
-        if (CreationIdentity is { } identity)
-        {
-            if (!identity.IsComplete) { error = T("CreationIdentityInvalid"); return; }
-            name = identity.Name; displayName = identity.DisplayName; resourceNamespace = identity.Namespace;
-            relayVersion = identity.Version; description = identity.Description;
-        }
-        busy = true; error = null;
-        try
-        {
-            var properties = new RelayToolDefinitionProperties
-            {
-                DisplayName = displayName, Description = description, Version = relayVersion, Enabled = enabled,
-                RequiresApproval = requiresApproval, InvocationTimeoutSeconds = timeout, Bindings = BuildBindings(), InputEnvelope = inputEnvelope,
-                Target = new() { Name = selected.Name, Namespace = selected.Namespace, ScopeRef = selected.ScopeRef!.Value, Uid = selected.Uid, Generation = selected.Generation }
-            };
-            snapshot = snapshot is null
-                ? await Definitions.CreateAsync(new(name, properties, resourceNamespace, OwnerScope), cancellation.Token)
-                : await Definitions.UpdateAsync(name, ResourceNamespace.Parse(resourceNamespace), new(properties), snapshot.ETag, cancellation.Token);
-            if (CreationIdentity is not null) await OnCreated.InvokeAsync(snapshot.Value);
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
-    }
+    private Task SaveAsync() => SaveDefinitionAsync();
 
     public Task CreateDraftAsync() => CreationIdentity is null ? Task.CompletedTask : SaveAsync();
 
-    private void ReviewPublication()
+    private async Task ReviewPublication()
     {
-        if (!busy && CanManage && selected is not null && !HasInvalidBindings && bindingEditContext.Validate()) reviewing = true;
+        if (busy || refreshing || !CanMutate) return;
+        var valid = bindingEditContext.Validate();
+        if (selected is null || !valid || HasInvalidBindings || invalidInput || CreationIdentity is null && !savedEditContext.Validate())
+        {
+            if (selected is null && relayMessages is not null) { relayMessages.Add(savedEditContext.Field(nameof(model.SourceKey)), T("SelectSourceTool")); savedEditContext.NotifyValidationStateChanged(); }
+            BridgeBindingValidation(); if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return;
+        }
+        reviewing = true;
     }
 
-    private async Task PublishAsync()
-    {
-        if (busy || !CanManage || selected is null || HasInvalidBindings || !bindingEditContext.Validate()) return;
-        await SaveAsync();
-        if (error is not null || snapshot is null || HasInvalidBindings || !bindingEditContext.Validate()) return;
-        busy = true;
-        try
-        {
-            _ = await Definitions.PublishAsync(name, snapshot.Value.Namespace, relayVersion, cancellation.Token, snapshot.ETag);
-            versions = await Definitions.GetVersionsAsync(name, snapshot.Value.Namespace, cancellation.Token);
-            usages = await Definitions.GetUsagesAsync(name, snapshot.Value.Namespace, cancellation.Token);
-            baseline = versions.FirstOrDefault(); reviewing = false; view = "versions";
-        }
-        catch (Exception exception) { error = exception.Message; }
-        finally { busy = false; }
-    }
+    private Task PublishAsync() => PublishDefinitionAsync();
 
     private void NewDraft(ToolDefinitionVersionResource version)
     {
-        baseline = version;
-        inputEnvelope = (version.Definition as RelayToolDefinitionProperties)?.InputEnvelope;
+        if (busy || refreshing || !CanMutate) return;
+        baseline = version; draftBase = (RelayToolDefinitionProperties)version.Definition;
+        model.InputEnvelope = (version.Definition as RelayToolDefinitionProperties)?.InputEnvelope;
         sourceUpdateRequested = false;
-        displayName = version.Definition.DisplayName; description = version.Definition.Description ?? "";
-        requiresApproval = version.Definition.RequiresApproval; timeout = version.Definition.InvocationTimeoutSeconds;
-        selected = version.Source?.Tool;
+        model.DisplayName = version.Definition.DisplayName; model.Description = version.Definition.Description ?? "";
+        model.RequiresApproval = version.Definition.RequiresApproval; model.Timeout = version.Definition.InvocationTimeoutSeconds;
+        selected = version.Source?.Tool; model.SourceKey = SelectedKey;
         var parts = version.Definition.Version.Split('.');
-        relayVersion = $"{parts[0]}.{parts[1]}.{int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture) + 1}";
-        BuildRows(version.Definition.Bindings); view = "configuration";
+        model.Version = $"{parts[0]}.{parts[1]}.{int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture) + 1}";
+        BuildRows(version.Definition.Bindings); NavigateSection("definition/configuration");
     }
 
     private void UpdateSource()
@@ -376,14 +401,14 @@ else
         NewDraft(baseline);
         sourceUpdateRequested = true;
         // Selecting another exact revision is deliberate; no latest-source selection is saved automatically.
-        view = "configuration";
+        if (section != "definition/configuration") NavigateSection("definition/configuration");
     }
 
     private void BindingValidationChanged(object? sender, ValidationStateChangedEventArgs args)
     {
         var invalid = bindingEditContext.GetValidationMessages().Any();
         if (invalid == editorValidationInvalid) return;
-        editorValidationInvalid = invalid;
+        editorValidationInvalid = invalid; BridgeBindingValidation();
         if (invalid) reviewing = false;
         _ = InvokeAsync(StateHasChanged);
     }
@@ -411,7 +436,7 @@ else
     private static ValueBindingSelection BindingSelection(BindingRow row) => new(Enum.Parse<ValueBindingSourceKind>(row.Kind, ignoreCase: true), row.Resource, row.Literal);
     private void BindingChanged(BindingRow row, ValueBindingSelection value)
     {
-        if (!CanManage || !BindingSources(row).Contains(value.Kind)) return;
+        if (!CanMutate || busy || refreshing || !BindingSources(row).Contains(value.Kind)) return;
         row.Kind = value.Kind.ToString().ToLowerInvariant();
         row.Resource = value.Kind is ValueBindingSourceKind.Parameter or ValueBindingSourceKind.Secret ? value.Resource : null;
         row.Literal = value.Kind == ValueBindingSourceKind.Literal && value.Literal is { } literal
@@ -419,7 +444,7 @@ else
         Preview();
     }
     private ContextualValueCreationContext? BindingCreationContext(BindingRow row) => OwnerScope is { } owner
-        ? new(owner, "", "", Namespace: ResourceNamespace.Parse(CreationIdentity?.Namespace ?? resourceNamespace), ValueType: ParameterType(row.Schema)) : null;
+        ? new(owner, "", "", Namespace: ResourceNamespace.Parse(CreationIdentity?.Namespace ?? model.Namespace), ValueType: ParameterType(row.Schema)) : null;
     private async Task ValueCreatedAsync(ScopedResourceAddress address)
     {
         try
@@ -443,10 +468,11 @@ else
     private static ScopedResourceAddress ResourceAddress(Resource resource) => ScopedResourceAddress.Create(resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Name);
     private string SourceVersion(ToolResource? tool) => tool is null ? T("SourceUnavailable") : tool.Definition.Version ?? T("CatalogRevision", tool.Generation);
     private static string Pretty(JsonElement? value) => value is null ? "" : JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
-    private static string UsageUrl(ToolDefinitionUsage usage) => $"/{usage.Kind switch { "Agent" => "agents", "Flow" => "flows", _ => "tools/sets" }}/{Uri.EscapeDataString(usage.Name)}?namespace={Uri.EscapeDataString(usage.Namespace.Value)}&context={Uri.EscapeDataString(usage.ScopeRef.Value)}";
-    public void Dispose() { bindingEditContext.OnValidationStateChanged -= BindingValidationChanged; cancellation.Cancel(); cancellation.Dispose(); }
+    private string UsageUrl(ToolDefinitionUsage usage) => ConsoleResourceUrls.Resource(usage.Kind switch { "Agent" => "/agents", "Flow" => "/flows", _ => "/tools/sets" }, usage.Name, usage.Namespace, usage.ScopeRef, ResourceOwnershipContext.TryGetCurrent(NavigationContext));
+    public void Dispose() { disposed = true; if (subscribed && contextState is not null) contextState.Changed -= ContextChanged; operationVersion++; bindingEditContext.OnValidationStateChanged -= BindingValidationChanged; cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
     private sealed class BindingRow
     {
+        public object DialogSectionId { get; } = new();
         public required string Path { get; init; }
         public required JsonElement Schema { get; init; }
         public string Kind { get; set; } = "caller";

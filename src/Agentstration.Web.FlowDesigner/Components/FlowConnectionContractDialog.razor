@@ -25,10 +25,10 @@
                 <p>@T($"ConnectionContractInlineHelp.{Source}")</p>
             </article>
         }
-        <div class="dialog-actions">
+        <FormActions Class="dialog-actions">
             <button type="button" class="button-secondary" data-testid="connection-contract-later" @onclick="DismissConnectionContractPrompt">@T("ConfigureContractLater")</button>
             <button type="button" class="button-primary" data-testid="connection-contract-apply" @onclick="ApplyConnectionContractAsync">@T(Reference is not null ? $"ConnectionContractApplyShared.{Source}" : $"ConnectionContractApplyInline.{Source}")</button>
-        </div>
+        </FormActions>
     </section>
 </div>
 

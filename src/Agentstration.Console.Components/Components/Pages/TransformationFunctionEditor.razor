@@ -7,14 +7,36 @@
 @inject ConsoleContextState Context
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
-<PageTitle>@T("Title") · Agentstration</PageTitle>
-<PageHeader Title="@T("Title")" Description="@T("EditorHelp")" TestId="transformation-function-editor" />
-@if (original?.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <p role="note">@T("BuiltInHelp")</p> }
-@if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
-@if (loading) { <LoadingState Message="@T("Loading")" /> }
+<PageTitle>@(IsNew ? T("Create") : original?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+@{ var presentations = Presentations; }
+@if (IsNew)
+{
+    <UnsavedNavigationGuard IsDirty="HasDraft" HasUnsavedChanges="@(() => HasDraft)" />
+    <PageHeader CollectionHref="/transformation-functions" CollectionLabel="@T("Title")" Title="@T("Create")" Description="@T("EditorHelp")" TestId="transformation-function-editor"></PageHeader>
+    <ResourceLoadFeedback State="loadState" OnRetry="RetryAsync" />
+    @if (loadState.HasContent)
+    {
+        @Feedback
+        <ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="transformation-function-form" FormName="transformation-function" Busy="busy" Disabled="@(!interactive)" ReadOnly="@(!CanEdit)" InvalidInputChanged="value => invalidInput = value">
+            <p class="required-fields-note"><span aria-hidden="true">*</span> @Shared["RequiredFields"]</p>
+            <CreationWizard Steps="Steps" OnFinish="FinishAsync" Busy="busy" Disabled="@(!CanEdit)" FinishLabel="@T("Save")" FinishTestId="function-save" />
+        </ResourceDefinitionForm>
+    }
+}
 else
 {
+    <ConsoleResourceDetailsTemplate CollectionHref="@BackUrl" CollectionLabel="@T("Title")" Resource="original" Name="@(original?.Definition.DisplayName ?? Name)" ResourceType="@T("Function")" Domain="function" IconName="cube"
+        Description="@original?.Definition.Description" Enabled="@(original is null ? null : model.Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(!CanEdit || busy || refreshing || !interactive)"
+        LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations"
+        DefinitionReadOnlyReason="@(Context.HasPermission("resources/write") ? null : ResourceReadOnlyReason.InsufficientPermissions)" HasDraft="HasDraft"
+        Yaml="@SavedYaml" Busy="busy" TestId="transformation-function-editor" SectionTestIdPrefix="transformation-function">
+
+        <Feedback>@Feedback</Feedback>
+        <OverviewMetrics>@if (original is not null) { <MetricCard Label="@T("Versions")" Value="@original.Definition.Versions.Count.ToString()" Detail="@T("ImmutableHelp")" /> }</OverviewMetrics>
+        <OverviewConfiguration>@Configuration</OverviewConfiguration>
+        <OverviewContent>@Contracts
     @if (original?.Definition.Versions.Any(v => v.TransformationSnapshot is not null) == true)
     {
         <section class="panel form-section function-transformation-evidence" data-testid="function-transformation-evidence">
@@ -25,104 +47,165 @@ else
             }
         </section>
     }
-    <form class="panel form-section" @onsubmit="SaveAsync" @onsubmit:preventDefault @formname="transformation-function">
-        <fieldset disabled="@(!CanEdit || busy || !interactive)">
-            <label>@T("Name")<input @bind="technicalName" disabled="@(original is not null)" required data-testid="function-name" /></label>
-            <label>@T("DisplayName")<input @bind="displayName" required /></label>
-            @if (original?.Governance.Origin.Kind != ResourceOriginKind.BuiltIn)
-            { <label>@T("FunctionDescription")<textarea @bind="description" maxlength="4000" data-testid="function-description-input"></textarea></label> }
-            <label>@T("Enabled")<input type="checkbox" @bind="enabled" /></label>
-            <label>@T("Version")<input @bind="version" required /></label>
-            <label>@T("Kind")<select @bind="kindKey" data-testid="function-kind">
-                <option value="">@T("SelectKind")</option>
-                @foreach (var kind in kinds) { @foreach (var descriptor in kind.Definition.Versions) { <option value="@KindKey(kind, descriptor.Version)">@kind.Definition.DisplayName · @descriptor.Version</option> } }
-            </select></label>
-            <label>@T("Implementation")<select @bind="implementationKey" data-testid="function-implementation">
-                <option value="">@T("SelectImplementation")</option>
-                @foreach (var implementation in implementations) { <option value="@ImplementationKey(implementation)">@implementation.Id · @implementation.Version</option> }
-            </select></label>
-            @if (Selected is { } selected)
-            {
-                <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" />
-                <h2>@T("InputSchema")</h2><SchemaDocumentEditor Value="selected.InputSchema" ReadOnly="true" />
-                <h2>@T("OutputSchema")</h2><SchemaDocumentEditor Value="selected.OutputSchema" ReadOnly="true" />
-            }
-            <p>@T("ImmutableHelp")</p>
-            <div class="form-actions"><button type="submit" class="button-primary" disabled="@(Selected is null || string.IsNullOrEmpty(kindKey))" data-testid="function-save">@T("Save")</button><a href="@ScopedUri("/transformation-functions")">@T("Back")</a></div>
-        </fieldset>
-    </form>
+        </OverviewContent>
+        <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="transformation-function-form" FormName="transformation-function" data-resource-etag="@etag"
+            Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" Disabled="@(!interactive)" ReadOnly="@(!CanEdit)" /></DefinitionContent>
+        <DraftActions><button type="button" class="button-secondary" @onclick="Discard" disabled="@(busy || refreshing)">@Shared["Discard"]</button><button type="submit" form="transformation-function-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="function-save">@T("Save")</button></DraftActions>
+    </ConsoleResourceDetailsTemplate>
 }
 
 @code {
+    private RenderFragment Feedback => @<div>
+        @if (original?.Governance.Origin.Kind == ResourceOriginKind.BuiltIn) { <p role="note">@T("BuiltInHelp")</p> }
+        @if (error is not null) { <div role="alert" class="form-alert form-alert-danger"><p>@T("Error")</p><details><summary>@T("Details")</summary><pre>@error.Message</pre></details></div> }
+        @if (newer is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }
+    </div>;
+    private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@FunctionResourceKinds.TransformationFunction"
+        @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
+        ScopeRef="model.ScopeRef" ScopeRefChanged="ScopeChanged" ScopeTargets="ScopeTargets" ScopeValidation="ScopeValidation"
+        @bind-Description="model.Description" DescriptionMaxLength="4000" @bind-Labels="model.Tags" IsNew="IsNew" ReadOnly="@(!CanEdit)"
+        TechnicalNameTestId="function-name" DisplayNameTestId="function-display-name" DescriptionTestId="function-description-input" TestId="function-identity-editor" />;
+    private RenderFragment ScopeValidation => @<ValidationMessage For="() => model.ScopeRef" />;
+    private RenderFragment Options => @<FormSection Title="@Shared["Configuration"]"><FormGrid>
+        @if (IsNew) { <FormField Label="@T("Enabled")"><FormCheckbox role="switch" @bind-Value="model.Enabled" /></FormField> }
+        <FormField Label="@T("Version")" Required><ChildContent><ClearableText @bind-Value="model.Version" data-testid="function-version" /></ChildContent><Validation><ValidationMessage For="() => model.Version" /></Validation></FormField>
+        <FormField Label="@T("Kind")" Required><ChildContent><ClearableSelect @bind-Value="model.KindKey" data-testid="function-kind"><option value="">@T("SelectKind")</option>
+            @if (!string.IsNullOrWhiteSpace(model.KindKey) && !kinds.Any(k => k.Definition.Versions.Any(v => TransformationFunctionEditorModel.KindIdentity(k, v.Version) == model.KindKey))) { <option value="@model.KindKey">@model.KindKey</option> }
+            @foreach (var kind in kinds) { @foreach (var descriptor in kind.Definition.Versions) { <option value="@TransformationFunctionEditorModel.KindIdentity(kind, descriptor.Version)">@kind.Definition.DisplayName · @descriptor.Version · @kind.Namespace/@kind.Name · @kind.ScopeRef</option> } }
+        </ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.KindKey" /></Validation></FormField>
+        <FormField Label="@T("Implementation")" Required><ChildContent><ClearableSelect @bind-Value="model.ImplementationKey" data-testid="function-implementation"><option value="">@T("SelectImplementation")</option>@foreach (var implementation in implementations) { <option value="@TransformationFunctionEditorModel.ImplementationIdentity(implementation)">@implementation.Id · @implementation.Version</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.ImplementationKey" /></Validation></FormField>
+    </FormGrid><p>@T("ImmutableHelp")</p>@DraftContracts</FormSection>;
+    private RenderFragment DraftContracts => @<div>@if (Selected is { } selected) { <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" /><FormSection Title="@T("InputSchema")"><SchemaDocumentEditor Value="selected.InputSchema" ReadOnly="true" /></FormSection><FormSection Title="@T("OutputSchema")"><SchemaDocumentEditor Value="selected.OutputSchema" ReadOnly="true" /></FormSection> }</div>;
+    private RenderFragment Contracts => @<div>@if (SavedImplementation is { } selected) { <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" /><FormSection Title="@T("InputSchema")"><pre class="runner-json">@JsonSerializer.Serialize(selected.InputSchema, new JsonSerializerOptions { WriteIndented = true })</pre></FormSection><FormSection Title="@T("OutputSchema")"><pre class="runner-json">@JsonSerializer.Serialize(selected.OutputSchema, new JsonSerializerOptions { WriteIndented = true })</pre></FormSection> }</div>;
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
+    private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details"><dt>@Shared["Identity"]</dt><dd>@model.DisplayName <code>@model.Namespace/@model.Name</code></dd><dt>@T("Version")</dt><dd>@model.Version</dd><dt>@T("Kind")</dt><dd>@model.KindKey</dd><dt>@T("Implementation")</dt><dd>@model.ImplementationKey</dd></dl></FormSection>;
+    private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => Identity, "definition/configuration" => Options, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
     [Parameter] public string Name { get; set; } = "new";
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRef { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
     private readonly CancellationTokenSource cancellation = new();
+    private readonly ResourceSectionState sectionState = new();
     private IReadOnlyList<FunctionKindResource> kinds = [];
     private IReadOnlyList<NativeFunctionDescriptor> implementations = [];
     private TransformationFunctionResource? original;
-    private string? etag;
-    private string technicalName = string.Empty, displayName = string.Empty, description = string.Empty, version = "1.0.0", kindKey = string.Empty, implementationKey = string.Empty;
-    private bool enabled = true, loading = true, busy, interactive;
+    private ResourceSnapshot<TransformationFunctionResource>? newer;
+    private TransformationFunctionEditorModel model = new();
+    private string? etag, loadedKey, returnAfterSave;
+    private string baseline = string.Empty;
+    private bool loading, refreshing, busy, interactive, invalidInput;
+    private long loadVersion;
     private Exception? error;
-    private ResourceScopeRef? Owner => ScopeRef is null ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
-    private bool CanEdit => Context.HasPermission("resources/write") && (original is null || !original.Governance.IsManaged
-        && !original.Definition.Versions.Any(v => v.TransformationSchema is not null) && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
-    private NativeFunctionDescriptor? Selected
-    {
-        get
-        {
-            var descriptor = implementations.FirstOrDefault(item => ImplementationKey(item) == implementationKey);
-            return descriptor is not null && original?.Definition.Versions.Last().TransformationSnapshot is { } mapping
-                ? descriptor with { InputSchema = FunctionInvocationSchemas.XmlContent, OutputSchema = mapping.Output.Content } : descriptor;
-        }
-    }
+    private EditContext? editContext;
+    private ResourceDefinitionForm? definitionForm;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private EditContext FormContext => editContext is not null && ReferenceEquals(editContext.Model, model) ? editContext : editContext = new(model);
+    private bool IsNew => Name == "new";
+    private string Fingerprint => JsonSerializer.Serialize(model);
+    private bool HasDraft => !loading && baseline.Length > 0 && (Fingerprint != baseline || invalidInput);
+    private ResourceScopeRef? RequestedOwner => string.IsNullOrWhiteSpace(ScopeRef) ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
+    private bool CanEdit => Context.HasPermission("resources/write") && (IsNew || original is not null && !original.Governance.IsManaged && !original.Definition.Versions.Any(v => v.TransformationSchema is not null) && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
+    private string NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? Context.Current?.SelectedScopeRef ?? string.Empty;
+    private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/transformation-functions", Services);
+    private string SavedYaml => original is null ? string.Empty : ResourceManifestSerializer.ToYaml(original);
+    private NativeFunctionDescriptor? Selected => WithContentContracts(implementations.FirstOrDefault(item => TransformationFunctionEditorModel.ImplementationIdentity(item) == model.ImplementationKey));
+    private NativeFunctionDescriptor? SavedImplementation => original is null ? null : WithContentContracts(implementations.FirstOrDefault(item => TransformationFunctionEditorModel.ImplementationIdentity(item) == TransformationFunctionEditorModel.From(original).ImplementationKey));
+    private NativeFunctionDescriptor? WithContentContracts(NativeFunctionDescriptor? descriptor) => descriptor is not null && original?.Definition.Versions.LastOrDefault()?.TransformationSnapshot is { } mapping
+        ? descriptor with { InputSchema = FunctionInvocationSchemas.XmlContent, OutputSchema = mapping.Output.Content } : descriptor;
+    private IReadOnlyList<ResourceScopeTargetResponse>? ScopeTargets => model.ScopeRef is { } owner ? [new(owner, owner.Kind, owner.Value, CanEdit)] : null;
     private string T(string key) => Localizer[key];
-    private string ScopedUri(string uri) => (Services.GetService(typeof(IConsoleNavigationContext)) as IConsoleNavigationContext)?.AddToUri(uri) ?? uri;
-    private static string KindKey(FunctionKindResource kind, string value) => $"{kind.ScopeRef}|{kind.Namespace}|{kind.Name}|{value}";
-    private static string ImplementationKey(NativeFunctionDescriptor value) => value.Id + "@" + value.Version;
-    protected override async Task OnParametersSetAsync()
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => original is null ? [] : [
+        new(T("Enabled"), T(original.Definition.Enabled ? "Enabled" : "Disabled")),
+        new(T("Versions"), string.Join("\n", original.Definition.Versions.Select(v => $"{v.Version} · {v.FunctionKind.ScopeRef ?? original.ScopeRef} · {v.FunctionKind.Namespace ?? original.Namespace}/{v.FunctionKind.Name}@{v.FunctionKind.Version} · {v.Configuration.GetRawText()}")))];
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
     {
-        loading = true; error = null; original = null; etag = null;
-        technicalName = string.Empty; displayName = string.Empty; description = string.Empty; version = "1.0.0"; kindKey = string.Empty; implementationKey = string.Empty; enabled = true;
+        ["definition/identity"] = new() { ReadOnly = !CanEdit, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.ScopeRef), nameof(model.Description), nameof(model.Tags)] },
+        ["definition/configuration"] = new() { ReadOnly = !CanEdit, HasRequiredFields = true, Fields = [nameof(model.Enabled), nameof(model.Version), nameof(model.KindKey), nameof(model.ImplementationKey)] },
+        ["yaml"] = new() { ReadOnly = true, ReadOnlyMessage = T("ResourceYamlExport") }
+    };
+    private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [nameof(model.Name)] = T("Name"), [nameof(model.DisplayName)] = T("DisplayName"), [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.ScopeRef)] = Shared["Scope"],
+        [nameof(model.Description)] = T("FunctionDescription"), [nameof(model.Tags)] = Shared["Labels"], [nameof(model.Version)] = T("Version"), [nameof(model.KindKey)] = T("Kind"), [nameof(model.ImplementationKey)] = T("Implementation")
+    };
+    private IReadOnlyList<CreationWizardStep> Steps => [new("identity", Shared["Identity"], Identity) { IsComplete = model.IdentityComplete }, new("configuration", Shared["Configuration"], Options) { IsComplete = model.ConfigurationComplete }, new("review", Shared["Verification"], Review) { IsComplete = model.IdentityComplete && model.ConfigurationComplete }];
+    private void ScopeChanged(ResourceScopeRef? value) { var initializing = model.ScopeRef is null && Fingerprint == baseline; model.ScopeRef = value; if (initializing) baseline = Fingerprint; }
+    private void EnabledChanged(bool value) { if (!CanEdit || busy || refreshing) return; model.Enabled = value; sectionState.Visit("definition/identity"); }
+    private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
+    private async Task FinishAsync(CreationWizardFinish finish)
+    {
+        if (!FormContext.Validate() || !model.IdentityComplete || !model.ConfigurationComplete) { finish.ReturnToStepId = !model.IdentityComplete || FormContext.GetValidationMessages(FormContext.Field(nameof(model.Tags))).Any() ? "identity" : "configuration"; definitionForm?.RequestValidationFocus(); return; }
+        await SaveAsync();
+    }
+    protected override Task OnParametersSetAsync()
+    {
+        var key = $"{Name}|{Namespace}|{ScopeRef}|{NavigationScope}";
+        if (loadedKey == key) return Task.CompletedTask;
+        loadedKey = key; return LoadAsync();
+    }
+    private void Clear() { original = null; newer = null; etag = null; model = new(); editContext = null; baseline = string.Empty; error = null; invalidInput = false; kinds = []; implementations = []; }
+    private void Apply(ResourceSnapshot<TransformationFunctionResource> saved) { original = saved.Value; etag = saved.ETag; model = TransformationFunctionEditorModel.From(saved.Value); editContext = null; newer = null; invalidInput = false; baseline = Fingerprint; }
+    private async Task LoadAsync()
+    {
+        var request = ++loadVersion; loading = true; busy = refreshing = false; Clear(); loadState = new(ResourceLoadStatus.Loading);
         try
         {
-            kinds = await Client.ListKindsAsync(Owner, cancellation.Token);
-            implementations = await Client.ImplementationsAsync(cancellation.Token);
-            if (Name != "new")
+            await Context.EnsureLoadedAsync(cancellation.Token); if (request != loadVersion) return;
+            loadedKey = $"{Name}|{Namespace}|{ScopeRef}|{NavigationScope}";
+            var owner = RequestedOwner ?? throw new InvalidOperationException(T("ScopeRequired"));
+            var availableKinds = await Client.ListKindsAsync(owner, cancellation.Token); if (request != loadVersion) return;
+            var availableImplementations = await Client.ImplementationsAsync(cancellation.Token); if (request != loadVersion) return;
+            if (!IsNew)
             {
-                var snapshot = await Client.GetAsync(new(Name, "", Owner, Namespace is null ? null : ResourceNamespace.Parse(Namespace)), cancellation.Token);
-                original = snapshot.Value; etag = snapshot.ETag;
-                technicalName = original.Name; displayName = original.Definition.DisplayName; enabled = original.Definition.Enabled;
-                description = original.Definition.Description ?? string.Empty;
-                var latest = original.Definition.Versions.Last(); version = latest.Version;
-                kindKey = $"{latest.FunctionKind.ScopeRef ?? original.ScopeRef}|{latest.FunctionKind.Namespace ?? original.Namespace}|{latest.FunctionKind.Name}|{latest.FunctionKind.Version}";
-                var implementation = latest.Configuration.GetProperty("implementation");
-                implementationKey = implementation.GetProperty("id").GetString() + "@" + implementation.GetProperty("version").GetString();
+                var saved = await Client.GetAsync(new(Name, "", owner, ResourceNamespace.Parse(Namespace)), cancellation.Token); if (request != loadVersion) return;
+                if (saved.Value.Name != Name || saved.Value.Namespace != ResourceNamespace.Parse(Namespace) || saved.Value.ScopeRef != owner) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
+                Apply(saved);
             }
+            else { model.ScopeRef = owner; model.Namespace = ResourceNamespace.Parse(Namespace).Value; baseline = Fingerprint; }
+            kinds = availableKinds; implementations = availableImplementations; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
-        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception failure) { if (request == loadVersion) { Clear(); loadState = Failure(failure); } }
+        finally { if (request == loadVersion) loading = false; }
     }
-    protected override void OnAfterRender(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } }
+    private Task RetryAsync() => busy || loading || refreshing ? Task.CompletedTask : original is null ? LoadAsync() : RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        if (busy || loading || refreshing || original is not { ScopeRef: { } owner } current) return;
+        var request = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
+        try
+        {
+            var saved = await Client.GetAsync(new(current.Name, "", owner, current.Namespace), cancellation.Token); if (request != loadVersion) return;
+            if (saved.Value.Uid != current.Uid || saved.Value.Address != current.Address || saved.Value.ScopeRef != owner) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            if (HasDraft) newer = saved.ETag != etag || saved.Value.Generation != current.Generation ? saved : null;
+            else Apply(saved);
+            loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception failure) { if (request == loadVersion) { var state = Failure(failure); if (state.Status is ResourceLoadStatus.Forbidden or ResourceLoadStatus.NotFound) Clear(); loadState = state with { HasContent = original is not null }; } }
+        finally { if (request == loadVersion) refreshing = false; }
+    }
+    private static ResourceLoadState Failure(Exception exception) => new(exception is AgentstrationApiException api ? api.StatusCode switch { System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
+    private void Discard() { if (busy || refreshing || original is null) return; Apply(newer ?? new(original, etag ?? string.Empty)); error = null; }
     private async Task SaveAsync()
     {
-        if (!CanEdit || busy || !interactive || Owner is not { } owner || Selected is not { } selected) return;
-        busy = true; error = null;
+        if (!CanEdit || busy || loading || refreshing || !interactive) return;
+        if (!FormContext.Validate() || !model.IdentityComplete || !model.ConfigurationComplete) { if (definitionForm is not null) await definitionForm.RevealValidationAsync(); return; }
+        var kind = kinds.SelectMany(k => k.Definition.Versions.Select(v => (Resource: k, Version: v))).SingleOrDefault(k => TransformationFunctionEditorModel.KindIdentity(k.Resource, k.Version.Version) == model.KindKey);
+        if (kind.Resource is null || Selected is not { } selected) { error = new InvalidOperationException(T("SelectionUnavailable")); return; }
+        var request = loadVersion; busy = true; error = null;
         try
         {
-            var kind = kinds.SelectMany(resource => resource.Definition.Versions.Select(descriptor => (Resource: resource, Version: descriptor)))
-                .Single(item => KindKey(item.Resource, item.Version.Version) == kindKey);
-            var next = new TransformationFunctionVersion(version, new(kind.Resource.Name, kind.Version.Version, kind.Resource.ScopeRef, kind.Resource.Namespace, kind.Resource.Uid, FunctionDigests.Compute(kind.Version)),
-                JsonSerializer.SerializeToElement(new { implementation = new { id = selected.Id, version = selected.Version } }));
-            var versions = original?.Definition.Versions.Where(item => item.Version != version).Append(next).ToArray() ?? [next];
-            var resource = original ?? new TransformationFunctionResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = FunctionResourceKinds.TransformationFunction,
-                ScopeRef = owner, Metadata = new() { Name = technicalName, Namespace = Namespace is null ? ResourceNamespace.Default : ResourceNamespace.Parse(Namespace) }, Definition = new(displayName, versions) };
-            await Client.SaveAsync(resource with { Definition = new(displayName, versions, enabled) { Description = string.IsNullOrWhiteSpace(description) ? null : description } }, etag, cancellation.Token);
-            Navigation.NavigateTo(ScopedUri("/transformation-functions"));
+            var next = model.ToResource(original, kind.Resource, kind.Version, selected);
+            await Client.SaveAsync(next, etag, cancellation.Token); if (request != loadVersion) return;
+            var saved = await Client.GetAsync(new(next.Name, "", next.ScopeRef, next.Namespace), cancellation.Token); if (request != loadVersion) return;
+            if (saved.Value.Address != next.Address || saved.Value.ScopeRef != next.ScopeRef || !IsNew && saved.Value.Uid != original!.Uid) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
+            Apply(saved); returnAfterSave = BackUrl;
         }
-        catch (Exception failure) when (failure is not OperationCanceledException) { error = failure; }
-        finally { busy = false; }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception failure) { if (request == loadVersion) error = failure; }
+        finally { if (request == loadVersion) busy = false; }
     }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    protected override void OnAfterRender(bool firstRender) { if (returnAfterSave is { } url) { returnAfterSave = null; Navigation.NavigateTo(url); return; } if (firstRender) { interactive = true; StateHasChanged(); } }
+    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
 }

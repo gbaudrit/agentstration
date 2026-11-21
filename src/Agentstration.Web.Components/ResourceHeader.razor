@@ -1,29 +1,93 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
 <header class="resource-header resource-domain-@Domain" data-testid="@TestId">
-    <div class="resource-header-identity">
-        <div class="resource-icon" aria-hidden="true">@if (!string.IsNullOrWhiteSpace(IconName)) { <UiIcon Name="@IconName" /> } else { @Icon }</div>
-        <div>
-            <p class="eyebrow">@ResourceType</p>
-            <div class="resource-title-row">
-                <h1>@Name</h1>
-                @if (!string.IsNullOrWhiteSpace(StatusText)) { <StatusIndicator Text="@StatusText" Status="@Status" /> }
+    <div class="resource-header-top">
+        <div class="resource-header-identity">
+            <ResourceIcon Source="@ImageSource" DarkSource="@DarkImageSource" IconName="@IconName" Fallback="@Icon" Domain="@Domain" ChildContent="@IconContent" />
+            <span class="eyebrow resource-type">@ResourceType</span>
+        </div>
+        @if (HasToolbar)
+        {
+            <div class="resource-header-toolbar">
+                <div class="page-actions">
+                    @NavigationActions
+                    @if (Enabled is { } enabled) { <ResourceActivationToggle Enabled="enabled" EnabledChanged="EnabledChanged" Disabled="EnabledDisabled" TestId="@EnabledTestId" ShowStateLabel /> }
+                    @if (Actions is not null || PrimaryActions is not null || MoreActions is not null)
+                    {
+                        <ResourceActionBar Primary="@PrimaryActions" MoreActions="@MoreActions">
+                            @Actions
+                        </ResourceActionBar>
+                    }
+                    <ResourceCollectionLink Href="@CollectionHref" Label="@CollectionLabel" />
+                </div>
             </div>
-            @if (!string.IsNullOrWhiteSpace(Description)) { <p class="resource-description">@Description</p> }
-            @if (Metadata is not null) { <div class="resource-metadata">@Metadata</div> }
+        }
+    </div>
+    <div class="resource-header-heading">
+        <div class="resource-title-row">
+            <h1>@Name</h1>
+            @if (IdentityAvailable && !string.IsNullOrWhiteSpace(TechnicalName)) { <ResourceIdentityPopover @key="QualifiedIdentity" Name="@Name" TechnicalName="@TechnicalName" Namespace="@Namespace" ScopeRef="ScopeRef" Description="@Description" ResourceUid="ResourceUid" Labels="IdentityLabels" Version="@Version" VersionDescription="@VersionDescription" AdditionalDetails="IdentityDetails" /> }
         </div>
     </div>
-    @if (Actions is not null) { <div class="page-actions">@Actions</div> }
+    <div class="resource-header-copy">
+        @if (!string.IsNullOrWhiteSpace(Description)) { <p class="resource-description" title="@Description" tabindex="0">@Description</p> }
+        <div class="resource-header-badges">
+            @if (ScopeRef is not null) { <ResourceScopeBadge ScopeRef="ScopeRef" Compact JoinedName /> }
+            @if (!string.IsNullOrWhiteSpace(Version)) { <ResourceMetadataBadge Value="@Shared["ResourceVersion", Version]" Tooltip="@VersionDescription" Class="resource-version-badge" /> }
+            @if (Metadata is not null) { <span class="resource-metadata">@Metadata</span> }
+            @if (!string.IsNullOrWhiteSpace(StatusText)) { <StatusIndicator Text="@StatusText" Status="@Status" /> }
+        </div>
+        @if (ShowTechnicalIdentity && !string.IsNullOrWhiteSpace(TechnicalName))
+        {
+            <div class="resource-technical-metadata">
+                <span class="resource-header-technical" title="@QualifiedTechnicalName">
+                    @if (!string.IsNullOrWhiteSpace(Namespace)) { <UiIcon Name="folder" /> }
+                    <CopyableValue Value="@QualifiedTechnicalName" />
+                </span>
+            </div>
+        }
+    </div>
 </header>
 
 @code {
+    [Parameter] public bool? Enabled { get; set; }
+    [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
+    [Parameter] public bool EnabledDisabled { get; set; }
+    [Parameter] public string? EnabledTestId { get; set; }
+    [Parameter] public Agentstration.Resources.ResourceScopeRef? ScopeRef { get; set; }
     [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string ResourceType { get; set; } = string.Empty;
     [Parameter] public string Domain { get; set; } = "neutral";
     [Parameter] public string Icon { get; set; } = "◇";
+    [Parameter] public string? ImageSource { get; set; }
+    [Parameter] public string? DarkImageSource { get; set; }
+    [Parameter] public RenderFragment? IconContent { get; set; }
+    [Parameter] public RenderFragment? PrimaryActions { get; set; }
+    [Parameter] public RenderFragment? MoreActions { get; set; }
+    [Parameter] public RenderFragment? NavigationActions { get; set; }
     [Parameter] public string? IconName { get; set; }
+    [Parameter] public string? TechnicalName { get; set; }
+    [Parameter] public string? Namespace { get; set; }
+    [Parameter] public Guid? ResourceUid { get; set; }
     [Parameter] public string? Description { get; set; }
+    [Parameter] public string? Version { get; set; }
+    [Parameter] public string? VersionDescription { get; set; }
     [Parameter] public string? StatusText { get; set; }
     [Parameter] public UiStatus Status { get; set; }
     [Parameter] public RenderFragment? Metadata { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public string? TestId { get; set; }
+    [Parameter] public string? CollectionHref { get; set; }
+    [Parameter] public string? CollectionLabel { get; set; }
+    [Parameter] public bool ShowTechnicalIdentity { get; set; } = true;
+    [Parameter] public bool IdentityAvailable { get; set; } = true;
+    [Parameter] public IReadOnlyDictionary<string, string>? IdentityLabels { get; set; }
+    [Parameter] public RenderFragment? IdentityDetails { get; set; }
+
+    private bool HasCollectionLink => !string.IsNullOrWhiteSpace(CollectionHref) && !string.IsNullOrWhiteSpace(CollectionLabel);
+    private bool HasToolbar => Enabled is not null || Actions is not null || PrimaryActions is not null || MoreActions is not null || NavigationActions is not null || HasCollectionLink;
+    private string QualifiedIdentity => $"{ScopeRef}|{Namespace}|{TechnicalName}";
+
+    private string? QualifiedTechnicalName => string.IsNullOrWhiteSpace(Namespace)
+        ? TechnicalName : $"{Namespace}/{TechnicalName}";
 }

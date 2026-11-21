@@ -1,0 +1,40 @@
+@using Agentstration.Resources
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<FormField Label="@Shared["Scope"]" Validation="Validation">
+    <ClearableText Value="@Label" ReadOnly AllowClear="false" data-testid="resource-scope-readonly" />
+</FormField>
+
+@code {
+    [Parameter] public ResourceScopeRef? ScopeRef { get; set; }
+    [Parameter] public string? DisplayName { get; set; }
+    [Parameter] public RenderFragment? Validation { get; set; }
+    private ConsoleContextState? context;
+    private WorkplaceContextState? workplaceContext;
+    private string Label
+    {
+        get
+        {
+            if (ScopeRef is not { } scope) return string.Empty;
+            var kind = Shared[$"ResourceScope.{scope.Kind}"].Value;
+            var name = scope.Kind == ResourceScopeKind.Instance ? null
+                : ResourceScopeDisplayName.Resolve(scope, DisplayName, context?.Current, workplaceContext?.Current);
+            return string.IsNullOrWhiteSpace(name) ? kind : $"{kind} · {name}";
+        }
+    }
+    protected override void OnInitialized()
+    {
+        context = Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
+        if (context is not null) context.Changed += ContextChanged;
+        workplaceContext = Services.GetService(typeof(WorkplaceContextState)) as WorkplaceContextState;
+        if (workplaceContext is not null) workplaceContext.Changed += ContextChanged;
+    }
+    private void ContextChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose()
+    {
+        if (context is not null) context.Changed -= ContextChanged;
+        if (workplaceContext is not null) workplaceContext.Changed -= ContextChanged;
+    }
+}

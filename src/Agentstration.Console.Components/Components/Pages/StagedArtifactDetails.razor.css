@@ -48,7 +48,7 @@
     margin: 0;
 }
 
-.artifact-retention-editor input {
+.artifact-retention-editor ::deep input {
     width: 100%;
 }
 
@@ -85,7 +85,7 @@
 .artifact-overview-metrics ::deep .metric-card:last-child strong {
     font-size: clamp(.98rem, 1.25vw, 1.25rem);
     letter-spacing: -.025em;
-    white-space: nowrap;
+    white-space: normal;
 }
 
 .artifact-details-grid code {
@@ -107,3 +107,6 @@
 .artifact-header ::deep p {
     overflow-wrap: anywhere;
 }
+
+.configuration-key { overflow-wrap: anywhere; }
+.configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }

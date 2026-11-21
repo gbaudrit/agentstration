@@ -8,7 +8,7 @@
     @if (loading) { <p role="status">@T("Loading")</p> }
     else if (description is not null)
     {
-        <dl class="resource-details"><dt>@T("Documents.Publication")</dt><dd><code>@description.PublicationId</code></dd>
+        <dl class="resource-details"><dt>@T("Documents.Publication")</dt><dd><CopyableValue Value="@description.PublicationId" /></dd>
             @if (description.Selection.Contract.SchemaReference is { } schema) { <dt>@T("Documents.SchemaVersion")</dt><dd><code>@schema.Name / @schema.Version @schema.SchemaPath</code></dd> }
         </dl>
         <p class="muted">@T("Documents.EnvelopeHelp")</p>
@@ -17,7 +17,7 @@
             ResetRequested="ResetResult" TestId="dataset-document-query" />
         @if (result is not null)
         {
-            <p>@T("DatasetContentAcquisition"): <code>@result.AcquisitionId</code></p>
+            <p>@T("DatasetContentAcquisition"): <CopyableValue Value="@result.AcquisitionId" /></p>
             <pre class="runner-json" data-testid="dataset-document-result">@JsonSerializer.Serialize(result.Page, new JsonSerializerOptions { WriteIndented = true })</pre>
         }
         @if (Context.HasPermission("resources/write"))

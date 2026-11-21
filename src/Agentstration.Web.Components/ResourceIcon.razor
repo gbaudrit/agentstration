@@ -1,0 +1,34 @@
+<span class="resource-icon resource-artwork resource-domain-@Domain" aria-hidden="true">
+    @if (!failed && SafeSource is not null)
+    {
+        <img class="@(SafeDarkSource is null ? null : "resource-artwork-light")" src="@SafeSource" alt="" loading="lazy" @onerror="() => failed = true" />
+        @if (SafeDarkSource is not null) { <img class="resource-artwork-dark" src="@SafeDarkSource" alt="" loading="lazy" @onerror="() => failed = true" /> }
+    }
+    else if (ChildContent is not null) { @ChildContent }
+    else if (!string.IsNullOrWhiteSpace(IconName)) { <UiIcon Name="@IconName" /> }
+    else { @Fallback }
+</span>
+@code {
+    [Parameter] public string? Source { get; set; }
+    [Parameter] public string? DarkSource { get; set; }
+    [Parameter] public string? IconName { get; set; }
+    [Parameter] public string Fallback { get; set; } = "◇";
+    [Parameter] public string Domain { get; set; } = "neutral";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    private bool failed;
+    private string? previousSource;
+    private string? previousDarkSource;
+    private string? SafeSource => SafeImage(Source);
+    private string? SafeDarkSource => SafeImage(DarkSource);
+    protected override void OnParametersSet()
+    {
+        if (previousSource != Source || previousDarkSource != DarkSource) failed = false;
+        previousSource = Source; previousDarkSource = DarkSource;
+    }
+    private static string? SafeImage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Contains('\\') || value.Any(char.IsControl)) return null;
+        if (value.StartsWith('/') && !value.StartsWith("//", StringComparison.Ordinal)) return value;
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http" ? value : null;
+    }
+}

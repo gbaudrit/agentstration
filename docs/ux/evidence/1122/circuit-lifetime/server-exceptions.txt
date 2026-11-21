@@ -1,0 +1,92 @@
+SOURCE evidence/coverage/.work/1794590663901-4490/console.log
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'm5YkCxDiGY55pRjlAfQbhbVPoKMiwwz2_OvQ7s1-Ce8'.
+      System.ObjectDisposedException: Cannot access a disposed object.
+      Object name: 'Microsoft.JSInterop.Implementation.JSObjectReference'.
+         at Microsoft.JSInterop.Implementation.JSObjectReference.InvokeAsync[TValue](String identifier, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+
+SOURCE evidence/promotion/.work/1794591284731-4546/console.log
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'esGXkpYmfR31GekG9cx02qET0oL5jB467oDMnL8TI6g'.
+      System.ObjectDisposedException: Cannot access a disposed object.
+      Object name: 'Microsoft.JSInterop.Implementation.JSObjectReference'.
+         at Microsoft.JSInterop.Implementation.JSObjectReference.InvokeAsync[TValue](String identifier, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+warn: Microsoft.AspNetCore.Components.Server.Circuits.RemoteRenderer[100]
+      Unhandled exception rendering component: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'esGXkpYmfR31GekG9cx02qET0oL5jB467oDMnL8TI6g'.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+warn: Microsoft.AspNetCore.Components.Server.Circuits.RemoteRenderer[100]
+      Unhandled exception rendering component: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'esGXkpYmfR31GekG9cx02qET0oL5jB467oDMnL8TI6g'.
+
+SOURCE evidence/promotion/.work/1794591284731-4546/console.log
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'esGXkpYmfR31GekG9cx02qET0oL5jB467oDMnL8TI6g'.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+warn: Microsoft.AspNetCore.Components.Server.Circuits.RemoteRenderer[100]
+      Unhandled exception rendering component: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'esGXkpYmfR31GekG9cx02qET0oL5jB467oDMnL8TI6g'.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+
+SOURCE evidence/promotion/.work/1794591284731-4546/console.log
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)
+fail: Microsoft.AspNetCore.Components.Server.Circuits.CircuitHost[111]
+      Unhandled exception in circuit 'esGXkpYmfR31GekG9cx02qET0oL5jB467oDMnL8TI6g'.
+      Microsoft.JSInterop.JSDisconnectedException: JavaScript interop calls cannot be issued at this time. This is because the circuit has disconnected and is being disposed.
+         at Microsoft.AspNetCore.Components.Server.Circuits.RemoteJSRuntime.BeginInvokeJS(JSInvocationInfo& invocationInfo)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, CancellationToken cancellationToken, Object[] args)
+         at Microsoft.JSInterop.JSRuntime.InvokeAsync[TValue](Int64 targetInstanceId, String identifier, JSCallType callType, Object[] args)
+         at Microsoft.JSInterop.JSObjectReferenceExtensions.InvokeVoidAsync(IJSObjectReference jsObjectReference, String identifier, Object[] args)
+         at Agentstration.Web.Components.CollectionActions.OnAfterRenderAsync(Boolean firstRender) in /home/runner/work/agentstration/agentstration/src/Agentstration.Web.Components/CollectionActions.razor:line 37
+         at Microsoft.AspNetCore.Components.RenderTree.Renderer.GetErrorHandledTask(Task taskToHandle, ComponentState owningComponentState)

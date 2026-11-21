@@ -1,0 +1,17 @@
+{
+  "baseCommit": "4ba7a3ddca38fd56ad5d645197b86b0871d8adb8",
+  "route": "/resource-plans",
+  "sourceBlobs": {
+    "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor": "3eda1205a615b485629020d622314e475f6ee3f2",
+    "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor.cs": "73b1756fbc1a6c223437a61ccaccf1188f95e640",
+    "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor.css": "ab614286ef50e1e305de9309c297b5a2d7c31102",
+    "src/Agentstration.Console.Components/Console/ResourcePlanReviewProjection.cs": "8f7e4db33d2c69fae18f33f82889fb70122498eb",
+    "src/Agentstration.ResourcePlanning.Api/ResourcePlanningApiModule.cs": "2c7d4a9c1a5b177129f2d8589132d8a93a27e224",
+    "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor": "73ae9d85770643bd3ac167cd8e05ad088a6cf6ae"
+  },
+  "screenshots": [
+    "desktop-en.png",
+    "mobile-fr.png",
+    "mobile-fr-results.png"
+  ]
+}
