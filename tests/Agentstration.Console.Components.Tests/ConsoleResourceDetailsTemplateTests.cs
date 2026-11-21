@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ConsoleResourceDetailsTemplateTests
+public sealed partial class ConsoleResourceDetailsTemplateTests
 {
     [TestMethod]
     public void ManagementSectionIsComposedAutomaticallyFromTheSavedGovernance()
@@ -155,15 +155,16 @@ public sealed class ConsoleResourceDetailsTemplateTests
         Definition = new() { DisplayName = "Example", Instructions = "Example instructions", ModelProfile = new("default", ResourceScopeRef.Instance) }
     };
 
-    private static BunitContext Context()
+    private static BunitContext Context(Agentstration.Web.Components.State.IConsoleNavigationContext? navigation = null)
     {
         var context = new BunitContext();
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        if (navigation is not null) context.Services.AddSingleton(navigation);
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.ComponentFactories.AddStub<ResourceAccessPanel>();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("http://localhost/agents/example");
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
-        foreach (var path in new[] { "overview", "definition/configuration", "access", "yaml" })
+        foreach (var path in new[] { "overview", "definition/configuration", "access", "yaml", "relations", "activity" })
         {
             var target = "http://localhost/agents/example#" + path;
             module.Setup<string>("navigate", call => Equals(call.Arguments[0], target)).SetResult(target);

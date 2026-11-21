@@ -1,9 +1,33 @@
 # Embedding resource relationships
 
-`ResourceRelations` is a read-only Console component prepared for future resource
-detail tabs. It reuses the System Explorer LikeC4 island, authorized progressive
-stream, ToolSet access summaries and exact provenance. It does not install tabs
-on resource screens or add a production route.
+`ResourceRelations` is a read-only Console component using the System Explorer
+LikeC4 island, authorized progressive stream, ToolSet access summaries and exact
+provenance. The shared Console resource layout automatically offers it as a
+**Relations** section on saved Agent screens, including namespaced/governed Agent
+details already using that layout. No Agent screen or canonical route changes.
+
+## Automatic Agent section
+
+`ConsoleResourceDetailsTemplate` owns the localized `#relations` entry and its
+content. Its central first-rollout condition checks saved kind `Agent`, a nonempty
+UID, a known owner and the existing Console navigation actor context. Other kinds
+remain unchanged; enabling later families belongs in the layout, not their
+screens. Screens using a different layout must first adopt the common template.
+Graph coverage still depends on each family's authorized contributor.
+
+The layout composes family additional sections, preserving the standard
+Overview/Definition/Access/YAML destinations. `relations` is reserved by the
+layout when enabled; a competing family entry is rejected rather than silently
+replacing either region. Creation, pending resources and absent actor context do
+not establish a graph root, and the owner is never used as an actor fallback.
+
+The shared template mounts the section on first visit and retains it while
+hidden. Switching sections preserves the definition form and draft guard.
+Accepted resource generation/ETag, exact identity or actor changes remount the
+observation using saved metadata; typing in a form does not refresh the graph.
+The component retains its own direction/expansion/refresh and stale-response
+protections. Direct fragment navigation retains owner, namespace and actor query
+coordinates. Display-only scope badges do not affect graph authorization.
 
 ## Minimal integration
 
@@ -17,7 +41,7 @@ on resource screens or add a production route.
                    Root="@SystemGraphIds.Definition(resource.Uid)" />
 ```
 
-Persisted resource screens follow the [resource-screen authoring guide](../ux/resource-screen-authoring.md)
+For manual embedding outside the automatic Agent section, persisted resource screens follow the [resource-screen authoring guide](../ux/resource-screen-authoring.md)
 and compose `ConsoleResourceDetailsTemplate`. Declare a primary `relations` entry
 in its `AdditionalSections` and render the component from `AdditionalContent` for
 that path. Preserve any existing family sections and fragments. Do not replace
@@ -47,8 +71,8 @@ therefore ordinary Overview visits do not start a graph request. Its existing
 fragment navigation owns `#relations`, keyboard/mobile navigation and draft leave
 protection. This component does not parse or rewrite the resource page URL.
 
-This is the integration contract; resource-screen adoption is not installed by
-this component preparation. The Console adapter owns physical resource identity,
+Do not declare this manual section on Agents: their Console layout already owns
+it. The Console adapter owns physical resource identity,
 while `PresentationScopeRef` is display-only and must not be passed as the actor
 context. Use the screen's current authorized actor context.
 
@@ -129,10 +153,12 @@ context changes, callbacks and fallback. Native renderer tests cover local icons
 rectangles, layout and unchanged graph input. Temporary local browser hosts
 validate the executable component.
 
-A new resource-screen UX journey is **Not applicable** to this preparation: no
-resource route or tab is added. Future screen adoption owns its journey. Existing
-Explorer regressions/browser smoke still apply; deferred scenario #1201 retains
-its maintainer UX validation and merged-PR gates.
+The automatic Agent section adds a resource-screen UX journey. Deferred scenario
+[#1201](https://github.com/gbaudrit/agentstration/issues/1201) records its exact
+routes, prerequisites and success/failure assertions alongside the existing
+Explorer coverage. Its maintainer UX-validation and merged-PR gates remain in
+force. Component/client regressions and temporary executable desktop/mobile smoke
+are required in the implementation; no reusable Playwright journey starts here.
 
 Focused traversal does not expand through a non-root ToolSet. Selected-member
 `toolset-access` evidence connects Agents to Tools; ordinary membership cannot
