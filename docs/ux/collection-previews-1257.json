@@ -401,7 +401,13 @@
       "rowTypes": [
         "SecurityAuditEvent"
       ],
-      "status": "assessment-pending"
+      "status": "not-applicable-non-resource",
+      "family": "Security audit events",
+      "decision": "SecurityAuditEvent is append-only event evidence with action, outcome, actor/target IDs and occurrence time. The scope records where an event happened, not resource ownership. It has no inspectable saved definition or edit command; retain bounded audit snapshot and invariant identifiers.",
+      "tests": [
+        "SecurityAuditCollectionTests"
+      ],
+      "validation": "Source and native DTO contract reviewed. Existing family regressions retained; final broad verification records the synchronized result."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
@@ -1846,7 +1852,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-native-administration",
+      "reason": "SecurityAuditEvent is append-only event evidence with action, outcome, actor/target IDs and occurrence time. The scope records where an event happened, not resource ownership. It has no inspectable saved definition or edit command; retain bounded audit snapshot and invariant identifiers."
     },
     {
       "id": "model-profile-editor-model-capability-response",

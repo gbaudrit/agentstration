@@ -257,3 +257,9 @@ Regression ownership: `OrganizationAccessCollectionTests`. This is an explicit n
 OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented.
 
 Regression ownership: `OrganizationMembersCollectionTests / OrganizationMemberDetailsTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
+
+### Security audit events
+
+SecurityAuditEvent is append-only event evidence with action, outcome, actor/target IDs and occurrence time. The scope records where an event happened, not resource ownership. It has no inspectable saved definition or edit command; retain bounded audit snapshot and invariant identifiers.
+
+Regression ownership: `SecurityAuditCollectionTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
