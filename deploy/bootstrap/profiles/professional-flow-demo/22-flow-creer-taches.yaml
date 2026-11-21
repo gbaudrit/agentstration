@@ -1,0 +1,61 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: creer-taches
+  namespace: demo.flows-professionnels
+definition:
+  displayName: Créer les tâches
+  description: Vérifie des actions puis prépare des tâches exploitables sans simuler une persistance externe.
+  version: 1.0.0
+  enabled: true
+  spec:
+    flowKind: direct
+    target: { kind: agent, id: analyste-actions, namespace: demo.flows-professionnels }
+  graph:
+    entryStep: entree
+    inputSchema:
+      type: object
+      properties:
+        contexte: { type: string }
+        actions: { type: string }
+      required: [contexte, actions]
+      additionalProperties: false
+    steps:
+      - { type: input, name: entree, displayName: Actions structurées }
+      - type: agent
+        name: verifier
+        displayName: Vérifier les actions
+        agent: { resourceId: analyste-actions, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Vérifier
+          contexte: "${input.contexte}"
+          actions: "${input.actions}"
+      - type: agent
+        name: preparer
+        displayName: Préparer les tâches
+        agent: { resourceId: analyste-actions, namespace: demo.flows-professionnels }
+        inputMapping:
+          operation: Préparer les tâches
+          contexte: "${input.contexte}"
+          actionsVerifiees: "${steps.verifier.output}"
+          consigne: Produire une fiche par tâche avec titre, responsable, échéance, priorité et critère de réussite. Indiquer clairement que les tâches sont préparées et non créées dans un système externe.
+      - type: output
+        name: resultat
+        displayName: Tâches préparées
+        outputMapping:
+          taches: "${steps.preparer.output}"
+          bilan: Tâches préparées pour validation ; aucune création externe effectuée.
+    transitions:
+      - { id: entree-vers-verification, fromStep: entree, event: completed, toStep: verifier }
+      - { id: verification-vers-preparation, fromStep: verifier, event: completed, toStep: preparer }
+      - { id: preparation-vers-resultat, fromStep: preparer, event: completed, toStep: resultat }
+    outputSchema:
+      type: object
+      properties:
+        taches: { type: string }
+        bilan: { type: string }
+      required: [taches, bilan]
+      additionalProperties: false
+  metadata: { bootstrapProfile: professional-flow-demo, capability: task-preparation }
+  publish: true
+  activate: true
