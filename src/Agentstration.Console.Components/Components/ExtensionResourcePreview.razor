@@ -22,6 +22,7 @@
 
 @code {
     [Parameter, EditorRequired] public ScopedResourceAddress Address { get; set; }
+    [Parameter] public ResourcePreviewExpectation? Expectation { get; set; }
     [Parameter, EditorRequired] public string OverviewHref { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string DefinitionHref { get; set; } = string.Empty;
     [Parameter] public bool CanManageEnrollment { get; set; }
@@ -32,7 +33,7 @@
     private string? requestedKey;
     private long revision;
     private bool disposed;
-    private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
+    private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}|{Expectation}";
     private bool CanEdit => resource is not null && resource.Definition.Source == ExtensionRegistrationSource.Manual && !resource.Governance.IsManaged
         && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef
         && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services);
@@ -48,7 +49,7 @@
         pending?.Cancel(); pending?.Dispose(); pending = new();
         var token = pending.Token;
         resource = null; loadState = new(ResourceLoadStatus.Loading);
-        if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+        if (Context.Error is not null || Expectation?.CanRead(Context) == false || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
         if (target.Kind != ExtensionKinds.ExtensionRegistration || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
         try
         {
@@ -56,6 +57,8 @@
             if (!IsCurrent(requestRevision, key)) return;
             if (snapshot.Value.Kind != target.Kind || snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Name != target.Name)
             { loadState = new(ResourceLoadStatus.Forbidden); return; }
+            if (Expectation?.Matches(snapshot.Value.Uid, snapshot.Value.Generation, snapshot.ETag) == false)
+            { loadState = new(ResourceLoadStatus.NotFound); return; }
             resource = snapshot.Value; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -72,7 +75,7 @@
         }
     }
     private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey
-        && Context.Error is null && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
+        && Context.Error is null && Expectation?.CanRead(Context) != false && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
     public void Dispose()
     {
         if (disposed) return;

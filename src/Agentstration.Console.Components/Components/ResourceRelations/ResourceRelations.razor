@@ -4,6 +4,7 @@
 @using Agentstration.Web.Components.Pages
 @using Microsoft.Extensions.Localization
 @implements IDisposable
+@inject IStringLocalizer<SharedFormStrings> Shared
 @inject ISystemGraphStreamClient Client
 @inject IStringLocalizer<SystemExplorerStrings> Localizer
 @inject NavigationManager Navigation
@@ -83,8 +84,8 @@
                 }
                 @if (inspectorOpen && selected is not null)
                 {
-                    <aside class="relations-inspector" aria-label="@T("RelationsSelection")">
-                        <header><span class="relations-detail-caption">@T(selectedLink is null ? "RelationsSelection" : "SummaryLinkDetails")</span><button type="button" class="relations-icon-button" aria-label="@T("RelationsCloseDetails")" title="@T("RelationsCloseDetails")" @onclick="CloseInspector"><TablerIcon Name="x" /></button></header>
+                    <aside class="relations-inspector @(selectedLink is null && ResourceRelationsPreview.CanPreview(selected) ? "has-resource-preview" : null)" aria-label="@T("RelationsSelection")">
+                        <header><span class="relations-detail-caption">@(selectedLink is null ? Shared["Preview"] : T("SummaryLinkDetails"))</span><button type="button" class="relations-icon-button" aria-label="@T("RelationsCloseDetails")" title="@T("RelationsCloseDetails")" @onclick="CloseInspector"><TablerIcon Name="x" /></button></header>
                         <div class="relations-inspector-body">
                             @if (selectedLink is not null)
                             {
@@ -92,12 +93,14 @@
                             }
                             else
                             {
+                                <ResourceRelationsPreview Node="selected" Context="Context">
                                 <div class="relations-detail-identity"><span class="relations-resource-icon"><TablerIcon Name="@KindIcon(selected)" /></span><div><h3>@Name(selected)</h3><span class="relations-kind">@KindLabel(selected)</span></div></div>
                                 @if (selected.Id == focusRoot) { <span class="relations-root">@T("RelationsRoot")</span> }
                                 <dl><dt>@T("Namespace")</dt><dd>@selected.Identity.Namespace.Value</dd><dt>@T("Owner")</dt><dd><ResourceScopeBadge ScopeRef="selected.Identity.OwnerScope" /></dd>
                                     @if (selected.Evidence?.Publication is { } publication) { <dt>@T("Published")</dt><dd>@publication</dd> }
                                     @if (selected.Evidence?.Generation is { } generation) { <dt>@T(selected.State == "definition" ? "CurrentGeneration" : "RecordedGenerations")</dt><dd>@generation</dd> }
                                 </dl>
+                                </ResourceRelationsPreview>
                                 @if (selected.Id != focusRoot) { <button type="button" class="button-primary relations-recenter" @onclick="RecenterAsync"><TablerIcon Name="focus-2" />@T("RelationsRecenter")</button> }
                                 @if (OpenResource.HasDelegate) { <button type="button" class="button-secondary" @onclick="() => OpenResource.InvokeAsync(selected)">@T("OpenDetails")</button> }
                                 <details class="relations-technical"><summary>@T("RelationsTechnicalDetails")</summary><code>@selected.Id</code><pre tabindex="0">@Serialize(view.Summary.RepresentedNodes[selected.Id])</pre></details>

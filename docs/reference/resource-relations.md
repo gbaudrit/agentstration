@@ -6,6 +6,32 @@ provenance. The shared Console resource layout automatically offers it as a
 **Relations** section on saved Agent screens, including namespaced/governed Agent
 details already using that layout. No Agent screen or canonical route changes.
 
+## Selected resource preview
+
+`ResourceRelationsPreview` reuses the existing on-demand `AgentResourcePreview`,
+`FlowResourcePreview` and `ExtensionResourcePreview`, so graph selection and list
+Preview share their family Summary, Identity, Configuration and authorized quick
+actions. The graph supplies exact owner/namespace/name plus the observed UID,
+generation/ETag and separate actor context. A changed UID or saved state is
+unavailable until the observation is refreshed; it never opens a homonym or a
+newer definition in place of the selected snapshot. Context changes and lost
+read permission clear the preview and cancel pending reads.
+
+Only canonical current definitions use these previews. Historical generations,
+publications and unsupported families keep their authorized graph metadata;
+no current-definition request substitutes for historical evidence. Recentering,
+link provenance and expandable technical details remain graph-owned. Preview is
+mounted on selection, within the existing inline/fullscreen drawer, without a
+second modal or collection-fragment navigation. The family adapters retain their
+existing permission checks and command destinations. Registration Preview offers
+no enrollment-management action from the graph.
+
+To support another family, add its existing Preview adapter to the centralized
+`ResourceRelationsPreview` dispatch and validate the supplied expectation before
+showing its Summary. No resource-screen changes are needed. Adding a preview does
+not enable that family's Relations section; initial section adoption remains
+restricted centrally to saved Agents.
+
 ## Automatic Agent section
 
 `ConsoleResourceDetailsTemplate` owns the localized `#relations` entry and its

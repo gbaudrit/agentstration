@@ -37,6 +37,7 @@ button:focus-visible, summary:focus-visible { outline:2px solid var(--primary); 
 .relations-control-divider { width:1px; height:1.25rem; background:var(--border); margin:0 .2rem; }
 .relations-canvas-hint { position:absolute; inset:auto 1rem .95rem auto; max-width:55%; margin:0; padding:.35rem .55rem; border-radius:.5rem; background:var(--surface); color:var(--muted); font-size:.73rem; pointer-events:none; }
 .relations-inspector { position:absolute; z-index:3; inset:.75rem .75rem .75rem auto; width:min(19rem,calc(100% - 1.5rem)); display:flex; flex-direction:column; overflow:hidden; border:1px solid var(--border); border-radius:.85rem; background:var(--surface); box-shadow:var(--shadow-md); }
+.relations-inspector.has-resource-preview { width:min(38rem,calc(100% - 1.5rem)); }
 .relations-inspector > header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.5rem .75rem; border-bottom:1px solid var(--border); background:var(--surface-2); }
 .relations-detail-caption { color:var(--muted); font-size:.72rem; font-weight:650; letter-spacing:.03em; }
 .relations-inspector-body { min-height:0; overflow:auto; padding:1rem; }
