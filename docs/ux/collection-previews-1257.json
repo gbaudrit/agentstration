@@ -43,7 +43,27 @@
       "rowTypes": [
         "ConnectedServiceResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "ConnectedService",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/connected-services/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/connected-services/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, service type/version, literal options and Parameter/Secret references; no resolved secret values, catalog/discovery/usages fetch or editor draft. Reconcile and deactivation retain the full detail confirmation/ETag workflow.",
+      "loader": "IConnectedServicesClient.GetConnectedServiceAsync(name, owner, namespace, token)",
+      "tests": [
+        "ConnectedServiceResourcePreviewTests",
+        "ConnectedServiceCollectionTests"
+      ],
+      "validation": "Release component/test build passed; 56 Connected Service tests passed; browser/final offline checks pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",

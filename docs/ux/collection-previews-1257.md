@@ -33,3 +33,9 @@ Validation: Release component/test build passed without warnings/errors; 43 Vaul
 Saved Secret metadata, Vault reference, key, localized type and descendant-use policy. Secret contents are never read or displayed; value operations and usages stay on the full detail page. The family Preview uses `ISecretsClient.GetSecretAsync(name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 40 Secret tests passed. All four desktop/mobile English/French light/dark browser variants passed; [observations](evidence/1257/secrets/README.md). Final offline lanes remain pending.
+
+## ConnectedService
+
+Saved identity, service type/version, literal options and Parameter/Secret references; no resolved secret values, catalog/discovery/usages fetch or editor draft. Reconcile and deactivation retain the full detail confirmation/ETag workflow. The family Preview uses `IConnectedServicesClient.GetConnectedServiceAsync(name, owner, namespace, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 56 Connected Service tests passed. Browser and final offline checks remain pending.
