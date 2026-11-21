@@ -46,4 +46,16 @@
   <data name="Preparation" xml:space="preserve"><value>Préparation</value></data>
   <data name="PreparationDescription" xml:space="preserve"><value>Validation des profils sélectionnés et de leur source exacte avant application des ressources.</value></data>
   <data name="ObservedResourcesOnly" xml:space="preserve"><value>Cette ancienne application conserve uniquement les ressources observées ; les groupes non observés ne sont pas reconstitués.</value></data>
+  <data name="CatalogConfiguration" xml:space="preserve"><value>Configuration du catalogue</value></data>
+  <data name="CloseConfiguration" xml:space="preserve"><value>Fermer</value></data>
+  <data name="BackToSelection" xml:space="preserve"><value>Retour à la préparation</value></data>
+  <data name="PlanOrderHelp" xml:space="preserve"><value>Chaque profil possède sa propre cible. Les profils Instance sont appliqués avant les profils Tenant, puis Workspace. Vous pouvez réordonner les profils au sein du même niveau.</value></data>
+  <data name="PlanTargets" xml:space="preserve"><value>Profils et cibles</value></data>
+  <data name="ValidationDeferred" xml:space="preserve"><value>La validation de ce profil sera complétée après la mise à disposition de sa cible et des ressources précédentes. L’exécution s’arrête au premier échec ; les ressources déjà créées sont conservées.</value></data>
+  <data name="PlanTargetInvalid" xml:space="preserve"><value>Choisissez une cible valide pour chaque profil sélectionné. Une cible prévue doit être créée par un profil précédent.</value></data>
+  <data name="PlanBindingsInvalid" xml:space="preserve"><value>Vérifiez les liaisons requises et les profils qui fournissent leurs ressources.</value></data>
+  <data name="MultipleTargets" xml:space="preserve"><value>Plusieurs cibles</value></data>
+  <data name="TargetForProfile" xml:space="preserve"><value>Cible de {0}</value></data>
+  <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation différée</value></data>
+  <data name="ApplicationTitle" xml:space="preserve"><value>Application du bootstrap</value></data>
 </root>

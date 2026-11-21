@@ -28,6 +28,7 @@
 </StepProgress>
 
 @code {
+    [Parameter] public string? TargetLabel { get; set; }
     [Parameter, EditorRequired] public BootstrapApplicationResource Application { get; set; } = default!;
     private IReadOnlyList<BootstrapApplicationProgressGroup> groups = [];
     private bool Prepared => !(Application.Definition.Error == "bootstrap_application_invalid" && Application.Definition.Resources.Count == 0)
@@ -67,12 +68,12 @@
                 steps.Add(new("resources:" + group.Id, title, BootstrapApplicationProgressModel.Status(group.Rows), Panel(group.Rows, title))
                 {
                     ParentId = "resources",
-                    Summary = Startup["ResourceCount", group.Rows.Count(row => row.Result is not null), group.Rows.Count]
+                    Summary = Startup["ResourceCount", group.Rows.Count(row => row.Result is not null), group.Rows.Count] + " · " + group.Rows[0].Resource.Profile
                 });
             }
             return steps;
         }
     }
     private RenderFragment Preparation => @<section><h2>@Localizer["Preparation"]</h2><p>@Localizer["PreparationDescription"]</p><p>@string.Join(" → ", Application.Definition.Profiles)</p></section>;
-    private RenderFragment Panel(IReadOnlyList<BootstrapApplicationProgressRow> rows, string title) => @<BootstrapApplicationResources Rows="rows" Title="@title" />;
+    private RenderFragment Panel(IReadOnlyList<BootstrapApplicationProgressRow> rows, string title) => @<BootstrapApplicationResources Rows="rows" Title="@title" TargetLabel="@TargetLabel" />;
 }

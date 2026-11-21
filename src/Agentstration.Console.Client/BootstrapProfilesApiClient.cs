@@ -36,7 +36,7 @@ public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstr
     {
         using var response = await httpClient.PostAsJsonAsync(
             "api/bootstrap/profiles/preview",
-            new BootstrapProfilePreviewRequest(selection.Profiles, selection.Target, selection.Bindings, selection.Source),
+            new BootstrapProfilePreviewRequest(selection.Profiles, selection.Target, selection.Bindings, selection.Source, selection.Applications),
             cancellationToken);
         return await ReadAsync<BootstrapCompositionPreview>(response, "Bootstrap preview", cancellationToken);
     }
@@ -45,7 +45,7 @@ public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstr
     {
         using var response = await httpClient.PostAsJsonAsync(
             "api/bootstrap/applications",
-            new ApplyBootstrapProfilesRequest(selection.Profiles, expectedDigest, selection.Target, selection.Bindings, selection.Source, requestId),
+            new ApplyBootstrapProfilesRequest(selection.Profiles, expectedDigest, selection.Target, selection.Bindings, selection.Source, requestId, selection.Applications),
             cancellationToken);
         return await ReadAsync<BootstrapApplicationResource>(response, "Bootstrap application", cancellationToken);
     }

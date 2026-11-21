@@ -20,7 +20,7 @@ internal static class BootstrapApplicationProgressModel
         List<BootstrapApplicationProgressRow>? rows = null;
         foreach (var resource in plan)
         {
-            if (groups.Count == 0 || groups[^1].Kind != resource.Kind)
+            if (groups.Count == 0 || groups[^1].Kind != resource.Kind || groups[^1].Rows[0].Resource.Profile != resource.Profile)
             {
                 rows = [];
                 groups.Add(new(resource.Profile + "/" + resource.Location, resource.Kind, rows));

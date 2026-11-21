@@ -46,4 +46,16 @@
   <data name="Preparation" xml:space="preserve"><value>Preparation</value></data>
   <data name="PreparationDescription" xml:space="preserve"><value>Validate the selected profiles and their exact source before applying resources.</value></data>
   <data name="ObservedResourcesOnly" xml:space="preserve"><value>This older application retains only observed resources; unobserved resource groups are not reconstructed.</value></data>
+  <data name="CatalogConfiguration" xml:space="preserve"><value>Catalog configuration</value></data>
+  <data name="CloseConfiguration" xml:space="preserve"><value>Close</value></data>
+  <data name="BackToSelection" xml:space="preserve"><value>Back to preparation</value></data>
+  <data name="PlanOrderHelp" xml:space="preserve"><value>Each profile has its own target. Instance profiles run first, then Tenant profiles, then Workspace profiles. You can reorder profiles within the same level.</value></data>
+  <data name="PlanTargets" xml:space="preserve"><value>Profiles and targets</value></data>
+  <data name="ValidationDeferred" xml:space="preserve"><value>Validation of this profile will complete after the preceding resources and target are available. Execution stops at the first failure; resources already created are retained.</value></data>
+  <data name="PlanTargetInvalid" xml:space="preserve"><value>Choose a valid target for every selected profile. Planned targets must be created by an earlier profile.</value></data>
+  <data name="PlanBindingsInvalid" xml:space="preserve"><value>Check required bindings and their producer profiles.</value></data>
+  <data name="MultipleTargets" xml:space="preserve"><value>Multiple targets</value></data>
+  <data name="TargetForProfile" xml:space="preserve"><value>Target for {0}</value></data>
+  <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation deferred</value></data>
+  <data name="ApplicationTitle" xml:space="preserve"><value>Bootstrap application</value></data>
 </root>

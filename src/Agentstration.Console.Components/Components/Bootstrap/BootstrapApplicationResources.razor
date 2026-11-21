@@ -11,16 +11,17 @@
     @if (Visible.Count == 0) { <EmptyState Title="@Localizer["NoResourceOutcome"]" /> }
     else
     {
-        <CollectionView TItem="BootstrapApplicationProgressRow" Items="@Visible" IdentityLabel="@Localizer["Resource"]" StateLabel="@Localizer["Outcome"]" InformationLabels="@(new[] { Localizer["Profile"].Value, Localizer["Details"].Value })" Compact="true" RowTestId="bootstrap-application-resource">
+        <CollectionView TItem="BootstrapApplicationProgressRow" Items="@Visible" IdentityLabel="@Localizer["Resource"]" StateLabel="@Localizer["Outcome"]" InformationLabels="@(new[] { Localizer["Profile"].Value, Localizer["Target"].Value, Localizer["Details"].Value })" Compact="true" RowTestId="bootstrap-application-resource">
             <Identity Context="row"><strong>@row.Resource.Kind/@row.Resource.Name</strong></Identity>
             <State Context="row"><StatusBadge Text="@Label(row)" Status="@Tone(row.Status)" /></State>
-            <Information Context="row"><CollectionValue Label="@Localizer["Profile"]">@row.Resource.Profile</CollectionValue><CollectionValue Label="@Localizer["Details"]"><code>@row.Resource.Location</code></CollectionValue></Information>
+            <Information Context="row"><CollectionValue Label="@Localizer["Profile"]">@row.Resource.Profile</CollectionValue><CollectionValue Label="@Localizer["Target"]">@(row.Resource.TargetLabel ?? TargetLabel)</CollectionValue><CollectionValue Label="@Localizer["Details"]"><code>@row.Resource.Location</code></CollectionValue></Information>
         </CollectionView>
         <CollectionPager Page="@pageNumber" PageSize="25" Total="@Filtered.Count" HasMore="@(pageNumber * 25 < Filtered.Count)" SupportsDirectNavigation="true" PageChanged="value => pageNumber = value" />
     }
 </section>
 
 @code {
+    [Parameter] public string? TargetLabel { get; set; }
     [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
     [Parameter, EditorRequired] public IReadOnlyList<BootstrapApplicationProgressRow> Rows { get; set; } = [];
     private string search = string.Empty;

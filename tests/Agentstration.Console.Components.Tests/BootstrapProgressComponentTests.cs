@@ -57,7 +57,7 @@ public sealed class BootstrapProgressComponentTests
     public void SelectingHistoryPinsItsIdentityForReload()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = Context(new StubClient());
+        using var context = Context(new StubClient(), application: false);
         var rendered = context.Render<BootstrapProfiles>();
         rendered.FindAll("button").Single(button => button.TextContent == "View").Click();
         var navigation = context.Services.GetRequiredService<NavigationManager>();
@@ -91,7 +91,12 @@ public sealed class BootstrapProgressComponentTests
         var client = new StubClient { ExposeCatalog = changeSelection };
         using var context = Context(client);
         var rendered = context.Render<BootstrapProfiles>();
-        if (changeSelection) rendered.Find("[data-profile-name='base']").Change(true);
+        if (changeSelection)
+        {
+            rendered.FindAll("button").Single(button => button.TextContent == "Back to preparation").Click();
+            rendered.Find("[data-profile-name='base']").Change(true);
+            rendered.FindAll("button").Single(button => button.TextContent == "View").Click();
+        }
         rendered.FindAll("button").Single(button => button.TextContent == "Cancel application").Click();
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "Cancellation requested."));
         Assert.AreEqual("retained-application", client.CancelledId);
@@ -103,7 +108,7 @@ public sealed class BootstrapProgressComponentTests
     {
         using var culture = new TestCultureScope("en-US");
         var client = new StubClient { ExposeCatalog = true };
-        using var context = Context(client);
+        using var context = Context(client, application: false);
         var cut = context.Render<BootstrapProfiles>();
         Assert.AreEqual(1, cut.FindComponents<ResourceCollectionTemplate<BootstrapProfileSummary>>().Count);
         cut.Find("[data-profile-name='base']").Change(true);
@@ -142,13 +147,45 @@ public sealed class BootstrapProgressComponentTests
         Assert.AreEqual("true", cut.Find("[data-step-id='prepare']").GetAttribute("aria-selected"));
     }
 
-    private static BunitContext Context(StubClient client)
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void MixedScopesHaveIndividualTargetsAndPreviewIsASeparateScreenWithPreservedPreparation(bool plannedTargets)
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StubClient { MixedCatalog = true };
+        using var context = Context(client, application: false);
+        var cut = context.Render<BootstrapProfiles>();
+        foreach (var name in new[] { "workspace", "tenant", "base" }) cut.Find($"[data-profile-name='{name}']").Change(true);
+        CollectionAssert.AreEqual(new[] { "base", "tenant", "workspace" }, cut.FindAll("[data-bootstrap-profile]").Select(node => node.GetAttribute("data-bootstrap-profile")).ToArray());
+        var tenantSelect = cut.Find("[data-target-profile='tenant']");
+        tenantSelect.Change(plannedTargets ? tenantSelect.QuerySelectorAll("option").Single(option => option.TextContent.Contains("future-tenant", StringComparison.Ordinal)).GetAttribute("value") : StubClient.TenantId.ToString());
+        var workspaceSelect = cut.Find("[data-target-profile='workspace']");
+        workspaceSelect.Change(plannedTargets ? workspaceSelect.QuerySelectorAll("option").Single(option => option.TextContent.Contains("future-workspace", StringComparison.Ordinal)).GetAttribute("value") : StubClient.WorkspaceId.ToString());
+        cut.FindAll("button").Single(button => button.TextContent == "Preview application").Click();
+        var selection = client.LastSelection;
+        Assert.IsNotNull(selection);
+        Assert.IsNotNull(selection.Applications);
+        CollectionAssert.AreEqual(new[] { "base", "tenant", "workspace" }, selection.Applications.Select(item => item.Profile).ToArray());
+        Assert.AreEqual(0, cut.FindAll("[data-testid='distribution-bootstrap-profiles']").Count);
+        Assert.AreEqual(1, cut.FindAll(".bootstrap-preview-summary").Count);
+        Assert.AreEqual(0, client.Submissions);
+        cut.FindAll("button").Single(button => button.TextContent == "Back to preparation").Click();
+        Assert.AreEqual(1, cut.FindAll("[data-testid='distribution-bootstrap-profiles']").Count);
+        Assert.AreEqual(0, cut.FindAll(".bootstrap-preview-summary").Count);
+        Assert.IsFalse(string.IsNullOrEmpty(cut.Find("[data-target-profile='workspace']").GetAttribute("value")));
+        Assert.HasCount(3, cut.FindAll("input[data-profile-name]:checked"));
+    }
+
+    private static BunitContext Context(StubClient client, bool application = true)
     {
         var context = new BunitContext();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js").Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/step-progress.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IBootstrapProfilesApiClient>(client);
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
+        if (application) context.Services.GetRequiredService<NavigationManager>().NavigateTo("/settings/bootstrap?applicationId=retained-application");
         return context;
     }
 
@@ -171,6 +208,16 @@ public sealed class BootstrapProgressComponentTests
             }
         };
         public bool ExposeCatalog { get; init; }
+        public bool MixedCatalog { get; init; }
+        public BootstrapProfileSelection? LastSelection { get; private set; }
+        public static Guid TenantId { get; } = Guid.NewGuid();
+        public static Guid WorkspaceId { get; } = Guid.NewGuid();
+        private static IReadOnlyList<BootstrapProfileSummary> MixedProfiles =>
+        [
+            CatalogProfile with { Topology = [new("Tenant", "future-tenant")] },
+            new("tenant", "Tenant fixture", null, BootstrapProfileScope.Tenant, 1, 1, "tenant-digest", []) { Topology = [new("Workspace", "future-workspace")] },
+            new("workspace", "Workspace fixture", null, BootstrapProfileScope.Workspace, 1, 1, "workspace-digest", [])
+        ];
         public int Previews { get; private set; }
         private BootstrapApplicationResource? submitted;
         private static BootstrapProfileSummary CatalogProfile => new("base", "Base", "Fixture profile", BootstrapProfileScope.Instance, 1, 1, new string('a', 64), []);
@@ -185,15 +232,15 @@ public sealed class BootstrapProgressComponentTests
         public int Observations { get; private set; }
         public string? CancelledId { get; private set; }
         public Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken) => Task.FromResult(
-            new BootstrapManagementView(new(null, false, [], ExposeCatalog ? [CatalogProfile] : []), [], [], IncludeNewerApplication ? [Newer, application] : [application]));
+            new BootstrapManagementView(new(null, false, [], MixedCatalog ? MixedProfiles : ExposeCatalog ? [CatalogProfile] : []), MixedCatalog ? [new(TenantId, "current", "Current Tenant")] : [], MixedCatalog ? [new(TenantId, "current", "Current Tenant", WorkspaceId, "current", "Current Workspace")] : [], IncludeNewerApplication ? [Newer, application] : [application]));
         public Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken)
         {
             if (submitted?.Metadata.Name == applicationId) return Task.FromResult<BootstrapApplicationResource?>(submitted);
             if (applicationId == "newer-application") return Task.FromResult<BootstrapApplicationResource?>(Newer);
             Assert.AreEqual(application.Metadata.Name, applicationId);
             Observations++;
-            if (DisconnectOnce && Observations == 1) throw new HttpRequestException("Synthetic disconnect");
-            if (!DisconnectOnce) return Task.FromResult<BootstrapApplicationResource?>(application);
+            if (DisconnectOnce && Observations == 2) throw new HttpRequestException("Synthetic disconnect");
+            if (!DisconnectOnce || Observations == 1) return Task.FromResult<BootstrapApplicationResource?>(application);
             return Task.FromResult<BootstrapApplicationResource?>(application with
             {
                 Definition = application.Definition with
@@ -221,6 +268,11 @@ public sealed class BootstrapProgressComponentTests
         public Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken)
         {
             Previews++;
+            LastSelection = selection;
+            if (selection.Applications is { Count: > 0 } applications)
+                return Task.FromResult(new BootstrapCompositionPreview(applications.Select(item => MixedProfiles.Single(profile => profile.Name == item.Profile)).ToArray(), BootstrapProfileScope.Instance, null, [], new string('a', 64),
+                    applications.Select(item => new BootstrapResourcePreview(item.Profile, item.Profile + ".yaml", "Parameter", item.Profile, BootstrapResourceDisposition.Create)).ToArray())
+                { Applications = applications.Select(item => new BootstrapProfileApplicationPreview(item.Profile, MixedProfiles.Single(profile => profile.Name == item.Profile).Scope, item.PlannedTarget?.TenantName ?? item.Target?.TenantId?.ToString() ?? "/instance", item.PlannedTarget is not null)).ToArray() });
             return Task.FromResult(new BootstrapCompositionPreview([CatalogProfile], BootstrapProfileScope.Instance, null, [], new string('a', 64),
                 [new("base", "one.yaml", "Parameter", "one", BootstrapResourceDisposition.Create)]));
         }
