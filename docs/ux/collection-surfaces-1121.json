@@ -7447,6 +7447,38 @@
         "review": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md",
         "uiChanged": true
       }
+    },
+    {
+      "id": "connected-service-operation-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/ConnectedServiceOperationResourceSummary.razor",
+      "line": 26,
+      "host": "console",
+      "routes": [
+        "/connected-service-operations/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Parameter configuration shared between overview and lazy exact-address Preview; current validation is recorded in collection-previews-1257.md."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
+        "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
+      }
     }
   ],
   "specialized": [
@@ -19066,6 +19098,11 @@
       "source": "src/Agentstration.Console.Components/Components/ResourcePlanResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Shared native saved Resource Plan review facts."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ConnectedServiceOperationResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Pure saved discovered-operation inspection Summary."
     }
   ],
   "reconciliation": {

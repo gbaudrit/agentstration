@@ -68,6 +68,24 @@ public sealed class ConnectedServiceDiscoveryPanelTests
         Assert.AreEqual(0, handler.Activations);
     }
 
+    [TestMethod]
+    public async Task PreviewRequestsTheExactOperationWithoutStartingDiscoveryOrActivation()
+    {
+        using var handler = new DiscoveryHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http, false);
+        ScopedResourceAddress? requested = null;
+        var cut = context.Render<ConnectedServiceDiscoveryPanel>(p => p.Add(c => c.Service, handler.Service)
+            .Add(c => c.PreviewRequested, address => requested = address));
+        await cut.Find("[data-testid=connected-service-operation-preview]").ClickAsync(new());
+        Assert.AreEqual(handler.Operation.ScopeRef, requested?.ScopeRef);
+        Assert.AreEqual(handler.Operation.Namespace, requested?.Namespace);
+        Assert.AreEqual(handler.Operation.Name, requested?.Name);
+        Assert.AreEqual(handler.Operation.Kind, requested?.Kind);
+        Assert.AreEqual(0, handler.Discoveries);
+        Assert.AreEqual(0, handler.Activations);
+    }
+
     private static async Task<BunitContext> SetupAsync(HttpClient http, bool write)
     {
         var context = new BunitContext().WithCollectionPresentation();

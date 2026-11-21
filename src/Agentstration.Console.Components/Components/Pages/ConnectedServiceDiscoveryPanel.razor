@@ -1,6 +1,7 @@
 @implements IDisposable
 @inject IConnectedServiceOperationsClient Client
 @inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
 
 <section class="panel discovery-panel" data-testid="connected-service-discovery" data-interactive="@(interactive ? "true" : "false")">
@@ -26,13 +27,15 @@
         else
         {
             <CollectionView TItem="ConnectedServiceOperationResource" Items="operations" IdentityLabel="@T("Discovery.Operation")" InformationLabels="@(new[] { T("Enabled"), T("Generation") })" RowTestId="connected-service-operation-row" ItemAttributes="OperationAttributes">
-                <Identity Context="operation"><CollectionIdentity DisplayName="@operation.Definition.DisplayName" Namespace="@operation.Namespace.Value" Name="@operation.Name" IconName="puzzle" Domain="tools"><IconBadges><ResourceScopeBadge ScopeRef="operation.ScopeRef" IconOnly /><StatusBadge Text="@T($"Discovery.Availability.{operation.ObservedState.Availability}")" Status="@OperationColor(operation.ObservedState.Availability)" IconOnly /><ManagedResourceBadge IsManaged="@operation.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))" IconOnly /></IconBadges><Badges><CopyableValue Value="@operation.Definition.ExternalId" /></Badges></CollectionIdentity></Identity>
+                <Identity Context="operation"><CollectionIdentity DisplayName="@operation.Definition.DisplayName" Namespace="@operation.Namespace.Value" Name="@operation.Name" Href="@OperationUrl(operation)" IconName="puzzle" Domain="tools"><IconBadges><ResourceScopeBadge ScopeRef="operation.ScopeRef" IconOnly /><StatusBadge Text="@T($"Discovery.Availability.{operation.ObservedState.Availability}")" Status="@OperationColor(operation.ObservedState.Availability)" IconOnly /><ManagedResourceBadge IsManaged="@operation.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))" IconOnly /></IconBadges><Badges><CopyableValue Value="@operation.Definition.ExternalId" /></Badges></CollectionIdentity></Identity>
                 <Information Context="operation"><CollectionValue Label="@T("Enabled")">@T(operation.Enabled ? "Yes" : "No")</CollectionValue><CollectionValue Label="@T("Generation")">@operation.Generation</CollectionValue></Information>
                 <Actions Context="operation">
-                    @if (operation.Definition.Definition.TryGetProperty("responseShape", out var shape) && shape.TryGetProperty("x-agentstration-response", out _))
-                    { <OperationSchemaCandidate Operation="operation" CanManage="@CanAuthorSchema" TargetScope="@ResourceOwnershipContext.TryGetCurrent(Services)" /> }
+                    <CollectionActions ResourceName="@operation.Definition.DisplayName"><a href="@OperationUrl(operation)"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a><button type="button" data-testid="connected-service-operation-preview" disabled="@(operation.ScopeRef is null)" @onclick="() => OpenPreview(operation)"><UiIcon Name="eye" />@Shared["Preview"]</button>
                     @if (CanManage && ResourceOwnershipContext.CanManage(operation.ScopeRef, Services))
                     { <button class="button-secondary" type="button" data-testid="connected-service-operation-enabled" disabled="@(busy || !interactive || !operation.Enabled && (!Service.Definition.Enabled || operation.ObservedState.Availability != ConnectedServiceOperationAvailability.Available || operation.Definition.Service.Generation != Service.Generation))" @onclick="() => ToggleAsync(operation)">@T(operation.Enabled ? "Discovery.DisableOperation" : "Discovery.EnableOperation")</button> }
+                    </CollectionActions>
+                    @if (operation.Definition.Definition.TryGetProperty("responseShape", out var shape) && shape.TryGetProperty("x-agentstration-response", out _))
+                    { <OperationSchemaCandidate Operation="operation" CanManage="@CanAuthorSchema" TargetScope="@ResourceOwnershipContext.TryGetCurrent(Services)" /> }
                 </Actions>
             </CollectionView>
         }
@@ -49,6 +52,11 @@
 </section>
 
 @code {
+    [Parameter] public EventCallback<ScopedResourceAddress> PreviewRequested { get; set; }
+    private string OperationUrl(ConnectedServiceOperationResource value) => ResourceOwnershipContext.Resource(Services, "/connected-service-operations", value.Name, value.Namespace, value.ScopeRef) + "#overview";
+    private Task OpenPreview(ConnectedServiceOperationResource value) => value.ScopeRef is { } owner
+        ? PreviewRequested.InvokeAsync(ScopedResourceAddress.Create(owner, value.Namespace, value.Kind, value.Name)) : Task.CompletedTask;
+
     [Parameter, EditorRequired] public ConnectedServiceResource Service { get; set; } = null!;
     [Parameter] public bool Supported { get; set; }
     private readonly CancellationTokenSource cancellation = new();

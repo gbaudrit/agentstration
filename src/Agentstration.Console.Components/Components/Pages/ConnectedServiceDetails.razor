@@ -40,7 +40,7 @@
         }
     </DefinitionContent>
     <AdditionalContent Context="path">
-        @if (path == "discovery" && resource is { } saved) { <ConnectedServiceDiscoveryPanel @key="saved.Uid" Service="saved" Supported="@(TypeVersion?.OperationDiscovery is not null)" /> }
+        @if (path == "discovery" && resource is { } saved) { <ConnectedServiceDiscoveryPanel @key="saved.Uid" Service="saved" PreviewRequested="OpenOperationPreview" Supported="@(TypeVersion?.OperationDiscovery is not null)" /> }
         else if (path == "dependents") { @Dependents }
     </AdditionalContent>
     <DraftActions><button type="button" class="button-secondary" disabled="@Busy" @onclick="DiscardDefinition">@Shared["Discard"]</button><button type="submit" form="@editor?.FormId" class="button-primary" disabled="@(Busy || editor?.CanEdit != true)" data-testid="connected-service-save">@T("Save")</button></DraftActions>
@@ -48,7 +48,15 @@
 <ConfirmationDialog IsOpen="confirmReconcile" Title="@T("Reconcile")" Message="@T("ReconcileConfirm")" ConfirmLabel="@T("Reconcile")" OnConfirm="ReconcileAsync" OnCancel="() => confirmReconcile = false" />
 <ConfirmationDialog IsOpen="confirmDeactivate" Title="@T("Deactivate")" Message="@T("DeactivateConfirm")" ConfirmLabel="@T("Deactivate")" OnConfirm="DeactivateAsync" OnCancel="() => confirmDeactivate = false" />
 
+<ResourceCollectionPreview @ref="operationPreview" ResourceKind="@ConnectedServiceResourceKinds.ConnectedServiceOperation" ContextKey="@(loadedKey)" Enabled="@(resource is not null)">
+    <ChildContent Context="address"><ConnectedServiceOperationResourcePreview Address="address" OverviewHref="@OperationPreviewUrl(address)" DefinitionHref="" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? operationPreview;
+    private void OpenOperationPreview(ScopedResourceAddress address) => operationPreview?.Open(address);
+    private string OperationPreviewUrl(ScopedResourceAddress address) => ResourceOwnershipContext.Resource(Services, "/connected-service-operations", address.Name, address.Namespace, address.ScopeRef) + "#overview";
+
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }

@@ -215,3 +215,9 @@ Validation: Release component/test build passed without warnings/errors; 36 reso
 The Provider Tools panel reuses the same saved Tool Summary and exact adapter as the standalone Tools catalog. Open selects overview; Preview is lazy and has no definition Edit. The existing activation toggle, availability/governance guards and fresh ETag path stay independent. Changing Provider identity or losing access clears the panel.
 
 Validation: Release component/test build passed without warnings/errors; 27 Provider Tools and Tool Preview tests passed. Browser and final offline checks remain pending.
+
+## ConnectedServiceOperation
+
+The embedded discovered-operation catalog now offers Open and lazy exact Preview. A read-only inspection overview shares saved identity/service/type pins, definition/digest and known manifest/time facts with Preview. No definition form or execution command is invented. The existing activation predicates and fresh ETag workflow remain in the parent panel; the existing schema-candidate authoring disclosure stays outside the menu. Reads use the existing exact operation GET without Service/type/discovery/Flow/history requests.
+
+Validation: Release component/test build passed without warnings/errors; 17 connected service operations tests passed. Browser and final offline checks remain pending.

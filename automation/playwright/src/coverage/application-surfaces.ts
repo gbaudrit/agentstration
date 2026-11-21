@@ -313,6 +313,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
     pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
     coverage: 'partial', trackingIssue: 1122,
   },
+  planned('connected-service-operation-details', `${consolePages}/ConnectedServiceOperationDetails.razor`, ['/connected-service-operations/{Name}'], 1258, ['name']),
   partialResourceAdministration('connected-service-details', `${consolePages}/ConnectedServiceDetails.razor`, ['/connected-services/{Name}'], 1048, ['name']),
   {
     id: 'connected-service-editor', host: 'console', source: `${consolePages}/ConnectedServiceEditor.razor`, routes: ['/connected-services/new', '/connected-services/{Name}/edit'], fixtureKeys: ['name'],

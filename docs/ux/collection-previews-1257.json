@@ -1129,6 +1129,35 @@
       ],
       "validation": "Release component/test build passed without warnings/errors; 27 Provider Tools and Tool Preview tests passed. Browser and final offline checks remain pending.",
       "evidence": "evidence/1257/tools/README.md"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor",
+      "routes": [
+        "/connected-services/{Name}#discovery"
+      ],
+      "rowTypes": [
+        "ConnectedServiceOperationResource"
+      ],
+      "family": "ConnectedServiceOperation",
+      "status": "implemented-validation-pending",
+      "coordinates": "Exact persisted ScopeRef + Namespace + Name; desired discovered operation snapshot.",
+      "overview": "/connected-service-operations/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview",
+        "Existing guarded activation with fresh ETag"
+      ],
+      "quickActions": [
+        "Open"
+      ],
+      "summary": "Saved identity, service/type pins, generation, definition/digest and known discovery manifest/time; no physical internal discovery Workspace in normal presentation.",
+      "loader": "GetOperationAtAddressAsync uses existing exact GET; no Service/type/Flow/history/schema reads. The native ConnectedServiceDetails host owns the shell outside lazily visited discovery content; direct/off-window Preview does not depend on opening the discovery section.",
+      "tests": [
+        "ConnectedServiceOperationResourcePreviewTests",
+        "ConnectedServiceDiscoveryPanelTests"
+      ],
+      "validation": "Release component build passed; 18 operation/discovery component cases passed including EN/FR exact reads, saved overview reuse, native activation ETags and exact Preview-request coordinates. Shared native navigation reserves Preview fragments. Browser/final broad verification pending."
     }
   ],
   "surfaces": [
