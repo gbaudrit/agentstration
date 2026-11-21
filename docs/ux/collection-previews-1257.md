@@ -143,3 +143,9 @@ Validation: Release component/test build passed without warnings/errors; 98 sour
 Saved Trigger identity, schedule, target, resolution and execution policy/input. Preview displays the logical administrative context, retaining the physical operational Workspace only in its exact address. The server rejects a requested physical owner different from the current operational context; no scope fallback, firing, schedule preview, history or Flow catalog read. Full details retain their existing failure observation and execution/history panels. The family Preview uses `ITriggerApiClient.GetAsync(exact physical owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 71 triggers tests passed. Browser and final offline checks remain pending.
+
+## TransformationFunction
+
+Saved identity, enabled state and immutable version-to-kind/configuration references. Full details may supply already loaded native contract observations; exact Preview does not load implementations, Function Kind catalogs, editor options or mutation state. The family Preview uses `ITransformationFunctionsClient.GetAsync(exact FunctionReference, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 34 transformation functions tests passed. Browser and final offline checks remain pending.

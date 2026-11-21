@@ -80,11 +80,13 @@ export async function startProductHosts(
   initialBootstrapEnabled = true,
   formPendingFixture = false,
   bootstrapProvenanceFixture = false,
+  collectionLayoutFixture = false,
 ): Promise<ProductHosts> {
+  if (collectionLayoutFixture && !governedInventoryFixture) throw new Error('Collection layout data requires the inventory fixture.');
   if (formPendingFixture && !organizationStructureFixture) throw new Error('Pending form data requires the organization fixture.');
   if ([acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture].filter(Boolean).length > 1) throw new Error('Browser fixture hosts are mutually exclusive.');
   return await withReservedLoopbackPorts(7, ports => startProductHostsOnPorts(
-    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture, ports,
+    authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture, collectionLayoutFixture, ports,
   ));
 }
 
@@ -98,6 +100,7 @@ async function startProductHostsOnPorts(
   initialBootstrapEnabled: boolean,
   formPendingFixture: boolean,
   bootstrapProvenanceFixture: boolean,
+  collectionLayoutFixture: boolean,
   ports: readonly LoopbackPortReservation[],
 ): Promise<ProductHosts> {
   const runId = `${Date.now()}-${process.pid}`;
@@ -193,6 +196,7 @@ async function startProductHostsOnPorts(
   const consoleHost = runDotnet(consoleProject, path.join(workDirectory, 'console.log'), {
     ...(organizationStructureFixture ? { ORGANIZATION_STRUCTURE_READY_FILE: fixtureReadyFile } : {}),
     ...(formPendingFixture ? { SHARED_FORM_PENDING_FIXTURE: 'true' } : {}),
+    ...(collectionLayoutFixture ? { COLLECTION_LAYOUT_FIXTURE: 'true' } : {}),
     ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
     ...(sourcePolicyFixture ? { SOURCE_POLICY_FIXTURE_KEY: sourcePolicyKey } : {}),
     ASPNETCORE_ENVIRONMENT: 'Development',

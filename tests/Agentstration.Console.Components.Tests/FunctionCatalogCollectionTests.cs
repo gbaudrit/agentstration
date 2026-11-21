@@ -36,7 +36,7 @@ public sealed class FunctionCatalogCollectionTests
         Assert.IsEmpty(cut.FindAll("input[type=search], [data-filter-key], .collection-page-number, .metric-card"));
         Assert.AreEqual(21, handler.LastTake);
         var headings = cut.FindAll("[data-testid=function-catalog] th");
-        Assert.HasCount(4, headings);
+        Assert.HasCount(5, headings);
         Assert.AreEqual(culture == "fr-FR" ? "Type de fonction" : "Function kind", headings[1].TextContent);
         Assert.IsTrue(cut.FindAll("[data-testid=function-catalog] .function-kind").All(value => value.TextContent == "native"));
         await cut.Find("[data-testid=function-catalog] .collection-pager button:last-child").ClickAsync(new());

@@ -758,7 +758,27 @@
         "TransformationFunctionResource",
         "FunctionKindResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "TransformationFunction",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/transformation-functions/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/transformation-functions/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, enabled state and immutable version-to-kind/configuration references. Full details may supply already loaded native contract observations; exact Preview does not load implementations, Function Kind catalogs, editor options or mutation state.",
+      "loader": "ITransformationFunctionsClient.GetAsync(exact FunctionReference, token)",
+      "tests": [
+        "TransformationFunctionResourcePreviewTests",
+        "TransformationFunctionCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 34 transformation functions tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",

@@ -6519,11 +6519,12 @@
     },
     {
       "id": "transformation-function-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
-      "line": 69,
+      "source": "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/transformation-functions/{Name}"
+        "/transformation-functions/{Name}",
+        "/transformation-functions"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6539,7 +6540,7 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "Reconciles the existing read-only saved configuration frame introduced upstream; no editor UI change or new browser claim."
+        "interpretation": "Saved TransformationFunction configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       }
     },
     {
@@ -19015,6 +19016,11 @@
       "source": "src/Agentstration.Console.Components/Components/TriggerResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved Trigger configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved TransformationFunction configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
