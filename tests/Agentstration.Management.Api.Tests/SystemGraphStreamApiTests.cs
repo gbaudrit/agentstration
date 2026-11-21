@@ -29,7 +29,12 @@ public sealed class SystemGraphStreamApiTests : ModelManagementApiTestBase
         {
             first = await store.PutExactAsync(owner, Profile("stream-first", owner, ns), null, true, default);
             var second = await store.PutExactAsync(owner, Profile("stream-second", owner, ns), null, true, default);
-            source.Owner = owner; source.Nodes = [ResourceSystemGraph.Node(first.Value), ResourceSystemGraph.Node(second.Value)];
+            source.Owner = owner;
+            // The artificial duplicate must match the Models contributor's display metadata.
+            source.Nodes = [
+                ResourceSystemGraph.Node(first.Value) with { DisplayName = first.Value.Definition.DisplayName },
+                ResourceSystemGraph.Node(second.Value) with { DisplayName = second.Value.Definition.DisplayName }
+            ];
         }
         using var client = factory.CreateClient(); SelectConsoleContext(client, owner);
         using var lifetime = new CancellationTokenSource(TimeSpan.FromSeconds(20));
