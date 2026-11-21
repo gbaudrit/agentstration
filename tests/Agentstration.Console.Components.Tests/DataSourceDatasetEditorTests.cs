@@ -187,8 +187,8 @@ public sealed partial class DataSourceDatasetEditorTests
     [TestMethod]
     [DataRow("en-US", "data_source_rule_invalid", "relative directory prefix")]
     [DataRow("fr-FR", "data_source_rule_invalid", "préfixe de répertoire relatif")]
-    [DataRow("en-US", "data_source_composition_invalid", "input, parameter and output contracts are compatible")]
-    [DataRow("fr-FR", "data_source_composition_invalid", "contrats d’entrée, de paramètres et de sortie sont compatibles")]
+    [DataRow("en-US", "data_source_composition_invalid", "JSON selection or projection")]
+    [DataRow("fr-FR", "data_source_composition_invalid", "sélection ou une projection JSON")]
     public async Task SaveFailureShowsLocalizedReasonAndCorrelationWithoutRawValues(string cultureName, string code, string expected)
     {
         using var culture = new TestCultureScope(cultureName);

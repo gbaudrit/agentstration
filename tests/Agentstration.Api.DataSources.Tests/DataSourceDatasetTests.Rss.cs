@@ -30,9 +30,13 @@ public sealed partial class DataSourceDatasetTests
             new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var fixture = await PrepareAsync(factory.Services, declareAcquisitionOutput: false,
-            operationResult: JsonSerializer.SerializeToElement(new { mediaType = "application/rss+xml", content = RssTransformationTestData.Feed(itemCount) }));
+            operationResult: JsonSerializer.SerializeToElement(new { mediaType = "application/rss+xml", content = RssTransformationTestData.Feed(itemCount) }),
+            operationOutputSchema: JsonSerializer.Deserialize<JsonElement>("""
+                {"type":"object","properties":{"mediaType":{"type":"string"},"content":{"type":"string"}},"required":["mediaType","content"],"additionalProperties":false}
+                """));
         using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         await RssTransformationTestData.CreateAsync(factory.Services, Owner);
+        if (itemCount == 0) await VerifyAcquisitionContentAdmissionAsync(factory.Services);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
         (string Point, bool DocumentStorage, bool Explode)[] cases = itemCount == 0
@@ -71,17 +75,30 @@ public sealed partial class DataSourceDatasetTests
                     Storage = point == "data-source" ? storage : fixture.Storage,
                     DocumentCollectionUid = point == "data-source" ? structured?.Collection : null,
                     Transformations = point != "data-source" ? [] : explode
-                        ? [new() { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "/content" }) }, convert, split]
-                        : [new() { Function = new("json-select-builtin", "1.0.0", Owner), Parameters = JsonSerializer.SerializeToElement(new { path = "/content" }) }, convert]
+                        ? [convert, split]
+                        : [convert]
                 }
             }
         }, default);
+        if (point == "data-source" && !explode)
+        {
+            var management = services.GetRequiredService<DataSourceManagementService>();
+            var rejected = await Assert.ThrowsExactlyAsync<DataSourceValidationException>(() => management.PutAsync(
+                source.Value.Namespace, source.Value.Name, Owner, source.Value.Definition with
+                { Dataset = source.Value.Definition.Dataset! with { Transformations = [convert with { FunctionInputSource = FlowCompositionFunctionInputSource.PreviousResult }] } }, source.ETag, default));
+            Assert.AreEqual("data_source_composition_invalid", rejected.Code);
+            Assert.AreEqual("flow_composition_function_input_incompatible", rejected.CompositionErrorCode);
+            Assert.AreEqual(source.ETag, (await management.GetAsync(source.Value.Namespace, source.Value.Name, Owner, default))!.ETag,
+                "An incompatible full-response call must preserve the saved content conversion sequence.");
+        }
         var acquired = await AcquireAsync(client, source.Value.Name);
         Assert.HasCount(1, acquired.Manifest!.Artifacts);
         Assert.HasCount(point == "data-source" && explode ? 2 : 1, acquired.Publication!.Records!.Members);
         if (point == "data-source")
         {
             var receipt = acquired.Dataset!.Composition!.Receipt!.Bindings["transformations"].Single(c => c.Function?.Name == "rss-xml-to-json");
+            Assert.AreEqual(FlowCompositionFunctionInputSource.AcquisitionContent, receipt.FunctionInputSource);
+            Assert.HasCount(explode ? 2 : 1, acquired.Dataset.Composition.Receipt.Bindings["transformations"]);
             Assert.IsNotNull(receipt.Function!.Uid);
             Assert.IsNotNull(receipt.Function.Digest);
         }

@@ -140,15 +140,28 @@ That wire contract is separate from the native XSD content contract. Input XML i
 validated against its frozen XSD before conversion. The converted object is
 validated against its frozen JSON Schema afterward.
 
-For HTTP Data Source acquisition, configure the existing transformation sequence:
+For HTTP Data Source acquisition, select the exposed function and its exact
+version directly as the first transformation. When the acquisition contract
+requires exactly the two string fields `mediaType` and `content` and refuses
+additional properties, a first function expecting a single string value receives
+`content`. Literal configuration parameters remain supported. The Console explains
+this selection; it is recorded as `functionInputSource: acquisitionContent` in the
+accepted composition receipt and compiled into the immutable invocation mapping.
+The raw response is still validated against the acquisition contract first, and
+the function validates its text content against the native XML contract.
 
-1. `json-select-builtin@1.0.0`, parameter `path: /content`, explicitly extracts
-   the XML string from `{mediaType, content}`.
-2. Select the exposed function and its exact version. The sequence supplies
-   `value`; there are no mapping rules to duplicate in the consumer.
-3. Optionally select `json-explode-builtin@1.0.0`, `path: /items`, with
-   `itemSchema.reference` selecting `rss-json@1.0.0` at
-   `/properties/items/items`.
+Optionally follow the conversion with `json-explode-builtin@1.0.0`, `path: /items`,
+and `itemSchema.reference` selecting `rss-json@1.0.0` at
+`/properties/items/items`. This uses one logical Artifact for the resulting records.
+
+Object-valued functions receive the complete response. Later functions receive the
+previous result; ordinary objects containing a `content` field are never unwrapped.
+Missing, optional, nullable or non-string response content does not trigger this
+adaptation. Explicit `json-select-builtin@1.0.0` with `path: /content` remains valid
+and is required for other envelope shapes. An incompatible edit fails before
+persistence. Existing accepted compositions retain their original selection;
+receipts predating this feature continue to use the whole previous result. Changing
+the sequence explicitly resolves and freezes a new selection. See [ADR-0240](../decisions/0240-acquisition-text-content-is-selected-at-admission.md).
 
 Ordinary Flow `transform` steps select the same function and explicitly map its
 `value` argument. Knowledge binding/before-publication transformations receive

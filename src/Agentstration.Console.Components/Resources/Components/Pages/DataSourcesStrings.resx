@@ -287,4 +287,7 @@
   <data name="SourceDiscard" xml:space="preserve"><value>Discard</value></data>
   <data name="SourceSettingValue" xml:space="preserve"><value>Value</value></data>
   <data name="SourceNamespaceInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
+  <data name="SequenceTextInputHelp" xml:space="preserve"><value>This function expects text from the previous step. If that step returns a JSON object, first add JSON selection to extract the text field (for an HTTP response: /content).</value></data>
+  <data name="SequenceFunctionInputIncompatible" xml:space="preserve"><value>A transformation function cannot accept the previous step’s result. Use JSON selection or projection to supply a value that matches its input contract.</value></data>
+  <data name="SequenceAcquisitionContentHelp" xml:space="preserve"><value>This transformation receives the text content of the acquisition response. This selection is fixed when saved.</value></data>
 </root>

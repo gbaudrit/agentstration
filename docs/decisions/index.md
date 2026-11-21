@@ -286,3 +286,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 238. [ADR-0238 — Resource-local sections use URL fragments](0238-fragment-selection-for-resource-navigation.md)
 
 239. [ADR-0239 — Transformation Schemas have explicit function exposure](0239-transformation-schemas-have-explicit-function-exposure.md)
+
+240. [ADR-0240 — Acquisition text content is selected at admission](0240-acquisition-text-content-is-selected-at-admission.md)
