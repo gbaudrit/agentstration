@@ -30,6 +30,7 @@ public sealed class ClearableControlTagHelperTests
             var html = output.PostElement.GetContent(HtmlEncoder.Default);
             StringAssert.Contains(html, $"aria-label=\"{expected}\"");
             StringAssert.Contains(html, "type=\"button\"");
+            StringAssert.Contains(html, "tabindex=\"-1\"");
             StringAssert.Contains(html, "hidden=\"hidden\"");
             Assert.IsFalse(html.Contains("type=\"submit\"", StringComparison.Ordinal));
 
@@ -48,6 +49,7 @@ public sealed class ClearableControlTagHelperTests
         var helper = new ClearableControlTagHelper(services.GetRequiredService<IStringLocalizer<SharedFormStrings>>()) { Label = "Expiry" };
         var output = Output("select", new() { { "name", "Input.ExpiresInDays" } }, "<option value=\"30\" selected>30 days</option>");
         await helper.ProcessAsync(Context(), output);
+        StringAssert.Contains(output.PostElement.GetContent(HtmlEncoder.Default), "tabindex=\"-1\"");
         StringAssert.Contains(output.PostContent.GetContent(HtmlEncoder.Default), "value=\"\"");
         Assert.IsFalse(output.PostContent.GetContent().Contains("disabled", StringComparison.Ordinal));
         var withEmpty = Output("select", new(), "<option value=\"\">Choose</option>");

@@ -15,8 +15,9 @@ for (const locale of ['en-US', 'fr-FR'] as const) for (const theme of ['light', 
     await testInfo.attach(Checkpoints.sharedForms.nativeAccount, { body: await forms.target().screenshot(), contentType: 'image/png' });
   });
 }
-for (const locale of ['en-US', 'fr-FR'] as const) {
-  test(`rejected native login keeps passwords write-only ${locale} ${locale === 'fr-FR' ? '@locale' : ''} @smoke`, async ({ page, product }) => {
+for (const locale of ['en-US', 'fr-FR'] as const) for (const mobile of [false, true]) {
+  const dimension = mobile ? '@responsive' : locale === 'fr-FR' ? '@locale' : '';
+  test(`rejected native login keeps passwords write-only ${locale} ${mobile ? 'mobile' : 'desktop'} ${dimension} @smoke`, async ({ page, product }) => {
     await new NativeFormsPage(page).inspectRejectedLogin(product.consoleUrl, locale);
   });
 }
