@@ -28,22 +28,40 @@ public static partial class WorkplaceEndpoints
         return Results.Ok(values);
     }
 
-    private static Task<IResult> GetEntryDraftAsync(string entryName, EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetEntrySummaryAsync(string entryName, HttpRequest request, IWorkplaceContext context,
+        EntryAdministrationService service, WorkplaceService workplace, CancellationToken token) => ExecuteAsync(async () =>
     {
+        if (!ResourceScopeRef.TryParse(request.Query["scopeRef"].ToString(), out var owner)
+            || owner != ResourceScopeRef.Workspace(context.WorkspaceId.Value)) return Results.NotFound();
+        var id = new EntryId(entryName, ResourceNamespace.Parse(request.Query["namespace"].ToString()));
+        var draft = await service.GetAsync(id, token);
+        EntryResource? published = null;
+        try { published = await workplace.GetEntryAsync(id, token); } catch (KeyNotFoundException) { }
+        return Results.Ok(new EntrySavedSummaryResponse(draft, published));
+    });
+
+    private static Task<IResult> GetEntryDraftAsync(string entryName, HttpRequest request, IWorkplaceContext context, EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        if (!MatchesEntryOwner(request, context)) return Results.NotFound();
         var draft = await service.GetAsync(EntryResourceId(entryName), token);
         EntryResource? published = null;
         try { published = await workplace.GetEntryAsync(draft.Id, token); } catch (KeyNotFoundException) { }
         return Results.Ok(new EntryDraftResponse(draft, published, IsManagedByPack(draft.Id, await packs.ListAsync(token))));
     });
 
-    private static Task<IResult> GetNamespacedEntryDraftAsync(string @namespace, string entryName, EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetNamespacedEntryDraftAsync(string @namespace, string entryName, HttpRequest request, IWorkplaceContext context, EntryAdministrationService service, WorkplaceService workplace, PackManagementService packs, CancellationToken token) => ExecuteAsync(async () =>
     {
+        if (!MatchesEntryOwner(request, context)) return Results.NotFound();
         var id = NamespacedEntryId(@namespace, entryName);
         var draft = await service.GetAsync(id, token);
         EntryResource? published = null;
         try { published = await workplace.GetEntryAsync(id, token); } catch (KeyNotFoundException) { }
         return Results.Ok(new EntryDraftResponse(draft, published, IsManagedByPack(id, await packs.ListAsync(token))));
     });
+
+    private static bool MatchesEntryOwner(HttpRequest request, IWorkplaceContext context) =>
+        !request.Query.ContainsKey("scopeRef") || ResourceScopeRef.TryParse(request.Query["scopeRef"].ToString(), out var owner)
+            && owner == ResourceScopeRef.Workspace(context.WorkspaceId.Value);
 
     private static bool IsManagedByPack(EntryId id, IReadOnlyList<StoredResource<InstalledPackResource>> packs) =>
         packs.Any(pack => pack.Value.Definition.ManagedResources.Any(resource =>

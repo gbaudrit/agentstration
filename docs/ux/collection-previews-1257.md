@@ -173,3 +173,9 @@ Validation: Release component/test build passed without warnings/errors; 82 pack
 Workers use their existing Instance/default AwpWorkerIdentity enrollment coordinates (WorkerId N), with native GUID detail URLs. Row and quick actions offer inspection; there is no business definition form. The pure Summary shares native identity, compatibility and capacity facts with full details, and omits unavailable UID/labels/publication facts. The lazy endpoint reads one enrollment, one in-memory registration and a WorkerId-filtered bounded active-assignment count; it never scans worker catalogs or loads recent assignment history. PlatformAdmin authorization remains on the API.
 
 Validation: Release component/test build passed without warnings/errors; 29 runtime workers tests passed. Browser and final offline checks remain pending.
+
+## Entry
+
+The native Entries card catalog gets Open, owned/unmanaged Edit and lazy Preview. Overview and Preview reuse saved draft configuration and the current persisted publication, with native Workspace/EntryId coordinates. The endpoint rejects a different execution Workspace before reading, and loads only the draft and current publication, without pickers, usage, validation, publication or Pack-catalog scans. Logical scope replaces internal operational Workspace presentation. Preview Edit requires the loaded catalog's known non-managed flag; a direct link outside that loaded catalog offers Open until the full editor resolves governance. No unknown management state is treated as editable. No UID or labels are invented for this native Work resource.
+
+Validation: Release component/test build passed without warnings/errors; 39 entries tests passed. Browser and final offline checks remain pending.

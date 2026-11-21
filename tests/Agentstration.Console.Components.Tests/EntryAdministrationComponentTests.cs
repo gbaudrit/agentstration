@@ -73,8 +73,8 @@ public sealed partial class EntryAdministrationComponentTests
         Assert.AreEqual("Published", rendered.Find(".status-icon-only button").GetAttribute("aria-label"));
         Assert.AreEqual($"/workspaces/{client.EntryDrafts[0].Value.WorkspaceId.Value:D}", rendered.Find(".resource-owner-icon").GetAttribute("data-scope-ref"));
         Assert.IsFalse(rendered.Markup.Contains("Draft r", StringComparison.Ordinal));
-        Assert.IsTrue(rendered.Markup.Contains("Configure", StringComparison.Ordinal));
-        Assert.AreEqual("/entries/prepare-report", rendered.Find(".entry-card-link").GetAttribute("href"));
+        Assert.IsTrue(rendered.Markup.Contains("Edit definition", StringComparison.Ordinal));
+        Assert.AreEqual($"/entries/prepare-report?scopeRef={Uri.EscapeDataString($"/workspaces/{client.EntryDrafts[0].Value.WorkspaceId.Value:D}")}&context={Uri.EscapeDataString($"/workspaces/{client.EntryDrafts[0].Value.WorkspaceId.Value:D}")}#overview", rendered.Find(".entry-card-link").GetAttribute("href"));
     }
 
     [TestMethod]
@@ -533,7 +533,8 @@ public sealed partial class EntryAdministrationComponentTests
         public bool HasWorkspace { get; set; } = true;
         public bool EntryManagedByPack { get; init; }
 
-        public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) => Task.FromResult(EntryDrafts);
+        public int CatalogReads { get; private set; }
+        public Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) { CatalogReads++; return Task.FromResult(EntryDrafts); }
         public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken)
             => GetEntryAsync(Agentstration.Resources.ResourceNamespace.Default, name, cancellationToken);
         public Task<EntryDraftResponse> GetEntryAsync(Agentstration.Resources.ResourceNamespace @namespace, string name, CancellationToken cancellationToken)

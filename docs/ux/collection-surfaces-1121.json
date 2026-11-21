@@ -6779,7 +6779,7 @@
     },
     {
       "id": "entry-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/EntryResourceSummary.razor",
       "host": "console",
       "routes": [
         "/entries/{Name}",
@@ -6794,7 +6794,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 53,
+      "line": 23,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -19051,6 +19051,11 @@
       "source": "src/Agentstration.Console.Components/Components/RuntimeWorkerResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Pure native enrollment/registration snapshot Summary; definition-list values are not a new dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/EntryResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Pure saved Entry Summary; native identity has no Resource UID/labels."
     }
   ],
   "reconciliation": {

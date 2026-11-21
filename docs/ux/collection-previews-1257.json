@@ -945,6 +945,36 @@
         "PackProjectDetailsTests"
       ],
       "validation": "Release component/test build passed without warnings/errors; 82 pack projects tests passed. Browser and final offline checks remain pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Entries.razor",
+      "routes": [
+        "/entries"
+      ],
+      "rowTypes": [
+        "EntryDraftResponse"
+      ],
+      "family": "Entry",
+      "status": "implemented-validation-pending",
+      "coordinates": "Existing physical execution Workspace + EntryId namespace/name; native Entry has no Resource UID/labels.",
+      "overview": "/[namespaces/{namespace}/]entries/{name}?scopeRef={physical-owner}&context={context}#overview",
+      "edit": "/[namespaces/{namespace}/]entries/{name}?scopeRef={physical-owner}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (owned, authorized, not managed by Pack)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (known not managed, owned, authorized)"
+      ],
+      "summary": "Saved Entry draft identity/presentation/exposure/binding/behavior plus current persisted published version/target.",
+      "loader": "GetEntrySummaryAsync: exact current execution Workspace/EntryId draft + current publication only.",
+      "tests": [
+        "EntryResourcePreviewTests",
+        "EntryAdministrationComponentTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 39 entries tests passed. Browser and final offline checks remain pending."
     }
   ],
   "surfaces": [

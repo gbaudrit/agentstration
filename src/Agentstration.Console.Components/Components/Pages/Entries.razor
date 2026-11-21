@@ -1,14 +1,18 @@
 @page "/entries"
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @rendermode InteractiveServer
 @inject IEntryAdministrationApiClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceStrings> Localizer
 
 <PageTitle>@T("Entries") · Agentstration</PageTitle>
 <PageHeader Eyebrow="Workplace" Title="@T("Entries")" Description="@T("Entries.Description")" TestId="resource-entries">
-    <Actions><a class="button-primary entry-create-action" href="/entries/new"><UiIcon Name="plus" />@T("CreateEntry")</a></Actions>
+    <Actions><a class="button-primary entry-create-action" href="@ResourceOwnershipContext.PreserveNavigation("/entries/new", Services)"><UiIcon Name="plus" />@T("CreateEntry")</a></Actions>
 </PageHeader>
 
 @if (loading) { <LoadingState Message="@T("LoadingEntries")" /> }
+else if (loadState.BlocksContent) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" /> }
 else if (items.Count == 0) { <EmptyState Title="@T("NoEntries")" Message="@T("NoEntriesMessage")" /> }
 else
 {
@@ -29,18 +33,22 @@ else
             @foreach (var item in items)
             {
                 <article role="listitem" class="entry-card @(item.Published is null ? "entry-card-draft" : "entry-card-published")">
-                    <CollectionIdentity DisplayName="@item.Value.DisplayName" Namespace="@item.Value.Id.Namespace.Value" Name="@item.Value.Id.Value" Href="@ConsoleResourceUrls.Entry(item.Value.Id)" IconName="entry" class="resource-name-link entry-card-link"><Versions><CollectionVersion Label="@T("PublishedVersionLabel")" Value="@item.Published?.Version.ToString()" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="@ResourceScopeRef.Workspace(item.Value.WorkspaceId.Value)" IconOnly /><StatusBadge Text="@(item.Published is null ? T("Draft") : T("Published"))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" IconOnly /><ManagedResourceBadge IsManaged="@item.ManagedByPack" IconOnly /></IconBadges></CollectionIdentity>
+                    <CollectionIdentity DisplayName="@item.Value.DisplayName" Namespace="@item.Value.Id.Namespace.Value" Name="@item.Value.Id.Value" Href="@EntryUrl(item, "overview")" IconName="entry" class="resource-name-link entry-card-link"><Versions><CollectionVersion Label="@T("PublishedVersionLabel")" Value="@item.Published?.Version.ToString()" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="@PresentationScope(item)" IconOnly /><StatusBadge Text="@(item.Published is null ? T("Draft") : T("Published"))" Status="@(item.Published is null ? UiStatus.Warning : UiStatus.Success)" IconOnly /><ManagedResourceBadge IsManaged="@item.ManagedByPack" IconOnly /></IconBadges></CollectionIdentity>
                     <div class="entry-card-context">
                         <p class="entry-kind">@T("EntryKind", EnumLabel("Presentation", item.Value.Presentation.Kind))</p>
                         <p class="entry-description">@(string.IsNullOrWhiteSpace(item.Value.Description) ? T("EntryFallbackDescription", ResourceName(item.Value.Binding.ResourceId)) : item.Value.Description)</p>
                         <p class="entry-metadata">@EnumLabel("Binding", item.Value.Binding.Kind) <strong>@ResourceName(item.Value.Binding.ResourceId)</strong></p>
                     </div>
-                    <CollectionActions ResourceName="@($"{item.Value.DisplayName} ({item.Value.Id.Namespace}/{item.Value.Id.Value})")"><Primary><a class="button-secondary" href="@ConsoleResourceUrls.Entry(item.Value.Id)">@T("Configure")</a></Primary></CollectionActions>
+                    <CollectionActions ResourceName="@($"{item.Value.DisplayName} ({item.Value.Id.Namespace}/{item.Value.Id.Value})")"><a href="@EntryUrl(item, "overview")">@Shared["OpenItem"]</a>@if (CanEdit(item)) { <a href="@EntryUrl(item, "definition/configuration")">@Shared["EditDefinition"]</a> }<button type="button" data-testid="entry-preview" @onclick="() => OpenPreview(item)">@Shared["Preview"]</button></CollectionActions>
                 </article>
             }
         </div>
     </section>
 }
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="@EntryResourceKinds.Entry" ContextKey="@ContextKey" Enabled="@(contextState?.Current is not null && contextState.Error is null && contextState.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><EntryResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" ManagedByPack="@KnownManagement(address)" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
     private bool loading = true;
@@ -48,11 +56,39 @@ else
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private int PublishedCount => items.Count(item => item.Published is not null);
 
+    private ResourceCollectionPreview? preview;
+    private ConsoleContextState? contextState;
+    private CancellationTokenSource? pending;
+    private long revision;
+    private bool disposed;
+    private string? ContextKey => contextState?.Current is { } current ? $"{current.UserId}|{current.SelectedScopeRef}|{current.WorkspaceId}" : null;
+    private bool CanEdit(EntryDraftResponse item) => !item.ManagedByPack && (contextState is null || contextState.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.Value.WorkspaceId.Value == contextState.Current?.WorkspaceId);
+    private ResourceScopeRef PresentationScope(EntryDraftResponse item) => contextState?.Current is { } context && item.Value.WorkspaceId.Value == context.WorkspaceId ? ResourceScopeRef.Parse(context.SelectedScopeRef) : ResourceScopeRef.Workspace(item.Value.WorkspaceId.Value);
+    private string EntryUrl(EntryDraftResponse item, string section) => PreviewUrl(ScopedResourceAddress.Create(ResourceScopeRef.Workspace(item.Value.WorkspaceId.Value), item.Value.Id.Namespace, EntryResourceKinds.Entry, item.Value.Name), section);
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.Entry(new(address.Name, address.Namespace)), Services), address.ScopeRef) + "#" + section;
+    private bool? KnownManagement(ScopedResourceAddress address) => items.FirstOrDefault(item => item.Value.Name == address.Name && item.Value.Id.Namespace == address.Namespace && ResourceScopeRef.Workspace(item.Value.WorkspaceId.Value) == address.ScopeRef)?.ManagedByPack;
+    private void OpenPreview(EntryDraftResponse item) => preview?.Open(ScopedResourceAddress.Create(ResourceScopeRef.Workspace(item.Value.WorkspaceId.Value), item.Value.Id.Namespace, EntryResourceKinds.Entry, item.Value.Name));
     protected override async Task OnInitializedAsync()
     {
-        items = await Client.GetEntriesAsync(default);
-        loading = false;
+        contextState = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetService<ConsoleContextState>(Services);
+        if (contextState is not null) { await contextState.EnsureLoadedAsync(default); if (disposed) return; contextState.Changed += ContextChanged; }
+        await LoadAsync();
     }
+    private void ContextChanged() => _ = InvokeAsync(async () => { preview?.Close(); items = []; await LoadAsync(); if (!disposed) StateHasChanged(); });
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private async Task LoadAsync()
+    {
+        if (disposed) return;
+        var request = ++revision; var key = ContextKey; pending?.Cancel(); pending?.Dispose(); pending = new(); var token = pending.Token;
+        if (contextState is not null && (contextState.Error is not null || !contextState.HasPermission(AuthorizationPermissions.ResourcesRead))) { items = []; loading = false; loadState = new(ResourceLoadStatus.Forbidden); return; }
+        loading = true;
+        try { var saved = await Client.GetEntriesAsync(token); if (disposed || request != revision || key != ContextKey) return; items = saved; loadState = new(ResourceLoadStatus.Ready); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception error) when (error is AgentstrationApiException or HttpRequestException)
+        { if (disposed || request != revision || key != ContextKey) return; items = []; var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode; loadState = new(status is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized ? ResourceLoadStatus.Forbidden : status == System.Net.HttpStatusCode.NotFound ? ResourceLoadStatus.NotFound : ResourceLoadStatus.Failed) { ErrorId = (error as AgentstrationApiException)?.ErrorId }; }
+        finally { if (!disposed && request == revision) loading = false; }
+    }
+    public void Dispose() { disposed = true; revision++; if (contextState is not null) contextState.Changed -= ContextChanged; pending?.Cancel(); pending?.Dispose(); }
 
     private string EnumLabel<TEnum>(string prefix, TEnum value) where TEnum : struct, Enum => T($"{prefix}.{value}");
     private static string ResourceName(string id) => id[(id.LastIndexOf('/') + 1)..];

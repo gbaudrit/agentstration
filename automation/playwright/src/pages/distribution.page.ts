@@ -125,11 +125,21 @@ export class DistributionPage {
     await expect(entry).toBeVisible();
     await expect(entry.locator('.collection-version-label')).toHaveText(CollectionVersionTextByLocale[locale].active);
     await expect(entry.locator('.resource-owner-icon')).toHaveAttribute('data-scope-ref', `/workspaces/${workspaceId}`);
-    const configure = entry.locator('.collection-primary-actions').getByRole('link', { name: CollectionVersionTextByLocale[locale].configure, exact: true });
-    await expect(configure).toBeVisible();
-    await expect(configure.locator('xpath=ancestor::details')).toHaveCount(0);
-    await expect(entry.locator('details')).toHaveCount(0);
-    expect(await configure.getAttribute('href')).toBe(await entry.locator('.resource-name-link').getAttribute('href'));
+    const actions = entry.locator('.collection-actions-menu');
+    await expect(actions).toHaveCount(1);
+    await actions.locator('summary').click();
+    const open = actions.getByRole('link', { name: CollectionVersionTextByLocale[locale].open, exact: true });
+    await expect(open).toBeVisible();
+    const overview = await entry.locator('.resource-name-link').getAttribute('href');
+    expect(await open.getAttribute('href')).toBe(overview);
+    expect(overview).toMatch(/#overview$/);
+    const edit = actions.getByRole('link', { name: CollectionVersionTextByLocale[locale].editDefinition, exact: true });
+    if (await entry.locator('.managed-resource-badge').count()) await expect(edit).toHaveCount(0);
+    else {
+      await expect(edit).toBeVisible();
+      expect(await edit.getAttribute('href')).toBe(overview!.replace(/#overview$/, '#definition/configuration'));
+    }
+    await this.page.keyboard.press('Escape');
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
   }
 
