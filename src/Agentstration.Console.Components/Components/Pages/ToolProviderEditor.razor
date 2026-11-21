@@ -40,8 +40,7 @@ else
         AdditionalSections="AdditionalSections" Feedback="feedback" HasDraft="IsDirty" DefinitionReadOnlyReason="@(CanMutate ? null : ResourceReadOnlyReason.InsufficientPermissions)"
         Yaml="@SavedYaml" Busy="busy" TestId="resource-tool-provider-editor" SectionTestIdPrefix="provider">
         <OverviewMetrics>@if (provider is not null) { <MetricCard Label="@T("Tools")" Value="@ToolCount(tools.Count)" /><MetricCard Label="@T("LastDiscovery")" Value="@(provider.Definition.Discovery.LastDiscoveryAt?.ToString("g") ?? T("Never"))" /> }</OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
-        <OverviewContent>@Ownership</OverviewContent>
+        <OverviewSummary Context="identity">@if (provider is not null) { <ToolProviderResourceSummary Resource="provider" Identity="identity" AdditionalContent="Ownership" /> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="tool-provider-resource-form" FormName="tool-provider-editor" data-resource-etag="@etag"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
             InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanMutate)" /></DefinitionContent>
@@ -97,31 +96,6 @@ else
         }
 </div>;
     private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><ChildContent><dl class="resource-details"><dt>@Shared["Identity"]</dt><dd>@model.DisplayName<br /><code>@model.Name</code></dd><dt>@T("ProviderType")</dt><dd>@model.ProviderType</dd><dt>@T("Connection")</dt><dd>@(model.ProviderType == ToolProviderType.Aep ? model.ExtensionId : model.Transport == McpToolProviderTransport.Stdio ? model.Command : model.Endpoint)</dd><dt>@T("Enabled")</dt><dd>@BooleanLabel(model.Enabled)</dd><dt>@Shared["Scope"]</dt><dd><ResourceScopeBadge ScopeRef="model.ScopeRef" /></dd></dl></ChildContent></FormSection>;
-
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration
-    {
-        get
-        {
-            if (provider is null) return [];
-            var definition = provider.Definition;
-            var rows = new List<ConfigurationEntry> { new(T("ProviderType"), definition.ProviderType.ToString()), new(T("Enabled"), BooleanLabel(definition.Enabled)) };
-            if (definition.Mcp is { } mcp)
-            {
-                rows.Add(new(T("Transport"), mcp.Transport.ToString()));
-                if (mcp.Transport == McpToolProviderTransport.StreamableHttp) rows.Add(new(T("Endpoint"), mcp.Endpoint?.ToString() ?? Shared["NotProvided"]));
-                else
-                {
-                    rows.Add(new(T("Command"), mcp.Command ?? Shared["NotProvided"]));
-                    rows.Add(new(T("Arguments"), string.Join("\n", mcp.Arguments ?? [])));
-                    rows.Add(new(T("WorkingDirectory"), mcp.WorkingDirectory ?? Shared["NotProvided"]));
-                    rows.Add(new(T("EnvironmentReferences"), string.Join("\n", (mcp.EnvironmentReferences ?? new Dictionary<string, string>()).Select(pair => $"{pair.Key}={pair.Value}"))));
-                }
-            }
-            if (definition.Aep is { } aep) rows.Add(new(T("AepExtensionId"), $"{aep.Extension.Namespace ?? provider.Namespace}/{aep.Extension.Name}"));
-            return rows;
-        }
-    }
 
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }

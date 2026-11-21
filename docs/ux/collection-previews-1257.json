@@ -474,7 +474,27 @@
       "rowTypes": [
         "ToolProviderResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "ToolProvider",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/tools/providers/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/tools/providers/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, localized provider type, enabled state, MCP transport/endpoint or command/argument/environment references and AEP Extension reference. Full details retain the existing ownership banner, discovery, tests, toggles and discovered Tools. Preview does not probe a provider or enumerate Tools.",
+      "loader": "IToolsClient.GetProviderAsync(owner, namespace, name, token)",
+      "tests": [
+        "ToolProviderResourcePreviewTests",
+        "ToolProviderCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 34 tool providers tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
