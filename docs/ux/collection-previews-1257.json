@@ -379,7 +379,27 @@
       "rowTypes": [
         "StorageResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Storage",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/storages/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/storages/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, pinned type/version, configuration/envelope, collections, access policy and declared Connected Service/export mappings. Preview never loads the type catalog, usages, diagnostics or document contents. The full overview retains its resolved type display name.",
+      "loader": "IStoragesClient.GetAsync(exact address, token)",
+      "tests": [
+        "StorageResourcePreviewTests",
+        "StorageCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 140 storages tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",

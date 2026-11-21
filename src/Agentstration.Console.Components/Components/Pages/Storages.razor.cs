@@ -46,7 +46,7 @@ public partial class Storages
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { items = null; loadedQuery = null; pagination = null; requested = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); items = null; loadedQuery = null; pagination = null; requested = new(); contextKey = scope; }
         query = requested;
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {

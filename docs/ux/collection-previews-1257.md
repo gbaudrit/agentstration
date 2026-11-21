@@ -45,3 +45,9 @@ Validation: Release component/test build passed without warnings/errors; 56 Conn
 Saved identity, enabled flag, preferred immutable version, observed generic-use decision and access policy. Full details retain usages and version-contract panels without fetching usages/history for Preview. The independently supplied Preview quick actions add the existing version publication form. The family Preview uses `IStorageTypesClient.GetTypeAsync(exact address, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 54 storage types tests passed. Browser and final offline checks remain pending.
+
+## Storage
+
+Saved identity, pinned type/version, configuration/envelope, collections, access policy and declared Connected Service/export mappings. Preview never loads the type catalog, usages, diagnostics or document contents. The full overview retains its resolved type display name. The family Preview uses `IStoragesClient.GetAsync(exact address, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 140 storages tests passed. Browser and final offline checks remain pending.
