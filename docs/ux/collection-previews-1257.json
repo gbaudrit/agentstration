@@ -11,7 +11,13 @@
       "rowTypes": [
         "ExecutionSummary"
       ],
-      "status": "assessment-pending"
+      "status": "not-applicable-non-resource",
+      "family": "Execution history",
+      "decision": "ExecutionSummary is a bounded projection of RuntimeRun activity: run ID, execution status, start/duration and result/error. Its native /runs/{id} destination is operational diagnostics, with no saved definition, namespace or standalone authoring form. Retain native run inspection and server paging; no resource-definition Summary or Edit is manufactured.",
+      "tests": [
+        "RuntimeObservabilityConsoleTests"
+      ],
+      "validation": "Source and native DTO contract reviewed. Existing family regressions retained; final broad verification records the synchronized result."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
@@ -1318,7 +1324,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-runtime-evidence",
+      "reason": "ExecutionSummary is a bounded projection of RuntimeRun activity: run ID, execution status, start/duration and result/error. Its native /runs/{id} destination is operational diagnostics, with no saved definition, namespace or standalone authoring form. Retain native run inspection and server paging; no resource-definition Summary or Edit is manufactured."
     },
     {
       "id": "agent-editor-resolved-agent-tool-set-assignment",

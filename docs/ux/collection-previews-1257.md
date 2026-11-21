@@ -233,3 +233,9 @@ Validation: Release component/shared builds passed without warnings/errors; 6 sc
 Both durable and staged catalog branches expose native Open and Preview. They remain read-only saved records; retention, purge, content, record reads and materialization keep their existing full-page workflows and permission checks. Both summaries are shared with full overviews. Durable identity uses actual Core metadata. A staged metadata projection carries actual UID, namespace, owner, labels and governance alongside its existing safe view, without exposing backend references. Exact reads reject a different current execution Workspace or namespace before loading metadata. The UI preserves the logical administrative navigation context without promoting an internal operational Workspace to a user scope.
 
 List rendering loads its existing two metadata catalogs only. Preview adds one selected metadata request and no content, lease, record, materialization or producer lookup. Context replacement cancels and clears the preview. Browser and final offline verification remain pending.
+
+### Execution history
+
+ExecutionSummary is a bounded projection of RuntimeRun activity: run ID, execution status, start/duration and result/error. Its native /runs/{id} destination is operational diagnostics, with no saved definition, namespace or standalone authoring form. Retain native run inspection and server paging; no resource-definition Summary or Edit is manufactured.
+
+Regression ownership: `RuntimeObservabilityConsoleTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
