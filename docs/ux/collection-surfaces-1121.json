@@ -6173,11 +6173,12 @@
     },
     {
       "id": "source-provider-details-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
-      "line": 40,
+      "source": "src/Agentstration.Console.Components/Components/SourceProviderResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/sourceproviders/{Name}"
+        "/sourceproviders/{Name}",
+        "/sourceproviders"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6195,7 +6196,7 @@
           "tests/distribution.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved extension coordinates and source-provider contribution; option contracts remain specialized descriptors with their own preferred versions and source-channel context."
+        "interpretation": "Saved SourceProvider configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18988,6 +18989,11 @@
       "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved KnowledgeSource configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SourceProviderResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved SourceProvider configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

@@ -63,7 +63,7 @@ public sealed class SourceProviderConsoleTests
         {
             StringAssert.Contains(rendered.Markup, "Git Source Provider");
             StringAssert.Contains(rendered.Markup, "Available");
-            Assert.AreEqual("/sourceproviders/git-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance", rendered.Find(".resource-name-link").GetAttribute("href"));
+            Assert.AreEqual("/sourceproviders/git-local?namespace=default&scopeRef=%2Finstance&context=%2Finstance#overview", rendered.Find(".resource-name-link").GetAttribute("href"));
         });
     }
 
@@ -280,6 +280,7 @@ public sealed class SourceProviderConsoleTests
         public int Deletes { get; private set; }
         public int Reads { get; private set; }
         public string? LastEtag { get; private set; }
+        public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) => GetSourceProviderAsync(ns, name, token);
         public Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) { Reads++; return Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<SourceProviderResource>(Managed ? Saved with { Governance = ResourceGovernance.Core("source-provider") } : Saved, "\"initial\"")); }
         public Task<ResourceSnapshot<SourceProviderResource>> CreateSourceProviderAsync(CreateSourceProviderRequest request, CancellationToken cancellationToken)
         {

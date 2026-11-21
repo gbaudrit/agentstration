@@ -119,3 +119,9 @@ Validation: Release component/test build passed without warnings/errors; 137 dat
 Saved identity, exact declared Flow references, projection parameters, input bindings, output storage pin and lifecycle/composition policy. Both full details and the standalone edit adapter reuse the saved Summary. Preview reads no readiness, resolved Flows, snapshots, Tool exposure, data-source/Storage catalogs or document content. Full-detail observations remain supplied by the owning page. The family Preview uses `IKnowledgeSourcesClient.GetAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. Browser and final offline checks remain pending.
+
+## SourceProvider
+
+Saved identity and declared Extension/contribution reference. Existing exact owner/namespace/name reads are reused; legacy client implementations now reject unsupported exact reads instead of silently ignoring the owner. Preview does not inspect Extension connections, enumerate contributions, probe the provider or read usages. Catalog Platform administrator authorization remains enforced by the existing endpoint. The family Preview uses `ISourceProvidersClient.GetSourceProviderAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 34 source providers tests passed. Browser and final offline checks remain pending.
