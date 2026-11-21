@@ -393,6 +393,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('bootstrap-profiles', `${consolePages}/BootstrapProfiles.razor`, ['/settings/bootstrap']),
   planned('bootstrap-startup-progress', `${consolePages}/BootstrapStartupProgress.razor`, ['/startup/progress'], 1251),
   coveredDistribution('packs', `${consolePages}/Packs.razor`, ['/packs']),
+  planned('installed-pack-details', `${consolePages}/InstalledPackDetails.razor`, ['/packs/resources/{Name}'], 1258, ['name']),
   coveredDistribution('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], [], 'create-pack-project'),
   coveredDistribution('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], ['projectId'], 'create-pack-project'),
   {

@@ -155,3 +155,9 @@ Validation: Release component/test build passed without warnings/errors; 34 tran
 The separate Function Kind catalog retains its existing immutable contract expansion and guarded activation command inside the row menu, and adds Open/Preview. A read-only addressable detail composes the same saved Summary through OverviewSummary. Preview performs only the exact kind read and never loads implementation choices or mutates activation. The native version/executor/schema dataset remains explicitly inventoried.
 
 Validation: Release component/test build passed without warnings/errors; 48 function kinds tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/function-kinds/README.md). Final offline lanes remain pending.
+
+## InstalledPack
+
+Saved installation identity/version, destination namespace, purpose/audience, source/installation facts, persisted Source provenance and declared binding/managed-resource records. The existing native management panel and new read-only details reuse the same saved Summary. Preview reads exactly one canonical Pack address through the existing scoped endpoint; malformed/non-default-namespace addresses never scan or fall back. Installation management remains a separate supplied navigation action for authorized owned installations, with its existing dialogs/ETags. The family Preview uses `IPacksClient.GetPackAtAddressAsync(exact address, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 70 installed packs tests passed. Browser and final offline checks remain pending.

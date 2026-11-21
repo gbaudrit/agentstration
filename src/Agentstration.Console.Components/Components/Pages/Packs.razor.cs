@@ -27,12 +27,17 @@ public partial class Packs
 
     [SupplyParameterFromQuery(Name = "publisher")] public string? RequestedPublisher { get; set; }
     [SupplyParameterFromQuery(Name = "name")] public string? RequestedName { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedScopeRef { get; set; }
+
+    private string? requestedSelectionKey;
+    private string RequestedSelectionKey => $"{RequestedPublisher}|{RequestedName}|{RequestedScopeRef}|{CurrentContextKey}";
 
     private const long MaximumArchiveBytes = 8 * 1024 * 1024;
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<InstalledPackResource>? packs;
     private IReadOnlyList<PackProjectResource>? projects;
     private ResourceSnapshot<InstalledPackResource>? selected;
+    private ResourceScopeRef? KnownEntryExecutionOwner => selected?.Value.ScopeRef?.Value == Context.Current?.SelectedScopeRef && Context.Current?.WorkspaceId is { } workspace && workspace != Guid.Empty ? ResourceScopeRef.Workspace(workspace) : null;
     private string? sourceDisplayName;
     private string? sourceUrl;
     private AgentstrationApiException? error;
@@ -107,6 +112,16 @@ public partial class Packs
         contextKey = CurrentContextKey; initialized = true;
         await LoadAsync();
     }
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!initialized || disposed || requestedSelectionKey == RequestedSelectionKey) return;
+        requestedSelectionKey = RequestedSelectionKey;
+        if (string.IsNullOrWhiteSpace(RequestedPublisher) || string.IsNullOrWhiteSpace(RequestedName)) return;
+        var match = packs?.FirstOrDefault(pack => pack.Definition.Publisher == RequestedPublisher
+            && pack.Definition.PackName == RequestedName && pack.ScopeRef?.Value == (RequestedScopeRef ?? Context.Current?.SelectedScopeRef));
+        if (match is not null) await SelectAsync(match);
+    }
+
     protected override void OnAfterRender(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } }
     private Task ChangeQueryAsync(CollectionQuery next)
     {
@@ -121,6 +136,7 @@ public partial class Packs
     private async Task LoadAsync()
     {
         if (disposed) return;
+        requestedSelectionKey = RequestedSelectionKey;
         var requestRevision = ++revision;
         pending?.Cancel(); pending?.Dispose();
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
@@ -133,6 +149,7 @@ public partial class Packs
         }
         loading = true; error = null;
         loadState = new(packs is null ? ResourceLoadStatus.Loading : ResourceLoadStatus.Refreshing) { HasContent = packs is not null };
+        requestedSelectionKey = RequestedSelectionKey;
         var primaryLoaded = false;
         try
         {
@@ -141,7 +158,7 @@ public partial class Packs
             if (!IsCurrent(requestRevision, scope)) return;
             packs = result; projects = projectResult; primaryLoaded = true; CorrectPage();
             var match = !string.IsNullOrWhiteSpace(RequestedPublisher) && !string.IsNullOrWhiteSpace(RequestedName)
-                ? packs.FirstOrDefault(pack => pack.Definition.Publisher == RequestedPublisher && pack.Definition.PackName == RequestedName)
+                ? packs.FirstOrDefault(pack => pack.Definition.Publisher == RequestedPublisher && pack.Definition.PackName == RequestedName && pack.ScopeRef?.Value == (RequestedScopeRef ?? Context.Current?.SelectedScopeRef))
                 : selected is null ? null : packs.FirstOrDefault(pack => SameIdentity(pack, selected.Value));
             var selection = match is null ? null : await ReadPackAsync(match, token);
             if (!IsCurrent(requestRevision, scope)) return;
@@ -166,7 +183,7 @@ public partial class Packs
     private async Task RetryAsync() { if (Context.Error is not null) await Context.LoadAsync(cancellation.Token); await LoadAsync(); }
     private void ClearCatalog()
     {
-        packs = null; projects = null; selected = null; sourceDisplayName = sourceUrl = null; error = null;
+        packCollectionPreview?.Close(); packs = null; projects = null; selected = null; sourceDisplayName = sourceUrl = null; error = null;
         installOpen = forkOpen = confirmUninstall = false;
         modelProfiles = []; modelProviders = []; runtimeProfiles = []; extensionRegistrations = []; parameters = []; secrets = [];
         archive = null; preview = null; bindingSelections.Clear();

@@ -26,73 +26,24 @@
     }</Metrics>
     <Feedback>@if (error is not null) { <ErrorState Message="@error.Message" ErrorId="@error.ErrorId"><button class="button-secondary" @onclick="LoadAsync">@T("Retry")</button></ErrorState> }</Feedback>
     <EmptyActions>@if (CanWrite) { <button class="button-primary" @onclick="OpenInstall" disabled="@(!interactive)">@T("InstallLocalPack")</button> }</EmptyActions>
+    <ItemActions Context="pack"><CollectionActions ResourceName="@DisplayName(pack)">
+        <a href="@(PackOverviewUrl(pack) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        <button type="button" disabled="@(pack.ScopeRef is null)" data-testid="pack-preview" @onclick="() => OpenCollectionPreview(pack)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+        @if (CanManageInstallation(pack)) { <button type="button" data-testid="pack-manage" @onclick="() => OpenPackAsync(pack)">@T("ManageInstallation")</button> }
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
 @if (!loadState.BlocksContent)
 {
     @if (selected is not null)
     {
-        <section class="panel pack-details" aria-label="@T("SelectedPackDetails")">
+        <section id="pack-management" class="panel pack-details" aria-label="@T("SelectedPackDetails")">
             <div class="panel-header">
                 <div><p class="eyebrow">@T("InstalledPack")</p><h2>@DisplayName(selected.Value)</h2></div>
-                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" /><button class="button-secondary" @onclick="OpenFork">@T("Fork")</button><button class="button-danger" @onclick="() => confirmUninstall = true">@T("Uninstall")</button></div>
+                <div class="pack-detail-actions"><StatusBadge Text="@StateLabel(selected.Value.Definition.State)" Status="@StateTone(selected.Value.Definition.State)" />@if (CanManageInstallation(selected.Value)) { <button class="button-secondary" @onclick="OpenFork">@T("Fork")</button><button class="button-danger" @onclick="() => confirmUninstall = true">@T("Uninstall")</button> }</div>
             </div>
             @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.Description)) { <p>@selected.Value.Definition.Description</p> }
-            <dl class="resource-details pack-facts">
-                <dt>@T("Identity")</dt><dd><code>@selected.Value.Definition.Publisher/@selected.Value.Definition.PackName</code></dd>
-                <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="selected.Value.ScopeRef" /></dd>
-                <dt>@T("Namespace")</dt><dd><code>@selected.Value.Definition.Namespace</code></dd>
-                <dt>@T("Version")</dt><dd>@selected.Value.Definition.Version</dd>
-                <dt>@T("Purpose")</dt><dd><span class="pack-kind">@PurposeLabel(selected.Value.Definition.Purpose)</span></dd>
-                <dt>@T("Audience")</dt><dd>@AudienceLabel(selected.Value.Definition.Audience)</dd>
-                <dt>@T("Source")</dt><dd>@selected.Value.Definition.Source</dd>
-                <dt>@T("Installed")</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
-            </dl>
-            @if (selected.Value.Definition.SourceProvenance is { } source)
-            {
-                <section class="pack-source-provenance">
-                    <p class="eyebrow">@T("SourceProvenance")</p>
-                    <div class="pack-source-heading">
-                        <div>
-                            <h3>@(sourceDisplayName ?? $"{source.SourcePublisher}/{source.SourceName}")</h3>
-                            @if (sourceDisplayName is not null) { <code>@source.SourcePublisher/@source.SourceName</code> }
-                        </div>
-                        @if (sourceUrl is not null) { <a class="text-button" href="@sourceUrl">@T("OpenSource") →</a> }
-                    </div>
-                    <dl class="resource-details pack-facts">
-                        <dt>@T("SourceVersion")</dt><dd>@source.SourceVersion · <code>@source.ManifestDigest</code></dd>
-                        <dt>@T("Channel")</dt><dd>@source.Channel · <code>@source.ProviderRevision</code></dd>
-                        <dt>@T("Snapshot")</dt><dd><code>@source.SnapshotUid</code> · <code>@source.SnapshotDigest</code></dd>
-                        <dt>@T("CatalogEntry")</dt><dd>@source.CatalogName/@source.EntryName · <code>@source.EntryPath</code></dd>
-                    </dl>
-                </section>
-            }
-            <h3>@T("ResourceBindings")</h3>
-            @if (selected.Value.Definition.Bindings.Count == 0) { <p class="pack-muted">@T("NoDeclaredBindings")</p> }
-            else
-            {
-                <div class="pack-binding-list">
-                    @foreach (var binding in selected.Value.Definition.Bindings)
-                    {
-                        <article>
-                            <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
-                            <div><strong>@binding.Name</strong><small><code>@BindingTarget(binding.Target)</code></small></div>
-                            <StatusBadge Text="@T("SecretStatus.Configured")" Status="UiStatus.Success" />
-                        </article>
-                    }
-                </div>
-            }
-            <h3>@T("ManagedResources")</h3>
-            @if (selected.Value.Definition.ManagedResources.Count == 0) { <p class="pack-muted">@T("NoManagedResources")</p> }
-            else
-            {
-                <div class="pack-resource-list">
-                    @foreach (var resource in selected.Value.Definition.ManagedResources)
-                    {
-                        <article><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace.Value" Name="@resource.Name" Href="@(DefinitionFormUrl(resource) is { } target ? ConsoleResourceUrls.WithOwnerScope(target, selected.Value.ScopeRef) : null)" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="selected.Value.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IsReadOnly="@(!ResourceOwnershipContext.CanManage(selected.Value.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><span class="pack-kind">@resource.Kind</span><small>@resource.Path</small>@if (DefinitionFormUrl(resource) is { } formUrl) { <CollectionActions ResourceName="@resource.Name"><a class="text-button" href="@ConsoleResourceUrls.WithOwnerScope(formUrl, selected.Value.ScopeRef)">@T("Form")</a></CollectionActions> }</article>
-                    }
-                </div>
-            }
+            <InstalledPackResourceSummary Resource="selected.Value" EntryExecutionOwner="@KnownEntryExecutionOwner" SourceDisplayName="@sourceDisplayName" SourceHref="@sourceUrl" ConfigurationInitiallyCollapsed="false" />
             @if (!string.IsNullOrWhiteSpace(selected.Value.Definition.ErrorMessage)) { <p class="error-panel">@selected.Value.Definition.ErrorMessage</p> }
         </section>
     }
@@ -269,8 +220,17 @@
 }
 </div>
 
+<ResourceCollectionPreview @ref="packCollectionPreview" ResourceKind="@PackKinds.InstalledPack" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><InstalledPackResourcePreview Address="address" OverviewHref="@PackPreviewUrl(address)" DefinitionHref="@PackPreviewUrl(address)" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
-    private CollectionColumn<InstalledPackResource> IdentityColumn => new("identity", T("Pack"), pack => @<text><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" OnOpen="() => OpenPackAsync(pack)" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@pack.Definition.Version" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="pack.ScopeRef" IconOnly /><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(pack.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></text>)
+    private ResourceCollectionPreview? packCollectionPreview;
+    private bool CanManageInstallation(InstalledPackResource pack) => !pack.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && pack.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(pack.ScopeRef, Services);
+    private string PackOverviewUrl(InstalledPackResource pack) => ResourceOwnershipContext.Resource(Services, "/packs/resources", pack.Name, pack.Namespace, pack.ScopeRef);
+    private string PackPreviewUrl(ScopedResourceAddress address) => ResourceOwnershipContext.Resource(Services, "/packs/resources", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#overview";
+    private void OpenCollectionPreview(InstalledPackResource pack) { if (pack.ScopeRef is { } owner) packCollectionPreview?.Open(ScopedResourceAddress.Create(owner, pack.Namespace, PackKinds.InstalledPack, pack.Name)); }
+    private CollectionColumn<InstalledPackResource> IdentityColumn => new("identity", T("Pack"), pack => @<text><CollectionIdentity DisplayName="@DisplayName(pack)" Namespace="@pack.Namespace.Value" Name="@pack.Name" Href="@(PackOverviewUrl(pack) + "#overview")" IconName="package"><Versions><CollectionVersion Label="@T("Version")" Value="@pack.Definition.Version" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="pack.ScopeRef" IconOnly /><StatusBadge Text="@StateLabel(pack.Definition.State)" Status="@StateTone(pack.Definition.State)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(pack.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@pack.Definition.Publisher/@pack.Definition.PackName</code></text>)
     {
         Filters = [new("state", T("Status"), CollectionFilterKind.Choice) { Options = (packs ?? []).Select(pack => pack.Definition.State).Distinct().Select(value => new CollectionFilterOption(value.ToString(), StateLabel(value))).ToArray() }]
     };

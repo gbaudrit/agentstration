@@ -12,6 +12,8 @@ public interface IPacksClient
     Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<InstalledPackResource>> GetPackAtScopeAsync(ResourceScopeRef scopeRef, string publisher, string name, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support exact scoped Pack inspection.");
+    Task<ResourceSnapshot<InstalledPackResource>> GetPackAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Pack address reads.");
     Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<PackProjectSourceDocument>>([]);
     Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken);
@@ -55,6 +57,13 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
     {
         using var response = await httpClient.GetAsync($"{Path(publisher, name)}?scopeRef={Uri.EscapeDataString(scopeRef.Value)}", cancellationToken);
         return await ReadInstalledAsync(response, cancellationToken);
+    }
+
+    public Task<ResourceSnapshot<InstalledPackResource>> GetPackAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != PackKinds.InstalledPack || address.ScopeRef == default || !address.Namespace.IsDefault || !PackIdentity.TryParseResourceName(address.Name, out var identity))
+            throw new HttpRequestException("The exact Pack address is unavailable.", null, System.Net.HttpStatusCode.NotFound);
+        return GetPackAtScopeAsync(address.ScopeRef, identity.Publisher, identity.Name, token);
     }
 
     public async Task<IReadOnlyList<PackProjectSourceDocument>> GetPackResourcesAsync(string publisher, string name, CancellationToken cancellationToken) =>

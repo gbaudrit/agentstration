@@ -8508,13 +8508,13 @@
     },
     {
       "id": "packs-pack-bindings",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "source": "src/Agentstration.Console.Components/Components/InstalledPackResourceSummary.razor",
       "host": "console",
       "routes": [
         "/packs"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "adaptation": "Persisted installation records shared by native management, read-only overview and exact-address Preview; existing resource destinations retain owner/current context.",
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
         "sourceReviewed": true,
@@ -8582,13 +8582,13 @@
     },
     {
       "id": "packs-managed-resources",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "source": "src/Agentstration.Console.Components/Components/InstalledPackResourceSummary.razor",
       "host": "console",
       "routes": [
         "/packs"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "adaptation": "Persisted installation records shared by native management, read-only overview and exact-address Preview; existing resource destinations retain owner/current context.",
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
         "sourceReviewed": true,
@@ -19031,6 +19031,16 @@
       "source": "src/Agentstration.Console.Components/Components/Pages/FunctionKindDetails.razor",
       "classification": "inventoried",
       "reason": "Read-only detail adapter composes the inventoried Function Kind Summary."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/InstalledPackResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved InstalledPack configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/InstalledPackDetails.razor",
+      "classification": "inventoried",
+      "reason": "Read-only detail adapter composes the shared saved installation Summary."
     }
   ],
   "reconciliation": {
