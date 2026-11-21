@@ -5,3 +5,10 @@
 .startup-resource-operations ol { display: grid; gap: .65rem; padding-inline-start: 1.25rem; }
 .startup-resource-operations li { overflow-wrap: anywhere; }
 .startup-resource-operations time { margin-inline-start: .5rem; color: var(--muted); font-size: .8rem; }
+
+.startup-resource-list ::deep .resource-toolbar, .startup-resource-list ::deep .resource-toolbar-filters { align-items: end; }
+.startup-resource-list ::deep .form-field { margin: 0; }
+.startup-resource-list ::deep .search-box { flex: 1 1 14rem; min-width: 0; height: var(--field-height, 42px); }
+.startup-resource-list ::deep .resource-toolbar input, .startup-resource-list ::deep .resource-toolbar select { height: var(--field-height, 42px); }
+.startup-resource-list ::deep .search-box .clearable-field { height: 100%; }
+.startup-resource-list ::deep .search-box input { height: 100%; }

@@ -131,6 +131,29 @@ public sealed class BootstrapStartupProgressTests
     }
 
     [TestMethod]
+    public void ARepeatedPolicyGroupUsesItsOwnPanelAndFilteredResources()
+    {
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            Activity = new("ResourceAccessPolicy", "policy-two", GroupId: "policy-second"),
+            Families = [new("resources", "ResourceAccessPolicy", "succeeded", 1, 1, 1, 0, 0, 0, 0) { GroupId = "policy-first" },
+                new("resources", "ModelProfile", "succeeded", 1, 1, 1, 0, 0, 0, 0) { GroupId = "profile" },
+                new("resources", "ResourceAccessPolicy", "running", 1, 0, 0, 0, 0, 0, 0) { GroupId = "policy-second" }]
+        };
+        api.ResourceRows = [new("row-one", "resources", "base", "one.yaml", "ResourceAccessPolicy", "policy-one", "default", "/instance", "created", []) { GroupId = "policy-first" },
+            new("row-two", "resources", "tenant", "two.yaml", "ResourceAccessPolicy", "policy-two", "default", "/tenants/dev", "running", []) { GroupId = "policy-second" }];
+        using var context = Context(api);
+        var cut = context.Render<BootstrapStartupProgress>();
+        Assert.AreEqual("policy-second", api.ResourceQueries.Last().GroupId);
+        StringAssert.Contains(cut.Find("[role='tabpanel']").TextContent, "policy-two");
+        Assert.IsFalse(cut.Find("[role='tabpanel']").TextContent.Contains("policy-one", StringComparison.Ordinal));
+        cut.Find("[data-step-id='resources:ResourceAccessPolicy:policy-first']").Click();
+        Assert.AreEqual("policy-first", api.ResourceQueries.Last().GroupId);
+        StringAssert.Contains(cut.Find("[role='tabpanel']").TextContent, "policy-one");
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Change provider or model")]
     [DataRow("fr-FR", "Modifier le fournisseur ou le modèle")]
     public void ABlockedProfileCanSelectAnotherProviderAndKnownModelWithoutLeavingProgress(string culture, string label)
@@ -142,6 +165,8 @@ public sealed class BootstrapStartupProgressTests
         StringAssert.Contains(cut.Find("button").TextContent, label);
         cut.Find("[data-testid='startup-change-model']").Click();
         cut.Find("[data-testid='startup-model-provider']").Change(api.BackupProvider.ToString("D"));
+        Assert.AreEqual("SELECT", cut.Find("[data-testid='startup-model-name']").TagName);
+        Assert.AreEqual(0, cut.FindAll("datalist").Count);
         cut.Find("[data-testid='startup-model-name']").Change("replacement:model");
         cut.Find("[data-testid='startup-model-apply']").Click();
         Assert.AreEqual(1, api.ModelChanges.Count);
@@ -236,7 +261,7 @@ public sealed class BootstrapStartupProgressTests
         {
             ResourceQueries.Add(query);
             var matches = ResourceRows.Where(row => (query.StepId is null || row.StepId == query.StepId)
-                && (query.Kind is null || row.Kind == query.Kind) && (query.State is null || row.State == query.State)).ToArray();
+                && (query.GroupId is null || row.GroupId == query.GroupId) && (query.Kind is null || row.Kind == query.Kind) && (query.State is null || row.State == query.State)).ToArray();
             return Task.FromResult(new BootstrapStartupResourcePage(Snapshot.AttemptId, Snapshot.Revision,
                 matches.Length, query.Offset, query.Limit, matches.Skip(query.Offset).Take(query.Limit).ToArray()));
         }

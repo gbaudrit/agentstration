@@ -38,6 +38,35 @@ public sealed class StepProgressTests
     }
 
     [TestMethod]
+    public void CompletedGroupsCollapseOnceAndAnOperatorCanReopenThemWithoutPollingClosingThem()
+    {
+        using var context = Context();
+        var steps = new ProgressStep[]
+        {
+            new("prepared", "Prepared", ProgressStepStatus.Succeeded, builder => builder.AddContent(0, "Prepared summary")),
+            new("tenant", "Tenant", ProgressStepStatus.Succeeded, builder => builder.AddContent(0, "Tenant details")) { ParentId = "prepared" },
+            new("resources", "Resources", ProgressStepStatus.Running, builder => builder.AddContent(0, "Current work"))
+        };
+        var initial = steps.Select(step => step with { Status = step.Id == "resources" ? ProgressStepStatus.Pending : ProgressStepStatus.Running }).ToArray();
+        var cut = context.Render<StepProgress>(p => p.Add(x => x.Steps, initial).Add(x => x.ActiveStepId, "tenant").Add(x => x.AutoCollapseCompletedGroups, true));
+        Assert.AreEqual("tenant", Panel(cut));
+        cut.Render(p => p.Add(x => x.Steps, steps));
+        Assert.AreEqual("prepared", Panel(cut));
+        Assert.AreEqual(0, cut.FindAll("[data-step-id='tenant']").Count);
+        cut.Render(p => p.Add(x => x.ActiveStepId, "resources"));
+        Assert.AreEqual(0, cut.FindAll("[data-step-id='tenant']").Count);
+        cut.Find("[data-step-id='prepared']").Click();
+        Assert.AreEqual(1, cut.FindAll("[data-step-id='tenant']").Count);
+        cut.Render(p => p.Add(x => x.Steps, steps.ToArray()));
+        Assert.AreEqual(1, cut.FindAll("[data-step-id='tenant']").Count);
+        cut.Find("[data-step-id='tenant']").Click();
+        Assert.AreEqual("tenant", Panel(cut));
+        cut.Find(".step-progress-expand").Click();
+        Assert.AreEqual("prepared", Panel(cut));
+        Assert.AreEqual(0, cut.FindAll("[data-step-id='tenant']").Count);
+    }
+
+    [TestMethod]
     public void ActiveStepSelectsItsContentAndKeepsSelectionSeparateFromExecution()
     {
         using var context = Context();

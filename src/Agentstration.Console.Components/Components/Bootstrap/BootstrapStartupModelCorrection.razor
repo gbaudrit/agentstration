@@ -16,6 +16,7 @@
         @if (loading && options is null) { <LoadingState Message="@Localizer["LoadingModelChoices"]" /> }
         @if (options is not null)
         {
+            <FormGrid>
             <FormField Label="@Localizer["Provider"]">
                 <ClearableSelect TValue="string" Value="@providerUid" ValueChanged="ProviderAsync" AllowClear="false" disabled="@loading" data-testid="startup-model-provider">
                     <option value="">@Localizer["ChooseProvider"]</option>
@@ -23,9 +24,13 @@
                 </ClearableSelect>
             </FormField>
             <FormField Label="@Localizer["ExpectedModel"]">
-                <ClearableText Value="@model" ValueChanged="value => model = value ?? string.Empty" list="@modelListId" disabled="@loading" data-testid="startup-model-name" />
-                <datalist id="@modelListId">@foreach (var name in options.Models) { <option value="@name"></option> }</datalist>
+                <ClearableSelect TValue="string" Value="@model" ValueChanged="value => model = value" AllowClear="false" disabled="@(loading || options.Models.Count == 0)" data-testid="startup-model-name">
+                    <option value="">@Localizer["ChooseModel"]</option>
+                    @if (!string.IsNullOrEmpty(model) && !options.Models.Contains(model, StringComparer.Ordinal)) { <option value="@model" disabled>@model</option> }
+                    @foreach (var name in options.Models) { <option value="@name">@name</option> }
+                </ClearableSelect>
             </FormField>
+            </FormGrid>
             @if (options.Models.Count == 0) { <p role="status">@Localizer["NoCachedModels"]</p> }
         }
         @if (message is not null) { <p class="inline-warning" role="alert">@Localizer[message]</p> }
@@ -41,7 +46,6 @@
     [Parameter] public Guid AttemptId { get; set; }
     [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
     private readonly CancellationTokenSource stopping = new();
-    private readonly string modelListId = "startup-models-" + Guid.NewGuid().ToString("N");
     private BootstrapStartupModelOptions? options;
     private (Guid, string)? identity;
     private string providerUid = string.Empty, model = string.Empty;

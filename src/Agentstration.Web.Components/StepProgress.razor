@@ -39,8 +39,9 @@
                         <button @ref="buttons[step.Id]" id="@TabId(step.Id)" type="button" role="tab"
                                 class="step-progress-step @StatusClass(step.Status) @(selected ? "is-selected" : null) @(active ? "is-active" : null)"
                                 data-step-id="@step.Id" aria-selected="@selected.ToString().ToLowerInvariant()" aria-controls="@PanelId"
+                                aria-expanded="@(HasChildren(step.Id) ? (!collapsed.Contains(step.Id)).ToString().ToLowerInvariant() : null)"
                                 aria-current="@(active ? "step" : null)" tabindex="@(selected ? 0 : -1)" disabled="@(!step.Selectable)"
-                                @onclick="() => SelectAsync(step.Id)" @onkeydown="args => KeyDownAsync(args, step.Id)">
+                                @onclick="() => ClickStepAsync(step.Id)" @onkeydown="args => KeyDownAsync(args, step.Id)">
                             <span class="step-progress-marker" aria-hidden="true">
                                 @if (step.Status == ProgressStepStatus.Running) { <span class="step-progress-spinner"></span> }
                                 else if (StatusIcon(step.Status) is { } icon) { <UiIcon Name="@icon" /> }
@@ -54,6 +55,7 @@
                                 <span class="step-progress-state">@Localizer[step.Status.ToString()]</span>
                                 @if (!string.IsNullOrWhiteSpace(step.Summary)) { <span class="step-progress-summary">@step.Summary</span> }
                             </span>
+                            @if (HasChildren(step.Id)) { <span class="step-progress-disclosure" aria-hidden="true"><UiIcon Name="@(collapsed.Contains(step.Id) ? "chevron-down" : "chevron-up")" /></span> }
                         </button>
                         </div>
                     }
@@ -79,6 +81,7 @@
     [Parameter] public string? SelectedStepId { get; set; }
     [Parameter] public EventCallback<string?> SelectedStepIdChanged { get; set; }
     [Parameter] public bool FollowActiveStep { get; set; } = true;
+    [Parameter] public bool AutoCollapseCompletedGroups { get; set; }
     [Parameter] public EventCallback<bool> FollowActiveStepChanged { get; set; }
     [Parameter] public string? Label { get; set; }
     [Parameter] public RenderFragment? HeaderContent { get; set; }
@@ -89,9 +92,12 @@
     private readonly string id = "step-progress-" + Guid.NewGuid().ToString("N");
     private readonly Dictionary<string, ElementReference> buttons = new(StringComparer.Ordinal);
     private readonly HashSet<string> collapsed = new(StringComparer.Ordinal);
+    private readonly HashSet<string> completedGroups = new(StringComparer.Ordinal);
+    private readonly HashSet<string> parentIds = new(StringComparer.Ordinal);
+    private bool HasChildren(string stepId) => parentIds.Contains(stepId);
     private ProgressStep? ExpandedParent => Selectable(selectedId) is { } selected
         && Steps.FirstOrDefault(step => step.Id == (selected.ParentId ?? selected.Id)) is { } parent
-        && Steps.Any(step => step.ParentId == parent.Id) ? parent : null;
+        && HasChildren(parent.Id) ? parent : null;
     private IEnumerable<ProgressStep> VisibleSteps => Steps.Where(step => step.ParentId is null || !collapsed.Contains(step.ParentId));
     private ElementReference root;
     private IJSObjectReference? module;
@@ -118,10 +124,13 @@
                 throw new ArgumentException("Progress steps require unique non-empty IDs, titles, content and valid statuses.", nameof(Steps));
         }
         foreach (var removed in buttons.Keys.Where(key => !ids.Contains(key)).ToArray()) buttons.Remove(removed);
+        parentIds.Clear();
         foreach (var child in Steps.Where(step => step.ParentId is not null))
             if (!Steps.Any(parent => parent.Id == child.ParentId && parent.ParentId is null))
                 throw new ArgumentException("A progress substep requires an existing top-level parent.", nameof(Steps));
+            else parentIds.Add(child.ParentId!);
         collapsed.RemoveWhere(key => !ids.Contains(key));
+        completedGroups.RemoveWhere(key => !ids.Contains(key));
 
         var previous = selectedId;
         var previousFollowing = following;
@@ -137,10 +146,31 @@
         initialized = true;
         if (following && Selectable(ActiveStepId) is { } active) selectedId = active.Id;
         if (Selectable(selectedId) is null) selectedId = Selectable(ActiveStepId)?.Id ?? Steps.FirstOrDefault(step => step.Selectable)?.Id;
+        if (AutoCollapseCompletedGroups)
+            foreach (var parent in Steps.Where(step => step.ParentId is null && HasChildren(step.Id)))
+            {
+                var complete = parent.Status is ProgressStepStatus.Succeeded or ProgressStepStatus.Skipped
+                    && Steps.Where(step => step.ParentId == parent.Id).All(step => step.Status is ProgressStepStatus.Succeeded or ProgressStepStatus.Skipped);
+                if (!complete) { completedGroups.Remove(parent.Id); continue; }
+                if (Selectable(selectedId)?.ParentId == parent.Id && !following) continue;
+                if (completedGroups.Add(parent.Id)) collapsed.Add(parent.Id);
+                if (collapsed.Contains(parent.Id) && following && Selectable(selectedId)?.ParentId == parent.Id)
+                    selectedId = parent.Id;
+            }
         if (Selectable(selectedId)?.ParentId is { } parentId) collapsed.Remove(parentId);
         if (previous != selectedId || (selectionParameterChanged && SelectedStepId != selectedId))
             await SelectedStepIdChanged.InvokeAsync(selectedId);
         if (previousFollowing != following) await FollowActiveStepChanged.InvokeAsync(following);
+    }
+
+    private async Task ClickStepAsync(string stepId)
+    {
+        if (HasChildren(stepId))
+        {
+            if (selectedId == stepId && !collapsed.Contains(stepId)) await ToggleChildrenAsync(stepId);
+            else { collapsed.Remove(stepId); await SelectAsync(stepId); }
+        }
+        else await SelectAsync(stepId);
     }
 
     private async Task SelectAsync(string stepId)

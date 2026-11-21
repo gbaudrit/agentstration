@@ -29,7 +29,7 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             attemptId = Guid.NewGuid(); revision = 1; failure = null; administrationReady = false;
             created = skipped = conflicts = failed = 0; activity = null;
-            resourceRows.Clear(); activeResourceId = null;
+            resourceRows.Clear(); lastGroupByStep.Clear(); activeResourceId = null;
             steps.Clear();
             foreach (var id in new[] { "topology", "extensions", "resources", "finalization" }) steps.Add(id, "pending");
             activeStep = "topology"; steps[activeStep] = "running";
@@ -55,7 +55,11 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
             if (activeStep != "resources" || failure is not null) return;
             // Keep safe dependency identities when its resource fails (for example a model timeout).
             if (outcome != "failed" || activity?.ResourceKind != kind || activity.ResourceName != name)
-                activity = new(kind, name, ResourceId: activeResourceId);
+            {
+                var resourceId = activeResourceId ?? (outcome is not null ? activity?.ResourceId : null);
+                activity = new(kind, name, ResourceId: resourceId,
+                    GroupId: resourceId is { } id && resourceRows.TryGetValue(id, out var row) ? row.GroupId : null);
+            }
             steps[activeStep] = "running";
             switch (outcome)
             {
@@ -73,7 +77,8 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
         {
             if (activeStep != "resources" || failure is not null) return;
             var next = new BootstrapStartupActivity("ModelProfile", resource, provider, model, reason, providerNamespace, ProviderScopeRef: providerScopeRef, ResourceId: activeResourceId, CanChangeModel: canChangeModel,
-                TargetLevel: activeResourceId is { } id && resourceRows.TryGetValue(id, out var row) ? row.TargetLevel : null);
+                TargetLevel: activeResourceId is { } id && resourceRows.TryGetValue(id, out var row) ? row.TargetLevel : null,
+                GroupId: activeResourceId is { } active && resourceRows.TryGetValue(active, out var resourceRow) ? resourceRow.GroupId : null);
             if (activity == next && steps[activeStep] == "waiting") return;
             activity = next; steps[activeStep] = "waiting"; revision++;
             ObserveOperationCore(activeResourceId, "model_discovery", "waiting");

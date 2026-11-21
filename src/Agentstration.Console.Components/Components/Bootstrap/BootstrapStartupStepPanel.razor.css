@@ -16,7 +16,7 @@
 .startup-resource-facts code { font-family: var(--font-family-mono); font-size: .85rem; }
 .startup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; margin: 1rem 0 0; }
 .startup-step-actions a { gap: .5rem; }
-.startup-resource-outcomes { border-top: 1px solid var(--border); margin-top: 1.5rem; padding-top: 1.25rem; }
+.startup-resource-outcomes { margin-block: 1rem 1.25rem; }
 .startup-resource-outcomes h3 { margin: 0 0 .85rem; font-size: .9rem; color: var(--muted); font-weight: 600; }
 .startup-resource-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }
 .startup-resource-metrics ::deep .metric-card { padding: .85rem; min-width: 0; box-shadow: none; }

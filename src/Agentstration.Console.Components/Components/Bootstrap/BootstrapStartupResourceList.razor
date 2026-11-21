@@ -70,10 +70,11 @@
     [Parameter, EditorRequired] public BootstrapStartupSnapshot Snapshot { get; set; } = default!;
     [Parameter, EditorRequired] public string StepId { get; set; } = string.Empty;
     [Parameter] public string? Kind { get; set; }
+    [Parameter] public string? GroupId { get; set; }
     private static readonly string[] States = ["pending", "running", "waiting", "created", "skipped", "succeeded", "conflict", "failed", "blocked"];
     private readonly CancellationTokenSource stopping = new();
     private BootstrapStartupResourcePage? resourcePage;
-    private (Guid Attempt, string Step, string? Kind)? identity;
+    private (Guid Attempt, string Step, string? Kind, string? Group)? identity;
     private string search = string.Empty, state = string.Empty;
     private string? expanded;
     private int pageNumber = 1, request;
@@ -82,7 +83,7 @@
 
     protected override Task OnParametersSetAsync()
     {
-        var next = (Snapshot.AttemptId, StepId, Kind);
+        var next = (Snapshot.AttemptId, StepId, Kind, GroupId);
         if (identity != next)
         {
             identity = next; pageNumber = 1; search = state = string.Empty; expanded = null; resourcePage = null; loadedRevision = -1;
@@ -102,7 +103,7 @@
         {
             var result = await Client.GetResourcesAsync(new(Snapshot.AttemptId, StepId, Kind,
                 string.IsNullOrEmpty(state) ? null : state, string.IsNullOrWhiteSpace(search) ? null : search,
-                (pageNumber - 1) * 25, 25), stopping.Token);
+                (pageNumber - 1) * 25, 25, GroupId), stopping.Token);
             if (current != request || stopping.IsCancellationRequested || result.AttemptId != Snapshot.AttemptId) return;
             resourcePage = result; readError = false; loadedRevision = result.Revision;
             if (pageNumber > 1 && resourcePage.Items.Count == 0) { pageNumber = Math.Max(1, (int)Math.Ceiling(resourcePage.Total / 25d)); await LoadAsync(); }

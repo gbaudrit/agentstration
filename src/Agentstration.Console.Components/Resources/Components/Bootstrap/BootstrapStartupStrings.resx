@@ -197,4 +197,6 @@
   <data name="Family_DataSource" xml:space="preserve"><value>Data sources</value></data>
   <data name="Family_KnowledgeSource" xml:space="preserve"><value>Knowledge sources</value></data>
   <data name="Family_KnowledgeSourceToolExposure" xml:space="preserve"><value>Knowledge source tool exposures</value></data>
+  <data name="ChooseModel" xml:space="preserve"><value>Choose an available model</value></data>
+  <data name="FamilyOccurrence" xml:space="preserve"><value>{0} · {1}</value></data>
 </root>

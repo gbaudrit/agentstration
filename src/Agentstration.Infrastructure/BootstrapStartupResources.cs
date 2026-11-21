@@ -10,6 +10,7 @@ public sealed partial class BootstrapStartupState
     // containing at most 512 documents. No manifest or secret value is retained.
     private const int MaximumResources = 2 * 17 * 16 * 512;
     private readonly Dictionary<string, BootstrapStartupResource> resourceRows = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Kind, string GroupId)> lastGroupByStep = new(StringComparer.Ordinal);
     private string? activeResourceId;
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -22,8 +23,13 @@ public sealed partial class BootstrapStartupState
             if (resourceRows.ContainsKey(id)) return id;
             if (resourceRows.Count >= MaximumResources)
                 throw new InvalidOperationException("The Bootstrap observation limit was exceeded.");
+            var groupId = lastGroupByStep.TryGetValue(stepId, out var previous) && previous.Kind == kind ? previous.GroupId : id;
+            lastGroupByStep[stepId] = (kind, groupId);
             resourceRows.Add(id, new(id, stepId, profile, location, kind, name,
-                resourceNamespace, targetLevel, "pending", []));
+                resourceNamespace, targetLevel, "pending", [])
+            {
+                GroupId = groupId
+            });
             revision++;
             return id;
         }
@@ -87,7 +93,12 @@ public sealed partial class BootstrapStartupState
         {
             if (resourceRows.TryGetValue(id, out var completed) && completed.State == outcome) return;
             ObserveOperationCore(id, "resource_apply", outcome);
-            if (resourceRows.TryGetValue(id, out var row)) resourceRows[id] = row with { State = outcome };
+            if (resourceRows.TryGetValue(id, out var row))
+            {
+                resourceRows[id] = row with { State = outcome };
+                if (outcome == "failed" && activity?.ResourceId != id)
+                    activity = new(row.Kind, row.Name, ResourceId: id, TargetLevel: row.TargetLevel, GroupId: row.GroupId);
+            }
             if (activeResourceId == id) activeResourceId = null;
             revision++;
         }
@@ -97,7 +108,7 @@ public sealed partial class BootstrapStartupState
         failure is not null && row.State == "pending" ? "blocked" : row.State;
 
     private BootstrapStartupFamily[] ReadFamilies() => resourceRows.Values
-        .GroupBy(row => (row.StepId, row.Kind))
+        .GroupBy(row => (row.StepId, row.Kind, row.GroupId))
         .Select(group =>
         {
             var rows = group.ToArray();
@@ -110,7 +121,11 @@ public sealed partial class BootstrapStartupState
                 : processed == rows.Length ? "succeeded" : failure is not null ? "blocked" : "pending";
             return new BootstrapStartupFamily(group.Key.StepId, group.Key.Kind, state, rows.Length, processed,
                 rows.Count(row => row.State == "created"), rows.Count(row => row.State == "skipped"),
-                failedCount, conflictCount, waiting);
+                failedCount, conflictCount, waiting)
+            {
+                GroupId = group.Key.GroupId,
+                Profile = rows.Select(row => row.Profile).Distinct(StringComparer.Ordinal).Take(2).ToArray() is [var profile] ? profile : null
+            };
         }).ToArray();
 
     public BootstrapStartupResourcePage? ReadResources(BootstrapStartupResourceQuery query)
@@ -125,6 +140,7 @@ public sealed partial class BootstrapStartupState
             var matches = resourceRows.Values.Where(row =>
                 (query.StepId is null || row.StepId == query.StepId)
                 && (query.Kind is null || row.Kind == query.Kind)
+                && (query.GroupId is null || row.GroupId == query.GroupId)
                 && (query.State is null || ObservedState(row) == query.State)
                 && (string.IsNullOrWhiteSpace(query.Search)
                     || row.Name.Contains(query.Search, StringComparison.OrdinalIgnoreCase)

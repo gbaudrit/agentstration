@@ -24,7 +24,7 @@ else if (snapshot is null)
 else
 {
     @if (disconnected) { <p class="startup-progress-notice" role="status">@Localizer["ConnectionLostDescription"]</p> }
-    <StepProgress Steps="@Steps" ActiveStepId="@ActiveNavigationId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
+    <StepProgress @key="snapshot.AttemptId" AutoCollapseCompletedGroups="true" Steps="@Steps" ActiveStepId="@ActiveNavigationId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
         <HeaderContent>
             <div class="startup-progress-summary" role="status">
                 <div class="startup-progress-summary-heading">
@@ -51,10 +51,10 @@ else
 
     private int CompletedSteps => snapshot?.Steps.Count(step => step.State is "succeeded" or "skipped") ?? 0;
     private string? ActiveNavigationId => (snapshot?.Families.FirstOrDefault(family => family.StepId == snapshot.ActiveStepId
-        && family.Kind == snapshot.Activity?.ResourceKind)
+        && (snapshot.Activity?.GroupId is { } groupId ? family.GroupId == groupId : family.Kind == snapshot.Activity?.ResourceKind))
         ?? snapshot?.Families.FirstOrDefault(family => family.StepId == snapshot.ActiveStepId && family.State is "running" or "waiting")) is { } active
         ? FamilyId(active) : snapshot?.ActiveStepId;
-    private static string FamilyId(BootstrapStartupFamily family) => family.StepId + ":" + family.Kind;
+    private static string FamilyId(BootstrapStartupFamily family) => family.StepId + ":" + family.Kind + (family.GroupId is null ? string.Empty : ":" + family.GroupId);
     private string FamilyLabel(string kind)
     {
         var label = Localizer["Family_" + kind];
@@ -77,23 +77,33 @@ else
             var items = new List<ProgressStep>();
             foreach (var step in snapshot!.Steps)
             {
-                items.Add(new(step.Id, Localizer["Stage_" + step.Id], StepStatus(step.State), Panel(step.Id, null)));
-                foreach (var family in snapshot.Families.Where(family => family.StepId == step.Id))
-                    items.Add(new(FamilyId(family), FamilyLabel(family.Kind), StepStatus(family.State), Panel(step.Id, family.Kind))
+                items.Add(new(step.Id, Localizer["Stage_" + step.Id], StepStatus(step.State), Panel(step.Id, null, null)));
+                var families = snapshot.Families.Where(family => family.StepId == step.Id).ToArray();
+                var counts = families.GroupBy(family => family.Kind).ToDictionary(group => group.Key, group => group.Count());
+                var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (var family in families)
+                {
+                    var ordinal = seen.GetValueOrDefault(family.Kind) + 1;
+                    seen[family.Kind] = ordinal;
+                    var title = counts[family.Kind] > 1 ? Localizer["FamilyOccurrence", FamilyLabel(family.Kind), ordinal].Value : FamilyLabel(family.Kind);
+                    items.Add(new(FamilyId(family), title, StepStatus(family.State), Panel(step.Id, family.Kind, family.GroupId, title))
                     {
                         ParentId = step.Id,
-                        Summary = Localizer["ResourceCount", family.Processed, family.Total]
+                        Summary = Localizer["ResourceCount", family.Processed, family.Total] + (counts[family.Kind] > 1 && family.Profile is not null ? " · " + family.Profile : string.Empty)
                     });
+                }
             }
             return items;
         }
     }
-    private RenderFragment Panel(string step, string? kind) => builder =>
+    private RenderFragment Panel(string step, string? kind, string? groupId, string? title = null) => builder =>
     {
         builder.OpenComponent<BootstrapStartupStepPanel>(0);
         builder.AddAttribute(1, nameof(BootstrapStartupStepPanel.Snapshot), snapshot);
         builder.AddAttribute(2, nameof(BootstrapStartupStepPanel.StepId), step);
         builder.AddAttribute(3, nameof(BootstrapStartupStepPanel.Kind), kind);
+        builder.AddAttribute(4, nameof(BootstrapStartupStepPanel.GroupId), groupId);
+        builder.AddAttribute(5, nameof(BootstrapStartupStepPanel.GroupTitle), title);
         builder.CloseComponent();
     };
 

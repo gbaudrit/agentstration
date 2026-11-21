@@ -4,11 +4,23 @@
 
 <section class="startup-step-content">
     <header class="startup-step-heading">
-        <h2>@(Kind is null ? Localizer["Stage_" + StepId] : FamilyLabel(Kind))</h2>
+        <h2>@(GroupTitle ?? (Kind is null ? Localizer["Stage_" + StepId].Value : FamilyLabel(Kind)))</h2>
         <StatusBadge Text="@StepLocalizer[PresentationState.ToString()]" Status="@BadgeStatus" />
     </header>
     <p class="startup-step-description">@Localizer["Explanation_" + StepId]</p>
-    @if (Snapshot.ActiveStepId == StepId && Snapshot.Activity is { } activity && (Kind is null || Kind == activity.ResourceKind || StepId == "extensions" && Kind == "ExtensionContribution"))
+    @if (StepId == "resources")
+    {
+        <section class="startup-resource-outcomes" aria-label="@Localizer["ResourceOutcomes"]">
+            <h3>@Localizer["ResourceOutcomes"]</h3>
+            <div class="startup-resource-metrics">
+                <MetricCard Label="@Localizer["Created"]" Value="@((SelectedFamily?.Created ?? Snapshot.Created).ToString())" Status="UiStatus.Success" />
+                <MetricCard Label="@Localizer["Skipped"]" Value="@((SelectedFamily?.Skipped ?? Snapshot.Skipped).ToString())" Status="UiStatus.Neutral" />
+                <MetricCard Label="@Localizer["Conflicts"]" Value="@((SelectedFamily?.Conflicts ?? Snapshot.Conflicts).ToString())" Status="@((SelectedFamily?.Conflicts ?? Snapshot.Conflicts) > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
+                <MetricCard Label="@Localizer["ResourceFailures"]" Value="@((SelectedFamily?.Failed ?? Snapshot.Failed).ToString())" Status="@((SelectedFamily?.Failed ?? Snapshot.Failed) > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
+            </div>
+        </section>
+    }
+    @if (Snapshot.ActiveStepId == StepId && Snapshot.Activity is { } activity && (GroupId is null || activity.GroupId == GroupId) && (Kind is null || Kind == activity.ResourceKind || StepId == "extensions" && Kind == "ExtensionContribution"))
     {
         @if (activity.WaitReason is not null)
         {
@@ -32,33 +44,24 @@
     }
     @if (Snapshot.Families.Any(family => family.StepId == StepId))
     {
-        <BootstrapStartupResourceList Snapshot="@Snapshot" StepId="@StepId" Kind="@Kind" />
+        <BootstrapStartupResourceList Snapshot="@Snapshot" StepId="@StepId" Kind="@Kind" GroupId="@GroupId" />
     }
-    @if (StepId == "resources")
-    {
-        <section class="startup-resource-outcomes" aria-label="@Localizer["ResourceOutcomes"]">
-            <h3>@Localizer["ResourceOutcomes"]</h3>
-            <div class="startup-resource-metrics">
-                <MetricCard Label="@Localizer["Created"]" Value="@((SelectedFamily?.Created ?? Snapshot.Created).ToString())" Status="UiStatus.Success" />
-                <MetricCard Label="@Localizer["Skipped"]" Value="@((SelectedFamily?.Skipped ?? Snapshot.Skipped).ToString())" Status="UiStatus.Neutral" />
-                <MetricCard Label="@Localizer["Conflicts"]" Value="@((SelectedFamily?.Conflicts ?? Snapshot.Conflicts).ToString())" Status="@((SelectedFamily?.Conflicts ?? Snapshot.Conflicts) > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
-                <MetricCard Label="@Localizer["ResourceFailures"]" Value="@((SelectedFamily?.Failed ?? Snapshot.Failed).ToString())" Status="@((SelectedFamily?.Failed ?? Snapshot.Failed) > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
-            </div>
-        </section>
-    }
+
 </section>
 
 @code {
     [Parameter, EditorRequired] public BootstrapStartupSnapshot Snapshot { get; set; } = default!;
     [Parameter, EditorRequired] public string StepId { get; set; } = string.Empty;
     [Parameter] public string? Kind { get; set; }
-    private BootstrapStartupFamily? SelectedFamily => Snapshot.Families.FirstOrDefault(family => family.StepId == StepId && family.Kind == Kind);
+    [Parameter] public string? GroupId { get; set; }
+    [Parameter] public string? GroupTitle { get; set; }
+    private BootstrapStartupFamily? SelectedFamily => Snapshot.Families.FirstOrDefault(family => family.StepId == StepId && family.Kind == Kind && (GroupId is null || family.GroupId == GroupId));
     private string FamilyLabel(string kind)
     {
         var label = Localizer["Family_" + kind];
         return label.ResourceNotFound ? kind : label.Value;
     }
-    private ProgressStepStatus PresentationState => (Snapshot.Families.FirstOrDefault(family => family.StepId == StepId && family.Kind == Kind)?.State ?? Snapshot.Steps.First(step => step.Id == StepId).State) switch
+    private ProgressStepStatus PresentationState => (SelectedFamily?.State ?? Snapshot.Steps.First(step => step.Id == StepId).State) switch
     {
         "succeeded" => ProgressStepStatus.Succeeded,
         "waiting" => ProgressStepStatus.Waiting,

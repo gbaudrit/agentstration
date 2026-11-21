@@ -6,12 +6,12 @@
 .step-progress-navigation-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .65rem; padding: 0 .5rem 1rem; }
 .step-progress-navigation-heading h2 { margin: 0; font-size: 1.15rem; line-height: 1.4; }
 .step-progress-follow { border: 1px solid var(--border, #d7e2f4); border-radius: .5rem; padding: .4rem .65rem; background: var(--surface, #fff); color: var(--primary, #2863ff); font: inherit; font-size: .8rem; cursor: pointer; }
-.step-progress-step { position: relative; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .75rem; align-items: start; width: 100%; padding: .85rem .6rem; border: 1px solid transparent; border-radius: .75rem; background: transparent; color: inherit; text-align: start; font: inherit; cursor: pointer; }
-.step-progress-row:not(:last-child) > .step-progress-step::after { position: absolute; content: ""; inset-inline-start: calc(.6rem + 1rem); top: 2.95rem; bottom: -.6rem; width: 2px; background: var(--border, #d7e2f4); }
+.step-progress-step { position: relative; display: grid; --step-marker-size: 2rem; grid-template-columns: var(--step-marker-size) minmax(0, 1fr); gap: .75rem; align-items: start; width: 100%; padding: .85rem .6rem; border: 1px solid transparent; border-radius: .75rem; background: transparent; color: inherit; text-align: start; font: inherit; cursor: pointer; }
+.step-progress-row:not(:last-child) > .step-progress-step::after { position: absolute; content: ""; inset-inline-start: calc(.6rem + var(--step-marker-size) / 2 - 1px); top: calc(.85rem + var(--step-marker-size) + .3rem); bottom: -.6rem; width: 2px; background: var(--border, #d7e2f4); }
 .step-progress-step.is-selected { background: var(--primary-soft, #eaf1ff); border-color: color-mix(in srgb, var(--primary, #2863ff) 22%, transparent); }
 .step-progress-step:hover:not(:disabled) { background: var(--surface-2, #f5f7fb); }
 .step-progress-step.is-selected:hover { background: var(--primary-soft, #eaf1ff); }
-.step-progress-marker { z-index: 1; display: flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 2px solid var(--border, #b7c4d9); border-radius: 50%; background: var(--surface, #fff); color: var(--muted, #66748c); font-size: .8rem; font-weight: 650; }
+.step-progress-marker { z-index: 1; display: flex; align-items: center; justify-content: center; width: var(--step-marker-size); height: var(--step-marker-size); border: 2px solid var(--border, #b7c4d9); border-radius: 50%; background: var(--surface, #fff); color: var(--muted, #66748c); font-size: .8rem; font-weight: 650; }
 .step-progress-marker ::deep .ui-icon { width: 1.1rem; height: 1.1rem; }
 .step-progress-copy { display: flex; flex-direction: column; gap: .25rem; min-width: 0; overflow-wrap: anywhere; }
 .step-progress-step-heading { display: flex; gap: .4rem; align-items: center; }
@@ -43,8 +43,16 @@
 .step-progress-row { position: relative; display: flex; align-items: start; }
 .step-progress-row > .step-progress-step { flex: 1; min-width: 0; }
 .step-progress-row.is-child { padding-inline-start: 1.6rem; }
-.step-progress-row.is-child .step-progress-marker { width: 1.5rem; height: 1.5rem; font-size: .75rem; }
-.step-progress-row.is-child .step-progress-step { grid-template-columns: 1.5rem minmax(0,1fr); padding-block: .55rem; }
+.step-progress-row.is-child .step-progress-marker { width: var(--step-marker-size); height: var(--step-marker-size); font-size: .75rem; }
+.step-progress-row.is-child .step-progress-step { --step-marker-size: 1.5rem; grid-template-columns: var(--step-marker-size) minmax(0,1fr); padding-block: .65rem; }
 .step-progress-row.is-child .step-progress-step-title { font-size: .9rem; }
 .step-progress-expand { flex: 0 0 2rem; display: grid; place-items: center; margin-block-start: 0; padding: .35rem; border: 0; border-radius: .35rem; background: transparent; color: var(--muted); cursor: pointer; }
 .step-progress-expand:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.step-progress-step:has(.step-progress-disclosure) { padding-inline-end: 2.5rem; }
+.step-progress-disclosure { position: absolute; inset-inline-end: .65rem; top: 1rem; display: grid; place-items: center; color: var(--muted); }
+.step-progress-disclosure ::deep .ui-icon { width: 1rem; height: 1rem; }
+.step-progress-row.is-child > .step-progress-step::after { top: calc(.65rem + var(--step-marker-size) + .3rem); }
+.step-progress-row.is-child:has(+ .step-progress-row:not(.is-child)) > .step-progress-step::after { display: none; }
+.step-progress-row.is-child .step-progress-marker ::deep .ui-icon { width: .95rem; height: .95rem; }
+.step-progress-row.is-child .step-progress-spinner { width: 1rem; height: 1rem; border-width: 2px; }

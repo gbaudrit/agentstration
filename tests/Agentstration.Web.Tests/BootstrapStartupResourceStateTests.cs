@@ -24,6 +24,27 @@ public sealed class BootstrapStartupResourceStateTests
     }
 
     [TestMethod]
+    public void InterleavedPoliciesKeepTheirExecutionPositionAndTheirOwnProgress()
+    {
+        var state = new BootstrapStartupState(); state.Begin(); state.MoveTo("resources");
+        var kinds = new[] { "ModelProvider", "ResourceAccessPolicy", "ModelProfile", "ResourceAccessPolicy", "Agent" };
+        for (var index = 0; index < kinds.Length; index++)
+            state.RegisterResource("/instance", "resources", index + ".yaml", "resources", kinds[index], "item-" + index);
+        var planned = state.Read();
+        CollectionAssert.AreEqual(kinds, planned.Families.Select(family => family.Kind).ToArray());
+        var policies = planned.Families.Where(family => family.Kind == "ResourceAccessPolicy").ToArray();
+        Assert.AreNotEqual(policies[0].GroupId, policies[1].GroupId);
+        state.StartResource("/instance", "resources", "3.yaml", kinds[3], "item-3", "default");
+        state.ObserveResource(kinds[3], "item-3");
+        Assert.AreEqual(policies[1].GroupId, state.Read().Activity?.GroupId);
+        var page = state.ReadResources(new(planned.AttemptId, GroupId: policies[1].GroupId))!;
+        Assert.AreEqual(1, page.Total);
+        Assert.AreEqual("item-3", page.Items.Single().Name);
+        Assert.AreEqual("running", state.Read().Families[3].State);
+        Assert.AreEqual("pending", state.Read().Families[1].State);
+    }
+
+    [TestMethod]
     public void LargePlansReturnBoundedPagesAndExactFilteredCountsWithoutDumpingRowsInSnapshots()
     {
         var state = new BootstrapStartupState(); state.Begin();

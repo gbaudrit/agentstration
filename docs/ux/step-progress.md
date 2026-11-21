@@ -126,3 +126,16 @@ reusable journey or migrating existing Flow/Workplace progress components.
 
 The [standalone browser smoke evidence](evidence/1250/step-progress/README.md)
 contains the desktop/mobile captures and observed assertions for this primitive.
+
+## Completed groups
+
+`AutoCollapseCompletedGroups` is opt-in. A top-level step folds its substeps once
+its own state and all of its children are Succeeded/Skipped. Failed, interrupted
+or incomplete groups stay visible. An operator inspecting a child keeps that
+panel and focus; completion never closes it underneath them. Selecting a closed
+parent reopens it, and another selection of the open parent or the group control
+closes it. Manually reopened completed groups remain open across refreshes.
+
+In follow mode, a completed active child resolves to the folded parent summary
+until activity advances. This also handles observations where completion arrives
+before the next active-step identity.
