@@ -113,3 +113,9 @@ Validation: Release component/test build passed without warnings/errors; 132 mod
 Saved identity and Profile-based or Dataset acquisition configuration, shared by both detail adapters. Optional already resolved service/operation/storage display names and observations stay in the full overview. Preview uses one exact snapshot and does not read readiness, operation contracts, service/storage catalogs, acquisitions, discovery or document contents. The family Preview uses `IDataSourcesClient.GetAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 137 data sources tests passed. Browser and final offline checks remain pending.
+
+## KnowledgeSource
+
+Saved identity, exact declared Flow references, projection parameters, input bindings, output storage pin and lifecycle/composition policy. Both full details and the standalone edit adapter reuse the saved Summary. Preview reads no readiness, resolved Flows, snapshots, Tool exposure, data-source/Storage catalogs or document content. Full-detail observations remain supplied by the owning page. The family Preview uses `IKnowledgeSourcesClient.GetAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. Browser and final offline checks remain pending.

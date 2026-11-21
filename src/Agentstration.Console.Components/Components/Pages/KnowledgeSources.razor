@@ -13,14 +13,27 @@
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction" OnRefresh="LoadAsync" OnRetry="RetryAsync">
     <Actions><a class="button-secondary" href="@Navigate("/artifacts")">@T("OpenArtifacts")</a><a class="button-secondary" href="@Navigate("/tools/sets")">@T("OpenToolSets")</a></Actions>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="knowledge-source-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@KnowledgeResourceKinds.KnowledgeSource" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><KnowledgeSourceResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(KnowledgeSourceResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(KnowledgeSourceResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, KnowledgeResourceKinds.KnowledgeSource, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/knowledge-sources", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/knowledge-sources/new")">@T("CreateSource")</a></PermissionGate> : null;
-    private CollectionColumn<KnowledgeSourceResource> IdentityColumn => new("identity", T("KnowledgeSource"), source => @<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@DetailsUrl(source)" IconName="database" data-testid="knowledge-source-name-link">
+    private CollectionColumn<KnowledgeSourceResource> IdentityColumn => new("identity", T("KnowledgeSource"), source => @<CollectionIdentity DisplayName="@source.Definition.DisplayName" Namespace="@source.Namespace.Value" Name="@source.Name" Href="@(DetailsUrl(source) + "#overview")" IconName="database" data-testid="knowledge-source-name-link">
         <IconBadges><ResourceScopeBadge ScopeRef="source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(source.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(source.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(source.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {

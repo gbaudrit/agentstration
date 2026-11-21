@@ -699,7 +699,7 @@ public sealed partial class KnowledgeSourceEditorTests
         {
             var link = rendered.Find("[data-testid='knowledge-source-name-link']");
             Assert.AreEqual("Agentstration documentation", link.TextContent);
-            Assert.AreEqual($"/knowledge-sources/agentstration-documentation?namespace=default&scopeRef={Uri.EscapeDataString(DataSourceScope.Value)}&context={Uri.EscapeDataString(DataSourceScope.Value)}", link.GetAttribute("href"));
+            Assert.AreEqual($"/knowledge-sources/agentstration-documentation?namespace=default&scopeRef={Uri.EscapeDataString(DataSourceScope.Value)}&context={Uri.EscapeDataString(DataSourceScope.Value)}#overview", link.GetAttribute("href"));
             var headers = rendered.FindAll("th").Select(value => value.TextContent).ToArray();
             CollectionAssert.Contains(headers, "Data Sources");
             CollectionAssert.Contains(headers, "Projection Flow");

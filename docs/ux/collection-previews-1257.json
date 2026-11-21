@@ -168,7 +168,27 @@
       "rowTypes": [
         "KnowledgeSourceResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "KnowledgeSource",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/knowledge-sources/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/knowledge-sources/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, exact declared Flow references, projection parameters, input bindings, output storage pin and lifecycle/composition policy. Both full details and the standalone edit adapter reuse the saved Summary. Preview reads no readiness, resolved Flows, snapshots, Tool exposure, data-source/Storage catalogs or document content. Full-detail observations remain supplied by the owning page.",
+      "loader": "IKnowledgeSourcesClient.GetAsync(owner, namespace, name, token)",
+      "tests": [
+        "KnowledgeSourceResourcePreviewTests",
+        "KnowledgeSourceCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 107 knowledge sources tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",

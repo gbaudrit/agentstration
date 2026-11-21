@@ -6920,10 +6920,11 @@
     },
     {
       "id": "knowledge-source-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
       "host": "console",
       "routes": [
-        "/knowledge-sources/{Name}"
+        "/knowledge-sources/{Name}",
+        "/knowledge-sources"
       ],
       "renderer": "CollectionView",
       "itemType": "KeyValuePair<string,string>",
@@ -6934,7 +6935,7 @@
       "informationKeys": [
         "SettingValue"
       ],
-      "line": 27,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6943,7 +6944,7 @@
           "tests/governed-knowledge.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved KnowledgeSource configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6954,7 +6955,7 @@
     },
     {
       "id": "knowledge-source-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/knowledge-sources/new",
@@ -6969,7 +6970,7 @@
       "informationKeys": [
         "SettingValue"
       ],
-      "line": 27,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6979,7 +6980,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Legacy standalone edit overview now reuses the same complete saved configuration as full details and Preview; the two adapter inventory IDs point at the shared frame."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18982,6 +18983,11 @@
       "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved DataSource configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved KnowledgeSource configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
