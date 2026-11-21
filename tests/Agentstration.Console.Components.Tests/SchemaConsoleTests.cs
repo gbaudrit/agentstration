@@ -5,6 +5,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.Schemas;
 using Agentstration.Web.Components.State;
@@ -348,10 +349,11 @@ public sealed partial class SchemaConsoleTests
     }
 
     [TestMethod]
-    [DataRow("en-US", true, "Expose as function")]
-    [DataRow("fr-FR", true, "Exposer comme fonction")]
-    [DataRow("fr-FR", false, "Exposer comme fonction")]
-    public async Task ExposureIsExplicitLocalizedAndUsesTheSelectedPublishedVersion(string locale, bool canWrite, string label)
+    [DataRow("en-US", true, "Expose as function", false)]
+    [DataRow("en-US", true, "Expose as function", true)]
+    [DataRow("fr-FR", true, "Exposer comme fonction", false)]
+    [DataRow("fr-FR", false, "Exposer comme fonction", false)]
+    public async Task ExposureIsExplicitLocalizedAndUsesTheSelectedPublishedVersion(string locale, bool canWrite, string label, bool pendingPublication)
     {
         using var culture = new TestCultureScope(locale);
         var schema = Schema("xml-json-transformation");
@@ -374,8 +376,16 @@ public sealed partial class SchemaConsoleTests
         rendered.Find("[data-testid=exposure-name]").Change("catalog-conversion");
         rendered.Find("[data-testid=exposure-display-name]").Change("Catalog conversion");
         rendered.Find("[data-testid=exposure-version]").Change("2.0.0");
+        rendered.Find("[data-testid=schema-exposure]").Input("typed");
+        if (pendingPublication) rendered.Find(".schema-publish-card").Input("2.0.0");
+        Assert.IsTrue(rendered.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
         action.Click();
-        rendered.WaitForAssertion(() => Assert.IsNotNull(functions.Request));
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(functions.Request);
+            Assert.AreEqual(pendingPublication, rendered.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+            if (!pendingPublication) StringAssert.Contains(context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri, "/transformation-functions/catalog-conversion?");
+        });
         Assert.AreEqual("1.2.3", functions.Request!.Schema.Version);
         Assert.AreEqual("2.0.0", functions.Request.Version);
         Assert.AreEqual(Scope, functions.Request.ScopeRef);

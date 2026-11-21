@@ -24,7 +24,7 @@ else
     <ConsoleResourceDetailsTemplate CollectionHref="/schemas" CollectionLabel="@T("Title")" Resource="schema" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(NamespaceQuery), SchemaResourceKinds.Schema, Name!)"
         ResourceIdentity="@($"{loadedKey}|{schema?.Uid}")" Name="@(schema?.Definition.DisplayName ?? Name!)" ResourceType="@T("Schema")" Domain="schema" IconName="file-text" Description="@schema?.Definition.Description"
         SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="BusinessSections" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
-        HasDraft="HasDraft" HasAdditionalDraft="publicationTouched" Busy="@(busy || refreshing)" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Feedback="Feedback"
+        HasDraft="HasDraft" HasAdditionalDraft="@(publicationTouched || exposureTouched)" Busy="@(busy || refreshing)" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Feedback="Feedback"
         Yaml="@rawYaml" YamlChanged="value => rawYaml = value" YamlReadOnly="@(!CanEdit || FormDirty || sourceDirty)" YamlError="@error" YamlInputTestId="schema-yaml-source"
         YamlTitle="@T("YamlManifest")" YamlDescription="@T("YamlHelp")" TestId="schema-editor" SectionTestIdPrefix="schema">
 
@@ -35,7 +35,7 @@ else
         <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
         <OverviewContent>@if (schema?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><details><summary>@T("SourceEvidence")</summary><pre class="runner-json">@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details></FormSection> }</OverviewContent>
         <DefinitionContent Context="path">@DefinitionForm(presentations)</DefinitionContent>
-        <AdditionalContent Context="path"><div @oninput="() => publicationTouched = true" @onchange="() => publicationTouched = true">@VersionsContent</div></AdditionalContent>
+        <AdditionalContent Context="path">@VersionsContent</AdditionalContent>
         <DraftActions><button class="text-button" type="button" @onclick="Discard" disabled="@(busy || refreshing)">@T("DiscardDraft")</button>
             @if (sectionState.Is("yaml")) { <button class="button-primary" type="button" data-testid="schema-yaml-save" @onclick="SaveRawAsync" disabled="@(busy || refreshing || !CanEdit || FormDirty || sourceDirty)">@T("SaveYaml")</button> }
             else { <button class="button-primary" type="submit" form="schema-definition-form" data-testid="schema-save" disabled="@(busy || refreshing || !CanEdit)">@T("SaveDraft")</button> }
@@ -62,7 +62,7 @@ else
     private SchemaVersionResource? selectedVersion;
     private string? etag, yamlEtag, error, message, loadedKey, destination, loadedVersion, observedVersionQuery;
     private string baseline = "", rawYaml = "", yamlBaseline = "", publishVersion = "1.0.0";
-    private bool loading = true, busy, refreshing, touched, sourceDirty, invalidInput, publicationTouched, disposed, validationFocus, interactive;
+    private bool loading = true, busy, refreshing, touched, sourceDirty, invalidInput, publicationTouched, exposureTouched, disposed, validationFocus, interactive;
     private long revision;
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
@@ -159,7 +159,7 @@ else
     {
         revision++; busy = refreshing = false; schema = null; latestSnapshot = null; selectedVersion = null; versions = []; model = new(); formContext = null;
         etag = yamlEtag = error = message = loadedVersion = observedVersionQuery = null; rawYaml = yamlBaseline = ""; baseline = JsonSerializer.Serialize(model);
-        touched = sourceDirty = invalidInput = publicationTouched = false; publishVersion = "1.0.0";
+        touched = sourceDirty = invalidInput = publicationTouched = exposureTouched = false; publishVersion = functionVersion = "1.0.0"; functionName = functionDisplayName = string.Empty;
     }
     private void HandleFailure(Exception exception, long request)
     {
@@ -232,6 +232,7 @@ else
     private async Task ExposeAsync()
     {
         if (!CanExpose || busy || schema is null || selectedVersion is null) return;
+        var request = revision;
         busy = true; error = null; message = null;
         try
         {
@@ -239,7 +240,9 @@ else
             var exposed = await client.ExposeAsync(new(functionName.Trim(), functionDisplayName.Trim(), functionVersion.Trim(),
                 new() { Name = schema.Name, Version = selectedVersion.Version, ScopeRef = schema.ScopeRef, Namespace = schema.Namespace },
                 schema.ScopeRef!.Value, schema.Namespace), cancellation.Token);
-            Navigation.NavigateTo(ResourceOwnershipContext.Resource(Services, "/transformation-functions", exposed.Name, exposed.Namespace, exposed.ScopeRef));
+            if (disposed || request != revision) return;
+            exposureTouched = false;
+            destination = ResourceOwnershipContext.Resource(Services, "/transformation-functions", exposed.Name, exposed.Namespace, exposed.ScopeRef);
         }
         catch (Exception) { error = T("ExposureFailed"); }
         finally { busy = false; }
@@ -289,7 +292,7 @@ else
     private RenderFragment VersionsContent => @<div class="resource-editor-view">@if (schema is not null) {
             <section class="panel form-section" data-testid="schema-versions">
                 <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PublishedVersionsHelp")</p></div></div>
-                <section class="schema-publish-card" aria-labelledby="schema-publish-title">
+                <section class="schema-publish-card" aria-labelledby="schema-publish-title" @oninput="() => publicationTouched = true" @onchange="() => publicationTouched = true">
                     <div class="schema-publish-summary">
                         <span class="schema-publish-icon" aria-hidden="true"><TablerIcon Name="upload" /></span>
                         <div><h3 id="schema-publish-title">@T("PublishDraft")</h3><p>@T("PublishDraftHelp", schema.Generation)</p></div>
@@ -330,7 +333,7 @@ else
                             </div>
                             @if (selectedVersion.Format == "xml-json-transformation")
                             {
-                                <section class="panel form-section" data-testid="schema-exposure">
+                                <section class="panel form-section" data-testid="schema-exposure" @oninput="() => exposureTouched = true" @onchange="() => exposureTouched = true">
                                     <h4>@T("ExposeAsFunction")</h4><p>@T("ExposureHelp")</p>
                                     <fieldset class="schema-exposure-fields" disabled="@(!CanExpose || busy)">
                                         <FormField Label="@T("TechnicalName")" Required="true"><ClearableText @bind-Value="functionName" Disabled="@(!CanExpose || busy)" data-testid="exposure-name" /></FormField>
