@@ -153,6 +153,10 @@ height. Narrow layouts keep stacked panes with bounded scrolling regions.
 While following, selection changes reveal the selected tab, and `ProgressKey`
 changes reveal the feature-owned row marked `data-progress-current="true"`.
 Scrolling either pane or interacting with detail controls pauses following.
+Clicking plain panel text or blank space leaves following enabled. Content
+mutations and pane/current-row resizes reposition the visible target even when
+its progress identity has not changed. An explicit resume releases the local
+pause even when pause/resume updates arrive within one animation frame.
 The existing follow command restores it without moving document scroll or
 changing execution. Paging/search adapters bind the same follow state, so manual
 inspection stays stable through polling. Features remain responsible for bounded

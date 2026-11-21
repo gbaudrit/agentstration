@@ -10,7 +10,8 @@ function reveal(container, node) {
 
 export function attach(root, reference) {
     detach(root);
-    let frame = 0, signature, selected, paused = false;
+    let frame = 0, selected, paused = false;
+    const observed = new Set([root]);
     const sync = () => {
         frame = 0;
         const layout = root.querySelector(".step-progress-layout");
@@ -18,14 +19,14 @@ export function attach(root, reference) {
         const available = Math.max(240, (window.visualViewport?.height ?? window.innerHeight) - Math.max(0, layout.getBoundingClientRect().top) - 20);
         const height = `${Math.floor(available)}px`;
         if (root.style.getPropertyValue("--step-progress-available") !== height) root.style.setProperty("--step-progress-available", height);
-        if (root.dataset.followActive !== "true") { paused = false; signature = null; return; }
+        if (root.dataset.followActive !== "true") { paused = false; return; }
         if (paused) return;
         const panel = root.querySelector("[data-selected-step]");
         const current = panel?.querySelector('[data-progress-current="true"]');
-        const next = `${root.dataset.activeStep}|${panel?.dataset.selectedStep}|${root.dataset.progressKey}|${current?.dataset.progressResource ?? ""}`;
-        if (next === signature) return;
-        signature = next;
         const tabs = root.querySelector("[data-step-progress-tabs]");
+        const targets = new Set([root, panel, tabs, current].filter(Boolean));
+        for (const node of observed) if (!targets.has(node)) { resize.unobserve(node); observed.delete(node); }
+        for (const node of targets) if (!observed.has(node)) { resize.observe(node); observed.add(node); }
         reveal(tabs, tabs?.querySelector('[aria-selected="true"]'));
         if (selected !== panel?.dataset.selectedStep && panel) panel.scrollTop = 0;
         selected = panel?.dataset.selectedStep;
@@ -39,7 +40,12 @@ export function attach(root, reference) {
         reference?.invokeMethodAsync("PauseFollowingAsync").catch(() => {});
     };
     const interaction = event => {
-        if (event.target.closest?.(".step-progress-panel, [data-step-progress-tabs]")) pause(event);
+        const container = event.target.closest?.(".step-progress-panel, [data-step-progress-tabs]");
+        if (!container) return;
+        const box = container.getBoundingClientRect();
+        const scrollbar = event.target === container && (event.clientX >= box.left + container.clientLeft + container.clientWidth
+            || event.clientY >= box.top + container.clientTop + container.clientHeight);
+        if (scrollbar || event.target.closest?.("button, a, input, select, textarea, summary, [contenteditable=true]")) pause(event);
     };
     const listener = event => {
         if (event.key !== "Tab" && event.target.closest?.(".step-progress-panel")) pause(event);
@@ -53,8 +59,12 @@ export function attach(root, reference) {
     root.addEventListener("wheel", pause, { passive: true });
     root.addEventListener("touchmove", pause, { passive: true });
     root.addEventListener("pointerdown", interaction);
-    const mutation = new MutationObserver(schedule);
-    mutation.observe(root, { attributes: true, childList: true, subtree: true, attributeFilter: ["data-follow-active", "data-active-step", "data-progress-key", "data-selected-step", "data-progress-current", "data-progress-resource"] });
+    const mutation = new MutationObserver(records => {
+        // A pause and explicit resume can be rendered before the next animation frame.
+        if (records.some(record => record.target === root && record.attributeName === "data-follow-active")) paused = false;
+        schedule();
+    });
+    mutation.observe(root, { attributes: true, childList: true, characterData: true, subtree: true, attributeFilter: ["data-follow-active", "data-active-step", "data-progress-key", "data-selected-step", "data-progress-current", "data-progress-resource", "aria-selected"] });
     const resize = new ResizeObserver(schedule);
     resize.observe(root);
     window.addEventListener("resize", schedule);
