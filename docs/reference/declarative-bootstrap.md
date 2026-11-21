@@ -10,8 +10,8 @@ validated local return URL. `/startup` also exposes the waiting page directly.
 Neither the page nor its probe discloses Bootstrap resources, errors or progress.
 API requests retain the ordinary initialization fence and Problem Details response;
 `/health/ready` continues to represent full application readiness. Authenticated
-Bootstrap progress and the temporary administrator-only sign-in policy are separate
-follow-up work pending the Console UX consolidation.
+Bootstrap progress and the temporary administrator-only sign-in policy are described
+below.
 
 Agentstration treats `Agentstration:Bootstrap:Path` as the root of a profile catalog. Each immediate child directory is one independently selectable profile. Startup applies the ordered `Agentstration:Bootstrap:InitialProfiles` list only when `Agentstration:Bootstrap:InitialBootstrapEnabled` is `true`. Initial bootstrap is disabled by default.
 
@@ -718,10 +718,13 @@ The progress tree includes only resource families present in the selected startu
 profiles. Structural resources, enrollment policies and required contributions
 are tracked alongside dependent application resources. Expanding a stage shows
 its actual kinds and processed/total counts; absent kinds are never rendered as
-`0/0`. Grouping is presentation only and does not reorder dependency execution.
+`0/0`. Grouping is presentation only and does not reorder dependency execution. Consecutive
+resources of the same kind form an ordered group; a later access-policy block has
+its own stable group identity, rather than sending progress back to an earlier
+policy group. Completed preparation groups fold automatically and can be reopened.
 
 `GET /api/bootstrap/startup/resources` is PlatformAdmin-only and requires the
-current `attemptId`. Optional `stepId`, `kind`, `state`, `search`, `offset` and
+current `attemptId`. Optional `stepId`, `kind`, `groupId`, `state`, `search`, `offset` and
 `limit` select a bounded server page (25 by default, at most 100; search at most
 128 characters). A previous attempt returns 409. The overview snapshot carries
 family summaries, never all resource rows. Each row identifies its profile,
@@ -829,3 +832,19 @@ Duration depends on storage and hardware. The regression test holds a local hand
 for 16 seconds (beyond the ordinary 15-second request budget), closes the initiating
 client after acceptance, then verifies live durable progress, duplicate requests,
 completion and idempotent reapplication of all 512 committed resources.
+
+
+### Bootstrap catalog and manual application presentation
+
+The Bootstrap section uses the shared resource-list layout with catalog metrics,
+search, a scope filter and exact local paging of the already-loaded authorized
+catalog. Selection order, target/bindings, side-effect-free preview and explicit
+confirmation of that preview are retained. Preview results are paged at 25.
+
+After submission, StepProgress displays preparation and ordered resource groups
+inside the same Bootstrap section. Its summary cards precede the step panels.
+Applications retain their ordered resource identities so pending groups survive
+reload without another preview or submission. Only names/kinds and relative source
+identities are added to history, not resource bodies or secrets. Older applications
+without this optional plan show only observed resources and say so explicitly.
+Application cancellation and audit details keep their existing authority and scope.

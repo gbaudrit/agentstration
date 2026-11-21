@@ -63,3 +63,13 @@ would require a fenced ownership protocol rather than process-owner comparison.
 - Bootstrap remains create-only, sequential and best effort, with no rollback.
 - The versioned, test-only `load-test` catalog profile contains 512 offline Tenant
   Parameters and is never included in standard initial bootstrap selections.
+
+## Progress presentation refinement — 2026-11-21
+
+Retain the safe ordered resource identities (profile, relative source location,
+kind and name) alongside the existing bounded application progress. This lets the
+Bootstrap page reconnect to the same preparation/resource groups without
+replanning or retaining manifest bodies, configuration values or exception text.
+Older records without this additive field show observed resources only. The
+shared StepProgress presentation does not own submission, confirmation, execution,
+cancellation or retries; preview/digest validation remains unchanged.

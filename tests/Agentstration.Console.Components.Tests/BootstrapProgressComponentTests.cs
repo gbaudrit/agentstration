@@ -1,6 +1,8 @@
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
+using Agentstration.Web.Components;
+using Agentstration.Web.Components.Bootstrap;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
@@ -14,8 +16,8 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapProgressComponentTests
 {
     [TestMethod]
-    [DataRow("en-US", "Processed 1 of 512 resources", "1 created", "Resource 2:")]
-    [DataRow("fr-FR", "1 ressources traitées sur 512", "1 créée(s)", "Ressource 2 :")]
+    [DataRow("en-US", "Processed 1 of 512 resources", "Created", "Resource 2:")]
+    [DataRow("fr-FR", "1 ressources traitées sur 512", "Créées", "Ressource 2 :")]
     public void ReloadResumesPersistedProgressWithoutSubmittingAgain(string locale, string progress, string created, string current)
     {
         using var culture = new TestCultureScope(locale);
@@ -26,7 +28,9 @@ public sealed class BootstrapProgressComponentTests
         {
             var panel = rendered.Find("[data-testid='bootstrap-application-progress']");
             StringAssert.Contains(panel.TextContent, progress);
-            StringAssert.Contains(panel.TextContent, created);
+            Assert.AreEqual("1", panel.QuerySelector(".metric-card strong")?.TextContent.Trim());
+            StringAssert.Contains(panel.QuerySelector(".metric-card")!.TextContent, created);
+            Assert.IsTrue(panel.QuerySelector(".step-progress") is not null);
             StringAssert.Contains(panel.TextContent, current);
             Assert.AreEqual("512", panel.QuerySelector("progress")?.GetAttribute("max"));
             Assert.AreEqual("1", panel.QuerySelector("progress")?.GetAttribute("value"));
@@ -79,22 +83,70 @@ public sealed class BootstrapProgressComponentTests
     }
 
     [TestMethod]
-    public void CancelRequestsCancellationForExistingIdentity()
+    [DataRow(false)]
+    [DataRow(true)]
+    public void CancelRequestsCancellationForExistingIdentity(bool changeSelection)
     {
         using var culture = new TestCultureScope("en-US");
-        var client = new StubClient();
+        var client = new StubClient { ExposeCatalog = changeSelection };
         using var context = Context(client);
         var rendered = context.Render<BootstrapProfiles>();
+        if (changeSelection) rendered.Find("[data-profile-name='base']").Change(true);
         rendered.FindAll("button").Single(button => button.TextContent == "Cancel application").Click();
         rendered.WaitForAssertion(() => StringAssert.Contains(rendered.Markup, "Cancellation requested."));
         Assert.AreEqual("retained-application", client.CancelledId);
         Assert.AreEqual(0, client.Submissions);
     }
 
+    [TestMethod]
+    public void CatalogUsesTheSharedListAndPreviewStillPrecedesConfirmedSubmission()
+    {
+        using var culture = new TestCultureScope("en-US");
+        var client = new StubClient { ExposeCatalog = true };
+        using var context = Context(client);
+        var cut = context.Render<BootstrapProfiles>();
+        Assert.AreEqual(1, cut.FindComponents<ResourceCollectionTemplate<BootstrapProfileSummary>>().Count);
+        cut.Find("[data-profile-name='base']").Change(true);
+        Assert.AreEqual(0, client.Submissions);
+        cut.FindAll("button").Single(button => button.TextContent == "Preview application").Click();
+        Assert.AreEqual(1, client.Previews);
+        Assert.AreEqual(0, client.Submissions);
+        StringAssert.Contains(cut.Find(".bootstrap-preview-summary").TextContent, "Ready");
+        cut.FindAll("button").Single(button => button.TextContent == "Apply preview").Click();
+        Assert.AreEqual(0, client.Submissions);
+        cut.Find("[role='dialog']").QuerySelectorAll("button").Single(button => button.TextContent == "Apply profiles").Click();
+        Assert.AreEqual(1, client.Submissions);
+        Assert.AreEqual(1, cut.FindAll("[data-testid='bootstrap-manual-step-progress']").Count);
+    }
+
+    [TestMethod]
+    public void InvalidPreviewIsAPreparationFailureWithoutPretendingResourcesWereApplied()
+    {
+        using var context = Context(new StubClient());
+        var application = new BootstrapApplicationResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = BootstrapKinds.BootstrapApplication,
+            Metadata = new() { Name = "invalid" },
+            Definition = new()
+            {
+                Status = BootstrapApplicationStatus.Failed,
+                Error = "bootstrap_application_invalid",
+                TotalResources = 1,
+                ResourcePlan = [new("base", "one.yaml", "Parameter", "one")]
+            }
+        };
+        var cut = context.Render<BootstrapApplicationProgress>(p => p.Add(x => x.Application, application));
+        Assert.IsTrue(cut.Find("[data-step-id='prepare']").ClassList.Contains("status-failed"));
+        Assert.IsTrue(cut.Find("[data-step-id='resources']").ClassList.Contains("status-interrupted"));
+        Assert.AreEqual("true", cut.Find("[data-step-id='prepare']").GetAttribute("aria-selected"));
+    }
+
     private static BunitContext Context(StubClient client)
     {
         var context = new BunitContext();
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js").Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/step-progress.js").Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IBootstrapProfilesApiClient>(client);
         return context;
@@ -113,10 +165,15 @@ public sealed class BootstrapProgressComponentTests
                 Status = BootstrapApplicationStatus.Running,
                 StartedAt = DateTimeOffset.UnixEpoch,
                 TotalResources = 512,
+                ResourcePlan = Enumerable.Range(1, 512).Select(index => new BootstrapPlannedResource("load-test", $"10-parameters.yaml#{index}", "Parameter", $"bootstrap-load-test-{index:D3}")).ToArray(),
                 Resources = [new("load-test", "10-parameters.yaml#1", "Parameter", "bootstrap-load-test-001", BootstrapResourceDisposition.Create)],
                 CurrentResource = new("load-test", "10-parameters.yaml#2", "Parameter", "bootstrap-load-test-002", BootstrapResourceDisposition.Create)
             }
         };
+        public bool ExposeCatalog { get; init; }
+        public int Previews { get; private set; }
+        private BootstrapApplicationResource? submitted;
+        private static BootstrapProfileSummary CatalogProfile => new("base", "Base", "Fixture profile", BootstrapProfileScope.Instance, 1, 1, new string('a', 64), []);
         public bool DisconnectOnce { get; init; }
         public bool IncludeNewerApplication { get; init; }
         private BootstrapApplicationResource Newer => application with
@@ -128,9 +185,10 @@ public sealed class BootstrapProgressComponentTests
         public int Observations { get; private set; }
         public string? CancelledId { get; private set; }
         public Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken) => Task.FromResult(
-            new BootstrapManagementView(new(null, false, [], []), [], [], IncludeNewerApplication ? [Newer, application] : [application]));
+            new BootstrapManagementView(new(null, false, [], ExposeCatalog ? [CatalogProfile] : []), [], [], IncludeNewerApplication ? [Newer, application] : [application]));
         public Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken)
         {
+            if (submitted?.Metadata.Name == applicationId) return Task.FromResult<BootstrapApplicationResource?>(submitted);
             if (applicationId == "newer-application") return Task.FromResult<BootstrapApplicationResource?>(Newer);
             Assert.AreEqual(application.Metadata.Name, applicationId);
             Observations++;
@@ -155,10 +213,16 @@ public sealed class BootstrapProgressComponentTests
         public Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, CancellationToken cancellationToken, Guid? requestId = null)
         {
             Submissions++;
-            throw new NotSupportedException();
+            submitted = application with { Metadata = application.Metadata with { Name = "submitted" }, Definition = new() { Profiles = selection.Profiles, Status = BootstrapApplicationStatus.Running } };
+            return Task.FromResult(submitted);
         }
         public Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<BootstrapBindingTargetOption>> GetBindingTargetsAsync(BootstrapBindingTargetsRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken)
+        {
+            Previews++;
+            return Task.FromResult(new BootstrapCompositionPreview([CatalogProfile], BootstrapProfileScope.Instance, null, [], new string('a', 64),
+                [new("base", "one.yaml", "Parameter", "one", BootstrapResourceDisposition.Create)]));
+        }
     }
 }

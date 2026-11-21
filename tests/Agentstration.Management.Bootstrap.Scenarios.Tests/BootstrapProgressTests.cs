@@ -70,6 +70,8 @@ public sealed partial class DeclarativeBootstrapTests
             var running = (await pollClient.GetFromJsonAsync<BootstrapApplicationResource>($"/api/bootstrap/applications/{id}"))!;
             Assert.AreEqual(BootstrapApplicationStatus.Running, running.Definition.Status);
             Assert.AreEqual(512, running.Definition.TotalResources);
+            Assert.HasCount(512, running.Definition.ResourcePlan);
+            Assert.AreEqual("bootstrap-load-test-512", running.Definition.ResourcePlan[^1].Name);
             Assert.HasCount(1, running.Definition.Resources);
             Assert.AreEqual("bootstrap-load-test-002", running.Definition.CurrentResource?.Name);
             using var duplicate = await pollClient.PostAsJsonAsync("/api/bootstrap/applications", request);

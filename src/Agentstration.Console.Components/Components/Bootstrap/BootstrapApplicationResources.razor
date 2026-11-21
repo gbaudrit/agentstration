@@ -1,0 +1,43 @@
+@using Agentstration.Web.Components.Pages
+@using Agentstration.ResourceManagement.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StepProgressStrings> StepStrings
+
+<section class="bootstrap-application-resources">
+    <h2>@Title</h2>
+    <ResourceToolbar>
+        <SearchBox Value="@search" ValueChanged="Search" Label="@Localizer["SearchResources"]" Placeholder="@Localizer["SearchResources"]" />
+    </ResourceToolbar>
+    @if (Visible.Count == 0) { <EmptyState Title="@Localizer["NoResourceOutcome"]" /> }
+    else
+    {
+        <CollectionView TItem="BootstrapApplicationProgressRow" Items="@Visible" IdentityLabel="@Localizer["Resource"]" StateLabel="@Localizer["Outcome"]" InformationLabels="@(new[] { Localizer["Profile"].Value, Localizer["Details"].Value })" Compact="true" RowTestId="bootstrap-application-resource">
+            <Identity Context="row"><strong>@row.Resource.Kind/@row.Resource.Name</strong></Identity>
+            <State Context="row"><StatusBadge Text="@Label(row)" Status="@Tone(row.Status)" /></State>
+            <Information Context="row"><CollectionValue Label="@Localizer["Profile"]">@row.Resource.Profile</CollectionValue><CollectionValue Label="@Localizer["Details"]"><code>@row.Resource.Location</code></CollectionValue></Information>
+        </CollectionView>
+        <CollectionPager Page="@pageNumber" PageSize="25" Total="@Filtered.Count" HasMore="@(pageNumber * 25 < Filtered.Count)" SupportsDirectNavigation="true" PageChanged="value => pageNumber = value" />
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public IReadOnlyList<BootstrapApplicationProgressRow> Rows { get; set; } = [];
+    private string search = string.Empty;
+    private int pageNumber = 1;
+    private IReadOnlyList<BootstrapApplicationProgressRow> Filtered => Rows.Where(row => string.IsNullOrWhiteSpace(search)
+        || row.Resource.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || row.Resource.Kind.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || row.Resource.Profile.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    private IReadOnlyList<BootstrapApplicationProgressRow> Visible => Filtered.Skip((pageNumber - 1) * 25).Take(25).ToArray();
+    protected override void OnParametersSet() => pageNumber = Math.Clamp(pageNumber, 1, Math.Max(1, (Filtered.Count + 24) / 25));
+    private void Search(string value) { search = value; pageNumber = 1; }
+    private string Label(BootstrapApplicationProgressRow row) => row.Result is { } result ? Localizer["Disposition." + result.Disposition] : StepStrings[row.Status.ToString()];
+    private static UiStatus Tone(ProgressStepStatus status) => status switch
+    {
+        ProgressStepStatus.Succeeded => UiStatus.Success,
+        ProgressStepStatus.Failed => UiStatus.Danger,
+        ProgressStepStatus.Running => UiStatus.Info,
+        ProgressStepStatus.Interrupted or ProgressStepStatus.Cancelled => UiStatus.Warning,
+        _ => UiStatus.Neutral
+    };
+}

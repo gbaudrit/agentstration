@@ -40,4 +40,10 @@
 <data name="ProcessedResources" xml:space="preserve"><value>{0} ressource(s) traitée(s)</value></data>
 <data name="RequestIdentityConflict" xml:space="preserve"><value>Cette identité de requête appartient déjà à une autre application. Prévisualisez à nouveau les profils.</value></data>
 <data name="ApplicationQueueFull" xml:space="preserve"><value>Suivez les applications en cours avant d’en soumettre une nouvelle.</value></data>
+  <data name="SearchProfiles" xml:space="preserve"><value>Rechercher des profils</value></data>
+  <data name="SearchResources" xml:space="preserve"><value>Rechercher des ressources</value></data>
+  <data name="Resources" xml:space="preserve"><value>Ressources</value></data>
+  <data name="Preparation" xml:space="preserve"><value>Préparation</value></data>
+  <data name="PreparationDescription" xml:space="preserve"><value>Validation des profils sélectionnés et de leur source exacte avant application des ressources.</value></data>
+  <data name="ObservedResourcesOnly" xml:space="preserve"><value>Cette ancienne application conserve uniquement les ressources observées ; les groupes non observés ne sont pas reconstitués.</value></data>
 </root>

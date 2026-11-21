@@ -356,6 +356,7 @@ public sealed class BootstrapProfileManagementService(
                             Definition = application.Definition with
                             {
                                 TotalResources = progress.Preview.Resources.Count,
+                                ResourcePlan = application.Definition.ResourcePlan.Count > 0 ? application.Definition.ResourcePlan : ResourcePlan(progress.Preview),
                                 Profiles = progress.Preview.Profiles.Select(profile => profile.Name).ToArray(),
                                 Bindings = progress.Preview.Bindings,
                                 SourceProvenance = progress.Preview.SourceProvenance,
@@ -458,6 +459,7 @@ public sealed class BootstrapProfileManagementService(
                 Digest = preview.Digest,
                 StartedAt = timeProvider.GetUtcNow(),
                 TotalResources = preview.Resources.Count,
+                ResourcePlan = ResourcePlan(preview),
                 ExecutionOwner = applicationLock.Owner
             }
         };
@@ -499,11 +501,15 @@ public sealed class BootstrapProfileManagementService(
                 Bindings = execution.Preview.Bindings,
                 Resources = execution.Resources,
                 TotalResources = execution.Preview.Resources.Count,
+                ResourcePlan = ResourcePlan(execution.Preview),
                 CurrentResource = null,
                 SourceProvenance = execution.Preview.SourceProvenance
             }
         };
     }
+
+    private static IReadOnlyList<BootstrapPlannedResource> ResourcePlan(BootstrapCompositionPreview preview) =>
+        preview.Resources.Select(resource => new BootstrapPlannedResource(resource.Profile, resource.Location, resource.Kind, resource.Name)).ToArray();
 
     private BootstrapApplicationResource Interrupt(BootstrapApplicationResource application) => application with
     {
