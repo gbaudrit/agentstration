@@ -50,7 +50,7 @@ else
             <MetricCard Label="@T("AvailableModels")" Value="@(status?.Discovery is { LastSuccessAt: null } ? T("NotObserved") : modelsKnown ? ModelCount(models.Count) : "—")" Detail="@DiscoveryStateLabel" />
             <MetricCard Label="@T("ModelProfileUsages")" Value="@(usagesKnown ? ProfileCount(usages.Count) : "—")" Detail="@T("UsagesHelp")" />
         </OverviewMetrics>
-        <OverviewConfiguration>@SavedConfiguration</OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (resource is not null) { <ModelProviderResourceSummary Resource="resource" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path">@definition</DefinitionContent>
         <AdditionalContent Context="path">@AdditionalContent(path)</AdditionalContent>
         <DraftActions><button class="button-secondary" type="button" disabled="@(Busy || creators.Count > 0)" @onclick="Discard">@Shared["Discard"]</button><button class="button-primary" type="submit" form="model-provider-resource-form" disabled="@(Busy || !CanManage || creators.Count > 0)" data-testid="model-provider-save">@(saving ? T("Saving") : T("SaveChanges"))</button></DraftActions>
@@ -167,9 +167,6 @@ else
         new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete && ConfigurationComplete }
     ];
     private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details"><dt>@IdentityLabels["DisplayName"]</dt><dd>@model?.DisplayName</dd><dt>@IdentityLabels["TechnicalName"]</dt><dd><code>@model?.Namespace/@model?.Name</code></dd><dt>@T("ExtensionRegistration")</dt><dd><code>@model?.ExtensionId</code></dd><dt>@T("ModelProviderContribution")</dt><dd><code>@model?.ContributionId</code></dd></dl></FormSection>;
-    private sealed record Setting(string Label, string Value);
-    private IEnumerable<Setting> SavedEntries => resource is null ? [] : new Setting[] { new(T("ExtensionRegistration"), $"{resource.Definition.Extension.ScopeRef} {(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}/{resource.Definition.Extension.Name}".Trim()), new(T("ModelProviderContribution"), resource.Definition.ContributionId), new(T("ValueBindings"), JsonSerializer.Serialize(resource.Definition.ValueBindings)), new(T("SpecificationOverrides"), JsonSerializer.Serialize(resource.Definition.SpecificationOverrides)) };
-    private RenderFragment SavedConfiguration => @<CollectionView TItem="Setting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
     private RenderFragment AdditionalContent(string path) => path switch { "models" => ModelsPanel, "usages" => UsagesPanel, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
     private RenderFragment ModelsPanel => @<FormSection Title="@T("AvailableModels")">
         <p role="status" data-testid="model-discovery-state">@DiscoveryStateLabel</p>
@@ -225,7 +222,9 @@ else
                 model.ExtensionScopeRef = SelectedExtension?.RegistrationScopeRef; SyncBindings(false); ResetForm();
                 loadState = new(ResourceLoadStatus.Ready) { HasContent = true }; return;
             }
-            var snapshot = await Client.GetModelProviderAsync(requestedNamespace, requestedName!, cancellation.Token);
+            var snapshot = string.IsNullOrWhiteSpace(ScopeRefValue)
+                ? await Client.GetModelProviderAsync(requestedNamespace, requestedName!, cancellation.Token)
+                : await Client.GetModelProviderAsync(requestedNamespace, requestedName!, ResourceScopeRef.Parse(ScopeRefValue), cancellation.Token);
             if (request != loadVersion) return;
             if (!Matches(snapshot.Value, requestedNamespace, requestedName!, expected)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
             var bundle = await ReadBundleAsync(snapshot, request);

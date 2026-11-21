@@ -168,7 +168,27 @@
       "rowTypes": [
         "ModelProviderResponse"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "ModelProvider",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/modelproviders/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/modelproviders/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, Extension/contribution reference, value bindings and specification overrides. Preview reads one exact Instance/namespace/name snapshot, without testing providers, discovering models or loading Extension/Parameter/Secret pickers. ModelProvider remains Instance-only under its existing scope policy.",
+      "loader": "IModelProvidersClient.GetModelProviderAsync(namespace, name, owner, token)",
+      "tests": [
+        "ModelProviderResourcePreviewTests",
+        "ModelProviderCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 123 model providers tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",

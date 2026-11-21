@@ -70,7 +70,7 @@ public partial class ModelProviders
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { providers = null; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); providers = null; query = new(); contextKey = scope; }
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {
             providers = null;

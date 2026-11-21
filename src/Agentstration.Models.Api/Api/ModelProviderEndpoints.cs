@@ -21,10 +21,14 @@ internal sealed class ListModelProvidersEndpoint : IModelManagementEndpoint
 internal sealed class GetModelProviderEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapGet("/{providerName}", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
-    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, string? scopeRef, HttpResponse response, ModelProviderManagementService service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken)
+            var ns = ModelsApiHttp.Namespace(resourceNamespace);
+            if (scopeRef is not null && !ResourceScopePolicy.AllowedScopes(ModelResourceKinds.ModelProvider).Contains(ResourceScopeRef.Parse(scopeRef).Kind))
+                throw new ModelProviderResourceNotFoundException(providerName);
+            var stored = await (scopeRef is null ? service.GetAsync(ns, providerName, cancellationToken)
+                : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), ns, providerName, cancellationToken))
                 ?? throw new ModelProviderResourceNotFoundException(providerName);
             return ModelsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });

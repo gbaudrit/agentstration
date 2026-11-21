@@ -718,6 +718,8 @@ public sealed partial class ModelProviderNavigationTests
             return GetModelProvidersAsync(cancellationToken);
         }
 
+        public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) => GetModelProviderAsync(name, token);
+
         public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken) =>
             ReadError is not null ? Task.FromException<ResourceSnapshot<ModelProviderResource>>(ReadError) : PendingRead ?? Task.FromResult(new ResourceSnapshot<ModelProviderResource>(Replacement ?? ProviderResource(providerName), ReadEtag));
 

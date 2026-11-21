@@ -23,6 +23,8 @@ public interface IModelProvidersClient
         GetModelProvidersAsync(cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderAsync(providerName, cancellationToken);
+    Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact scoped Model Provider reads.");
     Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(ResourceNamespace @namespace, string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken) => UpdateModelProviderAsync(providerName, request, etag, cancellationToken);
@@ -321,6 +323,9 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 
     public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         ReadResourceAsync(HttpMethod.Get, Path(@namespace, providerName), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+        ReadResourceAsync(HttpMethod.Get, Path(ns, name) + $"&scopeRef={Uri.EscapeDataString(owner.Value)}", null, null, token);
 
     public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) =>
         ReadResourceAsync(HttpMethod.Post, "api/modelproviders", JsonContent.Create(request), null, cancellationToken);
