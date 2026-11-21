@@ -514,7 +514,26 @@
       "rowTypes": [
         "ToolResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Tool",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/tools/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Execution form (enabled, available, RunsExecute)"
+      ],
+      "summary": "Saved identity/configuration, capability, input/output schema summaries, observed discovery facts and known governance/provider references. Provider/Extension observations are optional saved caller inputs on the full overview, never loaded by Preview. Tools have a read-only inspection definition: Edit definition is not applicable. Preview independently offers the existing execution form only for enabled, available Tools with RunsExecute; it never invokes a Tool.",
+      "loader": "IToolsClient.GetToolAsync(owner, namespace, name, token)",
+      "tests": [
+        "ToolResourcePreviewTests",
+        "ToolCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 35 tools tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
@@ -4777,6 +4796,18 @@
       "host": "console",
       "inventoryCategory": "specialized",
       "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-summary-schema-properties",
+      "source": "src/Agentstration.Console.Components/Components/ToolResourceSummary.razor",
+      "routes": [
+        "/tools",
+        "/tools/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "discovered-during-adoption",
+      "decision": "non-resource-values",
+      "reason": "Saved schema properties and constraints are value facts; preserve the existing schema renderer without inventing per-property resource actions."
     }
   ]
 }

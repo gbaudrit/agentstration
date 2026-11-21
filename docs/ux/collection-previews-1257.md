@@ -71,3 +71,9 @@ Runtime Profile HTTP GET now accepts the existing exact `scopeRef` plus `resourc
 Saved identity, localized provider type, enabled state, MCP transport/endpoint or command/argument/environment references and AEP Extension reference. Full details retain the existing ownership banner, discovery, tests, toggles and discovered Tools. Preview does not probe a provider or enumerate Tools. The family Preview uses `IToolsClient.GetProviderAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 34 tool providers tests passed. Browser and final offline checks remain pending.
+
+## Tool
+
+Saved identity/configuration, capability, input/output schema summaries, observed discovery facts and known governance/provider references. Provider/Extension observations are optional saved caller inputs on the full overview, never loaded by Preview. Tools have a read-only inspection definition: Edit definition is not applicable. Preview independently offers the existing execution form only for enabled, available Tools with RunsExecute; it never invokes a Tool. The family Preview uses `IToolsClient.GetToolAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 35 tools tests passed. Browser and final offline checks remain pending.

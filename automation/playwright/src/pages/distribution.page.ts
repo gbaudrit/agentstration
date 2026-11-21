@@ -88,9 +88,10 @@ export class DistributionPage {
       await this.showCollectionTable();
       const row = frame.locator('tbody tr').first();
       await expect(row.locator('.collection-identity')).toBeVisible();
-      await expect(row.locator(':scope > td')).toHaveCount(2);
+      await expect(row.locator(':scope > td')).toHaveCount(3);
+      await expect(row.locator('.collection-actions-menu summary')).toBeVisible();
       await expect.poll(() => row.locator(':scope > td').evaluateAll(cells => {
-        if (cells.length !== 2 || cells.some(cell => !cell.isConnected)) return Infinity;
+        if (cells.length !== 3 || cells.some(cell => !cell.isConnected)) return Infinity;
         return Math.max(...cells.map(cell => {
           const range = document.createRange();
           range.selectNodeContents(cell);
@@ -98,13 +99,14 @@ export class DistributionPage {
           const bounds = cell.getBoundingClientRect();
           return Math.abs(content.y + content.height / 2 - bounds.y - bounds.height / 2);
         }));
-      }), { message: 'Tool identity and provider share the vertical center of each row.' }).toBeLessThan(2);
+      }), { message: 'Tool identity, provider and Actions share the vertical center of each row.' }).toBeLessThan(2);
     }
     await frame.locator('.collection-view-switch button').last().click();
     const card = frame.locator('.collection-card').first();
     await expect(card.locator('.collection-identity')).toBeVisible();
     await expect(card.locator('.collection-value')).toHaveCount(1);
-    await expect(frame.locator('.collection-actions')).toHaveCount(0);
+    await expect(card.locator('.collection-actions')).toHaveCount(1);
+    await expect(card.locator('.collection-actions-menu summary')).toBeVisible();
     expect(await this.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   }
 
