@@ -14,6 +14,30 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ConnectedServiceComponentTests
 {
     [TestMethod]
+    [DataRow("en-US", "Expose all discovered operations using the service access rules", "Yes")]
+    [DataRow("fr-FR", "Exposer toutes les opérations découvertes selon les règles d’accès du service", "Oui")]
+    public void ServiceWizardLocalizesAndReviewsCollectiveOperationExposure(string locale, string label, string yes)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var scope = ResourceScopeRef.Workspace(Guid.NewGuid());
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(new EditorClient(TypeCatalog(), scope));
+        context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
+        var cut = context.Render<ConnectedServiceEditor>();
+        cut.Find("[data-wizard-step=access]").Click();
+        var checkbox = cut.Find("[data-testid=connected-service-expose-operations]");
+        Assert.IsFalse(checkbox.HasAttribute("checked"));
+        StringAssert.Contains(checkbox.ParentElement!.TextContent, label);
+        checkbox.Change(true);
+        Assert.IsTrue(((ConnectedServiceEditorModel)cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext.Model).ExposeOperationsToDescendants);
+        cut.Find("[data-wizard-step=review]").Click();
+        Assert.AreEqual(yes, cut.Find("[data-testid=connected-service-operation-exposure-review]").TextContent);
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Display name")]
     [DataRow("fr-FR", "Nom d’affichage")]
     public void ServiceWizardUsesCommonIdentityFormAndRootBindingValidation(string locale, string displayLabel)
@@ -45,6 +69,30 @@ public sealed partial class ConnectedServiceComponentTests
         cut.Find("[data-testid=connected-service-save]").Click();
         Assert.AreEqual("step", cut.Find("[data-wizard-step=configuration]").GetAttribute("aria-current"));
         Assert.IsTrue(common.EditContext.GetValidationMessages().Any());
+    }
+
+    [TestMethod]
+    public void InheritedServiceShowsSavedOperationExposureWithoutAllowingChanges()
+    {
+        using var context = new BunitContext().WithCollectionPresentation();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var scope = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var type = TypeCatalog();
+        var original = Resource(scope, type);
+        original = original with { Uid = Guid.NewGuid(), Definition = original.Definition with { ExposeOperationsToDescendants = true } };
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IConnectedServicesClient>(new DetailsClient(original, type, scope));
+        context.Services.AddSingleton<IParametersClient>(new ParametersClientStub([]));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsClientStub([]));
+        var cut = context.Render<ConnectedServiceEditor>(p => p.Add(v => v.Name, original.Name).Add(v => v.Embedded, true)
+            .Add(v => v.EmbeddedScopeRef, scope).Add(v => v.InitialSnapshot, new ResourceSnapshot<ConnectedServiceResource>(original, "etag"))
+            .Add(v => v.ReadOnlyReason, ResourceReadOnlyReason.Inherited));
+        var checkbox = cut.Find("[data-testid=connected-service-expose-operations]");
+        Assert.IsTrue(checkbox.HasAttribute("checked"));
+        Assert.IsTrue(checkbox.HasAttribute("disabled"));
+        Assert.IsFalse(cut.Instance.IsDirty);
+        checkbox.Change(false);
+        Assert.IsTrue(((ConnectedServiceEditorModel)cut.FindComponent<ResourceDefinitionForm>().Instance.EditContext.Model).ExposeOperationsToDescendants);
     }
 
     [TestMethod]
