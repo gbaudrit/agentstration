@@ -299,3 +299,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 245. [ADR-0245 — Bootstrap policies assign SharedKeyFile extension installations](0245-bootstrap-policies-assign-shared-key-extensions.md)
 
 246. [ADR-0246 — Bootstrap applications run independently of HTTP requests](0246-bootstrap-applications-run-independently-of-http.md)
+
+247. [ADR-0247 — Correct blocked Bootstrap models through versioned plan substitutions](0247-bootstrap-model-substitutions-preserve-plan-and-owner.md)

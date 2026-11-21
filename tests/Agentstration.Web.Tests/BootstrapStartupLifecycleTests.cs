@@ -9,6 +9,33 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapStartupLifecycleTests
 {
     [TestMethod]
+    public async Task DeferredWorkersStartOnceAfterAnExplicitRecoveryFromFailedStartup()
+    {
+        var state = new BootstrapStartupState(); state.Begin(); state.EnableAdministration();
+        var worker = new ProbeWorker();
+        using var deferred = new BootstrapDeferredHostedServices(state, [worker]);
+        await deferred.StartAsync(default);
+        var failedAttempt = state.Read().AttemptId;
+        state.Fail("model_dependency_timeout");
+        Assert.AreEqual(0, worker.Starts);
+        state.BeginRetry();
+        await state.WaitForAttemptChangeAsync(failedAttempt, default);
+        state.Complete();
+        await worker.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.AreEqual(1, worker.Starts);
+        await deferred.StopAsync(default);
+        Assert.AreEqual(1, worker.Stops);
+    }
+
+    private sealed class ProbeWorker : IHostedService
+    {
+        public int Starts { get; private set; }
+        public int Stops { get; private set; }
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task StartAsync(CancellationToken cancellationToken) { Starts++; Started.TrySetResult(); return Task.CompletedTask; }
+        public Task StopAsync(CancellationToken cancellationToken) { Stops++; return Task.CompletedTask; }
+    }
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task ApplicationStartedWaitsForBootstrapOrRetainedAdministration(bool failed)

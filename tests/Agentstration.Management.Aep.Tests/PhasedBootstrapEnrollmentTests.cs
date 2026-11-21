@@ -38,7 +38,7 @@ public sealed partial class AepEnrollmentTests
             Assert.IsFalse(startup.IsReady);
             Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
             Assert.AreEqual(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health/ready")).StatusCode);
-            Assert.AreEqual(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/api/tools")).StatusCode);
+            Assert.AreEqual(HttpStatusCode.ServiceUnavailable, (await client.PostAsync("/api/tools/unknown/run", null)).StatusCode);
             await WaitForPhasedTopologyAsync(factory);
             using (factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem())
             {
@@ -98,6 +98,11 @@ public sealed partial class AepEnrollmentTests
             StringAssert.Contains(startup.Failure, "bootstrap-consumer");
             StringAssert.Contains(startup.Failure, "crawl4ai.web.crawl");
             StringAssert.Contains(startup.Failure, PhasedExtensionId);
+            var snapshot = startup.Read();
+            var dependencies = startup.ReadResources(new(snapshot.AttemptId, Kind: "ExtensionContribution"))!.Items;
+            Assert.IsNotEmpty(dependencies);
+            Assert.IsTrue(dependencies.All(resource => resource.State == "failed"
+                && resource.Operations.Any(operation => operation.Code == "contribution_availability" && operation.State == "failed")));
         }
         finally { Directory.Delete(root, recursive: true); }
     }

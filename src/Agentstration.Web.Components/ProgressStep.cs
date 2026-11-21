@@ -20,4 +20,5 @@ public sealed record ProgressStep(string Id, string Title, ProgressStepStatus St
     public string? Summary { get; init; }
     public string? IconName { get; init; }
     public bool Selectable { get; init; } = true;
+    public string? ParentId { get; init; }
 }

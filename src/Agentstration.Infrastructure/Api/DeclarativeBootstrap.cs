@@ -135,7 +135,8 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken,
         IReadOnlyList<string>? expectedProfileDigests = null,
         string? expectedDigest = null,
-        Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null)
+        Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
+        string? startupTargetLevel = null)
     {
         var preview = await PreviewPhaseAsync(selection, phase, cancellationToken);
         if (expectedProfileDigests is not null && !preview.Profiles.Select(profile => profile.Digest)
@@ -145,7 +146,15 @@ public sealed partial class DeclarativeBootstrapService(
             return new(preview, [], "The bootstrap catalog or target changed after preview. Preview the application again.");
         var invalid = preview.Resources.FirstOrDefault(resource => resource.Disposition == BootstrapResourceDisposition.Invalid);
         if (invalid is not null)
+        {
+            if (startupTargetLevel is not null)
+            {
+                var id = BootstrapStartupState.ResourceId(startupTargetLevel, invalid.Profile, invalid.Location);
+                startup?.ObserveOperation(id, "resource_validation", "failed");
+                startup?.FinishResource(id, "failed");
+            }
             return new(preview, [], $"Bootstrap resource '{invalid.Kind}/{invalid.Name}' from '{invalid.Location}' is invalid: {invalid.Message}");
+        }
 
         await using var loadedSelection = await LoadAsync(selection, cancellationToken, phase);
         var loaded = loadedSelection.Profiles;
@@ -178,11 +187,24 @@ public sealed partial class DeclarativeBootstrapService(
                     await reportProgress(new(preview, resources.ToArray(),
                         new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name, BootstrapResourceDisposition.Create)), cancellationToken);
                 string? error = null;
+                string? observationId = null;
                 try
                 {
                     resource = prepared[source.Location];
+                    if (startupTargetLevel is not null)
+                        observationId = startup?.StartResource(startupTargetLevel, profile.Summary.Name, source.Location,
+                            resource.Kind, resource.Metadata.Name, resource.Metadata.Namespace.Value);
+                    var resourceOperation = observationId is { } id
+                        ? operation with { ObserveOperation = (code, state) => startup!.ObserveOperation(id, code, state), StartupResourceId = id, StartupProfileDigest = profile.Summary.Digest }
+                        : operation;
                     if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name);
-                    var result = await handlers[resource.Kind].ApplyAsync(resource, operation, cancellationToken);
+                    var result = await handlers[resource.Kind].ApplyAsync(resource, resourceOperation, cancellationToken);
+                    if (observationId is not null) startup?.FinishResource(observationId, result switch
+                    {
+                        BootstrapResourceApplyResult.Created => "created",
+                        BootstrapResourceApplyResult.Skipped => "skipped",
+                        _ => "conflict"
+                    });
                     if (phase == BootstrapStartupPhase.Resources)
                         startup?.ObserveResource(resource.Kind, resource.Metadata.Name, result switch
                         {
@@ -202,6 +224,7 @@ public sealed partial class DeclarativeBootstrapService(
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
+                    if (observationId is not null) startup?.FinishResource(observationId, "failed");
                     if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name, "failed");
                     logger.LogWarning("Bootstrap resource {ResourceKind}/{ResourceName} at {Location} failed ({ExceptionType}).",
                         resource.Kind, resource.Metadata.Name, source.Location, exception.GetType().Name);

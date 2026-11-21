@@ -11,9 +11,9 @@ namespace Agentstration.Web.Components;
 public partial class MainLayout
 {
     [Parameter] public RenderFragment? StatusContent { get; set; }
+    [Parameter] public RenderFragment? NoticeContent { get; set; }
     [Parameter] public string? SectionTitle { get; set; }
     [Parameter] public bool EnableCommandPalette { get; set; } = true;
-    [Parameter] public bool EnableNavigation { get; set; } = true;
 
     private sealed record NavigationItem(string LabelKey, string Url, string Icon, string Domain = "neutral", IReadOnlyList<string>? RequiredPermissions = null);
     private sealed record NavigationGroup(string LabelKey, string Tone, IReadOnlyList<NavigationItem> Items);
@@ -227,7 +227,7 @@ public partial class MainLayout
             themeReady = true;
             StateHasChanged();
             selfReference = DotNetObjectReference.Create(this);
-            if (EnableNavigation && EnableCommandPalette)
+            if (EnableCommandPalette)
                 commandRegistration = await commandModule.InvokeAsync<IJSObjectReference>("registerCommandPalette", selfReference);
             navigationTooltipRegistration = await navigationTooltipModule.InvokeAsync<IJSObjectReference>("registerCollapsedNavigationTooltips", shellElement);
             if (CultureNavigation.NavigateToPreferredCulture(NavigationManager, Preferences.Language)) return;
@@ -250,7 +250,7 @@ public partial class MainLayout
 
     private void OpenCommandPalette()
     {
-        if (!EnableNavigation || !EnableCommandPalette) return;
+        if (!EnableCommandPalette) return;
         commandPaletteOpen = true;
         commandQuery = string.Empty;
         resourceCommands = [];

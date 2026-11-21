@@ -11,6 +11,33 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class StepProgressTests
 {
     [TestMethod]
+    public void SubstepsCollapseAndFollowWithoutChangingExecutionOrRenderingOtherFamilies()
+    {
+        using var context = Context();
+        var steps = new ProgressStep[]
+        {
+            new("resources", "Resources", ProgressStepStatus.Running, builder => builder.AddContent(0, "Resource summary")),
+            new("agents", "Agents", ProgressStepStatus.Running, builder => builder.AddContent(0, "Agent details")) { ParentId = "resources", Summary = "2/3" },
+            new("flows", "Flows", ProgressStepStatus.Pending, builder => builder.AddContent(0, "Flow details")) { ParentId = "resources", Summary = "0/2" },
+            new("ready", "Ready", ProgressStepStatus.Pending, builder => builder.AddContent(0, "Ready details"))
+        };
+        var cut = context.Render<StepProgress>(p => p.Add(x => x.Steps, steps).Add(x => x.ActiveStepId, "agents"));
+        Assert.AreEqual("agents", Panel(cut));
+        Assert.AreEqual(2, cut.FindAll(".step-progress-row.is-child").Count);
+        Assert.AreEqual(4, cut.FindAll("[role='tab']").Count);
+        cut.Find(".step-progress-expand").Click();
+        Assert.AreEqual("resources", Panel(cut));
+        Assert.AreEqual(0, cut.FindAll(".step-progress-row.is-child").Count);
+        Assert.AreEqual(2, cut.FindAll("[role='tab']").Count);
+        cut.Find(".step-progress-follow").Click();
+        Assert.AreEqual("agents", Panel(cut));
+        Assert.AreEqual(2, cut.FindAll(".step-progress-row.is-child").Count);
+        cut.Find("[data-step-id='agents']").KeyDown(new KeyboardEventArgs { Key = "ArrowDown" });
+        Assert.AreEqual("flows", Panel(cut));
+        Assert.AreEqual("step", cut.Find("[data-step-id='agents']").GetAttribute("aria-current"));
+    }
+
+    [TestMethod]
     public void ActiveStepSelectsItsContentAndKeepsSelectionSeparateFromExecution()
     {
         using var context = Context();

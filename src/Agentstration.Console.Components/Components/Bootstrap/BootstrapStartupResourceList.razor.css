@@ -1,0 +1,7 @@
+.startup-resource-list { margin-block: 1.25rem; }
+.startup-resource-count { color: var(--muted); font-size: .875rem; }
+.startup-resource-operations { padding: .75rem; }
+.startup-resource-operations h3 { margin-block: 0 .75rem; }
+.startup-resource-operations ol { display: grid; gap: .65rem; padding-inline-start: 1.25rem; }
+.startup-resource-operations li { overflow-wrap: anywhere; }
+.startup-resource-operations time { margin-inline-start: .5rem; color: var(--muted); font-size: .8rem; }

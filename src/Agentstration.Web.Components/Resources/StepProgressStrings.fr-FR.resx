@@ -13,4 +13,6 @@
   <data name="Skipped" xml:space="preserve"><value>Ignorée</value></data>
   <data name="Cancelled" xml:space="preserve"><value>Annulée</value></data>
   <data name="Interrupted" xml:space="preserve"><value>Interrompue</value></data>
+  <data name="Expand" xml:space="preserve"><value>Afficher les ressources : {0}</value></data>
+  <data name="Collapse" xml:space="preserve"><value>Masquer les ressources : {0}</value></data>
 </root>

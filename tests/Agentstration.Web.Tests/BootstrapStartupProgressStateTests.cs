@@ -7,6 +7,16 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapStartupProgressStateTests
 {
     [TestMethod]
+    public void BootstrapEntryPreservesAValidatedInspectionScopeSeparatelyFromItsReturnDestination()
+    {
+        var url = BootstrapStartupNavigation.ProgressUrl("/?context=%2Finstance");
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri("https://console.invalid" + url).Query);
+        Assert.AreEqual("/instance", query["context"].ToString());
+        Assert.AreEqual("/?context=%2Finstance", query["ReturnUrl"].ToString());
+        var invalid = BootstrapStartupNavigation.ProgressUrl("/?context=https%3A%2F%2Fexample.invalid");
+        Assert.IsFalse(Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri("https://console.invalid" + invalid).Query).ContainsKey("context"));
+    }
+    [TestMethod]
     public void SnapshotIsStableSanitizedAndDoesNotExposeMutableState()
     {
         var state = new BootstrapStartupState();

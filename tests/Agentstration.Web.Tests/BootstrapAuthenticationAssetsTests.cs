@@ -49,9 +49,12 @@ public sealed partial class BootstrapAuthenticationAssetsTests
         using var script = await client.GetAsync("/resource-name-fields.js");
         Assert.AreEqual(HttpStatusCode.OK, script.StatusCode);
         Assert.IsTrue(script.Content.Headers.ContentType?.MediaType is "text/javascript" or "application/javascript");
-        using var execution = await client.GetAsync("/api/tools");
+        // Inspection reaches normal authentication; execution remains fenced.
+        using var inspection = await client.GetAsync("/api/tools");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, inspection.StatusCode);
+        using var execution = await client.PostAsync("/api/tools/unknown/run", null);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, execution.StatusCode);
-        using var disguisedExecution = await client.GetAsync("/api/tools/auth.css");
+        using var disguisedExecution = await client.PostAsync("/api/tools/auth.css", null);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, disguisedExecution.StatusCode);
         Assert.IsFalse(startup.IsReady);
     }

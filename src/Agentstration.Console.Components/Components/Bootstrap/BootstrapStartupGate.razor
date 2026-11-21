@@ -5,15 +5,16 @@
 
 @if (denied)
 {
-    <LayoutView Layout="typeof(BootstrapStartupLayout)"><ErrorState Title="@Localizer["AccessUnavailable"]" Message="@Localizer["AccessUnavailableDescription"]" /></LayoutView>
+    <BootstrapStartupLayout ShowNotice="false"><Body><ErrorState Title="@Localizer["AccessUnavailable"]" Message="@Localizer["AccessUnavailableDescription"]" /></Body></BootstrapStartupLayout>
 }
 else if (error)
 {
-    <LayoutView Layout="typeof(BootstrapStartupLayout)"><ErrorState Title="@Localizer["ConnectionLost"]" Message="@Localizer["GateConnectionLostDescription"]"><button class="button-secondary" @onclick="CheckAsync">@Localizer["Retry"]</button></ErrorState></LayoutView>
+    <BootstrapStartupLayout ShowNotice="false"><Body><ErrorState Title="@Localizer["ConnectionLost"]" Message="@Localizer["GateConnectionLostDescription"]"><button class="button-secondary" @onclick="CheckAsync">@Localizer["Retry"]</button></ErrorState></Body></BootstrapStartupLayout>
 }
 else if (allowed)
 {
-    @ChildContent
+    @if (RouteContent is not null) { @RouteContent(ready) }
+    else { @ChildContent }
 }
 else
 {
@@ -22,6 +23,7 @@ else
 
 @code {
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment<bool>? RouteContent { get; set; }
     private readonly CancellationTokenSource stopping = new();
     private bool allowed, denied, error, ready;
     private string? admittedPath;
@@ -47,7 +49,7 @@ else
             var admission = await Client.GetAdmissionAsync(stopping.Token);
             if (request != revision || stopping.IsCancellationRequested) return;
             ready = admission.Ready;
-            if (!admission.Ready && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsRepairPath(path))
+            if (!admission.Ready && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsInspectionPath(path))
                 Navigation.NavigateTo(BootstrapStartupNavigation.ProgressUrl(relative).TrimStart('/'), replace: true);
             else { admittedPath = path; allowed = true; }
         }

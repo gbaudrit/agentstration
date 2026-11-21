@@ -49,12 +49,20 @@ public sealed class BootstrapStartupCoordinator(
         foreach (var application in options.InitialApplications)
             applications.Add(await PrepareAsync(application.Profiles, application.TargetLevel, cancellationToken));
 
+        foreach (var application in applications)
+            foreach (var profile in application.Snapshot)
+                foreach (var source in profile.Resources)
+                    startup.RegisterResource(application.TargetLevel, profile.Summary.Name, source.Location,
+                        source.Resource.Kind is "PlatformAdministrator" or "Tenant" or "Workspace" or "PrincipalDefaultContext" ? "topology"
+                            : source.Resource.Kind == ExtensionKinds.ExtensionEnrollmentPolicy ? "extensions" : "resources",
+                        source.Resource.Kind, source.Resource.Metadata.Name, source.Resource.Metadata.Namespace.Value);
+
         foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
-            await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Topology, application.Snapshot, cancellationToken);
+            await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Topology, application.Snapshot, application.TargetLevel, cancellationToken);
         await operationalTopology.EnsureAllAsync(cancellationToken);
         await platformResources.EnsureAllAsync(cancellationToken);
         foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
-            await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Policies, application.Snapshot, cancellationToken);
+            await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Policies, application.Snapshot, application.TargetLevel, cancellationToken);
         await automaticEnrollment.ActivateAsync(cancellationToken);
 
         startup.EnableAdministration();
@@ -84,7 +92,7 @@ public sealed class BootstrapStartupCoordinator(
             using var operation = context is null ? scopes.PushSystem()
                 : selection.Target!.WorkspaceId is not null ? scopes.Push(context)
                 : scopes.PushTenant(context.PrincipalId, context.TenantId);
-            await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index].Snapshot, cancellationToken);
+            await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index].Snapshot, applications[index].TargetLevel, cancellationToken);
         }
         startup.MoveTo("finalization");
     }
@@ -126,11 +134,11 @@ public sealed class BootstrapStartupCoordinator(
     }
 
     private async Task ApplyPhaseAsync(BootstrapProfileSelection selection, BootstrapStartupPhase phase,
-        IReadOnlyList<LoadedBootstrapProfile> expected, CancellationToken cancellationToken)
+        IReadOnlyList<LoadedBootstrapProfile> expected, string targetLevel, CancellationToken cancellationToken)
     {
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("Applying Bootstrap phase {Phase} for profiles {Profiles}.", phase, string.Join(",", selection.Profiles));
-        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray());
+        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: targetLevel);
         if (result.Error is not null) throw new DeclarativeBootstrapException(result.Error);
     }
 
@@ -138,6 +146,10 @@ public sealed class BootstrapStartupCoordinator(
         IReadOnlyList<BootstrapExtensionRequirement> requirements, TimeSpan timeout, CancellationToken cancellationToken)
     {
         if (requirements.Count == 0) return;
+        requirements = requirements.DistinctBy(requirement => (requirement.ConsumerScope, requirement.Selector)).ToArray();
+        var observations = requirements.Select(requirement => startup.RegisterResource(
+            requirement.ConsumerScope.Value, requirement.Profile, "contribution:" + requirement.Location + ":" + requirement.Selector.ExtensionId + ":" + requirement.Selector.InstanceId + ":" + requirement.Selector.Kind + ":" + requirement.Selector.ContributionId,
+            "extensions", "ExtensionContribution", requirement.Selector.ExtensionId + "/" + requirement.Selector.ContributionId)).ToArray();
         var requiredIds = requirements.Select(value => value.Selector.ExtensionId).ToHashSet(StringComparer.Ordinal);
         using var deadline = new CancellationTokenSource(timeout, timeProvider);
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
@@ -150,8 +162,9 @@ public sealed class BootstrapStartupCoordinator(
                 wait.Token.ThrowIfCancellationRequested();
                 await automaticEnrollment.ProcessPendingAsync(wait.Token, requiredIds);
                 var missing = false;
-                foreach (var requirement in requirements)
+                for (var index = 0; index < requirements.Count; index++)
                 {
+                    var requirement = requirements[index];
                     try
                     {
                         if (requirement.Selector.Kind == ExtensionKinds.ExtensionRegistration)
@@ -162,11 +175,14 @@ public sealed class BootstrapStartupCoordinator(
                             }, requirement.ConsumerScope, wait.Token);
                         else
                             _ = await references.ResolveContributionAsync(requirement.Selector, requirement.ConsumerScope, wait.Token);
+                        startup.ObserveOperation(observations[index], "contribution_availability", "succeeded");
+                        startup.FinishResource(observations[index], "succeeded");
                     }
                     catch (BootstrapDependencyException exception)
                     {
                         startup.ObserveContributionWait(requirement.ResourceKind, requirement.ResourceName,
                             requirement.Selector.ExtensionId, requirement.Selector.ContributionId);
+                        startup.ObserveOperation(observations[index], "contribution_availability", "waiting");
                         lastDiagnostic = $"{requirement.Profile}/{requirement.Location}: {requirement.ResourceKind}/{requirement.ResourceName} requires extension '{requirement.Selector.ExtensionId}' installation '{requirement.Selector.InstanceId}', {requirement.Selector.Kind}/{requirement.Selector.ContributionId} [{exception.Code}]: {exception.Message}";
                         if (exception.Code is not ("extension_unavailable" or "contribution_unavailable"))
                             throw new DeclarativeBootstrapException(lastDiagnostic, exception);
@@ -179,9 +195,18 @@ public sealed class BootstrapStartupCoordinator(
                 await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, wait.Token);
             }
         }
-        catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested
+            && (exception is not OperationCanceledException || deadline.IsCancellationRequested))
         {
-            throw new DeclarativeBootstrapException($"[bootstrap_dependency_timeout] Required extension contributions were not ready within {timeout}. {lastDiagnostic}");
+            var attempt = startup.Read().AttemptId;
+            foreach (var id in observations.Where(id => startup.FindResource(attempt, id)?.State != "succeeded"))
+            {
+                startup.ObserveOperation(id, "contribution_availability", "failed");
+                startup.FinishResource(id, "failed");
+            }
+            if (exception is OperationCanceledException)
+                throw new DeclarativeBootstrapException($"[bootstrap_dependency_timeout] Required extension contributions were not ready within {timeout}. {lastDiagnostic}");
+            throw;
         }
     }
 }

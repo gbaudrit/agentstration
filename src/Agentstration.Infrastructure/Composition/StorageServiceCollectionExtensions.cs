@@ -25,6 +25,9 @@ internal static class StorageServiceCollectionExtensions
         services.AddSingleton(context.Options.StorageContent);
         services.AddSingleton<InstanceInitializationOptions>();
         services.AddSingleton<BootstrapStartupState>();
+        services.AddSingleton(new Agentstration.Infrastructure.Bootstrap.BootstrapStartupModelOverrideOptions(
+            Path.Combine(context.Options.DataDirectory, "bootstrap-model-overrides")));
+        services.AddSingleton<Agentstration.Infrastructure.Bootstrap.BootstrapStartupModelOverrideStore>();
         services.AddSingleton<Agentstration.Bootstrap.Contracts.IBootstrapStartupStatus>(provider => provider.GetRequiredService<BootstrapStartupState>());
         services.AddSingleton<IInstanceInitializationCoordinator, InstanceInitializationCoordinator>();
         services.AddSingleton<WorkspacePlatformResourceProvisioner>();

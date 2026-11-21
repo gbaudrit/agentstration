@@ -7,7 +7,7 @@
 .step-progress-navigation-heading h2 { margin: 0; font-size: 1.15rem; line-height: 1.4; }
 .step-progress-follow { border: 1px solid var(--border, #d7e2f4); border-radius: .5rem; padding: .4rem .65rem; background: var(--surface, #fff); color: var(--primary, #2863ff); font: inherit; font-size: .8rem; cursor: pointer; }
 .step-progress-step { position: relative; display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .75rem; align-items: start; width: 100%; padding: .85rem .6rem; border: 1px solid transparent; border-radius: .75rem; background: transparent; color: inherit; text-align: start; font: inherit; cursor: pointer; }
-.step-progress-step:not(:last-child)::after { position: absolute; content: ""; inset-inline-start: calc(.6rem + 1rem); top: 2.95rem; bottom: -.6rem; width: 2px; background: var(--border, #d7e2f4); }
+.step-progress-row:not(:last-child) > .step-progress-step::after { position: absolute; content: ""; inset-inline-start: calc(.6rem + 1rem); top: 2.95rem; bottom: -.6rem; width: 2px; background: var(--border, #d7e2f4); }
 .step-progress-step.is-selected { background: var(--primary-soft, #eaf1ff); border-color: color-mix(in srgb, var(--primary, #2863ff) 22%, transparent); }
 .step-progress-step:hover:not(:disabled) { background: var(--surface-2, #f5f7fb); }
 .step-progress-step.is-selected:hover { background: var(--primary-soft, #eaf1ff); }
@@ -39,3 +39,12 @@
 @media (prefers-reduced-motion: reduce) {
     .step-progress-spinner { animation: none; }
 }
+
+.step-progress-row { position: relative; display: flex; align-items: start; }
+.step-progress-row > .step-progress-step { flex: 1; min-width: 0; }
+.step-progress-row.is-child { padding-inline-start: 1.6rem; }
+.step-progress-row.is-child .step-progress-marker { width: 1.5rem; height: 1.5rem; font-size: .75rem; }
+.step-progress-row.is-child .step-progress-step { grid-template-columns: 1.5rem minmax(0,1fr); padding-block: .55rem; }
+.step-progress-row.is-child .step-progress-step-title { font-size: .9rem; }
+.step-progress-expand { flex: 0 0 2rem; display: grid; place-items: center; margin-block-start: 0; padding: .35rem; border: 0; border-radius: .35rem; background: transparent; color: var(--muted); cursor: pointer; }
+.step-progress-expand:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

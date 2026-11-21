@@ -12,6 +12,13 @@ Each `ProgressStep` has a stable, unique, non-empty `Id`, a `Title`, a
 `IconName` enrich the list. `Selectable = false` keeps a step visible while
 excluding it from inspection and keyboard selection.
 
+`ParentId` optionally places a step under an existing top-level step. Parents
+can expand/collapse their substeps; keyboard navigation follows only visible
+selectable steps. Following an active substep expands its parent. Collapsing the
+inspected substep's parent returns inspection to that parent and pauses following.
+Substep IDs remain globally unique. Features supply only actual groups from their
+execution plan, rather than a fixed inventory of possible resource kinds.
+
 Statuses are `Pending`, `Running`, `Waiting`, `Succeeded`, `Failed`, `Skipped`,
 `Cancelled` and `Interrupted`. Waiting is distinct from failure. Status labels,
 empty states and follow controls use the neutral English and French resource

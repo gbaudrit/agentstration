@@ -2,10 +2,11 @@ using Agentstration.Bootstrap.Contracts;
 
 namespace Agentstration.Infrastructure;
 
-public sealed class BootstrapStartupState : IBootstrapStartupStatus
+public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = null) : IBootstrapStartupStatus
 {
     private readonly object sync = new();
     private TaskCompletionSource? completion;
+    private TaskCompletionSource attemptChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private Guid attemptId;
     private long revision;
     private string? failure;
@@ -23,9 +24,12 @@ public sealed class BootstrapStartupState : IBootstrapStartupStatus
     {
         lock (sync)
         {
+            attemptChanged.TrySetResult();
+            attemptChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             attemptId = Guid.NewGuid(); revision = 1; failure = null; administrationReady = false;
             created = skipped = conflicts = failed = 0; activity = null;
+            resourceRows.Clear(); activeResourceId = null;
             steps.Clear();
             foreach (var id in new[] { "topology", "extensions", "resources", "finalization" }) steps.Add(id, "pending");
             activeStep = "topology"; steps[activeStep] = "running";
@@ -40,6 +44,10 @@ public sealed class BootstrapStartupState : IBootstrapStartupStatus
             activeStep = step; steps[step] = "running"; activity = null; revision++;
         }
     }
+    public void BeginRetry()
+    {
+        lock (sync) { Begin(); administrationReady = true; }
+    }
     public void ObserveResource(string kind, string name, string? outcome = null)
     {
         lock (sync)
@@ -47,7 +55,7 @@ public sealed class BootstrapStartupState : IBootstrapStartupStatus
             if (activeStep != "resources" || failure is not null) return;
             // Keep safe dependency identities when its resource fails (for example a model timeout).
             if (outcome != "failed" || activity?.ResourceKind != kind || activity.ResourceName != name)
-                activity = new(kind, name);
+                activity = new(kind, name, ResourceId: activeResourceId);
             steps[activeStep] = "running";
             switch (outcome)
             {
@@ -59,14 +67,16 @@ public sealed class BootstrapStartupState : IBootstrapStartupStatus
             revision++;
         }
     }
-    public void ObserveModelWait(string resource, string provider, string model, string reason, string? providerNamespace = null, string? providerScopeRef = null)
+    public void ObserveModelWait(string resource, string provider, string model, string reason, string? providerNamespace = null, string? providerScopeRef = null, bool canChangeModel = false)
     {
         lock (sync)
         {
             if (activeStep != "resources" || failure is not null) return;
-            var next = new BootstrapStartupActivity("ModelProfile", resource, provider, model, reason, providerNamespace, ProviderScopeRef: providerScopeRef);
+            var next = new BootstrapStartupActivity("ModelProfile", resource, provider, model, reason, providerNamespace, ProviderScopeRef: providerScopeRef, ResourceId: activeResourceId, CanChangeModel: canChangeModel,
+                TargetLevel: activeResourceId is { } id && resourceRows.TryGetValue(id, out var row) ? row.TargetLevel : null);
             if (activity == next && steps[activeStep] == "waiting") return;
             activity = next; steps[activeStep] = "waiting"; revision++;
+            ObserveOperationCore(activeResourceId, "model_discovery", "waiting");
         }
     }
     public void ObserveContributionWait(string kind, string resource, string extension, string contribution)
@@ -95,6 +105,9 @@ public sealed class BootstrapStartupState : IBootstrapStartupStatus
         {
             if (completion?.Task.IsCompleted == true) return;
             failure = reason;
+            if (activeResourceId is { } id && resourceRows.TryGetValue(id, out var row)
+                && row.State is "running" or "waiting")
+                resourceRows[id] = row with { State = "failed" };
             if (activeStep is not null) steps[activeStep] = "failed";
             revision++; completion?.TrySetCanceled();
         }
@@ -107,11 +120,16 @@ public sealed class BootstrapStartupState : IBootstrapStartupStatus
             return new(attemptId, revision, ready, administrationReady,
                 ready ? "ready" : failure is null ? "running" : "failed",
                 steps.Select(step => new BootstrapStartupStep(step.Key, step.Value)).ToArray(), activeStep,
-                activity, created, skipped, conflicts, failed);
+                activity, created, skipped, conflicts, failed)
+            { Families = ReadFamilies() };
         }
     }
     public Task WaitUntilReadyAsync(CancellationToken cancellationToken)
     {
         lock (sync) return completion?.Task.WaitAsync(cancellationToken) ?? Task.CompletedTask;
+    }
+    public Task WaitForAttemptChangeAsync(Guid previousAttempt, CancellationToken cancellationToken)
+    {
+        lock (sync) return previousAttempt != attemptId ? Task.CompletedTask : attemptChanged.Task.WaitAsync(cancellationToken);
     }
 }

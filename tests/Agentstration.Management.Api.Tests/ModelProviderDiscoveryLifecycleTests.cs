@@ -208,7 +208,9 @@ public sealed class ModelProviderDiscoveryLifecycleTests : ModelManagementApiTes
         Assert.AreEqual(HttpStatusCode.OK, observed.StatusCode);
         using var ready = await client.GetAsync("/health/ready");
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, ready.StatusCode);
-        using var execution = await client.GetAsync("/api/tools");
+        using var inspection = await client.GetAsync("/api/tools");
+        Assert.AreEqual(HttpStatusCode.OK, inspection.StatusCode);
+        using var execution = await client.PostAsync("/api/tools/unknown/run", null);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, execution.StatusCode);
         startup.Fail("model_dependency_timeout");
         using var afterFailure = await client.GetAsync("/api/modelproviders/ollama-local/status");

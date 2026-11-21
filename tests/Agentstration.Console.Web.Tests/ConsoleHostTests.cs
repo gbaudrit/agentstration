@@ -241,10 +241,10 @@ public sealed class ConsoleHostTests
         StringAssert.Contains(progress, "bootstrap-startup-progress");
         StringAssert.Contains(progress, "Bootstrap in progress");
         StringAssert.Contains(progress, "console-shell");
-        StringAssert.Contains(progress, "shell-brand");
-        Assert.IsFalse(progress.Contains("console-sidebar", StringComparison.Ordinal));
-        Assert.IsFalse(progress.Contains("context-selector-trigger", StringComparison.Ordinal));
-        Assert.IsFalse(progress.Contains("console-command-trigger", StringComparison.Ordinal));
+        StringAssert.Contains(progress, "bootstrap-startup-notice");
+        StringAssert.Contains(progress, "console-sidebar");
+        Assert.IsFalse(progress.Contains("bootstrap-startup-header", StringComparison.Ordinal));
+        StringAssert.Contains(progress, "console-command-trigger");
         Assert.IsFalse(progress.Contains("bootstrap-startup-header", StringComparison.Ordinal));
         startup.Ready = true;
         using var ready = await client.GetAsync("/");

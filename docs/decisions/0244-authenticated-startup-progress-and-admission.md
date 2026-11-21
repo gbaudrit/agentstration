@@ -94,3 +94,13 @@ presentation and omits provider repair links from progress panels. Normal Consol
 navigation returns after readiness. The existing API admission and execution
 boundaries remain authoritative; this change adds no new shell or Bootstrap
 dependency to the shared layout.
+
+## Consultation and correction follow-up — 2026-11-21
+
+The maintainer subsequently requested consultation during preparation and inline
+model correction. ADR-0247 supersedes the navigation-disabled presentation above:
+use the standard navigation and scope selector with a persistent Bootstrap notice.
+Keep the initial overview and execution fenced, and distinguish the consulted
+scope from the original Bootstrap target. Substeps summarize only actual plan
+families and resource operations are paged. Explicit model substitutions and
+recovery are governed by ADR-0247, not by arbitrary edits to progress snapshots.

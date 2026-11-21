@@ -50,7 +50,12 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile
 }
 
-public sealed record BootstrapResourceOperationContext(string ProfileName, string ProfilePath, BootstrapProfileScope ProfileScope, BootstrapApplicationTarget? Target = null, bool WaitForDependencies = false);
+public sealed record BootstrapResourceOperationContext(string ProfileName, string ProfilePath, BootstrapProfileScope ProfileScope, BootstrapApplicationTarget? Target = null, bool WaitForDependencies = false)
+{
+    [JsonIgnore] public Action<string, string>? ObserveOperation { get; init; }
+    [JsonIgnore] public string? StartupResourceId { get; init; }
+    [JsonIgnore] public string? StartupProfileDigest { get; init; }
+}
 public sealed record BootstrapResourcePlanDetail(string Kind, string Name, BootstrapResourceDisposition Disposition, string? Description = null);
 public sealed record BootstrapResourcePlanResult(BootstrapResourceDisposition Disposition, IReadOnlyList<BootstrapResourcePlanDetail>? Details = null);
 

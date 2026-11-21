@@ -7,7 +7,7 @@
     <value>Initialisation de l’instance</value>
   </data>
   <data name="Description" xml:space="preserve">
-    <value>Suivez la préparation de votre environnement. La Console s’ouvrira automatiquement lorsque l’instance sera prête.</value>
+    <value>Suivez la préparation et consultez les ressources pendant le bootstrap. Les exécutions seront disponibles à la fin de la préparation.</value>
   </data>
   <data name="Running" xml:space="preserve">
     <value>Bootstrap en cours</value>
@@ -37,7 +37,7 @@
     <value>L’instance est momentanément injoignable. Le suivi reprendra lorsque la connexion sera rétablie.</value>
   </data>
   <data name="Recovery" xml:space="preserve">
-    <value>Le bootstrap s’est arrêté. Corrigez la configuration ou la dépendance requise, puis redémarrez l’instance. Consultez les journaux du serveur pour le diagnostic détaillé.</value>
+    <value>Le bootstrap s’est arrêté. Consultez la ressource en échec et appliquez ici une correction de modèle si elle est proposée. Pour les autres échecs, corrigez la configuration puis redémarrez l’instance.</value>
   </data>
   <data name="Stage_topology" xml:space="preserve">
     <value>Structure de l’instance</value>
@@ -123,4 +123,78 @@
   <data name="DependencyFailureDescription" xml:space="preserve">
     <value>Une dépendance requise n’a pas pu être résolue.</value>
   </data>
+  <data name="ResourceCount" xml:space="preserve"><value>{0}/{1}</value></data>
+  <data name="ResourceFilters" xml:space="preserve"><value>Filtres des ressources du bootstrap</value></data>
+  <data name="SearchResources" xml:space="preserve"><value>Rechercher par ressource, profil ou scope</value></data>
+  <data name="ResourceState" xml:space="preserve"><value>Résultat / état</value></data>
+  <data name="AllStates" xml:space="preserve"><value>Tous les états</value></data>
+  <data name="SearchLimit" xml:space="preserve"><value>La recherche est limitée à 128 caractères.</value></data>
+  <data name="ResourceReadFailed" xml:space="preserve"><value>Le détail des ressources est temporairement indisponible. Le suivi reprendra automatiquement.</value></data>
+  <data name="LoadingResources" xml:space="preserve"><value>Chargement du détail des ressources…</value></data>
+  <data name="MatchingResources" xml:space="preserve"><value>{0} ressources correspondantes</value></data>
+  <data name="NoResources" xml:space="preserve"><value>Aucune ressource ne correspond aux filtres</value></data>
+  <data name="Target" xml:space="preserve"><value>Scope cible</value></data>
+  <data name="Profile" xml:space="preserve"><value>Profil de bootstrap</value></data>
+  <data name="ResourceDetails" xml:space="preserve"><value>Opérations</value></data>
+  <data name="NotStarted" xml:space="preserve"><value>Cette ressource n’a pas encore été appliquée.</value></data>
+  <data name="State_pending" xml:space="preserve"><value>À venir</value></data>
+  <data name="State_running" xml:space="preserve"><value>En cours</value></data>
+  <data name="State_waiting" xml:space="preserve"><value>En attente d’une dépendance</value></data>
+  <data name="State_created" xml:space="preserve"><value>Créée</value></data>
+  <data name="State_skipped" xml:space="preserve"><value>Déjà présente</value></data>
+  <data name="State_succeeded" xml:space="preserve"><value>Terminée</value></data>
+  <data name="State_conflict" xml:space="preserve"><value>Conflit</value></data>
+  <data name="State_failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="State_blocked" xml:space="preserve"><value>Bloquée</value></data>
+  <data name="Operation_resource_apply" xml:space="preserve"><value>Application de la ressource</value></data>
+  <data name="Operation_definition" xml:space="preserve"><value>Enregistrement de la définition</value></data>
+  <data name="Operation_generation_apply" xml:space="preserve"><value>Application de la génération d’exécution</value></data>
+  <data name="Operation_model_discovery" xml:space="preserve"><value>Vérification du modèle requis</value></data>
+  <data name="Operation_contribution_availability" xml:space="preserve"><value>Vérification de la contribution</value></data>
+  <data name="Operation_resource_validation" xml:space="preserve"><value>Validation de la ressource</value></data>
+  <data name="Family_PlatformAdministrator" xml:space="preserve"><value>Administrateurs de plateforme</value></data>
+  <data name="Family_Tenant" xml:space="preserve"><value>Tenants</value></data>
+  <data name="Family_Workspace" xml:space="preserve"><value>Espaces de travail</value></data>
+  <data name="Family_PrincipalDefaultContext" xml:space="preserve"><value>Contextes par défaut</value></data>
+  <data name="Family_ExtensionEnrollmentPolicy" xml:space="preserve"><value>Politiques d’enrôlement</value></data>
+  <data name="Family_ExtensionContribution" xml:space="preserve"><value>Contributions requises</value></data>
+  <data name="Family_ModelProvider" xml:space="preserve"><value>Fournisseurs de modèles</value></data>
+  <data name="Family_ModelProfile" xml:space="preserve"><value>Profils de modèles</value></data>
+  <data name="Family_RuntimeProfile" xml:space="preserve"><value>Profils d’exécution</value></data>
+  <data name="Family_Agent" xml:space="preserve"><value>Agents</value></data>
+  <data name="Family_Flow" xml:space="preserve"><value>Flows</value></data>
+  <data name="Family_Parameter" xml:space="preserve"><value>Paramètres</value></data>
+  <data name="Family_Secret" xml:space="preserve"><value>Secrets</value></data>
+  <data name="Family_ResourceAccessPolicy" xml:space="preserve"><value>Politiques d’accès</value></data>
+  <data name="Family_PackInstallation" xml:space="preserve"><value>Installations de Packs</value></data>
+  <data name="Family_ToolSet" xml:space="preserve"><value>Ensembles d’outils</value></data>
+  <data name="Family_Entry" xml:space="preserve"><value>Entrées</value></data>
+  <data name="Family_Storage" xml:space="preserve"><value>Stockages</value></data>
+  <data name="ConsultationAvailable" xml:space="preserve"><value>Vous pouvez consulter les ressources. Certaines actions restent indisponibles pendant la préparation.</value></data>
+  <data name="ViewProgress" xml:space="preserve"><value>Voir l’avancement du bootstrap</value></data>
+  <data name="ChangeModel" xml:space="preserve"><value>Modifier le fournisseur ou le modèle</value></data>
+  <data name="CorrectionAccepted" xml:space="preserve"><value>Le choix est enregistré. Le bootstrap reprend avec ce fournisseur et ce modèle.</value></data>
+  <data name="CorrectionHelp" xml:space="preserve"><value>Cette correction s’applique à ce profil dans ce plan de bootstrap et est conservée sur cette instance après redémarrage. Les fichiers sources ne sont pas modifiés.</value></data>
+  <data name="LoadingModelChoices" xml:space="preserve"><value>Chargement des fournisseurs et modèles connus…</value></data>
+  <data name="ChooseProvider" xml:space="preserve"><value>Choisir un fournisseur</value></data>
+  <data name="NoCachedModels" xml:space="preserve"><value>Aucun modèle disponible n’est actuellement connu pour ce fournisseur. Actualisez cette liste après la découverte.</value></data>
+  <data name="ApplyAndResume" xml:space="preserve"><value>Appliquer et reprendre</value></data>
+  <data name="RefreshModelChoices" xml:space="preserve"><value>Actualiser les modèles connus</value></data>
+  <data name="CancelCorrection" xml:space="preserve"><value>Annuler</value></data>
+  <data name="CorrectionStale" xml:space="preserve"><value>La ressource ou la sélection a changé. Fermez puis rouvrez le formulaire avant d’appliquer votre correction.</value></data>
+  <data name="CorrectionUnavailable" xml:space="preserve"><value>La correction ne peut pas être chargée ou appliquée pour le moment. Réessayez.</value></data>
+  <data name="CorrectionInvalid" xml:space="preserve"><value>Ce modèle est indisponible ou incompatible avec les paramètres du profil. Actualisez les choix et sélectionnez un autre modèle.</value></data>
+  <data name="SubstitutionApplied" xml:space="preserve"><value>Une substitution de fournisseur ou de modèle est enregistrée pour ce plan.</value></data>
+  <data name="PreviousSelection" xml:space="preserve"><value>Choix précédent</value></data>
+  <data name="NewSelection" xml:space="preserve"><value>Nouveau choix</value></data>
+  <data name="Operation_model_substitution" xml:space="preserve"><value>Substitution du fournisseur ou du modèle</value></data>
+  <data name="Family_ConnectedServiceType" xml:space="preserve"><value>Types de services connectés</value></data>
+  <data name="Family_StorageType" xml:space="preserve"><value>Types de stockage</value></data>
+  <data name="Family_FunctionKind" xml:space="preserve"><value>Types de fonctions</value></data>
+  <data name="Family_TransformationFunction" xml:space="preserve"><value>Fonctions de transformation</value></data>
+  <data name="Family_ConnectedServiceOperationType" xml:space="preserve"><value>Types d’opérations de services connectés</value></data>
+  <data name="Family_DataSourceProfile" xml:space="preserve"><value>Profils de sources de données</value></data>
+  <data name="Family_DataSource" xml:space="preserve"><value>Sources de données</value></data>
+  <data name="Family_KnowledgeSource" xml:space="preserve"><value>Sources de connaissances</value></data>
+  <data name="Family_KnowledgeSourceToolExposure" xml:space="preserve"><value>Expositions d’outils des sources de connaissances</value></data>
 </root>

@@ -18,18 +18,25 @@
             <div class="step-progress-navigation">
                 <div class="step-progress-navigation-heading">
                     <h2 id="@(id + "-title")">@(Label ?? Localizer["Steps"].Value)</h2>
+                    @if (ExpandedParent is { } parent)
+                    {
+                        <button class="step-progress-expand" type="button" aria-expanded="@((!collapsed.Contains(parent.Id)).ToString().ToLowerInvariant())"
+                                aria-label="@Localizer[collapsed.Contains(parent.Id) ? "Expand" : "Collapse", parent.Title]"
+                                title="@Localizer[collapsed.Contains(parent.Id) ? "Expand" : "Collapse", parent.Title]"
+                                @onclick="() => ToggleChildrenAsync(parent.Id)"><UiIcon Name="@(collapsed.Contains(parent.Id) ? "chevron-down" : "chevron-up")" /></button>
+                    }
                     @if (!following && Selectable(ActiveStepId) is not null)
                     {
                         <button type="button" class="step-progress-follow" @onclick="ResumeFollowingAsync">@Localizer["FollowCurrent"]</button>
                     }
                 </div>
                 <div role="tablist" aria-orientation="vertical" aria-labelledby="@(id + "-title")" data-step-progress-tabs>
-                    @for (var index = 0; index < Steps.Count; index++)
+                    @foreach (var step in VisibleSteps)
                     {
-                        var step = Steps[index];
                         var selected = step.Id == selectedId;
                         var active = step.Id == ActiveStepId;
-                        <button @key="step.Id" @ref="buttons[step.Id]" id="@TabId(step.Id)" type="button" role="tab"
+                        <div @key="step.Id" class="step-progress-row @(step.ParentId is not null ? "is-child" : null)">
+                        <button @ref="buttons[step.Id]" id="@TabId(step.Id)" type="button" role="tab"
                                 class="step-progress-step @StatusClass(step.Status) @(selected ? "is-selected" : null) @(active ? "is-active" : null)"
                                 data-step-id="@step.Id" aria-selected="@selected.ToString().ToLowerInvariant()" aria-controls="@PanelId"
                                 aria-current="@(active ? "step" : null)" tabindex="@(selected ? 0 : -1)" disabled="@(!step.Selectable)"
@@ -37,7 +44,7 @@
                             <span class="step-progress-marker" aria-hidden="true">
                                 @if (step.Status == ProgressStepStatus.Running) { <span class="step-progress-spinner"></span> }
                                 else if (StatusIcon(step.Status) is { } icon) { <UiIcon Name="@icon" /> }
-                                else { <span>@(index + 1)</span> }
+                                else { <span>@(step.ParentId is null ? (Steps.Where(item => item.ParentId is null).ToList().IndexOf(step) + 1).ToString() : "·")</span> }
                             </span>
                             <span class="step-progress-copy">
                                 <span class="step-progress-step-heading">
@@ -48,6 +55,7 @@
                                 @if (!string.IsNullOrWhiteSpace(step.Summary)) { <span class="step-progress-summary">@step.Summary</span> }
                             </span>
                         </button>
+                        </div>
                     }
                 </div>
             </div>
@@ -80,6 +88,11 @@
 
     private readonly string id = "step-progress-" + Guid.NewGuid().ToString("N");
     private readonly Dictionary<string, ElementReference> buttons = new(StringComparer.Ordinal);
+    private readonly HashSet<string> collapsed = new(StringComparer.Ordinal);
+    private ProgressStep? ExpandedParent => Selectable(selectedId) is { } selected
+        && Steps.FirstOrDefault(step => step.Id == (selected.ParentId ?? selected.Id)) is { } parent
+        && Steps.Any(step => step.ParentId == parent.Id) ? parent : null;
+    private IEnumerable<ProgressStep> VisibleSteps => Steps.Where(step => step.ParentId is null || !collapsed.Contains(step.ParentId));
     private ElementReference root;
     private IJSObjectReference? module;
     private string? selectedId;
@@ -105,6 +118,10 @@
                 throw new ArgumentException("Progress steps require unique non-empty IDs, titles, content and valid statuses.", nameof(Steps));
         }
         foreach (var removed in buttons.Keys.Where(key => !ids.Contains(key)).ToArray()) buttons.Remove(removed);
+        foreach (var child in Steps.Where(step => step.ParentId is not null))
+            if (!Steps.Any(parent => parent.Id == child.ParentId && parent.ParentId is null))
+                throw new ArgumentException("A progress substep requires an existing top-level parent.", nameof(Steps));
+        collapsed.RemoveWhere(key => !ids.Contains(key));
 
         var previous = selectedId;
         var previousFollowing = following;
@@ -120,6 +137,7 @@
         initialized = true;
         if (following && Selectable(ActiveStepId) is { } active) selectedId = active.Id;
         if (Selectable(selectedId) is null) selectedId = Selectable(ActiveStepId)?.Id ?? Steps.FirstOrDefault(step => step.Selectable)?.Id;
+        if (Selectable(selectedId)?.ParentId is { } parentId) collapsed.Remove(parentId);
         if (previous != selectedId || (selectionParameterChanged && SelectedStepId != selectedId))
             await SelectedStepIdChanged.InvokeAsync(selectedId);
         if (previousFollowing != following) await FollowActiveStepChanged.InvokeAsync(following);
@@ -142,6 +160,7 @@
     {
         if (Selectable(ActiveStepId) is not { } active) return;
         requestedFocus = active.Id;
+        if (active.ParentId is { } parentId) collapsed.Remove(parentId);
         following = true;
         await FollowActiveStepChanged.InvokeAsync(true);
         if (selectedId != active.Id)
@@ -154,7 +173,7 @@
     private async Task KeyDownAsync(KeyboardEventArgs args, string stepId)
     {
         if (args.AltKey || args.CtrlKey || args.MetaKey || args.ShiftKey) return;
-        var available = Steps.Where(step => step.Selectable).ToArray();
+        var available = VisibleSteps.Where(step => step.Selectable).ToArray();
         var index = Array.FindIndex(available, step => step.Id == stepId);
         if (index < 0) return;
         var next = args.Key switch
@@ -168,6 +187,13 @@
         if (next < 0) return;
         requestedFocus = available[next].Id;
         await SelectAsync(requestedFocus);
+    }
+
+    private async Task ToggleChildrenAsync(string parentId)
+    {
+        if (collapsed.Remove(parentId)) return;
+        if (Selectable(selectedId)?.ParentId == parentId) await SelectAsync(parentId);
+        collapsed.Add(parentId);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

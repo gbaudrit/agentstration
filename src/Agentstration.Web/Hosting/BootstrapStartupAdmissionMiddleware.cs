@@ -36,7 +36,7 @@ internal sealed class BootstrapStartupAdmissionMiddleware(RequestDelegate next)
             else context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
-        if (browser && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsRepairPath(path.Value ?? "/"))
+        if (browser && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsInspectionPath(path.Value ?? "/"))
         {
             context.Response.Headers.CacheControl = "no-store";
             await Results.LocalRedirect(pathBase + BootstrapStartupNavigation.ProgressUrl(path + context.Request.QueryString)).ExecuteAsync(context);

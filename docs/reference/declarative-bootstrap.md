@@ -697,15 +697,13 @@ stage until the administrator selects another stage; following can be resumed.
 Model/provider details are activity data in the generic resource panel. No panel
 is specific to an extension or provider implementation.
 
-The page uses the existing Console layout with navigation disabled: the full
-brand logo and a light toolbar retain only theme selection and sign-out. The
-sidebar, upper navigation, context/environment selectors, command palette,
-notifications and account links are absent. Progress panels expose dependency
-facts without repair-navigation links. Its layout adapter supplies startup status
-instead of loading operational dashboard statistics. Ordinary navigation and
-scope selection return with the standard Console after readiness. Direct document
-navigation still returns to progress while execution APIs remain fenced. Stage
-completion and resource outcomes use the same visual primitives as other pages.
+The page and permitted resource consultations use the existing Console frame,
+navigation and scope selector. A persistent preparation notice links back to
+progress, while the layout adapter avoids operational dashboard statistics.
+Command search remains disabled until readiness. The initial overview still
+opens progress, and execution/unsupported mutations remain fenced. Changing the
+consulted scope never changes a Bootstrap target. Stage completion and resource
+outcomes use the same visual primitives as other pages.
 
 The page reads `GET /api/bootstrap/startup` every two seconds. This PlatformAdmin
 endpoint returns an attempt identity, revision, stage states, safe dependency
@@ -715,6 +713,50 @@ authenticated readiness-only probe used by Console routing. Both endpoints are
 non-cacheable and observe local state without contacting a provider or provisioning
 business resources. The anonymous `/startup/ready` login-availability probe remains
 empty and unchanged.
+
+The progress tree includes only resource families present in the selected startup
+profiles. Structural resources, enrollment policies and required contributions
+are tracked alongside dependent application resources. Expanding a stage shows
+its actual kinds and processed/total counts; absent kinds are never rendered as
+`0/0`. Grouping is presentation only and does not reorder dependency execution.
+
+`GET /api/bootstrap/startup/resources` is PlatformAdmin-only and requires the
+current `attemptId`. Optional `stepId`, `kind`, `state`, `search`, `offset` and
+`limit` select a bounded server page (25 by default, at most 100; search at most
+128 characters). A previous attempt returns 409. The overview snapshot carries
+family summaries, never all resource rows. Each row identifies its profile,
+source document and logical target and reports created/already-present/conflict,
+waiting/failure or blocked outcomes. Expand a row for the operations actually
+observed, including Agent definition/generation preparation. Observations retain
+no manifest body, secret value or arbitrary provider exception. Repeated waits
+update one bounded operation fact rather than appending an unbounded event log.
+These startup details remain process-local and restart with the current attempt;
+durable manual application history remains a separate contract.
+
+For a blocked, unapplied initial Model Profile, **Change provider or model** opens
+a form in the progress panel. Choices use cached inventory and the original
+profile owner's provider access rules, regardless of the currently selected
+Console scope. **Apply and resume** submits a versioned substitution; the service
+revalidates provider identity, model availability and profile settings. A stale
+selection returns 409 instead of racing resource creation or another operator.
+The same profile name and ownership remain in place for dependent Agents.
+
+`GET /api/bootstrap/startup/resources/{resourceId}/model-options` requires the
+current `attemptId`; optional `providerName` and `providerNamespace` select cached
+model choices. `POST /api/bootstrap/startup/resources/{resourceId}/model-substitution`
+accepts `attemptId`, `version`, an exact Instance `provider`, `providerUid` and
+`model`, returning 202. Both operations require a Platform administrator. Opening
+the form never initiates provider discovery or downloads a model.
+
+Accepted substitutions are retained under `Data:Directory/bootstrap-model-overrides`
+using atomic, source-digest-bound records containing only provider/model choices
+and their actor/time. Source manifests and credential values are not copied or
+rewritten. A changed source invalidates replay, and a replaced provider requires
+reselection. If the model wait already failed, applying a valid correction starts
+a new attempt under the retained initialization lease; create-only replay retains
+existing resources. Other failures can still require an instance restart. Rows
+show the accepted substitution separately from actual application outcomes. See
+[ADR-0247](../decisions/0247-bootstrap-model-substitutions-preserve-plan-and-owner.md).
 
 A reload reconnects to the current process-local attempt. Transient read failures
 retain the last snapshot and polling resumes automatically. At readiness the page

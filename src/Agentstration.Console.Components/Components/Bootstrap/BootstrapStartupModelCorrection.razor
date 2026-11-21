@@ -1,0 +1,100 @@
+@using Agentstration.Bootstrap.Contracts
+@implements IDisposable
+@inject IBootstrapStartupApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+<section class="startup-model-correction" data-testid="startup-model-correction">
+    @if (!editing)
+    {
+        <button type="button" class="button-secondary" @onclick="OpenAsync" data-testid="startup-change-model"><UiIcon Name="adjustments" />@Localizer["ChangeModel"]</button>
+        @if (accepted) { <p role="status">@Localizer["CorrectionAccepted"]</p> }
+    }
+    else
+    {
+        <h3>@Localizer["ChangeModel"]</h3>
+        <p>@Localizer["CorrectionHelp"]</p>
+        @if (loading && options is null) { <LoadingState Message="@Localizer["LoadingModelChoices"]" /> }
+        @if (options is not null)
+        {
+            <FormField Label="@Localizer["Provider"]">
+                <ClearableSelect TValue="string" Value="@providerUid" ValueChanged="ProviderAsync" AllowClear="false" disabled="@loading" data-testid="startup-model-provider">
+                    <option value="">@Localizer["ChooseProvider"]</option>
+                    @foreach (var provider in options.Providers) { <option value="@provider.Uid.ToString("D")">@provider.DisplayName — @provider.Reference.Namespace/@provider.Reference.Name</option> }
+                </ClearableSelect>
+            </FormField>
+            <FormField Label="@Localizer["ExpectedModel"]">
+                <ClearableText Value="@model" ValueChanged="value => model = value ?? string.Empty" list="@modelListId" disabled="@loading" data-testid="startup-model-name" />
+                <datalist id="@modelListId">@foreach (var name in options.Models) { <option value="@name"></option> }</datalist>
+            </FormField>
+            @if (options.Models.Count == 0) { <p role="status">@Localizer["NoCachedModels"]</p> }
+        }
+        @if (message is not null) { <p class="inline-warning" role="alert">@Localizer[message]</p> }
+        <div class="startup-correction-actions">
+            <button type="button" class="button-primary" disabled="@(loading || !CanApply)" @onclick="ApplyAsync" data-testid="startup-model-apply">@Localizer["ApplyAndResume"]</button>
+            <button type="button" class="button-secondary" disabled="@loading" @onclick="RefreshAsync">@Localizer["RefreshModelChoices"]</button>
+            <button type="button" class="button-secondary" disabled="@loading" @onclick="Cancel">@Localizer["CancelCorrection"]</button>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public Guid AttemptId { get; set; }
+    [Parameter, EditorRequired] public string ResourceId { get; set; } = string.Empty;
+    private readonly CancellationTokenSource stopping = new();
+    private readonly string modelListId = "startup-models-" + Guid.NewGuid().ToString("N");
+    private BootstrapStartupModelOptions? options;
+    private (Guid, string)? identity;
+    private string providerUid = string.Empty, model = string.Empty;
+    private string? message;
+    private bool editing, loading, accepted;
+    private long? editVersion;
+    private int request;
+    private BootstrapStartupModelProviderChoice? SelectedProvider => options?.Providers.FirstOrDefault(provider => provider.Uid.ToString("D") == providerUid);
+    private bool CanApply => SelectedProvider is not null && options?.Models.Contains(model, StringComparer.Ordinal) == true;
+    protected override void OnParametersSet()
+    {
+        var next = (AttemptId, ResourceId);
+        if (identity == next) return;
+        identity = next; request++; editing = loading = accepted = false; options = null; message = null; editVersion = null;
+    }
+    private Task OpenAsync() { editing = true; accepted = false; options = null; editVersion = null; return LoadAsync(null, null); }
+    private Task RefreshAsync() => LoadAsync(SelectedProvider?.Reference.Name, SelectedProvider?.Reference.Namespace?.Value);
+    private Task ProviderAsync(string uid)
+    {
+        providerUid = uid; model = string.Empty;
+        return RefreshAsync();
+    }
+    private void Cancel() { editing = false; message = null; request++; }
+    private async Task LoadAsync(string? providerName, string? providerNamespace)
+    {
+        var current = ++request; loading = true; message = null;
+        try
+        {
+            var result = await Client.GetModelOptionsAsync(AttemptId, ResourceId, providerName, providerNamespace, stopping.Token);
+            if (current != request || stopping.IsCancellationRequested) return;
+            if (editVersion is not null && editVersion != result.Version) { message = "CorrectionStale"; return; }
+            editVersion = result.Version; options = result;
+            providerUid = result.Providers.FirstOrDefault(provider => provider.Reference.Name == result.Provider.Name
+                && provider.Reference.Namespace == result.Provider.Namespace)?.Uid.ToString("D") ?? string.Empty;
+            if (providerName is null) model = result.Model;
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict) { message = "CorrectionStale"; }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException) { message = "CorrectionUnavailable"; }
+        finally { if (current == request) loading = false; }
+    }
+    private async Task ApplyAsync()
+    {
+        if (!CanApply || SelectedProvider is not { } provider || options is null || editVersion is null) return;
+        loading = true; message = null;
+        try
+        {
+            await Client.ApplyModelChangeAsync(ResourceId, new(AttemptId, editVersion.Value, provider.Reference, provider.Uid, model), stopping.Token);
+            accepted = true; editing = false;
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Conflict) { message = "CorrectionStale"; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.BadRequest) { message = "CorrectionInvalid"; }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException) { message = "CorrectionUnavailable"; }
+        finally { loading = false; }
+    }
+    public void Dispose() { stopping.Cancel(); stopping.Dispose(); }
+}

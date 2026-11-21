@@ -183,7 +183,8 @@ public sealed class RuntimeProfileBootstrapResourceHandler(RuntimeProfileManagem
 public sealed class ModelProfileBootstrapResourceHandler(
     ModelProfileManagementService service,
     ModelProviderManagementService providers,
-    BootstrapModelDependencies? dependencies = null) : IBootstrapResourceHandler
+    BootstrapModelDependencies? dependencies = null,
+    BootstrapStartupState? startup = null) : IBootstrapResourceHandler
 {
     public string Kind => ModelResourceKinds.ModelProfile;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
@@ -218,12 +219,19 @@ public sealed class ModelProfileBootstrapResourceHandler(
         CancellationToken cancellationToken)
     {
         if (operation.WaitForDependencies && dependencies is not null)
-            await dependencies.WaitAsync(resource, operation, cancellationToken);
+            resource = await dependencies.WaitAsync(resource, operation, cancellationToken);
         var value = WorkspaceBootstrapResource.Parse<ModelProfileResource>(resource);
         var scopeRef = value.ScopeRef ?? TargetScope(operation);
         value = value with { ScopeRef = scopeRef };
-        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
+        var existing = await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken);
+        if (existing is not null)
+        {
+            if (startup is not null && operation.StartupResourceId is { } id
+                && startup.FindResource(startup.Read().AttemptId, id)?.Substitution is not null
+                && !JsonElement.DeepEquals(JsonSerializer.SerializeToElement(existing.Value.Definition), JsonSerializer.SerializeToElement(value.Definition)))
+                throw new ResourceConcurrencyException("bootstrap_profile_changed_during_substitution");
             return BootstrapResourceApplyResult.Skipped;
+        }
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
     }
@@ -350,15 +358,21 @@ public sealed class AgentBootstrapResourceHandler(
             if (existing.Value.Generation == 1 && JsonElement.DeepEquals(
                     JsonSerializer.SerializeToElement(existing.Value.Definition),
                     JsonSerializer.SerializeToElement(value.Definition)))
+            {
                 _ = await service.EnsureExecutionRevisionAsync(
                     existing.Value.Namespace, existing.Value.Name, existing.Value.ScopeRef,
                     existing.Value.Generation, cancellationToken);
+                operation.ObserveOperation?.Invoke("generation_apply", "succeeded");
+            }
+            operation.ObserveOperation?.Invoke("definition", "skipped");
             return BootstrapResourceApplyResult.Skipped;
         }
         var created = await service.PutAgentAsync(value, null, true, cancellationToken);
+        operation.ObserveOperation?.Invoke("definition", "created");
         _ = await service.EnsureExecutionRevisionAsync(
             created.Value.Namespace, created.Value.Name, created.Value.ScopeRef,
             created.Value.Generation, cancellationToken);
+        operation.ObserveOperation?.Invoke("generation_apply", "succeeded");
         return BootstrapResourceApplyResult.Created;
     }
 

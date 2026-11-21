@@ -192,6 +192,7 @@ internal static class StandaloneHostCompositionExtensions
                 && string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/api/aep/enrollments/announce", StringComparison.OrdinalIgnoreCase);
             if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement
                 && !(startup.AdministrationReady && (BootstrapAdministrationAccess.IsAdministrationPath(context.Request.Path)
+                    || BootstrapAdministrationAccess.IsInspectionRead(context.Request)
                     || BootstrapAdministrationAccess.IsLoginOrAsset(context.Request.Path)
                     || BootstrapAdministrationAccess.IsConsoleNavigation(context.Request))))
             {
@@ -272,8 +273,7 @@ internal static class StandaloneHostCompositionExtensions
                     await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                         await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
-                    await using (var execution = app.Services.CreateAsyncScope())
-                        await execution.ServiceProvider.GetRequiredService<BootstrapStartupCoordinator>().ExecuteAsync(token);
+                    await BootstrapStartupRetry.ExecuteAsync(app.Services, token);
                     await app.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
                         await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);

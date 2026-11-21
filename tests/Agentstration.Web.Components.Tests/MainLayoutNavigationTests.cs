@@ -11,30 +11,6 @@ namespace Agentstration.Web.Components.Tests;
 public sealed class MainLayoutNavigationTests
 {
     [TestMethod]
-    [DataRow("en-US")]
-    [DataRow("fr-FR")]
-    public async Task NavigationCanBeRemovedWithoutReplacingTheStandardFrame(string cultureName)
-    {
-        using var culture = new CultureScope(cultureName);
-        using var context = CreateContext(AllNavigationPermissions);
-        var rendered = context.Render<MainLayout>(parameters => parameters
-            .Add(x => x.EnableNavigation, false)
-            .Add(x => x.StatusContent, builder => builder.AddContent(0, "Preparation"))
-            .Add(x => x.Body, builder => builder.AddContent(0, "Progress body")));
-
-        Assert.IsTrue(rendered.Find("[data-testid='console-shell']").ClassList.Contains("navigation-disabled"));
-        foreach (var selector in new[] { ".sidebar", ".side-nav", ".breadcrumb", ".command-palette-trigger", ".context-switcher", ".environment-switcher", "[data-testid='console-sidebar-toggle']", "[data-testid='console-notifications-trigger']", "a[href='/settings/profile']", "a[href='/account/security']" })
-            Assert.AreEqual(0, rendered.FindAll(selector).Count, selector);
-        Assert.AreEqual("Agentstration", rendered.Find(".topbar .shell-brand img").GetAttribute("alt"));
-        Assert.AreEqual(1, rendered.FindAll("[data-testid='theme-toggle']").Count);
-        Assert.AreEqual("/logout", rendered.FindAll("a[href]").Single().GetAttribute("href"));
-        StringAssert.Contains(rendered.Find("main").TextContent, "Progress body");
-
-        await rendered.Instance.ToggleCommandPalette();
-        Assert.AreEqual(0, rendered.FindAll("[data-testid='console-command-palette']").Count);
-    }
-
-    [TestMethod]
     public void NavigationMatchesTargetEnglishGroupingLabelsAndRoutes()
     {
         using var culture = new CultureScope("en-US");

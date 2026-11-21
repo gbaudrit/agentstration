@@ -1,0 +1,49 @@
+@implements IAsyncDisposable
+@inject IBootstrapStartupApiClient Client
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+@if (!ready)
+{
+    <aside class="startup-notice" role="status" data-testid="bootstrap-startup-notice">
+        <span><UiIcon Name="cloud-upload" /> <strong>@Localizer[failed ? "Failed" : "Running"]</strong> — @Localizer["ConsultationAvailable"]</span>
+        <a class="button-secondary" href="@BootstrapStartupNavigation.ProgressUrl(null)">@Localizer["ViewProgress"]</a>
+    </aside>
+}
+
+@code {
+    private readonly CancellationTokenSource stopping = new();
+    private Task? polling;
+    private bool ready, failed;
+    protected override Task OnInitializedAsync() => ReadAsync();
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) polling = PollAsync();
+        return Task.CompletedTask;
+    }
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2), Clock);
+        try { while (!ready && await timer.WaitForNextTickAsync(stopping.Token)) await InvokeAsync(ReadAsync); }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+    }
+    private async Task ReadAsync()
+    {
+        try
+        {
+            var state = await Client.GetAsync(stopping.Token);
+            ready = state.Ready; failed = state.State == "failed";
+            if (ready && ("/" + Navigation.ToBaseRelativePath(Navigation.Uri)).Split('?', '#')[0] != BootstrapStartupNavigation.ProgressPath)
+                Navigation.NavigateTo(Navigation.Uri, forceLoad: true, replace: true);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException) { }
+        if (!stopping.IsCancellationRequested) StateHasChanged();
+    }
+    public async ValueTask DisposeAsync()
+    {
+        stopping.Cancel();
+        if (polling is not null) await polling;
+        stopping.Dispose();
+    }
+}

@@ -2,6 +2,12 @@ namespace Agentstration.Web.Hosting;
 
 internal static class BootstrapAdministrationAccess
 {
+    internal static bool IsInspectionRead(HttpRequest request) =>
+        (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+        && new[] { "/api/agents", "/api/deployments", "/api/flows", "/api/schemas", "/api/runtimeprofiles", "/api/tools", "/api/data-sources",
+            "/api/data-source-profiles", "/api/knowledge-sources", "/api/storages", "/api/storage-types", "/api/connected-services",
+            "/api/packs", "/api/resource-plans", "/api/entries", "/api/transformation-functions" }
+            .Any(prefix => request.Path.StartsWithSegments(prefix));
     // This allowlist only bypasses the startup fence. Normal endpoint authentication,
     // authorization and scope checks still run; execution endpoints stay fenced.
     internal static bool IsAdministrationPath(PathString path) =>

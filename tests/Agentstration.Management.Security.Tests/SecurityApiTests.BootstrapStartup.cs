@@ -27,6 +27,7 @@ public sealed partial class SecurityApiTests
         var startup = factory.Services.GetRequiredService<BootstrapStartupState>();
         startup.Begin(); startup.EnableAdministration(); startup.MoveTo("extensions"); startup.MoveTo("resources");
         startup.ObserveModelWait("profile", "provider", "expected:tag", "required_model_missing", "custom");
+        startup.RegisterResource("/instance", "startup", "profile.yaml", "resources", "ModelProfile", "profile");
         if (failed) startup.Fail("private-password-in-an-exception");
 
         using var anonymous = UnredirectedClient(factory);
@@ -49,14 +50,35 @@ public sealed partial class SecurityApiTests
         var snapshot = await progress.Content.ReadFromJsonAsync<BootstrapStartupSnapshot>();
         Assert.AreEqual(failed ? "failed" : "running", snapshot!.State);
         Assert.IsFalse(snapshot.Ready);
+        var resourceUrl = $"/api/bootstrap/startup/resources?attemptId={snapshot.AttemptId:D}&limit=25";
+        using var publicResources = await anonymous.GetAsync(resourceUrl);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, publicResources.StatusCode);
+        using var memberResources = await member.GetAsync(resourceUrl);
+        Assert.AreEqual(HttpStatusCode.Forbidden, memberResources.StatusCode);
+        using var administratorResources = await newAdmin.GetAsync(resourceUrl);
+        Assert.AreEqual(HttpStatusCode.OK, administratorResources.StatusCode);
+        var resourcePage = await administratorResources.Content.ReadFromJsonAsync<BootstrapStartupResourcePage>();
+        Assert.AreEqual(1, resourcePage!.Total);
+        Assert.IsTrue(administratorResources.Headers.CacheControl?.NoStore);
+        using var oversizedPage = await newAdmin.GetAsync(resourceUrl + "&offset=-1");
+        Assert.AreEqual(HttpStatusCode.BadRequest, oversizedPage.StatusCode);
+        using var staleAttempt = await newAdmin.GetAsync($"/api/bootstrap/startup/resources?attemptId={Guid.NewGuid():D}");
+        Assert.AreEqual(HttpStatusCode.Conflict, staleAttempt.StatusCode);
+        var correctionUrl = $"/api/bootstrap/startup/resources/unknown/model-options?attemptId={snapshot.AttemptId:D}";
+        using var anonymousCorrection = await anonymous.GetAsync(correctionUrl);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, anonymousCorrection.StatusCode);
+        using var deniedCorrection = await member.GetAsync(correctionUrl);
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedCorrection.StatusCode);
+        using var staleCorrection = await newAdmin.GetAsync(correctionUrl);
+        Assert.AreEqual(HttpStatusCode.Conflict, staleCorrection.StatusCode);
 
         administrator.DefaultRequestHeaders.Accept.ParseAdd("text/html");
         using var overview = await administrator.GetAsync("/?source=login");
         Assert.AreEqual(HttpStatusCode.Redirect, overview.StatusCode);
         Assert.AreEqual(BootstrapStartupNavigation.ProgressUrl("/?source=login"), overview.Headers.Location?.OriginalString);
-        using var direct = await administrator.GetAsync("/agents/assistant?tab=overview");
-        Assert.AreEqual(HttpStatusCode.Redirect, direct.StatusCode);
-        Assert.AreEqual(BootstrapStartupNavigation.ProgressUrl("/agents/assistant?tab=overview"), direct.Headers.Location?.OriginalString);
+        using var direct = await administrator.GetAsync("/agents");
+        Assert.AreEqual(HttpStatusCode.OK, direct.StatusCode);
+        StringAssert.Contains(await direct.Content.ReadAsStringAsync(), "bootstrap-startup-notice");
         using var repair = await newAdmin.GetAsync("/api/extensionregistrations");
         Assert.AreEqual(HttpStatusCode.OK, repair.StatusCode);
         using var memberRepair = await member.GetAsync("/api/extensionregistrations");
@@ -69,7 +91,9 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.OK, memberHealth.StatusCode);
         newAdmin.DefaultRequestHeaders.Accept.ParseAdd("text/html");
         using var tools = await newAdmin.GetAsync("/api/tools");
-        Assert.AreEqual(HttpStatusCode.ServiceUnavailable, tools.StatusCode);
+        Assert.AreEqual(HttpStatusCode.OK, tools.StatusCode);
+        using var toolMutation = await newAdmin.PostAsJsonAsync("/api/tools", new { name = "blocked" });
+        Assert.AreEqual(HttpStatusCode.ServiceUnavailable, toolMutation.StatusCode);
 
         if (!failed)
         {

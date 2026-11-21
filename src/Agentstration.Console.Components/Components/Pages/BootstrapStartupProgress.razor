@@ -24,7 +24,7 @@ else if (snapshot is null)
 else
 {
     @if (disconnected) { <p class="startup-progress-notice" role="status">@Localizer["ConnectionLostDescription"]</p> }
-    <StepProgress Steps="@Steps" ActiveStepId="@snapshot.ActiveStepId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
+    <StepProgress Steps="@Steps" ActiveStepId="@ActiveNavigationId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
         <HeaderContent>
             <div class="startup-progress-summary" role="status">
                 <div class="startup-progress-summary-heading">
@@ -50,22 +50,52 @@ else
     private Task? polling;
 
     private int CompletedSteps => snapshot?.Steps.Count(step => step.State is "succeeded" or "skipped") ?? 0;
-    private IReadOnlyList<ProgressStep> Steps => snapshot!.Steps.Select(step => new ProgressStep(
-        step.Id, Localizer["Stage_" + step.Id].Value, step.State switch
+    private string? ActiveNavigationId => (snapshot?.Families.FirstOrDefault(family => family.StepId == snapshot.ActiveStepId
+        && family.Kind == snapshot.Activity?.ResourceKind)
+        ?? snapshot?.Families.FirstOrDefault(family => family.StepId == snapshot.ActiveStepId && family.State is "running" or "waiting")) is { } active
+        ? FamilyId(active) : snapshot?.ActiveStepId;
+    private static string FamilyId(BootstrapStartupFamily family) => family.StepId + ":" + family.Kind;
+    private string FamilyLabel(string kind)
+    {
+        var label = Localizer["Family_" + kind];
+        return label.ResourceNotFound ? kind : label.Value;
+    }
+    private static ProgressStepStatus StepStatus(string state) => state switch
+    {
+        "succeeded" => ProgressStepStatus.Succeeded,
+        "running" => ProgressStepStatus.Running,
+        "waiting" => ProgressStepStatus.Waiting,
+        "failed" => ProgressStepStatus.Failed,
+        "skipped" => ProgressStepStatus.Skipped,
+        "blocked" => ProgressStepStatus.Interrupted,
+        _ => ProgressStepStatus.Pending
+    };
+    private IReadOnlyList<ProgressStep> Steps
+    {
+        get
         {
-            "succeeded" => ProgressStepStatus.Succeeded,
-            "running" => ProgressStepStatus.Running,
-            "waiting" => ProgressStepStatus.Waiting,
-            "failed" => ProgressStepStatus.Failed,
-            "skipped" => ProgressStepStatus.Skipped,
-            _ => ProgressStepStatus.Pending
-        }, builder =>
-        {
-            builder.OpenComponent<BootstrapStartupStepPanel>(0);
-            builder.AddAttribute(1, nameof(BootstrapStartupStepPanel.Snapshot), snapshot);
-            builder.AddAttribute(2, nameof(BootstrapStartupStepPanel.StepId), step.Id);
-            builder.CloseComponent();
-        })).ToArray();
+            var items = new List<ProgressStep>();
+            foreach (var step in snapshot!.Steps)
+            {
+                items.Add(new(step.Id, Localizer["Stage_" + step.Id], StepStatus(step.State), Panel(step.Id, null)));
+                foreach (var family in snapshot.Families.Where(family => family.StepId == step.Id))
+                    items.Add(new(FamilyId(family), FamilyLabel(family.Kind), StepStatus(family.State), Panel(step.Id, family.Kind))
+                    {
+                        ParentId = step.Id,
+                        Summary = Localizer["ResourceCount", family.Processed, family.Total]
+                    });
+            }
+            return items;
+        }
+    }
+    private RenderFragment Panel(string step, string? kind) => builder =>
+    {
+        builder.OpenComponent<BootstrapStartupStepPanel>(0);
+        builder.AddAttribute(1, nameof(BootstrapStartupStepPanel.Snapshot), snapshot);
+        builder.AddAttribute(2, nameof(BootstrapStartupStepPanel.StepId), step);
+        builder.AddAttribute(3, nameof(BootstrapStartupStepPanel.Kind), kind);
+        builder.CloseComponent();
+    };
 
     protected override Task OnInitializedAsync() => LoadAsync();
     protected override Task OnAfterRenderAsync(bool firstRender)

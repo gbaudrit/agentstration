@@ -11,11 +11,14 @@ internal sealed class BootstrapDeferredHostedServices(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        try { await startup.WaitUntilReadyAsync(stoppingToken); }
-        catch (OperationCanceledException) when (startup.Failure is not null && !stoppingToken.IsCancellationRequested)
+        while (true)
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
-            return;
+            var attempt = startup.Read().AttemptId;
+            try { await startup.WaitUntilReadyAsync(stoppingToken); break; }
+            catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+            {
+                await startup.WaitForAttemptChangeAsync(attempt, stoppingToken);
+            }
         }
         // Keep original ordering: in particular Quartz's schema initializer must
         // finish before its scheduler starts accepting work.
