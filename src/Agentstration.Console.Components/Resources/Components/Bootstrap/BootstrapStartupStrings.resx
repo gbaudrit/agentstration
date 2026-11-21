@@ -49,7 +49,7 @@
     <value>Resources and dependencies</value>
   </data>
   <data name="Stage_finalization" xml:space="preserve">
-    <value>Opening the Console</value>
+    <value>Console readiness</value>
   </data>
   <data name="Explanation_topology" xml:space="preserve">
     <value>Preparing storage, identity, tenants, workspaces and enrollment policies.</value>
@@ -215,4 +215,7 @@
   <data name="FailureToolUnavailable" xml:space="preserve"><value>A required Tool or its provider is missing or unavailable. Check the profile bindings and the Tool and provider configuration in the target scope.</value></data>
   <data name="FailureProfileUnpublished" xml:space="preserve"><value>The referenced profile has no active published revision. Review and publish the profile before retrying the resource.</value></data>
   <data name="RecoveryAction" xml:space="preserve"><value>Recovery guidance</value></data>
+  <data name="Completed" xml:space="preserve"><value>Bootstrap completed</value></data>
+  <data name="CompletedDescription" xml:space="preserve"><value>Preparation is complete. Review the results, then open the Console when you are ready.</value></data>
+  <data name="OpenConsole" xml:space="preserve"><value>Open Console</value></data>
 </root>

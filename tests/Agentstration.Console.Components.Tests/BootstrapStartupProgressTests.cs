@@ -191,7 +191,7 @@ public sealed class BootstrapStartupProgressTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void PollingRecoversAndRedirectsOnlyAtReadinessToALocalDestination(bool timeout)
+    public void PollingRecoversAndRetainsCompletedProgressUntilExplicitConsoleNavigation(bool timeout)
     {
         var api = new StartupClient();
         var clock = new ManualClock();
@@ -211,8 +211,43 @@ public sealed class BootstrapStartupProgressTests
         Assert.IsFalse(cut.Markup.Contains("PRIVATE-TRANSPORT-ERROR", StringComparison.Ordinal));
         api.FailRead = false; api.Snapshot = api.Snapshot with { Ready = true, State = "ready" };
         clock.Tick();
-        cut.WaitForAssertion(() => Assert.AreEqual("http://localhost/", navigation.Uri));
+        cut.WaitForAssertion(() => StringAssert.Contains(cut.Markup, "Bootstrap completed"));
+        Assert.AreEqual("http://localhost/startup/progress?ReturnUrl=%2F%2Fexternal.example", navigation.Uri);
+        var reads = api.Reads;
+        clock.Tick();
+        Assert.AreEqual(reads, api.Reads);
+        cut.Find("button.button-primary").Click();
+        Assert.AreEqual("http://localhost/", navigation.Uri);
         Assert.IsTrue(api.Reads >= 3);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Open Console")]
+    [DataRow("fr-FR", "Ouvrir la console")]
+    public void AlreadyCompletedProgressKeepsResultsAndAnExplicitSafeReturnAction(string culture, string label)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            Ready = true,
+            State = "ready",
+            ActiveStepId = null,
+            Steps = api.Snapshot.Steps.Select(step => step with { State = "succeeded" }).ToArray()
+        };
+        var clock = new ManualClock();
+        using var context = Context(api, clock);
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/startup/progress?ReturnUrl=%2Fagents");
+        var cut = context.Render<BootstrapStartupProgress>();
+        var button = cut.Find("button.button-primary");
+        StringAssert.Contains(button.TextContent, label);
+        Assert.IsTrue(navigation.Uri.Contains("/startup/progress", StringComparison.Ordinal));
+        Assert.IsFalse(cut.Markup.Contains("Stage_", StringComparison.Ordinal));
+        clock.Tick();
+        Assert.AreEqual(1, api.Reads);
+        button.Click();
+        Assert.AreEqual("http://localhost/agents", navigation.Uri);
     }
 
     [TestMethod]

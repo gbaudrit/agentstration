@@ -73,3 +73,31 @@ arbitrary exception messages, provider responses and secret values do not.
 The full repository browser campaign is not certified by these focused checks.
 Release, Fast, Integration, component and documentation results are recorded in
 the PR's Validation section.
+
+## Following and explicit completion correction
+
+A subsequent maintainer report required correcting following and retaining the
+results after success. The same actual extension/offline upstream fixture was
+run with the required model initially absent, then made available. Bootstrap
+created 520 resources, including 512 Parameters, and reached readiness.
+
+Three samples observed the Parameter step and its current row inside their
+independent viewports while following remained enabled. The navigation scrolled
+179 pixels to reveal that step. The completed screen remained at
+`/startup/progress` beyond two polling intervals. Clicking **Ouvrir la console**
+opened the Console and preserved its normal context query. Reopening completed
+progress with a local Agents return destination also waited for an explicit
+click. Desktop 1600 × 900 and mobile 390 × 844 passed without JavaScript errors
+or horizontal overflow.
+
+- [Completed results, desktop French](completed-desktop-fr.png)
+- [Completed results, mobile French](completed-mobile-fr.png)
+
+The actual JavaScript-module browser check additionally passed content reflow
+with unchanged progress identities, fast pause/resume before the next animation
+frame and plain panel clicks retaining following. The permanent module tests
+cover these regression cases. Component tests cover stopped polling, safe return
+destinations and both EN/FR completion actions. The separately hosted Console
+test verifies pending and completed progress HTML without a readiness redirect.
+This correction supersedes the earlier automatic-completion-navigation behavior;
+it does not change server readiness or ordinary admission rules.

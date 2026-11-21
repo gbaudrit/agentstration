@@ -49,7 +49,7 @@
     <value>Ressources et dépendances</value>
   </data>
   <data name="Stage_finalization" xml:space="preserve">
-    <value>Ouverture de la Console</value>
+    <value>Disponibilité de la console</value>
   </data>
   <data name="Explanation_topology" xml:space="preserve">
     <value>Préparation du stockage, de l’identité, des tenants, des espaces de travail et des politiques d’enrôlement.</value>
@@ -215,4 +215,7 @@
   <data name="FailureToolUnavailable" xml:space="preserve"><value>Un outil requis ou son fournisseur est absent ou indisponible. Vérifiez les références du profil et la configuration de l’outil et du fournisseur dans la portée cible.</value></data>
   <data name="FailureProfileUnpublished" xml:space="preserve"><value>Le profil référencé n’a aucune révision publiée active. Vérifiez puis publiez le profil avant de réessayer la ressource.</value></data>
   <data name="RecoveryAction" xml:space="preserve"><value>Comment reprendre le bootstrap</value></data>
+  <data name="Completed" xml:space="preserve"><value>Bootstrap terminé</value></data>
+  <data name="CompletedDescription" xml:space="preserve"><value>La préparation est terminée. Consultez le résultat, puis ouvrez la console quand vous le souhaitez.</value></data>
+  <data name="OpenConsole" xml:space="preserve"><value>Ouvrir la console</value></data>
 </root>

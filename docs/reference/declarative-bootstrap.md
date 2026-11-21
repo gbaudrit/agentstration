@@ -763,7 +763,9 @@ show the accepted substitution separately from actual application outcomes. See
 
 A reload reconnects to the current process-local attempt. Transient read failures
 retain the last snapshot and polling resumes automatically. At readiness the page
-opens a validated local return destination. These observations are not a durable
+keeps the completed results visible and stops polling. An explicit **Open Console**
+action opens a validated local return destination; completion never navigates away
+from the results automatically. These observations are not a durable
 startup journal or the manual Bootstrap application history. Existing startup
 readiness semantics remain authoritative; this delivery adds no critical-worker
 startup barrier.
