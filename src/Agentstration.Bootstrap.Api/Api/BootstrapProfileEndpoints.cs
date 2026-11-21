@@ -78,7 +78,9 @@ public static class BootstrapProfileEndpoints
         IBootstrapProfileApiService service,
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
-        await ExecuteAsync(async () => Results.Ok(await service.GetBindingTargetsAsync(
+        await ExecuteAsync(async () => Results.Ok(request.Applications is { Count: > 0 }
+            ? await service.GetPlanBindingTargetsAsync(request, requestContext.Current.PrincipalId, cancellationToken)
+            : await service.GetBindingTargetsAsync(
             request.Target,
             request.TargetKind,
             request.Profiles ?? [],
@@ -98,7 +100,7 @@ public static class BootstrapProfileEndpoints
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
         await ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
-            new(request.Profiles ?? [], request.Target, request.Bindings, request.Source),
+            new(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications),
             requestContext.Current.PrincipalId,
             cancellationToken)));
 

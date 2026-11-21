@@ -33,7 +33,7 @@ public enum BootstrapResourceDisposition
 }
 
 public sealed record BootstrapApplicationTarget(Guid? TenantId = null, Guid? WorkspaceId = null);
-public sealed record BootstrapBindingSelection(string Profile, string Name, ResourceReference Target, JsonElement? TargetValue = null);
+public sealed record BootstrapBindingSelection(string Profile, string Name, ResourceReference Target, JsonElement? TargetValue = null, string? TargetProfile = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<BootstrapBindingTargetKind>))]
 public enum BootstrapBindingTargetKind

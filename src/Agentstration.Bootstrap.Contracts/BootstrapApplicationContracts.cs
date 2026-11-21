@@ -54,7 +54,10 @@ public enum BootstrapApplicationStatus
     [JsonStringEnumMemberName("cancelled")] Cancelled
 }
 
-public sealed record BootstrapPlannedResource(string Profile, string Location, string Kind, string Name);
+public sealed record BootstrapPlannedResource(string Profile, string Location, string Kind, string Name)
+{
+    public string? TargetLabel { get; init; }
+}
 
 public sealed record BootstrapAppliedResource(string Profile, string Location, string Kind, string Name, BootstrapResourceDisposition Disposition, string? Message = null);
 
@@ -75,6 +78,7 @@ public sealed record BootstrapApplicationProperties
     public bool CancellationRequested { get; init; }
     public int TotalResources { get; init; }
     public IReadOnlyList<BootstrapPlannedResource> ResourcePlan { get; init; } = [];
+    public IReadOnlyList<BootstrapProfileApplicationPreview> Applications { get; init; } = [];
     public BootstrapResourcePreview? CurrentResource { get; init; }
     public string? ExecutionOwner { get; init; }
     public BootstrapProfileSelection? Selection { get; init; }

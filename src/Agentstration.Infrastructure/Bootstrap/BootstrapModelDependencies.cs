@@ -73,7 +73,7 @@ public sealed class BootstrapModelDependencies(
                         if (!available)
                         {
                             lastState = observation.ErrorCode ?? observation.State;
-                            startup?.ObserveModelWait(effective.Name, config.Name, effective.Definition.Model.Name,
+                            if (operation.StartupResourceId is not null) startup?.ObserveModelWait(effective.Name, config.Name, effective.Definition.Model.Name,
                                 observation.Health == "available" ? "required_model_missing" : "provider_unavailable",
                                 config.Namespace.Value, (config.ScopeRef ?? ResourceScopeRef.Instance).Value, canChange);
                             if (initialAttempt || observation.State is "never" or "succeeded")

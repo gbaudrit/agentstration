@@ -14,7 +14,10 @@ public sealed record BootstrapProfileSummary(
     string Digest,
     IReadOnlyList<BootstrapProfileBinding> Bindings,
     bool Valid = true,
-    string? Error = null);
+    string? Error = null)
+{
+    public IReadOnlyList<BootstrapTopologyResource> Topology { get; init; } = [];
+}
 
 public sealed record BootstrapProfileBinding(
     string Name,
@@ -36,7 +39,8 @@ public sealed record BootstrapProfileSelection(
     IReadOnlyList<string> Profiles,
     BootstrapApplicationTarget? Target = null,
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
-    BootstrapSourceProfileSelection? Source = null);
+    BootstrapSourceProfileSelection? Source = null,
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null);
 
 public sealed record BootstrapResourcePreview(
     string Profile,
@@ -45,7 +49,10 @@ public sealed record BootstrapResourcePreview(
     string Name,
     BootstrapResourceDisposition Disposition,
     string? Message = null,
-    IReadOnlyList<BootstrapResourcePlanDetail>? Details = null);
+    IReadOnlyList<BootstrapResourcePlanDetail>? Details = null)
+{
+    public string? TargetLabel { get; init; }
+}
 
 public sealed record BootstrapCompositionPreview(
     IReadOnlyList<BootstrapProfileSummary> Profiles,
@@ -56,6 +63,7 @@ public sealed record BootstrapCompositionPreview(
     IReadOnlyList<BootstrapResourcePreview> Resources,
     BootstrapSourceProvenance? SourceProvenance = null)
 {
+    public IReadOnlyList<BootstrapProfileApplicationPreview> Applications { get; init; } = [];
     public bool CanApply => Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid);
 }
 
@@ -79,7 +87,8 @@ public sealed record BootstrapBindingTargetOption(
     string Namespace,
     string DisplayName,
     bool Planned = false,
-    ResourceScopeRef? ScopeRef = null);
+    ResourceScopeRef? ScopeRef = null,
+    string? TargetProfile = null);
 
 public sealed record BootstrapManagementView(
     BootstrapCatalogSnapshot Catalog,
@@ -91,7 +100,8 @@ public sealed record BootstrapProfilePreviewRequest(
     IReadOnlyList<string> Profiles,
     BootstrapApplicationTarget? Target = null,
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
-    BootstrapSourceProfileSelection? Source = null);
+    BootstrapSourceProfileSelection? Source = null,
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null);
 
 public sealed record ApplyBootstrapProfilesRequest(
     IReadOnlyList<string> Profiles,
@@ -99,7 +109,8 @@ public sealed record ApplyBootstrapProfilesRequest(
     BootstrapApplicationTarget? Target = null,
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
     BootstrapSourceProfileSelection? Source = null,
-    Guid? RequestId = null);
+    Guid? RequestId = null,
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null);
 
 public sealed record BootstrapExecutionProgress(
     BootstrapCompositionPreview Preview,
@@ -110,4 +121,15 @@ public sealed record BootstrapBindingTargetsRequest(
     BootstrapApplicationTarget? Target,
     BootstrapBindingTargetKind TargetKind,
     IReadOnlyList<string> Profiles,
-    BootstrapSourceProfileSelection? Source = null);
+    BootstrapSourceProfileSelection? Source = null,
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null,
+    string? ConsumerProfile = null);
+
+public sealed record BootstrapTopologyResource(string Kind, string Name, string? TenantName = null);
+public sealed record BootstrapPlannedTarget(string TenantName, string? WorkspaceName = null);
+public sealed record BootstrapProfileApplication(string Profile, BootstrapApplicationTarget? Target = null,
+    IReadOnlyList<BootstrapBindingSelection>? Bindings = null, BootstrapPlannedTarget? PlannedTarget = null);
+public sealed record BootstrapProfileApplicationPreview(string Profile, BootstrapProfileScope Scope, string TargetLabel, bool ValidationDeferred, string? Digest = null)
+{
+    public BootstrapApplicationTarget? ResolvedTarget { get; init; }
+}

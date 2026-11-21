@@ -200,7 +200,12 @@ public sealed class BootstrapProfileCatalog(
 
         var hash = Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant();
         return new(
-            new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings),
+            new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings)
+            {
+                Topology = resources.Where(item => item.Resource.Kind is "Tenant" or "Workspace")
+                    .Select(item => new BootstrapTopologyResource(item.Resource.Kind, item.Resource.Metadata.Name,
+                        item.Resource.Definition.TryGetProperty("tenantRef", out var tenant) && tenant.TryGetProperty("name", out var name) ? name.GetString() : null)).ToArray()
+            },
             profilePath,
             resources);
     }

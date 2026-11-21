@@ -25,7 +25,7 @@ public sealed class BootstrapApplicationLock
     internal string Owner { get; } = Guid.NewGuid().ToString("N");
 }
 
-public sealed class BootstrapProfileManagementService(
+public sealed partial class BootstrapProfileManagementService(
     BootstrapProfileCatalog catalog,
     SourceBootstrapProfileLoader sourceProfiles,
     DeclarativeBootstrapService bootstrap,
@@ -74,6 +74,7 @@ public sealed class BootstrapProfileManagementService(
         CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        if (selection.Applications is { Count: > 0 }) return await PreviewPlanAsync(selection, actorPrincipalId, cancellationToken);
         var targetContext = await ResolveTargetContextAsync(selection.Target, actorPrincipalId, cancellationToken);
         using var operationScope = PushTargetScope(targetContext);
         return await bootstrap.PreviewAsync(selection, cancellationToken);
@@ -212,10 +213,19 @@ public sealed class BootstrapProfileManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.ExpectedDigest) || request.RequestId == Guid.Empty)
             throw new DeclarativeBootstrapException("bootstrap_request_identity_required");
-        if ((request.Profiles.Count == 0) == (request.Source is null) || request.Profiles.Count > catalog.MaximumSelectedProfiles)
-            throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
-        _ = await ResolveTargetContextAsync(request.Target, actorPrincipalId, cancellationToken);
-        var selection = new BootstrapProfileSelection(request.Profiles, request.Target, request.Bindings, request.Source);
+        var selection = new BootstrapProfileSelection(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications);
+        if (selection.Applications is { Count: > 0 })
+        {
+            ValidatePlanRequest(selection);
+            foreach (var item in selection.Applications)
+                if (item.Target is not null) _ = await ResolveTargetContextAsync(item.Target, actorPrincipalId, cancellationToken);
+        }
+        else
+        {
+            if ((selection.Profiles.Count == 0) == (request.Source is null) || selection.Profiles.Count > catalog.MaximumSelectedProfiles)
+                throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
+            _ = await ResolveTargetContextAsync(request.Target, actorPrincipalId, cancellationToken);
+        }
         var fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
             new { Selection = selection, request.ExpectedDigest, Actor = actorPrincipalId })));
         await applicationLock.Admission.WaitAsync(cancellationToken);
@@ -273,7 +283,7 @@ public sealed class BootstrapProfileManagementService(
                 {
                     Source = BootstrapApplicationSource.Manual,
                     ActorPrincipalId = actorPrincipalId,
-                    Profiles = request.Profiles,
+                    Profiles = selection.Applications is { Count: > 0 } planEntries ? planEntries.Select(item => item.Profile).ToArray() : selection.Profiles,
                     Scope = scope,
                     Target = request.Target,
                     Bindings = request.Bindings ?? [],
@@ -301,14 +311,12 @@ public sealed class BootstrapProfileManagementService(
         await applicationLock.Execution.WaitAsync(cancellationToken);
         try
         {
-            var context = await ResolveTargetContextAsync(selection.Target, actorPrincipalId, cancellationToken);
-            using var operationScope = PushTargetScope(context);
-            var preview = await bootstrap.PreviewAsync(selection, cancellationToken);
+            var preview = await PreviewAsync(selection, actorPrincipalId, cancellationToken);
             if (!string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
                 throw new DeclarativeBootstrapException("The bootstrap catalog or target changed after preview. Preview the application again.");
             if (!preview.CanApply)
                 throw new DeclarativeBootstrapException("The bootstrap preview contains invalid resources and cannot be applied.");
-            var application = await CreateApplicationAsync(preview, actorPrincipalId, cancellationToken);
+            var application = await CreateApplicationAsync(preview, actorPrincipalId, cancellationToken, selection);
             return await ExecuteApplicationAsync(application, selection, cancellationToken);
         }
         finally { applicationLock.Execution.Release(); }
@@ -341,8 +349,7 @@ public sealed class BootstrapProfileManagementService(
             await EnsurePlatformAdministratorAsync(application.Definition.ActorPrincipalId!.Value, cancellationToken);
             var context = await ResolveTargetContextAsync(selection.Target, application.Definition.ActorPrincipalId.Value, cancellationToken);
             using var operationScope = PushTargetScope(context);
-            var execution = await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest,
-                async (progress, token) =>
+            Func<BootstrapExecutionProgress, CancellationToken, Task> report = async (progress, token) =>
                 {
                     await applicationLock.State.WaitAsync(token);
                     try
@@ -356,6 +363,7 @@ public sealed class BootstrapProfileManagementService(
                             Definition = application.Definition with
                             {
                                 TotalResources = progress.Preview.Resources.Count,
+                                Applications = progress.Preview.Applications,
                                 ResourcePlan = application.Definition.ResourcePlan.Count > 0 ? application.Definition.ResourcePlan : ResourcePlan(progress.Preview),
                                 Profiles = progress.Preview.Profiles.Select(profile => profile.Name).ToArray(),
                                 Bindings = progress.Preview.Bindings,
@@ -367,7 +375,10 @@ public sealed class BootstrapProfileManagementService(
                         if (application.Definition.CancellationRequested) throw new OperationCanceledException();
                     }
                     finally { applicationLock.State.Release(); }
-                });
+                };
+            var execution = selection.Applications is { Count: > 0 }
+                ? await ExecutePlanAsync(selection, application.Definition.ActorPrincipalId.Value, application.Definition.Digest, report, cancellationToken)
+                : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report);
             await applicationLock.State.WaitAsync(CancellationToken.None);
             try
             {
@@ -436,7 +447,8 @@ public sealed class BootstrapProfileManagementService(
     private async Task<BootstrapApplicationResource> CreateApplicationAsync(
         BootstrapCompositionPreview preview,
         Guid actorPrincipalId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BootstrapProfileSelection? selection = null)
     {
         var id = Guid.NewGuid();
         var resource = new BootstrapApplicationResource
@@ -451,6 +463,7 @@ public sealed class BootstrapProfileManagementService(
             {
                 Source = BootstrapApplicationSource.Manual,
                 ActorPrincipalId = actorPrincipalId,
+                Selection = selection,
                 Profiles = preview.Profiles.Select(profile => profile.Name).ToArray(),
                 Scope = preview.Scope,
                 Target = preview.Target,
@@ -459,6 +472,7 @@ public sealed class BootstrapProfileManagementService(
                 Digest = preview.Digest,
                 StartedAt = timeProvider.GetUtcNow(),
                 TotalResources = preview.Resources.Count,
+                Applications = preview.Applications,
                 ResourcePlan = ResourcePlan(preview),
                 ExecutionOwner = applicationLock.Owner
             }
@@ -501,6 +515,7 @@ public sealed class BootstrapProfileManagementService(
                 Bindings = execution.Preview.Bindings,
                 Resources = execution.Resources,
                 TotalResources = execution.Preview.Resources.Count,
+                Applications = execution.Preview.Applications,
                 ResourcePlan = ResourcePlan(execution.Preview),
                 CurrentResource = null,
                 SourceProvenance = execution.Preview.SourceProvenance
@@ -509,7 +524,7 @@ public sealed class BootstrapProfileManagementService(
     }
 
     private static IReadOnlyList<BootstrapPlannedResource> ResourcePlan(BootstrapCompositionPreview preview) =>
-        preview.Resources.Select(resource => new BootstrapPlannedResource(resource.Profile, resource.Location, resource.Kind, resource.Name)).ToArray();
+        preview.Resources.Select(resource => new BootstrapPlannedResource(resource.Profile, resource.Location, resource.Kind, resource.Name) { TargetLabel = resource.TargetLabel }).ToArray();
 
     private BootstrapApplicationResource Interrupt(BootstrapApplicationResource application) => application with
     {

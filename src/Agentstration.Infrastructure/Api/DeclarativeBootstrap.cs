@@ -52,6 +52,8 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selection);
+        if (selection.Bindings?.Any(binding => binding.TargetProfile is not null) == true)
+            throw new DeclarativeBootstrapException("Profile-relative bindings require a Bootstrap plan.");
         if (selection.Source is null && selection.Profiles.Count == 0)
             throw new DeclarativeBootstrapException("At least one bootstrap profile must be selected.");
         if (selection.Source is not null && selection.Profiles.Count != 0)
@@ -127,16 +129,17 @@ public sealed partial class DeclarativeBootstrapService(
     public Task<BootstrapExecutionResult> ExecuteAsync(
         BootstrapProfileSelection selection, CancellationToken cancellationToken,
         string? expectedDigest = null,
-        Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null) =>
+        Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
+        bool waitForDependencies = false) =>
         ExecutePhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken,
-            expectedDigest: expectedDigest, reportProgress: reportProgress);
+            expectedDigest: expectedDigest, reportProgress: reportProgress, waitForDependencies: waitForDependencies);
 
     internal async Task<BootstrapExecutionResult> ExecutePhaseAsync(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken,
         IReadOnlyList<string>? expectedProfileDigests = null,
         string? expectedDigest = null,
         Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
-        string? startupTargetLevel = null)
+        string? startupTargetLevel = null, bool waitForDependencies = false)
     {
         var preview = await PreviewPhaseAsync(selection, phase, cancellationToken);
         if (expectedProfileDigests is not null && !preview.Profiles.Select(profile => profile.Digest)
@@ -178,7 +181,7 @@ public sealed partial class DeclarativeBootstrapService(
         var resources = new List<BootstrapAppliedResource>();
         foreach (var profile in loaded)
         {
-            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources);
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources || waitForDependencies);
             foreach (var source in profile.Resources)
             {
                 cancellationToken.ThrowIfCancellationRequested();

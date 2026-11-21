@@ -848,3 +848,50 @@ reload without another preview or submission. Only names/kinds and relative sour
 identities are added to history, not resource bodies or secrets. Older applications
 without this optional plan show only observed resources and say so explicitly.
 Application cancellation and audit details keep their existing authority and scope.
+
+
+### Manual plans with per-profile targets
+
+The Console preparation screen accepts profiles at different levels, each with
+its own target. Server-defined order is Instance → Tenant → Workspace; ordering
+within a level is preserved. Configuration of the catalog opens independently.
+Preview replaces the preparation screen, and confirmed application opens the
+shared progress component independently of the catalog. Back retains in-memory
+choices; any edit requires a new preview. Reloading an application resumes the
+same persisted identity. Preparation/preview drafts are not persisted.
+
+The existing preview and application routes also accept `applications` instead of
+legacy `profiles`/`target`/`bindings` fields:
+
+```json
+{
+  "profiles": [],
+  "applications": [
+    { "profile": "topology" },
+    { "profile": "tenant-settings", "plannedTarget": { "tenantName": "example" } },
+    { "profile": "workspace-resources", "plannedTarget": { "tenantName": "example", "workspaceName": "default" } }
+  ]
+}
+```
+
+The actual scopes come from each profile descriptor, not caller-supplied scope
+values. `target` with exact `tenantId`/`workspaceId` selects existing topology;
+`plannedTarget` names topology declared earlier in the selected plan. Bindings
+belong to their own application item. An optional binding `targetProfile` refers
+to a preceding producer's declared resource and resolves its real owner after
+topology creation. The binding-target route accepts the same `applications` list
+plus `consumerProfile` for these planned choices.
+
+Preview returns ordered per-profile targets and explicitly marks deferred semantic
+validation when topology or dependencies are not available yet. Those checks run
+before applying the profile; preview never writes topology or invents IDs. Missing,
+inactive, foreign-Tenant and operational targets fail validation. Confirmation pins
+the whole plan digest; application still returns 202 and one durable ID/request
+identity. The background worker executes the plan sequentially and reports safe
+profile/target identities through existing progress/history. Model requirements
+reuse the existing dependency barrier. A failure or cancellation stops subsequent
+work and retains resources already created; no rollback is promised.
+
+The limit remains 16 unique local profiles per plan. Legacy homogeneous selections,
+exact Source profile selection and historical records remain compatible. Local and
+Source profiles cannot be mixed. See [ADR-0248](../decisions/0248-manual-bootstrap-plans-preserve-profile-targets.md).

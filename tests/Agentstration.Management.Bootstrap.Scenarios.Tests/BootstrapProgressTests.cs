@@ -249,6 +249,7 @@ public sealed partial class DeclarativeBootstrapTests
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public string ResourceName { get; init; } = "bootstrap-load-test-002";
         public bool Fail { get; init; }
         public bool FailPlanning { get; init; }
     }
@@ -266,7 +267,7 @@ public sealed partial class DeclarativeBootstrapTests
         public async Task<BootstrapResourceApplyResult> ApplyAsync(BootstrapResourceDocument resource, BootstrapResourceOperationContext operation,
             CancellationToken cancellationToken)
         {
-            if (resource.Metadata.Name == "bootstrap-load-test-002")
+            if (resource.Metadata.Name == gate.ResourceName)
             {
                 gate.Entered.TrySetResult();
                 await gate.Release.Task.WaitAsync(cancellationToken);

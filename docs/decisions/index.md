@@ -301,3 +301,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 246. [ADR-0246 — Bootstrap applications run independently of HTTP requests](0246-bootstrap-applications-run-independently-of-http.md)
 
 247. [ADR-0247 — Correct blocked Bootstrap models through versioned plan substitutions](0247-bootstrap-model-substitutions-preserve-plan-and-owner.md)
+
+248. [ADR-0248 — Manual Bootstrap plans preserve per-profile targets](0248-manual-bootstrap-plans-preserve-profile-targets.md)
