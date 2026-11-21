@@ -6648,8 +6648,8 @@
     },
     {
       "id": "staged-artifact-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
-      "line": 31,
+      "source": "src/Agentstration.Console.Components/Components/StagedArtifactResourceSummary.razor",
+      "line": 18,
       "host": "console",
       "routes": [
         "/artifacts/staged/{Id}"
@@ -7478,6 +7478,31 @@
         "decision": "shared-frame-business-contract",
         "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
         "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
+      }
+    },
+    {
+      "id": "durable-artifact-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
+      "line": 18,
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Final inventory-only reconciliation of upstream 67784be2 saved configuration frame; protected detail UI unchanged, no new browser claim."
       }
     }
   ],
@@ -19103,6 +19128,16 @@
       "source": "src/Agentstration.Console.Components/Components/ConnectedServiceOperationResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Pure saved discovered-operation inspection Summary."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/StagedArtifactResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared saved Artifact configuration values used by native full overview and metadata-only Preview. No content/backend/record dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared saved Artifact configuration values used by native full overview and metadata-only Preview. No content/backend/record dataset."
     }
   ],
   "reconciliation": {

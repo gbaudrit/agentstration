@@ -227,3 +227,9 @@ Validation: Release component/test build passed without warnings/errors; 17 conn
 The administrative explorer composes the existing family Preview adapters for its mixed resource rows. It has one shared history/presentation shell with an explicit accepted-kind set; each family keeps its own exact loader, authorization, Summary and quick actions. No generic query or command registry is introduced. Canonical links now select overview and preserve the current administrative context. Internal/version/activity records without their own detail adapter retain native navigation without fabricated forms. Changing administrative context or selected ownership node closes/cancels inspection.
 
 Validation: Release component/shared builds passed without warnings/errors; 6 scope-explorer component tests and 16 shared Preview history tests passed. Browser and final offline checks remain pending.
+
+### Artifacts
+
+Both durable and staged catalog branches expose native Open and Preview. They remain read-only saved records; retention, purge, content, record reads and materialization keep their existing full-page workflows and permission checks. Both summaries are shared with full overviews. Durable identity uses actual Core metadata. A staged metadata projection carries actual UID, namespace, owner, labels and governance alongside its existing safe view, without exposing backend references. Exact reads reject a different current execution Workspace or namespace before loading metadata. The UI preserves the logical administrative navigation context without promoting an internal operational Workspace to a user scope.
+
+List rendering loads its existing two metadata catalogs only. Preview adds one selected metadata request and no content, lease, record, materialization or producer lookup. Context replacement cancels and clears the preview. Browser and final offline verification remain pending.

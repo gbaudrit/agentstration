@@ -59,7 +59,28 @@
         "FlowRunArtifactResource",
         "StagedArtifactView"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Artifacts",
+      "coordinates": "Physical current execution Workspace + default namespace + actual ArtifactId in N format. Durable Core metadata and safe staged metadata projection retain actual UID/labels/governance; logical administrative context is displayed independently.",
+      "overview": "Existing /artifacts/durable/{Id} and /artifacts/staged/{Id} #overview, exact owner and current navigation context.",
+      "edit": "Read-only saved artifacts. Native staged retention/purge and durable content/materialization workflows remain on their own sections; no definition Edit invented.",
+      "rowActions": [
+        "Open",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open full overview"
+      ],
+      "summary": "DurableArtifactResourceSummary and StagedArtifactResourceSummary reused by native overviews. Independent identity/configuration disclosures; no opaque locator or binary content rendered.",
+      "loader": "One exact current-Workspace metadata GET on demand; staged safe projection excludes backend resolution. Existing ArtifactsInspect authorization preserved; explicit requested owner/namespace rejected before reads.",
+      "tests": [
+        "DurableArtifactResourcePreviewTests",
+        "StagedArtifactResourcePreviewTests",
+        "ArtifactCollectionTests",
+        "ArtifactAdministrationComponentTests",
+        "ArtifactApiTests"
+      ],
+      "validation": "Release component and API builds passed without warnings/errors. 86 Artifact component tests and 2 operational Instance/Tenant API cases passed, including exact owner/namespace rejection and safe staged metadata. Browser and final broad lanes remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
@@ -5456,6 +5477,12 @@
       "inventoryCategory": "discovered-during-adoption",
       "decision": "non-resource-values",
       "reason": "Saved schema properties and constraints are value facts; preserve the existing schema renderer without inventing per-property resource actions."
+    },
+    {
+      "id": "durable-artifact-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
+      "decision": "shared-saved-summary-values",
+      "reason": "Saved configuration values compose the immutable Artifact summary; they have no independent resource identity or row actions."
     }
   ]
 }

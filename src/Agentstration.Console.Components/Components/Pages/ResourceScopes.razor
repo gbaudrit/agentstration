@@ -137,6 +137,8 @@ else
             case "InstalledPack": <InstalledPackResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
             case "PackProject": <PackProjectResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
             case "AwpWorkerIdentity": <RuntimeWorkerResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "FlowRunArtifact": <DurableArtifactResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" /> break;
+            case "StagedArtifact": <StagedArtifactResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" /> break;
             case "AepEnrollmentRequest": <AepEnrollmentResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
             case "ExtensionRegistration": <ExtensionResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
             case "ConnectedServiceOperation": <ConnectedServiceOperationResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
@@ -152,7 +154,7 @@ else
     private long revision;
     private string? InspectionContextKey => contextState?.Current is not { } context ? null : $"{context.UserId}|{context.SelectedScopeRef}|{context.WorkspaceId}";
     private static readonly IReadOnlySet<string> SupportedPreviewKinds = new HashSet<string>(StringComparer.Ordinal)
-    { "Agent", "Flow", "Entry", "Parameter", "Schema", "Vault", "Secret", "ConnectedService", "StorageType", "Storage", "DataSourceProfile", "DataSource", "KnowledgeSource", "RuntimeProfile", "ToolProvider", "Tool", "ToolSet", "ToolCategory", "ToolDefinition", "ModelProvider", "ModelProfile", "Model", "SourceProvider", "SourceRegistryRegistration", "Source", "Trigger", "TransformationFunction", "FunctionKind", "InstalledPack", "PackProject", "AwpWorkerIdentity", "AepEnrollmentRequest", "ExtensionRegistration", "ConnectedServiceOperation" };
+    { "Agent", "Flow", "Entry", "Parameter", "Schema", "Vault", "Secret", "ConnectedService", "StorageType", "Storage", "DataSourceProfile", "DataSource", "KnowledgeSource", "RuntimeProfile", "ToolProvider", "Tool", "ToolSet", "ToolCategory", "ToolDefinition", "ModelProvider", "ModelProfile", "Model", "SourceProvider", "SourceRegistryRegistration", "Source", "Trigger", "TransformationFunction", "FunctionKind", "InstalledPack", "PackProject", "AwpWorkerIdentity", "AepEnrollmentRequest", "ExtensionRegistration", "ConnectedServiceOperation", "FlowRunArtifact", "StagedArtifact" };
     private static readonly IReadOnlySet<string> DefinitionKinds = new HashSet<string>(StringComparer.Ordinal)
     { "Agent", "Flow", "Parameter", "Schema", "Vault", "Secret", "ConnectedService", "StorageType", "Storage", "DataSourceProfile", "DataSource", "KnowledgeSource", "RuntimeProfile", "ToolProvider", "ToolCategory", "ToolDefinition", "ModelProvider", "ModelProfile", "SourceProvider", "SourceRegistryRegistration", "Source", "Trigger", "TransformationFunction" };
     private bool CanEdit(ResourceScopeInventoryItemResponse value) => !value.IsManaged && DefinitionKinds.Contains(value.Kind)
@@ -166,7 +168,7 @@ else
     private string InspectionDesignerUrl(ScopedResourceAddress address) => ResourceOwnershipContext.PreserveNavigation($"{(address.Namespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(address.Namespace.Value)}/flows")}/{Uri.EscapeDataString(address.Name)}/designer?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}", Services);
     private string? InspectionUrl(ScopedResourceAddress address, Guid? uid = null)
     {
-        if (!address.Namespace.IsDefault && address.Kind is "Parameter" or "Vault" or "Secret" or "SourceRegistryRegistration" or "InstalledPack" or "PackProject" or "AwpWorkerIdentity" or "AepEnrollmentRequest") return null;
+        if (!address.Namespace.IsDefault && address.Kind is "Parameter" or "Vault" or "Secret" or "SourceRegistryRegistration" or "InstalledPack" or "PackProject" or "AwpWorkerIdentity" or "AepEnrollmentRequest" or "FlowRunArtifact" or "StagedArtifact") return null;
         var name = Uri.EscapeDataString(address.Name); var ns = Uri.EscapeDataString(address.Namespace.Value);
         string? path = address.Kind switch
         {
@@ -176,6 +178,8 @@ else
             "Source" => $"/settings/sources/{ns}/{name}",
             "PackProject" when uid is { } projectId => $"/pack-projects/{projectId:D}?namespace={ns}&resourceName={name}",
             "PackProject" => null,
+            "FlowRunArtifact" when Guid.TryParseExact(address.Name, "N", out _) => $"/artifacts/durable/{name}",
+            "StagedArtifact" when Guid.TryParseExact(address.Name, "N", out _) => $"/artifacts/staged/{name}",
             "AwpWorkerIdentity" when Guid.TryParseExact(address.Name, "N", out var workerId) => $"/settings/runtime-workers/{workerId:D}",
             "AepEnrollmentRequest" when Guid.TryParseExact(address.Name, "N", out var enrollmentId) => $"/extensions/enrollment/{enrollmentId:D}",
             "Parameter" or "Secret" or "Vault" when address.Namespace.IsDefault => $"/{(address.Kind == "Parameter" ? "parameters" : address.Kind == "Secret" ? "secrets" : "vaults")}/{name}",

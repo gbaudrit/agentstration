@@ -73,4 +73,5 @@
   <data name="ProducerKind.Tool"><value>Outil</value></data>
   <data name="ProducerKind.Unknown"><value>Inconnu</value></data>
   <data name="RetentionRefreshDraft" xml:space="preserve"><value>Des métadonnées actualisées sont disponibles. Votre saisie de rétention est conservée. Abandonnez-la pour adopter la copie actualisée.</value></data>
+  <data name="Generation" xml:space="preserve"><value>Génération</value></data>
 </root>

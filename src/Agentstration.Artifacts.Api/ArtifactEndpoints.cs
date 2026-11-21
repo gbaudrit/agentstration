@@ -20,6 +20,7 @@ internal static class ArtifactEndpoints
         artifacts.MapPost("/staging-bindings", CreateBindingAsync).WithSummary("Create an Artifact staging binding").Produces<ArtifactStagingBindingResource>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         artifacts.MapGet("/staged", ListStagedAsync).WithSummary("List staged Artifacts").Produces<IEnumerable<StagedArtifactView>>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staged", CreateStagedAsync).WithSummary("Create a staged Artifact").Produces<StagedArtifactView>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        artifacts.MapGet("/staged/{id}/summary", GetStagedSummaryAsync).WithSummary("Inspect saved staged Artifact metadata without reading content").Produces<StagedArtifactSavedSummary>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapGet("/staged/{id}", GetStagedAsync).WithSummary("Inspect a staged Artifact").Produces<StagedArtifactView>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
         artifacts.MapPost("/staged/{id}/content", WriteAsync).WithSummary("Write a bounded staged Artifact chunk").Produces<StagedArtifactView>().RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         artifacts.MapGet("/staged/{id}/content", ReadAsync).WithSummary("Read a bounded staged Artifact chunk").Produces<ArtifactContentChunk>().RequireAuthorization(AgentstrationPolicies.CanReadResources);
@@ -72,6 +73,22 @@ internal static class ArtifactEndpoints
     {
         var stored = await service.GetStagedAsync(StagedArtifactId.Parse(id), ParseLease(leaseId), ArtifactLeaseOperation.Inspect, token);
         return stored is null ? Results.NotFound() : Results.Ok(ArtifactViews.Staged(stored.Value));
+    });
+
+    private static bool MatchesRequestedOwner(HttpRequest request, ICurrentRequestContext current) => current.IsInitialized
+        && (!request.Query.ContainsKey("scopeRef") || ResourceScopeRef.TryParse(request.Query["scopeRef"].ToString(), out var owner)
+            && owner == ResourceScopeRef.Workspace(current.Current.WorkspaceId))
+        && (!request.Query.ContainsKey("namespace") || ResourceNamespace.Parse(request.Query["namespace"].ToString()).IsDefault);
+
+    private static Task<IResult> GetStagedSummaryAsync(string id, HttpRequest request, ICurrentRequestContext current,
+        ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
+    {
+        if (!MatchesRequestedOwner(request, current)) return Results.NotFound();
+        var stored = await service.GetStagedAsync(StagedArtifactId.Parse(id), null, ArtifactLeaseOperation.Inspect, token);
+        if (stored is null) return Results.NotFound();
+        var value = stored.Value;
+        return Results.Ok(new StagedArtifactSavedSummary(value.Metadata, value.Uid, value.ScopeRef!.Value,
+            value.Generation, value.Governance, ArtifactViews.Staged(value)));
     });
 
     private static Task<IResult> CreateStagedAsync(CreateStagedArtifactRequest body, HttpResponse response,
@@ -139,8 +156,9 @@ internal static class ArtifactEndpoints
     private static Task<IResult> ListFlowRunArtifactsAsync(ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
         Results.Ok((await service.ListFlowRunArtifactsAsync(token)).Select(value => value.Value)));
 
-    private static Task<IResult> GetFlowRunArtifactAsync(string id, ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
+    private static Task<IResult> GetFlowRunArtifactAsync(string id, HttpRequest request, ICurrentRequestContext current, ArtifactManagementService service, CancellationToken token) => ExecuteAsync(async () =>
     {
+        if (!MatchesRequestedOwner(request, current)) return Results.NotFound();
         var stored = await service.GetFlowRunArtifactAsync(FlowRunArtifactId.Parse(id), token);
         return stored is null ? Results.NotFound() : Results.Ok(stored.Value);
     });
