@@ -10,6 +10,7 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
     private Guid attemptId;
     private long revision;
     private string? failure;
+    private BootstrapFailure? failureDiagnostic;
     private bool administrationReady;
     private string? activeStep;
     private BootstrapStartupActivity? activity;
@@ -27,7 +28,7 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
             attemptChanged.TrySetResult();
             attemptChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            attemptId = Guid.NewGuid(); revision = 1; failure = null; administrationReady = false;
+            attemptId = Guid.NewGuid(); revision = 1; failure = null; failureDiagnostic = null; administrationReady = false;
             created = skipped = conflicts = failed = 0; activity = null;
             resourceRows.Clear(); lastGroupByStep.Clear(); activeResourceId = null;
             steps.Clear();
@@ -104,12 +105,15 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
             completion?.TrySetResult();
         }
     }
-    public void Fail(string reason)
+    public void Fail(Exception exception) => Fail(exception.Message, Bootstrap.BootstrapFailureDiagnostics.Describe(exception));
+
+    public void Fail(string reason, BootstrapFailure? diagnostic = null)
     {
         lock (sync)
         {
             if (completion?.Task.IsCompleted == true) return;
             failure = reason;
+            failureDiagnostic = diagnostic;
             if (activeResourceId is { } id && resourceRows.TryGetValue(id, out var row)
                 && row.State is "running" or "waiting")
                 resourceRows[id] = row with { State = "failed" };
@@ -126,7 +130,7 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
                 ready ? "ready" : failure is null ? "running" : "failed",
                 steps.Select(step => new BootstrapStartupStep(step.Key, step.Value)).ToArray(), activeStep,
                 activity, created, skipped, conflicts, failed)
-            { Families = ReadFamilies() };
+            { Families = ReadFamilies(), Failure = resourceRows.Values.LastOrDefault(row => row.Failure is not null)?.Failure ?? failureDiagnostic };
         }
     }
     public Task WaitUntilReadyAsync(CancellationToken cancellationToken)

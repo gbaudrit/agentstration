@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Identity.Contracts;
@@ -204,14 +205,16 @@ public sealed partial class BootstrapProfileManagementService
                 if (execution.Error is not null)
                 {
                     if (execution.Resources.Count == 0 && first is not null)
-                        resources.Add(new(first.Profile, first.Location, first.Kind, first.Name, BootstrapResourceDisposition.Failed, "bootstrap_application_invalid"));
+                        resources.Add(new(first.Profile, first.Location, first.Kind, first.Name, BootstrapResourceDisposition.Failed, "bootstrap_application_invalid") { Failure = new("validation", "bootstrap_application_invalid", Guid.NewGuid().ToString("N")) });
                     return new(preview, resources, execution.Error);
                 }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                var diagnostic = Agentstration.Infrastructure.Bootstrap.BootstrapFailureDiagnostics.Describe(exception);
+                logger?.LogWarning("Bootstrap profile {Profile} failed ({ReasonCode}, diagnostic {DiagnosticId}).", profile.Name, diagnostic.Code, diagnostic.DiagnosticId);
                 if (first is not null)
-                    resources.Add(new(first.Profile, first.Location, first.Kind, first.Name, BootstrapResourceDisposition.Failed, "bootstrap_resource_failed"));
+                    resources.Add(new(first.Profile, first.Location, first.Kind, first.Name, BootstrapResourceDisposition.Failed, "bootstrap_resource_failed") { Failure = diagnostic });
                 await report(new(preview, resources.ToArray(), null), CancellationToken.None);
                 return new(preview, resources, "bootstrap_resource_failed");
             }

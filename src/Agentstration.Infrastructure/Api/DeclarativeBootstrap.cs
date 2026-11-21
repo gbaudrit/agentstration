@@ -227,13 +227,15 @@ public sealed partial class DeclarativeBootstrapService(
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
-                    if (observationId is not null) startup?.FinishResource(observationId, "failed");
+                    var diagnostic = Agentstration.Infrastructure.Bootstrap.BootstrapFailureDiagnostics.Describe(exception);
+                    if (observationId is not null) startup?.FinishResource(observationId, "failed", diagnostic);
                     if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name, "failed");
-                    logger.LogWarning("Bootstrap resource {ResourceKind}/{ResourceName} at {Location} failed ({ExceptionType}).",
-                        resource.Kind, resource.Metadata.Name, source.Location, exception.GetType().Name);
+                    logger.LogWarning("Bootstrap resource {ResourceKind}/{ResourceName} at {Location} failed ({ExceptionType}, {ReasonCode}, diagnostic {DiagnosticId}).",
+                        resource.Kind, resource.Metadata.Name, source.Location, exception.GetType().Name, diagnostic.Code, diagnostic.DiagnosticId);
                     var message = "bootstrap_resource_failed";
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
-                        BootstrapResourceDisposition.Failed, message));
+                        BootstrapResourceDisposition.Failed, message)
+                    { Failure = diagnostic });
                     error = message;
                 }
                 if (reportProgress is not null)

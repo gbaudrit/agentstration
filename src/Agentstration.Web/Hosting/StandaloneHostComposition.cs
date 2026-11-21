@@ -292,10 +292,11 @@ internal static class StandaloneHostCompositionExtensions
         }
         catch (Exception exception)
         {
-            startupState.Fail(exception.Message);
+            startupState.Fail(exception);
             if (startupState.AdministrationReady && !app.Lifetime.ApplicationStopping.IsCancellationRequested)
             {
-                app.Logger.LogError("Bootstrap failed. Administration remains available; readiness and execution remain disabled. Correct the configuration and restart to retry.");
+                var diagnostic = startupState.Read().Failure;
+                app.Logger.LogError("Bootstrap failed ({ReasonCode}, diagnostic {DiagnosticId}). Administration remains available; readiness and execution remain disabled. Correct the configuration and restart to retry.", diagnostic?.Code, diagnostic?.DiagnosticId);
                 if (hostStart is not null) await hostStart;
                 return;
             }

@@ -135,6 +135,12 @@ public sealed partial class DeclarativeBootstrapTests
             Assert.IsNotNull(terminal.Definition.CompletedAt);
             Assert.IsNull(terminal.Definition.CurrentResource);
             Assert.AreEqual(fail ? BootstrapResourceDisposition.Failed : BootstrapResourceDisposition.Create, terminal.Definition.Resources[^1].Disposition);
+            if (fail)
+            {
+                Assert.IsNotNull(terminal.Definition.Failure);
+                Assert.AreEqual(terminal.Definition.Resources[^1].Failure, terminal.Definition.Failure);
+                Assert.IsFalse(System.Text.Json.JsonSerializer.Serialize(terminal).Contains("Synthetic load-test failure", StringComparison.Ordinal));
+            }
         }
         finally { gate.Release.TrySetResult(); }
     }

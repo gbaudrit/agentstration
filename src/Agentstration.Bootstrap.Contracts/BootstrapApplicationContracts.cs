@@ -59,7 +59,12 @@ public sealed record BootstrapPlannedResource(string Profile, string Location, s
     public string? TargetLabel { get; init; }
 }
 
-public sealed record BootstrapAppliedResource(string Profile, string Location, string Kind, string Name, BootstrapResourceDisposition Disposition, string? Message = null);
+public sealed record BootstrapFailure(string Category, string Code, string DiagnosticId);
+
+public sealed record BootstrapAppliedResource(string Profile, string Location, string Kind, string Name, BootstrapResourceDisposition Disposition, string? Message = null)
+{
+    public BootstrapFailure? Failure { get; init; }
+}
 
 public sealed record BootstrapApplicationProperties
 {
@@ -75,6 +80,7 @@ public sealed record BootstrapApplicationProperties
     public DateTimeOffset? CompletedAt { get; init; }
     public BootstrapApplicationStatus Status { get; init; } = BootstrapApplicationStatus.Running;
     public string? Error { get; init; }
+    public BootstrapFailure? Failure { get; init; }
     public bool CancellationRequested { get; init; }
     public int TotalResources { get; init; }
     public IReadOnlyList<BootstrapPlannedResource> ResourcePlan { get; init; } = [];

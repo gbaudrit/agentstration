@@ -15,12 +15,13 @@ public sealed record BootstrapStartupResource(
     string Namespace, string TargetLevel, string State, IReadOnlyList<BootstrapStartupOperation> Operations)
 {
     public string? GroupId { get; init; }
+    public BootstrapFailure? Failure { get; init; }
     public BootstrapStartupModelSubstitution? Substitution { get; init; }
 }
 
 public sealed record BootstrapStartupResourceQuery(
     Guid AttemptId, string? StepId = null, string? Kind = null, string? State = null,
-    string? Search = null, int Offset = 0, int Limit = 25, string? GroupId = null);
+    string? Search = null, int Offset = 0, int Limit = 25, string? GroupId = null, string? FollowResourceId = null);
 
 public sealed record BootstrapStartupResourcePage(
     Guid AttemptId, long Revision, int Total, int Offset, int Limit,

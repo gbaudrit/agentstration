@@ -25,7 +25,7 @@ public sealed class BootstrapStartupApiClient(HttpClient client) : IBootstrapSta
     public Task<BootstrapStartupResourcePage> GetResourcesAsync(BootstrapStartupResourceQuery query, CancellationToken cancellationToken)
     {
         var url = $"api/bootstrap/startup/resources?attemptId={query.AttemptId:D}&offset={query.Offset}&limit={query.Limit}";
-        foreach (var (key, value) in new[] { ("stepId", query.StepId), ("kind", query.Kind), ("groupId", query.GroupId), ("state", query.State), ("search", query.Search) })
+        foreach (var (key, value) in new[] { ("stepId", query.StepId), ("kind", query.Kind), ("groupId", query.GroupId), ("followResourceId", query.FollowResourceId), ("state", query.State), ("search", query.Search) })
             if (!string.IsNullOrWhiteSpace(value)) url += $"&{key}={Uri.EscapeDataString(value)}";
         return ApiResponse.ReadAsync<BootstrapStartupResourcePage>(client, url, cancellationToken);
     }

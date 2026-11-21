@@ -87,7 +87,7 @@ public sealed partial class BootstrapStartupState
         revision++;
     }
 
-    public void FinishResource(string id, string outcome)
+    public void FinishResource(string id, string outcome, BootstrapFailure? diagnostic = null)
     {
         lock (sync)
         {
@@ -95,7 +95,7 @@ public sealed partial class BootstrapStartupState
             ObserveOperationCore(id, "resource_apply", outcome);
             if (resourceRows.TryGetValue(id, out var row))
             {
-                resourceRows[id] = row with { State = outcome };
+                resourceRows[id] = row with { State = outcome, Failure = diagnostic };
                 if (outcome == "failed" && activity?.ResourceId != id)
                     activity = new(row.Kind, row.Name, ResourceId: id, TargetLevel: row.TargetLevel, GroupId: row.GroupId);
             }
@@ -132,7 +132,7 @@ public sealed partial class BootstrapStartupState
     {
         ArgumentNullException.ThrowIfNull(query);
         ArgumentOutOfRangeException.ThrowIfNegative(query.Offset);
-        if (query.Limit is < 1 or > 100 || query.Search?.Length > 128)
+        if (query.Limit is < 1 or > 100 || query.Search?.Length > 128 || query.FollowResourceId?.Length > 128)
             throw new ArgumentOutOfRangeException(nameof(query));
         lock (sync)
         {
@@ -146,9 +146,15 @@ public sealed partial class BootstrapStartupState
                     || row.Name.Contains(query.Search, StringComparison.OrdinalIgnoreCase)
                     || row.Profile.Contains(query.Search, StringComparison.OrdinalIgnoreCase)
                     || row.TargetLevel.Contains(query.Search, StringComparison.OrdinalIgnoreCase)));
-            var items = matches.Skip(query.Offset).Take(query.Limit)
+            var offset = query.Offset;
+            if (query.FollowResourceId is { } focus)
+            {
+                var index = matches.TakeWhile(row => row.Id != focus).Count();
+                if (index < matches.Count()) offset = index / query.Limit * query.Limit;
+            }
+            var items = matches.Skip(offset).Take(query.Limit)
                 .Select(row => row with { State = ObservedState(row) }).ToArray();
-            return new(attemptId, revision, matches.Count(), query.Offset, query.Limit, items);
+            return new(attemptId, revision, matches.Count(), offset, query.Limit, items);
         }
     }
 }

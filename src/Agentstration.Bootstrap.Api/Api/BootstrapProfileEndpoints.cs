@@ -22,13 +22,13 @@ public static class BootstrapProfileEndpoints
             context.Response.Headers.CacheControl = "no-store";
             return Results.Ok(status.Read());
         }).RequireAuthorization(AgentstrationPolicies.PlatformAdmin).Produces<BootstrapStartupSnapshot>().WithSummary("Read current Bootstrap startup progress");
-        startup.MapGet("/resources", (Guid attemptId, string? stepId, string? kind, string? state, string? search, string? groupId,
+        startup.MapGet("/resources", (Guid attemptId, string? stepId, string? kind, string? state, string? search, string? groupId, string? followResourceId,
             int? offset, int? limit, IBootstrapStartupStatus status, HttpContext context) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            if (offset is < 0 || limit is < 1 or > 100 || search?.Length > 128)
+            if (offset is < 0 || limit is < 1 or > 100 || search?.Length > 128 || followResourceId?.Length > 128)
                 return Results.Problem(statusCode: 400, extensions: new Dictionary<string, object?> { ["code"] = "invalid_startup_query" });
-            var page = status.ReadResources(new(attemptId, stepId, kind, state, search, offset ?? 0, limit ?? 25, groupId));
+            var page = status.ReadResources(new(attemptId, stepId, kind, state, search, offset ?? 0, limit ?? 25, groupId, followResourceId));
             return page is null ? Results.Problem(statusCode: 409,
                 extensions: new Dictionary<string, object?> { ["code"] = "startup_attempt_changed" }) : Results.Ok(page);
         }).RequireAuthorization(AgentstrationPolicies.PlatformAdmin)

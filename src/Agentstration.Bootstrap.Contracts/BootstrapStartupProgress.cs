@@ -13,6 +13,7 @@ public sealed record BootstrapStartupSnapshot(
     IReadOnlyList<BootstrapStartupStep> Steps, string? ActiveStepId,
     BootstrapStartupActivity? Activity, int Created, int Skipped, int Conflicts, int Failed)
 {
+    public BootstrapFailure? Failure { get; init; }
     public IReadOnlyList<BootstrapStartupFamily> Families { get; init; } = [];
 }
 

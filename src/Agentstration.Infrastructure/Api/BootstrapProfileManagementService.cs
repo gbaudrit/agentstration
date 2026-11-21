@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.ConnectedServices.Contracts;
@@ -35,7 +36,8 @@ public sealed partial class BootstrapProfileManagementService(
     IResourceStore store,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
-    BootstrapApplicationLock applicationLock) : IBootstrapProfileApiService
+    BootstrapApplicationLock applicationLock,
+    ILogger<BootstrapProfileManagementService>? logger = null) : IBootstrapProfileApiService
 {
     public async Task<BootstrapManagementView> GetAsync(Guid actorPrincipalId, CancellationToken cancellationToken)
     {
@@ -403,8 +405,10 @@ public sealed partial class BootstrapProfileManagementService(
             if (!background) throw;
             return application;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            var diagnostic = Agentstration.Infrastructure.Bootstrap.BootstrapFailureDiagnostics.Describe(exception);
+            logger?.LogWarning("Bootstrap application {ApplicationId} failed ({ReasonCode}, diagnostic {DiagnosticId}).", application.Metadata.Name, diagnostic.Code, diagnostic.DiagnosticId);
             // Persist only a safe diagnostic. Provider exceptions may contain resource contents.
             application = await SaveTerminalAsync(application.Metadata.Name, current => current with
             {
@@ -416,7 +420,8 @@ public sealed partial class BootstrapProfileManagementService(
                         ? BootstrapApplicationStatus.PartiallyApplied : BootstrapApplicationStatus.Failed,
                     CompletedAt = timeProvider.GetUtcNow(),
                     CurrentResource = null,
-                    Error = "bootstrap_application_failed"
+                    Error = "bootstrap_application_failed",
+                    Failure = diagnostic
                 }
             });
         }
@@ -498,6 +503,10 @@ public sealed partial class BootstrapProfileManagementService(
             : createdBeforeFailure
                 ? BootstrapApplicationStatus.PartiallyApplied
                 : BootstrapApplicationStatus.Failed;
+        var diagnostic = execution.Resources.LastOrDefault(row => row.Failure is not null)?.Failure
+            ?? (execution.Error is not null ? new BootstrapFailure("validation", "bootstrap_application_invalid", Guid.NewGuid().ToString("N")) : null);
+        if (diagnostic is not null)
+            logger?.LogWarning("Bootstrap application {ApplicationId} stopped ({ReasonCode}, diagnostic {DiagnosticId}).", application.Metadata.Name, diagnostic.Code, diagnostic.DiagnosticId);
         return application with
         {
             Generation = checked(application.Generation + 1),
@@ -511,6 +520,7 @@ public sealed partial class BootstrapProfileManagementService(
                 Status = status,
                 Error = execution.Error is null ? null
                     : execution.Error == "bootstrap_resource_failed" ? "bootstrap_resource_failed" : "bootstrap_application_invalid",
+                Failure = diagnostic,
                 Profiles = execution.Preview.Profiles.Select(profile => profile.Name).ToArray(),
                 Bindings = execution.Preview.Bindings,
                 Resources = execution.Resources,

@@ -895,3 +895,24 @@ work and retains resources already created; no rollback is promised.
 The limit remains 16 unique local profiles per plan. Legacy homogeneous selections,
 exact Source profile selection and historical records remain compatible. Local and
 Source profiles cannot be mixed. See [ADR-0248](../decisions/0248-manual-bootstrap-plans-preserve-profile-targets.md).
+
+### Following progress and inspecting failures
+
+Initial startup and manual application opt into the shared StepProgress viewport
+layout. Desktop panes use the remaining screen height and scroll independently;
+following keeps the current step and resource visible, including its bounded page.
+Scrolling, filtering, paging or inspecting another step pauses following. The
+existing follow command resumes it. Startup resource queries optionally accept
+`followResourceId` to return the bounded page containing that matching resource;
+filters, group, attempt and administrator authorization still apply.
+
+Manual applications retain optional per-resource and aggregate `failure` metadata:
+a bounded category/reason code and a generated diagnostic identity that appears in
+sanitized server logs. Initial snapshots and resource observations expose the same
+safe diagnostic while the process runs. Native validation codes are retained where
+available; arbitrary exception messages, provider bodies, manifest contents and
+secret/parameter values are excluded. The Console explains common dependency and
+publication failures, highlights the failed group and preserves preceding outcomes.
+Older history without diagnostic metadata explicitly states that the precise cause
+was not recorded. This additive JSON change needs no relational migration and does
+not introduce rollback or durable initial-startup history.
