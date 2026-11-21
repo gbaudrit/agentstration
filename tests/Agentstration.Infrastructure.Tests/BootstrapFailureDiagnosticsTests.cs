@@ -1,8 +1,8 @@
 using System.Text.Json;
+using Agentstration.Bootstrap.Contracts;
 using Agentstration.DataSources;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Bootstrap;
-using Agentstration.Bootstrap.Contracts;
 
 namespace Agentstration.Infrastructure.Tests;
 

@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Hosting;
 
