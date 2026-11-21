@@ -509,7 +509,28 @@
       "rowTypes": [
         "SourceConsoleListItem"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Source",
+      "coordinates": "Exact owner + namespace (publisher) + name; verify Source and SourceConfiguration addresses and linked Source UID.",
+      "overview": "/settings/sources/{publisher}/{name}?scopeRef={owner}&context={context}#overview",
+      "edit": "/settings/sources/{publisher}/{name}?scopeRef={owner}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved Source identity, publisher, origin, local bindings and refresh policies. Full details additionally supply the already selected immutable publication and its declared channels. The exact Source Summary endpoint reads only Source and local SourceConfiguration by owner/publisher/name; it does not enumerate versions, providers, catalog materializations or channels. Preview omits unknown publication facts instead of resolving history. Existing full-detail verification/import observations remain caller-supplied.",
+      "loader": "ISourceConsoleApiClient.GetSavedSummaryAsync(owner, namespace/publisher, name, token)",
+      "tests": [
+        "SourceResourcePreviewTests",
+        "SourcesCollectionTests"
+      ],
+      "apiValidation": "Exact HTTP integration passed for publisher homonyms, matching configuration UID, missing publisher and missing owner. No Source versions or observed state need exist for this read.",
+      "validation": "Release component/test build passed without warnings/errors; 98 sources tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",

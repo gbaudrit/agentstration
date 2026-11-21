@@ -7202,7 +7202,7 @@
     },
     {
       "id": "sources-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "source": "src/Agentstration.Console.Components/Components/SourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/settings/sources",
@@ -7217,7 +7217,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 65,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7226,7 +7226,7 @@
           "tests/distribution.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Source configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18999,6 +18999,16 @@
       "source": "src/Agentstration.Console.Components/Components/SourceRegistryRegistrationResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved SourceRegistryRegistration configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceDetails.razor",
+      "classification": "inventoried",
+      "reason": "Detail route adapter composes the existing inventoried Sources screen; separate route lifetimes preserve collection Preview history."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SourceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Source configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
