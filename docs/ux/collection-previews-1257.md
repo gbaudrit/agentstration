@@ -88,16 +88,22 @@ Validation: Release component/test build passed without warnings/errors; 37 tool
 
 Saved identity and declared Tool membership references, independent of the editor selection/draft. Preview adds one exact Workspace/namespace/name read through the existing store; it never loads resolved members, Tools or Provider pickers. Full editor reads now use the exact owner when supplied. The family Preview uses `IToolCategoriesClient.GetCategoryAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 30 tool categories tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 30 tool categories tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/tools/categories/README.md). Final offline lanes remain pending.
 
 ## ToolDefinition
 
 Saved identity and the existing Flow, Relay or Acquisition configuration. Both full detail adapters reuse the same saved Summary. Preview reads no Flow contracts, source catalogs, version history, usages or pickers; a Relay source generation is displayed as a catalog revision unless an actual known version is supplied. The family Preview uses `IToolDefinitionsClient.GetAsync(owner, name, namespace, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 95 tool definitions tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 95 tool definitions tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/tools/definitions/README.md). Final offline lanes remain pending.
 
 ## ModelProvider
 
 Saved identity, Extension/contribution reference, value bindings and specification overrides. Preview reads one exact Instance/namespace/name snapshot, without testing providers, discovering models or loading Extension/Parameter/Secret pickers. ModelProvider remains Instance-only under its existing scope policy. The family Preview uses `IModelProvidersClient.GetModelProviderAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 123 model providers tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 123 model providers tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/modelproviders/README.md). Final offline lanes remain pending.
+
+## ModelProfile
+
+Saved identity, Provider/Model reference, generation/reasoning/output options, stop sequences and provider options. The full overview may supply an already known Provider owner; Preview does not infer one from another catalog. Exact Preview avoids model resolution, Extension/Provider/Model pickers, capabilities and usage reads. Existing row deletion retains its authorization, ETag and confirmation workflow. The family Preview uses `IModelProfilesClient.GetModelProfileAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 132 model profiles tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/modelprofiles/README.md). Final offline lanes remain pending.

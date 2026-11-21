@@ -158,7 +158,28 @@
       "rowTypes": [
         "ModelProfileSummaryResponse"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-smoke-passed",
+      "family": "ModelProfile",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/modelprofiles/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/modelprofiles/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, Provider/Model reference, generation/reasoning/output options, stop sequences and provider options. The full overview may supply an already known Provider owner; Preview does not infer one from another catalog. Exact Preview avoids model resolution, Extension/Provider/Model pickers, capabilities and usage reads. Existing row deletion retains its authorization, ETag and confirmation workflow.",
+      "loader": "IModelProfilesClient.GetModelProfileAsync(namespace, name, owner, token)",
+      "tests": [
+        "ModelProfileResourcePreviewTests",
+        "ModelProfileCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 132 model profiles tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/modelprofiles/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
@@ -168,7 +189,7 @@
       "rowTypes": [
         "ModelProviderResponse"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "ModelProvider",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/modelproviders/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -188,7 +209,8 @@
         "ModelProviderResourcePreviewTests",
         "ModelProviderCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 123 model providers tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 123 model providers tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/modelproviders/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",
@@ -475,7 +497,7 @@
       "rowTypes": [
         "ToolCategoryResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "ToolCategory",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/tools/categories/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -496,7 +518,8 @@
         "ToolCategoryCollectionTests"
       ],
       "apiValidation": "Exact HTTP integration passed for namespace homonyms, ETag and missing namespace/owner; 17 storage hardening tests passed, including unknown owner without fallback.",
-      "validation": "Release component/test build passed without warnings/errors; 30 tool categories tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 30 tool categories tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/tools/categories/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
@@ -506,7 +529,7 @@
       "rowTypes": [
         "ToolDefinitionResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "ToolDefinition",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/tools/definitions/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -526,7 +549,8 @@
         "ToolDefinitionResourcePreviewTests",
         "ToolDefinitionCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 95 tool definitions tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 95 tool definitions tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/tools/definitions/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
@@ -1093,7 +1117,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "triggers-trigger-resource",
@@ -1147,7 +1172,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "parameters-parameter-resource",
@@ -1198,7 +1224,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "agents-agent-summary",
@@ -1218,7 +1245,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "data-source-editor-data-source-acquisition-resource",
@@ -1728,7 +1756,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "tool-details-configuration-summary",
@@ -1760,7 +1789,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "tool-definition-published-versions",
@@ -1790,7 +1820,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "transformation-function-editor-configuration-summary",
@@ -1821,7 +1852,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "modelproviderdetails-setting",
@@ -1832,7 +1864,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "modelproviderdetails-modelproviderusageresponse",
@@ -3717,7 +3750,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "model-profiles-delete-conflict-consumers",
@@ -3727,7 +3761,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "model-provider-details-profile-usages",

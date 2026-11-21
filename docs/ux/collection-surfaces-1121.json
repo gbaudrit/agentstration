@@ -6568,12 +6568,13 @@
     },
     {
       "id": "modelprofileeditor-profilesetting",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
-      "line": 167,
+      "source": "src/Agentstration.Console.Components/Components/ModelProfileResourceSummary.razor",
+      "line": 21,
       "host": "console",
       "routes": [
         "/modelprofiles/new",
-        "/modelprofiles/{Name}"
+        "/modelprofiles/{Name}",
+        "/modelprofiles"
       ],
       "renderer": "CollectionView",
       "itemType": "ProfileSetting",
@@ -6589,7 +6590,7 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+        "interpretation": "Saved ModelProfile configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       }
     },
     {
@@ -18970,6 +18971,11 @@
       "source": "src/Agentstration.Console.Components/Components/ModelProviderResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved ModelProvider configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ModelProfileResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ModelProfile configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

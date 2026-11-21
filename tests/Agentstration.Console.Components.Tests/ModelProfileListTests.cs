@@ -28,7 +28,7 @@ public sealed class ModelProfileListTests
         using var context = Context(handler);
         var cut = context.Render<Agentstration.Web.Components.Pages.ModelProfiles>();
         Assert.HasCount(20, cut.FindAll("tbody tr"));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());
         Assert.HasCount(5, cut.FindAll("tbody tr"));
         await cut.Find("[data-filter-key=status] select").ChangeAsync(new() { Value = "Ready" });
@@ -102,7 +102,7 @@ public sealed class ModelProfileListTests
         {
             var cut = reader.Render<Agentstration.Web.Components.Pages.ModelProfiles>();
             Assert.HasCount(1, cut.FindAll(".resource-name-link"));
-            Assert.IsEmpty(cut.FindAll("a[href*='/modelprofiles/new'], .collection-actions"));
+            Assert.IsEmpty(cut.FindAll("a[href*='/modelprofiles/new'], .collection-actions button.danger-text, .collection-actions a[href*='definition/configuration']"));
         }
         using var protectedHandler = new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -111,7 +111,7 @@ public sealed class ModelProfileListTests
         using var protectedContext = Context(protectedHandler, Administrator());
         var list = protectedContext.Render<Agentstration.Web.Components.Pages.ModelProfiles>();
         Assert.HasCount(2, list.FindAll(".resource-name-link"));
-        Assert.IsEmpty(list.FindAll(".collection-actions"));
+        Assert.IsEmpty(list.FindAll(".collection-actions button.danger-text, .collection-actions a[href*='definition/configuration']"));
     }
 
     [TestMethod]
@@ -122,12 +122,12 @@ public sealed class ModelProfileListTests
         HttpResponseMessage Deleted() { deleted = true; return new(HttpStatusCode.NoContent); }
         using var context = Context(handler, Administrator());
         var cut = context.Render<Agentstration.Web.Components.Pages.ModelProfiles>();
-        await cut.Find(".collection-actions-panel button").ClickAsync(new());
+        await cut.Find(".collection-actions-panel button.danger-text").ClickAsync(new());
         Assert.IsNotNull(cut.Find("[role=alertdialog]"));
         Assert.IsFalse(deleted);
         await cut.Find("[role=alertdialog] .button-secondary").ClickAsync(new());
         Assert.IsFalse(deleted);
-        await cut.Find(".collection-actions-panel button").ClickAsync(new());
+        await cut.Find(".collection-actions-panel button.danger-text").ClickAsync(new());
         await cut.Find("[role=alertdialog] .button-danger").ClickAsync(new());
         Assert.IsTrue(deleted);
         Assert.IsEmpty(cut.FindAll(".resource-name-link, [role=alertdialog]"));
@@ -146,7 +146,7 @@ public sealed class ModelProfileListTests
         using var handler = new Handler(request => Task.FromResult(request.Method == HttpMethod.Delete ? new HttpResponseMessage(HttpStatusCode.Conflict) { Content = JsonContent.Create(new { title = "PRIVATE", detail = "PRIVATE" }) } : request.RequestUri!.AbsolutePath.EndsWith("/usages", StringComparison.Ordinal) ? Usages(!conflict || ++usageReads > 1) : request.RequestUri.AbsolutePath.EndsWith("profile-0", StringComparison.Ordinal) ? Snapshot() : Summaries(1)));
         using var context = Context(handler, Administrator());
         var cut = context.Render<Agentstration.Web.Components.Pages.ModelProfiles>();
-        await cut.Find(".collection-actions-panel button").ClickAsync(new());
+        await cut.Find(".collection-actions-panel button.danger-text").ClickAsync(new());
         if (conflict) await cut.Find("[role=alertdialog] .button-danger").ClickAsync(new());
         Assert.IsEmpty(cut.FindAll("[role=alertdialog]"));
         Assert.DoesNotContain("PRIVATE", cut.Markup, StringComparison.Ordinal);
@@ -170,15 +170,15 @@ public sealed class ModelProfileListTests
         Task action;
         if (snapshotPending)
         {
-            await cut.Find(".collection-actions-panel button").ClickAsync(new());
+            await cut.Find(".collection-actions-panel button.danger-text").ClickAsync(new());
             action = cut.Find("[role=alertdialog] .button-danger").ClickAsync(new());
         }
-        else action = cut.Find(".collection-actions-panel button").ClickAsync(new());
+        else action = cut.Find(".collection-actions-panel button.danger-text").ClickAsync(new());
         provider.Scope = ResourceScopeRef.Workspace(Guid.NewGuid()).Value;
         await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(CancellationToken.None));
         late.SetResult(snapshotPending ? Snapshot() : Usages(false));
         await action;
-        Assert.IsEmpty(cut.FindAll("[role=alertdialog], .collection-actions-panel button"));
+        Assert.IsEmpty(cut.FindAll("[role=alertdialog], .collection-actions-panel button.danger-text"));
         Assert.IsFalse(handler.Requests.Any(request => request.Method == HttpMethod.Delete));
     }
 
