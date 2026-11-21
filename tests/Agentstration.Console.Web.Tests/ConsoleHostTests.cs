@@ -240,11 +240,18 @@ public sealed class ConsoleHostTests
         var progress = await client.GetStringAsync("/startup/progress?ReturnUrl=%2F");
         StringAssert.Contains(progress, "bootstrap-startup-progress");
         StringAssert.Contains(progress, "Bootstrap in progress");
-        StringAssert.Contains(progress, "console-sidebar");
+        StringAssert.Contains(progress, "console-shell");
+        StringAssert.Contains(progress, "shell-brand");
+        Assert.IsFalse(progress.Contains("console-sidebar", StringComparison.Ordinal));
+        Assert.IsFalse(progress.Contains("context-selector-trigger", StringComparison.Ordinal));
+        Assert.IsFalse(progress.Contains("console-command-trigger", StringComparison.Ordinal));
         Assert.IsFalse(progress.Contains("bootstrap-startup-header", StringComparison.Ordinal));
         startup.Ready = true;
         using var ready = await client.GetAsync("/");
         Assert.AreEqual(HttpStatusCode.OK, ready.StatusCode);
+        var console = await ready.Content.ReadAsStringAsync();
+        StringAssert.Contains(console, "console-sidebar");
+        StringAssert.Contains(console, "console-command-trigger");
     }
 
     private static WebApplicationFactory<Program> CreateFactory(IBffSessionAuthorityClient? authority = null,

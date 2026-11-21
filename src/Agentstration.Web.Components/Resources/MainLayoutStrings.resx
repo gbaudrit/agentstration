@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
+  <data name="Brand" xml:space="preserve"><value>Agentstration</value></data>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>2.0</value></resheader>
   <data name="MainNavigation" xml:space="preserve"><value>Main navigation</value></data><data name="ControlPlaneHome" xml:space="preserve"><value>Agentstration Control Plane home</value></data><data name="OpenPlatformHealth" xml:space="preserve"><value>Open platform health</value></data><data name="Platform" xml:space="preserve"><value>Platform</value></data><data name="RequiresAttention" xml:space="preserve"><value>Requires attention</value></data>
   <data name="PlatformStatus.Connecting" xml:space="preserve"><value>Connecting</value></data><data name="PlatformStatus.Operational" xml:space="preserve"><value>Operational</value></data><data name="PlatformStatus.AttentionRequired" xml:space="preserve"><value>Attention required</value></data><data name="PlatformStatus.PartiallyUnavailable" xml:space="preserve"><value>Partially unavailable</value></data><data name="PlatformStatus.NoActiveDeployments" xml:space="preserve"><value>No active deployments</value></data><data name="PlatformStatus.Unavailable" xml:space="preserve"><value>Unavailable</value></data>

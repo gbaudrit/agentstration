@@ -13,127 +13,146 @@
 @inject IConsoleNavigationContext NavigationContext
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
-<div @ref="shellElement" class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-theme="@(Preferences.IsDarkTheme ? "dark" : "light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-context-kind="@ContextState.Current?.SelectedKind" data-context-scope="@ContextState.Current?.SelectedScopeRef" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
-    <aside class="sidebar" aria-label="@T("MainNavigation")" data-testid="console-sidebar">
-        <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
-            <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
-            <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup-dark.png" alt="" width="204" height="41" />
-        </a>
-        <nav class="side-nav">
-            @foreach (var group in NavigationGroups)
-            {
-                <section class="navigation-group navigation-group-@group.Tone" aria-label="@T(group.LabelKey)">
-                    @if (!string.IsNullOrWhiteSpace(group.LabelKey)) { <h2>@T(group.LabelKey)</h2> }
-                    @foreach (var item in group.Items)
-                    {
-                        @if (CanNavigate(item.RequiredPermissions))
+<div @ref="shellElement" class="app-shell @(!EnableNavigation ? "navigation-disabled" : null) @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-theme="@(Preferences.IsDarkTheme ? "dark" : "light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-context-kind="@ContextState.Current?.SelectedKind" data-context-scope="@ContextState.Current?.SelectedScopeRef" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
+    @if (EnableNavigation)
+    {
+        <aside class="sidebar" aria-label="@T("MainNavigation")" data-testid="console-sidebar">
+            <a class="brand-lockup" href="/" aria-label="@T("ControlPlaneHome")">
+                <span class="brand-mark brand-mark-compact" aria-hidden="true"><img src="_content/Agentstration.Web.Components/images/agentstration-mark.png" alt="" width="38" height="38" /></span>
+                <img class="brand-lockup-logo" src="_content/Agentstration.Web.Components/images/agentstration-lockup-dark.png" alt="" width="204" height="41" />
+            </a>
+            <nav class="side-nav">
+                @foreach (var group in NavigationGroups)
+                {
+                    <section class="navigation-group navigation-group-@group.Tone" aria-label="@T(group.LabelKey)">
+                        @if (!string.IsNullOrWhiteSpace(group.LabelKey)) { <h2>@T(group.LabelKey)</h2> }
+                        @foreach (var item in group.Items)
                         {
-                            <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" data-nav-tooltip="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
-                                <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@T(item.LabelKey)</span>
-                            </NavLink>
+                            @if (CanNavigate(item.RequiredPermissions))
+                            {
+                                <NavLink href="@item.Url" Match="@(item.Url is "/" or "/settings" ? NavLinkMatch.All : NavLinkMatch.Prefix)" aria-label="@T(item.LabelKey)" data-nav-tooltip="@T(item.LabelKey)" class="@($"domain-{item.Domain}")">
+                                    <span class="nav-icon" aria-hidden="true"><UiIcon Name="@item.Icon" /></span><span class="nav-label">@T(item.LabelKey)</span>
+                                </NavLink>
+                            }
                         }
-                    }
-                </section>
-            }
-        </nav>
-        <a class="sidebar-footer" href="/" aria-label="@T("OpenPlatformHealth")">
-            @if (StatusContent is not null) { @StatusContent }
-            else
-            {
-                <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatusLabel" Status="@PlatformStatus.Status" />
-                @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>@T("RequiresAttention")</small> }
-            }
-        </a>
-    </aside>
+                    </section>
+                }
+            </nav>
+            <a class="sidebar-footer" href="/" aria-label="@T("OpenPlatformHealth")">
+                @if (StatusContent is not null) { @StatusContent }
+                else
+                {
+                    <HealthIndicator Label="@T("Platform")" StatusText="@PlatformStatusLabel" Status="@PlatformStatus.Status" />
+                    @if (PlatformStatus.Status is UiStatus.Warning or UiStatus.Danger) { <small>@T("RequiresAttention")</small> }
+                }
+            </a>
+        </aside>
+    }
 
     <div class="workspace">
         <header class="topbar">
             <div class="topbar-start">
-                <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="@T("ToggleNavigation")" aria-expanded="@(!Navigation.IsSidebarCollapsed)" data-testid="console-sidebar-toggle">☰</button>
-                <nav class="breadcrumb" aria-label="@T("CurrentContext")" data-testid="console-breadcrumb"><span>@CurrentContextPath</span><span>/</span><strong>@CurrentSection</strong></nav>
-            </div>
-            <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" disabled="@(!EnableCommandPalette)" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")" data-testid="console-command-trigger">
-                <UiIcon Name="search" /><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
-            </button>
-            <div class="topbar-actions">
-                @if (ContextState.Current is { } context)
+                @if (EnableNavigation)
                 {
-                    <div class="context-switcher">
-                        <button type="button" class="context-switcher-trigger" @onclick="ToggleContextSelector" disabled="@switchingContext" aria-haspopup="dialog" aria-expanded="@contextSelectorOpen" aria-label="@T("ChangeContext")" data-testid="context-selector-trigger">
-                            <span class="context-kind">@ContextKindLabel(context.SelectedKind)</span>
-                            <span class="context-name">@SelectedContextLabel(context)</span>
-                            <span aria-hidden="true">⌄</span>
-                        </button>
-                        @if (contextSelectorOpen)
-                        {
-                            <section class="context-selector-popover" role="dialog" aria-label="@T("ChooseContext")" data-testid="context-selector">
-                                <header><strong>@T("ChooseContext")</strong><button type="button" class="context-selector-close" @onclick="ToggleContextSelector" aria-label="@T("CloseContextSelector")">×</button></header>
-                                <label class="context-selector-search"><span class="sr-only">@T("SearchContexts")</span><UiIcon Name="search" /><input value="@contextQuery" @oninput="UpdateContextQuery" placeholder="@T("SearchContexts")" data-testid="context-selector-search" /></label>
-                                <div class="context-selector-options">
-                                    @if (IsFilteringContexts)
-                                    {
-                                        @foreach (var option in FilteredContexts)
-                                        {
-                                            <button type="button" class="context-option context-option-search-result context-option-@option.Kind.ToString().ToLowerInvariant() @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="@($"context-option-{option.Kind.ToString().ToLowerInvariant()}")">
-                                                <span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
-                                            </button>
-                                        }
-                                    }
-                                    else
-                                    {
-                                        @foreach (var option in InstanceContexts)
-                                        {
-                                            <button type="button" class="context-option context-option-instance context-option-root @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-instance">
-                                                <span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
-                                            </button>
-                                        }
-                                        <div class="context-tenant-tree">
-                                            @foreach (var group in ContextTenantGroups)
-                                            {
-                                                <section class="context-tenant-group" data-tenant-id="@group.TenantId">
-                                                    @if (group.Tenant is { } tenant)
-                                                    {
-                                                        <button type="button" class="context-option context-option-tenant @(tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(tenant)" aria-current="@(tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@tenant.TenantId" data-context-scope-ref="@tenant.ScopeRef" data-testid="context-option-tenant">
-                                                            <span><strong>@tenant.DisplayName</strong><small>@ContextOptionPath(tenant)</small></span><span class="context-kind">@ContextKindLabel(tenant.Kind)</span>
-                                                        </button>
-                                                    }
-                                                    else
-                                                    {
-                                                        <div class="context-tenant-label"><strong>@group.DisplayName</strong></div>
-                                                    }
-                                                    @if (group.Workspaces.Count > 0)
-                                                    {
-                                                        <div class="context-tenant-workspaces">
-                                                            @foreach (var workspace in group.Workspaces)
-                                                            {
-                                                                <button type="button" class="context-option context-option-workspace @(workspace.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(workspace)" aria-current="@(workspace.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@workspace.TenantId" data-context-workspace-id="@workspace.WorkspaceId" data-context-workspace-name="@workspace.WorkspaceName" data-context-scope-ref="@workspace.ScopeRef" data-testid="context-option-workspace">
-                                                                    <span><strong>@workspace.DisplayName</strong><small>@workspace.TenantDisplayName</small></span><span class="context-kind">@ContextKindLabel(workspace.Kind)</span>
-                                                                </button>
-                                                            }
-                                                        </div>
-                                                    }
-                                                </section>
-                                            }
-                                        </div>
-                                    }
-                                    @if (FilteredContexts.Count == 0) { <p class="context-selector-empty">@T("NoContextMatch")</p> }
-                                </div>
-                            </section>
-                        }
-                    </div>
+                    <button class="icon-button" @onclick="Navigation.ToggleSidebar" aria-label="@T("ToggleNavigation")" aria-expanded="@(!Navigation.IsSidebarCollapsed)" data-testid="console-sidebar-toggle">☰</button>
+                    <nav class="breadcrumb" aria-label="@T("CurrentContext")" data-testid="console-breadcrumb"><span>@CurrentContextPath</span><span>/</span><strong>@CurrentSection</strong></nav>
                 }
-                <EnvironmentSwitcher />
+                else
+                {
+                    <span class="shell-brand"><img src="@($"_content/Agentstration.Web.Components/images/agentstration-lockup-{(Preferences.IsDarkTheme ? "dark" : "light")}.png")" alt="@T("Brand")" width="204" height="41" /></span>
+                }
+            </div>
+            @if (EnableNavigation)
+            {
+                <button class="command-palette-trigger" type="button" @onclick="OpenCommandPalette" disabled="@(!EnableCommandPalette)" aria-keyshortcuts="Control+K" aria-haspopup="dialog" aria-expanded="@commandPaletteOpen" title="@T("OpenCommandPalette")" data-testid="console-command-trigger">
+                    <UiIcon Name="search" /><span>@T("SearchPagesCommands")</span><kbd>Ctrl K</kbd>
+                </button>
+            }
+            <div class="topbar-actions">
+                @if (EnableNavigation)
+                {
+                    @if (ContextState.Current is { } context)
+                    {
+                        <div class="context-switcher">
+                            <button type="button" class="context-switcher-trigger" @onclick="ToggleContextSelector" disabled="@switchingContext" aria-haspopup="dialog" aria-expanded="@contextSelectorOpen" aria-label="@T("ChangeContext")" data-testid="context-selector-trigger">
+                                <span class="context-kind">@ContextKindLabel(context.SelectedKind)</span>
+                                <span class="context-name">@SelectedContextLabel(context)</span>
+                                <span aria-hidden="true">⌄</span>
+                            </button>
+                            @if (contextSelectorOpen)
+                            {
+                                <section class="context-selector-popover" role="dialog" aria-label="@T("ChooseContext")" data-testid="context-selector">
+                                    <header><strong>@T("ChooseContext")</strong><button type="button" class="context-selector-close" @onclick="ToggleContextSelector" aria-label="@T("CloseContextSelector")">×</button></header>
+                                    <label class="context-selector-search"><span class="sr-only">@T("SearchContexts")</span><UiIcon Name="search" /><input value="@contextQuery" @oninput="UpdateContextQuery" placeholder="@T("SearchContexts")" data-testid="context-selector-search" /></label>
+                                    <div class="context-selector-options">
+                                        @if (IsFilteringContexts)
+                                        {
+                                            @foreach (var option in FilteredContexts)
+                                            {
+                                                <button type="button" class="context-option context-option-search-result context-option-@option.Kind.ToString().ToLowerInvariant() @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="@($"context-option-{option.Kind.ToString().ToLowerInvariant()}")">
+                                                    <span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
+                                                </button>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            @foreach (var option in InstanceContexts)
+                                            {
+                                                <button type="button" class="context-option context-option-instance context-option-root @(option.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(option)" aria-current="@(option.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-testid="context-option-instance">
+                                                    <span><strong>@option.DisplayName</strong><small>@ContextOptionPath(option)</small></span><span class="context-kind">@ContextKindLabel(option.Kind)</span>
+                                                </button>
+                                            }
+                                            <div class="context-tenant-tree">
+                                                @foreach (var group in ContextTenantGroups)
+                                                {
+                                                    <section class="context-tenant-group" data-tenant-id="@group.TenantId">
+                                                        @if (group.Tenant is { } tenant)
+                                                        {
+                                                            <button type="button" class="context-option context-option-tenant @(tenant.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(tenant)" aria-current="@(tenant.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@tenant.TenantId" data-context-scope-ref="@tenant.ScopeRef" data-testid="context-option-tenant">
+                                                                <span><strong>@tenant.DisplayName</strong><small>@ContextOptionPath(tenant)</small></span><span class="context-kind">@ContextKindLabel(tenant.Kind)</span>
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="context-tenant-label"><strong>@group.DisplayName</strong></div>
+                                                        }
+                                                        @if (group.Workspaces.Count > 0)
+                                                        {
+                                                            <div class="context-tenant-workspaces">
+                                                                @foreach (var workspace in group.Workspaces)
+                                                                {
+                                                                    <button type="button" class="context-option context-option-workspace @(workspace.ScopeRef == context.SelectedScopeRef ? "selected" : null)" @onclick="() => SelectContextAsync(workspace)" aria-current="@(workspace.ScopeRef == context.SelectedScopeRef ? "true" : null)" data-context-tenant-id="@workspace.TenantId" data-context-workspace-id="@workspace.WorkspaceId" data-context-workspace-name="@workspace.WorkspaceName" data-context-scope-ref="@workspace.ScopeRef" data-testid="context-option-workspace">
+                                                                        <span><strong>@workspace.DisplayName</strong><small>@workspace.TenantDisplayName</small></span><span class="context-kind">@ContextKindLabel(workspace.Kind)</span>
+                                                                    </button>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    </section>
+                                                }
+                                            </div>
+                                        }
+                                        @if (FilteredContexts.Count == 0) { <p class="context-selector-empty">@T("NoContextMatch")</p> }
+                                    </div>
+                                </section>
+                            }
+                        </div>
+                    }
+                    <EnvironmentSwitcher />
+                }
                 <button class="icon-button" @onclick="ToggleThemeAsync" disabled="@Preferences.IsSaving" aria-label="@T("ToggleColorTheme")" data-testid="theme-toggle" title="@(Preferences.Error ?? F("ThemeValue", Preferences.Theme))"><UiIcon Name="@(Preferences.IsDarkTheme ? "theme-light" : "theme-dark")" /></button>
-                <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")" data-testid="console-notifications-trigger"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
-                <a class="icon-button" href="/settings/profile" aria-label="@T("Nav.Profile")" title="@T("Nav.Profile")"><UiIcon Name="user-circle" /></a>
-                <a class="icon-button" href="/account/security" aria-label="@T("AccountSecurity")" title="@T("AccountSecurity")"><UiIcon Name="shield-check" /></a>
+                @if (EnableNavigation)
+                {
+                    <button class="icon-button notification-button" @onclick="Notifications.TogglePanel" aria-label="@T("Notifications")" data-testid="console-notifications-trigger"><span aria-hidden="true">♢</span>@if (Notifications.UnreadCount > 0) { <span class="notification-count">@Notifications.UnreadCount</span> }</button>
+                    <a class="icon-button" href="/settings/profile" aria-label="@T("Nav.Profile")" title="@T("Nav.Profile")"><UiIcon Name="user-circle" /></a>
+                    <a class="icon-button" href="/account/security" aria-label="@T("AccountSecurity")" title="@T("AccountSecurity")"><UiIcon Name="shield-check" /></a>
+                }
                 <a class="icon-button" href="/logout" aria-label="@T("SignOut")" title="@T("SignOut")"><UiIcon Name="log-out" /></a>
             </div>
         </header>
         <main class="content" id="main-content">@Body</main>
     </div>
 
-    @if (Notifications.IsPanelOpen)
+    @if (EnableNavigation && Notifications.IsPanelOpen)
     {
         <aside class="notification-panel" aria-label="@T("Notifications")" data-testid="console-notifications-panel">
             <header><div><p class="eyebrow">@T("Activity")</p><h2>@T("Notifications")</h2></div><button class="icon-button" @onclick="Notifications.TogglePanel" aria-label="@T("CloseNotifications")">×</button></header>
@@ -142,7 +161,7 @@
         </aside>
     }
 
-    @if (commandPaletteOpen)
+    @if (EnableNavigation && commandPaletteOpen)
     {
         <div class="command-palette-backdrop" @onclick="CloseCommandPalette">
             <section class="command-palette" role="dialog" aria-modal="true" aria-label="@T("CommandPalette")" @onclick:stopPropagation="true" data-testid="console-command-palette">

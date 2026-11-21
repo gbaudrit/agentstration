@@ -83,8 +83,20 @@ public sealed class BootstrapStartupProgressTests
         StringAssert.Contains(System.Net.WebUtility.HtmlDecode(cut.Markup), title);
         StringAssert.Contains(cut.Find("[role='tabpanel']").TextContent, modelLabel);
         StringAssert.Contains(cut.Find("[role='tabpanel']").TextContent, "model:exact");
-        Assert.AreEqual("/modelproviders/provider?namespace=other&scopeRef=%2Finstance&context=%2Finstance", cut.Find("[role='tabpanel'] a").GetAttribute("href"));
+        Assert.AreEqual(0, cut.FindAll("[role='tabpanel'] a").Count);
         Assert.AreEqual(1, api.Reads);
+    }
+
+    [TestMethod]
+    public void StartupLayoutUsesTheStandardFrameWithoutNavigation()
+    {
+        using var context = Context(new StartupClient());
+        var cut = context.Render<BootstrapStartupLayout>(p => p.Add(x => x.Body, builder => builder.AddContent(0, "Progress body")));
+        Assert.IsFalse(cut.FindComponent<MainLayout>().Instance.EnableNavigation);
+        Assert.AreEqual(1, cut.FindAll("[data-testid='console-shell']").Count);
+        Assert.AreEqual(0, cut.FindAll(".sidebar, .context-switcher, .command-palette-trigger").Count);
+        Assert.AreEqual("/logout", cut.FindAll("a[href]").Single().GetAttribute("href"));
+        StringAssert.Contains(cut.Find("main").TextContent, "Progress body");
     }
 
     [TestMethod]

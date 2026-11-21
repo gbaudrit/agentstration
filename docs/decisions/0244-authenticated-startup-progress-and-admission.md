@@ -83,3 +83,14 @@ operational dashboard reads. The command palette can be disabled by the adapter
 while its underlying destinations remain fenced. The shared layout has no
 Bootstrap contract or orchestration dependency. This presentation refinement
 preserves the admission, observation and readiness decisions above.
+
+## Navigation refinement — 2026-11-21
+
+The maintainer requires the standard frame without access to navigation or scope
+changes during Bootstrap. MainLayout now offers an opt-in navigation-disabled
+presentation: no sidebar, upper menus, context selector or command palette; the
+standard full logo, theme control and sign-out remain. Bootstrap selects that
+presentation and omits provider repair links from progress panels. Normal Console
+navigation returns after readiness. The existing API admission and execution
+boundaries remain authoritative; this change adds no new shell or Bootstrap
+dependency to the shared layout.

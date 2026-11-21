@@ -697,12 +697,15 @@ stage until the administrator selects another stage; following can be resumed.
 Model/provider details are activity data in the generic resource panel. No panel
 is specific to an extension or provider implementation.
 
-The page uses the existing Console layout, navigation, context selector, theme and
-session actions. Its layout adapter supplies startup status instead of loading
-operational dashboard statistics. The command palette stays disabled until
-ordinary Console access resumes; direct document navigation returns to progress
-while execution APIs remain fenced. Stage completion, dependency facts and
-resource outcomes use the same visual primitives as other Console pages.
+The page uses the existing Console layout with navigation disabled: the full
+brand logo and a light toolbar retain only theme selection and sign-out. The
+sidebar, upper navigation, context/environment selectors, command palette,
+notifications and account links are absent. Progress panels expose dependency
+facts without repair-navigation links. Its layout adapter supplies startup status
+instead of loading operational dashboard statistics. Ordinary navigation and
+scope selection return with the standard Console after readiness. Direct document
+navigation still returns to progress while execution APIs remain fenced. Stage
+completion and resource outcomes use the same visual primitives as other pages.
 
 The page reads `GET /api/bootstrap/startup` every two seconds. This PlatformAdmin
 endpoint returns an attempt identity, revision, stage states, safe dependency

@@ -1,7 +1,7 @@
 @inherits LayoutComponentBase
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
 
-<MainLayout SectionTitle="@Localizer["Title"]" EnableCommandPalette="false" Body="@Body">
+<MainLayout SectionTitle="@Localizer["Title"]" EnableNavigation="false" EnableCommandPalette="false" Body="@Body">
     <StatusContent>
         <HealthIndicator Label="@Localizer["Brand"]" StatusText="@Localizer["Title"]" Status="UiStatus.Info" />
     </StatusContent>

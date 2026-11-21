@@ -24,12 +24,6 @@
             @if (activity.ExtensionId is not null) { <div><dt>@Localizer["Extension"]</dt><dd><code>@activity.ExtensionId</code></dd></div> }
             @if (activity.ContributionId is not null) { <div><dt>@Localizer["Contribution"]</dt><dd>@activity.ContributionId</dd></div> }
         </dl>
-        @if (activity.ProviderName is { } provider)
-        {
-            var providerUrl = ConsoleResourceUrls.Resource("/modelproviders", provider, ResourceNamespace.Parse(activity.ProviderNamespace),
-                activity.ProviderScopeRef is { } scope ? ResourceScopeRef.Parse(scope) : null);
-            <div class="startup-step-actions"><a class="button-secondary" href="@providerUrl"><UiIcon Name="settings" />@Localizer["OpenProvider"]</a></div>
-        }
     }
     @if (StepId == "resources")
     {
