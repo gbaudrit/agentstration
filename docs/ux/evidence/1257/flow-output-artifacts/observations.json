@@ -1,0 +1,89 @@
+{
+  "browser": "System Chromium, headless; isolated deterministic Web; frozen Release binaries",
+  "sourceProofEncoding": "SHA-256 of UTF-8 text with LF line endings",
+  "sourceProof": {
+    "src/Agentstration.Console.Components/Components/DurableArtifactResourcePreview.razor": "6a8d3af3709dd498068237a5b197593fec1cdbeb5feff682d13317cb34ca378b",
+    "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor": "efec685bbfb8e1e2568d98e55def6349477c398cb05ae41a81d209fcf6273e8c",
+    "src/Agentstration.Console.Components/Components/Flows/FlowRunOutput.razor": "e2589b526adaf919b58197ec2bb536c45f94ee580d835858e427dce5124a6fa6",
+    "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor": "c30a8864cede8f79dd44be47f9e35040e41701b5593bd172ea98a96be0ffbd2a",
+    "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor.css": "d2ef3f3314703f8a950813c2a922ccf7b0debc3532654defb60d10507a29b591",
+    "src/Agentstration.Web.Components/CollectionActions.razor": "310d2030838c80d090f6488d8271774facd7d998153a50a19528af529e72ca07",
+    "src/Agentstration.Web.Components/CollectionView.razor": "93e933abd6791e5a3661d21baac1ee0463127f30198a81afceaa9ba9fc792cef",
+    "src/Agentstration.Web.Components/ModalFrame.razor": "2f41cd1f5928c31e8c53b4c4e2be0ad69f0c0da255ac747864cd65ede039fdea",
+    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "a155d0ed78831aa2abf8480c09521d112d8866d0473bb3e6d0f8ba566a8c8bd8",
+    "src/Agentstration.Web.Components/ResourceNavigation.razor": "56ba15b89dc694e1d5df308746330f80bbe82a7c6282784d9b7176f78aa46025",
+    "src/Agentstration.Web.Components/ResourceSummary.razor": "12600afa42c43c5285bff9258e9de215ee0d403bf1837f01e1983abe7c5de1c4",
+    "src/Agentstration.Web.Components/ResourceSummary.razor.css": "459280f1d102433019ce02ca8f76c80bd2ada56708df7341b133ef8648680fdf",
+    "src/Agentstration.Web.Components/ValueDisclosure.razor": "ca0d72f0afcd4a22bc2c2f0999f5322e8471735feb18a612a04073bb2320cb6d",
+    "src/Agentstration.Web.Components/wwwroot/preview-location.js": "98c9c6569437d1aeca8520a7e9a00b4c6432fcb95649e470221cd19204e46753",
+    "src/Agentstration.Web.Components/wwwroot/resource-navigation.js": "2b5359a7a4446dceb8fe478c9116d6ea5502ccf16c3371cf3a9cd2bfc62af128"
+  },
+  "cases": [
+    {
+      "key": "flow-output-artifact-en-US-light-1440",
+      "id": "flow-output-artifact",
+      "status": "passed",
+      "screenshot": "flow-output-artifact-en-US-light-1440.png",
+      "checks": [
+        "cold exact direct address",
+        "row menu keyboard Escape/focus and mobile touch",
+        "independent initially open saved disclosures and hidden view selector",
+        "responsive bounds and reachable close",
+        "native Open overview and browser Back",
+        "no edit shortcut for readonly resource",
+        "reload exact saved address",
+        "explicit close and native same-fragment reopening"
+      ]
+    },
+    {
+      "key": "flow-output-artifact-fr-FR-dark-1440",
+      "id": "flow-output-artifact",
+      "status": "passed",
+      "screenshot": "flow-output-artifact-fr-FR-dark-1440.png",
+      "checks": [
+        "cold exact direct address",
+        "row menu keyboard Escape/focus and mobile touch",
+        "independent initially open saved disclosures and hidden view selector",
+        "responsive bounds and reachable close",
+        "native Open overview and browser Back",
+        "no edit shortcut for readonly resource",
+        "reload exact saved address",
+        "explicit close and native same-fragment reopening"
+      ]
+    },
+    {
+      "key": "flow-output-artifact-en-US-dark-390",
+      "id": "flow-output-artifact",
+      "status": "passed",
+      "screenshot": "flow-output-artifact-en-US-dark-390.png",
+      "checks": [
+        "cold exact direct address",
+        "row menu keyboard Escape/focus and mobile touch",
+        "independent initially open saved disclosures and hidden view selector",
+        "responsive bounds and reachable close",
+        "native Open overview and browser Back",
+        "no edit shortcut for readonly resource",
+        "reload exact saved address",
+        "explicit close and native same-fragment reopening"
+      ]
+    },
+    {
+      "key": "flow-output-artifact-fr-FR-light-390",
+      "id": "flow-output-artifact",
+      "status": "passed",
+      "screenshot": "flow-output-artifact-fr-FR-light-390.png",
+      "checks": [
+        "cold exact direct address",
+        "row menu keyboard Escape/focus and mobile touch",
+        "independent initially open saved disclosures and hidden view selector",
+        "responsive bounds and reachable close",
+        "native Open overview and browser Back",
+        "no edit shortcut for readonly resource",
+        "reload exact saved address",
+        "explicit close and native same-fragment reopening"
+      ]
+    }
+  ],
+  "toolInvocationCount": 0,
+  "modelGenerationCount": 0
+}

@@ -267,3 +267,7 @@ Regression ownership: `SecurityAuditCollectionTests`. This is an explicit non-re
 ### Cleanup resource candidates
 
 Agent, Flow and Entry deletion candidates with known owners offer saved Preview through existing adapters. Native run/task candidates remain operational evidence. Candidate rows do not infer governance or definition editability; family quick actions resolve saved authorization. Current administrative context is retained. Deletion ordering, selection and confirmation/ETag behavior stay independent. Context replacement closes Preview and rejects stale inventory responses.
+
+### Produced Flow Artifacts
+
+The native run output catalog contains persisted durable Artifact resources. Its direct Inspect stays available alongside Open and Preview. The run host owns the Preview shell outside lazily visited sections, so direct/reload/history fragments work before the output tab has been visited. The existing exact Artifact adapter and saved Summary are reused; output JSON, run filtering, content and materialization behavior stay native.

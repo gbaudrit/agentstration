@@ -1265,6 +1265,36 @@
         "CleanupConsoleTests"
       ],
       "validation": "Release component build passed; 5 Cleanup component tests passed, including lazy exact-address resource inspection and existing fresh-ETag/confirmed deletion regressions. Browser/final broad checks pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowRunOutput.razor",
+      "routes": [
+        "/flow-runs/{RunId}#input-output"
+      ],
+      "rowTypes": [
+        "FlowRunArtifactResource"
+      ],
+      "family": "Flow output Artifacts",
+      "status": "implemented-validation-pending",
+      "coordinates": "Actual durable Artifact owner/namespace/name in the existing run-output metadata catalog.",
+      "overview": "Existing /artifacts/durable/{ArtifactId}#overview preserving execution owner and logical administrative context.",
+      "edit": "Immutable output Artifact; no definition Edit.",
+      "rowActions": [
+        "Inspect (existing primary)",
+        "Open",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open full Artifact overview"
+      ],
+      "summary": "Existing DurableArtifactResourceSummary, shared with native full overview and primary Artifact catalog.",
+      "loader": "Existing exact Artifact metadata adapter, hosted outside conditionally visited run sections so direct/reload/off-window fragments mount independently.",
+      "tests": [
+        "FlowRunOutputTests",
+        "DurableArtifactResourcePreviewTests",
+        "ResourceNavigationTests"
+      ],
+      "validation": "Release component build passed; existing output metadata/filter/localization regressions passed with exact Preview-request coordinate assertions and no content reads. Browser/final broad checks pending."
     }
   ],
   "surfaces": [
@@ -5375,7 +5405,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted-durable-artifact-preview",
+      "reason": "Actual persisted FlowRunArtifactResource metadata delegates to the existing exact Artifact adapter; returned execution JSON remains native run output."
     },
     {
       "id": "flow-process-ordered-units",
