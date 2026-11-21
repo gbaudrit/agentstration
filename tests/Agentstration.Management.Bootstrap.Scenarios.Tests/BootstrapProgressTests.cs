@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Management.Tests;
 
+[TestClass]
 public sealed partial class DeclarativeBootstrapTests
 {
     [TestMethod]
@@ -199,6 +200,14 @@ public sealed partial class DeclarativeBootstrapTests
             Assert.IsFalse(await restarted.ProcessNextAsync(default));
         }
         finally { execution.Release(); }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx")))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new InvalidOperationException("The Agentstration repository root could not be located.");
     }
 
     private static WebApplicationFactory<Program> LoadTestFactory(LoadTestGate? gate = null) =>

@@ -71,6 +71,8 @@ Each JSON report records total/passed/failed test counts, TRX availability, proc
 
 The [CI memory investigation for PR #1181](ci-memory-1181.md) retains the evidence and its limits. All three resource-family modules enforce the original 2432 MiB failure ceiling. The split bounds the workload retained in each process; it does not establish or repair a product memory leak.
 
+Bootstrap retains its original 500/700 MiB warning/failure limits in both the framework and scenario processes. The [PR #1224 investigation](ci-memory-1224.md) records the cumulative working-set breach and the unchanged 60-case inventory. Both modules remain in Integration and coverage shard A; module concurrency is unchanged.
+
 The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. `Agentstration.Management.Api.Tests` was recalibrated during #745 from 108-test Release runs: 1784.1 MiB peak working set on Ubuntu 24.04.5 with .NET 10.0.12 and 1757.6 MiB on Windows 11 10.0.26200 with .NET 10.0.11. `Agentstration.Management.Security.Tests` was recalibrated from 59-test runs in the same change: 1193.7 MiB on Ubuntu and 1127.6 MiB on Windows. The consolidated `Agentstration.Api.Tests` baseline was collected on the same Windows build with .NET 10.0.11 during #142: 191 tests in 200 seconds, 1503.7 MiB peak working set, 1176.6 MiB peak private memory, and 1621.2 MiB aggregate `dotnet` working set. A warning is evidence to review the Linux and Windows trend; a failure caps regression relative to the retained baseline. Adjust these values only after retaining representative artifacts from both runner families.
 
 | Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
@@ -83,6 +85,7 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 | `Agentstration.Api.Artifacts.Tests` | Pending after resource-family split | 2048 | 2432 | 39 |
 | `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2560 | 112 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 31 |
+| `Agentstration.Management.Bootstrap.Scenarios.Tests` | Pending CI baseline after split | 500 | 700 | 10 |
 | `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1664 | 64 |
 | `Agentstration.Management.Aep.Tests` | 763.4 | 832 | 1024 | 29 |
 
@@ -117,7 +120,8 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Api.DataSources.Tests` | Integration | Data Source acquisition, Knowledge Snapshots and structured Storage |
 | `Agentstration.Api.Artifacts.Tests` | Integration | Artifact APIs, processing and storage-backed content |
 | `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
-| `Agentstration.Management.Bootstrap.Tests` | Integration | Declarative bootstrap catalog, application, and hosted startup scenarios using the API-only test profile |
+| `Agentstration.Management.Bootstrap.Tests` | Integration | Bootstrap framework, catalog, enrollment and startup contracts using the API-only test profile |
+| `Agentstration.Management.Bootstrap.Scenarios.Tests` | Integration | Durable profile application/progress and versioned Assistant/documentation profile scenarios |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
