@@ -19,6 +19,7 @@
     private string? previousContext;
     private bool contextEstablished;
     private string collectionPath = string.Empty;
+    private string returnFragment = string.Empty;
     private string? observedNavigation;
     private IJSObjectReference? module;
     private IJSObjectReference? browserObserver;
@@ -55,6 +56,8 @@
         if (!Enabled || disposed) return;
         if (!SupportsKind(target.Kind) || target.ScopeRef == default)
             throw new ArgumentException("A collection preview requires an exact address of its resource kind.", nameof(target));
+        var currentFragment = Navigation.ToAbsoluteUri(Navigation.Uri).Fragment;
+        if (!currentFragment.StartsWith("#preview/", StringComparison.Ordinal)) returnFragment = currentFragment;
         var fragment = string.Join('/', "preview", Uri.EscapeDataString(target.Kind), Uri.EscapeDataString(target.ScopeRef.Value),
             Uri.EscapeDataString(target.Namespace.Value), Uri.EscapeDataString(target.Name));
         Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + fragment);
@@ -69,7 +72,7 @@
         var wasOpen = address is not null;
         address = null;
         if (!disposed && IsCollectionLocation() && (wasOpen || Navigation.ToAbsoluteUri(Navigation.Uri).Fragment.StartsWith("#preview/", StringComparison.Ordinal)))
-            Navigation.NavigateTo(Navigation.Uri.Split('#')[0], replace: true);
+            Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + returnFragment, replace: true);
         if (!disposed) StateHasChanged();
     }
 

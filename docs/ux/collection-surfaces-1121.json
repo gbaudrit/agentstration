@@ -7504,6 +7504,38 @@
         "routeEvidence": [],
         "interpretation": "Final inventory-only reconciliation of upstream 67784be2 saved configuration frame; protected detail UI unchanged, no new browser claim."
       }
+    },
+    {
+      "id": "data-source-query-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceQueryResourceSummary.razor",
+      "line": 19,
+      "host": "console",
+      "routes": [
+        "/data-sources/{Name}#queries"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Parameter configuration shared between overview and lazy exact-address Preview; current validation is recorded in collection-previews-1257.md."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
+        "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
+      }
     }
   ],
   "specialized": [
@@ -19138,6 +19170,11 @@
       "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Shared saved Artifact configuration values used by native full overview and metadata-only Preview. No content/backend/record dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DataSourceQueryResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Saved Data Source Query configuration is shared by the native embedded query overview and exact-address Preview. Draft JSON remains in the existing native editor."
     }
   ],
   "reconciliation": {

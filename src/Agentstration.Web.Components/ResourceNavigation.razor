@@ -116,6 +116,18 @@
         if (disposed || BaseUri(location) != identity) return;
         var uri = new Uri(location);
         var requested = uri.Fragment.Length > 0 ? uri.Fragment[1..] : string.Empty;
+        // A collection Preview owns this reserved fragment. Keep the native section
+        // mounted and never canonicalize away its exact-address history entry.
+        if (requested.StartsWith("preview/", StringComparison.Ordinal) && requested.Length <= 2048)
+        {
+            if (CurrentPath is null || !CanSelect(CurrentPath))
+            {
+                CurrentPath = DefaultPath is not null && CanSelect(DefaultPath) ? DefaultPath : Items.FirstOrDefault(item => CanSelect(item.Path))?.Path;
+                notifyPending = true;
+            }
+            observedLocation = location; canonicalPending = null; unavailable = false;
+            return;
+        }
         string? selected = ValidPath(requested) && CanSelect(requested) ? requested : null;
         if (selected is null && entries.TryGetValue(requested, out var group) && !group.Navigable && IsVisible(requested) && IsEnabled(requested))
             selected = Items.FirstOrDefault(item => Parent(item.Path) == requested && CanSelect(item.Path))?.Path;

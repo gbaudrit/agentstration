@@ -51,13 +51,19 @@
             <OverviewSummary Context="identity">@if (source is not null) { <DataSourceResourceSummary ConfigurationTestId="dataset-configuration-summary" Resource="source" Identity="identity" ServiceDisplayName="@SavedService?.Definition.DisplayName" OperationDisplayName="@SavedOperationLabel" StorageDisplayName="@SavedStorageLabel"><AdditionalContent>@OverviewContent</AdditionalContent></DataSourceResourceSummary> }</OverviewSummary>
 
             <DefinitionContent Context="path">@form</DefinitionContent>
-            <AdditionalContent Context="path">@if (path == "acquisitions") { @AcquisitionsContent } else if (path == "content") { @ContentView } else if (source is not null) { <FormSection Title="@T(path == "tools" ? "Tools" : "Queries")"><DataSourceQueries @key="source.Uid" Source="source" ShowTools="@(path == "tools")" Acquisitions="history" /></FormSection> }</AdditionalContent>
+            <AdditionalContent Context="path">@if (path == "acquisitions") { @AcquisitionsContent } else if (path == "content") { @ContentView } else if (source is not null) { <FormSection Title="@T(path == "tools" ? "Tools" : "Queries")"><DataSourceQueries @key="source.Uid" Source="source" PreviewRequested="OpenQueryPreview" ShowTools="@(path == "tools")" Acquisitions="history" /></FormSection> }</AdditionalContent>
             <DraftActions><button class="text-button" type="button" disabled="@(busy || resourceRefreshing)" @onclick="CancelDefinitionAsync">@T("SourceDiscard")</button><button class="button-primary" type="submit" form="data-source-dataset-definition" data-testid="data-source-save" disabled="@(busy || resourceRefreshing)">@T("Save")</button></DraftActions>
         </ConsoleResourceDetailsTemplate>
     }
 }
 
+<ResourceCollectionPreview @ref="queryPreview" ResourceKind="@DataSourceResourceKinds.DataSourceQuery" ContextKey="@($"{Name}|{Namespace}|{ScopeRef}|{ResourceOwnershipContext.TryGetCurrent(Services)}")" Enabled="@(source is not null)">
+    <ChildContent Context="address"><DataSourceQueryResourcePreview Address="address" OverviewHref="" DefinitionHref="" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? queryPreview;
+    private void OpenQueryPreview(ScopedResourceAddress address) => queryPreview?.Open(address);
     [Parameter] public string? Name { get; set; }
     [Parameter] public string? Namespace { get; set; }
     [Parameter] public string? ScopeRef { get; set; }

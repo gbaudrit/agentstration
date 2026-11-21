@@ -11,6 +11,20 @@ public sealed class ResourceCollectionPreviewTests
     private static readonly ScopedResourceAddress Target = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001")), new("team.demo"), "Agent", "same-name");
 
     [TestMethod]
+    public async Task ClosingAnEmbeddedPreviewRestoresItsNativeSectionFragment()
+    {
+        using var context = Context();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/agents?context=%2Finstance#queries");
+        var cut = Render(context);
+        await cut.InvokeAsync(() => cut.Instance.Open(Target));
+        await cut.InvokeAsync(cut.Instance.Close);
+        Assert.AreEqual("#queries", new Uri(navigation.Uri).Fragment);
+        Assert.Contains("context=%2Finstance", navigation.Uri);
+        Assert.IsEmpty(cut.FindAll("dialog"));
+    }
+
+    [TestMethod]
     public async Task ServerNavigationShowsTheSelectionBeforeTheBrowserAcknowledgesTheFragment()
     {
         using var context = Context();

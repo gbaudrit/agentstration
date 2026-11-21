@@ -33,14 +33,17 @@ public sealed class DataSourceQueryViewsTests
         var page = context.Render<DataSourceQueries>(p => p.Add(c => c.Source, handler.Source));
         page.WaitForElement("[data-testid=dataset-query-row]");
         Assert.AreEqual("default/only-alpha", page.Find("[data-testid=dataset-query-row] .copyable-value code").TextContent);
-        Assert.Contains("Only alpha", page.Find("[data-testid=dataset-query-row] .collection-identity-button").TextContent);
+        Assert.Contains("Only alpha", page.Find("[data-testid=dataset-query-row] .collection-identity-cell a").TextContent);
+        AssertScopeBesideIcon(page);
         await page.InvokeAsync(() => page.FindComponent<CollectionView<DataSourceQueryResource>>().Instance.SetNarrow(true));
         Assert.HasCount(1, page.FindAll("li[data-testid=dataset-query-row]"));
         Assert.AreEqual("default/only-alpha", page.Find("[data-testid=dataset-query-row] .copyable-value code").TextContent);
-        await page.Find("[data-testid=dataset-query-row] .collection-actions button").ClickAsync();
+        AssertScopeBesideIcon(page);
+        await page.Find("[data-testid=dataset-query-edit]").ClickAsync();
         page.WaitForElement("[data-testid=dataset-query-edit-json]");
         Assert.IsTrue(page.Find("[data-testid=dataset-query-edit-name]").HasAttribute("readonly"));
         await page.Find("[data-testid=dataset-query-edit-json]").ChangeAsync("{\"$filter\":\"dataset eq 'beta'\"}");
+        Assert.DoesNotContain("beta", page.Find("[data-testid=data-source-query-configuration-summary]").TextContent, "The saved Summary must not display an unsaved JSON draft.");
         await page.Find("[data-testid=dataset-query-edit-save]").ClickAsync();
         Assert.AreEqual("dataset eq 'beta'", handler.Query.Definition.Query.GetProperty("$filter").GetString());
         await page.Find("[data-testid=dataset-query-publish-version]").ChangeAsync("B");
@@ -97,11 +100,15 @@ public sealed class DataSourceQueryViewsTests
         Assert.HasCount(0, page.FindAll("[data-testid=dataset-query-tool-edit]"));
     }
 
+    private static void AssertScopeBesideIcon(IRenderedComponent<DataSourceQueries> page)
+    {
+        Assert.HasCount(1, page.FindAll("[data-testid=dataset-query-row] .collection-identity-indicators .resource-scope-badge"));
+        Assert.HasCount(0, page.FindAll("[data-testid=dataset-query-row] .collection-icon-badges .resource-scope-badge"));
+    }
+
     private static void SetupCollectionInterop(BunitContext context)
     {
-        var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/collection-ui.js");
-        foreach (var method in new[] { "observeCollection", "releaseCollection", "attachDisclosure", "releaseDisclosure" })
-            module.SetupVoid(method, _ => true).SetVoidResult();
+        context.WithCollectionPresentation();
     }
 
     private sealed class ContextProvider(bool canWrite = true) : IConsoleContextProvider

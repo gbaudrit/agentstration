@@ -271,3 +271,9 @@ Agent, Flow and Entry deletion candidates with known owners offer saved Preview 
 ### Produced Flow Artifacts
 
 The native run output catalog contains persisted durable Artifact resources. Its direct Inspect stays available alongside Open and Preview. The run host owns the Preview shell outside lazily visited sections, so direct/reload/history fragments work before the output tab has been visited. The existing exact Artifact adapter and saved Summary are reused; output JSON, run filtering, content and materialization behavior stay native.
+
+### Saved Data Source Queries
+
+These embedded rows are persisted Query resources with independent metadata and an existing JSON definition editor. Open selects the saved query overview in the native Data Source queries section. Edit definition selects that same existing form. Native links carry the actual query owner, namespace and name alongside the saved parent source reference; no catalog scan resolves a direct target. Preview makes one existing exact Query GET, without history, source, content, picker or execution reads. The saved Summary is also rendered above the native editor and never reads its unsaved JSON draft. Managed/inherited rows cannot use the edit shortcut.
+
+Embedded Preview hosts live outside lazily visited section content. ResourceNavigation reserves `#preview/...` for the collection shell, preserves the current section and does not rewrite its history entry. On a direct Preview URL the host can mount independently of its embedded catalog having been opened.

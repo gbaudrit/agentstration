@@ -1295,6 +1295,37 @@
         "ResourceNavigationTests"
       ],
       "validation": "Release component build passed; existing output metadata/filter/localization regressions passed with exact Preview-request coordinate assertions and no content reads. Browser/final broad checks pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/{Name}#queries"
+      ],
+      "rowTypes": [
+        "DataSourceQueryResource"
+      ],
+      "family": "Data Source Queries",
+      "status": "implemented-validation-pending",
+      "coordinates": "Persisted Query ScopeRef + namespace + technical name. Parent navigation is derived only from its saved Selection.Source reference; direct links also carry the query owner/namespace/name.",
+      "overview": "Native Data Source queries section selects the saved query overview through query/queryNamespace/queryOwner/queryView=overview.",
+      "edit": "The existing inline JSON query authoring form, selected explicitly with queryView=definition or its authorized owned unmanaged row action.",
+      "rowActions": [
+        "Open saved overview",
+        "Edit definition (authorized owned unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open native saved overview",
+        "Edit existing definition (authorized owned unmanaged)"
+      ],
+      "summary": "DataSourceQueryResourceSummary renders actual metadata, generation, governance, saved selection/contract pin and saved query JSON. Native drafts remain separate.",
+      "loader": "One existing exact GetQueryAsync read; no query execution, content, versions, tools or source lookup in Preview. Host shell lives outside conditionally visited native query sections.",
+      "tests": [
+        "DataSourceQueryResourcePreviewTests",
+        "DataSourceQueryViewsTests",
+        "ResourceNavigationTests"
+      ],
+      "validation": "Release component/shared builds passed. 12 exact Query Preview cases, 3 native query editor/publication cases and 22 resource navigation cases passed, including saved/draft separation and reserved Preview fragments. Browser/final broad checks pending."
     }
   ],
   "surfaces": [
@@ -2210,7 +2241,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted-embedded-resource-catalog",
+      "reason": "Actual persisted DataSourceQueryResource has its own saved metadata and native inline authoring form; exact Preview and saved Summary are adopted."
     },
     {
       "id": "connected-service-discovery-panel-connected-service-operation-resource",
@@ -5582,6 +5614,17 @@
       "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
       "decision": "shared-saved-summary-values",
       "reason": "Saved configuration values compose the immutable Artifact summary; they have no independent resource identity or row actions."
+    },
+    {
+      "id": "data-source-query-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceQueryResourceSummary.razor",
+      "routes": [
+        "/data-sources/{Name}#queries"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "shared-saved-summary-values",
+      "reason": "Saved Query identity/selection/query values are shared presentation data, not independent row resources."
     }
   ]
 }
