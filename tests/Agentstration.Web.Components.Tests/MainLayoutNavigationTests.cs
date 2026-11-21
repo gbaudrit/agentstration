@@ -8,7 +8,7 @@ namespace Agentstration.Web.Components.Tests;
 
 [TestClass]
 [DoNotParallelize]
-public sealed class MainLayoutNavigationTests
+public sealed partial class MainLayoutNavigationTests
 {
     [TestMethod]
     public void NavigationMatchesTargetEnglishGroupingLabelsAndRoutes()

@@ -880,6 +880,7 @@ public sealed partial class FlowDetailsDesignerTests
             this.managed = managed;
             this.extensionManaged = extensionManaged;
         }
+        public bool Unpublished { get; init; }
         public ResourceScopeRef ScopeRef => scopeRef;
         public IReadOnlyDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
         public ResourceNamespace RequestedNamespace { get; private set; }
@@ -904,7 +905,7 @@ public sealed partial class FlowDetailsDesignerTests
         public Task<FlowResponse> GetFlowAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;
-            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, "1.0.0", definition, Metadata, Now, Now, Graph)
+            return Task.FromResult(new FlowResponse(flowId, "Sample", null, "1.0.0", true, Unpublished ? null : "1.0.0", definition, Metadata, Now, Now, Graph)
             {
                 Uid = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc"),
                 Namespace = @namespace,
@@ -917,7 +918,7 @@ public sealed partial class FlowDetailsDesignerTests
             });
         }
         public Task<IReadOnlyList<FlowVersionResponse>> GetFlowVersionsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<FlowVersionResponse>>([new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef }]);
+            Task.FromResult<IReadOnlyList<FlowVersionResponse>>(Unpublished ? [] : [new FlowVersionResponse(flowId, "1.0.0", null, definition, new Dictionary<string, string>(), Now, Graph) { Namespace = @namespace, ScopeRef = scopeRef }]);
         public Task<IReadOnlyList<FlowRun>> GetFlowRunsAsync(ResourceNamespace @namespace, string flowId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FlowRun>>([]);
         public Task<IReadOnlyList<FlowSummary>> GetFlowsAsync(CancellationToken cancellationToken) => Task.FromResult(FlowSummaries);
         public Task<FlowResponse> GetFlowAsync(string flowId, CancellationToken cancellationToken) =>

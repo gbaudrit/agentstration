@@ -1,0 +1,22 @@
+[
+  {
+    "locale": "fr-FR",
+    "language": "automatic",
+    "source": "Workspace",
+    "target": "Instance",
+    "draftFlowAccessSaved": true,
+    "descendants": true,
+    "languagePreserved": true,
+    "noBrowserErrors": true
+  },
+  {
+    "locale": "en-US",
+    "language": "automatic",
+    "source": "Workspace",
+    "target": "Instance",
+    "draftFlowAccessSaved": true,
+    "descendants": true,
+    "languagePreserved": true,
+    "noBrowserErrors": true
+  }
+]

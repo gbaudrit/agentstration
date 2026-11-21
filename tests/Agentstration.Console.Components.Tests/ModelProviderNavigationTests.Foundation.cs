@@ -6,6 +6,7 @@ using Agentstration.Resources;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Models;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Components.Values;
 using Agentstration.Web.Console;
 using Bunit;
@@ -17,6 +18,26 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class ModelProviderNavigationTests
 {
+    [TestMethod]
+    [DataRow("/tenants/33333333-3333-3333-3333-333333333333")]
+    [DataRow("/workspaces/22222222-2222-2222-2222-222222222222")]
+    public void InheritedProviderLoadsWithoutItsOwnersEditingSecretCatalogue(string contextScope)
+    {
+        using var context = CreateContext(out _);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new StubConsoleNavigationContext(contextScope));
+        var secrets = (StubSecretsClient)context.Services.GetRequiredService<ISecretsClient>();
+        secrets.FailReads = true;
+        var cut = RenderFoundationProvider(context);
+        cut.WaitForAssertion(() =>
+        {
+            var frame = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;
+            Assert.AreEqual(ResourceLoadStatus.Ready, frame.LoadState!.Status);
+            Assert.IsNotNull(frame.Resource);
+        });
+        Assert.AreEqual(0, secrets.ReadCount);
+        Assert.IsTrue(cut.FindComponent<ResourceDetailsTemplate>().Instance.DefinitionReadOnlyReason is not null);
+    }
+
     [TestMethod]
     public void ProviderWizardAllowsIncompleteNavigationAndReportsIncompleteReview()
     {

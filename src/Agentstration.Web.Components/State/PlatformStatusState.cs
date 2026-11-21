@@ -24,16 +24,22 @@ public sealed class PlatformStatusState(
     IPlatformStatusProvider provider,
     ILogger<PlatformStatusState> logger)
 {
+    private readonly object refreshLock = new();
+    private long refreshRevision;
+
     public UiStatus Status { get; private set; } = UiStatus.Neutral;
     public PlatformStatusKind Kind { get; private set; } = PlatformStatusKind.Connecting;
     public event Action? Changed;
 
     public async Task RefreshAsync(CancellationToken cancellationToken)
     {
+        long revision;
+        lock (refreshLock) revision = ++refreshRevision;
+        Set(revision, UiStatus.Neutral, PlatformStatusKind.Connecting);
         try
         {
             var result = await provider.GetStatusAsync(cancellationToken);
-            Set(result.Status, result.Kind);
+            Set(revision, result.Status, result.Kind);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -41,14 +47,18 @@ public sealed class PlatformStatusState(
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Platform status refresh is unavailable");
-            Set(UiStatus.Danger, PlatformStatusKind.Unavailable);
+            Set(revision, UiStatus.Danger, PlatformStatusKind.Unavailable);
         }
     }
 
-    private void Set(UiStatus status, PlatformStatusKind kind)
+    private void Set(long revision, UiStatus status, PlatformStatusKind kind)
     {
-        Status = status;
-        Kind = kind;
+        lock (refreshLock)
+        {
+            if (revision != refreshRevision) return;
+            Status = status;
+            Kind = kind;
+        }
         Changed?.Invoke();
     }
 }

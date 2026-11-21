@@ -10,7 +10,7 @@ using Agentstration.Resources;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class ResourceAccessPolicyApiTests : ModelManagementApiTestBase
+public sealed partial class ResourceAccessPolicyApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     public async Task CrudAndEvaluationUseExactResourceIdentityAndIndependentConcurrency()

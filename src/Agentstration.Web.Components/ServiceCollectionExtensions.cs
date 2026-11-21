@@ -15,9 +15,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<NotificationState>();
         services.AddScoped<PlatformStatusState>();
         services.AddScoped<ConsoleContextState>();
+        services.TryAddScoped<ConsoleResourceNavigationState>();
         services.AddScoped<IConsoleNavigationContext, ConsoleNavigationContext>();
         services.AddScoped<WorkplaceContextState>();
         services.TryAddScoped<IConsoleContextProvider, EmptyConsoleContextProvider>();
+        services.TryAddScoped<IConsoleContextSwitchResolver, DefaultConsoleContextSwitchResolver>();
         services.TryAddScoped<IResourceSearchProvider, EmptyResourceSearchProvider>();
         services.TryAddScoped<IPlatformStatusProvider, EmptyPlatformStatusProvider>();
         services.TryAddScoped<ICommandPaletteFallbackProvider, EmptyCommandPaletteFallbackProvider>();

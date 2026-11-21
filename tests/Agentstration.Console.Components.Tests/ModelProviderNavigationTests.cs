@@ -589,9 +589,9 @@ public sealed partial class ModelProviderNavigationTests
         return context;
     }
 
-    private sealed class StubConsoleNavigationContext : IConsoleNavigationContext
+    private sealed class StubConsoleNavigationContext(string? scopeRef = null) : IConsoleNavigationContext
     {
-        public string? ScopeRef => ResourceScopeRef.Instance.Value;
+        public string? ScopeRef => scopeRef ?? ResourceScopeRef.Instance.Value;
         public string AddToUri(string uri) => uri;
     }
 
@@ -778,7 +778,14 @@ public sealed partial class ModelProviderNavigationTests
     private sealed class StubSecretsClient : ISecretsClient
     {
         private readonly List<SecretResponse> resources = [];
-        public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SecretResponse>>(resources.ToArray());
+        public bool FailReads { get; set; }
+        public int ReadCount { get; private set; }
+        public Task<IReadOnlyList<SecretResponse>> GetSecretsAsync(CancellationToken cancellationToken)
+        {
+            ReadCount++;
+            if (FailReads) throw new AgentstrationApiException("The owner secret catalogue is unavailable in this context.", "secret-catalogue", System.Net.HttpStatusCode.InternalServerError);
+            return Task.FromResult<IReadOnlyList<SecretResponse>>(resources.ToArray());
+        }
         public Task<IReadOnlyList<VaultResponse>> GetVaultsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<VaultResponse>>([new(new VaultResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,

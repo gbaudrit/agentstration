@@ -1,0 +1,37 @@
+{
+  "revision": "rebased on main 51969396",
+  "results": [
+    {
+      "check": "accessible exact Agent and anchor, inherited read-only, no document reload",
+      "passed": true
+    },
+    {
+      "check": "Back and Forward restore each context and anchor without a document reload",
+      "passed": true
+    },
+    {
+      "check": "inaccessible Access section falls back to Overview",
+      "passed": true
+    },
+    {
+      "check": "unavailable Agent returns to collection without opening Workspace homonym; other tab unaffected",
+      "passed": true
+    },
+    {
+      "check": "explicit return restores the previous exact resource and anchor",
+      "passed": true
+    },
+    {
+      "check": "cancel preserves draft and context; explicit discard accepts the switch",
+      "passed": true
+    },
+    {
+      "check": "French mobile accessible/unavailable flows and no horizontal overflow",
+      "passed": true
+    },
+    {
+      "check": "no unhandled browser errors",
+      "passed": true
+    }
+  ]
+}

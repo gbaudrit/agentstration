@@ -78,7 +78,7 @@ export const exerciseHierarchicalContext: Journey<ExerciseHierarchicalContextInp
   await hierarchy.assertDirtyContextGuard(
     context.consoleUrl,
     fixture,
-    ExpectedTextByLocale['en-US'].contextSelector.confirmDiscard,
+    ExpectedTextByLocale['en-US'].contextSelector,
   );
   await context.checkpoint({
     name: Checkpoints.hierarchicalContext.dirtyGuard,

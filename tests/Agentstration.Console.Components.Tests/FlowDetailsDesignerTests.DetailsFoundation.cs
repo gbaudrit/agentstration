@@ -5,6 +5,7 @@ using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Console;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,22 @@ public sealed partial class FlowDetailsDesignerTests
         SelectFlowSection(context, "definition/identity");
         page.WaitForElement("[data-testid=flow-definition-form]");
         return (context, client, page);
+    }
+
+    [TestMethod]
+    [DataRow(true, null)]
+    [DataRow(false, "1.0.0")]
+    public void FlowAccessUsesTheActualPublishedVersionOrNoVersionForAnUnpublishedDraft(bool unpublished, string? expectedVersion)
+    {
+        using var context = FlowContext();
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IFlowApiClient>(new FlowClientStub { Unpublished = unpublished });
+        context.ComponentFactories.AddStub<ResourceAccessPanel>();
+        AddConsoleContext(context);
+        var page = context.Render<FlowDetails>(p => p.Add(value => value.FlowId, "sample"));
+        page.WaitForElement("[data-testid=flow-identity-summary]");
+        SelectFlowSection(context, "access");
+        page.WaitForAssertion(() => Assert.AreEqual(expectedVersion, page.FindComponent<Stub<ResourceAccessPanel>>().Instance.Parameters.Get(p => p.Version)));
     }
 
     [TestMethod]

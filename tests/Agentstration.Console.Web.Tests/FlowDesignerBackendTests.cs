@@ -4,6 +4,7 @@ using Agentstration.Console.Web.Features.Flows;
 using Agentstration.Flows;
 using Agentstration.Flows.Contracts;
 using Agentstration.Resources;
+using Agentstration.ResourceManagement;
 using Agentstration.Web.Console;
 using Agentstration.Web.FlowDesigner.Backend;
 
@@ -35,6 +36,9 @@ public sealed class FlowDesignerBackendTests
         Assert.AreEqual("1.0.0", loaded.PublishedVersion);
         StringAssert.Contains(loaded.Source, "entryStep: input");
         Assert.DoesNotContain("apiVersion:", loaded.Source);
+        var source = ResourceManifestSerializer.FromYaml<FlowGraphDefinition>(loaded.Source);
+        Assert.AreEqual("input", source.EntryStep);
+        Assert.IsInstanceOfType<InputFlowStepDefinition>(source.Steps.Single());
         CollectionAssert.AreEqual(new[] { "GET /api/flows/transform", "GET /api/flows/transform/versions/1.0.0" }, requests);
         await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => backend.SaveDraftAsync(target, new("Transform", null, null, graph), "etag", default));
         Assert.HasCount(2, requests);

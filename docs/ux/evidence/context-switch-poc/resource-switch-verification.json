@@ -1,0 +1,33 @@
+[
+  {
+    "family": "agents",
+    "retained": true,
+    "savedOwnerPinned": true,
+    "inheritedReadOnly": true,
+    "noReload": true
+  },
+  {
+    "family": "flows",
+    "retained": true,
+    "savedOwnerPinned": true,
+    "inheritedReadOnly": true,
+    "noReload": true
+  },
+  {
+    "family": "modelprofiles",
+    "retained": true,
+    "savedOwnerPinned": true,
+    "inheritedReadOnly": true,
+    "noReload": true
+  },
+  {
+    "flowUnavailableFallback": true,
+    "homonymNotOpened": true,
+    "explicitReturn": true
+  },
+  {
+    "mobileFlowRetained": true,
+    "noHorizontalOverflow": true,
+    "noBrowserErrors": true
+  }
+]

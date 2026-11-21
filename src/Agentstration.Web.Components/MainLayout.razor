@@ -11,6 +11,8 @@
 @inject ICommandPaletteFallbackProvider CommandFallback
 @inject ConsoleContextState ContextState
 @inject IConsoleNavigationContext NavigationContext
+@inject IConsoleContextSwitchResolver ContextSwitchResolver
+@inject ConsoleResourceNavigationState ResourceNavigationState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<MainLayoutStrings> Localizer
 
 <div @ref="shellElement" class="app-shell @(Navigation.IsSidebarCollapsed ? "sidebar-collapsed" : null) @(Preferences.IsDarkTheme ? "theme-dark" : "theme-light")" data-theme="@(Preferences.IsDarkTheme ? "dark" : "light")" data-testid="console-shell" data-preferences-ready="@(Preferences.IsLoaded && themeReady ? "true" : "false")" data-context-kind="@ContextState.Current?.SelectedKind" data-context-scope="@ContextState.Current?.SelectedScopeRef" data-workspace-id="@ContextState.Current?.WorkspaceId" data-workspace-name="@ContextState.Current?.WorkspaceName">
@@ -55,7 +57,7 @@
                 @if (ContextState.Current is { } context)
                 {
                     <div class="context-switcher">
-                        <button type="button" class="context-switcher-trigger" @onclick="ToggleContextSelector" disabled="@switchingContext" aria-haspopup="dialog" aria-expanded="@contextSelectorOpen" aria-label="@T("ChangeContext")" data-testid="context-selector-trigger">
+                        <button type="button" class="context-switcher-trigger" @onclick="ToggleContextSelector" disabled="@(switchingContext || ContextState.IsLoading || ResourceNavigationState.IsLoading || !ContextMatchesLocation)" aria-haspopup="dialog" aria-expanded="@contextSelectorOpen" aria-label="@T("ChangeContext")" data-testid="context-selector-trigger">
                             <span class="context-kind">@ContextKindLabel(context.SelectedKind)</span>
                             <span class="context-name">@SelectedContextLabel(context)</span>
                             <span aria-hidden="true">⌄</span>
@@ -126,7 +128,33 @@
                 <a class="icon-button" href="/logout" aria-label="@T("SignOut")" title="@T("SignOut")"><UiIcon Name="log-out" /></a>
             </div>
         </header>
-        <main class="content" id="main-content">@Body</main>
+        <main class="content" id="main-content">
+            @if (ContextState.Error is not null)
+            {
+                <ErrorState Title="@T("ContextChangeFailed")" Message="@T("ContextChangeFailedMessage")">
+                    <button type="button" class="button-secondary" @onclick="RetryContextAsync">@T("RetryContext")</button>
+                </ErrorState>
+            }
+            else if (ContextState.IsLoading || !ContextMatchesLocation)
+            {
+                <LoadingState Message="@T("LoadingContext")" />
+            }
+            else if (ContextState.Current is { } activeContext)
+            {
+                @if (unavailableContextReturn is { } previousLocation)
+                {
+                    <div class="context-resource-notice" role="status" data-testid="context-resource-unavailable">
+                        <span class="context-resource-notice-icon" aria-hidden="true"><UiIcon Name="info-circle" /></span>
+                        <div class="context-resource-notice-copy">
+                            <h2>@T("ContextResourceUnavailableTitle")</h2>
+                            <p>@T("ContextResourceUnavailable")</p>
+                        </div>
+                        <a class="button-secondary context-resource-notice-return" href="@previousLocation" data-testid="context-return-previous"><UiIcon Name="arrow-left" />@T("ReturnToPreviousContext")</a>
+                    </div>
+                }
+                <CascadingValue @key="activeContext.SelectedScopeRef" Name="ConsoleContextScope" Value="activeContext.SelectedScopeRef" IsFixed="true">@Body</CascadingValue>
+            }
+        </main>
     </div>
 
     @if (Notifications.IsPanelOpen)

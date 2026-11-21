@@ -67,7 +67,7 @@
     private static string OutcomeKey(TriggerLastOutcome outcome) => Enum.IsDefined(outcome) ? outcome.ToString() : "Unknown";
     private static UiStatus OutcomeStatus(TriggerLastOutcome outcome) => outcome switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
     private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
-    private string DetailsUrl(TriggerResource trigger) => ResourceOwnershipContext.Resource(Services, "/triggers", trigger.Name, trigger.Namespace, TriggerUi.DefinitionScope(trigger));
+    private string DetailsUrl(TriggerResource trigger) => ResourceOwnershipContext.Resource(Services, "/triggers", trigger.Name, trigger.Namespace, trigger.ScopeRef);
     private string FlowUrl(TriggerResource trigger) => trigger.Definition.Target.Flow is { } flow ? Navigate(ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? trigger.Namespace), flow.ScopeRef)) : "#";
     private static IReadOnlyDictionary<string, object> TriggerAttributes(TriggerResource trigger) => new Dictionary<string, object> { ["data-trigger-name"] = trigger.Name };
 }

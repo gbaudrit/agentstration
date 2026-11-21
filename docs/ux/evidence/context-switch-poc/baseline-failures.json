@@ -1,0 +1,49 @@
+{
+  "parentRevision": "7ba891adf3e7e775f95c73dba2f8db038379e7f4",
+  "parentComponentSuite": {
+    "total": 1552,
+    "passed": 1536,
+    "failed": 16
+  },
+  "reproducedOnParent": [
+    "AcquisitionToolUsesSavedRecipeAndSelectsOnePublishableArtifact (True)",
+    "CommonFrameKeepsSavedIdentityLabelsAndTheExactFormDeclarations (\"en-US\")",
+    "CommonFrameKeepsSavedIdentityLabelsAndTheExactFormDeclarations (\"fr-FR\")",
+    "ConversationListReturnsToThePersistedGenericInteraction",
+    "DetailUsesResourceNavigationAndYamlContainsReferencesWithoutConnectionValues",
+    "InheritedServiceActivationIsDisabled",
+    "SavedIdentityAndLabelsFollowMetricsAndUseTheCommonRetainedForm (\"en-US\",\"Identity\")",
+    "SavedIdentityAndLabelsFollowMetricsAndUseTheCommonRetainedForm (\"fr-FR\",\"Identit\u00e9\")",
+    "SavedOverviewDoesNotLeakDraftAndSectionsRetainTheFormAndExactUpdate (\"en-US\",\"Identity\")",
+    "SavedOverviewDoesNotLeakDraftAndSectionsRetainTheFormAndExactUpdate (\"fr-FR\",\"Identit\u00e9\")",
+    "ServiceDetailsKeepEditsMadeWhileARefreshIsPending",
+    "SharedCreatorRefreshesOptionsAndSavesItsNewExactReference",
+    "StagedRefreshKeepsInputTypedWhileTheReadIsPending",
+    "StorageKeepsEditsMadeDuringRefreshAndDoesNotLockTheFields",
+    "TypeDetailsShareTheFormStateAndRetainInvalidFieldsAndOriginalEtagUntilDiscard",
+    "TypeRefreshEvaluatesDraftsWhenTheResponseArrivesAndKeepsTheFieldsEditable"
+  ],
+  "additionalPreviouslyReproducedOn82206267": [
+    "LateReviewUnderAChangedOperationalWorkspaceCannotClearNewRows"
+  ],
+  "additionalPreviouslyObservedAfterFlowAccessFix": [
+    "ReplacedOperationalWorkspaceRejectsLateMetadataAndInspectRevocationClearsBothCollections"
+  ],
+  "notes": "Historical failures below predate the rebase onto main 51969396. After inheriting the main branch fixes, the complete Fast lane passes all 2641 tests. No unrelated test correction was made by this POC.",
+  "previousFastSuiteWithArtifactDisposal": {
+    "total": 2558,
+    "passed": 2541,
+    "failed": 17
+  },
+  "beforeMainRebaseFastSuite": {
+    "total": 2558,
+    "passed": 2542,
+    "failed": 16
+  },
+  "currentFastSuite": {
+    "baseRevision": "519693966364e56b29cdc820161e8d41f2c3059a",
+    "total": 2641,
+    "passed": 2641,
+    "failed": 0
+  }
+}

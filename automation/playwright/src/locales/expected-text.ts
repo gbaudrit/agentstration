@@ -112,6 +112,8 @@ export interface ExpectedText {
     globalAdministration: string;
     tenantAdministration: string;
     confirmDiscard: string;
+    cancel: string;
+    discard: string;
   };
   inheritedResource: {
     title: string;
@@ -195,7 +197,9 @@ export const ExpectedTextByLocale = {
       workspace: 'Workspace',
       globalAdministration: 'Global administration',
       tenantAdministration: 'Tenant administration',
-      confirmDiscard: 'You have unsaved changes. Discard them and change context?',
+      confirmDiscard: 'Your unsaved changes will be lost.',
+      cancel: 'Cancel',
+      discard: 'Discard',
     },
     inheritedResource: {
       title: 'View only',
@@ -277,7 +281,9 @@ export const ExpectedTextByLocale = {
       workspace: 'Workspace',
       globalAdministration: 'Administration globale',
       tenantAdministration: 'Administration du Tenant',
-      confirmDiscard: 'Des modifications ne sont pas enregistrées. Les abandonner et changer de contexte ?',
+      confirmDiscard: 'Vos modifications non enregistrées seront perdues.',
+      cancel: 'Annuler',
+      discard: 'Abandonner',
     },
     inheritedResource: {
       title: 'Consultation uniquement',

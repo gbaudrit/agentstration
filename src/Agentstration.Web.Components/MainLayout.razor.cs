@@ -114,6 +114,8 @@ public partial class MainLayout
     private bool themeReady;
     private bool contextSelectorOpen;
     private bool switchingContext;
+    private (string Source, string Target, string Fallback, ConsoleResourceLocation? Resource, bool ResourceUnavailable)? pendingContextSwitch;
+    private string? unavailableContextReturn;
     private string contextQuery = string.Empty;
     private int selectedCommandIndex;
     private IReadOnlyList<CommandItem> resourceCommands = [];
@@ -199,8 +201,9 @@ public partial class MainLayout
         Notifications.Changed += StateHasChanged;
         PlatformStatus.Changed += OnPlatformStatusChanged;
         ContextState.Changed += OnContextChanged;
+        ResourceNavigationState.Changed += OnResourceNavigationChanged;
+        ResourceNavigationState.ResourceUnavailable += OnResourceUnavailable;
         NavigationManager.LocationChanged += OnLocationChanged;
-        platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         await Task.WhenAll(
             ContextState.LoadAsync(ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri), lifetimeCancellation.Token),
             Preferences.LoadAsync(lifetimeCancellation.Token));
@@ -344,15 +347,51 @@ public partial class MainLayout
 
     private async Task SelectContextAsync(ConsoleContextOption option)
     {
-        if (contextModule is null || option.ScopeRef == ContextState.Current?.SelectedScopeRef) return;
+        if (switchingContext || ContextState.IsLoading || ResourceNavigationState.IsLoading || !ContextMatchesLocation
+            || ContextState.Current is not { } current || option.ScopeRef == current.SelectedScopeRef) return;
+        var navigationSource = NavigationManager.Uri;
         switchingContext = true;
         try
         {
-            _ = await contextModule.InvokeAsync<bool>("selectContext", option.ScopeRef, T("ConfirmContextChange"));
+            // Fragment pushes can update the browser before NavigationManager reports another location.
+            var browserSource = contextModule is null ? null : await contextModule.InvokeAsync<string?>("currentLocation", lifetimeCancellation.Token);
+            if (navigationSource != NavigationManager.Uri) return;
+            var sourceUri = new Uri(browserSource ?? navigationSource);
+            if (!ConsoleResourceNavigationState.SameLocation(sourceUri, new Uri(navigationSource))) return;
+            var source = sourceUri.AbsoluteUri;
+            var resource = ResourceNavigationState.GetCurrent(sourceUri, current.SelectedScopeRef);
+            var path = sourceUri.AbsolutePath;
+            var collection = NavigationGroups.SelectMany(group => group.Items)
+                .Where(item => item.Url == path || item.Url != "/" && path.StartsWith(item.Url + "/", StringComparison.Ordinal))
+                .OrderByDescending(item => item.Url.Length)
+                .FirstOrDefault()?.Url ?? "/";
+            var fallback = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(collection, "context", option.ScopeRef);
+            if (resource?.CollectionLocation is { } declaredCollection)
+            {
+                var location = NavigationManager.ToAbsoluteUri(declaredCollection);
+                if (location.Scheme == sourceUri.Scheme && location.Authority == sourceUri.Authority
+                    && location.AbsolutePath != sourceUri.AbsolutePath)
+                {
+                    var parameters = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(location.Query);
+                    parameters["context"] = option.ScopeRef;
+                    fallback = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(location.GetLeftPart(UriPartial.Path), parameters);
+                }
+            }
+            var destination = await ContextSwitchResolver.ResolveAsync(
+                new(sourceUri, current.SelectedScopeRef, option.ScopeRef, fallback, resource?.OwnerScopeRef, ResourceNavigationState.HasFrame), lifetimeCancellation.Token);
+            if (navigationSource != NavigationManager.Uri) return;
+            var latestBrowserLocation = contextModule is null ? null : await contextModule.InvokeAsync<string?>("currentLocation", lifetimeCancellation.Token);
+            if (navigationSource != NavigationManager.Uri || latestBrowserLocation is not null && new Uri(latestBrowserLocation).AbsoluteUri != source) return;
+            contextSelectorOpen = false;
+            contextQuery = string.Empty;
+            pendingContextSwitch = (source, NavigationManager.ToAbsoluteUri(destination.Location).AbsoluteUri, fallback, resource, destination.ResourceUnavailable);
+            // The existing navigation guard owns all drafts, including Access and hidden editors.
+            NavigationManager.NavigateTo(destination.Location);
         }
-        catch (JSException exception)
+        catch (OperationCanceledException) when (lifetimeCancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or ArgumentException or OperationCanceledException)
         {
-            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ContextChangeFailed"), exception.Message,
+            Notifications.Add(new NotificationItem(Guid.NewGuid(), T("ContextChangeFailed"), T("ContextChangeFailedMessage"),
                 DateTimeOffset.Now, UiStatus.Danger));
         }
         finally { switchingContext = false; }
@@ -378,12 +417,20 @@ public partial class MainLayout
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args) => _ = InvokeAsync(async () =>
     {
         if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
+        unavailableContextReturn = pendingContextSwitch is { } pending && pending.Target == args.Location && pending.ResourceUnavailable
+            ? pending.Source : null;
+        if (pendingContextSwitch is { } accepted && accepted.Target == args.Location)
+            ResourceNavigationState.BeginSwitch(new Uri(accepted.Source), new Uri(accepted.Target), accepted.Fallback, accepted.Resource);
+        else ResourceNavigationState.LocationChanged(new Uri(args.Location));
+        pendingContextSwitch = null;
         var requestedContext = ConsoleNavigationContext.GetScopeRef(args.Location);
         if (requestedContext is not null
-            && (ContextState.IsLoading || ContextState.Current is not { } current
+            && (ContextState.Error is not null || ContextState.IsLoading || ContextState.Current is not { } current
                 || !string.Equals(requestedContext, current.SelectedScopeRef, StringComparison.Ordinal)))
         {
-            await ContextState.LoadAsync(requestedContext, lifetimeCancellation.Token);
+            var load = ContextState.LoadAsync(requestedContext, lifetimeCancellation.Token);
+            StateHasChanged();
+            await load;
         }
         if (!string.Equals(args.Location, NavigationManager.Uri, StringComparison.Ordinal)) return;
         StateHasChanged();
@@ -397,11 +444,25 @@ public partial class MainLayout
         catch (JSDisconnectedException) { }
         catch (InvalidOperationException) { }
     });
+    private bool ContextMatchesLocation => ContextState.Current is { } current
+        && (ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri) is not { } requested || requested == current.SelectedScopeRef);
+    private Task RetryContextAsync() => ContextState.LoadAsync(ConsoleNavigationContext.GetScopeRef(NavigationManager.Uri), lifetimeCancellation.Token);
     private void OnContextChanged()
     {
         NavigationContext.SetSelectedScopeRef(ContextState.Current?.SelectedScopeRef);
+        if (ContextState.Current is not null && ContextState.Error is null)
+            platformStatusRefresh = PlatformStatus.RefreshAsync(lifetimeCancellation.Token);
         _ = InvokeAsync(StateHasChanged);
     }
+    private void OnResourceNavigationChanged() => _ = InvokeAsync(StateHasChanged);
+    private void OnResourceUnavailable(ConsoleResourceSwitchFailure failure) => _ = InvokeAsync(async () =>
+    {
+        await Task.Yield();
+        if (!ConsoleResourceNavigationState.SameLocation(failure.Target, new Uri(NavigationManager.Uri))) return;
+        var destination = NavigationManager.ToAbsoluteUri(failure.FallbackLocation).AbsoluteUri;
+        pendingContextSwitch = (failure.SourceLocation, destination, failure.FallbackLocation, null, true);
+        NavigationManager.NavigateTo(destination, replace: true);
+    });
     private void OnPlatformStatusChanged() => _ = InvokeAsync(StateHasChanged);
 
     public async ValueTask DisposeAsync()
@@ -411,6 +472,8 @@ public partial class MainLayout
         Notifications.Changed -= StateHasChanged;
         PlatformStatus.Changed -= OnPlatformStatusChanged;
         ContextState.Changed -= OnContextChanged;
+        ResourceNavigationState.Changed -= OnResourceNavigationChanged;
+        ResourceNavigationState.ResourceUnavailable -= OnResourceUnavailable;
         NavigationManager.LocationChanged -= OnLocationChanged;
         locationChangingRegistration?.Dispose();
         lifetimeCancellation.Cancel();

@@ -399,7 +399,8 @@ export class OrganizationWorkspacesPage {
 
   private async waitForContextNavigation(scopeRef: string): Promise<void> {
     await this.page.waitForURL(url => url.searchParams.get('context') === scopeRef, { waitUntil: 'domcontentloaded' });
-    // Context navigation reloads the document; wait beyond its prerendered shell.
+    // Context navigation stays in the circuit; wait for the accepted context snapshot.
     await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-context-scope', scopeRef);
   }
 }

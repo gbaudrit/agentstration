@@ -1,0 +1,42 @@
+[
+  {
+    "viewport": "desktop",
+    "workspace": {
+      "agents": 1,
+      "flows": 4
+    },
+    "instance": {
+      "agents": 1,
+      "flows": 14
+    },
+    "returned": {
+      "agents": 1,
+      "flows": 5
+    },
+    "countersMatchApi": true,
+    "noDocumentReload": true,
+    "instanceFlowEditable": true,
+    "historyPreservesContext": true,
+    "noBrowserErrors": true
+  },
+  {
+    "viewport": "mobile",
+    "workspace": {
+      "agents": 1,
+      "flows": 5
+    },
+    "instance": {
+      "agents": 1,
+      "flows": 14
+    },
+    "returned": {
+      "agents": 1,
+      "flows": 5
+    },
+    "countersMatchApi": true,
+    "noDocumentReload": true,
+    "instanceFlowEditable": true,
+    "historyPreservesContext": true,
+    "noBrowserErrors": true
+  }
+]

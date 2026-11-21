@@ -26,7 +26,7 @@
         ResourceIdentity="@($"{loadedKey}|{flow?.Uid}")" SectionState="sectionState" SectionPresentations="presentations" SelectionChanged="SelectSectionAsync"
         AdditionalSections="AdditionalSections" NavigationLabel="@T("DetailsAriaLabel")" SectionTestIdPrefix="flow"
         LoadState="loadState" OnRetry="RefreshAsync" OnRefresh="RefreshAsync" Busy="Busy" HasDraft="HasDefinitionDraft" HasAdditionalDraft="HasRunDraft"
-        DefinitionReadOnlyReason="ReadOnlyReason" AccessVersion="PublishedVersion"
+        DefinitionReadOnlyReason="ReadOnlyReason" AccessVersion="@PublishedVersion"
         Yaml="@FlowYaml" YamlReadOnly="true" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("ResourceManifestHelp")" YamlLabel="@Shared["ResourceManifest"]">
         <Metadata>@if (flow is not null) { <ResourceMetadataBadge Value="@FlowLabels[$"Kind.{flow.Definition.Kind}"]" /> }</Metadata>
         <PrimaryActions>

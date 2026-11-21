@@ -303,7 +303,9 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
-    public async Task WorkspaceDiscoveryIsDefaultDenyWhileTenantAdministrationIsExactScoped()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task TenantAndWorkspaceDiscoveryHonorGrantsWhileOwnershipRemainsExact(bool includeDescendants)
     {
         var principalId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
@@ -324,7 +326,7 @@ public sealed class ControlPlaneStoreHardeningTests
             Resource("workspace-owned"), null, true, default);
         await fixture.PolicyStore.PutAsync(new(new(sharedInstance.Value.Uid, ResourceScopeRef.Instance,
                 ResourceNamespace.Default, "MemoryProvider"),
-            [new(ResourceScopeRef.Tenant(tenantId), [ResourceAccessAction.Discover], true)]), null, default);
+            [new(ResourceScopeRef.Tenant(tenantId), [ResourceAccessAction.Discover], includeDescendants)]), null, default);
         await fixture.PolicyStore.PutAsync(new(new(sharedTenant.Value.Uid, ResourceScopeRef.Tenant(tenantId),
                 ResourceNamespace.Default, "MemoryProvider"),
             [new(ResourceScopeRef.Workspace(workspaceId), [ResourceAccessAction.Discover])]), null, default);
@@ -333,10 +335,10 @@ public sealed class ControlPlaneStoreHardeningTests
         var workspaceVisible = await fixture.Store.ListAsync<ExtensionResource>("MemoryProvider", 0, 20, default);
 
         CollectionAssert.AreEquivalent(
-            new[] { "shared-instance", "shared-tenant", "workspace-owned" },
+            includeDescendants ? new[] { "shared-instance", "shared-tenant", "workspace-owned" } : new[] { "shared-tenant", "workspace-owned" },
             workspaceVisible.Select(value => value.Value.Name).ToArray());
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(hiddenInstance.Value.Uid, default));
-        Assert.IsNotNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.AreEqual(includeDescendants, await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default) is not null);
         Assert.IsFalse((await fixture.PolicyStore.GetAsync(sharedInstance.Value.Uid,
             ResourceScopeRef.Instance, default))!.Policy.Grants.Single().Actions.Contains(ResourceAccessAction.Use),
             "Discover must not implicitly grant Use.");
@@ -344,14 +346,22 @@ public sealed class ControlPlaneStoreHardeningTests
         context.UseTenantAdministration(principalId, tenantId);
         var tenantVisible = await fixture.Store.ListAsync<ExtensionResource>("MemoryProvider", 0, 20, default);
         CollectionAssert.AreEquivalent(
-            new[] { sharedTenant.Value.Name, tenantOnly.Value.Name },
+            new[] { sharedInstance.Value.Name, sharedTenant.Value.Name, tenantOnly.Value.Name },
             tenantVisible.Select(value => value.Value.Name).ToArray());
         var tenantDesignerVisible = await fixture.Store.ListVisibleAsync<ExtensionResource>(
             ResourceScopeRef.Tenant(tenantId), "MemoryProvider", 0, 20, default);
         CollectionAssert.AreEquivalent(
             new[] { sharedInstance.Value.Name, sharedTenant.Value.Name, tenantOnly.Value.Name },
             tenantDesignerVisible.Select(value => value.Value.Name).ToArray());
-        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.IsNotNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(hiddenInstance.Value.Uid, default));
+        Assert.AreEqual(sharedInstance.Value.Uid, (await fixture.Store.GetExactAsync<ExtensionResource>(
+            new(ResourceScopeRef.Instance, ResourceNamespace.Default, "MemoryProvider", "shared-instance"), default))!.Value.Uid);
+        Assert.IsNull(await fixture.Store.GetExactAsync<ExtensionResource>(
+            new(ResourceScopeRef.Instance, ResourceNamespace.Default, "MemoryProvider", "hidden-instance"), default));
+        await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() => fixture.Store.ListExactInventoryAsync(ResourceScopeRef.Instance, 0, 20, default));
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => fixture.Store.PutExactAsync(ResourceScopeRef.Instance,
+            sharedInstance.Value, sharedInstance.ETag, false, default));
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(workspaceOwned.Value.Uid, default));
     }
 

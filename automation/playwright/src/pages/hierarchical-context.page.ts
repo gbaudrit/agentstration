@@ -180,7 +180,7 @@ export class HierarchicalContextPage {
   public async assertDirtyContextGuard(
     consoleUrl: string,
     fixture: HierarchicalContextFixture,
-    expectedMessage: string,
+    expected: ExpectedText['contextSelector'],
   ): Promise<void> {
     await this.selectInstance();
     const response = await this.page.goto(
@@ -200,15 +200,16 @@ export class HierarchicalContextPage {
     await description.blur();
     await expect(this.page.locator('.unsaved-changes-bar')).toBeVisible();
 
-    let dialogMessage = '';
-    this.page.once('dialog', async dialog => {
-      dialogMessage = dialog.message();
-      await dialog.dismiss();
-    });
     await this.openSelector();
     await this.workspaceOption(fixture.workspaceId).click();
-    await expect.poll(() => dialogMessage).toBe(expectedMessage);
+    const dialog = this.page.getByRole('alertdialog');
+    await expect(dialog).toContainText(expected.confirmDiscard);
+    await dialog.getByRole('button', { name: expected.cancel, exact: true }).click();
+    await expect(dialog).toHaveCount(0);
     await expect(this.shell).toHaveAttribute('data-context-kind', 'Instance');
+    await expect(description).toHaveValue(/Unsaved context guard/);
+    // Explicitly discard before the document reload used to finish the existing regression.
+    await this.page.locator('.unsaved-changes-bar').getByRole('button', { name: expected.discard, exact: true }).click();
     await this.page.reload({ waitUntil: 'domcontentloaded' });
   }
 
