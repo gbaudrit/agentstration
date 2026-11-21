@@ -1326,6 +1326,33 @@
         "ResourceNavigationTests"
       ],
       "validation": "Release component/shared builds passed. 12 exact Query Preview cases, 3 native query editor/publication cases and 22 resource navigation cases passed, including saved/draft separation and reserved Preview fragments. Browser/final broad checks pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}#contributions"
+      ],
+      "rowTypes": [
+        "ToolResource"
+      ],
+      "family": "Extension materialized Tools",
+      "status": "implemented-validation-pending",
+      "coordinates": "Actual persisted owner + namespace + technical name from existing family metadata. No owner is inferred for an absent reference.",
+      "overview": "Existing exact family overview #overview, retaining current administrative context.",
+      "edit": "Existing loaded family adapter decides authorized quick Edit; embedded rows do not infer unknown governance. Tool definitions remain read-only.",
+      "rowActions": [
+        "Open",
+        "Preview (known owner; existing availability/conflict guards)"
+      ],
+      "quickActions": [
+        "Existing independently supplied family actions"
+      ],
+      "summary": "Reuses the existing family saved Summary; contribution labels and registration commands remain native.",
+      "loader": "ToolResourcePreview performs one existing exact scoped GET on demand. Host shell is outside lazily visited native sections; no per-row detail reads.",
+      "tests": [
+        "ExtensionsConsoleTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 93 Extension/Tool/SourceProvider regression cases passed, including EN/FR lazy exact-read assertions for both embedded catalogs. Browser/final broad verification pending."
     }
   ],
   "surfaces": [
@@ -4483,7 +4510,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "adopted-embedded-resource-catalog",
+      "reason": "Persisted ToolResource rows delegate to the existing exact family adapter. Existing missing/conflict/authorization predicates are retained."
     },
     {
       "id": "extension-details-materialized-resources",

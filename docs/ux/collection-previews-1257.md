@@ -277,3 +277,7 @@ The native run output catalog contains persisted durable Artifact resources. Its
 These embedded rows are persisted Query resources with independent metadata and an existing JSON definition editor. Open selects the saved query overview in the native Data Source queries section. Edit definition selects that same existing form. Native links carry the actual query owner, namespace and name alongside the saved parent source reference; no catalog scan resolves a direct target. Preview makes one existing exact Query GET, without history, source, content, picker or execution reads. The saved Summary is also rendered above the native editor and never reads its unsaved JSON draft. Managed/inherited rows cannot use the edit shortcut.
 
 Embedded Preview hosts live outside lazily visited section content. ResourceNavigation reserves `#preview/...` for the collection shell, preserves the current section and does not rewrite its history entry. On a direct Preview URL the host can mount independently of its embedded catalog having been opened.
+
+### Extension materialized Tools
+
+The contribution view contains actual persisted Tool resources, distinct from bundle membership/version-reference records. Known unambiguous Tools now offer Open and Preview through the existing Tool adapter. Conflicts continue to suppress target actions. The full Extension host owns the shell outside lazily visited contribution sections, preserving direct Preview restoration without visiting that section first.

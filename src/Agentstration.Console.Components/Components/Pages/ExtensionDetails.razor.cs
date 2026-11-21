@@ -54,6 +54,7 @@ public partial class ExtensionDetails
         && ResourceOwnershipContext.CanManage(registration.Value.ScopeRef, Services);
     private bool CanDeleteRegistration => CanEditRegistration && contextState?.HasPermission(AuthorizationPermissions.ResourcesDelete) == true;
     private string ContextKey => $"{ResourceOwnershipContext.TryGetCurrent(Services)}|{contextState?.Current?.UserId}|{contextState?.Current?.SelectedScopeRef}";
+    private string? ToolPreviewContextKey => contextState?.Current is { } current ? $"{RegistrationName}|{ResourceNamespaceValue}|{ScopeRefValue}|{current.UserId}|{current.SelectedScopeRef}|{current.WorkspaceId}" : null;
     private string RouteKey => $"{RegistrationName}|{EnrollmentInstanceId}|{ResourceNamespaceValue}|{ScopeRefValue}|{ContextKey}";
     private string SavedDisplayName => RegistrationName is not null ? registration?.Value.Definition.DisplayName ?? RegistrationName : enrollment?.Definition.ExtensionName ?? item?.DisplayName ?? T("Extension");
     private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/extensions", Services);
@@ -461,12 +462,12 @@ public partial class ExtensionDetails
         FlowResourceKinds.Flow => 2,
         _ => 3
     };
-    private static string ToolUrl(ToolResource tool) => ToolReferenceUrl(tool.ScopeRef ?? ResourceScopeRef.Instance, new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace));
+    private string ToolUrl(ToolResource tool) => ToolReferenceUrl(tool.ScopeRef ?? ResourceScopeRef.Instance, new ResourceReference(tool.Name, tool.ScopeRef, tool.Namespace)) + "#overview";
     private static string ToolProviderUrl(ToolProviderResource provider) => $"/tools/providers/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}&context={Uri.EscapeDataString((provider.ScopeRef ?? ResourceScopeRef.Instance).Value)}";
-    private static string ToolReferenceUrl(ResourceScopeRef scopeRef, ResourceReference reference)
+    private string ToolReferenceUrl(ResourceScopeRef scopeRef, ResourceReference reference)
     {
         var @namespace = reference.Namespace ?? ResourceNamespace.Default;
-        return $"/tools/{Uri.EscapeDataString(reference.Name)}?namespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}&context={Uri.EscapeDataString((reference.ScopeRef ?? scopeRef).Value)}";
+        return ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation($"/tools/{Uri.EscapeDataString(reference.Name)}?namespace={Uri.EscapeDataString(@namespace.Value)}", Services), reference.ScopeRef ?? scopeRef);
     }
     private static UiStatus InstallationStatus(ExtensionBundleInstallationState state) => state switch
     {
