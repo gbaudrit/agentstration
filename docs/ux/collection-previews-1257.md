@@ -191,3 +191,9 @@ Validation: Release component/test build passed without warnings/errors; 130 mod
 The namespaced Pack read-only adapter now supplies its template Identity to the same saved Agent Summary used by the editor and Preview. Its native forms, Pack provenance, original source, model/runtime diagnostics and prepare-runtime commands remain in place; bootstrap namespaced resources keep their existing editor redirect. Row/Preview Edit follows that real redirect for owned unmanaged namespaced resources. Saved summaries retain complete Tool/ToolSet owners/members, behaviors and both schema bindings and inline contracts. References with unknown owners stay text unless full details supply a known exact destination.
 
 Validation: Release component/test build passed without warnings/errors; 74 agents tests passed. Browser and final offline checks remain pending.
+
+## Flow (baseline verification)
+
+The existing exact-address Summary/Preview retains saved topology, current publication version and independent Designer navigation. No history read supplies an unknown publication date. Row ownership now also follows the explicit current context, and permission/context notifications clear or cancel a mounted adapter independently of its list shell. Read-only presentation follows actual editing availability.
+
+Validation: Release component/test build passed without warnings/errors; 91 flows tests passed. Browser and final offline checks remain pending.

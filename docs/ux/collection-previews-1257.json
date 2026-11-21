@@ -184,8 +184,30 @@
       "rowTypes": [
         "FlowSummary"
       ],
-      "status": "baseline-review-pending",
-      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters."
+      "status": "implemented-validation-pending",
+      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters.",
+      "family": "Flow",
+      "coordinates": "Exact ScopeRef + FlowId Namespace + Name; typed Flow snapshot transport.",
+      "overview": "/flows/{name}?namespace={namespace}&scopeRef={owner}&context={context}#overview",
+      "edit": "/flows/{name}?namespace={namespace}&scopeRef={owner}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Designer (existing non-orchestration capability)"
+      ],
+      "summary": "Shared saved Identity/configuration/topology; publication date only when already known to full caller.",
+      "loader": "Existing GetFlowSnapshotAsync(namespace,name,owner), cancellation and permission-loss/context clearing.",
+      "tests": [
+        "FlowResourcePreviewTests",
+        "FlowProcessSummaryTests",
+        "FlowDetailsDesignerTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 91 flows tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
