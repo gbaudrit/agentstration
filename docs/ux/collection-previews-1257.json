@@ -896,6 +896,36 @@
       ],
       "validation": "Release component/test build passed without warnings/errors; 48 function kinds tests passed. Browser and final offline checks remain pending.",
       "evidence": "evidence/1257/function-kinds/README.md"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "rowTypes": [
+        "PackProjectResource"
+      ],
+      "status": "implemented-validation-pending",
+      "family": "PackProject",
+      "coordinates": "Workspace owner + default metadata namespace + persisted GUID N name; server-assigned UID is a separate identity fact.",
+      "overview": "/pack-projects/{uid}?scopeRef={owner}&namespace={namespace}&resourceName={name}&context={context}#overview",
+      "edit": "/pack-projects/{uid}?scopeRef={owner}&namespace={namespace}&resourceName={name}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Native project metadata and source provenance; no source-document/archive/build reads.",
+      "loader": "GetProjectAtAddressAsync",
+      "tests": [
+        "PackProjectResourcePreviewTests",
+        "PackProjectDetailsTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 82 pack projects tests passed. Browser and final offline checks remain pending."
     }
   ],
   "surfaces": [

@@ -183,7 +183,7 @@ public partial class Packs
     private async Task RetryAsync() { if (Context.Error is not null) await Context.LoadAsync(cancellation.Token); await LoadAsync(); }
     private void ClearCatalog()
     {
-        packCollectionPreview?.Close(); packs = null; projects = null; selected = null; sourceDisplayName = sourceUrl = null; error = null;
+        projectCollectionPreview?.Close(); packCollectionPreview?.Close(); packs = null; projects = null; selected = null; sourceDisplayName = sourceUrl = null; error = null;
         installOpen = forkOpen = confirmUninstall = false;
         modelProfiles = []; modelProviders = []; runtimeProfiles = []; extensionRegistrations = []; parameters = []; secrets = [];
         archive = null; preview = null; bindingSelections.Clear();

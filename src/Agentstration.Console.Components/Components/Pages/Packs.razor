@@ -55,7 +55,7 @@
             <div class="pack-resource-list">
                 @foreach (var project in projects)
                 {
-                    <article><CollectionIdentity DisplayName="@(project.Definition.DisplayName ?? project.Definition.PackName)" Namespace="@project.Namespace.Value" Name="@project.Name" Href="@($"/pack-projects/{project.Uid:D}")" IconName="package"><Versions><CollectionVersion Label="@T("TargetArchiveVersion")" Value="@(project.Definition.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="project.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(project.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><span class="pack-kind">@T("Project")</span><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small><CollectionActions ResourceName="@(project.Definition.DisplayName ?? project.Definition.PackName)"><button class="text-button" @onclick="() => OpenProject(project.Uid)">@T("Open")</button></CollectionActions></article>
+                    <article><CollectionIdentity DisplayName="@(project.Definition.DisplayName ?? project.Definition.PackName)" Namespace="@project.Namespace.Value" Name="@project.Name" Href="@ProjectUrl(project, "overview")" IconName="package"><Versions><CollectionVersion Label="@T("TargetArchiveVersion")" Value="@(project.Definition.Version)" /></Versions><IconBadges><ResourceScopeBadge ScopeRef="project.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(project.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><span class="pack-kind">@T("Project")</span><small><code>@project.Definition.Publisher/@project.Definition.PackName</code> · @PurposeLabel(project.Definition.Purpose) · @AudienceLabel(project.Definition.Audience)</small><CollectionActions ResourceName="@(project.Definition.DisplayName ?? project.Definition.PackName)"><a href="@ProjectUrl(project, "overview")">@Shared["OpenItem"]</a>@if (CanEditProject(project)) { <a href="@ProjectUrl(project, "definition/configuration")">@Shared["EditDefinition"]</a> }<button type="button" data-testid="pack-project-preview" @onclick="() => OpenProjectPreview(project)">@Shared["Preview"]</button></CollectionActions></article>
                 }
             </div>
         </section>
@@ -224,7 +224,18 @@
     <ChildContent Context="address"><InstalledPackResourcePreview Address="address" OverviewHref="@PackPreviewUrl(address)" DefinitionHref="@PackPreviewUrl(address)" /></ChildContent>
 </ResourceCollectionPreview>
 
+<ResourceCollectionPreview @ref="projectCollectionPreview" ResourceKind="@PackAuthoringKinds.PackProject" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><PackProjectResourcePreview Address="address" OverviewHref="@ProjectPreviewUrl(address, "overview")" DefinitionHref="@ProjectPreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? projectCollectionPreview;
+    private bool CanEditProject(PackProjectResource project) => project.ScopeRef?.Value == Context.Current?.SelectedScopeRef && !project.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(project.ScopeRef, Services);
+    private string ProjectUrl(PackProjectResource project, string section) => ResourceOwnershipContext.PreserveNavigation($"/pack-projects/{project.Uid:D}?scopeRef={Uri.EscapeDataString(project.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(project.Namespace.Value)}&resourceName={Uri.EscapeDataString(project.Name)}#{section}", Services);
+    private string ProjectPreviewUrl(ScopedResourceAddress address, string section) => Guid.TryParseExact(address.Name, "N", out var id)
+        ? ResourceOwnershipContext.Resource(Services, "/pack-projects", id.ToString("D"), address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section : ResourceOwnershipContext.PreserveNavigation("/packs", Services);
+    private void OpenProjectPreview(PackProjectResource project) { if (project.ScopeRef is { } owner) projectCollectionPreview?.Open(ScopedResourceAddress.Create(owner, project.Namespace, PackAuthoringKinds.PackProject, project.Name)); }
+
     private ResourceCollectionPreview? packCollectionPreview;
     private bool CanManageInstallation(InstalledPackResource pack) => !pack.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && pack.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(pack.ScopeRef, Services);
     private string PackOverviewUrl(InstalledPackResource pack) => ResourceOwnershipContext.Resource(Services, "/packs/resources", pack.Name, pack.Namespace, pack.ScopeRef);

@@ -7027,7 +7027,7 @@
     },
     {
       "id": "pack-project-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/PackProjectResourceSummary.razor",
       "host": "console",
       "routes": [
         "/pack-projects/{ProjectId:guid}"
@@ -7041,7 +7041,7 @@
       "informationKeys": [
         "Project.Value"
       ],
-      "line": 54,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -19041,6 +19041,11 @@
       "source": "src/Agentstration.Console.Components/Components/Pages/InstalledPackDetails.razor",
       "classification": "inventoried",
       "reason": "Read-only detail adapter composes the shared saved installation Summary."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/PackProjectResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared saved Pack Project Summary."
     }
   ],
   "reconciliation": {

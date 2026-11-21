@@ -29,6 +29,8 @@ public interface IPacksClient
         throw new NotSupportedException("This client does not support Pack composition.");
     Task<IReadOnlyList<PackProjectResource>> GetProjectsAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<PackProjectResource>> GetProjectAsync(Guid projectId, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<PackProjectResource>> GetProjectAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Pack Project reads.");
     Task<ResourceSnapshot<PackProjectResource>> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, string etag, CancellationToken cancellationToken);
     Task<IReadOnlyList<PackProjectSourceDocument>> GetProjectResourcesAsync(Guid projectId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Pack Project source editing.");
@@ -132,6 +134,15 @@ public sealed class PacksApiClient(HttpClient httpClient) : IPacksClient
     {
         using var response = await httpClient.GetAsync(ProjectPath(projectId), cancellationToken);
         return await ReadResourceAsync<PackProjectResource>(response, "Pack Project", cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<PackProjectResource>> GetProjectAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != PackAuthoringKinds.PackProject || address.ScopeRef == default || address.ScopeRef.Kind != ResourceScopeKind.Workspace || !address.Namespace.IsDefault
+            || !Guid.TryParseExact(address.Name, "N", out var id) || id == Guid.Empty)
+            throw new HttpRequestException("The exact Pack Project address is unavailable.", null, System.Net.HttpStatusCode.NotFound);
+        using var response = await httpClient.GetAsync($"api/pack-projects/resources/{Uri.EscapeDataString(address.Name)}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}", token);
+        return await ReadResourceAsync<PackProjectResource>(response, "Pack Project", token);
     }
 
     public async Task<ResourceSnapshot<PackProjectResource>> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, string etag, CancellationToken cancellationToken)

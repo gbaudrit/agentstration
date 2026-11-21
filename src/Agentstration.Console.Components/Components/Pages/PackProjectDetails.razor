@@ -23,8 +23,7 @@
     </Feedback>
     <OverviewMetrics><MetricCard Label="@T("Revision")" Value="@(project?.Value.Definition.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /><MetricCard Label="@T("Project.Generation")" Value="@(project?.Value.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /><MetricCard Label="@T("Builds")" Value="@(builds?.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /><MetricCard Label="@T("PackResources")" Value="@(sourceDocuments?.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /></OverviewMetrics>
     <IdentityDetails>@if (project is { Value.Definition: var definition }) { <dt>@T("Publisher")</dt><dd>@definition.Publisher</dd><dt>@T("PackIdentity")</dt><dd>@definition.PackName</dd> }</IdentityDetails>
-    <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
-    <OverviewContent>@Provenance</OverviewContent>
+    <OverviewSummary Context="identity">@if (project is not null) { <PackProjectResourceSummary Resource="project.Value" Identity="identity" /> }</OverviewSummary>
     <DefinitionContent Context="path">
         <ResourceDefinitionForm @key="metadataContext" @ref="definitionForm" Id="@formId" EditContext="metadataContext" FieldLabels="FieldLabels" Sections="presentations" SectionState="sectionState" SectionContent="MetadataSection" SectionRequested="ShowSection"
             ReadOnly="@(!CanAuthor)" Busy="commandBusy" OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidMetadata = value" data-testid="pack-project-form" />
@@ -49,13 +48,6 @@
         <FormField Label="@T("Purpose")"><ChildContent><ClearableSelect @bind-Value="model.Purpose">@foreach (var value in Enum.GetValues<PackPurpose>()) { <option value="@value">@T($"Purpose.{value}")</option> }</ClearableSelect></ChildContent><Validation><ValidationMessage For="() => model.Purpose" /></Validation></FormField>
         <FormField Label="@T("Categories")"><ClearableText @bind-Value="model.Categories" /></FormField><FormField Label="@T("Tags")"><ClearableText @bind-Value="model.ManifestTags" /></FormField>
     </FormGrid></FormSection>;
-    private sealed record Setting(string Name, string Value);
-    private IReadOnlyList<Setting> Settings => project is not { Value.Definition: var definition } ? [] : [new(T("Publisher"), definition.Publisher), new(T("TechnicalName"), definition.PackName), new(T("Version"), definition.Version), new(T("Audience"), T($"Audience.{definition.Audience}")), new(T("Purpose"), T($"Purpose.{definition.Purpose}")), new(T("Categories"), string.Join(", ", definition.Categories)), new(T("Tags"), string.Join(", ", definition.Tags)), new(T("Source"), T(definition.SourceKind == PackProjectSourceKind.Fork ? "ForkedFrom" : "WorkspaceResourceSnapshot"))];
-    private RenderFragment ConfigurationSummary => @<CollectionView TItem="Setting" Items="Settings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Project.Value") })"><Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity><Information Context="row"><CollectionValue Label="@T("Project.Value")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView>;
-    private RenderFragment Provenance => @<FormSection Title="@T("Source")">@if (project is { Value.Definition: var definition }) {
-        @if (definition.Origin is { } origin) { <p>@T("ForkedFrom") <code>@origin.Publisher/@origin.Name</code> · @origin.Version</p> }
-        <dl class="resource-details"><dt>@T("SourceHash")</dt><dd><ValueDisclosure Value="@definition.SourceArtifact.Sha256" /></dd><dt>@T("Created")</dt><dd>@definition.CreatedAt.ToLocalTime().ToString("g")</dd><dt>@T("Project.Updated")</dt><dd>@definition.UpdatedAt.ToLocalTime().ToString("g")</dd></dl>
-    }</FormSection>;
     private RenderFragment SourcesPanel => @<FormSection Title="@T("PackResources")" Description="@T("PackResourcesHelp")" TestId="pack-source-resources">
         @if (sourceDocuments is null) { <p>@T("Project.SourcesUnavailable")</p> }
         else if (sourceDocuments.Count == 0) { <EmptyState Title="@T("NoSourceResource")" Message="@T("NoSourceResourceHelp")" /> }

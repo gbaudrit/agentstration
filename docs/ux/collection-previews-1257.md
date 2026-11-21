@@ -161,3 +161,9 @@ Validation: Release component/test build passed without warnings/errors; 48 func
 Saved installation identity/version, destination namespace, purpose/audience, source/installation facts, persisted Source provenance and declared binding/managed-resource records. The existing native management panel and new read-only details reuse the same saved Summary. Preview reads exactly one canonical Pack address through the existing scoped endpoint; malformed/non-default-namespace addresses never scan or fall back. Installation management remains a separate supplied navigation action for authorized owned installations, with its existing dialogs/ETags. The family Preview uses `IPacksClient.GetPackAtAddressAsync(exact address, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 70 installed packs tests passed. Browser and final offline checks remain pending.
+
+## PackProject
+
+The embedded project catalog gets independent Open, authorized Edit and Preview actions. Both overview and Preview share the native saved metadata and source provenance. Exact reads use the Workspace owner, default namespace and persisted GUID N name, retain the independent server-assigned UID for the full-detail route, and do not enumerate projects, archives, source documents or builds. Existing editing/build/installation guards remain in the full view.
+
+Validation: Release component/test build passed without warnings/errors; 82 pack projects tests passed. Browser and final offline checks remain pending.
