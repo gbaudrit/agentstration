@@ -21,3 +21,9 @@ Validation: Console component/test project Release build passed with zero warnin
 Saved format, dialect, schema content and Source evidence. No formats catalog or version-history read in Preview. The family Preview uses `ISchemasClient.GetSchemaAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed with zero warnings/errors; 91 Schema tests passed, including exact-address Preview, bilingual disclosure and existing editor/collection regressions. Browser checks remain pending.
+
+## Vault
+
+Saved Vault identity, provider type and descendant-use policy; initialization and key operations stay on the full detail page. The family Preview uses `ISecretsClient.GetVaultAsync(name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 43 Vault tests passed. Browser and final offline checks remain pending.

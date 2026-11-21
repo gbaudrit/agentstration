@@ -398,7 +398,27 @@
       "rowTypes": [
         "VaultResponse"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Vault",
+      "coordinates": "Exact ScopeRef + default Namespace + Name; reject non-default namespace before reading.",
+      "overview": "/vaults/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/vaults/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved Vault identity, provider type and descendant-use policy; initialization and key operations stay on the full detail page.",
+      "loader": "ISecretsClient.GetVaultAsync(name, owner, token)",
+      "tests": [
+        "VaultResourcePreviewTests",
+        "VaultCollectionTests"
+      ],
+      "validation": "Release component/test build passed; 43 Vault tests passed; browser/final offline checks pending."
     }
   ],
   "surfaces": [

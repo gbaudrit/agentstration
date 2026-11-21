@@ -6033,11 +6033,12 @@
     },
     {
       "id": "vault-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
-      "line": 41,
+      "source": "src/Agentstration.Console.Components/Components/VaultResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/vaults/{Name}"
+        "/vaults/{Name}",
+        "/vaults"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6057,7 +6058,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved Vault provider and allowed descendant scopes; component checks cover draft isolation and grants. Browser evidence is recorded after host validation."
+        "interpretation": "Saved Vault configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18891,6 +18892,11 @@
       "source": "src/Agentstration.Console.Components/Components/SchemaResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved Schema configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/VaultResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Vault configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
