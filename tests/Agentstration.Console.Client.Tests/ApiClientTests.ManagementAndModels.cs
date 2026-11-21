@@ -434,7 +434,7 @@ public sealed partial class ApiClientTests
     {
         string? path = null;
         HttpMethod? method = null;
-        var expected = new ModelDiscoveryDiffResponse(2, 1, 3, 1, 0, 7);
+        var expected = new ModelProviderStatusResponse("ollama/local", "unknown", DateTimeOffset.MinValue, null);
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
             path = request.RequestUri!.PathAndQuery;

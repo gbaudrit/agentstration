@@ -1,0 +1,7 @@
+apiVersion: agentstration.io/v1
+kind: ModelProvider
+metadata: { name: bootstrap-ollama }
+definition:
+  displayName: Ollama local
+  extension: { id: Agentstration.Extensions.Ollama }
+  contributionId: ollama

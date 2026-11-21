@@ -1519,6 +1519,12 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
+                // This fixture belongs to the test root and is compiled into
+                // the two independently bounded Bootstrap test processes.
+                if (include.Replace('\\', '/') == "../BootstrapApiOnlyWebApplicationFactory.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
+                        or "Agentstration.Management.Bootstrap.Scenarios.Tests") continue;
+
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.
                 if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"
@@ -1689,7 +1695,7 @@ public sealed class DependencyTests
             var enabled = variables.TryGetProperty("Agentstration__Lan__Enabled", out var lan)
                 && bool.Parse(lan.GetString()!);
             Assert.AreEqual(profile.Name is "https-LAN" or "https-LAN-NoBootstrap", enabled);
-            Assert.AreEqual(profile.Name is "https" or "https-LAN",
+            Assert.AreEqual(profile.Name is "https" or "https-LAN" or "https-BootstrapExtensions" or "https-BootstrapOllama",
                 bool.Parse(variables.GetProperty("Agentstration__Bootstrap__InitialBootstrapEnabled").GetString()!));
 
             foreach (var key in new[] { "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL", "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL" })

@@ -48,6 +48,7 @@ public sealed partial class SecurityApiTests
                 RouteThroughTestServer<IUserPreferencesClient>(services, handlerFactory);
                 RouteThroughTestServer<IIdentityAdministrationApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IManagementApiClient>(services, handlerFactory);
+                RouteThroughTestServer<IBootstrapStartupApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IModelProvidersClient>(services, handlerFactory);
                 RouteThroughTestServer<IFlowApiClient>(services, handlerFactory);
                 RouteThroughTestServer<IRuntimeApiClient>(services, handlerFactory);

@@ -10,6 +10,7 @@ public sealed record AepEnrollmentPolicyOptions
     public const string SectionName = "Agentstration:Aep:Enrollment";
     public bool PairingCodeAllowed { get; init; } = true;
     public bool SharedKeyFileAllowed { get; init; } = true;
+    public string? AutoEnrollmentLevel { get; init; }
 }
 
 public sealed class AepEnrollmentSettingsService(

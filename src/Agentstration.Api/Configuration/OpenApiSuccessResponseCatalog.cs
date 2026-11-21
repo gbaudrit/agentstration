@@ -329,9 +329,10 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/modelproviders", StringComparison.OrdinalIgnoreCase))
         {
             if (path == "/api/modelproviders") return method == "POST" ? Json<ModelProviderResource>(201, "Create a model provider") : Json<ValueResponse<ModelProviderResponse>>(200, "List model providers");
-            if (path.EndsWith("/models/refresh", StringComparison.OrdinalIgnoreCase)) return Json<ModelDiscoveryDiffResponse>(200, "Refresh a Model Provider inventory");
+            if (path.EndsWith("/models/refresh", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderStatusResponse>(202, "Queue a Model Provider inventory refresh");
             if (path.EndsWith("/models", StringComparison.OrdinalIgnoreCase)) return Json<ValueResponse<AvailableModelResponse>>(200, "List provider models");
-            if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase) || path.EndsWith("/test", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderStatusResponse>(200, "Get model provider status");
+            if (path.EndsWith("/test", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderStatusResponse>(202, "Queue a model provider connection test and discovery");
+            if (path.EndsWith("/status", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderStatusResponse>(200, "Get model provider status");
             if (path.EndsWith("/usages", StringComparison.OrdinalIgnoreCase)) return Json<ModelProviderUsagesResponse>(200, "List model provider usages");
             return Json<ModelProviderResource>(200, method == "PUT" ? "Update a model provider" : "Get a model provider");
         }
@@ -522,7 +523,9 @@ internal static class OpenApiSuccessResponseCatalog
         if (path == "/api/bootstrap/profiles/preview" && method == "POST")
             return Json<BootstrapCompositionPreview>(200, "Preview bootstrap profiles");
         if (path == "/api/bootstrap/applications" && method == "POST")
-            return Json<BootstrapApplicationResource>(201, "Apply bootstrap profiles");
+            return Json<BootstrapApplicationResource>(202, "Start a durable bootstrap application");
+        if (path == "/api/bootstrap/applications/{applicationId}/cancel" && method == "POST")
+            return Json<BootstrapApplicationResource>(202, "Request bootstrap application cancellation");
         if (path == "/api/bootstrap/applications/{applicationId}" && method == "GET")
             return Json<BootstrapApplicationResource>(200, "Get a bootstrap application");
         return null;

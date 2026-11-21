@@ -121,8 +121,9 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             await providerResponse.Content.ReadAsStringAsync());
         using var refreshResponse = await client.PostAsync(
             "/api/modelproviders/workspace-visible-provider/models/refresh", null);
-        Assert.AreEqual(HttpStatusCode.OK, refreshResponse.StatusCode,
+        Assert.AreEqual(HttpStatusCode.Accepted, refreshResponse.StatusCode,
             await refreshResponse.Content.ReadAsStringAsync());
+        await ProcessDiscoveryAsync(factory, "workspace-visible-provider");
         using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
             "workspace-visible-profile",
             new ModelProfileProperties
@@ -966,7 +967,8 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
             providerProperties));
         Assert.AreEqual(HttpStatusCode.Created, providerResponse.StatusCode);
         using var refreshResponse = await client.PostAsync("/api/modelproviders/diagnostic-local/models/refresh", null);
-        Assert.AreEqual(HttpStatusCode.OK, refreshResponse.StatusCode);
+        Assert.AreEqual(HttpStatusCode.Accepted, refreshResponse.StatusCode);
+        await ProcessDiscoveryAsync(factory, "diagnostic-local");
         using var profileResponse = await client.PostAsJsonAsync("/api/modelprofiles", new CreateModelProfileRequest(
             "incompatible-profile",
             new ModelProfileProperties
@@ -1015,6 +1017,7 @@ public sealed class ModelProfileApiTests : ModelManagementApiTestBase
         overrideRequest.Headers.IfMatch.ParseAdd(providerEtag);
         using var overrideResponse = await client.SendAsync(overrideRequest);
         Assert.AreEqual(HttpStatusCode.OK, overrideResponse.StatusCode);
+        await ProcessDiscoveryAsync(factory, "diagnostic-local");
 
         resolution = await client.GetFromJsonAsync<ModelProfileResolutionResponse>(
             "/api/modelprofiles/incompatible-profile/resolution");

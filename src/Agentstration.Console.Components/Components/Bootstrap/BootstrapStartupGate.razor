@@ -1,0 +1,66 @@
+@inject IBootstrapStartupApiClient Client
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@implements IDisposable
+
+@if (denied)
+{
+    <BootstrapStartupLayout ShowNotice="false"><Body><ErrorState Title="@Localizer["AccessUnavailable"]" Message="@Localizer["AccessUnavailableDescription"]" /></Body></BootstrapStartupLayout>
+}
+else if (error)
+{
+    <BootstrapStartupLayout ShowNotice="false"><Body><ErrorState Title="@Localizer["ConnectionLost"]" Message="@Localizer["GateConnectionLostDescription"]"><button class="button-secondary" @onclick="CheckAsync">@Localizer["Retry"]</button></ErrorState></Body></BootstrapStartupLayout>
+}
+else if (allowed)
+{
+    @if (RouteContent is not null) { @RouteContent(ready) }
+    else { @ChildContent }
+}
+else
+{
+    <LoadingState Message="@Localizer["Checking"]" />
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment<bool>? RouteContent { get; set; }
+    private readonly CancellationTokenSource stopping = new();
+    private bool allowed, denied, error, ready;
+    private string? admittedPath;
+    private int revision;
+
+    protected override Task OnParametersSetAsync()
+    {
+        var path = CurrentRelativeUrl().Split('?', '#')[0];
+        // Readiness is final for this instance. Context/query updates must retain
+        // the admitted route and its layout while their JS initialization runs.
+        return ready || (allowed && string.Equals(admittedPath, path, StringComparison.Ordinal))
+            ? Task.CompletedTask : CheckAsync();
+    }
+    private string CurrentRelativeUrl() => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+    private async Task CheckAsync()
+    {
+        var request = ++revision;
+        var relative = CurrentRelativeUrl();
+        var path = relative.Split('?', '#')[0];
+        allowed = denied = error = false;
+        try
+        {
+            var admission = await Client.GetAdmissionAsync(stopping.Token);
+            if (request != revision || stopping.IsCancellationRequested) return;
+            ready = admission.Ready;
+            if (!admission.Ready && path != BootstrapStartupNavigation.ProgressPath && !BootstrapStartupNavigation.IsInspectionPath(path))
+                Navigation.NavigateTo(BootstrapStartupNavigation.ProgressUrl(relative).TrimStart('/'), replace: true);
+            else { admittedPath = path; allowed = true; }
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { if (request == revision) denied = true; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Navigation.NavigateTo("login?ReturnUrl=" + Uri.EscapeDataString(BootstrapStartupNavigation.LocalReturnUrl("/" + Navigation.ToBaseRelativePath(Navigation.Uri))), forceLoad: true);
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or InvalidOperationException or OperationCanceledException)
+        { if (request == revision) error = true; }
+    }
+    public void Dispose() { stopping.Cancel(); stopping.Dispose(); }
+}

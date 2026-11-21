@@ -320,7 +320,7 @@ public sealed class ModelProfileManagementService(
         }
         var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType));
         if (discovery is null) return new(profile, provider, new("unknown", "No discovery adapter."), null, "unknown", ["No provider discovery adapter is registered."]);
-        var health = await discovery.GetHealthAsync(provider, cancellationToken);
+        var health = (await providerConfigurations.GetViewRequiredAsync(provider.Namespace, provider.Name, cancellationToken)).Health;
         if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase)) return new(profile, provider, health, null, "unavailable", [health.Details ?? "Provider unavailable."]);
         var modelResource = await modelDiscovery.FindAsync(provider.Uid, profile.Definition.Model.Name, cancellationToken);
         if (modelResource is null) return new(profile, provider, health, null, "unavailable", ["The configured model has not been discovered."]);

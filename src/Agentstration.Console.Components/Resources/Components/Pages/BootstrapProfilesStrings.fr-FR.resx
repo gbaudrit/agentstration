@@ -21,4 +21,41 @@
   <data name="SourceSelection" xml:space="preserve"><value>Source {0}/{1} · locale du contenu {2}</value></data><data name="SourceVersion" xml:space="preserve"><value>Version de la Source</value></data><data name="ContentLocale" xml:space="preserve"><value>Locale du contenu</value></data><data name="ContentPath" xml:space="preserve"><value>Chemin du contenu</value></data>
 <data name="BindingTargetKind.Parameter"><value>Paramètre</value></data><data name="InheritedScope"><value>portée visible</value></data>
   <data name="BindingTargetKind.Tool" xml:space="preserve"><value>Outil</value></data>
+  <data name="BindingTargetKind.ConnectedServiceType" xml:space="preserve"><value>Type de service connecté</value></data>
+  <data name="BindingTargetKind.StorageType" xml:space="preserve"><value>Type de stockage</value></data>
+  <data name="BindingTargetKind.DataSourceProfile" xml:space="preserve"><value>Profil de source de données</value></data>
+
+  <data name="ProcessedCount" xml:space="preserve"><value>{0} ressources traitées sur {1}</value></data>
+  <data name="ProgressLabel" xml:space="preserve"><value>Progression de l’application Bootstrap</value></data>
+  <data name="PreparingApplication" xml:space="preserve"><value>Préparation de l’application…</value></data>
+  <data name="CurrentResource" xml:space="preserve"><value>Ressource {0} :</value></data>
+  <data name="ObservationInterrupted" xml:space="preserve"><value>La progression est temporairement indisponible. Reconnexion à la même application…</value></data>
+  <data name="ApplicationStatus.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="CancelApplication" xml:space="preserve"><value>Annuler l’application</value></data>
+  <data name="CancellationRequested" xml:space="preserve"><value>Annulation demandée. La ressource en cours peut terminer son traitement.</value></data>
+<data name="ApplicationCancelled" xml:space="preserve"><value>L’application a été annulée. Les ressources déjà créées sont conservées.</value></data>
+<data name="ApplicationInterrupted" xml:space="preserve"><value>L’application a été interrompue. Prévisualisez les profils avant de démarrer une nouvelle application.</value></data>
+<data name="ApplicationFailed" xml:space="preserve"><value>L’application n’a pas pu se terminer. Prévisualisez les profils avant de réessayer.</value></data>
+<data name="ApplicationInvalid" xml:space="preserve"><value>Les profils ou la cible ont changé, ou la validation a échoué. Prévisualisez à nouveau l’application.</value></data>
+<data name="ProcessedResources" xml:space="preserve"><value>{0} ressource(s) traitée(s)</value></data>
+<data name="RequestIdentityConflict" xml:space="preserve"><value>Cette identité de requête appartient déjà à une autre application. Prévisualisez à nouveau les profils.</value></data>
+<data name="ApplicationQueueFull" xml:space="preserve"><value>Suivez les applications en cours avant d’en soumettre une nouvelle.</value></data>
+  <data name="SearchProfiles" xml:space="preserve"><value>Rechercher des profils</value></data>
+  <data name="SearchResources" xml:space="preserve"><value>Rechercher des ressources</value></data>
+  <data name="Resources" xml:space="preserve"><value>Ressources</value></data>
+  <data name="Preparation" xml:space="preserve"><value>Préparation</value></data>
+  <data name="PreparationDescription" xml:space="preserve"><value>Validation des profils sélectionnés et de leur source exacte avant application des ressources.</value></data>
+  <data name="ObservedResourcesOnly" xml:space="preserve"><value>Cette ancienne application conserve uniquement les ressources observées ; les groupes non observés ne sont pas reconstitués.</value></data>
+  <data name="CatalogConfiguration" xml:space="preserve"><value>Configuration du catalogue</value></data>
+  <data name="CloseConfiguration" xml:space="preserve"><value>Fermer</value></data>
+  <data name="BackToSelection" xml:space="preserve"><value>Retour à la préparation</value></data>
+  <data name="PlanOrderHelp" xml:space="preserve"><value>Chaque profil possède sa propre cible. Les profils Instance sont appliqués avant les profils Tenant, puis Workspace. Vous pouvez réordonner les profils au sein du même niveau.</value></data>
+  <data name="PlanTargets" xml:space="preserve"><value>Profils et cibles</value></data>
+  <data name="ValidationDeferred" xml:space="preserve"><value>La validation de ce profil sera complétée après la mise à disposition de sa cible et des ressources précédentes. L’exécution s’arrête au premier échec ; les ressources déjà créées sont conservées.</value></data>
+  <data name="PlanTargetInvalid" xml:space="preserve"><value>Choisissez une cible valide pour chaque profil sélectionné. Une cible prévue doit être créée par un profil précédent.</value></data>
+  <data name="PlanBindingsInvalid" xml:space="preserve"><value>Vérifiez les liaisons requises et les profils qui fournissent leurs ressources.</value></data>
+  <data name="MultipleTargets" xml:space="preserve"><value>Plusieurs cibles</value></data>
+  <data name="TargetForProfile" xml:space="preserve"><value>Cible de {0}</value></data>
+  <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation différée</value></data>
+  <data name="ApplicationTitle" xml:space="preserve"><value>Application du bootstrap</value></data>
 </root>

@@ -697,6 +697,7 @@ export const TestIds = {
     sourceDefinitionForm: 'source-definition-form',
     sourceSave: 'source-save',
     bootstrapProfiles: 'distribution-bootstrap-profiles',
+    bootstrapApplicationProgress: 'bootstrap-application-progress',
     packs: 'distribution-packs',
     packComposer: 'distribution-pack-composer',
     packProjectDetails: 'distribution-pack-project-details',

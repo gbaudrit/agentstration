@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: load-test
+definition:
+  displayName: TEST ONLY - Bootstrap load test
+  description: 512 offline Tenant Parameters for progress and timeout regression testing. Never apply automatically.
+  targetScope: tenant

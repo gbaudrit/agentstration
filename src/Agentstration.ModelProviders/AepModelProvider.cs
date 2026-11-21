@@ -2,6 +2,7 @@ using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
 using Agentstration.Aep.MicrosoftExtensionsAI;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Parameters;
 using Agentstration.Resources;
@@ -18,7 +19,8 @@ public sealed class AepModelProvider(
     ISecretCapabilityService? capabilities = null,
     IParameterResolver? parameters = null,
     IConfiguration? configuration = null,
-    AepInferenceOptions? inferenceOptions = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+    AepInferenceOptions? inferenceOptions = null,
+    IRequestContextScopeFactory? requestScopes = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -375,7 +377,7 @@ public sealed class AepModelProvider(
                 provider.Namespace,
                 provider.ExtensionScopeRef,
                 provider.Extension.Name,
-                secrets),
+                secrets, requestScopes),
             expectedExtensionId: provider.ExpectedExtensionId);
     }
 
@@ -405,7 +407,7 @@ public sealed class AepModelProvider(
                 registration.Namespace,
                 registration.ScopeRef,
                 registration.Name,
-                secrets),
+                secrets, requestScopes),
             expectedExtensionId: definition.ExpectedExtensionId);
     }
 

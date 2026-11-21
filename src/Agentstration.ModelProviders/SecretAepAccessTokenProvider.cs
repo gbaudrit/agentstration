@@ -1,6 +1,7 @@
 using System.Text;
 using Agentstration.Aep.Client;
 using Agentstration.Extensions.Contracts;
+using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
@@ -12,13 +13,18 @@ internal sealed class SecretAepAccessTokenProvider(
     ResourceReference credential,
     ResourceNamespace extensionNamespace,
     ResourceScopeRef extensionScopeRef,
-    string extensionName) : IAepAccessTokenProvider
+    string extensionName,
+    IRequestContextScopeFactory? requestScopes) : IAepAccessTokenProvider
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public async ValueTask<string?> GetAccessTokenAsync(CancellationToken cancellationToken = default)
     {
         var address = credential.Resolve(extensionNamespace, SecretResourceKinds.Secret);
+        // Transport credentials belong to the trusted registration. Keep the
+        // Secret's consumer/use-policy checks while reading its private metadata
+        // outside the model consumer's discovery projection.
+        using var transportScope = requestScopes?.PushSystem();
         using var resolved = await secrets.ResolveAsync(
             new SecretReference(address, credential.ScopeRef),
             new SecretResolutionContext(
@@ -50,7 +56,8 @@ internal static class AepExtensionCredentials
         ResourceNamespace extensionNamespace,
         ResourceScopeRef? extensionScopeRef,
         string? extensionName,
-        ISecretResolver? secrets)
+        ISecretResolver? secrets,
+        IRequestContextScopeFactory? requestScopes = null)
     {
         if (authenticationMode == AepTransportAuthenticationMode.None)
         {
@@ -62,6 +69,6 @@ internal static class AepExtensionCredentials
             throw new AepProtocolException("authentication_mode_unsupported", $"AEP authentication mode '{authenticationMode}' is not supported.");
         if (credential is null || extensionScopeRef is null || string.IsNullOrWhiteSpace(extensionName) || secrets is null)
             throw new AepProtocolException("credential_configuration_invalid", "Static Bearer AEP authentication requires a scoped Secret and an available secret resolver.");
-        return new SecretAepAccessTokenProvider(secrets, credential, extensionNamespace, extensionScopeRef.Value, extensionName);
+        return new SecretAepAccessTokenProvider(secrets, credential, extensionNamespace, extensionScopeRef.Value, extensionName, requestScopes);
     }
 }

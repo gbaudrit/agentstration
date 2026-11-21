@@ -1,0 +1,9 @@
+apiVersion: agentstration.io/v1
+kind: ModelProfile
+metadata: { name: ollama-chat }
+definition:
+  displayName: Ollama Qwen3 1.7B
+  provider: { name: bootstrap-ollama, scopeRef: /instance }
+  model: { name: "qwen3:1.7b" }
+  generation:
+    temperature: 0.2

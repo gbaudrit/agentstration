@@ -416,6 +416,7 @@ public sealed partial class DeclarativeBootstrapTests
             Definition = application.Definition with
             {
                 Status = BootstrapApplicationStatus.Running,
+                ExecutionOwner = null,
                 CompletedAt = null,
                 Error = null,
                 Resources = []
@@ -1414,15 +1415,5 @@ public sealed partial class DeclarativeBootstrapTests
 
         public string Path { get; }
         public void Dispose() => Directory.Delete(Path, recursive: true);
-    }
-}
-
-internal sealed class BootstrapApiOnlyWebApplicationFactory : WebApplicationFactory<Program>
-{
-    protected override void ConfigureWebHost(IWebHostBuilder builder)
-    {
-        builder.UseEnvironment("Testing");
-        builder.UseSetting("Agentstration:Testing:ApiOnly", "true");
-        builder.UseSetting("Logging:LogLevel:Default", "Warning");
     }
 }

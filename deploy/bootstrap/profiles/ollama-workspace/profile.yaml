@@ -1,0 +1,7 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata: { name: ollama-workspace }
+definition:
+  displayName: Ollama Workspace agent
+  description: Creates a Workspace agent using the Tenant model and the built-in Microsoft Agent Framework runtime.
+  targetScope: workspace

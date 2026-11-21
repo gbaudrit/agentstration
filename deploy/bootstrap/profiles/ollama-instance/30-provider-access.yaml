@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: ResourceAccessPolicy
+metadata: { name: bootstrap-ollama-to-dev }
+definition:
+  resource: { kind: ModelProvider, name: bootstrap-ollama }
+  grants:
+    - targetLevel: /tenants/dev
+      actions: [discover, use]
