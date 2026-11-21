@@ -190,7 +190,13 @@
       "rowTypes": [
         "AgentInstanceResponse"
       ],
-      "status": "assessment-pending"
+      "status": "not-applicable-non-resource",
+      "family": "Runtime placements",
+      "decision": "AgentInstanceResponse is the current placement snapshot for a run and worker, not a persisted Agent definition. Instance ID, execution scope, run/revision, worker and capacity retain their runtime meanings. Existing Agent, run and worker links remain; no saved resource metadata or placement definition editor exists.",
+      "tests": [
+        "RuntimeObservabilityConsoleTests"
+      ],
+      "validation": "Source and native DTO contract reviewed. Existing family regressions retained; final broad verification records the synchronized result."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
@@ -1629,7 +1635,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-runtime-evidence",
+      "reason": "AgentInstanceResponse is the current placement snapshot for a run and worker, not a persisted Agent definition. Instance ID, execution scope, run/revision, worker and capacity retain their runtime meanings. Existing Agent, run and worker links remain; no saved resource metadata or placement definition editor exists."
     },
     {
       "id": "tool-definitions-tool-definition-resource",

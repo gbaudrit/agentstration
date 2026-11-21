@@ -239,3 +239,9 @@ List rendering loads its existing two metadata catalogs only. Preview adds one s
 ExecutionSummary is a bounded projection of RuntimeRun activity: run ID, execution status, start/duration and result/error. Its native /runs/{id} destination is operational diagnostics, with no saved definition, namespace or standalone authoring form. Retain native run inspection and server paging; no resource-definition Summary or Edit is manufactured.
 
 Regression ownership: `RuntimeObservabilityConsoleTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
+
+### Runtime placements
+
+AgentInstanceResponse is the current placement snapshot for a run and worker, not a persisted Agent definition. Instance ID, execution scope, run/revision, worker and capacity retain their runtime meanings. Existing Agent, run and worker links remain; no saved resource metadata or placement definition editor exists.
+
+Regression ownership: `RuntimeObservabilityConsoleTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
