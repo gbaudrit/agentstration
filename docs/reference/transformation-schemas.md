@@ -11,15 +11,51 @@ It requires no extension, external endpoint, PostgreSQL or LLM.
 
 ## Bootstrap example
 
-Apply `rss-schemas` to a Workspace through **System > Bootstrap profiles**. This
-synthetic example creates and publishes `rss-xml`, `rss-json` and `rss-mapping` at
+The same `rss-schemas` and `rss-functions` manifests can be installed at
+Instance, Tenant or Workspace scope. The catalog ships them with
+`targetScope: instance`. Before previewing an installation, set the existing
+`definition.targetScope` field in **both** `profile.yaml` descriptors to the
+chosen owner:
+
+| `targetScope` | Target selected in the existing Bootstrap procedure |
+| --- | --- |
+| `instance` | None |
+| `tenant` | Explicit Tenant |
+| `workspace` | Explicit Tenant and Workspace |
+
+The existing fixed-scope profile mechanism
+([ADR-0077](../decisions/0077-bootstrap-profiles-are-explicit-administrative-applications.md))
+reads the ownership scope from these descriptors. Resource manifests stay
+identical, omit their installation-specific owner, and keep their
+contract references relative to that owner. The engine reference remains the
+exact Instance-owned `xml-to-json-builtin@1.0.0`. The preview digest includes the
+profile contents, scope and target; change the descriptors **before** previewing.
+Profiles composed in one application must declare the same scope. Changing
+`targetScope` does not move an existing installation to another owner.
+
+Apply `rss-schemas` through **System > Bootstrap profiles**. This synthetic
+example creates and publishes `rss-xml`, `rss-json` and `rss-mapping` at
 `1.0.0`; it creates no `rss-xml-to-json` function. `definition.publishVersion` is
 an optional Bootstrap instruction. Reapplying equivalent declarations preserves
 their identities and versions. Changed definitions at the same identity produce
 a conflict instead of replacing the operator's draft.
 
-Then either apply `rss-functions` to the same Workspace, or open `rss-mapping`
+Then either apply `rss-functions` to the same target, or open `rss-mapping`
 under **Schemas > Versions**, select `1.0.0`, and use **Expose as function**.
+The two profiles may also be composed in declaration-first order in one explicit
+application. Profiles with different scopes cannot be composed together; Tenant
+and Workspace applications require their explicit target. Reapplying either
+profile preserves the existing identities, published versions and accepted pins.
+
+Ownership and use authorization are separate. A single Instance installation can
+be shared with selected descendants without copying its Schemas or Function.
+Schema `usePolicy.grants` identify authorized Tenant/Workspace scopes and may
+include their descendants; the Function uses the existing resource access grants
+(`discover`/`use`). All accepted dependencies must allow the consumer as well.
+Ordinary RBAC permissions still apply. Installing a profile grants no additional
+cross-scope use automatically. Install separate copies only for independently
+owned versions or mappings.
+
 Choose the function's technical name, display name and exact version. The action
 requires `resources/write` and authorized use of every dependency. The API is:
 
@@ -33,7 +69,7 @@ Content-Type: application/json
   "name": "rss-xml-to-json",
   "displayName": "RSS XML to JSON",
   "version": "1.0.0",
-  "scopeRef": "/workspaces/<workspace-id>",
+  "scopeRef": "/instance",
   "namespace": "default",
   "schema": { "name": "rss-mapping", "version": "1.0.0" }
 }

@@ -5,4 +5,6 @@ metadata:
 definition:
   displayName: rss-schemas
   description: Standalone RSS contracts and independent transformation declaration; creates no named function.
-  targetScope: workspace
+  # Installation owner: instance, tenant or workspace.
+  # Use the same targetScope in rss-schemas and rss-functions.
+  targetScope: instance

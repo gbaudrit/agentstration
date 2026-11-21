@@ -30,16 +30,28 @@ internal static class RssTransformationTestData
         return (await services.GetRequiredService<TransformationFunctionService>().ExposeAsync(Request(owner), default)).Value;
     }
 
-    public static BootstrapResourceOperationContext Operation(ResourceScopeRef owner) => new("rss", Path.GetTempPath(),
-        owner.Kind == ResourceScopeKind.Instance ? BootstrapProfileScope.Instance : BootstrapProfileScope.Workspace,
-        owner.Kind == ResourceScopeKind.Workspace ? new BootstrapApplicationTarget(WorkspaceId: owner.TargetId) : null);
+    public static BootstrapResourceOperationContext Operation(ResourceScopeRef owner) => owner.Kind switch
+    {
+        ResourceScopeKind.Instance => new("rss", Path.GetTempPath(), BootstrapProfileScope.Instance),
+        ResourceScopeKind.Tenant => new("rss", Path.GetTempPath(), BootstrapProfileScope.Tenant, new(TenantId: owner.TargetId)),
+        ResourceScopeKind.Workspace => new("rss", Path.GetTempPath(), BootstrapProfileScope.Workspace, new(WorkspaceId: owner.TargetId)),
+        _ => throw new ArgumentOutOfRangeException(nameof(owner))
+    };
+
+    public static string ProfilesPath
+    {
+        get
+        {
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx"))) directory = directory.Parent;
+            var root = directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
+            return Path.Combine(root, "deploy/bootstrap/profiles");
+        }
+    }
 
     private static IReadOnlyList<BootstrapResourceDocument> Read(string profile)
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx"))) directory = directory.Parent;
-        var root = directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
-        return Directory.GetFiles(Path.Combine(root, "deploy/bootstrap/profiles", profile), "*.yaml")
+        return Directory.GetFiles(Path.Combine(ProfilesPath, profile), "*.yaml")
             .Where(path => Path.GetFileName(path) != "profile.yaml").Order(StringComparer.Ordinal)
             .Select(path => ResourceManifestSerializer.FromYaml<BootstrapResourceDocument>(File.ReadAllText(path))).ToArray();
     }
