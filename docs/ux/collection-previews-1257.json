@@ -428,7 +428,26 @@
       "rowTypes": [
         "ResourcePlanSnapshot"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "ResourcePlan",
+      "coordinates": "Native Tenant/Workspace + PlanId. URL adapter uses execution Workspace/default/PlanId N; no Core UID/labels/namespace invented in Identity.",
+      "overview": "/resource-plans/{id}?scopeRef={execution-owner}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open"
+      ],
+      "summary": "Native saved plan Identity, revision, goal, schema version, status and actual updated timestamp; review bindings/change-sets remain in full view.",
+      "loader": "GetPlanAtAddressAsync; explicit current execution Workspace and default namespace validated before native scoped GET.",
+      "tests": [
+        "ResourcePlanResourcePreviewTests",
+        "ResourcePlanReviewTests",
+        "ResourcePlanCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 36 resource plans tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfiles.razor",

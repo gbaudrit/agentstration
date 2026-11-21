@@ -7095,7 +7095,7 @@
     },
     {
       "id": "resource-plan-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanResourceSummary.razor",
       "host": "console",
       "routes": [
         "/resource-plans/{Id:guid}"
@@ -7109,7 +7109,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 46,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -19061,6 +19061,11 @@
       "source": "src/Agentstration.Console.Components/Components/ModelResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Pure shared saved Model facts/native capability cards. No new collection dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared native saved Resource Plan review facts."
     }
   ],
   "reconciliation": {

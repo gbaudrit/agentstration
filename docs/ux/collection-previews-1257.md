@@ -203,3 +203,9 @@ Validation: Release component/test build passed without warnings/errors; 91 flow
 Manual/managed registrations keep independent native actions and their exact saved Preview. Standalone identity now includes actual read-only/governance and Extension provenance. Unregistered AEP enrollment rows are inspectable resources too: a second adapter reads their existing Instance/default/InstanceId N address and reuses the same pure Summary as full details. The endpoint preserves existing enrollment authorization, target visibility and sanitization; it never reads credentials, probes endpoints or issues pairing/rotation commands. Enrollments have no invented definition form.
 
 Validation: Release component/test build passed without warnings/errors; 118 extensions tests passed. Browser and final offline checks remain pending.
+
+## ResourcePlan
+
+Resource Plans are inspectable native review resources. Their collection now offers Open and lazy Preview, reusing full review's saved identity/goal/schema/status/revision facts. The URL envelope carries the execution Workspace and PlanId N; the API validates that Workspace before the existing Tenant/Workspace-scoped GET. No Core UID/labels/namespace or definition form is fabricated. Review bindings, changes, activities, validation/materialization/application and their existing draft guards stay in the full review. Internal operational Workspace presentation uses the logical administrative scope.
+
+Validation: Release component/test build passed without warnings/errors; 36 resource plans tests passed. Browser and final offline checks remain pending.
