@@ -14,16 +14,22 @@ Summaries reuse the template's Identity fragment in full details and render a co
 
 The list adds Open, authorized Edit definition and Preview. There is no row Delete command to duplicate the full editor's usage/ETag workflow. The shared saved Summary shows value type and readable value; it never resolves secrets or performs usage/picker reads. The endpoint only supports the default namespace, so other namespaces are rejected before any read. Exact owner is mandatory. The overview retains its existing usage metric and saved/draft lifecycle.
 
-Validation: Console component/test project Release build passed with zero warnings/errors; 41 Parameter component/model/collection/resource-screen/Preview tests passed. Full offline and executable desktop/mobile checks remain pending. New reusable browser journeys remain deferred in native child [#1258](https://github.com/gbaudrit/agentstration/issues/1258) until the required maintainer UX validation and merge. Neither issue is closed by these implementation increments.
+Validation: Console component/test project Release build passed with zero warnings/errors; 41 Parameter component/model/collection/resource-screen/Preview tests passed. All four desktop/mobile English/French light/dark browser variants passed; [observations](evidence/1257/parameters/README.md). Final offline lanes remain pending. New reusable browser journeys remain deferred in native child [#1258](https://github.com/gbaudrit/agentstration/issues/1258) until the required maintainer UX validation and merge. Neither issue is closed by these implementation increments.
 
 ## Schema
 
 Saved format, dialect, schema content and Source evidence. No formats catalog or version-history read in Preview. The family Preview uses `ISchemasClient.GetSchemaAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed with zero warnings/errors; 91 Schema tests passed, including exact-address Preview, bilingual disclosure and existing editor/collection regressions. Browser checks remain pending.
+Validation: Release component/test build passed with zero warnings/errors; 91 Schema tests passed, including exact-address Preview, bilingual disclosure and existing editor/collection regressions. All four desktop/mobile English/French light/dark browser variants passed; [observations](evidence/1257/schemas/README.md). Final offline lanes remain pending.
 
 ## Vault
 
 Saved Vault identity, provider type and descendant-use policy; initialization and key operations stay on the full detail page. The family Preview uses `ISecretsClient.GetVaultAsync(name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 43 Vault tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 43 Vault tests passed. All four desktop/mobile English/French light/dark browser variants passed; [observations](evidence/1257/vaults/README.md). Final offline lanes remain pending.
+
+## Secret
+
+Saved Secret metadata, Vault reference, key, localized type and descendant-use policy. Secret contents are never read or displayed; value operations and usages stay on the full detail page. The family Preview uses `ISecretsClient.GetSecretAsync(name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 40 Secret tests passed. All four desktop/mobile English/French light/dark browser variants passed; [observations](evidence/1257/secrets/README.md). Final offline lanes remain pending.

@@ -176,7 +176,7 @@
       "rowTypes": [
         "ParameterResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Parameter",
       "coordinates": "ScopeRef + default Namespace + Name; reject non-default Namespace before calling the default-only endpoint.",
       "overview": "/parameters/{name}?scopeRef={owner}&context={context}#overview",
@@ -197,7 +197,8 @@
         "ParameterCollectionTests",
         "ParameterResourceScreenTests"
       ],
-      "validation": "Release component/test build passed; 41 Parameter tests passed; browser and full offline checks pending."
+      "validation": "Release component/test build passed; 41 Parameter tests passed; browser and full offline checks pending. All four desktop/mobile English/French light/dark smoke variants passed.",
+      "evidence": "evidence/1257/parameters/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
@@ -237,7 +238,7 @@
       "rowTypes": [
         "SchemaResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Schema",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/schemas/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -257,7 +258,8 @@
         "SchemaResourcePreviewTests",
         "SchemaCollectionTests"
       ],
-      "validation": "Release component/test build passed; 91 Schema tests passed; browser and final offline checks pending."
+      "validation": "Release component/test build passed; 91 Schema tests passed; browser and final offline checks pending. All four desktop/mobile English/French light/dark smoke variants passed.",
+      "evidence": "evidence/1257/schemas/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
@@ -267,7 +269,28 @@
       "rowTypes": [
         "SecretResponse"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-smoke-passed",
+      "family": "Secret",
+      "coordinates": "Exact ScopeRef + default Namespace + Name; reject non-default namespace before reading.",
+      "overview": "/secrets/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/secrets/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved Secret metadata, Vault reference, key, localized type and descendant-use policy. Secret contents are never read or displayed; value operations and usages stay on the full detail page.",
+      "loader": "ISecretsClient.GetSecretAsync(name, owner, token)",
+      "tests": [
+        "SecretResourcePreviewTests",
+        "SecretCollectionTests"
+      ],
+      "validation": "Release component/test build passed; 40 Secret tests passed; browser/final offline checks pending. All four desktop/mobile English/French light/dark smoke variants passed.",
+      "evidence": "evidence/1257/secrets/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
@@ -398,7 +421,7 @@
       "rowTypes": [
         "VaultResponse"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Vault",
       "coordinates": "Exact ScopeRef + default Namespace + Name; reject non-default namespace before reading.",
       "overview": "/vaults/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -418,7 +441,8 @@
         "VaultResourcePreviewTests",
         "VaultCollectionTests"
       ],
-      "validation": "Release component/test build passed; 43 Vault tests passed; browser/final offline checks pending."
+      "validation": "Release component/test build passed; 43 Vault tests passed; browser/final offline checks pending. All four desktop/mobile English/French light/dark smoke variants passed.",
+      "evidence": "evidence/1257/vaults/README.md"
     }
   ],
   "surfaces": [
@@ -711,7 +735,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and lazy exact-address Preview; see the family list entry and smoke evidence."
     },
     {
       "id": "flows-flow-summary",
@@ -857,7 +882,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and lazy exact-address Preview; see the family list entry and smoke evidence."
     },
     {
       "id": "data-source-profiles-data-source-profile-resource",
@@ -899,7 +925,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and lazy exact-address Preview; see the family list entry and smoke evidence."
     },
     {
       "id": "artifacts-staged-artifact-view",
@@ -1094,7 +1121,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and lazy exact-address Preview; see the family list entry and smoke evidence."
     },
     {
       "id": "data-source-profile-editor-data-source-profile-revision-resource",
@@ -1376,7 +1404,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration facts, extracted into the shared family Summary; individual values are not independent resource targets."
     },
     {
       "id": "vault-editor-configuration-summary",
@@ -1386,7 +1415,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration facts, extracted into the shared family Summary; individual values are not independent resource targets."
     },
     {
       "id": "secret-editor-configuration-summary",
@@ -1396,7 +1426,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration facts, extracted into the shared family Summary; individual values are not independent resource targets."
     },
     {
       "id": "tool-provider-editor-configuration-summary",
@@ -1728,7 +1759,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration facts, extracted into the shared family Summary; individual values are not independent resource targets."
     },
     {
       "id": "source-registries-saved-configuration-summary",
