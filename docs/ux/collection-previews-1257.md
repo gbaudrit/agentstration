@@ -38,16 +38,22 @@ Validation: Release component/test build passed without warnings/errors; 40 Secr
 
 Saved identity, service type/version, literal options and Parameter/Secret references; no resolved secret values, catalog/discovery/usages fetch or editor draft. Reconcile and deactivation retain the full detail confirmation/ETag workflow. The family Preview uses `IConnectedServicesClient.GetConnectedServiceAsync(name, owner, namespace, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 56 Connected Service tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 56 Connected Service tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/connected-services/README.md). Final offline lanes remain pending.
 
 ## StorageType
 
 Saved identity, enabled flag, preferred immutable version, observed generic-use decision and access policy. Full details retain usages and version-contract panels without fetching usages/history for Preview. The independently supplied Preview quick actions add the existing version publication form. The family Preview uses `IStorageTypesClient.GetTypeAsync(exact address, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 54 storage types tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 54 storage types tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/storage-types/README.md). Final offline lanes remain pending.
 
 ## Storage
 
 Saved identity, pinned type/version, configuration/envelope, collections, access policy and declared Connected Service/export mappings. Preview never loads the type catalog, usages, diagnostics or document contents. The full overview retains its resolved type display name. The family Preview uses `IStoragesClient.GetAsync(exact address, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 140 storages tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 140 storages tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/storages/README.md). Final offline lanes remain pending.
+
+## DataSourceProfile
+
+Saved identity, actual known publication version, acquisition/discovery Flow references, configuration schema, tool bindings, limits and policies. Preview does not fetch revisions, Flow catalogs or pickers. Inherited row links retain the current administrative context. The family Preview uses `IDataSourceProfilesClient.GetAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 38 data source profiles tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/data-source-profiles/README.md). Final offline lanes remain pending.

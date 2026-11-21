@@ -6203,11 +6203,12 @@
     },
     {
       "id": "data-source-profile-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
-      "line": 40,
+      "source": "src/Agentstration.Console.Components/Components/DataSourceProfileResourceSummary.razor",
+      "line": 34,
       "host": "console",
       "routes": [
-        "/data-source-profiles/{Name}"
+        "/data-source-profiles/{Name}",
+        "/data-source-profiles"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6226,7 +6227,7 @@
           "tests/source-lifecycle.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved profile settings and exact declared Flow references; fresh browser validation remains pending."
+        "interpretation": "Saved DataSourceProfile configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18922,6 +18923,11 @@
       "source": "src/Agentstration.Console.Components/Components/StorageResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved Storage configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DataSourceProfileResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved DataSourceProfile configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

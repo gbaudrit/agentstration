@@ -43,7 +43,7 @@
       "rowTypes": [
         "ConnectedServiceResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "ConnectedService",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/connected-services/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -63,7 +63,8 @@
         "ConnectedServiceResourcePreviewTests",
         "ConnectedServiceCollectionTests"
       ],
-      "validation": "Release component/test build passed; 56 Connected Service tests passed; browser/final offline checks pending."
+      "validation": "Release component/test build passed; 56 Connected Service tests passed; browser/final offline checks pending.",
+      "evidence": "evidence/1257/connected-services/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
@@ -73,7 +74,28 @@
       "rowTypes": [
         "DataSourceProfileResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-smoke-passed",
+      "family": "DataSourceProfile",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/data-source-profiles/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/data-source-profiles/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, actual known publication version, acquisition/discovery Flow references, configuration schema, tool bindings, limits and policies. Preview does not fetch revisions, Flow catalogs or pickers. Inherited row links retain the current administrative context.",
+      "loader": "IDataSourceProfilesClient.GetAsync(namespace, name, owner, token)",
+      "tests": [
+        "DataSourceProfileResourcePreviewTests",
+        "DataSourceProfileCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 38 data source profiles tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/data-source-profiles/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
@@ -349,7 +371,7 @@
       "rowTypes": [
         "StorageTypeResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "StorageType",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/storage-types/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -369,7 +391,8 @@
         "StorageTypeResourcePreviewTests",
         "StorageTypeCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 54 storage types tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 54 storage types tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/storage-types/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
@@ -379,7 +402,7 @@
       "rowTypes": [
         "StorageResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Storage",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/storages/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -399,7 +422,8 @@
         "StorageResourcePreviewTests",
         "StorageCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 140 storages tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 140 storages tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/storages/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
@@ -558,7 +582,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "run-grid-flow-run",
@@ -953,7 +978,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "source-registries-source-registry-registration-view",
@@ -1360,7 +1386,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "connected-services-connected-service-resource",
@@ -1370,7 +1397,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "data-source-queries-data-source-query-tool-publication",
@@ -1432,7 +1460,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "data-source-dataset-editor-data-source-acquisition-resource",
@@ -1453,7 +1482,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "parameter-editor-configuration-summary",
@@ -1527,7 +1557,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "namespaced-agent-configuration-summary",
@@ -1853,7 +1884,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "storage-type-details-saved-configuration-summary",
@@ -1863,7 +1895,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "trigger-details-saved-configuration-summary",
