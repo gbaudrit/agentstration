@@ -209,3 +209,9 @@ Validation: Release component/test build passed without warnings/errors; 118 ext
 Resource Plans are inspectable native review resources. Their collection now offers Open and lazy Preview, reusing full review's saved identity/goal/schema/status/revision facts. The URL envelope carries the execution Workspace and PlanId N; the API validates that Workspace before the existing Tenant/Workspace-scoped GET. No Core UID/labels/namespace or definition form is fabricated. Review bindings, changes, activities, validation/materialization/application and their existing draft guards stay in the full review. Internal operational Workspace presentation uses the logical administrative scope.
 
 Validation: Release component/test build passed without warnings/errors; 36 resource plans tests passed. Browser and final offline checks remain pending.
+
+## Tool Provider embedded Tools
+
+The Provider Tools panel reuses the same saved Tool Summary and exact adapter as the standalone Tools catalog. Open selects overview; Preview is lazy and has no definition Edit. The existing activation toggle, availability/governance guards and fresh ETag path stay independent. Changing Provider identity or losing access clears the panel.
+
+Validation: Release component/test build passed without warnings/errors; 27 Provider Tools and Tool Preview tests passed. Browser and final offline checks remain pending.

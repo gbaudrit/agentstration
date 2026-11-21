@@ -50,7 +50,15 @@ else
     </ConsoleResourceDetailsTemplate>
 }
 
+<ResourceCollectionPreview @ref="toolPreview" ResourceKind="@ToolResourceKinds.Tool" ContextKey="@loadedKey" Enabled="@(provider is not null && loadState.Status != ResourceLoadStatus.Forbidden)">
+    <ChildContent Context="address"><ToolResourcePreview Address="address" OverviewHref="@(ToolPreviewUrl(address) + "#overview")" DefinitionHref="" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? toolPreview;
+    private string ToolPreviewUrl(ScopedResourceAddress address) => ResourceOwnershipContext.Resource(Services, "/tools", address.Name, address.Namespace, address.ScopeRef);
+    private void OpenToolPreview(ToolResource tool) { if (tool.ScopeRef is { } owner) toolPreview?.Open(ScopedResourceAddress.Create(owner, tool.Namespace, ToolResourceKinds.Tool, tool.Name)); }
+
     private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.ToolProvider"
         DisplayName="@model.DisplayName" DisplayNameChanged="value => model.DisplayName = value" DisplayNameExpression="@(() => model.DisplayName)"
         TechnicalName="@model.Name" TechnicalNameChanged="value => model.Name = value" TechnicalNameExpression="@(() => model.Name)"
@@ -73,12 +81,12 @@ else
         @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
         else { <CollectionView TItem="ToolResource" Items="tools" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
         <Identity Context="tool">
-<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
+<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(ToolUrl(tool) + "#overview")" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="tool">
             <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
         </Information>
         <Actions Context="tool">
-<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><ResourceActivationToggle Enabled="tool.Definition.Enabled" EnabledChanged="value => EnableAsync(tool, value)" Disabled="@(!CanMutate || busy || refreshing || tool.Governance.IsManaged || !ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" /><a class="text-button" href="@ToolUrl(tool)">@T("Inspect")</a></CollectionActions></Actions>
+<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><ResourceActivationToggle Enabled="tool.Definition.Enabled" EnabledChanged="value => EnableAsync(tool, value)" Disabled="@(!CanMutate || busy || refreshing || tool.Governance.IsManaged || !ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" /><a href="@(ToolUrl(tool) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a><button type="button" data-testid="provider-tool-preview" disabled="@(tool.ScopeRef is null)" @onclick="() => OpenToolPreview(tool)"><UiIcon Name="eye" />@Shared["Preview"]</button></CollectionActions></Actions>
     </CollectionView> }
     </section> }</div>;
     private RenderFragment Ownership => @<div>        @if (provider?.Definition.Aep?.Extension is { } extension)
@@ -189,7 +197,7 @@ else
         if (loadedKey == key) return Task.CompletedTask;
         loadedKey = key; return LoadAsync();
     }
-    private void Clear() { provider = newerProvider = null; etag = newerEtag = null; model = new(); tools = []; invalidInput = baselinePending = false; baseline = string.Empty; }
+    private void Clear() { toolPreview?.Close(); provider = newerProvider = null; etag = newerEtag = null; model = new(); tools = []; invalidInput = baselinePending = false; baseline = string.Empty; }
     private async Task LoadAsync()
     {
         var version = ++loadVersion; loading = true; busy = refreshing = false; failed = false; message = null; Clear(); loadState = new(ResourceLoadStatus.Loading);

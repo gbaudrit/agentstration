@@ -1098,6 +1098,37 @@
         "ModelProviderNavigationTests"
       ],
       "validation": "Release component/test build passed without warnings/errors; 130 models tests passed. Browser and final offline checks remain pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
+      "routes": [
+        "/tools/providers/{Name}#tools"
+      ],
+      "rowTypes": [
+        "ToolResource"
+      ],
+      "status": "implemented-validation-pending",
+      "family": "Tool (Provider embedded)",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/tools/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview",
+        "Existing guarded activation toggle with fresh ETag"
+      ],
+      "quickActions": [
+        "Open",
+        "Execution form (enabled, available, RunsExecute)"
+      ],
+      "summary": "Saved identity/configuration, capability, input/output schema summaries, observed discovery facts and known governance/provider references. Provider/Extension observations are optional saved caller inputs on the full overview, never loaded by Preview. Tools have a read-only inspection definition: Edit definition is not applicable. Preview independently offers the existing execution form only for enabled, available Tools with RunsExecute; it never invokes a Tool.",
+      "loader": "IToolsClient.GetToolAsync(owner, namespace, name, token)",
+      "tests": [
+        "ToolProviderEditorTests",
+        "ToolResourcePreviewTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 27 Provider Tools and Tool Preview tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/tools/README.md"
     }
   ],
   "surfaces": [
