@@ -245,3 +245,9 @@ Regression ownership: `RuntimeObservabilityConsoleTests`. This is an explicit no
 AgentInstanceResponse is the current placement snapshot for a run and worker, not a persisted Agent definition. Instance ID, execution scope, run/revision, worker and capacity retain their runtime meanings. Existing Agent, run and worker links remain; no saved resource metadata or placement definition editor exists.
 
 Regression ownership: `RuntimeObservabilityConsoleTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
+
+### Role assignments
+
+AccessRow is the join of a member principal and a role assignment at an explicit/inherited identity scope. Its identity belongs to that relationship, not to a Core resource namespace/name. Retain the member administration destination and existing role/authorization workflows; a resource Preview would fabricate a definition address.
+
+Regression ownership: `OrganizationAccessCollectionTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.

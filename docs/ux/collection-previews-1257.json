@@ -369,7 +369,13 @@
       "rowTypes": [
         "AccessRow"
       ],
-      "status": "assessment-pending"
+      "status": "not-applicable-non-resource",
+      "family": "Role assignments",
+      "decision": "AccessRow is the join of a member principal and a role assignment at an explicit/inherited identity scope. Its identity belongs to that relationship, not to a Core resource namespace/name. Retain the member administration destination and existing role/authorization workflows; a resource Preview would fabricate a definition address.",
+      "tests": [
+        "OrganizationAccessCollectionTests"
+      ],
+      "validation": "Source and native DTO contract reviewed. Existing family regressions retained; final broad verification records the synchronized result."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
@@ -1538,7 +1544,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-native-administration",
+      "reason": "AccessRow is the join of a member principal and a role assignment at an explicit/inherited identity scope. Its identity belongs to that relationship, not to a Core resource namespace/name. Retain the member administration destination and existing role/authorization workflows; a resource Preview would fabricate a definition address."
     },
     {
       "id": "flow-details-flow-version-response",
