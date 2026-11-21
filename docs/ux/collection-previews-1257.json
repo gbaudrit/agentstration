@@ -768,7 +768,28 @@
       "rowTypes": [
         "TriggerResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Trigger",
+      "coordinates": "Exact physical operational Workspace + namespace + name; display the logical administrative context. The requested physical owner must equal the current operational owner.",
+      "overview": "/triggers/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/triggers/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved Trigger identity, schedule, target, resolution and execution policy/input. Preview displays the logical administrative context, retaining the physical operational Workspace only in its exact address. The server rejects a requested physical owner different from the current operational context; no scope fallback, firing, schedule preview, history or Flow catalog read. Full details retain their existing failure observation and execution/history panels.",
+      "loader": "ITriggerApiClient.GetAsync(exact physical owner, namespace, name, token)",
+      "tests": [
+        "TriggerResourcePreviewTests",
+        "TriggerCollectionTests"
+      ],
+      "apiValidation": "Exact HTTP test passed for default/namespaced homonyms, ETag, missing namespace, another physical owner and a logical Instance owner without fallback. English/French component checks verify the physical Workspace is absent from identity.",
+      "validation": "Release component/test build passed without warnings/errors; 71 triggers tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",

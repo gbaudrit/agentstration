@@ -1,0 +1,51 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<TriggerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@using Agentstration.Triggers
+
+<ResourceSummary TestId="trigger-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Version="@Resource.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture)" VersionDescription="@T("GenerationLabel")" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="trigger-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="@(PresentationScopeRef ?? TriggerUi.DefinitionScope(Resource))" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="trigger-configuration-summary">
+        <CollectionView TItem="Setting" Items="Settings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Value") })" ShowViewSwitch="ShowConfigurationViewSwitch">
+        <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity><Information Context="row"><CollectionValue Label="@T("Value")">@if (row.Href is { } href) { <a class="configuration-value text-button" href="@href">@row.Value</a> } else { <span class="configuration-value">@row.Value</span> }</CollectionValue></Information>
+    </CollectionView>
+    </FormSection>
+    @AdditionalContent
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public TriggerResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private sealed record Setting(string Name, string Value, string? Href = null);
+    private IReadOnlyList<Setting> Settings =>  [
+        new(T("Schedule"), TriggerUi.ScheduleLabel(Resource.Definition.Source.Schedule, Localizer)),
+        new(T("Flow"), $"{Resource.Definition.Target.Flow!.Namespace ?? Resource.Namespace}/{Resource.Definition.Target.Flow.Name}", FlowUrl(Resource)),
+        new(T("DefinitionScope"), TriggerUi.DefinitionScope(Resource)?.Value ?? "—"),
+        new(T("Resolution"), Resource.Definition.Target.Flow.Version is { } pinnedVersion ? T("PinnedVersion", pinnedVersion) : T("ActiveVersionThenPinned")),
+        new(T("Misfire"), MisfireLabel(Resource.Definition.MisfirePolicy)), new(T("Concurrency"), ConcurrencyLabel(Resource.Definition.ConcurrencyPolicy)),
+        new(T("LastScheduled"), TriggerUi.FormatDate(Resource.Observed.LastScheduledAt)), new(T("ErrorCode"), Resource.Observed.LastErrorCode ?? "—"),
+        new(T("Input"), PrettyInput(Resource.Definition.Input))];
+    private static string FlowUrl(TriggerResource value) { var flow = value.Definition.Target.Flow!; return ConsoleResourceUrls.Flow(new FlowId(flow.Name, flow.Namespace ?? value.Namespace), flow.ScopeRef); }
+    private static string PrettyInput(JsonElement value) => JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private string MisfireLabel(TriggerMisfirePolicy value) => T(value == TriggerMisfirePolicy.FireOnce ? "Misfire.FireOnceAfterRecovery" : "Misfire.Skip");
+    private string ConcurrencyLabel(TriggerConcurrencyPolicy value) => T(value == TriggerConcurrencyPolicy.Skip ? "Concurrency.SkipActive" : "Concurrency.AllowOverlap");
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+
+}

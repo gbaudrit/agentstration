@@ -7307,11 +7307,12 @@
     },
     {
       "id": "trigger-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/TriggerResourceSummary.razor",
       "host": "console",
       "routes": [
         "/triggers/{Name}",
-        "/triggers/{Name}/edit"
+        "/triggers/{Name}/edit",
+        "/triggers"
       ],
       "renderer": "CollectionView",
       "itemType": "Setting",
@@ -7322,7 +7323,7 @@
       "informationKeys": [
         "Value"
       ],
-      "line": 233,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7331,7 +7332,7 @@
           "tests/operational-triggers.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Trigger configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -19009,6 +19010,11 @@
       "source": "src/Agentstration.Console.Components/Components/SourceResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved Source configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/TriggerResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Trigger configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

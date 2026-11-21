@@ -13,9 +13,23 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@T("SearchPlaceholder")"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
-                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="trigger-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="@TriggerResourceKinds.Trigger" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><TriggerResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(TriggerResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && Context.Current is { WorkspaceId: var workspace } && workspace != Guid.Empty && item.ScopeRef == ResourceScopeRef.Workspace(workspace);
+    private void OpenPreview(TriggerResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, TriggerResourceKinds.Trigger, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/triggers", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private RenderFragment? Metrics => !loadState.BlocksContent && items is not null ? @<text>
         <MetricCard Label="@T("Triggers")" Value="@items.Count.ToString()" Status="UiStatus.Info" />
@@ -24,7 +38,7 @@
     </text> : null;
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/triggers/new")">@T("NewTrigger")</a></PermissionGate> : null;
-    private CollectionColumn<TriggerResource> IdentityColumn => new("identity", T("Trigger"), trigger => @<CollectionIdentity DisplayName="@trigger.Definition.DisplayName" Namespace="@trigger.Namespace.Value" Name="@trigger.Name" Href="@DetailsUrl(trigger)" IconName="trigger">
+    private CollectionColumn<TriggerResource> IdentityColumn => new("identity", T("Trigger"), trigger => @<CollectionIdentity DisplayName="@trigger.Definition.DisplayName" Namespace="@trigger.Namespace.Value" Name="@trigger.Name" Href="@(DetailsUrl(trigger) + "#overview")" IconName="trigger">
         <IconBadges><ResourceScopeBadge ScopeRef="TriggerUi.DefinitionScope(trigger)" ShowName IconOnly /><StatusBadge Text="@(trigger.Definition.Enabled ? T("Enabled") : T("Disabled"))" Status="@(trigger.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@trigger.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(TriggerUi.DefinitionScope(trigger), Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {
