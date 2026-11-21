@@ -320,9 +320,9 @@ public sealed partial class ExtensionsConsoleTests
             Assert.HasCount(6, rendered.FindAll(".extension-contribution-card"));
             var bundle = rendered.Find("[data-contribution-id='crawl4ai-web']");
             StringAssert.Contains(bundle.TextContent, "3 ressource(s) gouvernée(s) matérialisée(s)");
-            Assert.IsNotNull(bundle.QuerySelector("a[href='/tools/sets/crawl4ai-web-acquisition?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
-            Assert.IsNotNull(bundle.QuerySelector("a[href='/data-source-profiles/crawl4ai-web?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
-            Assert.IsNotNull(bundle.QuerySelector("a[href='/flows/crawl4ai-web-acquisition?scopeRef=%2Finstance&context=%2Finstance']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/tools/sets/crawl4ai-web-acquisition?namespace=default&scopeRef=%2Finstance&context=%2Finstance#overview']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/data-source-profiles/crawl4ai-web?namespace=default&scopeRef=%2Finstance&context=%2Finstance#overview']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/flows/crawl4ai-web-acquisition?scopeRef=%2Finstance&context=%2Finstance#overview']"));
 
             var tool = rendered.Find("[data-contribution-id='web.crawl']");
             Assert.IsNotNull(tool.QuerySelector("a[href='/tools/paired-crawl4ai.web.crawl?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));

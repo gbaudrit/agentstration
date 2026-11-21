@@ -475,15 +475,19 @@ public partial class ExtensionDetails
         ExtensionBundleInstallationState.Failed => UiStatus.Danger,
         _ => UiStatus.Neutral
     };
-    private static string? ManagedResourceUrl(ExtensionManagedResourceResponse resource) => resource.Kind switch
+    private string? ManagedResourceUrl(ExtensionManagedResourceResponse resource)
     {
-        ToolResourceKinds.ToolSet => $"/tools/sets/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        FlowResourceKinds.Flow => (resource.Namespace == ResourceNamespace.DefaultValue
-            ? $"/flows/{Uri.EscapeDataString(resource.Name)}"
-            : $"/namespaces/{Uri.EscapeDataString(resource.Namespace)}/flows/{Uri.EscapeDataString(resource.Name)}")
-            + $"?scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        DataSourceResourceKinds.DataSourceProfile => $"/data-source-profiles/{Uri.EscapeDataString(resource.Name.Split('@')[0])}?namespace={Uri.EscapeDataString(resource.Namespace)}&scopeRef={Uri.EscapeDataString(resource.ScopeRef.Value)}&context={Uri.EscapeDataString(resource.ScopeRef.Value)}",
-        _ => null
-    };
+        var name = Uri.EscapeDataString(resource.Name.Split('@')[0]);
+        var ns = Uri.EscapeDataString(resource.Namespace);
+        var path = resource.Kind switch
+        {
+            ToolResourceKinds.ToolSet => $"/tools/sets/{name}?namespace={ns}",
+            FlowResourceKinds.Flow => resource.Namespace == ResourceNamespace.DefaultValue
+                ? $"/flows/{name}" : $"/namespaces/{ns}/flows/{name}",
+            DataSourceResourceKinds.DataSourceProfile => $"/data-source-profiles/{name}?namespace={ns}",
+            _ => null
+        };
+        return path is null ? null : ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(path, Services), resource.ScopeRef) + "#overview";
+    }
     public void Dispose() { disposed = true; ++loadVersion; if (contextState is not null) contextState.Changed -= ContextChanged; cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
 }

@@ -98,6 +98,8 @@ public interface IExtensionsClient
         CancellationToken cancellationToken) =>
         Task.FromException<AepEnrollmentSettingsSnapshot>(new NotSupportedException("Enrollment settings are not supported by this client."));
 
+    Task<ResourceSnapshot<AepEnrollmentRequestResource>> GetEnrollmentAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact enrollment summaries.");
     Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
 
@@ -153,6 +155,20 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<AepEnrollmentRequestResource>> GetEnrollmentAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != ExtensionKinds.AepEnrollmentRequest || address.ScopeRef != ResourceScopeRef.Instance || !address.Namespace.IsDefault
+            || !Guid.TryParseExact(address.Name, "N", out var id) || id == Guid.Empty)
+            throw new HttpRequestException("The exact enrollment address is unavailable.", null, System.Net.HttpStatusCode.NotFound);
+        using var response = await httpClient.GetAsync($"api/aep/enrollments/{id:D}/summary?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        var value = await response.Content.ReadFromJsonAsync<AepEnrollmentRequestResource>(token)
+            ?? throw new AgentstrationApiException("The enrollment snapshot is empty.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag)) throw new AgentstrationApiException("The enrollment ETag is missing.", Guid.NewGuid().ToString("N"));
+        return new(value, etag);
     }
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>

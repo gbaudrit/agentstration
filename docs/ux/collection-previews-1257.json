@@ -171,10 +171,36 @@
         "/extensions"
       ],
       "rowTypes": [
-        "ExtensionInventoryItemResponse"
+        "ExtensionInventoryItemResponse",
+        "AepEnrollmentRequestResource (unregistered inventory row)"
       ],
-      "status": "baseline-review-pending",
-      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters."
+      "status": "implemented-validation-pending",
+      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters.",
+      "family": "Extension",
+      "coordinates": "Registration exact owner/namespace/name; enrollment exact Instance/default/InstanceId N name.",
+      "overview": "/extensions/{registration}?namespace={namespace}&scopeRef={owner}&context={context}#overview or /extensions/enrollment/{instanceId}#overview",
+      "edit": "Manual owned unmanaged registration existing definition/configuration; enrollment is inspection-only.",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized owned manual unmanaged registration)",
+        "Preview",
+        "Manage enrollment (existing capability)",
+        "Existing Source provider contribution links"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (registration capability)",
+        "Manage enrollment (existing capability)"
+      ],
+      "summary": "Shared saved registration or sanitized enrollment identity/configuration. Known observed facts only when supplied by full caller.",
+      "loader": "Exact GetRegistrationAsync or GetEnrollmentAtAddressAsync. Enrollment endpoint applies existing authorization/visibility and sanitization without catalogs, pairing, verification or credential access.",
+      "tests": [
+        "ExtensionResourcePreviewTests",
+        "AepEnrollmentResourcePreviewTests",
+        "ExtensionDetailsTests",
+        "ExtensionsCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 118 extensions tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",

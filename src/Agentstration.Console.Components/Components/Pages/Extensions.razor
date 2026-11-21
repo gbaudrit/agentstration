@@ -34,6 +34,10 @@
         <ChildContent Context="address"><ExtensionResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")"
             CanManageEnrollment="@(PreviewEnrollment(address) is not null)" OnManageEnrollment="() => OpenPreviewEnrollment(address)" /></ChildContent>
     </ResourceCollectionPreview>
+    <ResourceCollectionPreview @ref="enrollmentPreview" ResourceKind="@ExtensionKinds.AepEnrollmentRequest" ContextKey="@catalogContextKey" Enabled="CanPreview">
+        <ChildContent Context="address"><AepEnrollmentResourcePreview Address="address" OverviewHref="" DefinitionHref="" /></ChildContent>
+    </ResourceCollectionPreview>
+
 
     @if (editing)
     {
@@ -123,6 +127,7 @@
         <a href="@(DetailUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" /><span>@Shared["OpenItem"]</span></a>
         @if (CanEditItem(item)) { <a href="@(DetailUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" /><span>@Shared["EditDefinition"]</span></a> }
         @if (item.RegistrationName is not null && item.RegistrationScopeRef is not null) { <button type="button" data-testid="extension-preview" disabled="@(!CanPreview || loading || pairingBusy)" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" /><span>@Shared["Preview"]</span></button> }
+        @if (item.RegistrationName is null && EnrollmentFor(item) is { } inspectable) { <button type="button" data-testid="extension-enrollment-preview" disabled="@(!CanPreview || loading || pairingBusy)" @onclick="() => OpenEnrollmentPreview(inspectable)"><UiIcon Name="eye" />@Shared["Preview"]</button> }
         @if (EnrollmentFor(item) is { } enrollment) { <button type="button" data-testid="extension-enrollment-open" aria-expanded="@IsEnrollmentExpanded(item).ToString().ToLowerInvariant()" aria-controls="@EnrollmentPanelId(enrollment)" disabled="@(loading || pairingBusy)" @onclick="() => ToggleEnrollment(item)"><UiIcon Name="key" /><span>@T(IsEnrollmentExpanded(item) ? "CloseEnrollment" : "ManageEnrollment")</span></button> }
         @if (item.Extension?.Contributions.Any(value => value.Kind == "source-provider") == true) { @SourceActions(item) }
     </CollectionActions>;

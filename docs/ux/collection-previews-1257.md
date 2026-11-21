@@ -197,3 +197,9 @@ Validation: Release component/test build passed without warnings/errors; 74 agen
 The existing exact-address Summary/Preview retains saved topology, current publication version and independent Designer navigation. No history read supplies an unknown publication date. Row ownership now also follows the explicit current context, and permission/context notifications clear or cancel a mounted adapter independently of its list shell. Read-only presentation follows actual editing availability.
 
 Validation: Release component/test build passed without warnings/errors; 91 flows tests passed. Browser and final offline checks remain pending.
+
+## Extension (baseline completion)
+
+Manual/managed registrations keep independent native actions and their exact saved Preview. Standalone identity now includes actual read-only/governance and Extension provenance. Unregistered AEP enrollment rows are inspectable resources too: a second adapter reads their existing Instance/default/InstanceId N address and reuses the same pure Summary as full details. The endpoint preserves existing enrollment authorization, target visibility and sanitization; it never reads credentials, probes endpoints or issues pairing/rotation commands. Enrollments have no invented definition form.
+
+Validation: Release component/test build passed without warnings/errors; 118 extensions tests passed. Browser and final offline checks remain pending.
