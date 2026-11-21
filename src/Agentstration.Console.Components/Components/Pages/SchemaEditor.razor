@@ -31,8 +31,7 @@ else
             <MetricCard Label="@T("Generation")" Value="@schema.Generation.ToString()" />
             <MetricCard Label="@T("Format")" Value="@schema.Definition.Format" Detail="@(schema.Definition.Dialect ?? "—")" Status="@(SavedFormatAvailable ? UiStatus.Success : UiStatus.Warning)" />
         }</OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
-        <OverviewContent>@if (schema?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><details><summary>@T("SourceEvidence")</summary><pre class="runner-json">@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details></FormSection> }</OverviewContent>
+        <OverviewSummary Context="identity">@if (schema is not null) { <SchemaResourceSummary Resource="schema" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path">@DefinitionForm(presentations)</DefinitionContent>
         <AdditionalContent Context="path"><div @oninput="() => publicationTouched = true" @onchange="() => publicationTouched = true">@VersionsContent</div></AdditionalContent>
         <DraftActions><button class="text-button" type="button" @onclick="Discard" disabled="@(busy || refreshing)">@T("DiscardDraft")</button>
@@ -243,7 +242,6 @@ else
     private void SourceDraftChanged(SchemaEditorModel observed, long request, bool value) { if (!disposed && request == revision && ReferenceEquals(observed, model) && CanEdit && !busy) sourceDirty = value; }
     private string EditUrl(SchemaResource value) => ResourceOwnershipContext.Resource(Services, "/schemas", value.Name, value.Namespace, value.ScopeRef);
     private string VersionUrl(string version) => EditUrl(schema!) + "&version=" + Uri.EscapeDataString(version) + "#versions";
-    private IReadOnlyList<KeyValuePair<string,string>> SavedSettings => schema is null ? [] : [new(T("Format"), schema.Definition.Format), new(T("Dialect"), schema.Definition.Dialect ?? "—"), new(T("DefinitionSource"), schema.Definition.Content.GetRawText())];
     private RenderFragment Feedback => @<div>@if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }@if (message is not null) { <div class="form-alert form-alert-success" role="status">@message</div> }@if (latestSnapshot is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }@if (!loading && !FormatAvailable) { <div class="form-alert form-alert-warning" role="status">@T("UnavailableFormat", model.Format)</div> }</div>;
     private RenderFragment YamlActions => @<button class="button-secondary" type="button" @onclick="ApplyRawYaml" disabled="@(busy || !CanEdit || FormDirty || sourceDirty)">@T("ApplyToForm")</button>;
     private RenderFragment ReturnToDefinition => @<button class="button-secondary" type="button" @onclick='() => ShowSection("definition/identity")'>@T("Tab.Definition")</button>;

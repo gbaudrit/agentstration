@@ -13,13 +13,27 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
-                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(EditUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(EditUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="schema-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="@SchemaResourceKinds.Schema" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><SchemaResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(SchemaResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(SchemaResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, SchemaResourceKinds.Schema, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/schemas", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key) => Localizer[key].Value;
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/schemas/new")">@T("Create")</a></PermissionGate> : null;
-    private CollectionColumn<SchemaResource> IdentityColumn => new("identity", T("Schema"), schema => @<CollectionIdentity DisplayName="@schema.Definition.DisplayName" Namespace="@schema.Namespace.Value" Name="@schema.Name" Href="@EditUrl(schema)" IconName="schema" Domain="neutral" data-testid="schema-details-link">
+    private CollectionColumn<SchemaResource> IdentityColumn => new("identity", T("Schema"), schema => @<CollectionIdentity DisplayName="@schema.Definition.DisplayName" Namespace="@schema.Namespace.Value" Name="@schema.Name" Href="@(EditUrl(schema) + "#overview")" IconName="schema" Domain="neutral" data-testid="schema-details-link">
         <Versions><CollectionVersion Label="@T("Generation")" Value="@(schema.Generation.ToString())" /></Versions>
         <IconBadges><ResourceScopeBadge ScopeRef="schema.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@schema.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(schema.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>);

@@ -7113,11 +7113,12 @@
     },
     {
       "id": "schema-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/SchemaResourceSummary.razor",
       "host": "console",
       "routes": [
         "/schemas/new",
-        "/schemas/{Name}"
+        "/schemas/{Name}",
+        "/schemas"
       ],
       "renderer": "CollectionView",
       "itemType": "KeyValuePair<string,string>",
@@ -7128,7 +7129,7 @@
       "informationKeys": [
         "SettingValue"
       ],
-      "line": 34,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7137,7 +7138,7 @@
           "tests/schema-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Schema configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18885,6 +18886,11 @@
       "source": "src/Agentstration.Console.Components/Components/ParameterResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved Parameter configuration; commands and disclosures are controls, not extra datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SchemaResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Schema configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

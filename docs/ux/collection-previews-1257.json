@@ -237,7 +237,27 @@
       "rowTypes": [
         "SchemaResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "Schema",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/schemas/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/schemas/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved format, dialect, schema content and Source evidence. No formats catalog or version-history read in Preview.",
+      "loader": "ISchemasClient.GetSchemaAsync(owner, namespace, name, token)",
+      "tests": [
+        "SchemaResourcePreviewTests",
+        "SchemaCollectionTests"
+      ],
+      "validation": "Release component/test build passed; 91 Schema tests passed; browser and final offline checks pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
