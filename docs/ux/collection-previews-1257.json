@@ -349,7 +349,27 @@
       "rowTypes": [
         "StorageTypeResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "StorageType",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/storage-types/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/storage-types/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity, enabled flag, preferred immutable version, observed generic-use decision and access policy. Full details retain usages and version-contract panels without fetching usages/history for Preview. The independently supplied Preview quick actions add the existing version publication form.",
+      "loader": "IStorageTypesClient.GetTypeAsync(exact address, token)",
+      "tests": [
+        "StorageTypeResourcePreviewTests",
+        "StorageTypeCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 54 storage types tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",

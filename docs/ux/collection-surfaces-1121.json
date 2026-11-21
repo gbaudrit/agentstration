@@ -7258,10 +7258,11 @@
     },
     {
       "id": "storage-type-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/StorageTypeResourceSummary.razor",
       "host": "console",
       "routes": [
-        "/storage-types/{Name}"
+        "/storage-types/{Name}",
+        "/storage-types"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationRow",
@@ -7272,7 +7273,7 @@
       "informationKeys": [
         "Type.Value"
       ],
-      "line": 218,
+      "line": 41,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7281,7 +7282,7 @@
           "tests/connected-storage-collection.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved StorageType configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18909,6 +18910,11 @@
       "source": "src/Agentstration.Console.Components/Components/ConnectedServiceResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved ConnectedService configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/StorageTypeResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved StorageType configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
