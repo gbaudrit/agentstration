@@ -167,3 +167,9 @@ Validation: Release component/test build passed without warnings/errors; 70 inst
 The embedded project catalog gets independent Open, authorized Edit and Preview actions. Both overview and Preview share the native saved metadata and source provenance. Exact reads use the Workspace owner, default namespace and persisted GUID N name, retain the independent server-assigned UID for the full-detail route, and do not enumerate projects, archives, source documents or builds. Existing editing/build/installation guards remain in the full view.
 
 Validation: Release component/test build passed without warnings/errors; 82 pack projects tests passed. Browser and final offline checks remain pending.
+
+## RuntimeWorker
+
+Workers use their existing Instance/default AwpWorkerIdentity enrollment coordinates (WorkerId N), with native GUID detail URLs. Row and quick actions offer inspection; there is no business definition form. The pure Summary shares native identity, compatibility and capacity facts with full details, and omits unavailable UID/labels/publication facts. The lazy endpoint reads one enrollment, one in-memory registration and a WorkerId-filtered bounded active-assignment count; it never scans worker catalogs or loads recent assignment history. PlatformAdmin authorization remains on the API.
+
+Validation: Release component/test build passed without warnings/errors; 29 runtime workers tests passed. Browser and final offline checks remain pending.

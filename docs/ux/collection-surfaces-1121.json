@@ -19046,6 +19046,11 @@
       "source": "src/Agentstration.Console.Components/Components/PackProjectResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Shared saved Pack Project Summary."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/RuntimeWorkerResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Pure native enrollment/registration snapshot Summary; definition-list values are not a new dataset."
     }
   ],
   "reconciliation": {

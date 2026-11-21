@@ -11,9 +11,18 @@
                             IdentityColumn="IdentityColumn" Columns="Columns" Items="PageItems" ContextKey="@contextKey" RowTestId="runtime-worker-row" ItemAttributes="WorkerAttributes"
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
-                            EmptyTitle="@T("Empty")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync" />
+                            EmptyTitle="@T("Empty")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.DisplayName"><a href="@WorkerUrl(item)">@Shared["OpenItem"]</a><button type="button" data-testid="runtime-worker-preview" @onclick="() => OpenPreview(item)">@Shared["Preview"]</button></CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+<ResourceCollectionPreview @ref="preview" ResourceKind="AwpWorkerIdentity" ContextKey="@contextKey" Enabled="@(Context.Current is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden)">
+    <ChildContent Context="address"><RuntimeWorkerResourcePreview Address="address" OverviewHref="@WorkerPreviewUrl(address)" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private void OpenPreview(RuntimeWorkerSummaryResponse worker) => preview?.Open(ScopedResourceAddress.Create(ResourceScopeRef.Instance, ResourceNamespace.Default, "AwpWorkerIdentity", worker.WorkerId.ToString("N")));
+    private string WorkerPreviewUrl(ScopedResourceAddress address) => Guid.TryParseExact(address.Name, "N", out var id) ? ResourceOwnershipContext.PreserveNavigation($"/settings/runtime-workers/{id:D}#overview", Services) : ResourceOwnershipContext.PreserveNavigation("/settings/runtime-workers", Services);
+
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private CollectionColumn<RuntimeWorkerSummaryResponse> IdentityColumn => new("identity", T("Worker"), item => @<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.WorkerId.ToString("D")" Href="@WorkerUrl(item)" IconName="server">
         <IconBadges><StatusBadge Text="@T($"Presence.{PresenceKey(item.Presence)}")" Status="@PlatformDashboardService.ToStatus(PresenceKey(item.Presence))" IconOnly /></IconBadges>
@@ -59,7 +68,7 @@
         + (string.IsNullOrWhiteSpace(capability.RuntimeImplementationVersion) ? string.Empty : $" · {capability.RuntimeImplementationVersion}");
     private static string SoftwareVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "—" : version.Split('+', 2)[0];
     private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
-    private string WorkerUrl(RuntimeWorkerSummaryResponse worker) => ResourceOwnershipContext.PreserveNavigation($"/settings/runtime-workers/{worker.WorkerId:D}", Services);
+    private string WorkerUrl(RuntimeWorkerSummaryResponse worker) => ResourceOwnershipContext.PreserveNavigation($"/settings/runtime-workers/{worker.WorkerId:D}#overview", Services);
     private static IReadOnlyDictionary<string, object> WorkerAttributes(RuntimeWorkerSummaryResponse item) => new Dictionary<string, object>
     {
         ["data-worker-id"] = item.WorkerId.ToString("D"), ["data-presence"] = item.Presence.ToString(), ["data-session-id"] = item.SessionId?.ToString("D") ?? string.Empty

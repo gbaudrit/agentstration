@@ -396,7 +396,26 @@
       "rowTypes": [
         "RuntimeWorkerSummaryResponse"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "RuntimeWorker",
+      "coordinates": "Existing AwpWorkerIdentity enrollment: Instance/default, WorkerId N metadata name. Runtime snapshot has no resource UID/labels; do not fabricate them.",
+      "overview": "/settings/runtime-workers/{workerId}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open"
+      ],
+      "summary": "Native enrollment identity, software/protocol, capacity and capabilities; no definition form.",
+      "loader": "GetRuntimeWorkerSummaryAsync: exact enrollment + in-memory registration + WorkerId-filtered bounded active assignments; no list-workers scan/history.",
+      "tests": [
+        "RuntimeWorkerResourcePreviewTests",
+        "WorkerCollectionTests",
+        "RuntimeObservabilityConsoleTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 29 runtime workers tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",

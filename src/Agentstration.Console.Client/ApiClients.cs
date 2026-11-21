@@ -72,6 +72,8 @@ public interface IRuntimeApiClient
         GetAgentInstancesAsync(cancellationToken);
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime Worker inventory.");
+    Task<RuntimeWorkerSummaryResponse> GetRuntimeWorkerSummaryAsync(Guid workerId, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Worker summaries.");
     Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime Worker details.");
     Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) =>

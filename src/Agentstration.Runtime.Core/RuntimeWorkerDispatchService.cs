@@ -119,6 +119,8 @@ public sealed class RuntimeWorkerDispatchService(
         }
     }
 
+    public RuntimeWorkerRegistration? GetRegistration(RuntimeWorkerId workerId) => registrations.GetValueOrDefault(workerId);
+
     public IReadOnlyList<RuntimeWorkerRegistration> ListRegistrations() => registrations.Values
         .OrderBy(value => value.RegisteredAt)
         .ToArray();
