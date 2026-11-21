@@ -295,6 +295,8 @@ public interface IRuntimeProfilesClient
     Task<IReadOnlyList<RuntimeProfileSummaryResponse>> GetRuntimeProfilesAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(string profileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetRuntimeProfileAsync(profileName, cancellationToken);
+    Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support exact scoped Runtime Profile reads.");
     Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken) => UpdateRuntimeProfileAsync(profileName, request, etag, cancellationToken);
@@ -652,6 +654,9 @@ public sealed class RuntimeProfilesApiClient(HttpClient httpClient) : IRuntimePr
 
     public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         ReadAsync(HttpMethod.Get, Path(@namespace, profileName), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ReadAsync(HttpMethod.Get, Path(@namespace, profileName) + $"&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", null, null, cancellationToken);
 
     public Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken) =>
         ReadAsync(HttpMethod.Post, "api/runtimeprofiles", JsonContent.Create(request), null, cancellationToken);

@@ -57,3 +57,11 @@ Validation: Release component/test build passed without warnings/errors; 140 sto
 Saved identity, actual known publication version, acquisition/discovery Flow references, configuration schema, tool bindings, limits and policies. Preview does not fetch revisions, Flow catalogs or pickers. Inherited row links retain the current administrative context. The family Preview uses `IDataSourceProfilesClient.GetAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 38 data source profiles tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/data-source-profiles/README.md). Final offline lanes remain pending.
+
+## RuntimeProfile
+
+Saved identity, runtime type, execution/session/tool/streaming defaults and runtime options. Preview reads one exact snapshot without usages or editor pickers. Row and full-detail URLs retain exact owner/namespace and the current administrative context. The existing service exact-read capability is now exposed by the client and HTTP GET, with no unscoped fallback. The family Preview uses `IRuntimeProfilesClient.GetRuntimeProfileAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 31 runtime profiles tests passed. Browser and final offline checks remain pending.
+
+Runtime Profile HTTP GET now accepts the existing exact `scopeRef` plus `resourceNamespace` address. It preserves the Instance-only scope policy and legacy requests without an explicit owner. Focused API integration passed: exact namespace homonyms and ETags, hidden unshared Instance resources from a Workspace context, and missing/unsupported exact targets without fallback.

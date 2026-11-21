@@ -6138,11 +6138,12 @@
     },
     {
       "id": "runtime-profile-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
-      "line": 40,
+      "source": "src/Agentstration.Console.Components/Components/RuntimeProfileResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/runtimeprofiles/{Name}"
+        "/runtimeprofiles/{Name}",
+        "/runtimeprofiles"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6161,7 +6162,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved runtime type, execution modes and structured adapter options. Existing deployment usages and access policies retain family semantics."
+        "interpretation": "Saved RuntimeProfile configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18928,6 +18929,11 @@
       "source": "src/Agentstration.Console.Components/Components/DataSourceProfileResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved DataSourceProfile configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/RuntimeProfileResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved RuntimeProfile configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {
