@@ -221,3 +221,9 @@ Validation: Release component/test build passed without warnings/errors; 27 Prov
 The embedded discovered-operation catalog now offers Open and lazy exact Preview. A read-only inspection overview shares saved identity/service/type pins, definition/digest and known manifest/time facts with Preview. No definition form or execution command is invented. The existing activation predicates and fresh ETag workflow remain in the parent panel; the existing schema-candidate authoring disclosure stays outside the menu. Reads use the existing exact operation GET without Service/type/discovery/Flow/history requests.
 
 Validation: Release component/test build passed without warnings/errors; 17 connected service operations tests passed. Browser and final offline checks remain pending.
+
+## Resource scope inventory
+
+The administrative explorer composes the existing family Preview adapters for its mixed resource rows. It has one shared history/presentation shell with an explicit accepted-kind set; each family keeps its own exact loader, authorization, Summary and quick actions. No generic query or command registry is introduced. Canonical links now select overview and preserve the current administrative context. Internal/version/activity records without their own detail adapter retain native navigation without fabricated forms. Changing administrative context or selected ownership node closes/cancels inspection.
+
+Validation: Release component/shared builds passed without warnings/errors; 6 scope-explorer component tests and 16 shared Preview history tests passed. Browser and final offline checks remain pending.

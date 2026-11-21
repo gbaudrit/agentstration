@@ -92,7 +92,7 @@ else
             <CollectionValue Label="@T("Kind")"><span class="pack-kind">@resource.Kind</span></CollectionValue>
             <CollectionValue Label="@T("Updated")"><time datetime="@resource.UpdatedAt.ToString("O")">@resource.UpdatedAt.ToLocalTime().ToString("g")</time></CollectionValue>
         </Information>
-        <Actions Context="resource">@if (ResourceUrl(resource) is { } target) { <CollectionActions ResourceName="@resource.Name"><a href="@target">@Shared["OpenItem"]</a></CollectionActions> }</Actions>
+        <Actions Context="resource">@if (ResourceUrl(resource) is { } target) { <CollectionActions ResourceName="@resource.Name"><a href="@target"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>@if (CanEdit(resource)) { <a href="@(target.Split('#')[0] + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }@if (SupportedPreviewKinds.Contains(resource.Kind)) { <button type="button" data-testid="scope-resource-preview" disabled="@(contextState?.Current is null)" @onclick="() => OpenPreview(resource)"><UiIcon Name="eye" />@Shared["Preview"]</button> }</CollectionActions> }</Actions>
     </CollectionView>
                 }
             }
@@ -102,7 +102,111 @@ else
 
 </div>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="" ResourceKinds="SupportedPreviewKinds" ContextKey="@InspectionContextKey" Enabled="@(contextState?.Current is not null && contextState.Error is null && contextState.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address">
+        @switch (address.Kind)
+        {
+            case "Agent": <AgentResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" RunHref="@InspectionRunUrl(address)" /> break;
+            case "Flow": <FlowResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" DesignerHref="@InspectionDesignerUrl(address)" /> break;
+            case "Entry": <EntryResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Parameter": <ParameterResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Schema": <SchemaResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Vault": <VaultResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Secret": <SecretResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ConnectedService": <ConnectedServiceResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "StorageType": <StorageTypeResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Storage": <StorageResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "DataSourceProfile": <DataSourceProfileResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "DataSource": <DataSourceResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "KnowledgeSource": <KnowledgeSourceResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "RuntimeProfile": <RuntimeProfileResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ToolProvider": <ToolProviderResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Tool": <ToolResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ToolSet": <ToolSetResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ToolCategory": <ToolCategoryResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ToolDefinition": <ToolDefinitionResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ModelProvider": <ModelProviderResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ModelProfile": <ModelProfileResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Model": <ModelResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "SourceProvider": <SourceProviderResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "SourceRegistryRegistration": <SourceRegistryRegistrationResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Source": <SourceResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "Trigger": <TriggerResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "TransformationFunction": <TransformationFunctionResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "FunctionKind": <FunctionKindResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "InstalledPack": <InstalledPackResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "PackProject": <PackProjectResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "AwpWorkerIdentity": <RuntimeWorkerResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "AepEnrollmentRequest": <AepEnrollmentResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ExtensionRegistration": <ExtensionResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+            case "ConnectedServiceOperation": <ConnectedServiceOperationResourcePreview Address="address" OverviewHref="@(InspectionUrl(address) ?? string.Empty)" DefinitionHref="@(InspectionUrl(address)?.Split('#')[0] + "#definition/configuration")" /> break;
+        }
+    </ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private ConsoleContextState? contextState;
+    private CancellationTokenSource? pending;
+    private bool disposed;
+    private long revision;
+    private string? InspectionContextKey => contextState?.Current is not { } context ? null : $"{context.UserId}|{context.SelectedScopeRef}|{context.WorkspaceId}";
+    private static readonly IReadOnlySet<string> SupportedPreviewKinds = new HashSet<string>(StringComparer.Ordinal)
+    { "Agent", "Flow", "Entry", "Parameter", "Schema", "Vault", "Secret", "ConnectedService", "StorageType", "Storage", "DataSourceProfile", "DataSource", "KnowledgeSource", "RuntimeProfile", "ToolProvider", "Tool", "ToolSet", "ToolCategory", "ToolDefinition", "ModelProvider", "ModelProfile", "Model", "SourceProvider", "SourceRegistryRegistration", "Source", "Trigger", "TransformationFunction", "FunctionKind", "InstalledPack", "PackProject", "AwpWorkerIdentity", "AepEnrollmentRequest", "ExtensionRegistration", "ConnectedServiceOperation" };
+    private static readonly IReadOnlySet<string> DefinitionKinds = new HashSet<string>(StringComparer.Ordinal)
+    { "Agent", "Flow", "Parameter", "Schema", "Vault", "Secret", "ConnectedService", "StorageType", "Storage", "DataSourceProfile", "DataSource", "KnowledgeSource", "RuntimeProfile", "ToolProvider", "ToolCategory", "ToolDefinition", "ModelProvider", "ModelProfile", "SourceProvider", "SourceRegistryRegistration", "Source", "Trigger", "TransformationFunction" };
+    private bool CanEdit(ResourceScopeInventoryItemResponse value) => !value.IsManaged && DefinitionKinds.Contains(value.Kind)
+        && Selected?.ScopeRef.Value == contextState?.Current?.SelectedScopeRef && contextState?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true;
+    private void OpenPreview(ResourceScopeInventoryItemResponse value)
+    {
+        if (CanOpenSelectedScopeResources && Selected is { } selected && SupportedPreviewKinds.Contains(value.Kind))
+            preview?.Open(ScopedResourceAddress.Create(selected.ScopeRef, value.Namespace, value.Kind, value.Name));
+    }
+    private string InspectionRunUrl(ScopedResourceAddress address) => ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation($"/agents/{Uri.EscapeDataString(address.Name)}/run", Services), address.ScopeRef);
+    private string InspectionDesignerUrl(ScopedResourceAddress address) => ResourceOwnershipContext.PreserveNavigation($"{(address.Namespace.IsDefault ? "/flows" : $"/namespaces/{Uri.EscapeDataString(address.Namespace.Value)}/flows")}/{Uri.EscapeDataString(address.Name)}/designer?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}", Services);
+    private string? InspectionUrl(ScopedResourceAddress address, Guid? uid = null)
+    {
+        if (!address.Namespace.IsDefault && address.Kind is "Parameter" or "Vault" or "Secret" or "SourceRegistryRegistration" or "InstalledPack" or "PackProject" or "AwpWorkerIdentity" or "AepEnrollmentRequest") return null;
+        var name = Uri.EscapeDataString(address.Name); var ns = Uri.EscapeDataString(address.Namespace.Value);
+        string? path = address.Kind switch
+        {
+            "Agent" => ConsoleResourceUrls.Agent(address.Namespace, address.Name),
+            "Flow" => ConsoleResourceUrls.Flow(new(address.Name, address.Namespace)),
+            "Entry" => ConsoleResourceUrls.Entry(new(address.Name, address.Namespace)),
+            "Source" => $"/settings/sources/{ns}/{name}",
+            "PackProject" when uid is { } projectId => $"/pack-projects/{projectId:D}?namespace={ns}&resourceName={name}",
+            "PackProject" => null,
+            "AwpWorkerIdentity" when Guid.TryParseExact(address.Name, "N", out var workerId) => $"/settings/runtime-workers/{workerId:D}",
+            "AepEnrollmentRequest" when Guid.TryParseExact(address.Name, "N", out var enrollmentId) => $"/extensions/enrollment/{enrollmentId:D}",
+            "Parameter" or "Secret" or "Vault" when address.Namespace.IsDefault => $"/{(address.Kind == "Parameter" ? "parameters" : address.Kind == "Secret" ? "secrets" : "vaults")}/{name}",
+            "Schema" => "/schemas/" + name + "?namespace=" + ns,
+            "ConnectedService" => "/connected-services/" + name + "?namespace=" + ns,
+            "StorageType" => "/storage-types/" + name + "?namespace=" + ns,
+            "Storage" => "/storages/" + name + "?namespace=" + ns,
+            "DataSourceProfile" => "/data-source-profiles/" + name + "?namespace=" + ns,
+            "DataSource" => "/data-sources/" + name + "?namespace=" + ns,
+            "KnowledgeSource" => "/knowledge-sources/" + name + "?namespace=" + ns,
+            "RuntimeProfile" => "/runtimeprofiles/" + name + "?namespace=" + ns,
+            "ToolProvider" => "/tools/providers/" + name + "?namespace=" + ns,
+            "Tool" => "/tools/" + name + "?namespace=" + ns,
+            "ToolSet" => "/tools/sets/" + name + "?namespace=" + ns,
+            "ToolCategory" => "/tools/categories/" + name + "?namespace=" + ns,
+            "ToolDefinition" => "/tools/definitions/" + name + "?namespace=" + ns,
+            "ModelProvider" => "/modelproviders/" + name + "?namespace=" + ns,
+            "ModelProfile" => "/modelprofiles/" + name + "?namespace=" + ns,
+            "Model" => "/models/" + name + "?namespace=" + ns,
+            "SourceProvider" => "/sourceproviders/" + name + "?namespace=" + ns,
+            "SourceRegistryRegistration" => "/settings/source-registries/" + name + "?namespace=" + ns,
+            "Trigger" => "/triggers/" + name + "?namespace=" + ns,
+            "TransformationFunction" => "/transformation-functions/" + name + "?namespace=" + ns,
+            "FunctionKind" => "/function-kinds/" + name + "?namespace=" + ns,
+            "InstalledPack" => "/packs/resources/" + name + "?namespace=" + ns,
+            "ExtensionRegistration" => "/extensions/" + name + "?namespace=" + ns,
+            "ConnectedServiceOperation" => "/connected-service-operations/" + name + "?namespace=" + ns,
+            _ => null
+        };
+        return path is null ? null : ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(path, Services), address.ScopeRef).Split('#')[0] + "#overview";
+    }
     private readonly CancellationTokenSource cancellation = new();
     private ResourceScopeInventoryResponse? inventory;
     private ResourceScopeRef? selectedScopeRef;
@@ -129,24 +233,33 @@ else
             || resource.Kind.Contains(search, StringComparison.CurrentCultureIgnoreCase)
             || resource.Namespace.Value.Contains(search, StringComparison.CurrentCultureIgnoreCase))).ToArray() ?? [];
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        contextState = Services.GetService<ConsoleContextState>();
+        if (contextState is not null) { await contextState.EnsureLoadedAsync(cancellation.Token); if (disposed) return; contextState.Changed += ContextChanged; }
+        await LoadAsync();
+    }
+    private void ContextChanged() => _ = InvokeAsync(async () => { preview?.Close(); inventory = null; await LoadAsync(); if (!disposed) StateHasChanged(); });
     private async Task LoadAsync()
     {
-        loading = true;
-        error = null;
+        if (disposed) return;
+        var request = ++revision; var key = InspectionContextKey; pending?.Cancel(); pending?.Dispose(); pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token); var token = pending.Token;
+        loading = true; error = null;
         try
         {
-            inventory = await Client.GetAsync(cancellation.Token);
-            selectedScopeRef = inventory.Scopes.FirstOrDefault(scope => scope.IsCurrent)?.ScopeRef
-                ?? inventory.Scopes.FirstOrDefault()?.ScopeRef;
+            var saved = await Client.GetAsync(token);
+            if (disposed || request != revision || key != InspectionContextKey) return;
+            inventory = saved;
+            selectedScopeRef = inventory.Scopes.FirstOrDefault(scope => scope.IsCurrent)?.ScopeRef ?? inventory.Scopes.FirstOrDefault()?.ScopeRef;
         }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception) { if (!disposed && request == revision && key == InspectionContextKey) { inventory = null; error = exception; } }
+        finally { if (!disposed && request == revision) loading = false; }
     }
     private IEnumerable<ResourceScopeInventoryNodeResponse> Children(ResourceScopeRef parent) => inventory is null
         ? []
         : inventory.Scopes.Where(scope => scope.ParentScopeRef == parent).OrderBy(scope => scope.DisplayName, StringComparer.CurrentCultureIgnoreCase);
-    private void Select(ResourceScopeRef scopeRef) { selectedScopeRef = scopeRef; search = kind = string.Empty; }
+    private void Select(ResourceScopeRef scopeRef) { preview?.Close(); selectedScopeRef = scopeRef; search = kind = string.Empty; }
     private Task SearchChangedAsync(string value) { search = value; return Task.CompletedTask; }
     private void KindChanged(ChangeEventArgs args) => kind = args.Value?.ToString() ?? string.Empty;
     private string ScopeDisplayName(ResourceScopeInventoryNodeResponse scope) => scope.Kind == ResourceScopeKind.Instance ? T("InstanceName") : scope.DisplayName;
@@ -157,6 +270,7 @@ else
     private string? ResourceUrl(ResourceScopeInventoryItemResponse resource)
     {
         if (!CanOpenSelectedScopeResources || Selected is not { } selected) return null;
+        if (SupportedPreviewKinds.Contains(resource.Kind)) return InspectionUrl(ScopedResourceAddress.Create(selected.ScopeRef, resource.Namespace, resource.Kind, resource.Name), resource.Uid);
         var name = Uri.EscapeDataString(resource.Name);
         var resourceNamespace = Uri.EscapeDataString(resource.Namespace.Value);
         var scopeRef = Uri.EscapeDataString(selected.ScopeRef.Value);
@@ -187,6 +301,6 @@ else
         };
         return url is null ? null : ConsoleResourceUrls.WithOwnerScope(url, selected.ScopeRef);
     }
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { disposed = true; revision++; if (contextState is not null) contextState.Changed -= ContextChanged; pending?.Cancel(); pending?.Dispose(); cancellation.Cancel(); cancellation.Dispose(); }
 
 }

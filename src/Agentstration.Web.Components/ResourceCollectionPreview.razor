@@ -10,6 +10,7 @@
 
 @code {
     [Parameter, EditorRequired] public string ResourceKind { get; set; } = string.Empty;
+    [Parameter] public IReadOnlySet<string>? ResourceKinds { get; set; }
     [Parameter, EditorRequired] public RenderFragment<ScopedResourceAddress> ChildContent { get; set; } = null!;
     [Parameter] public string? ContextKey { get; set; }
     [Parameter] public bool Enabled { get; set; } = true;
@@ -52,7 +53,7 @@
     public void Open(ScopedResourceAddress target)
     {
         if (!Enabled || disposed) return;
-        if (target.Kind != ResourceKind || target.ScopeRef == default)
+        if (!SupportsKind(target.Kind) || target.ScopeRef == default)
             throw new ArgumentException("A collection preview requires an exact address of its resource kind.", nameof(target));
         var fragment = string.Join('/', "preview", Uri.EscapeDataString(target.Kind), Uri.EscapeDataString(target.ScopeRef.Value),
             Uri.EscapeDataString(target.Namespace.Value), Uri.EscapeDataString(target.Name));
@@ -72,6 +73,8 @@
         if (!disposed) StateHasChanged();
     }
 
+    private bool SupportsKind(string kind) => kind == ResourceKind || ResourceKinds?.Contains(kind) == true;
+
     private bool IsCollectionLocation() => string.Equals(Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath, collectionPath, StringComparison.OrdinalIgnoreCase);
     private void Restore(string location)
     {
@@ -86,7 +89,7 @@
         try
         {
             var kind = Uri.UnescapeDataString(segments[1]);
-            if (kind != ResourceKind) return;
+            if (!SupportsKind(kind)) return;
             address = ScopedResourceAddress.Create(ResourceScopeRef.Parse(Uri.UnescapeDataString(segments[2])),
                 ResourceNamespace.Parse(Uri.UnescapeDataString(segments[3])), kind, Uri.UnescapeDataString(segments[4]));
         }

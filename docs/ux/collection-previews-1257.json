@@ -1158,6 +1158,35 @@
         "ConnectedServiceDiscoveryPanelTests"
       ],
       "validation": "Release component build passed; 18 operation/discovery component cases passed including EN/FR exact reads, saved overview reuse, native activation ETags and exact Preview-request coordinates. Shared native navigation reserves Preview fragments. Browser/final broad verification pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "routes": [
+        "/settings/resource-scopes"
+      ],
+      "rowTypes": [
+        "ResourceScopeInventoryItemResponse"
+      ],
+      "family": "Resource scope inventory",
+      "status": "implemented-validation-pending",
+      "coordinates": "Selected inventory owner + exact row Namespace/Kind/Name. Deep links use the same family adapters independently of the loaded inventory window.",
+      "overview": "Existing canonical family route #overview, preserving actual owner and current administrative context.",
+      "edit": "Existing authoring destinations only; inventory never infers manual Extension origin or unknown Entry governance.",
+      "rowActions": [
+        "Open",
+        "Edit definition (known editable family, authorized owned unmanaged)",
+        "Preview (supported inspectable family)"
+      ],
+      "quickActions": [
+        "Supplied independently by each existing family adapter"
+      ],
+      "summary": "The existing per-family saved Summaries; internal/version/activity records without autonomous detail adapters retain native navigation only.",
+      "loader": "One shared mixed-kind presentation shell explicitly composes existing family Preview adapters; no generic query or command discovery.",
+      "tests": [
+        "ResourceScopesComponentTests",
+        "ResourceCollectionPreviewTests"
+      ],
+      "validation": "Release component/shared builds passed without warnings/errors; 6 scope-explorer component tests and 16 shared Preview history tests passed. Browser and final offline checks remain pending."
     }
   ],
   "surfaces": [

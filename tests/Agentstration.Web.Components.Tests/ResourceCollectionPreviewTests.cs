@@ -231,6 +231,26 @@ public sealed class ResourceCollectionPreviewTests
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         return context;
     }
+    [TestMethod]
+    public async Task MixedCatalogUsesOneExplicitKindSetAndRejectsUnrelatedFragments()
+    {
+        using var context = Context();
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        nav.NavigateTo("/settings/resource-scopes?context=%2Finstance");
+        var cut = context.Render<ResourceCollectionPreview>(p => p.Add(c => c.ResourceKind, "")
+            .Add(c => c.ResourceKinds, new HashSet<string> { "Agent", "Flow" }).Add(c => c.ContextKey, "principal|scope")
+            .Add(c => c.ChildContent, address => builder => { builder.OpenElement(0, "p"); builder.AddContent(1, address.ToString()); builder.CloseElement(); }));
+        await cut.InvokeAsync(() => cut.Instance.Open(Target));
+        Assert.AreEqual(Target.ToString(), cut.Find("p").TextContent);
+        var next = Target with { Kind = "Flow" };
+        await cut.InvokeAsync(() => cut.Instance.Open(next));
+        Assert.AreEqual(next.ToString(), cut.Find("p").TextContent);
+        Assert.Contains("?context=%2Finstance#preview/Flow/", nav.Uri);
+        Assert.ThrowsExactly<ArgumentException>(() => cut.Instance.Open(Target with { Kind = "Parameter" }));
+        await cut.InvokeAsync(() => nav.NavigateTo("/settings/resource-scopes?context=%2Finstance#preview/Parameter/%2Finstance/default/name"));
+        Assert.IsEmpty(cut.FindAll("dialog, p"));
+    }
+
     private static IRenderedComponent<ResourceCollectionPreview> Render(BunitContext context) => context.Render<ResourceCollectionPreview>(p => p
         .Add(c => c.ResourceKind, "Agent").Add(c => c.ContextKey, "principal|scope")
         .Add(c => c.ChildContent, address => builder => { builder.OpenElement(0, "p"); builder.AddContent(1, address.ToString()); builder.CloseElement(); }));
