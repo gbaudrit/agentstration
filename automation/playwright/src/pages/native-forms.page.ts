@@ -81,7 +81,7 @@ export class NativeFormsPage {
     await expect(user).toBeFocused();
     await password.fill('WrongFixture973!Password');
     await password.press('Tab');
-    await expect(this.input('RememberMe')).toBeFocused();
+    await expect(this.page.getByRole('checkbox')).toBeFocused();
     await this.page.keyboard.press('Shift+Tab');
     await expect(password).toBeFocused();
     await this.page.getByTestId(TestIds.login.submit).click();
