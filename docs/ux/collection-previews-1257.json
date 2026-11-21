@@ -21,8 +21,34 @@
       "rowTypes": [
         "AgentSummary"
       ],
-      "status": "baseline-review-pending",
-      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters."
+      "status": "implemented-validation-pending",
+      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters.",
+      "family": "Agent",
+      "coordinates": "Exact physical resource owner + Namespace + Name; preserve namespaced Pack readonly adapter and bootstrap redirect.",
+      "overview": "/agents/{name} or /namespaces/{namespace}/agents/{name}?scopeRef={owner}&context={context}#overview",
+      "edit": "Existing Agent editor #definition/configuration, authorized owned unmanaged including bootstrap namespaced resources.",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Run (existing default-namespace capability)",
+        "Preview",
+        "Delete (optional, existing guards/dialog/ETag)"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Run (existing capability); full caller reconciliation only"
+      ],
+      "summary": "Shared saved Agent Summary in normal editor, collection Preview and separate namespaced/Pack read-only adapter; known full resolution/provenance remains supplied.",
+      "loader": "Existing GetAgentAsync(namespace,name,owner) with full coordinate validation and cancellation.",
+      "tests": [
+        "AgentResourcePreviewTests",
+        "AgentResourceSummaryTests",
+        "NamespacedAgentDetailsTests",
+        "AgentsCollectionTests",
+        "AgentResourceTemplateTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 74 agents tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",

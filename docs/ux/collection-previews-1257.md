@@ -185,3 +185,9 @@ Validation: Release component/test build passed without warnings/errors; 39 entr
 Persisted Models embedded in the Provider catalog get Open and Preview alongside the existing guarded Create profile link. Discovery choices without ResourceName remain value choices, without fabricated addresses. Models are immutable observed resources: no Edit definition is invented. The shared native Summary renders provider identity, capabilities and limits from the saved snapshot. Full details may supply already-known saved override/effective facts and its existing override action; Preview never fetches the Provider, discovery/history or override editor. The new exact Instance/namespace/name GET preserves the full detail's provider UID/ETag override workflow.
 
 Validation: Release component/test build passed without warnings/errors; 130 models tests passed. Browser and final offline checks remain pending.
+
+## Agent (baseline completion)
+
+The namespaced Pack read-only adapter now supplies its template Identity to the same saved Agent Summary used by the editor and Preview. Its native forms, Pack provenance, original source, model/runtime diagnostics and prepare-runtime commands remain in place; bootstrap namespaced resources keep their existing editor redirect. Row/Preview Edit follows that real redirect for owned unmanaged namespaced resources. Saved summaries retain complete Tool/ToolSet owners/members, behaviors and both schema bindings and inline contracts. References with unknown owners stay text unless full details supply a known exact destination.
+
+Validation: Release component/test build passed without warnings/errors; 74 agents tests passed. Browser and final offline checks remain pending.
