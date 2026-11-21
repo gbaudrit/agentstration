@@ -1,0 +1,4576 @@
+{
+  "issue": 1257,
+  "baseline": "519693966364e56b29cdc820161e8d41f2c3059a",
+  "meaning": "Live adoption/exception matrix. Pending assessments are incomplete work, never waivers. All inventoried Console and other-host surfaces are retained for explicit review.",
+  "lists": [
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor",
+      "routes": [
+        "/agent-runs"
+      ],
+      "rowTypes": [
+        "ExecutionSummary"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
+      "routes": [
+        "/agents"
+      ],
+      "rowTypes": [
+        "AgentSummary"
+      ],
+      "status": "baseline-review-pending",
+      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
+      "routes": [
+        "/artifacts"
+      ],
+      "rowTypes": [
+        "FlowRunArtifactResource",
+        "StagedArtifactView"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
+      "routes": [
+        "/connected-services"
+      ],
+      "rowTypes": [
+        "ConnectedServiceResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
+      "routes": [
+        "/data-source-profiles"
+      ],
+      "rowTypes": [
+        "DataSourceProfileResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
+      "routes": [
+        "/data-sources"
+      ],
+      "rowTypes": [
+        "DataSourceResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
+      "routes": [
+        "/agent-instances",
+        "/deployments"
+      ],
+      "rowTypes": [
+        "AgentInstanceResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "routes": [
+        "/extensions"
+      ],
+      "rowTypes": [
+        "ExtensionInventoryItemResponse"
+      ],
+      "status": "baseline-review-pending",
+      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
+      "routes": [
+        "/flows"
+      ],
+      "rowTypes": [
+        "FlowSummary"
+      ],
+      "status": "baseline-review-pending",
+      "reason": "Existing POC; review exact loaders, saved Summary and remaining detail adapters."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
+      "routes": [
+        "/knowledge-sources"
+      ],
+      "rowTypes": [
+        "KnowledgeSourceResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "routes": [
+        "/modelprofiles"
+      ],
+      "rowTypes": [
+        "ModelProfileSummaryResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
+      "routes": [
+        "/modelproviders"
+      ],
+      "rowTypes": [
+        "ModelProviderResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",
+      "routes": [
+        "/settings/organization/access"
+      ],
+      "rowTypes": [
+        "AccessRow"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "rowTypes": [
+        "OrganizationMemberResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor",
+      "routes": [
+        "/settings/organization/security-audit"
+      ],
+      "rowTypes": [
+        "SecurityAuditEvent"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "rowTypes": [
+        "InstalledPackResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Parameters.razor",
+      "routes": [
+        "/parameters"
+      ],
+      "rowTypes": [
+        "ParameterResource"
+      ],
+      "status": "implemented-validation-pending",
+      "family": "Parameter",
+      "coordinates": "ScopeRef + default Namespace + Name; reject non-default Namespace before calling the default-only endpoint.",
+      "overview": "/parameters/{name}?scopeRef={owner}&context={context}#overview",
+      "edit": "/parameters/{name}?scopeRef={owner}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (owned, unmanaged, ResourcesWrite)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (owned, unmanaged, ResourcesWrite)"
+      ],
+      "summary": "Saved Identity, Extension provenance, value type and readable value; no draft, usage lookup or picker.",
+      "loader": "IParametersClient.GetParameterAsync(name, exact owner, cancellationToken)",
+      "tests": [
+        "ParameterResourcePreviewTests",
+        "ParameterCollectionTests",
+        "ParameterResourceScreenTests"
+      ],
+      "validation": "Release component/test build passed; 41 Parameter tests passed; browser and full offline checks pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
+      "routes": [
+        "/resource-plans"
+      ],
+      "rowTypes": [
+        "ResourcePlanSnapshot"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfiles.razor",
+      "routes": [
+        "/runtimeprofiles"
+      ],
+      "rowTypes": [
+        "RuntimeProfileSummaryResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor",
+      "routes": [
+        "/settings/runtime-workers"
+      ],
+      "rowTypes": [
+        "RuntimeWorkerSummaryResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
+      "routes": [
+        "/schemas"
+      ],
+      "rowTypes": [
+        "SchemaResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
+      "routes": [
+        "/secrets"
+      ],
+      "rowTypes": [
+        "SecretResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
+      "routes": [
+        "/sourceproviders"
+      ],
+      "rowTypes": [
+        "SourceProviderSummaryResponse"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryCollection.razor",
+      "routes": [],
+      "rowTypes": [
+        "SourceRegistryRegistrationView"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "rowTypes": [
+        "SourceConsoleListItem"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
+      "routes": [
+        "/storage-types"
+      ],
+      "rowTypes": [
+        "StorageTypeResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+      "routes": [
+        "/storages"
+      ],
+      "rowTypes": [
+        "StorageResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
+      "routes": [
+        "/tools/categories"
+      ],
+      "rowTypes": [
+        "ToolCategoryResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
+      "routes": [
+        "/tools/definitions"
+      ],
+      "rowTypes": [
+        "ToolDefinitionResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
+      "routes": [
+        "/tools/providers"
+      ],
+      "rowTypes": [
+        "ToolProviderResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
+      "routes": [
+        "/tools/sets"
+      ],
+      "rowTypes": [
+        "ToolSetResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
+      "routes": [
+        "/tools"
+      ],
+      "rowTypes": [
+        "ToolResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "rowTypes": [
+        "TransformationFunctionResource",
+        "FunctionKindResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
+      "routes": [
+        "/triggers"
+      ],
+      "rowTypes": [
+        "TriggerResource"
+      ],
+      "status": "assessment-pending"
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",
+      "routes": [
+        "/vaults"
+      ],
+      "rowTypes": [
+        "VaultResponse"
+      ],
+      "status": "assessment-pending"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "agent-runner-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/FlowResourceSummary.razor",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}",
+        "/flows"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "routes": [
+        "/agents/{Name}",
+        "/agents"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "connected-service-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "run-grid-flow-run",
+      "source": "src/Agentstration.Console.Components/Components/RunGrid.razor",
+      "routes": [
+        "/flow-runs",
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-operations-table-work-task-operations-summary",
+      "source": "src/Agentstration.Console.Components/Components/WorkOperations/TaskOperationsTable.razor",
+      "routes": [
+        "/tasks",
+        "/work"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-provider-editor-tool-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
+      "routes": [
+        "/tools/providers/new",
+        "/tools/providers/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extensions-extension-inventory-item-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "routes": [
+        "/extensions"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-runs-execution-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRuns.razor",
+      "routes": [
+        "/agent-runs"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-editor-resolved-agent-tool-set-assignment",
+      "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
+      "routes": [
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-worker-details-runtime-assignment-placement-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor",
+      "routes": [
+        "/settings/runtime-workers/{WorkerId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-sets-tool-set-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
+      "routes": [
+        "/tools/sets"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-providers-tool-provider-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
+      "routes": [
+        "/tools/providers"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-provider-details-available-model-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "trigger-details-trigger-occurrence",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "routes": [
+        "/triggers/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "durable-artifact-content-flow-run-artifact-materialization",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DurableArtifactContent.razor",
+      "routes": [
+        "/artifacts/durable/{Id}",
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-project-details-pack-project-build-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-set-details-published-tool-set-member",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
+      "routes": [
+        "/tools/sets/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-members-agentstration-identity-contracts-local-account-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-members-agentstration-identity-contracts-organization-member-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-resource-preview",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-application-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-applied-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-installed-pack-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "staged-artifact-details-artifact-lease",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "routes": [
+        "/artifacts/staged/{Id}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-sources-data-source-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSources.razor",
+      "routes": [
+        "/data-sources"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "secrets-secret-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Secrets.razor",
+      "routes": [
+        "/secrets"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flows-flow-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Flows.razor",
+      "routes": [
+        "/flows"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-access-access-row",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationAccess.razor",
+      "routes": [
+        "/settings/organization/access"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-details-flow-version-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowDetails.razor",
+      "routes": [
+        "/flows/{FlowId}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-extension-inventory-connection-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-extension-managed-resource-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-extension-option-set-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-extension-option-usage-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-providers-source-provider-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviders.razor",
+      "routes": [
+        "/sourceproviders"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plans-resource-plan-snapshot",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
+      "routes": [
+        "/resource-plans"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-workers-runtime-worker-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor",
+      "routes": [
+        "/settings/runtime-workers"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "deployments-agent-instance-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Deployments.razor",
+      "routes": [
+        "/agent-instances",
+        "/deployments"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-definitions-tool-definition-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitions.razor",
+      "routes": [
+        "/tools/definitions"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "triggers-trigger-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Triggers.razor",
+      "routes": [
+        "/triggers"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "vaults-vault-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Vaults.razor",
+      "routes": [
+        "/vaults"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-profiles-data-source-profile-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfiles.razor",
+      "routes": [
+        "/data-source-profiles"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registries-source-registry-registration-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryCollection.razor",
+      "routes": [
+        "/settings/source-registries",
+        "/settings/source-registries/new",
+        "/settings/source-registries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-providers-model-provider-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviders.razor",
+      "routes": [
+        "/modelproviders"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "parameters-parameter-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Parameters.razor",
+      "routes": [
+        "/parameters"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "artifacts-staged-artifact-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
+      "routes": [
+        "/artifacts"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "artifacts-flow-run-artifact-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
+      "routes": [
+        "/artifacts"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-scopes-resource-scope-inventory-item-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "routes": [
+        "/settings/resource-scopes"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-categories-tool-category-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategories.razor",
+      "routes": [
+        "/tools/categories"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agents-agent-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Agents.razor",
+      "routes": [
+        "/agents"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profiles-model-profile-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "routes": [
+        "/modelprofiles"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-editor-data-source-acquisition-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-editor-data-source-discovery-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-editor-data-source-discovery-choice",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-editor-data-source-acquisition-target-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-security-audit-agentstration-security-contracts-security-audit-event",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor",
+      "routes": [
+        "/settings/organization/security-audit"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-editor-model-capability-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-data-source-binding-readiness",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-projection-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-projection-input-evidence",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-snapshot-view",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-snapshot-artifact",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-source-tool-operation-exposure",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schemas-schema-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Schemas.razor",
+      "routes": [
+        "/schemas"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-profile-editor-data-source-profile-revision-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "routes": [
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-sources-knowledge-source-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSources.razor",
+      "routes": [
+        "/knowledge-sources"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-profiles-runtime-profile-summary-response",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfiles.razor",
+      "routes": [
+        "/runtimeprofiles"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-governance-audit-tool-execution-hook-evaluation",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolGovernanceAudit.razor",
+      "routes": [
+        "/tool-governance/{Owner}/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "settings-string-name-string-address",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Settings.razor",
+      "routes": [
+        "/settings"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schema-editor-schema-version-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "routes": [
+        "/schemas/new",
+        "/schemas/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-source-console-list-item",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-member-details-external-identity",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-runner-runtime-run",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tools-tool-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
+      "routes": [
+        "/tools"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-changes-view-resource-plan-field-difference",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-relay-editor-tool-definition-version-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-relay-editor-tool-definition-usage",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-knowledge-tool-proposal",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "transformation-functions-function-kind-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "transformation-functions-transformation-function-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storages-storage-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
+      "routes": [
+        "/storages"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "connected-services-connected-service-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServices.razor",
+      "routes": [
+        "/connected-services"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-queries-data-source-query-tool-publication",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-queries-data-source-query-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "connected-service-discovery-panel-connected-service-operation-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "connected-service-discovery-panel-connected-service-operation-discovery-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-artifact-details-record-row",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-types-storage-type-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
+      "routes": [
+        "/storage-types"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-dataset-editor-data-source-acquisition-resource",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-details-storage-export-binding",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "parameter-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/ParameterResourceSummary.razor",
+      "routes": [
+        "/parameters/{Name}",
+        "/parameters"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "vault-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
+      "routes": [
+        "/vaults/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "secret-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "routes": [
+        "/secrets/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-provider-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
+      "routes": [
+        "/tools/providers/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-profile-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "routes": [
+        "/runtimeprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-provider-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "routes": [
+        "/sourceproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-profile-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "routes": [
+        "/data-source-profiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "namespaced-agent-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-category-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "routes": [
+        "/tools/categories/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-details-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "routes": [
+        "/tools/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-set-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
+      "routes": [
+        "/tools/sets/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-definition-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-definition-published-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-definition-consumers",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-relay-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "routes": [
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "transformation-function-editor-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flowrunartifactdetails-configurationentry",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "modelprofileeditor-profilesetting",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "modelproviderdetails-setting",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "modelproviderdetails-modelproviderusageresponse",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "staged-artifact-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
+      "routes": [
+        "/artifacts/staged/{Id}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "console-entry-interaction-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConsoleEntryInteraction.razor",
+      "routes": [
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-dataset-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new?composition=dataset",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entry-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entry-editor-draft-configuration-review",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
+      "routes": [
+        "/extensions",
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-enrollment-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-member-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-project-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-project-details-source-documents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schema-editor-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "routes": [
+        "/schemas/new",
+        "/schemas/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registries-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "routes": [
+        "/settings/source-registries",
+        "/settings/source-registries/new",
+        "/settings/source-registries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-type-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "trigger-details-saved-configuration-summary",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "routes": [
+        "/triggers/{Name}",
+        "/triggers/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "frames",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entries-entry-catalog",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Entries.razor",
+      "routes": [
+        "/entries"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "cleanup-terminal-runtime-runs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "cleanup-terminal-flow-runs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "cleanup-terminal-tasks",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "cleanup-entries",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "cleanup-flows",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "cleanup-agents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Cleanup.razor",
+      "routes": [
+        "/cleanup"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "console-conversations-conversation-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConsoleConversations.razor",
+      "routes": [
+        "/conversations"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-workspaces-tenants",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationWorkspaces.razor",
+      "routes": [
+        "/settings/organization/structure",
+        "/settings/organization/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-workspaces-tenant-workspaces",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationWorkspaces.razor",
+      "routes": [
+        "/settings/organization/structure",
+        "/settings/organization/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-scopes-scope-hierarchy",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceScopes.razor",
+      "routes": [
+        "/settings/resource-scopes"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extensions-enrollments",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "routes": [
+        "/extensions"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-bundle-installations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-option-contract-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-profile-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-nested-preview-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-pack-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-managed-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-projects",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-archive-preview-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-archive-preview-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registry-discovery-discovered-sources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registry-discovery-discovered-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registry-discovery-registry-observations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-access-panel-access-grants",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceAccessPanel.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}",
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/flows/{FlowId}",
+        "/knowledge-sources/{Name}",
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}",
+        "/modelproviders/new",
+        "/modelproviders/{Name}",
+        "/namespaces/{AgentNamespace}/agents/{Name}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}",
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}",
+        "/secrets/new",
+        "/secrets/{Name}",
+        "/tools/sets/{Name}",
+        "/tools/{Name}",
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "descendant-use-grant-editor-descendant-use-grants",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DescendantUseGrantEditor.razor",
+      "routes": [
+        "/parameters/new",
+        "/parameters/{Name}",
+        "/secrets/new",
+        "/secrets/{Name}",
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-tool-configuration-tool-provider-groups",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-tool-configuration-tool-categories",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-tool-configuration-effective-tools",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolConfiguration.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-tool-set-configuration-published-toolset-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolSetConfiguration.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-tool-set-configuration-toolset-member-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentToolSetConfiguration.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-category-editor-provider-groups",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-category-editor-tool-members",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-category-editor-unavailable-members",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
+      "routes": [
+        "/tools/categories/new",
+        "/tools/categories/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-picker-reference-results",
+      "source": "src/Agentstration.Console.Components/Components/ModelProfiles/ModelProfilePicker.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-placement-summary-assignment-attempts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimePlacementSummary.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/flow-runs/{RunId}",
+        "/runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-details-execution-nodes",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-details-agent-executions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-details-tool-invocations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-timeline-execution-events",
+      "source": "src/Agentstration.Console.Components/Components/FlowRunTimeline.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-details-task-flow-runs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-details-task-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-details-task-artifacts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-details-pending-actions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-details-conversation-messages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-details-task-activity",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/tasks/{TaskId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-changes-view-reviewed-bindings",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-changes-view-resource-changes",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanChangesView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-validation-view-validation-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanValidationView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-application-view-application-operations",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanApplicationView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-activity-view-plan-activity",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanActivityView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-details-functional-roles",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-details-functional-integrations",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-details-materialization-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-acquisition-artifacts-acquired-artifact-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionArtifacts.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tasks-conversations",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Tasks.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tasks-tasks",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Tasks.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "home-featured-entries",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "home-standard-entries",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "home-mobile-entry-choices",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "interaction-view-conversation-thread",
+      "source": "src/Agentstration.Workplace.Components/InteractionView.razor",
+      "routes": [
+        "/",
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "conversation-panel-conversation-messages",
+      "source": "src/Agentstration.Workplace.Components/ConversationPanel.razor",
+      "routes": [],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-timeline-task-activities",
+      "source": "src/Agentstration.Workplace.Components/TaskTimeline.razor",
+      "routes": [],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "task-progress-timeline-functional-progress",
+      "source": "src/Agentstration.Workplace.Components/TaskProgressTimeline.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "artifact-list-task-artifacts",
+      "source": "src/Agentstration.Workplace.Components/ArtifactList.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "notification-center-notifications",
+      "source": "src/Agentstration.Workplace.Components/NotificationCenter.razor",
+      "routes": [
+        "/w/{WorkspaceName}/notifications"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "event-list-event-feed",
+      "source": "src/Agentstration.Web.Components/EventList.razor",
+      "routes": [],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "main-layout-console-notifications",
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "routes": [],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "main-layout-context-choice",
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "routes": [],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "main-layout-command-results",
+      "source": "src/Agentstration.Web.Components/MainLayout.razor",
+      "routes": [],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pat-personal-access-tokens",
+      "source": "src/Agentstration.Web/Pages/Account/Pat.cshtml",
+      "routes": [
+        "/account/pat"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "namespaced-agent-details-model-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "namespaced-agent-details-runtime-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
+      "routes": [
+        "/namespaces/{AgentNamespace}/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "home-attention-items",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Home.razor",
+      "routes": [
+        "/"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-workspaces",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "routes": [
+        "/settings/organization"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-members",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "routes": [
+        "/settings/organization"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-member-roles",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Organization.razor",
+      "routes": [
+        "/settings/organization"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-data-source-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-projection-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-retrieval-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-data-source-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-acquisition-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-editor-transformation-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-composer-resource-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-composer-explicit-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-composer-automatic-dependencies",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-composer-external-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-composer-composition-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackComposer.razor",
+      "routes": [
+        "/pack-projects/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entry-editor-execution-dependencies",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entry-editor-published-dashboard-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entry-editor-authored-suggestions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "entry-editor-binding-resource-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "new-flow-template-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewFlow.razor",
+      "routes": [
+        "/flows/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-provider-details-option-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-provider-details-source-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-provider-details-extension-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-provider-details-contribution-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
+      "routes": [
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-profile-editor-deployment-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
+      "routes": [
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-details-override-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelDetails.razor",
+      "routes": [
+        "/models/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-acquisition-tool-editor-publishable-artifact-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionToolEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-artifact-details-provenance",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "parameter-editor-resource-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
+      "routes": [
+        "/parameters/new",
+        "/parameters/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workspaces-workspace-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "routes": [
+        "/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workspaces-dashboard-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "routes": [
+        "/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workspaces-included-entry-composition",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "routes": [
+        "/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workspaces-excluded-entry-composition",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Workspaces.razor",
+      "routes": [
+        "/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "secret-editor-resource-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "routes": [
+        "/secrets/new",
+        "/secrets/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "secret-editor-vault-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
+      "routes": [
+        "/secrets/new",
+        "/secrets/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-details-execution-checks",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
+      "routes": [
+        "/tools/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "trigger-editor-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor",
+      "routes": [
+        "/triggers/new",
+        "/triggers/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "trigger-editor-occurrence-preview",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerEditor.razor",
+      "routes": [
+        "/triggers/new",
+        "/triggers/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "orchestration-definition-editor-agent-choices",
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "routes": [
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "orchestration-definition-editor-selected-participants",
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "routes": [
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "orchestration-definition-editor-manager-choices",
+      "source": "src/Agentstration.Console.Components/Components/Flows/OrchestrationDefinitionEditor.razor",
+      "routes": [
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-scope-picker-scope-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Shared/ResourceScopePicker.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/data-source-profiles/new",
+        "/data-source-profiles/{Name}",
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/entries/{Name}",
+        "/extensions",
+        "/flows/new",
+        "/flows/{FlowId}/orchestration",
+        "/modelprofiles/new",
+        "/modelprofiles/{Name}",
+        "/modelproviders/new",
+        "/modelproviders/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/orchestration",
+        "/pack-projects/new",
+        "/packs",
+        "/parameters/new",
+        "/parameters/{Name}",
+        "/runtimeprofiles/new",
+        "/runtimeprofiles/{Name}",
+        "/schemas/new",
+        "/schemas/{Name}",
+        "/secrets/new",
+        "/secrets/{Name}",
+        "/settings/source-registries/discovery",
+        "/settings/sources",
+        "/settings/sources/{Publisher}/{Name}",
+        "/sourceproviders/new",
+        "/sourceproviders/{Name}",
+        "/tools/categories/new",
+        "/tools/categories/{Name}",
+        "/tools/providers/new",
+        "/tools/providers/{Name}",
+        "/vaults/new",
+        "/vaults/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-overview-view-outcomes",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-overview-view-roles",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-overview-view-workflows",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-overview-view-integrations",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-overview-view-experiences",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-overview-view-retirements",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanOverviewView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-graph-view-ordered-changes",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanning/ResourcePlanGraphView.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "value-binding-requirement-editor-authorized-resource-choices",
+      "source": "src/Agentstration.Console.Components/Components/Values/ValueBindingRequirementEditor.razor",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "contextual-secret-creator-eligible-vault-choices",
+      "source": "src/Agentstration.Console.Components/Components/Values/ContextualSecretCreator.razor",
+      "routes": [
+        "/modelproviders/new",
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "execution-timeline-execution-history",
+      "source": "src/Agentstration.Web.Components/ExecutionTimeline.razor",
+      "routes": [],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "labels-summary-metadata-labels",
+      "source": "src/Agentstration.Web.Components/LabelsSummary.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "labels-editor-metadata-rows",
+      "source": "src/Agentstration.Web.Components/LabelsEditor.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "icon-picker-icon-search-results",
+      "source": "src/Agentstration.Web.Components/IconPicker.razor",
+      "routes": [
+        "/entries/{Name}",
+        "/namespaces/{EntryNamespace}/entries/{Name}",
+        "/workspaces"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schema-document-editor-schema-properties",
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaDocumentEditor.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/schemas/new",
+        "/schemas/{Name}",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schema-property-tree-node-property-tree",
+      "source": "src/Agentstration.Web.Components/Schemas/SchemaPropertyTreeNode.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/schemas/new",
+        "/schemas/{Name}",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-call-inspector-flow-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-call-inspector-version-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-call-inspector-named-outputs",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowCallInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-step-palette-step-templates",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowStepPalette.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-router-inspector-agent-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowRouterInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-agent-inspector-agent-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowAgentInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-tool-inspector-tool-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowToolInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schema-binding-editor-schema-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/SchemaBindingEditor.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "schema-binding-editor-version-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/SchemaBindingEditor.razor",
+      "routes": [
+        "/agents/new",
+        "/agents/{Name}",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer",
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-designer-transitions",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-designer-validation-issues",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "prompt-entry-suggestion-choices",
+      "source": "src/Agentstration.Workplace.Components/PromptEntry.razor",
+      "routes": [
+        "/",
+        "/entries/{Name}",
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}",
+        "/namespaces/{EntryNamespace}/entries/{Name}",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}",
+        "/w/{WorkspaceName}/d/{DashboardName}/start/{EntryNamespace}/{EntryName}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workplace-layout-recent-conversation-navigation",
+      "source": "src/Agentstration.Workplace.Components/WorkplaceLayout.razor",
+      "routes": [],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workplace-task-details-task-results",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "workplace-task-details-conversation-messages",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/TaskDetails.razor",
+      "routes": [
+        "/w/{WorkspaceName}/tasks/{TaskId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-editor-agent-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-editor-provider-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-editor-model-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-editor-resolution-warnings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profile-editor-compatibility-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
+      "routes": [
+        "/modelprofiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profiles-provider-filter-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "routes": [
+        "/modelprofiles"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-profiles-delete-conflict-consumers",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor",
+      "routes": [
+        "/modelprofiles"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-provider-details-profile-usages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-provider-details-extension-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "model-provider-details-contribution-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-contributions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}",
+        "/extensions/{RegistrationName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-contribution-providers",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}",
+        "/extensions/{RegistrationName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-materialized-tools",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}",
+        "/extensions/{RegistrationName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-materialized-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}",
+        "/extensions/{RegistrationName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-published-resource-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}",
+        "/extensions/{RegistrationName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extension-details-installation-tool-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
+      "routes": [
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}",
+        "/extensions/{RegistrationName}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extensions-source-provider-instances",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "routes": [
+        "/extensions"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "extensions-source-provider-configure-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
+      "routes": [
+        "/extensions"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-access-panel-grant-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceAccessPanel.razor",
+      "routes": [
+        "/agents/{Name}",
+        "/data-source-profiles/{Name}",
+        "/data-sources/{Name}",
+        "/flows/{FlowId}",
+        "/knowledge-sources/{Name}",
+        "/modelprofiles/{Name}",
+        "/modelproviders/{Name}",
+        "/namespaces/{AgentNamespace}/agents/{Name}",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}",
+        "/runtimeprofiles/{Name}",
+        "/secrets/{Name}",
+        "/tools/sets/{Name}",
+        "/tools/{Name}",
+        "/vaults/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "descendant-use-grant-editor-eligible-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DescendantUseGrantEditor.razor",
+      "routes": [
+        "/parameters/{Name}",
+        "/secrets/{Name}",
+        "/vaults/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-published-source-versions",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-provider-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-provider-binding-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-declared-channel-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-channel-status",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-channel-catalogs",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-bootstrap-catalog-entries",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-pack-catalog-entries",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-pack-binding-requirements",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-pack-binding-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "sources-pack-preview-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "routes": [
+        "/settings/sources/{Publisher}/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registries-credential-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "routes": [
+        "/settings/source-registries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registries-refresh-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "routes": [
+        "/settings/source-registries/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registry-discovery-publisher-filter-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-registry-discovery-registry-filter-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryDiscovery.razor",
+      "routes": [
+        "/settings/source-registries/discovery"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "runtime-worker-details-assignment-attempt-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor",
+      "routes": [
+        "/settings/runtime-workers/{WorkerId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-details-tool-attempt-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-timeline-raw-event-history",
+      "source": "src/Agentstration.Console.Components/Components/FlowRunTimeline.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-members-member-role-assignments",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-members-workspace-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
+      "routes": [
+        "/settings/organization/members"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-tenant-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-workspace-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "bootstrap-profiles-binding-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-project-details-build-binding-requirements",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "pack-project-details-build-binding-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "routes": [
+        "/pack-projects/{ProjectId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "packs-install-binding-target-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "routes": [
+        "/packs"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "resource-plan-details-saved-change-set-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "routes": [
+        "/resource-plans/{Id:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-editor-runtime-profile-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentEditor.razor",
+      "routes": [
+        "/agents/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "data-source-profile-editor-acquisition-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
+      "routes": [
+        "/data-source-profiles/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-governance-audit-audit-record-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolGovernanceAudit.razor",
+      "routes": [
+        "/tool-governance/{Owner}/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "organization-member-details-external-identities",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
+      "routes": [
+        "/settings/organization/members/{UserId:guid}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-runner-input-message-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-runner-tool-invocation-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "agent-runner-run-event-history",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
+      "routes": [
+        "/agents/{Name}/run",
+        "/runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-designer-node-reference-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDesigner.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "home-dashboard-choices",
+      "source": "src/Agentstration.Workplace.Web/Components/Pages/Home.razor",
+      "routes": [
+        "/",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "interaction-view-grouped-task-results",
+      "source": "src/Agentstration.Workplace.Components/InteractionView.razor",
+      "routes": [
+        "/entry-interactions/{WorkspaceId:guid}/{EntryNamespace}/{EntryName}",
+        "/w/{WorkspaceName}",
+        "/w/{WorkspaceName}/d/{DashboardName}",
+        "/w/{WorkspaceName}/d/{DashboardName}/conversations/{ConversationId:guid}"
+      ],
+      "host": "workplace",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "secret-reference-picker-secret-choices",
+      "source": "src/Agentstration.Web.Components/SecretReferencePicker.razor",
+      "routes": [],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-details-diagnostics",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-details-dependents",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-type-details-dependent-storages",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-type-details-immutable-version-choice",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-type-details-requirements",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "routes": [
+        "/storage-types/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-type-evidence-query-profiles",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeEvidence.razor",
+      "routes": [
+        "/storages",
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-documents-collection-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-documents-published-tools",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-editor-type-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-editor-connected-service-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-editor-export-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageEditor.razor",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-relay-source-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-relay-source-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-query-publication-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-query-resource-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-query-retained-acquisition-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-content-snapshot-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-content-read-chunks",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-content-regex-matches",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-content-record-lineage",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-content-input-freshness",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-content-document-status",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-connected-service-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-operation-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-storage-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-document-collection-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-acquisition-content-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-manifest-artifacts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "transformation-function-kind-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "transformation-function-implementation-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
+      "routes": [
+        "/transformation-functions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "connected-service-type-variant-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceEditor.razor",
+      "routes": [
+        "/connected-services/new",
+        "/connected-services/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "connected-service-dependent-resources",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "function-kind-version-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "routes": [
+        "/transformation-functions",
+        "/function-kinds"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-flow-function-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-flow-child-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-flow-child-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-flow-ordered-calls",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowSequenceEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit",
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-flow-orchestration-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceFlowCompositionEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "source-flow-composition-points",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceFlowCompositionEditor.razor",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "new-tool-flow-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "routes": [
+        "/tools/definitions/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "new-tool-flow-version-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor",
+      "routes": [
+        "/tools/definitions/new"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-produced-artifacts",
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowRunOutput.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-process-ordered-units",
+      "source": "src/Agentstration.Console.Components/Components/Flows/FlowProcessSummary.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "execution-progress-active-locations",
+      "source": "src/Agentstration.Console.Components/Components/Flows/ExecutionProgress.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-owned-processes",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-run-artifact-contracts",
+      "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
+      "routes": [
+        "/flow-runs/{RunId}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-output-storage-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-source-output-document-collection-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
+      "routes": [
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-transform-function-choices",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowTransformInspector.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "flow-data-mapping-variable-options",
+      "source": "src/Agentstration.Web.FlowDesigner/Components/FlowDataMappingEditor.razor",
+      "routes": [
+        "/flows/{FlowId}/designer",
+        "/namespaces/{FlowNamespace}/flows/{FlowId}/designer"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-collection-definition-rows",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageCollectionsEditor.razor",
+      "routes": [
+        "/storages/new",
+        "/storages/{Name}/edit"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "structured-document-query-profile-choices",
+      "source": "src/Agentstration.Console.Components/Components/StructuredDocumentQueryEditor.razor",
+      "routes": [
+        "/storages/{Name}",
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-document-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceAcquisitionDocuments.razor",
+      "routes": [
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "storage-document-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDocuments.razor",
+      "routes": [
+        "/storages/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "knowledge-document-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeContentAccess.razor",
+      "routes": [
+        "/knowledge-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "dataset-saved-query-results",
+      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
+      "routes": [
+        "/data-sources/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    },
+    {
+      "id": "tool-relay-fixed-input-bindings",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
+      "routes": [
+        "/tools/definitions/new",
+        "/tools/definitions/{Name}"
+      ],
+      "host": "console",
+      "inventoryCategory": "specialized",
+      "decision": "assessment-pending"
+    }
+  ]
+}

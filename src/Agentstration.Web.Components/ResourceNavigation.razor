@@ -224,6 +224,7 @@
             if (module is not null) await module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) { }
         finally { if (!initializing) reference?.Dispose(); }
     }
 }

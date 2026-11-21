@@ -1,6 +1,7 @@
 @using Agentstration.Resources
 @using Microsoft.AspNetCore.Components.Routing
-@implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @inject NavigationManager Navigation
 
 <ResourcePreviewPanel IsOpen="@(Enabled && address is not null)" OnClose="Close" OnClosed="OnClosed">
@@ -15,8 +16,12 @@
     [Parameter] public EventCallback OnClosed { get; set; }
     private ScopedResourceAddress? address;
     private string? previousContext;
+    private bool contextEstablished;
     private string collectionPath = string.Empty;
-    private string? restoredLocation;
+    private string? observedNavigation;
+    private IJSObjectReference? module;
+    private IJSObjectReference? browserObserver;
+    private DotNetObjectReference<ResourceCollectionPreview>? reference;
     private bool disposed;
 
     protected override void OnInitialized()
@@ -27,14 +32,21 @@
 
     protected override void OnParametersSet()
     {
-        if (previousContext is not null && previousContext != ContextKey)
+        // Initial authentication may replace a loading key before previews are enabled.
+        // Preserve the incoming exact address until the first authorized context exists.
+        var contextChanged = contextEstablished && previousContext != ContextKey;
+        previousContext = ContextKey;
+        contextEstablished |= Enabled && ContextKey is not null;
+        if (contextChanged)
         {
-            previousContext = ContextKey;
             Close();
             return;
         }
-        previousContext = ContextKey;
-        if (restoredLocation != Navigation.Uri) Restore();
+        if (observedNavigation != Navigation.Uri)
+        {
+            observedNavigation = Navigation.Uri;
+            Restore(Navigation.Uri);
+        }
     }
 
     public void Open(ScopedResourceAddress target)
@@ -61,12 +73,13 @@
     }
 
     private bool IsCollectionLocation() => string.Equals(Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath, collectionPath, StringComparison.OrdinalIgnoreCase);
-    private void Restore()
+    private void Restore(string location)
     {
-        restoredLocation = Navigation.Uri;
         address = null;
-        if (!IsCollectionLocation()) return;
-        var fragment = Navigation.ToAbsoluteUri(Navigation.Uri).Fragment;
+        if (!Uri.TryCreate(location, UriKind.Absolute, out var target)
+            || target.GetLeftPart(UriPartial.Authority) != Navigation.ToAbsoluteUri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority)
+            || !string.Equals(target.AbsolutePath, collectionPath, StringComparison.OrdinalIgnoreCase)) return;
+        var fragment = target.Fragment;
         if (fragment.Length > 2048 || !fragment.StartsWith("#preview/", StringComparison.Ordinal)) return;
         var segments = fragment[1..].Split('/');
         if (segments.Length != 5 || segments.Any(string.IsNullOrWhiteSpace)) return;
@@ -83,13 +96,54 @@
     private void LocationChanged(object? sender, LocationChangedEventArgs args)
     {
         if (disposed) return;
-        _ = InvokeAsync(() => { if (!disposed) { Restore(); StateHasChanged(); } });
+        _ = InvokeAsync(() => { if (!disposed) { observedNavigation = args.Location; Restore(args.Location); StateHasChanged(); } });
     }
 
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/preview-location.js");
+        if (disposed) { await module.DisposeAsync(); module = null; return; }
+        reference = DotNetObjectReference.Create(this);
+        var observer = await module.InvokeAsync<IJSObjectReference>("observePreviewLocation", reference);
+        if (disposed) { await observer.InvokeVoidAsync("dispose"); await observer.DisposeAsync(); return; }
+        browserObserver = observer;
+    }
+
+    [JSInvokable]
+    public Task NavigatePreviewLocation(string location) => InvokeAsync(() =>
+    {
+        if (disposed || !Uri.TryCreate(location, UriKind.Absolute, out var target)
+            || target.GetLeftPart(UriPartial.Authority) != Navigation.ToAbsoluteUri(Navigation.BaseUri).GetLeftPart(UriPartial.Authority)
+            || !string.Equals(target.AbsolutePath, collectionPath, StringComparison.OrdinalIgnoreCase)
+            || target.Query != Navigation.ToAbsoluteUri(Navigation.Uri).Query
+            || target.Fragment.Length > 2048 || !target.Fragment.StartsWith("#preview/", StringComparison.Ordinal)) return;
+        // Do not mount content until native navigation accepts the destination.
+        Navigation.NavigateTo(location, new NavigationOptions { HistoryEntryState = Navigation.HistoryEntryState });
+    });
+
+    // Native fragment navigation can raise hashchange without notifying Blazor's
+    // NavigationManager. Observe it without adding history entries or bypassing guards.
+    [JSInvokable]
+    public Task RestoreBrowserLocation(string location) => InvokeAsync(() =>
+    {
+        if (disposed) return;
+        Restore(location);
+        StateHasChanged();
+    });
+
+    public async ValueTask DisposeAsync()
     {
         disposed = true;
         Navigation.LocationChanged -= LocationChanged;
+        try
+        {
+            if (browserObserver is not null) { await browserObserver.InvokeVoidAsync("dispose"); await browserObserver.DisposeAsync(); }
+            if (module is not null) await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) { }
+        finally { reference?.Dispose(); }
         GC.SuppressFinalize(this);
     }
 }

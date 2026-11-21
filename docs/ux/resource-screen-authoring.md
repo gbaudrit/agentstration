@@ -296,3 +296,9 @@ Use focused component checks for template states/optional slots, retained form i
 The new reusable template journey is deferred to native child [#1236](https://github.com/gbaudrit/agentstration/issues/1236), after explicit maintainer UX validation and implementation merge. Navigation-specific follow-up remains #1234. Do not close #1235 before its children are complete or a maintainer records a waiver.
 
 Initial loading is not a draft. Agent only enables dirty-navigation protection after its saved baseline is loaded. Preferred-culture redirects retain the section fragment, and default context URL normalization uses the public Blazor API so the server navigation state and browser coordinates stay synchronized.
+
+## Saved Summary adoption
+
+The [#1257 adoption matrix](collection-previews-1257.md) records family migration and validation. `ParameterResourceSummary` receives saved values and the optional template-composed Identity; its Preview renders the complete standalone identity. Usage counts and editor scope targets remain on the full detail page. Keep mutations, dirty-form state and ETags in the existing owner screen.
+
+Wrap new family Summaries in `ResourceSummary` to share section spacing, bounded configuration columns and long-value wrapping across full details and the Preview panel. This presentation wrapper owns no data, commands or disclosure state.

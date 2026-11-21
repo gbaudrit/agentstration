@@ -6000,11 +6000,12 @@
     },
     {
       "id": "parameter-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
-      "line": 41,
+      "source": "src/Agentstration.Console.Components/Components/ParameterResourceSummary.razor",
+      "line": 19,
       "host": "console",
       "routes": [
-        "/parameters/{Name}"
+        "/parameters/{Name}",
+        "/parameters"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6022,7 +6023,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Component checks cover saved typed values and draft isolation; new screenshot validation is recorded separately."
+        "interpretation": "Saved Parameter configuration shared between overview and lazy exact-address Preview; current validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18879,6 +18880,11 @@
       "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationProgress.razor",
       "classification": "non-collection-control",
       "reason": "Configured process-step navigation delegates resource rows to BootstrapApplicationResources."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ParameterResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Parameter configuration; commands and disclosures are controls, not extra datasets."
     }
   ],
   "reconciliation": {

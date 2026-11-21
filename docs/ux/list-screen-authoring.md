@@ -130,3 +130,7 @@ Maintain affected existing component and browser regressions. Focused template t
 The collection source inventory counts each concrete template adapter as one shared frame; the generic template, filter options and pagination controls are not separate functional collections. Do not claim historical screenshots validate the new page composition.
 
 The new reusable browser scenario is tracked separately in native child [#1242](https://github.com/gbaudrit/agentstration/issues/1242). It remains blocked until explicit maintainer UX validation and implementation merge. This does not defer required smoke checks or repairs to existing regressions. Do not close #1241 until the child and coverage catalog are complete, or the maintainer records a reasoned waiver.
+
+## Family-by-family Preview rollout
+
+Track adoption and justified exceptions in [the #1257 matrix](collection-previews-1257.md). Parameters now uses the existing Actions/Preview contract with its exact owner and default namespace. The saved Summary is shared with the overview; the family adapter rejects unsupported namespaces before calling its default-only endpoint. Keep list and Summary action sets independently supplied, even when a family currently offers the same navigation shortcuts in both.
