@@ -71,6 +71,9 @@ export class ModelAdministrationPage {
     await expect(modelLink).toHaveAttribute('href', /[?&]context=%2Finstance/);
     await modelLink.click();
     await this.page.getByTestId(TestIds.resourceAdministration.modelDetails).waitFor({ state: 'visible' });
+    const configuration = this.page.getByTestId(TestIds.modelAdministration.modelConfigurationSummary).locator('.panel-disclosure').first();
+    if (await configuration.getAttribute('aria-expanded') === 'false') await configuration.click();
+    await expect(configuration).toHaveAttribute('aria-expanded', 'true');
     await this.page.getByTestId(TestIds.modelAdministration.editModelOverride).click();
     await fillAndCommit(this.page.getByTestId(TestIds.modelAdministration.modelOverrideContextTokens), contextTokens.toString());
     await this.page.getByTestId(TestIds.modelAdministration.saveModelOverride).click();

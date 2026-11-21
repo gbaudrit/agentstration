@@ -19056,6 +19056,11 @@
       "source": "src/Agentstration.Console.Components/Components/EntryResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Pure saved Entry Summary; native identity has no Resource UID/labels."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ModelResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Pure shared saved Model facts/native capability cards. No new collection dataset."
     }
   ],
   "reconciliation": {

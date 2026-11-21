@@ -455,6 +455,7 @@ export const TestIds = {
     modelIdentity: 'model-identity-editor',
     modelResourceRefresh: 'model-refresh',
     modelYaml: 'model-yaml-editor',
+    modelConfigurationSummary: 'model-configuration-summary',
     editModelOverride: 'edit-model-override',
     modelOverrideContextTokens: 'model-override-context-tokens',
     saveModelOverride: 'save-model-override',

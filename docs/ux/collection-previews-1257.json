@@ -975,6 +975,36 @@
         "EntryAdministrationComponentTests"
       ],
       "validation": "Release component/test build passed without warnings/errors; 39 entries tests passed. Browser and final offline checks remain pending."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
+      "routes": [
+        "/modelproviders/{Name}#models"
+      ],
+      "rowTypes": [
+        "AvailableModelResponse with ResourceName"
+      ],
+      "family": "Model",
+      "status": "implemented-validation-pending",
+      "coordinates": "Instance owner + provider namespace + persisted ResourceName, validated against Model snapshot.",
+      "overview": "/models/{name}?namespace={namespace}&scopeRef={owner}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview",
+        "Create profile (existing authorized availability predicate)"
+      ],
+      "quickActions": [
+        "Open"
+      ],
+      "summary": "Native saved model identity/provider facts, observed capabilities and limits. Full view may supply already-known saved Provider override/effective facts.",
+      "loader": "GetModelAsync(namespace,name,owner) exact persisted read, no Provider/model-discovery/history reads.",
+      "tests": [
+        "ModelResourcePreviewTests",
+        "ModelDetailsTests",
+        "ModelProviderNavigationTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 130 models tests passed. Browser and final offline checks remain pending."
     }
   ],
   "surfaces": [

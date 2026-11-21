@@ -179,3 +179,9 @@ Validation: Release component/test build passed without warnings/errors; 29 runt
 The native Entries card catalog gets Open, owned/unmanaged Edit and lazy Preview. Overview and Preview reuse saved draft configuration and the current persisted publication, with native Workspace/EntryId coordinates. The endpoint rejects a different execution Workspace before reading, and loads only the draft and current publication, without pickers, usage, validation, publication or Pack-catalog scans. Logical scope replaces internal operational Workspace presentation. Preview Edit requires the loaded catalog's known non-managed flag; a direct link outside that loaded catalog offers Open until the full editor resolves governance. No unknown management state is treated as editable. No UID or labels are invented for this native Work resource.
 
 Validation: Release component/test build passed without warnings/errors; 39 entries tests passed. Browser and final offline checks remain pending.
+
+## Model
+
+Persisted Models embedded in the Provider catalog get Open and Preview alongside the existing guarded Create profile link. Discovery choices without ResourceName remain value choices, without fabricated addresses. Models are immutable observed resources: no Edit definition is invented. The shared native Summary renders provider identity, capabilities and limits from the saved snapshot. Full details may supply already-known saved override/effective facts and its existing override action; Preview never fetches the Provider, discovery/history or override editor. The new exact Instance/namespace/name GET preserves the full detail's provider UID/ETag override workflow.
+
+Validation: Release component/test build passed without warnings/errors; 130 models tests passed. Browser and final offline checks remain pending.

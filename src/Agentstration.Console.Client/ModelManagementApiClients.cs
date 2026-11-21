@@ -46,6 +46,8 @@ public interface IModelProvidersClient
 
 public interface IModelsClient
 {
+    Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Model reads.");
     Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace @namespace, string modelName, CancellationToken cancellationToken);
 }
 
@@ -422,6 +424,17 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 
 public sealed class ModelsApiClient(HttpClient httpClient) : IModelsClient
 {
+    public async Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"api/models/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(ns.Value)}&scopeRef={Uri.EscapeDataString(owner.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        var resource = await response.Content.ReadFromJsonAsync<ModelResource>(token)
+            ?? throw new AgentstrationApiException("The model snapshot is empty.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag)) throw new AgentstrationApiException("The model ETag is missing.", Guid.NewGuid().ToString("N"));
+        return new(resource, etag);
+    }
+
     public async Task<ResourceSnapshot<ModelResource>> GetModelAsync(
         ResourceNamespace @namespace,
         string modelName,

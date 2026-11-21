@@ -133,7 +133,7 @@ public sealed partial class ModelProviderNavigationTests
                 "/modelprofiles/new?namespace=shared.models&provider=ollama%2Flocal&providerNamespace=shared.models&model=qwen3",
                 discoveredModelLink.GetAttribute("href"));
             Assert.AreEqual(
-                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models&context=%2Finstance",
+                "/models/ollama-local.qwen3-deadbeef?namespace=shared.models&context=%2Finstance#overview",
                 rendered.Find("[data-testid='open-model-details']").GetAttribute("href"));
             CollectionAssert.AreEqual(new[] { "overview", "definition/identity", "definition/configuration", "models", "usages", "access", "yaml" }, rendered.FindComponent<ResourceNavigation>().Instance.Items.Where(item => item.Navigable).Select(item => item.Path).ToArray());
             Assert.IsFalse(rendered.Markup.Contains("data-testid=\"model-provider-form\"", StringComparison.Ordinal));
