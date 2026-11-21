@@ -43,4 +43,36 @@ public sealed class ResourceRelationsPresentationTests
         Assert.IsTrue(result.Summary.Graph.Relations.All(edge => ids.Contains(edge.Source) && ids.Contains(edge.Target)));
         Assert.IsEmpty(ResourceRelationsPresentation.Create(input, "missing", SystemGraphDirection.Usages, 1).Summary.Graph.Nodes);
     }
+    [TestMethod]
+    public void ThreeLevelsExposeTheModelProviderAndExtensionAndFilteringKeepsDepthSemantics()
+    {
+        var agent = Node("Agent"); var profile = Node("ModelProfile"); var provider = Node("ModelProvider"); var extension = Node("ExtensionRegistration");
+        var input = Page([agent, profile, provider, extension], [new(agent.Id, profile.Id, "declared-reference"),
+            new(profile.Id, provider.Id, "declared-reference"), new(provider.Id, extension.Id, "declared-reference")]);
+        var two = ResourceRelationsPresentation.Create(input, agent.Id, SystemGraphDirection.Dependencies, 2);
+        CollectionAssert.AreEquivalent(new[] { agent.Id, profile.Id, provider.Id }, two.Summary.Graph.Nodes.Select(node => node.Id).ToArray());
+        Assert.IsTrue(two.CanExpand);
+        var hidden = new HashSet<string> { "Agent", "ModelProvider" };
+        var three = ResourceRelationsPresentation.Create(input, agent.Id, SystemGraphDirection.Dependencies, 3, hidden);
+        CollectionAssert.AreEquivalent(new[] { agent.Id, profile.Id, extension.Id }, three.Summary.Graph.Nodes.Select(node => node.Id).ToArray());
+        Assert.HasCount(1, three.Summary.Graph.Relations, "Hiding a type must not invent direct dependencies across the hidden resource.");
+        Assert.AreEqual(4, three.TotalCount); Assert.AreEqual(1, three.HiddenCount); Assert.IsFalse(three.CanExpand);
+        Assert.IsTrue(three.Kinds.Contains("ModelProvider"));
+        var uses = ResourceRelationsPresentation.Create(input, extension.Id, SystemGraphDirection.Usages, 3, hidden);
+        CollectionAssert.AreEquivalent(new[] { extension.Id, profile.Id }, uses.Summary.Graph.Nodes.Select(node => node.Id).ToArray());
+    }
+
+    [TestMethod]
+    public void HiddenTypesDoNotConsumeTheVisibleWindowBudgetOrChangeReceivedMetadata()
+    {
+        var root = Node("Agent"); var tools = Enumerable.Range(0, 120).Select(_ => Node("Tool")).ToArray(); var extension = Node("ExtensionRegistration");
+        var input = Page([root, .. tools, extension], [.. tools.Select(tool => new SystemGraphRelation(root.Id, tool.Id, "declared-reference")),
+            new(tools[^1].Id, extension.Id, "declared-reference")]);
+        var serialized = JsonSerializer.Serialize(input);
+        var result = ResourceRelationsPresentation.Create(input, root.Id, SystemGraphDirection.Dependencies, 2, new HashSet<string> { "Tool" });
+        CollectionAssert.AreEquivalent(new[] { root.Id, extension.Id }, result.Summary.Graph.Nodes.Select(node => node.Id).ToArray());
+        Assert.IsFalse(result.Limited); Assert.AreEqual(122, result.TotalCount); Assert.AreEqual(120, result.HiddenCount);
+        Assert.AreEqual(serialized, JsonSerializer.Serialize(input));
+    }
+
 }

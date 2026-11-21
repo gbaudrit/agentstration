@@ -82,13 +82,14 @@ public sealed partial class ResourceRelationsTests
         var actor = ResourceScopeRef.Workspace(Guid.NewGuid()); var replacement = ResourceScopeRef.Workspace(Guid.NewGuid());
         var client = new Client([next], []) { HoldFirstTail = true, FirstNodes = [old] };
         using var context = Context(client); var page = Render(context, old, actor);
-        page.WaitForAssertion(() => Assert.Contains("old private name", page.Markup));
+        page.WaitForAssertion(() => Assert.IsTrue(page.FindComponent<SystemGraphDiagram>().Instance.Page.Nodes.Any(node => node.Id == old.Id)));
         Assert.AreEqual("true", page.Find("section.resource-relations").GetAttribute("aria-busy"));
         page.Render(p => p.Add(c => c.Context, replacement).Add(c => c.Root, next.Id));
-        page.WaitForAssertion(() => Assert.Contains("new visible name", page.Markup));
+        page.WaitForAssertion(() => Assert.IsTrue(page.FindComponent<SystemGraphDiagram>().Instance.Page.Nodes.Any(node => node.Id == next.Id)));
         client.Release.TrySetResult();
         await client.FirstFinished.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        page.WaitForAssertion(() => Assert.Contains("new visible name", page.Markup));
+        page.WaitForAssertion(() => Assert.IsTrue(page.FindComponent<SystemGraphDiagram>().Instance.Page.Nodes.Any(node => node.Id == next.Id)));
+        Assert.IsFalse(page.FindComponent<SystemGraphDiagram>().Instance.Page.Nodes.Any(node => node.Id == old.Id));
         Assert.DoesNotContain("old private name", page.Markup);
         Assert.AreEqual(replacement, client.Calls[^1].Context);
         Assert.IsTrue(client.FirstCancelled);

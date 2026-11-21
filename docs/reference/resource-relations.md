@@ -63,6 +63,31 @@ visual depth and Graph/List presentation. Visible-resource counts describe the
 current authorized window, never global inventory. Type labels are localized for
 known families; unknown protocol kinds retain their exact name.
 
+The command band contains direction, depth, type filters, Graph/List selection,
+visible-resource counts, refresh and fullscreen. The page already identifies the
+resource and section, so the embedded widget does not repeat their visible titles;
+it retains an accessible heading for the fullscreen dialogue.
+
+Type filters apply to the graph and accessible list without another stream read.
+The focused root always stays visible. Depth is calculated before masking types,
+so an Extension at level 3 remains available when its level-2 provider is hidden.
+Hidden resources and their incident links disappear; no shortcut dependency is
+invented across them. Hidden types do not consume the 80-resource display budget.
+Counts with a denominator describe the received authorized neighborhood at the
+selected depth, never global inventory. Filters survive refresh, direction/view
+changes and fullscreen; a new actor or resource resets them. Hiding the selected
+resource closes its preview. Exact received metadata remains unmodified.
+
+Current Model Profile definitions expose their explicitly declared Model Provider
+reference, and Model Provider definitions expose their referenced Extension
+registration metadata. Three visual levels from an Agent can therefore show
+Agent → Model Profile → Model Provider → Extension. The family resolver preserves
+owner/namespace semantics and refuses ambiguous or out-of-scope references.
+Ordinary graph authorization still applies to every endpoint and binding owner;
+Discover alone cannot disclose a provider's extension binding. These live declared
+relations do not assert a historical pin or execution availability. Provider
+options, endpoints, credentials and Secret values are not exported or redeemed.
+
 The canvas takes the whole content width. Large graphs open around the focused
 resource at a readable scale; Fit shows the complete graph and Center view
 returns the camera to the focused resource. Camera changes never alter the graph

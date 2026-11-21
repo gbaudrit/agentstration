@@ -92455,6 +92455,7 @@ const Mde = { forSpecification(e) {
   ModelProfile: "cpu",
   ModelProvider: "cpu",
   RuntimeProfile: "server",
+  ExtensionRegistration: "puzzle",
   Flow: "route",
   Trigger: "clock",
   TransformationFunction: "puzzle",

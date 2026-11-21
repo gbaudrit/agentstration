@@ -23,13 +23,13 @@ public partial class ResourceRelations
     private CancellationTokenSource? cancellation;
     private long requestVersion;
     private bool reload, disposed, loading = true, failed, truncated, diagramFailed, showDiagram = true;
-    private bool maximized, inspectorOpen, diagramLoading;
+    private bool maximized, inspectorOpen, diagramLoading, filtersOpen;
+    private readonly HashSet<string> hiddenKinds = new(StringComparer.Ordinal);
     private readonly string titleId = "relations-" + Guid.NewGuid().ToString("N");
     private string? fullscreenLocation;
     private ElementReference maximizeButton, inspectorButton;
     private SystemGraphDiagram? diagram;
     private bool IsGraphView => showDiagram && !diagramFailed;
-    private SystemGraphNode? FocusNode => view?.Summary.Graph.Nodes.FirstOrDefault(node => node.Id == focusRoot);
     private string focusRoot = string.Empty;
     private ResourceNamespace focusNamespace;
     private SystemGraphDirection direction;
@@ -48,10 +48,11 @@ public partial class ResourceRelations
         ?? node.Identity.Name;
     private static string Serialize(object value) => JsonSerializer.Serialize(value, JsonOptions);
 
-    private string KindLabel(SystemGraphNode node)
+    private string KindLabel(SystemGraphNode node) => KindLabel(node.Identity.Kind);
+    private string KindLabel(string kind)
     {
-        var label = Localizer["RelationsKind." + node.Identity.Kind];
-        return label.ResourceNotFound ? node.Identity.Kind : label.Value;
+        var label = Localizer["RelationsKind." + kind];
+        return label.ResourceNotFound ? kind : label.Value;
     }
     private static string KindIcon(SystemGraphNode node) => node.Identity.Kind switch
     {
@@ -61,10 +62,10 @@ public partial class ResourceRelations
         "KnowledgeSource" => "book",
         "DataSource" => "database",
         "ConnectedService" or "ToolProvider" => "plug-connected",
-        "ModelProfile" => "cpu",
+        "ModelProfile" or "ModelProvider" => "cpu",
         "RuntimeProfile" or "AgentDeployment" => "server",
         "Flow" or "FlowVersion" => "route",
-        "Extension" or "ExtensionInstallation" => "puzzle",
+        "Extension" or "ExtensionInstallation" or "ExtensionRegistration" => "puzzle",
         "System" => "hierarchy",
         _ => "cube"
     };
@@ -101,7 +102,7 @@ public partial class ResourceRelations
         var next = (Context, Namespace, Root, InitialDirection);
         if (parameters == next) return;
         parameters = next;
-        maximized = false; fullscreenLocation = null;
+        maximized = false; fullscreenLocation = null; hiddenKinds.Clear(); filtersOpen = false;
         cancellation?.Cancel(); ++requestVersion;
         focusRoot = Root; focusNamespace = Namespace;
         direction = InitialDirection; depth = 1;
@@ -159,7 +160,7 @@ public partial class ResourceRelations
     private void RefreshView()
     {
         if (observation is null) { view = null; return; }
-        var next = ResourceRelationsPresentation.Create(observation, focusRoot, direction, depth);
+        var next = ResourceRelationsPresentation.Create(observation, focusRoot, direction, depth, hiddenKinds);
         var labels = next.Summary.Links.ToDictionary(link => link.Id, LinkTitle, StringComparer.Ordinal);
         foreach (var node in next.Summary.Graph.Nodes) labels["kind:" + node.Identity.Kind] = KindLabel(node);
         // Heartbeats and arrivals outside the displayed neighborhood never restart layout.
@@ -172,6 +173,9 @@ public partial class ResourceRelations
             rootNote = new Dictionary<string, string> { [focusRoot] = T("RelationsRoot") };
         }
         else view = next with { Summary = next.Summary with { Graph = view.Summary.Graph } };
+        if ((selected is not null && !next.Summary.Graph.Nodes.Any(node => node.Id == selected.Id))
+            || (selectedLink is not null && !next.Summary.Links.Any(link => link.Id == selectedLink.Id)))
+            inspectorOpen = false;
         selected = next.Summary.Graph.Nodes.FirstOrDefault(node => node.Id == selected?.Id)
             ?? next.Summary.Graph.Nodes.FirstOrDefault(node => node.Id == focusRoot);
         selectedLink = next.Summary.Links.FirstOrDefault(link => link.Id == selectedLink?.Id);
@@ -180,6 +184,12 @@ public partial class ResourceRelations
     private Task ChangeDirectionAsync(SystemGraphDirection value) { direction = value; depth = 1; return LoadAsync(); }
     private void ChangeDepth(int value) { depth = Math.Clamp(value, 1, ResourceRelationsPresentation.MaximumDepth); RefreshView(); }
     private void Expand() => ChangeDepth(depth + 1);
+    private void ChangeKind(string kind, bool visible)
+    {
+        if (visible) hiddenKinds.Remove(kind); else hiddenKinds.Add(kind);
+        RefreshView();
+    }
+    private void ResetKinds() { hiddenKinds.Clear(); RefreshView(); }
     private async Task SelectNodeAsync(string id)
     {
         var node = view?.Summary.Graph.Nodes.FirstOrDefault(value => value.Id == id);

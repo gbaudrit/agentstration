@@ -301,4 +301,29 @@
   <data name="RelationsFocusViewport" xml:space="preserve"><value>Center view on the focused resource</value></data>
   <data name="RelationsDiagramLabel" xml:space="preserve"><value>Resource relationship graph. The List view provides the same resources.</value></data>
   <data name="RelationsPreparingGraph" xml:space="preserve"><value>Preparing graph…</value></data>
+  <data name="RelationsTypes" xml:space="preserve"><value>Types</value></data>
+  <data name="RelationsVisibleTypes" xml:space="preserve"><value>Visible resource types</value></data>
+  <data name="RelationsFiltersHelp" xml:space="preserve"><value>The focused resource stays visible. Hiding a type preserves resources beyond it.</value></data>
+  <data name="RelationsShowAllTypes" xml:space="preserve"><value>Show all types</value></data>
+  <data name="RelationsFilteredResourceCount" xml:space="preserve"><value>{0} / {1} resources</value></data>
+  <data name="RelationsHiddenResources" xml:space="preserve"><value>{0} resources hidden by type filters</value></data>
+  <data name="RelationsKind.ModelProvider" xml:space="preserve"><value>Model provider</value></data>
+  <data name="RelationsKind.ExtensionRegistration" xml:space="preserve"><value>Extension</value></data>
+  <data name="RelationsOneHiddenResource" xml:space="preserve"><value>{0} resource hidden by type filters</value></data>
+  <data name="RelationsKind.ConnectedServiceOperation" xml:space="preserve"><value>Service operation</value></data>
+  <data name="RelationsKind.ConnectedServiceType" xml:space="preserve"><value>Service type</value></data>
+  <data name="RelationsKind.ConnectedServiceOperationType" xml:space="preserve"><value>Service operation type</value></data>
+  <data name="RelationsKind.DataSourceQuery" xml:space="preserve"><value>Data source query</value></data>
+  <data name="RelationsKind.DataSourceProfile" xml:space="preserve"><value>Data source profile</value></data>
+  <data name="RelationsKind.Storage" xml:space="preserve"><value>Storage</value></data>
+  <data name="RelationsKind.Schema" xml:space="preserve"><value>Schema</value></data>
+  <data name="RelationsKind.TransformationFunction" xml:space="preserve"><value>Transformation function</value></data>
+  <data name="RelationsKind.Trigger" xml:space="preserve"><value>Trigger</value></data>
+  <data name="RelationsKind.Parameter" xml:space="preserve"><value>Parameter</value></data>
+  <data name="RelationsKind.Secret" xml:space="preserve"><value>Secret</value></data>
+  <data name="RelationsKind.Artifact" xml:space="preserve"><value>Artifact</value></data>
+  <data name="RelationsKind.Source" xml:space="preserve"><value>Source</value></data>
+  <data name="RelationsKind.SourceRegistry" xml:space="preserve"><value>Source registry</value></data>
+  <data name="RelationsKind.Model" xml:space="preserve"><value>Model</value></data>
+  <data name="RelationsKind.ExtensionBundleInstallation" xml:space="preserve"><value>Extension installation</value></data>
 </root>

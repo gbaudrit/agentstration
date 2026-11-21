@@ -11,24 +11,9 @@
 
 @{
     RenderFragment workspace = @<section class="resource-relations @(maximized ? "is-maximized" : null)" aria-labelledby="@titleId" aria-busy="@loading.ToString().ToLowerInvariant()">
-        <header class="relations-header">
-            <div class="relations-heading">
-                <span class="relations-heading-icon"><TablerIcon Name="hierarchy" /></span>
-                <div><h2 id="@titleId">@T("ResourceRelations") @if (FocusNode is { } focus) { <span class="relations-focus-name" title="@Name(focus)">@Name(focus)</span> }</h2><p>@T(direction == SystemGraphDirection.Usages ? "RelationsUsagesHelp" : "RelationsDependenciesHelp")</p></div>
-            </div>
-            <div class="relations-header-actions">
-                @if (view?.Summary.Graph.Nodes.Count is > 0)
-                {
-                    <span class="relations-count">@Localizer[view.Summary.Graph.Nodes.Count == 1 ? "RelationsOneResource" : "RelationsResourceCount", view.Summary.Graph.Nodes.Count]</span>
-                }
-                <button type="button" class="relations-icon-button" title="@T("Refresh")" aria-label="@T("Refresh")" @onclick="RefreshAsync"><TablerIcon Name="refresh" /></button>
-                <button @ref="maximizeButton" type="button" class="button-secondary relations-maximize" autofocus="@maximized" title="@T(maximized ? "RelationsRestore" : "RelationsMaximize")" aria-label="@T(maximized ? "RelationsRestore" : "RelationsMaximize")" @onclick="ToggleMaximized">
-                    <TablerIcon Name="@(maximized ? "arrows-minimize" : "arrows-maximize")" /><span>@T(maximized ? "RelationsRestore" : "RelationsMaximize")</span>
-                </button>
-            </div>
-        </header>
-        <div class="relations-toolbar">
-            <div role="group" aria-label="@T("RelationsDirection")" class="relations-segmented relations-modes">
+        <h2 id="@titleId" class="relations-screen-reader">@T("ResourceRelations")</h2>
+        <div class="relations-toolbar" aria-label="@T("ResourceRelations")">
+            <div role="group" title="@T(direction == SystemGraphDirection.Usages ? "RelationsUsagesHelp" : "RelationsDependenciesHelp")" aria-label="@T("RelationsDirection")" class="relations-segmented relations-modes">
                 <button type="button" aria-pressed="@((direction == SystemGraphDirection.Dependencies).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Dependencies)">@T("RelationsDependencies")</button>
                 <button type="button" aria-pressed="@((direction == SystemGraphDirection.Usages).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Usages)">@T("RelationsUsages")</button>
             </div>
@@ -38,6 +23,7 @@
                 </ClearableSelect></FormField>
                 <button type="button" class="relations-icon-button" title="@T("RelationsExpand")" aria-label="@T("RelationsExpand")" disabled="@(view?.CanExpand != true)" @onclick="Expand"><TablerIcon Name="plus" /></button>
             </div>
+            <button type="button" class="button-secondary relations-filter-toggle" aria-expanded="@filtersOpen.ToString().ToLowerInvariant()" aria-controls="@(titleId + "-filters")" @onclick="() => filtersOpen = !filtersOpen"><TablerIcon Name="filter" />@T("RelationsTypes")@if (hiddenKinds.Count > 0) { <span class="relations-filter-count">@hiddenKinds.Count</span> }</button>
             @if (focusRoot != Root) { <button type="button" class="button-secondary relations-return" @onclick="ResetFocusAsync"><TablerIcon Name="arrow-back-up" />@T("RelationsResetFocus")</button> }
             <div class="relations-view-actions">
                 <div role="group" aria-label="@T("RelationsPresentation")" class="relations-segmented relations-view-switch">
@@ -46,6 +32,30 @@
                 </div>
                 <button @ref="inspectorButton" type="button" class="relations-icon-button" title="@T("RelationsShowDetails")" aria-label="@T("RelationsShowDetails")" aria-expanded="@inspectorOpen.ToString().ToLowerInvariant()" disabled="@(selected is null)" @onclick="() => inspectorOpen = !inspectorOpen"><TablerIcon Name="info-circle" /></button>
             </div>
+            <div class="relations-toolbar-status">
+                @if (view is not null)
+                {
+                    <span class="relations-count" role="status">@(view.HiddenCount > 0 || view.Limited
+                        ? Localizer["RelationsFilteredResourceCount", view.Summary.Graph.Nodes.Count, view.TotalCount]
+                        : Localizer[view.Summary.Graph.Nodes.Count == 1 ? "RelationsOneResource" : "RelationsResourceCount", view.Summary.Graph.Nodes.Count])</span>
+                }
+                <button type="button" class="relations-icon-button" title="@T("Refresh")" aria-label="@T("Refresh")" @onclick="RefreshAsync"><TablerIcon Name="refresh" /></button>
+                <button @ref="maximizeButton" type="button" class="button-secondary relations-maximize" autofocus="@maximized" title="@T(maximized ? "RelationsRestore" : "RelationsMaximize")" aria-label="@T(maximized ? "RelationsRestore" : "RelationsMaximize")" @onclick="ToggleMaximized"><TablerIcon Name="@(maximized ? "arrows-minimize" : "arrows-maximize")" /><span>@T(maximized ? "RelationsRestore" : "RelationsMaximize")</span></button>
+            </div>
+            @if (filtersOpen)
+            {
+                <fieldset class="relations-kind-filters" id="@(titleId + "-filters")">
+                    <legend>@T("RelationsVisibleTypes")</legend>
+                    <p>@T("RelationsFiltersHelp")</p>
+                    <div class="relations-kind-options">
+                        @foreach (var kind in view?.Kinds ?? [])
+                        {
+                            <label @key="kind" class="relations-kind-option"><FormCheckbox Value="@(!hiddenKinds.Contains(kind))" ValueChanged="visible => ChangeKind(kind, visible)" /><span>@KindLabel(kind)</span></label>
+                        }
+                    </div>
+                    <button type="button" class="text-button" disabled="@(hiddenKinds.Count == 0)" @onclick="ResetKinds">@T("RelationsShowAllTypes")</button>
+                </fieldset>
+            }
         </div>
         <div class="relations-stage">
             @if (failed) { <div class="relations-stage-state"><ErrorState Title="@T("RelationsErrorTitle")" Message="@T("RelationsUnavailable")" /></div> }
@@ -116,7 +126,8 @@
             @if (loading) { <span class="relations-loading" role="status">@T("Loading")</span> }
             @if (truncated) { <span class="relations-warning" role="status">@T("RelationsTruncated")</span> }
             @if (view?.Limited == true) { <span class="relations-warning" role="status">@Localizer["RelationsWindowLimit", ResourceRelationsPresentation.NodeLimit]</span> }
-            @if (!loading && view?.Summary.Graph.Nodes.Count == 1) { <span role="status">@T("RelationsEmpty")</span> }
+            @if (view?.HiddenCount > 0) { <span class="relations-filtered-note">@Localizer[view.HiddenCount == 1 ? "RelationsOneHiddenResource" : "RelationsHiddenResources", view.HiddenCount]</span> }
+            @if (!loading && view?.TotalCount == 1) { <span role="status">@T("RelationsEmpty")</span> }
             @if (OpenExplorer.HasDelegate) { <button type="button" class="relations-explorer-link" @onclick="() => OpenExplorer.InvokeAsync(new(Context, focusNamespace, focusRoot, direction, depth))">@T("RelationsOpenExplorer")<TablerIcon Name="arrow-up-right" /></button> }
         </footer>
     </section>;
