@@ -523,7 +523,9 @@ internal static class OpenApiSuccessResponseCatalog
         if (path == "/api/bootstrap/profiles/preview" && method == "POST")
             return Json<BootstrapCompositionPreview>(200, "Preview bootstrap profiles");
         if (path == "/api/bootstrap/applications" && method == "POST")
-            return Json<BootstrapApplicationResource>(201, "Apply bootstrap profiles");
+            return Json<BootstrapApplicationResource>(202, "Start a durable bootstrap application");
+        if (path == "/api/bootstrap/applications/{applicationId}/cancel" && method == "POST")
+            return Json<BootstrapApplicationResource>(202, "Request bootstrap application cancellation");
         if (path == "/api/bootstrap/applications/{applicationId}" && method == "GET")
             return Json<BootstrapApplicationResource>(200, "Get a bootstrap application");
         return null;

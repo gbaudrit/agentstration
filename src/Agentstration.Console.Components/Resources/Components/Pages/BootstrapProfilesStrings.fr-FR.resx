@@ -24,4 +24,20 @@
   <data name="BindingTargetKind.ConnectedServiceType" xml:space="preserve"><value>Type de service connecté</value></data>
   <data name="BindingTargetKind.StorageType" xml:space="preserve"><value>Type de stockage</value></data>
   <data name="BindingTargetKind.DataSourceProfile" xml:space="preserve"><value>Profil de source de données</value></data>
+
+  <data name="ProcessedCount" xml:space="preserve"><value>{0} ressources traitées sur {1}</value></data>
+  <data name="ProgressLabel" xml:space="preserve"><value>Progression de l’application Bootstrap</value></data>
+  <data name="PreparingApplication" xml:space="preserve"><value>Préparation de l’application…</value></data>
+  <data name="CurrentResource" xml:space="preserve"><value>Ressource {0} :</value></data>
+  <data name="ObservationInterrupted" xml:space="preserve"><value>La progression est temporairement indisponible. Reconnexion à la même application…</value></data>
+  <data name="ApplicationStatus.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="CancelApplication" xml:space="preserve"><value>Annuler l’application</value></data>
+  <data name="CancellationRequested" xml:space="preserve"><value>Annulation demandée. La ressource en cours peut terminer son traitement.</value></data>
+<data name="ApplicationCancelled" xml:space="preserve"><value>L’application a été annulée. Les ressources déjà créées sont conservées.</value></data>
+<data name="ApplicationInterrupted" xml:space="preserve"><value>L’application a été interrompue. Prévisualisez les profils avant de démarrer une nouvelle application.</value></data>
+<data name="ApplicationFailed" xml:space="preserve"><value>L’application n’a pas pu se terminer. Prévisualisez les profils avant de réessayer.</value></data>
+<data name="ApplicationInvalid" xml:space="preserve"><value>Les profils ou la cible ont changé, ou la validation a échoué. Prévisualisez à nouveau l’application.</value></data>
+<data name="ProcessedResources" xml:space="preserve"><value>{0} ressource(s) traitée(s)</value></data>
+<data name="RequestIdentityConflict" xml:space="preserve"><value>Cette identité de requête appartient déjà à une autre application. Prévisualisez à nouveau les profils.</value></data>
+<data name="ApplicationQueueFull" xml:space="preserve"><value>Suivez les applications en cours avant d’en soumettre une nouvelle.</value></data>
 </root>

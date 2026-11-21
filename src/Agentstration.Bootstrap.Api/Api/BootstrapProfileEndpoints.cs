@@ -29,6 +29,7 @@ public static class BootstrapProfileEndpoints
         group.MapPost("/profiles/preview", PreviewAsync);
         group.MapPost("/applications", ApplyAsync);
         group.MapGet("/applications/{applicationId}", GetApplicationAsync);
+        group.MapPost("/applications/{applicationId}/cancel", CancelAsync);
         return endpoints;
     }
 
@@ -78,6 +79,17 @@ public static class BootstrapProfileEndpoints
         return result is null ? Results.NotFound() : Results.Ok(result);
     }
 
+    private static async Task<IResult> CancelAsync(
+        string applicationId,
+        IBootstrapProfileApiService service,
+        ICurrentRequestContext requestContext,
+        CancellationToken cancellationToken) =>
+        await ExecuteAsync(async () =>
+        {
+            var application = await service.CancelAsync(applicationId, requestContext.Current.PrincipalId, cancellationToken);
+            return application is null ? Results.NotFound() : Results.Accepted($"/api/bootstrap/applications/{applicationId}", application);
+        });
+
     private static async Task<IResult> ApplyAsync(
         ApplyBootstrapProfilesRequest request,
         IBootstrapProfileApiService service,
@@ -85,12 +97,8 @@ public static class BootstrapProfileEndpoints
         CancellationToken cancellationToken) =>
         await ExecuteAsync(async () =>
         {
-            var result = await service.ApplyAsync(
-                new(request.Profiles ?? [], request.Target, request.Bindings, request.Source),
-                request.ExpectedDigest,
-                requestContext.Current.PrincipalId,
-                cancellationToken);
-            return Results.Created($"/api/bootstrap/applications/{result.Metadata.Name}", result);
+            var result = await service.StartAsync(request with { Profiles = request.Profiles ?? [] }, requestContext.Current.PrincipalId, cancellationToken);
+            return Results.Accepted($"/api/bootstrap/applications/{result.Metadata.Name}", result);
         });
 
     private static async Task<IResult> ExecuteAsync(Func<Task<IResult>> operation)

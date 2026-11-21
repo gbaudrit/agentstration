@@ -1519,6 +1519,12 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
+                // This fixture belongs to the test root and is compiled into
+                // the two independently bounded Bootstrap test processes.
+                if (include.Replace('\\', '/') == "../BootstrapApiOnlyWebApplicationFactory.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
+                        or "Agentstration.Management.Bootstrap.Scenarios.Tests") continue;
+
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.
                 if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"

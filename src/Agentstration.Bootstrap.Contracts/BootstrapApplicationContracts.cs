@@ -50,7 +50,8 @@ public enum BootstrapApplicationStatus
     [JsonStringEnumMemberName("succeeded")] Succeeded,
     [JsonStringEnumMemberName("partiallyApplied")] PartiallyApplied,
     [JsonStringEnumMemberName("interrupted")] Interrupted,
-    [JsonStringEnumMemberName("failed")] Failed
+    [JsonStringEnumMemberName("failed")] Failed,
+    [JsonStringEnumMemberName("cancelled")] Cancelled
 }
 
 public sealed record BootstrapAppliedResource(string Profile, string Location, string Kind, string Name, BootstrapResourceDisposition Disposition, string? Message = null);
@@ -69,6 +70,13 @@ public sealed record BootstrapApplicationProperties
     public DateTimeOffset? CompletedAt { get; init; }
     public BootstrapApplicationStatus Status { get; init; } = BootstrapApplicationStatus.Running;
     public string? Error { get; init; }
+    public bool CancellationRequested { get; init; }
+    public int TotalResources { get; init; }
+    public BootstrapResourcePreview? CurrentResource { get; init; }
+    public string? ExecutionOwner { get; init; }
+    public BootstrapProfileSelection? Selection { get; init; }
+    public string? RequestFingerprint { get; init; }
+    public IReadOnlyList<Guid> RequestIds { get; init; } = [];
     public IReadOnlyList<BootstrapAppliedResource> Resources { get; init; } = [];
 }
 

@@ -124,17 +124,25 @@ public sealed partial class DeclarativeBootstrapService(
             loadedSelection.SourceProvenance);
     }
 
-    public Task<BootstrapExecutionResult> ExecuteAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken) =>
-        ExecutePhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken);
+    public Task<BootstrapExecutionResult> ExecuteAsync(
+        BootstrapProfileSelection selection, CancellationToken cancellationToken,
+        string? expectedDigest = null,
+        Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null) =>
+        ExecutePhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken,
+            expectedDigest: expectedDigest, reportProgress: reportProgress);
 
     internal async Task<BootstrapExecutionResult> ExecutePhaseAsync(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken,
-        IReadOnlyList<string>? expectedProfileDigests = null)
+        IReadOnlyList<string>? expectedProfileDigests = null,
+        string? expectedDigest = null,
+        Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null)
     {
         var preview = await PreviewPhaseAsync(selection, phase, cancellationToken);
         if (expectedProfileDigests is not null && !preview.Profiles.Select(profile => profile.Digest)
             .SequenceEqual(expectedProfileDigests, StringComparer.Ordinal))
             return new(preview, [], "The Bootstrap catalog changed after structural preparation.");
+        if (expectedDigest is not null && !string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
+            return new(preview, [], "The bootstrap catalog or target changed after preview. Preview the application again.");
         var invalid = preview.Resources.FirstOrDefault(resource => resource.Disposition == BootstrapResourceDisposition.Invalid);
         if (invalid is not null)
             return new(preview, [], $"Bootstrap resource '{invalid.Kind}/{invalid.Name}' from '{invalid.Location}' is invalid: {invalid.Message}");
@@ -164,7 +172,12 @@ public sealed partial class DeclarativeBootstrapService(
             var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources);
             foreach (var source in profile.Resources)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var resource = source.Resource;
+                if (reportProgress is not null)
+                    await reportProgress(new(preview, resources.ToArray(),
+                        new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name, BootstrapResourceDisposition.Create)), cancellationToken);
+                string? error = null;
                 try
                 {
                     resource = prepared[source.Location];
@@ -190,11 +203,16 @@ public sealed partial class DeclarativeBootstrapService(
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name, "failed");
-                    var message = $"Bootstrap resource '{resource.Kind}/{resource.Metadata.Name}' from '{source.Location}' failed: {exception.Message}";
+                    logger.LogWarning("Bootstrap resource {ResourceKind}/{ResourceName} at {Location} failed ({ExceptionType}).",
+                        resource.Kind, resource.Metadata.Name, source.Location, exception.GetType().Name);
+                    var message = "bootstrap_resource_failed";
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
-                        BootstrapResourceDisposition.Failed, exception.Message));
-                    return new(preview, resources, message);
+                        BootstrapResourceDisposition.Failed, message));
+                    error = message;
                 }
+                if (reportProgress is not null)
+                    await reportProgress(new(preview, resources.ToArray(), null), CancellationToken.None);
+                if (error is not null) return new(preview, resources, error);
             }
         }
         return new(preview, resources);

@@ -681,6 +681,14 @@ and validation, enabled OIDC sign-in, and retained authenticated sessions enforc
 this temporary admission rule. Workspace administrator membership alone is
 insufficient. Ordinary admission resumes at startup readiness.
 
+The post-authentication gate checks retained user sessions before considering
+public endpoint metadata or session exit. A path prefix such as `/_blazor` or
+`/api/auth` cannot exempt a protected endpoint. Trusted BFF transport is identified
+by its verified workload authentication scheme; local session issuance and
+validation still apply the administrator admission policy. Startup navigation uses
+local redirects, with both return destinations and deployment path prefixes
+validated before generating browser URLs.
+
 Browser entry after sign-in opens `/startup/progress` instead of the partial
 Console overview. The shared StepProgress component displays the coordinator's
 four actual stages: instance structure, required extensions/contributions,
@@ -724,3 +732,55 @@ readiness stays false. Correct the saved provider configuration or install the
 required model upstream, inspect its discovery state, then restart the authority
 to retry Bootstrap. No model is substituted or downloaded automatically. Manual
 Bootstrap preview remains read-only and does not wait for upstream discovery.
+
+## Durable manual application and progress
+
+`POST /api/bootstrap/applications` returns **202 Accepted** after persisting an
+application, with its stable URL in `Location` and its initial state in the body.
+Follow `GET /api/bootstrap/applications/{applicationId}` until `definition.status`
+is terminal. The ordinary Console HTTP timeout does not limit resource execution.
+Target, permission, catalog digest and resource validation are checked again by
+the processor before mutation; a rejected preview can therefore become a failed
+accepted application. Initial startup bootstrap retains its synchronous behavior.
+
+Supply a GUID `requestId` with the application request. Retries with the same
+actor, selection and digest reuse that identity, including after completion.
+Reusing it for different input is rejected. A duplicate active selection from the
+same actor also follows the existing application. To intentionally reapply after
+completion, preview again and use a new request identity. At most 16 manual
+applications may be pending or running in the authoritative process.
+
+The Console at `/settings/bootstrap` displays processed/total resources, the current
+resource when available, and created, skipped, conflict and failed counts. Refresh
+loads retained applications and resumes observing active ones. The application
+identity is pinned in the page URL, so a newer application from another action or
+administrator does not replace the selected application after reload. A temporary network
+failure reconnects to the same identity without submitting again. Progress is
+persisted at resource boundaries. It stores resource identifiers and outcomes,
+never manifest bodies or resolved Secret/Parameter values.
+
+`POST /api/bootstrap/applications/{applicationId}/cancel` requests cooperative
+cancellation. Already-created resources remain. The current resource may finish
+before cancellation takes effect. History distinguishes `succeeded`,
+`partiallyApplied`, `failed`, `interrupted` and `cancelled`. Process shutdown or
+restart interrupts active applications rather than replaying uncertain side
+effects; review history and preview again before explicitly reapplying. These
+operations retain the Platform administrator requirement and explicit target
+validation. The Bootstrap processor assumes one active authoritative process;
+this is not distributed multi-replica scheduling.
+
+### Reusable offline load profile
+
+The catalog includes the explicitly **TEST ONLY** `load-test` profile: 512
+Tenant-scoped integer Parameters named `bootstrap-load-test-001` through
+`bootstrap-load-test-512`. Choose a disposable Tenant explicitly. This profile
+requires no model provider, Secret, network, Docker or cloud account, and no
+standard launch profile applies it automatically. Preview is read-only; subsequent
+applications skip existing addresses and preserve changes. Builds do not generate
+its manifests. See [the fixture notes](https://github.com/gbaudrit/agentstration/blob/main/deploy/bootstrap/profiles/load-test/README.md)
+and [ADR-0246](../decisions/0246-bootstrap-applications-run-independently-of-http.md).
+
+Duration depends on storage and hardware. The regression test holds a local handler
+for 16 seconds (beyond the ordinary 15-second request budget), closes the initiating
+client after acceptance, then verifies live durable progress, duplicate requests,
+completion and idempotent reapplication of all 512 committed resources.

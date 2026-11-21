@@ -16,5 +16,7 @@ public interface IBootstrapProfileApiService
         CancellationToken cancellationToken,
         BootstrapSourceProfileSelection? source = null);
     Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, Guid actorPrincipalId, CancellationToken cancellationToken);
+    Task<BootstrapApplicationResource?> CancelAsync(string applicationId, Guid actorPrincipalId, CancellationToken cancellationToken);
+    Task<BootstrapApplicationResource> StartAsync(ApplyBootstrapProfilesRequest request, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, Guid actorPrincipalId, CancellationToken cancellationToken);
 }
