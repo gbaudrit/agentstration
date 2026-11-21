@@ -1,0 +1,53 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="tool-definition-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="tool-definition-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="@ConfigurationTestId">
+        @if (Resource.Definition is RelayToolDefinitionProperties) { <CollectionView TItem="ConfigurationEntry" Items="RelayConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView> } else { <CollectionView TItem="ConfigurationEntry" Items="GeneralConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView> }
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ToolDefinitionResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> GeneralConfiguration
+    {
+        get
+        {
+            var value = Resource.Definition; var result = new List<ConfigurationEntry> { new(T("Enabled"), T(value.Enabled ? "Yes" : "No")), new(T("RequiresApproval"), T(value.RequiresApproval ? "Yes" : "No")), new(T("TimeoutSeconds"), value.InvocationTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)), new(T("RelayVersion"), value.Version), new(T("PublishVersion"), T(value.Publish ? "Yes" : "No")), new(T("InputContract"), Pretty(value.InputSchema)), new(T("OutputContract"), value.OutputSchema is { } output ? Pretty(output) : "—") };
+            if (value.Bindings.Count > 0 || value.FixedArguments is not null) result.Add(new(T("FixedInputBindings"), JsonSerializer.Serialize(new { value.Bindings, value.FixedArguments }, IndentedJson)));
+            if (value.InputSchemaBinding is not null || value.OutputSchemaBinding is not null) result.Add(new(T("SchemaReferences"), JsonSerializer.Serialize(new { value.InputSchemaBinding, value.OutputSchemaBinding }, IndentedJson)));
+            if (value is FlowToolDefinitionProperties flow) { result.Add(new(T("Flow"), FlowText(flow.Flow, Resource.Namespace))); result.Add(new(T("UseActiveVersion"), T(flow.Flow.UseActiveVersion ? "Yes" : "No"))); }
+            if (value is AcquisitionToolDefinitionProperties acquisition) { result.Add(new(T("AcquisitionTemplate"), $"{acquisition.Acquisition.TemplateNamespace}/{acquisition.Acquisition.TemplateId}")); result.Add(new(T("AcquisitionOutput"), acquisition.Acquisition.ArtifactName ?? "artifact")); }
+            return result;
+        }
+    }
+    private IReadOnlyList<ConfigurationEntry> RelayConfiguration => Resource.Definition is not RelayToolDefinitionProperties relay ? [] : [new(T("RelayVersion"), relay.Version), new(T("Enabled"), T(relay.Enabled ? "Yes" : "No")), new(T("RequiresApproval"), T(relay.RequiresApproval ? "Yes" : "No")), new(T("TimeoutSeconds"), relay.InvocationTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)), new(T("CreationSourceTool"), $"{relay.Target.ScopeRef} · {relay.Target.Namespace}/{relay.Target.Name}"), new(T("SourceToolVersion"), SourceVersion ?? T("CatalogRevision", relay.Target.Generation)), new(T("InputEnvelope"), relay.InputEnvelope ?? "—"), new(T("FixedInputBindings"), JsonSerializer.Serialize(new { relay.Bindings, relay.FixedArguments }, IndentedJson)), new(T("InputContract"), Pretty(relay.InputSchema)), new(T("OutputContract"), Pretty(relay.OutputSchema)), new(T("SchemaReferences"), JsonSerializer.Serialize(new { relay.InputSchemaBinding, relay.OutputSchemaBinding }, IndentedJson))];
+    [Parameter] public string? SourceVersion { get; set; }
+    [Parameter] public string ConfigurationTestId { get; set; } = "tool-definition-configuration-summary";
+    private static readonly JsonSerializerOptions IndentedJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    private static string Pretty(JsonElement? value) => value is null ? "" : JsonSerializer.Serialize(value, IndentedJson);
+    private static string FlowText(ToolDefinitionFlowTarget flow, ResourceNamespace ns) => $"{(flow.ScopeRef is { } owner ? owner.Value + " · " : "")}{flow.Namespace ?? ns}/{flow.Name}{(!flow.UseActiveVersion && !string.IsNullOrWhiteSpace(flow.Version) ? " · " + flow.Version : "")}";
+
+}

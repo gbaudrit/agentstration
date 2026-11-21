@@ -6379,11 +6379,12 @@
     },
     {
       "id": "tool-definition-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
-      "line": 28,
+      "source": "src/Agentstration.Console.Components/Components/ToolDefinitionResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/tools/definitions/{Name}"
+        "/tools/definitions/{Name}",
+        "/tools/definitions"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6402,7 +6403,7 @@
           "tests/schema-contract-bindings.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+        "interpretation": "Saved ToolDefinition configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6483,8 +6484,8 @@
     },
     {
       "id": "tool-relay-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
-      "line": 42,
+      "source": "src/Agentstration.Console.Components/Components/ToolDefinitionResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
         "/tools/definitions/{Name}"
@@ -6506,7 +6507,7 @@
           "tests/schema-contract-bindings.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved Relay definition/target/binding overview is separate from retained editors, immutable publications and consumers. Current validation pending."
+        "interpretation": "Saved Relay configuration shared by full detail and exact-address Preview; no source lookup occurs in Summary."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18958,6 +18959,11 @@
       "source": "src/Agentstration.Console.Components/Components/ToolCategoryResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved ToolCategory configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolDefinitionResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolDefinition configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

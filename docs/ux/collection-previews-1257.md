@@ -89,3 +89,9 @@ Validation: Release component/test build passed without warnings/errors; 37 tool
 Saved identity and declared Tool membership references, independent of the editor selection/draft. Preview adds one exact Workspace/namespace/name read through the existing store; it never loads resolved members, Tools or Provider pickers. Full editor reads now use the exact owner when supplied. The family Preview uses `IToolCategoriesClient.GetCategoryAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 30 tool categories tests passed. Browser and final offline checks remain pending.
+
+## ToolDefinition
+
+Saved identity and the existing Flow, Relay or Acquisition configuration. Both full detail adapters reuse the same saved Summary. Preview reads no Flow contracts, source catalogs, version history, usages or pickers; a Relay source generation is displayed as a catalog revision unless an actual known version is supplied. The family Preview uses `IToolDefinitionsClient.GetAsync(owner, name, namespace, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 95 tool definitions tests passed. Browser and final offline checks remain pending.

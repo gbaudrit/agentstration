@@ -486,7 +486,27 @@
       "rowTypes": [
         "ToolDefinitionResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-validation-pending",
+      "family": "ToolDefinition",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/tools/definitions/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": "/tools/definitions/{name}?scopeRef={owner}&namespace={namespace}&context={context}#definition/configuration",
+      "rowActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Edit definition (authorized, owned, unmanaged)"
+      ],
+      "summary": "Saved identity and the existing Flow, Relay or Acquisition configuration. Both full detail adapters reuse the same saved Summary. Preview reads no Flow contracts, source catalogs, version history, usages or pickers; a Relay source generation is displayed as a catalog revision unless an actual known version is supplied.",
+      "loader": "IToolDefinitionsClient.GetAsync(owner, name, namespace, token)",
+      "tests": [
+        "ToolDefinitionResourcePreviewTests",
+        "ToolDefinitionCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 95 tool definitions tests passed. Browser and final offline checks remain pending."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviders.razor",
