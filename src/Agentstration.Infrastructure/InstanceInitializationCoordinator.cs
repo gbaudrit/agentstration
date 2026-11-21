@@ -14,8 +14,8 @@ public interface IInstanceInitializationCoordinator
 public sealed class InstanceInitializationOptions
 {
     public const string ConfigurationSection = "Agentstration:Initialization";
-    // Reconcile integral Knowledge discovery and contribution access contracts.
-    public int TargetVersion { get; set; } = 10;
+    // Reconcile the local XML transformation engine and inherited catalogue access.
+    public int TargetVersion { get; set; } = 11;
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 }

@@ -1,10 +1,14 @@
 using System.Text.Json;
+using Agentstration.Functions.Abstractions;
+using Agentstration.Functions.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Schemas;
 using Agentstration.Schemas.Contracts;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
 using Agentstration.Web.Components.Schemas;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
@@ -342,6 +346,122 @@ public sealed partial class SchemaConsoleTests
         Assert.AreEqual("object", saved.Content.GetProperty("type").GetString());
         Assert.AreEqual(resource.Definition.Format, saved.Format);
         Assert.AreEqual(resource.Definition.Dialect, saved.Dialect);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", true, "Expose as function", false)]
+    [DataRow("en-US", true, "Expose as function", true)]
+    [DataRow("fr-FR", true, "Exposer comme fonction", false)]
+    [DataRow("fr-FR", false, "Exposer comme fonction", false)]
+    public async Task ExposureIsExplicitLocalizedAndUsesTheSelectedPublishedVersion(string locale, bool canWrite, string label, bool pendingPublication)
+    {
+        using var culture = new TestCultureScope(locale);
+        var schema = Schema("xml-json-transformation");
+        var client = new SchemaClientStub([schema]);
+        await client.PublishAsync(Scope, schema.Namespace, schema.Name, new("1.2.3"));
+        using var context = Context(client);
+        var state = new ConsoleContextState(new ExposureContext(canWrite));
+        await state.EnsureLoadedAsync(default);
+        context.Services.AddSingleton(state);
+        var functions = new ExposureClient();
+        context.Services.AddSingleton<ITransformationFunctionsClient>(functions);
+        context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().NavigateTo(
+            $"/schemas/contact?namespace=shared.contracts&scopeRef={Uri.EscapeDataString(Scope.Value)}&version=1.2.3#versions");
+        var rendered = context.Render<SchemaEditor>(parameters => parameters.Add(value => value.Name, "contact"));
+        var action = rendered.WaitForElement("[data-testid=schema-expose]");
+        Assert.AreEqual(label, action.TextContent);
+        Assert.IsNull(functions.Request, "Inspecting a published declaration never exposes it implicitly.");
+        Assert.AreEqual(!canWrite, rendered.Find("[data-testid=schema-exposure] fieldset").HasAttribute("disabled"));
+        if (!canWrite) return;
+        rendered.Find("[data-testid=exposure-name]").Change("catalog-conversion");
+        rendered.Find("[data-testid=exposure-display-name]").Change("Catalog conversion");
+        rendered.Find("[data-testid=exposure-version]").Change("2.0.0");
+        rendered.Find("[data-testid=schema-exposure]").Input("typed");
+        if (pendingPublication) rendered.Find(".schema-publish-card").Input("2.0.0");
+        Assert.IsTrue(rendered.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+        action.Click();
+        rendered.WaitForAssertion(() =>
+        {
+            Assert.IsNotNull(functions.Request);
+            Assert.AreEqual(pendingPublication, rendered.FindComponent<UnsavedNavigationGuard>().Instance.HasUnsavedChanges!());
+            if (!pendingPublication) StringAssert.Contains(context.Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>().Uri, "/transformation-functions/catalog-conversion?");
+        });
+        Assert.AreEqual("1.2.3", functions.Request!.Schema.Version);
+        Assert.AreEqual("2.0.0", functions.Request.Version);
+        Assert.AreEqual(Scope, functions.Request.ScopeRef);
+        Assert.AreEqual(schema.Namespace, functions.Request.Namespace);
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public async Task NativeXmlEditorPreservesTextAndUsesTheFormatValidator(string locale)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = Context(new SchemaClientStub([]));
+        JsonElement? saved = null;
+        ValidateSchemaDefinitionRequest? validated = null;
+        var initial = JsonSerializer.SerializeToElement("<schema />");
+        var rendered = context.Render<SchemaDocumentEditor>(parameters => parameters
+            .Add(p => p.Format, BuiltinXmlSchemaFormatHandler.Format)
+            .Add(p => p.Value, initial)
+            .Add(p => p.ValueChanged, value => saved = value)
+            .Add(p => p.DefinitionValidator, request => { validated = request; return Task.FromResult(SchemaFormatValidationResult.Valid); }));
+        var editor = rendered.FindComponent<SchemaSourceEditor>();
+        Assert.AreEqual("<schema />", editor.Instance.Value);
+        Assert.AreEqual("xml", editor.Instance.Language);
+        await rendered.InvokeAsync(() => editor.Instance.ValueChanged.InvokeAsync("<replacement />"));
+        rendered.Find("[data-testid=schema-apply-source]").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual("<replacement />", saved!.Value.GetString()));
+        Assert.AreEqual(JsonValueKind.String, validated!.Definition.ValueKind);
+        Assert.AreEqual("<replacement />", validated.Definition.GetString());
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Loading the source editor…")]
+    [DataRow("fr-FR", "Chargement de l’éditeur source…")]
+    public void NativeSourceEditorWaitsForTheLocalMonacoModule(string locale, string loading)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = Context(new SchemaClientStub([]));
+        var ready = context.JSInterop.SetupVoid("agentstrationMonaco.ready");
+        var rendered = context.Render<SchemaSourceEditor>(p => p.Add(v => v.Value, "<schema />").Add(v => v.Language, "xml"));
+        Assert.Contains(loading, rendered.Markup);
+        Assert.IsEmpty(rendered.FindComponents<BlazorMonaco.Editor.StandaloneCodeEditor>());
+        ready.SetVoidResult();
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindComponents<BlazorMonaco.Editor.StandaloneCodeEditor>()));
+    }
+
+    private sealed class ExposureContext(bool canWrite) : IConsoleContextProvider
+    {
+        public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(
+            Guid.NewGuid(), "Author", Guid.NewGuid(), "tenant", "Tenant", Scope.TargetId!.Value, "workspace", "Workspace",
+            canWrite ? new HashSet<string> { "resources/read", "resources/write" } : new HashSet<string> { "resources/read" }, []));
+    }
+
+    private sealed class ExposureClient : ITransformationFunctionsClient
+    {
+        public ExposeTransformationSchemaRequest? Request { get; private set; }
+        public Task<TransformationFunctionResource> ExposeAsync(ExposeTransformationSchemaRequest request, CancellationToken ct)
+        {
+            Request = request;
+            return Task.FromResult(new TransformationFunctionResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = FunctionResourceKinds.TransformationFunction,
+                ScopeRef = request.ScopeRef,
+                Metadata = new() { Name = request.Name, Namespace = request.Namespace },
+                Definition = new(request.DisplayName, [])
+            });
+        }
+        public Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<FunctionKindResource>> ListKindsAsync(ResourceScopeRef? scope, CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<NativeFunctionDescriptor>> ImplementationsAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<IReadOnlyList<FunctionChoice>> ChoicesAsync(ResourceScopeRef scope, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<TransformationFunctionResource>> GetAsync(FunctionReference reference, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ResourceSnapshot<FunctionKindResource>> GetKindAsync(FunctionReference reference, CancellationToken ct) => throw new NotSupportedException();
+        public Task SaveAsync(TransformationFunctionResource resource, string? etag, CancellationToken ct) => throw new NotSupportedException();
+        public Task SaveKindAsync(FunctionKindResource resource, string? etag, CancellationToken ct) => throw new NotSupportedException();
     }
 
     private static BunitContext Context(ISchemasClient client)

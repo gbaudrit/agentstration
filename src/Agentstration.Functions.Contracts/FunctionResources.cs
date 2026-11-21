@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Functions.Contracts;
 
@@ -22,6 +24,10 @@ public sealed record FunctionReference(string Name, string Version, ResourceScop
 public sealed record TransformationFunctionVersion(string Version, FunctionReference FunctionKind, JsonElement Configuration)
 {
     public string? NativeContractDigest { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SchemaVersionReference? TransformationSchema { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TransformationSchemaSnapshot? TransformationSnapshot { get; init; }
 }
 public sealed record TransformationFunctionProperties(string DisplayName, IReadOnlyList<TransformationFunctionVersion> Versions, bool Enabled = true)
 {
@@ -33,7 +39,18 @@ public sealed record TransformationFunctionResource : Resource
 }
 
 public sealed record ResolvedTransformationFunction(FunctionReference Reference, FunctionReference FunctionKind,
-    string ImplementationId, string ImplementationVersion, JsonElement InputSchema, JsonElement OutputSchema);
+    string ImplementationId, string ImplementationVersion, JsonElement InputSchema, JsonElement OutputSchema)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TransformationSchemaSnapshot? Transformation { get; init; }
+}
+
+public sealed record TransformationSchemaDeclaration(FunctionReference Engine, SchemaVersionReference Input,
+    SchemaVersionReference Output, JsonElement Rules);
+public sealed record TransformationSchemaSnapshot(SchemaBindingSnapshot Declaration, SchemaBindingSnapshot Input,
+    SchemaBindingSnapshot Output, FunctionReference Engine, string EngineContractDigest);
+public sealed record ExposeTransformationSchemaRequest(string Name, string DisplayName, string Version,
+    SchemaVersionReference Schema, ResourceScopeRef ScopeRef, ResourceNamespace Namespace);
 
 public interface ITransformationFunctionResolver
 {

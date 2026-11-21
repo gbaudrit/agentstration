@@ -2,6 +2,7 @@
 @page "/schemas/{Name}"
 @using System.Text.Json
 @using Agentstration.Schemas
+@using Agentstration.Functions.Contracts
 @using Agentstration.Schemas.Contracts
 @implements IDisposable
 @inject ISchemasClient Client
@@ -23,7 +24,7 @@ else
     <ConsoleResourceDetailsTemplate CollectionHref="/schemas" CollectionLabel="@T("Title")" Resource="schema" RequestedAddress="@ResourceAddress.Create(ResourceNamespace.Parse(NamespaceQuery), SchemaResourceKinds.Schema, Name!)"
         ResourceIdentity="@($"{loadedKey}|{schema?.Uid}")" Name="@(schema?.Definition.DisplayName ?? Name!)" ResourceType="@T("Schema")" Domain="schema" IconName="file-text" Description="@schema?.Definition.Description"
         SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="BusinessSections" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync"
-        HasDraft="HasDraft" HasAdditionalDraft="publicationTouched" Busy="@(busy || refreshing)" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Feedback="Feedback"
+        HasDraft="HasDraft" HasAdditionalDraft="@(publicationTouched || exposureTouched)" Busy="@(busy || refreshing)" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Feedback="Feedback"
         Yaml="@rawYaml" YamlChanged="value => rawYaml = value" YamlReadOnly="@(!CanEdit || FormDirty || sourceDirty)" YamlError="@error" YamlInputTestId="schema-yaml-source"
         YamlTitle="@T("YamlManifest")" YamlDescription="@T("YamlHelp")" TestId="schema-editor" SectionTestIdPrefix="schema">
 
@@ -34,7 +35,7 @@ else
         <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
         <OverviewContent>@if (schema?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><details><summary>@T("SourceEvidence")</summary><pre class="runner-json">@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details></FormSection> }</OverviewContent>
         <DefinitionContent Context="path">@DefinitionForm(presentations)</DefinitionContent>
-        <AdditionalContent Context="path"><div @oninput="() => publicationTouched = true" @onchange="() => publicationTouched = true">@VersionsContent</div></AdditionalContent>
+        <AdditionalContent Context="path">@VersionsContent</AdditionalContent>
         <DraftActions><button class="text-button" type="button" @onclick="Discard" disabled="@(busy || refreshing)">@T("DiscardDraft")</button>
             @if (sectionState.Is("yaml")) { <button class="button-primary" type="button" data-testid="schema-yaml-save" @onclick="SaveRawAsync" disabled="@(busy || refreshing || !CanEdit || FormDirty || sourceDirty)">@T("SaveYaml")</button> }
             else { <button class="button-primary" type="submit" form="schema-definition-form" data-testid="schema-save" disabled="@(busy || refreshing || !CanEdit)">@T("SaveDraft")</button> }
@@ -61,10 +62,12 @@ else
     private SchemaVersionResource? selectedVersion;
     private string? etag, yamlEtag, error, message, loadedKey, destination, loadedVersion, observedVersionQuery;
     private string baseline = "", rawYaml = "", yamlBaseline = "", publishVersion = "1.0.0";
-    private bool loading = true, busy, refreshing, touched, sourceDirty, invalidInput, publicationTouched, disposed, validationFocus, interactive;
+    private bool loading = true, busy, refreshing, touched, sourceDirty, invalidInput, publicationTouched, exposureTouched, disposed, validationFocus, interactive;
     private long revision;
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private bool IsNew => string.IsNullOrWhiteSpace(Name);
+    private string functionName = string.Empty, functionDisplayName = string.Empty, functionVersion = "1.0.0";
+    private bool CanExpose => interactive && CanManage && (Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState)?.HasPermission("resources/write") == true;
     private bool CanManage => schema?.ScopeRef is not null && ResourceOwnershipContext.CanManage(schema.ScopeRef, Services);
     private bool CanEdit => IsNew || CanManage && schema is { Governance.IsManaged: false };
     private bool CanPublish => schema?.ScopeRef is not null;
@@ -94,6 +97,12 @@ else
     private SchemaFormatDescriptor? VersionFormatDescriptor(SchemaVersionResource value) => FormatDescriptor(value.Format);
     private bool FormatAvailable => SelectedFormatDescriptor is not null;
     private bool SavedFormatAvailable => schema is not null && FormatDescriptor(schema.Definition.Format) is not null;
+    private string FormatLabel(SchemaFormatDescriptor descriptor) => descriptor.Format switch
+    {
+        "xml-xsd" => T("Format.XmlXsd"),
+        "xml-json-transformation" => T("Format.XmlJsonTransformation"),
+        _ => descriptor.DisplayName
+    };
     private string T(string key, params object[] args) => Localizer[key, args];
     private string CurrentKey => $"{Name}|{NamespaceQuery}|{ScopeRefQuery}|{Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query).GetValueOrDefault("context")}";
     protected override async Task OnParametersSetAsync()
@@ -150,7 +159,7 @@ else
     {
         revision++; busy = refreshing = false; schema = null; latestSnapshot = null; selectedVersion = null; versions = []; model = new(); formContext = null;
         etag = yamlEtag = error = message = loadedVersion = observedVersionQuery = null; rawYaml = yamlBaseline = ""; baseline = JsonSerializer.Serialize(model);
-        touched = sourceDirty = invalidInput = publicationTouched = false; publishVersion = "1.0.0";
+        touched = sourceDirty = invalidInput = publicationTouched = exposureTouched = false; publishVersion = functionVersion = "1.0.0"; functionName = functionDisplayName = string.Empty;
     }
     private void HandleFailure(Exception exception, long request)
     {
@@ -220,6 +229,25 @@ else
         catch (Exception exception) { HandleFailure(exception, request); }
         finally { if (request == revision) busy = false; }
     }
+    private async Task ExposeAsync()
+    {
+        if (!CanExpose || busy || schema is null || selectedVersion is null) return;
+        var request = revision;
+        busy = true; error = null; message = null;
+        try
+        {
+            var client = (ITransformationFunctionsClient)Services.GetService(typeof(ITransformationFunctionsClient))!;
+            var exposed = await client.ExposeAsync(new(functionName.Trim(), functionDisplayName.Trim(), functionVersion.Trim(),
+                new() { Name = schema.Name, Version = selectedVersion.Version, ScopeRef = schema.ScopeRef, Namespace = schema.Namespace },
+                schema.ScopeRef!.Value, schema.Namespace), cancellation.Token);
+            if (disposed || request != revision) return;
+            exposureTouched = false;
+            destination = ResourceOwnershipContext.Resource(Services, "/transformation-functions", exposed.Name, exposed.Namespace, exposed.ScopeRef);
+        }
+        catch (Exception) { error = T("ExposureFailed"); }
+        finally { busy = false; }
+    }
+
     private async Task PublishAsync()
     {
         if (!CanPublish || busy || schema is null) return;
@@ -238,7 +266,7 @@ else
     }
     private Task<SchemaFormatValidationResult> ValidateDefinitionAsync(ValidateSchemaDefinitionRequest request) => Client.ValidateDefinitionAsync(request, cancellation.Token);
     private Task<SchemaFormatValidationResult> ValidateInstanceAsync(ValidateSchemaInstanceRequest request) => Client.ValidateInstanceAsync(request, cancellation.Token);
-    private void ChangeFormat(string format) { model.Format = format; model.Dialect = SelectedFormatDescriptor?.Dialects.FirstOrDefault() ?? ""; MarkDirty(); }
+    private void ChangeFormat(string format) { model.Format = format; model.Dialect = SelectedFormatDescriptor?.Dialects.FirstOrDefault() ?? ""; if (format == BuiltinXmlSchemaFormatHandler.Format) model.Content = JsonSerializer.SerializeToElement("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" />"); MarkDirty(); }
     private Task ChangeContent(SchemaEditorModel observed, long request, JsonElement value) { if (disposed || request != revision || !ReferenceEquals(observed, model) || !CanEdit || busy) return Task.CompletedTask; model.Content = value.Clone(); FormContext.NotifyFieldChanged(FormContext.Field(nameof(model.Content))); return Task.CompletedTask; }
     private void SourceDraftChanged(SchemaEditorModel observed, long request, bool value) { if (!disposed && request == revision && ReferenceEquals(observed, model) && CanEdit && !busy) sourceDirty = value; }
     private string EditUrl(SchemaResource value) => ResourceOwnershipContext.Resource(Services, "/schemas", value.Name, value.Namespace, value.ScopeRef);
@@ -255,7 +283,7 @@ else
     private RenderFragment IdentityContent => @<ResourceIdentityEditor ResourceKind="@SchemaResourceKinds.Schema" IsNew="IsNew" NamespaceEditable="IsNew" ReadOnly="@(!CanEdit)" @bind-DisplayName="model.DisplayName" @bind-TechnicalName="model.Name" @bind-Namespace="model.Namespace" @bind-ScopeRef="model.Scope" @bind-Description="model.Description" @bind-Labels="model.Tags" LabelsReadOnly="true"
         DisplayNameTestId="schema-display-name" TechnicalNameTestId="schema-name" NamespaceTestId="schema-namespace" TestId="schema-definition"><AdditionalPanels>@if (schema?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><pre class="runner-json">@JsonSerializer.Serialize(evidence)</pre></FormSection> }</AdditionalPanels></ResourceIdentityEditor>;
     private RenderFragment ConfigurationContent { get { var observed = model; var request = revision; return @<FormSection Title="@T("Configuration")"><FormGrid>
-        <FormField Label="@T("Format")"><ClearableSelect TValue="string" Value="@model.Format" ValueExpression="@(() => model.Format)" ValueChanged="ChangeFormat" disabled="@(!IsNew || busy)">@foreach (var available in AvailableFormats) { <option value="@available.Format">@available.DisplayName (@available.Format)</option> }@if (!FormatAvailable) { <option value="@model.Format">@model.Format</option> }</ClearableSelect></FormField>
+        <FormField Label="@T("Format")"><ClearableSelect TValue="string" Value="@model.Format" ValueExpression="@(() => model.Format)" ValueChanged="ChangeFormat" disabled="@(!IsNew || busy)">@foreach (var available in AvailableFormats) { <option value="@available.Format">@FormatLabel(available) (@available.Format)</option> }@if (!FormatAvailable) { <option value="@model.Format">@model.Format</option> }</ClearableSelect></FormField>
         <FormField Label="@T("Dialect")"><ClearableSelect TValue="string" @bind-Value="model.Dialect" disabled="@(!IsNew || busy)">@foreach (var value in SelectedFormatDescriptor?.Dialects ?? []) { <option value="@value">@value</option> }@if (!FormatAvailable) { <option value="@model.Dialect">@model.Dialect</option> }</ClearableSelect></FormField>
     </FormGrid><section class="panel schema-designer-panel" data-testid="schema-designer" tabindex="-1" aria-invalid="@(IsNew && sourceDirty ? "true" : null)">
         <SchemaDocumentEditor Format="@model.Format" Dialect="@model.Dialect" Descriptor="SelectedFormatDescriptor" Value="model.Content" ValueChanged="value => ChangeContent(observed, request, value)" DraftChanged="value => SourceDraftChanged(observed, request, value)" Disabled="busy" ReadOnly="@(!CanEdit)" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
@@ -264,7 +292,7 @@ else
     private RenderFragment VersionsContent => @<div class="resource-editor-view">@if (schema is not null) {
             <section class="panel form-section" data-testid="schema-versions">
                 <div class="panel-header"><div><p class="eyebrow">@T("Publication")</p><h2>@T("PublishedVersions")</h2><p>@T("PublishedVersionsHelp")</p></div></div>
-                <section class="schema-publish-card" aria-labelledby="schema-publish-title">
+                <section class="schema-publish-card" aria-labelledby="schema-publish-title" @oninput="() => publicationTouched = true" @onchange="() => publicationTouched = true">
                     <div class="schema-publish-summary">
                         <span class="schema-publish-icon" aria-hidden="true"><TablerIcon Name="upload" /></span>
                         <div><h3 id="schema-publish-title">@T("PublishDraft")</h3><p>@T("PublishDraftHelp", schema.Generation)</p></div>
@@ -303,6 +331,18 @@ else
                                     Descriptor="@VersionFormatDescriptor(selectedVersion)" Value="@selectedVersion.Content"
                                     ReadOnly="true" DefinitionValidator="ValidateDefinitionAsync" InstanceValidator="ValidateInstanceAsync" />
                             </div>
+                            @if (selectedVersion.Format == "xml-json-transformation")
+                            {
+                                <section class="panel form-section" data-testid="schema-exposure" @oninput="() => exposureTouched = true" @onchange="() => exposureTouched = true">
+                                    <h4>@T("ExposeAsFunction")</h4><p>@T("ExposureHelp")</p>
+                                    <fieldset class="schema-exposure-fields" disabled="@(!CanExpose || busy)">
+                                        <FormField Label="@T("TechnicalName")" Required="true"><ClearableText @bind-Value="functionName" Disabled="@(!CanExpose || busy)" data-testid="exposure-name" /></FormField>
+                                        <FormField Label="@T("DisplayName")" Required="true"><ClearableText @bind-Value="functionDisplayName" Disabled="@(!CanExpose || busy)" data-testid="exposure-display-name" /></FormField>
+                                        <FormField Label="@T("Version")" Required="true"><ClearableText @bind-Value="functionVersion" Disabled="@(!CanExpose || busy)" data-testid="exposure-version" /></FormField>
+                                        <button type="button" class="button-primary" @onclick="ExposeAsync" data-testid="schema-expose">@T("ExposeAsFunction")</button>
+                                    </fieldset>
+                                </section>
+                            }
                         </section>
                     }
                 }

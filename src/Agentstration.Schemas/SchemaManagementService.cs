@@ -134,7 +134,7 @@ public sealed class SchemaManagementService(
         return stored;
     }
 
-    private async Task ValidateAsync(SchemaResource resource, CancellationToken cancellationToken)
+    public async Task ValidateAsync(SchemaResource resource, CancellationToken cancellationToken)
     {
         if (resource.Definition.SourceEvidence is { } evidence && JsonSerializer.SerializeToUtf8Bytes(evidence).Length > 65_536)
             throw new SchemaValidationException("schema_evidence_too_large", "Schema source evidence cannot exceed 64 KiB.");

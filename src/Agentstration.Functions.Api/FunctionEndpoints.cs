@@ -13,6 +13,10 @@ public static class FunctionEndpoints
     public static void MapFunctionsApi(this IEndpointRouteBuilder endpoints)
     {
         var functions = endpoints.MapGroup("/api/transformation-functions").WithTags("Transformation functions");
+        functions.MapPost("/expose-schema", async (ExposeTransformationSchemaRequest body, TransformationFunctionService service, HttpResponse response, CancellationToken ct) =>
+            await Execute(async () => Written(await service.ExposeAsync(body, ct), response, 201)))
+            .WithSummary("Explicitly expose an exact published transformation Schema as a named function")
+            .Produces<TransformationFunctionResource>(StatusCodes.Status201Created).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         functions.MapGet("/", async (string? scopeRef, int? skip, int? take, TransformationFunctionService service, IResourceScopeOperations scopes, CancellationToken ct) => await Execute(async () =>
         {
             Page(skip, take);
@@ -70,7 +74,7 @@ public static class FunctionEndpoints
     private static async Task<IResult> Execute(Func<Task<IResult>> action)
     {
         try { return await action(); }
-        catch (TransformationFunctionException error) { return Results.Problem(statusCode: error.Code == "function_use_denied" ? 403 : 422, title: error.Code, detail: error.Message); }
+        catch (TransformationFunctionException error) { return Results.Problem(statusCode: error.Code is "function_use_denied" or "schema_reference_forbidden" ? 403 : 422, title: error.Code, detail: error.Message); }
         catch (DataContractException error) { return Results.Problem(statusCode: 422, title: error.Code, detail: error.Message); }
         catch (ResourceConcurrencyException error) { return Results.Problem(statusCode: 412, title: "function_concurrency_conflict", detail: error.Message); }
         catch (ResourceScopeAccessDeniedException error) { return Results.Problem(statusCode: 403, title: "function_scope_denied", detail: error.Message); }

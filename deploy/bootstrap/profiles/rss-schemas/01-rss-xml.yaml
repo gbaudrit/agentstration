@@ -1,0 +1,14 @@
+{
+  "apiVersion": "agentstration.io/v1",
+  "kind": "Schema",
+  "metadata": {
+    "name": "rss-xml"
+  },
+  "definition": {
+    "displayName": "rss-xml",
+    "format": "xml-xsd",
+    "dialect": "http://www.w3.org/2001/XMLSchema",
+    "content": "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">\n  <xs:element name=\"rss\"><xs:complexType><xs:sequence>\n    <xs:element name=\"channel\"><xs:complexType><xs:sequence>\n      <xs:element name=\"title\" type=\"xs:string\"/>\n      <xs:element name=\"link\" type=\"xs:anyURI\"/>\n      <xs:element name=\"description\" type=\"xs:string\" minOccurs=\"0\"/>\n      <xs:element name=\"item\" minOccurs=\"0\" maxOccurs=\"100\"><xs:complexType><xs:sequence>\n        <xs:element name=\"guid\" type=\"xs:string\"/>\n        <xs:element name=\"title\" type=\"xs:string\"/>\n        <xs:element name=\"description\" type=\"xs:string\" minOccurs=\"0\"/>\n        <xs:element name=\"pubDate\" type=\"xs:string\" minOccurs=\"0\"/>\n        <xs:element name=\"source\" minOccurs=\"0\"><xs:complexType><xs:simpleContent><xs:extension base=\"xs:string\"><xs:attribute name=\"url\" type=\"xs:anyURI\" use=\"required\"/></xs:extension></xs:simpleContent></xs:complexType></xs:element>\n        <xs:any namespace=\"urn:agentstration:rss:example\" processContents=\"skip\" minOccurs=\"0\" maxOccurs=\"1\"/>\n      </xs:sequence></xs:complexType></xs:element>\n    </xs:sequence></xs:complexType></xs:element>\n  </xs:sequence><xs:attribute name=\"version\" type=\"xs:string\" use=\"required\"/></xs:complexType></xs:element>\n</xs:schema>",
+    "publishVersion": "1.0.0"
+  }
+}

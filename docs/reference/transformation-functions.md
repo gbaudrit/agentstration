@@ -68,3 +68,12 @@ The reseeded initial catalogue provisions one `1.0.0` version per standard nativ
 **For each Artifact** accepts a reference manifest and supports bounded content mode or scoped progressive access. Both steps expose bottom **Process** and **Processing result** connectors plus ordinary completed/error continuations. Their branches may contain Agents, Tools, functions and child Flows. Execution uses the existing causal implicit child runs.
 
 See [ADR-0233](../decisions/0233-native-function-catalogue-and-explicit-iteration.md) and [Artifact processing](artifact-transformations.md).
+
+## Expose an independent transformation Schema
+
+A published `xml-json-transformation` Schema can be exposed explicitly as a named
+function through its Versions page or `POST /api/transformation-functions/expose-schema`.
+It pins the declaration, engine and XML/JSON contracts separately. Bootstrap may
+declare just the Schemas or additionally request `TransformationFunctionExposure`.
+See [Transformation Schemas](transformation-schemas.md) for authoring, limits and
+the synthetic RSS example. Product execution contains no feed-specific rules.
