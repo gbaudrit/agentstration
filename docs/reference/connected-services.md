@@ -134,6 +134,29 @@ Materialized operations are read-only. Rediscovery preserves their deterministic
 identity, updates validated definitions and marks operations omitted from the
 latest successful manifest as unavailable instead of deleting them.
 
+### Expose operations to descendant scopes
+
+In the service's **Definition > Descendant use policy** section (or the creation
+wizard's Access step), enable **Expose all discovered operations using the service
+access rules**. The persisted option is `definition.exposeOperationsToDescendants`
+and defaults to `false` for existing and new definitions.
+
+When enabled, all current and subsequently discovered operations inherit the
+service's current resource access policy: `discover` controls lists and direct
+reads, and `use` controls consumption. Exact-target and propagated descendant grants
+keep their existing meaning. Revocation and disabling exposure take effect without
+rediscovery. Changing only this access choice updates the ETag without changing the
+connection generation pinned by existing operations. Other configuration changes
+continue to require exact revision reconciliation.
+
+Exposure does not activate operations. Enabled/available operations still require
+valid service and operation-type revisions, the service's descendant use policy,
+and the existing consumer/type permissions. Unrelated scopes and mismatched service
+UIDs, addresses, namespaces or owners never acquire inherited access. Discovery
+execution permissions are unchanged. Individual operation access editing is deferred.
+
+See [ADR-0239](../decisions/0239-discovered-operations-can-inherit-connected-service-access.md).
+
 ## Connected Services
 
 The following authorized endpoints manage configured external systems. Service

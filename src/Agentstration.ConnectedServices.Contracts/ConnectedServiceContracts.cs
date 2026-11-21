@@ -195,6 +195,7 @@ public sealed record ConnectedServiceProperties
     public required JsonElement Options { get; init; }
     public IReadOnlyList<ConnectedServiceValueBinding> Bindings { get; init; } = [];
     public DescendantUsePolicy UsePolicy { get; init; } = new();
+    public bool ExposeOperationsToDescendants { get; init; }
 }
 
 public sealed record ConnectedServiceResource : Resource

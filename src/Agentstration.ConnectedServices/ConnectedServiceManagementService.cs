@@ -344,12 +344,18 @@ public sealed class ConnectedServiceManagementService(
     {
         var scopeRef = RequireScope(existing.Value);
         var changed = existing.Value with { Definition = definition };
+        // This access choice does not change the connection revision pinned by discovered operations.
+        var onlyOperationAccessChanged = existing.Value.Definition.ExposeOperationsToDescendants
+                != definition.ExposeOperationsToDescendants
+            && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(existing.Value.Definition with
+                { ExposeOperationsToDescendants = definition.ExposeOperationsToDescendants }),
+                JsonSerializer.SerializeToElement(definition));
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var observed = await ValidateAsync(changed, token);
             return await store.PutExactAsync(scopeRef, changed with
             {
-                Generation = checked(existing.Value.Generation + 1),
+                Generation = onlyOperationAccessChanged ? existing.Value.Generation : checked(existing.Value.Generation + 1),
                 ObservedState = observed,
                 Status = Succeeded()
             }, etag, false, token);

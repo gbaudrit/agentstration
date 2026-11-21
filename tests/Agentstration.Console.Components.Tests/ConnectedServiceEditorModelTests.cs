@@ -34,6 +34,7 @@ public sealed class ConnectedServiceEditorModelTests
                 new() { InputId = "endpoint", Kind = ConnectedServiceBindingKind.Parameter, Reference = $"{parameterScope.Value}|shared|endpoint" },
                 new() { InputId = "retries", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement(3) }
             ],
+            ExposeOperationsToDescendants = true,
             UseGrants = [new DescendantUseGrant(owner)]
         };
 
@@ -53,5 +54,13 @@ public sealed class ConnectedServiceEditorModelTests
         Assert.IsNull(literal.Parameter);
         Assert.IsNull(literal.Secret);
         Assert.AreEqual(owner, properties.UsePolicy.Grants.Single().ScopeRef);
+        Assert.IsTrue(properties.ExposeOperationsToDescendants);
+        var reopened = ConnectedServiceEditorModel.From(new ConnectedServiceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedService,
+            Metadata = new() { Name = "redis" }, ScopeRef = owner, Definition = properties
+        });
+        Assert.IsTrue(reopened.ExposeOperationsToDescendants);
+        Assert.IsFalse(new ConnectedServiceEditorModel().ExposeOperationsToDescendants);
     }
 }

@@ -47,11 +47,11 @@ else
     {
         ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(ConnectedServiceEditorModel.Name), nameof(ConnectedServiceEditorModel.DisplayName), nameof(ConnectedServiceEditorModel.Description), nameof(ConnectedServiceEditorModel.Namespace), nameof(ConnectedServiceEditorModel.ScopeRef), nameof(ConnectedServiceEditorModel.TypeKey), nameof(ConnectedServiceEditorModel.Tags)] },
         ["definition/configuration"] = new() { HasRequiredFields = true, Fields = [nameof(ConnectedServiceEditorModel.Options), nameof(ConnectedServiceEditorModel.Bindings)] },
-        ["definition/use-policy"] = new() { Fields = [nameof(ConnectedServiceEditorModel.UseGrants)] }
+        ["definition/use-policy"] = new() { Fields = [nameof(ConnectedServiceEditorModel.UseGrants), nameof(ConnectedServiceEditorModel.ExposeOperationsToDescendants)] }
     };
     private IReadOnlyDictionary<string, string> FieldLabels => new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        [nameof(model.Name)] = T("TechnicalName"), [nameof(model.DisplayName)] = IdentityLocalizer["DisplayName"], [nameof(model.Description)] = T("Description"), [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.ScopeRef)] = Shared["Scope"], [nameof(model.TypeKey)] = T("ServiceType"), [nameof(model.Tags)] = Shared["Labels"], [nameof(model.Options)] = T("Options"), [nameof(model.Bindings)] = T("Bindings"), [nameof(model.UseGrants)] = Shared["Access"]
+        [nameof(model.Name)] = T("TechnicalName"), [nameof(model.DisplayName)] = IdentityLocalizer["DisplayName"], [nameof(model.Description)] = T("Description"), [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.ScopeRef)] = Shared["Scope"], [nameof(model.TypeKey)] = T("ServiceType"), [nameof(model.Tags)] = Shared["Labels"], [nameof(model.Options)] = T("Options"), [nameof(model.Bindings)] = T("Bindings"), [nameof(model.ExposeOperationsToDescendants)] = T("ExposeOperationsToDescendants"), [nameof(model.UseGrants)] = Shared["Access"]
     };
     private RenderFragment DefinitionContent(string path) => path switch { "definition/identity" => IdentityFields, "definition/configuration" => ConfigurationFields, "definition/use-policy" => SharingFields, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
     private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@ConnectedServiceResourceKinds.ConnectedService"
@@ -93,9 +93,12 @@ else
     else if (savedSnapshot is { } saved) { <FormSection Title="@T("Configuration")"><p class="inline-warning">@T("TypeContractUnavailable")</p><pre class="runner-json">@JsonSerializer.Serialize(new { saved.Value.Definition.Bindings, saved.Value.Definition.Options }, new JsonSerializerOptions { WriteIndented = true })</pre></FormSection> }
 </div>;
     private RenderFragment SharingFields => @<div>    <DescendantUseGrantEditor OwnerScopeRef="selectedScope" Targets="scopeTargets" Grants="model.UseGrants" OnChanged="UsePolicyChanged" />
+    <FormSection Title="@T("OperationAccess")" Description="@T("ExposeOperationsToDescendantsHelp")">
+        <label class="checkbox-field"><FormCheckbox Value="model.ExposeOperationsToDescendants" ValueChanged="SetOperationExposure" ValueExpression="() => model.ExposeOperationsToDescendants" disabled="@(IsBusy || !CanMutate)" data-testid="connected-service-expose-operations" /><span>@T("ExposeOperationsToDescendants")</span></label>
+    </FormSection>
 </div>;
     private RenderFragment Review => @<div><ResourceIdentitySummary DisplayName="@model.DisplayName" TechnicalName="@model.Name" Description="@model.Description" Namespace="@ResourceNamespaceValue.Value"><Scope><ResourceScopeBadge ScopeRef="selectedScope" /></Scope></ResourceIdentitySummary>
-        <FormSection Title="@Shared["Configuration"]"><dl class="resource-details"><dt>@T("ServiceType")</dt><dd>@(SelectedVariant?.Label ?? "—")</dd><dt>@T("Enabled")</dt><dd>@T(model.Enabled ? "Yes" : "No")</dd></dl>@if (SelectedVariant is { } variant) { <details><summary>@T("Configuration")</summary><pre>@JsonSerializer.Serialize(model.Properties(variant.Type, variant.Version), new JsonSerializerOptions { WriteIndented = true })</pre></details> }</FormSection></div>;
+        <FormSection Title="@Shared["Configuration"]"><dl class="resource-details"><dt>@T("ServiceType")</dt><dd>@(SelectedVariant?.Label ?? "—")</dd><dt>@T("Enabled")</dt><dd>@T(model.Enabled ? "Yes" : "No")</dd><dt>@T("ExposeOperationsToDescendants")</dt><dd data-testid="connected-service-operation-exposure-review">@T(model.ExposeOperationsToDescendants ? "Yes" : "No")</dd></dl>@if (SelectedVariant is { } variant) { <details><summary>@T("Configuration")</summary><pre>@JsonSerializer.Serialize(model.Properties(variant.Type, variant.Version), new JsonSerializerOptions { WriteIndented = true })</pre></details> }</FormSection></div>;
     [Parameter] public ResourceSnapshot<ConnectedServiceResource>? InitialSnapshot { get; set; }
     [Parameter] public bool ExternalActions { get; set; }
     [Parameter] public EventCallback<bool> DraftChanged { get; set; }
@@ -406,6 +409,13 @@ else
     {
         if (!CanMutate || IsBusy) return;
         BindingChanged(binding, value); editContext.NotifyFieldChanged(editContext.Field(nameof(model.Bindings))); MarkDirty();
+    }
+    private void SetOperationExposure(bool value)
+    {
+        if (!CanMutate || IsBusy) return;
+        model.ExposeOperationsToDescendants = value;
+        editContext.NotifyFieldChanged(editContext.Field(nameof(model.ExposeOperationsToDescendants)));
+        MarkDirty();
     }
     private void UsePolicyChanged() { if (CanMutate) { editContext.NotifyFieldChanged(editContext.Field(nameof(model.UseGrants))); MarkDirty(); } }
     private async Task CreatorChanged(ConnectedServiceBindingEditorModel binding, bool open)
