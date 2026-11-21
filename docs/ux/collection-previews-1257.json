@@ -385,7 +385,13 @@
       "rowTypes": [
         "OrganizationMemberResponse"
       ],
-      "status": "assessment-pending"
+      "status": "not-applicable-non-resource",
+      "family": "Identity membership and accounts",
+      "decision": "OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented.",
+      "tests": [
+        "OrganizationMembersCollectionTests / OrganizationMemberDetailsTests"
+      ],
+      "validation": "Source and native DTO contract reviewed. Existing family regressions retained; final broad verification records the synchronized result."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationSecurityAudit.razor",
@@ -1442,7 +1448,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-native-administration",
+      "reason": "OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented."
     },
     {
       "id": "organization-members-agentstration-identity-contracts-organization-member-response",
@@ -1452,7 +1459,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-native-administration",
+      "reason": "OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented."
     },
     {
       "id": "bootstrap-profiles-bootstrap-resource-preview",
@@ -4665,7 +4673,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "non-resource-native-administration",
+      "reason": "OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented."
     },
     {
       "id": "organization-members-workspace-target-choices",
@@ -4675,7 +4684,8 @@
       ],
       "host": "console",
       "inventoryCategory": "specialized",
-      "decision": "assessment-pending"
+      "decision": "non-resource-native-administration",
+      "reason": "OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented."
     },
     {
       "id": "bootstrap-profiles-tenant-target-choices",

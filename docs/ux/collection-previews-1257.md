@@ -251,3 +251,9 @@ Regression ownership: `RuntimeObservabilityConsoleTests`. This is an explicit no
 AccessRow is the join of a member principal and a role assignment at an explicit/inherited identity scope. Its identity belongs to that relationship, not to a Core resource namespace/name. Retain the member administration destination and existing role/authorization workflows; a resource Preview would fabricate a definition address.
 
 Regression ownership: `OrganizationAccessCollectionTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
+
+### Identity membership and accounts
+
+OrganizationMemberResponse, LocalAccountResponse and external-identity rows are identity-domain principals, credentials and membership relationships. Their existing administration page intentionally uses principal/account IDs and guarded role/status/password workflows, without a resource namespace, resource version or definition form. Retain those native pages and permissions; no Core resource metadata or generic resource Edit is invented.
+
+Regression ownership: `OrganizationMembersCollectionTests / OrganizationMemberDetailsTests`. This is an explicit non-resource decision for FR #1257, not an unverified adoption claim.
