@@ -62,7 +62,7 @@ public partial class ToolCategories
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { categories = null; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); categories = null; query = new(); contextKey = scope; }
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {
             categories = null;

@@ -6273,11 +6273,12 @@
     },
     {
       "id": "tool-category-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
-      "line": 33,
+      "source": "src/Agentstration.Console.Components/Components/ToolCategoryResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/tools/categories/{Name}"
+        "/tools/categories/{Name}",
+        "/tools/categories"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6296,7 +6297,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved declarations remain separate from the retained provider-grouped membership editor. Current browser validation is pending."
+        "interpretation": "Saved ToolCategory configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18952,6 +18953,11 @@
       "source": "src/Agentstration.Console.Components/Components/ToolSetResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved ToolSet configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolCategoryResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolCategory configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

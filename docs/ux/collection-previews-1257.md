@@ -83,3 +83,9 @@ Validation: Release component/test build passed without warnings/errors; 35 tool
 Saved identity, known published version, draft version/publication request, category, exact declared members and annotations. Tool Sets expose an existing read-only definition inspection, so Edit definition is not applicable. Preview independently links to the existing publication history without reading version lists until navigation; deletion remains in the full detail. The family Preview uses `IToolSetsClient.GetToolSetAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
 Validation: Release component/test build passed without warnings/errors; 37 tool sets tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/tools/sets/README.md). Final offline lanes remain pending.
+
+## ToolCategory
+
+Saved identity and declared Tool membership references, independent of the editor selection/draft. Preview adds one exact Workspace/namespace/name read through the existing store; it never loads resolved members, Tools or Provider pickers. Full editor reads now use the exact owner when supplied. The family Preview uses `IToolCategoriesClient.GetCategoryAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 30 tool categories tests passed. Browser and final offline checks remain pending.

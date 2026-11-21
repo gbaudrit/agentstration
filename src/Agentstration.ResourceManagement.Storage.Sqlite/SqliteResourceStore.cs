@@ -196,7 +196,8 @@ public sealed class SqliteResourceStore(
     public async Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken cancellationToken) where T : Resource
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var scope = await RequireScopeAsync(context, address.ScopeRef, cancellationToken);
+        var scope = await context.ResourceScopes.SingleOrDefaultAsync(value => value.Ref == address.ScopeRef.Value, cancellationToken);
+        if (scope is null) return null;
         await EnsureCanReadAsync(context, scope, cancellationToken);
         var document = await context.Documents.AsNoTracking().Include(value => value.Scope).SingleOrDefaultAsync(value => value.ScopeId == scope.Id
             && value.Namespace == address.Namespace.Value && value.Kind == address.Kind && value.Name == address.Name, cancellationToken);
