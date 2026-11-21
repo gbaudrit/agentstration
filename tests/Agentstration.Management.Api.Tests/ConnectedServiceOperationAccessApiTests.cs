@@ -57,8 +57,10 @@ public sealed partial class ConnectedServiceApiTests
             var version = type.Value.Definition.Versions.Single(v => v.Version == type.Value.Definition.PreferredVersion);
             service = await management.CreateAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedService,
-                Metadata = new() { Name = "shared-http", Namespace = ns }, ScopeRef = owner,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ConnectedServiceResourceKinds.ConnectedService,
+                Metadata = new() { Name = "shared-http", Namespace = ns },
+                ScopeRef = owner,
                 Definition = new()
                 {
                     DisplayName = "Shared HTTP",
@@ -72,11 +74,18 @@ public sealed partial class ConnectedServiceApiTests
             var opVersion = operationType.Value.Definition.Versions.Single(v => v.Version == operationType.Value.Definition.PreferredVersion);
             operation = (await store.PutExactAsync(owner, new ConnectedServiceOperationResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedServiceOperation,
-                Metadata = new() { Name = "shared-get", Namespace = ns }, ScopeRef = owner, Generation = 1, Enabled = true,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ConnectedServiceResourceKinds.ConnectedServiceOperation,
+                Metadata = new() { Name = "shared-get", Namespace = ns },
+                ScopeRef = owner,
+                Generation = 1,
+                Enabled = true,
                 Definition = new()
                 {
-                    DisplayName = "Shared GET", ExternalId = "GET /news", Definition = JsonSerializer.SerializeToElement(new { }), DefinitionDigest = "sha256:operation",
+                    DisplayName = "Shared GET",
+                    ExternalId = "GET /news",
+                    Definition = JsonSerializer.SerializeToElement(new { }),
+                    DefinitionDigest = "sha256:operation",
                     Service = new() { Service = new(service.Value.Address, owner), ServiceUid = service.Value.Uid, Generation = service.Value.Generation },
                     Type = new() { Type = new(operationType.Value.Name, operationType.Value.ScopeRef, operationType.Value.Namespace), TypeUid = operationType.Value.Uid, Version = opVersion.Version, SchemaDigest = opVersion.SchemaDigest },
                     Provenance = new() { Discovery = new(owner, ns, ConnectedServiceResourceKinds.ConnectedServiceOperationDiscovery, "fixture"), DiscoveryUid = Guid.NewGuid(), ManifestDigest = "sha256:manifest", DiscoveredAt = DateTimeOffset.UnixEpoch }
@@ -116,16 +125,21 @@ public sealed partial class ConnectedServiceApiTests
         using (scopes.PushSystem())
         {
             var later = await store.PutExactAsync(owner, operation with
-                { Uid = Guid.Empty, Metadata = operation.Metadata with { Name = "later-discovery" } }, null, true, default);
+            { Uid = Guid.Empty, Metadata = operation.Metadata with { Name = "later-discovery" } }, null, true, default);
             Assert.IsNotNull(ConnectedServiceOperationAccessPolicy.GetSource(later.Value, service.Value));
             Assert.IsNull(ConnectedServiceOperationAccessPolicy.GetSource(operation with { ScopeRef = consumer }, service.Value));
             Assert.IsNull(ConnectedServiceOperationAccessPolicy.GetSource(operation with
-                { Metadata = operation.Metadata with { Namespace = new ResourceNamespace("other") } }, service.Value));
+            { Metadata = operation.Metadata with { Namespace = new ResourceNamespace("other") } }, service.Value));
             Assert.IsNull(ConnectedServiceOperationAccessPolicy.GetSource(operation with
-                { Definition = operation.Definition with { Service = operation.Definition.Service with { ServiceUid = Guid.NewGuid() } } }, service.Value));
+            { Definition = operation.Definition with { Service = operation.Definition.Service with { ServiceUid = Guid.NewGuid() } } }, service.Value));
             Assert.IsNull(ConnectedServiceOperationAccessPolicy.GetSource(operation with
-                { Definition = operation.Definition with { Service = operation.Definition.Service with
-                    { Service = new(ResourceAddress.Create(ns, service.Value.Kind, "other-service"), owner) } } }, service.Value));
+            {
+                Definition = operation.Definition with
+                {
+                    Service = operation.Definition.Service with
+                    { Service = new(ResourceAddress.Create(ns, service.Value.Kind, "other-service"), owner) }
+                }
+            }, service.Value));
             var siblingId = Guid.NewGuid();
             var foreignTenantId = Guid.NewGuid();
             var identityStore = factory.Services.GetRequiredService<IIdentityStore>();
@@ -141,7 +155,7 @@ public sealed partial class ConnectedServiceApiTests
             var enabled = await operations.SetEnabledAsync(address, true, disabled.ETag, default);
             reference = reference with { Generation = enabled.Value.Generation };
             var stale = await store.PutExactAsync(owner, enabled.Value with
-                { ObservedState = enabled.Value.ObservedState with { Availability = ConnectedServiceOperationAvailability.Unavailable } }, enabled.ETag, false, default);
+            { ObservedState = enabled.Value.ObservedState with { Availability = ConnectedServiceOperationAvailability.Unavailable } }, enabled.ETag, false, default);
             unavailable = await Assert.ThrowsExactlyAsync<ConnectedServiceOperationDiscoveryException>(() => operations.ResolveAsync(reference, consumer, true, default));
             Assert.AreEqual("operation_unavailable", unavailable.Code);
             _ = await store.PutExactAsync(owner, stale.Value with { ObservedState = operation.ObservedState }, stale.ETag, false, default);

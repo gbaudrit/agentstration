@@ -57,8 +57,11 @@ public sealed class ConnectedServiceEditorModelTests
         Assert.IsTrue(properties.ExposeOperationsToDescendants);
         var reopened = ConnectedServiceEditorModel.From(new ConnectedServiceResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ConnectedServiceResourceKinds.ConnectedService,
-            Metadata = new() { Name = "redis" }, ScopeRef = owner, Definition = properties
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedService,
+            Metadata = new() { Name = "redis" },
+            ScopeRef = owner,
+            Definition = properties
         });
         Assert.IsTrue(reopened.ExposeOperationsToDescendants);
         Assert.IsFalse(new ConnectedServiceEditorModel().ExposeOperationsToDescendants);

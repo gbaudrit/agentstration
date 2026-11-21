@@ -348,7 +348,7 @@ public sealed class ConnectedServiceManagementService(
         var onlyOperationAccessChanged = existing.Value.Definition.ExposeOperationsToDescendants
                 != definition.ExposeOperationsToDescendants
             && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(existing.Value.Definition with
-                { ExposeOperationsToDescendants = definition.ExposeOperationsToDescendants }),
+            { ExposeOperationsToDescendants = definition.ExposeOperationsToDescendants }),
                 JsonSerializer.SerializeToElement(definition));
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
