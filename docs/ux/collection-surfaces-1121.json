@@ -6343,11 +6343,12 @@
     },
     {
       "id": "tool-set-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
-      "line": 28,
+      "source": "src/Agentstration.Console.Components/Components/ToolSetResourceSummary.razor",
+      "line": 37,
       "host": "console",
       "routes": [
-        "/tools/sets/{Name}"
+        "/tools/sets/{Name}",
+        "/tools/sets"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6366,7 +6367,7 @@
           "tests/governed-extension-inventory.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved ToolSet declarations and original working version remain distinct from immutable published membership. Current browser validation pending."
+        "interpretation": "Saved ToolSet configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -18946,6 +18947,11 @@
       "source": "src/Agentstration.Console.Components/Components/ToolResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Extracted saved Tool configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolSetResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolSet configuration; action and disclosure controls are not datasets."
     }
   ],
   "reconciliation": {

@@ -260,7 +260,7 @@
       "rowTypes": [
         "RuntimeProfileSummaryResponse"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "RuntimeProfile",
       "coordinates": "Instance owner + exact Namespace + Name; the existing RuntimeProfile scope policy is unchanged.",
       "overview": "/runtimeprofiles/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -281,7 +281,8 @@
         "RuntimeProfileCollectionTests"
       ],
       "apiValidation": "Exact HTTP GET integration passed: namespace homonyms, ETag, hidden unshared Instance resource from Workspace context, missing namespace and unsupported owner without fallback.",
-      "validation": "Release component/test build passed without warnings/errors; 31 runtime profiles tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 31 runtime profiles tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/runtimeprofiles/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkers.razor",
@@ -474,7 +475,7 @@
       "rowTypes": [
         "ToolProviderResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "ToolProvider",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/tools/providers/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -494,7 +495,8 @@
         "ToolProviderResourcePreviewTests",
         "ToolProviderCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 34 tool providers tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 34 tool providers tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/tools/providers/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSets.razor",
@@ -504,7 +506,27 @@
       "rowTypes": [
         "ToolSetResource"
       ],
-      "status": "assessment-pending"
+      "status": "implemented-smoke-passed",
+      "family": "ToolSet",
+      "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
+      "overview": "/tools/sets/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
+      "edit": null,
+      "rowActions": [
+        "Open",
+        "Preview"
+      ],
+      "quickActions": [
+        "Open",
+        "Publication history"
+      ],
+      "summary": "Saved identity, known published version, draft version/publication request, category, exact declared members and annotations. Tool Sets expose an existing read-only definition inspection, so Edit definition is not applicable. Preview independently links to the existing publication history without reading version lists until navigation; deletion remains in the full detail.",
+      "loader": "IToolSetsClient.GetToolSetAsync(owner, namespace, name, token)",
+      "tests": [
+        "ToolSetResourcePreviewTests",
+        "ToolSetCollectionTests"
+      ],
+      "validation": "Release component/test build passed without warnings/errors; 37 tool sets tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/tools/sets/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/Tools.razor",
@@ -514,7 +536,7 @@
       "rowTypes": [
         "ToolResource"
       ],
-      "status": "implemented-validation-pending",
+      "status": "implemented-smoke-passed",
       "family": "Tool",
       "coordinates": "Exact ScopeRef + Namespace + Name; validate returned kind and all address fields.",
       "overview": "/tools/{name}?scopeRef={owner}&namespace={namespace}&context={context}#overview",
@@ -533,7 +555,8 @@
         "ToolResourcePreviewTests",
         "ToolCollectionTests"
       ],
-      "validation": "Release component/test build passed without warnings/errors; 35 tools tests passed. Browser and final offline checks remain pending."
+      "validation": "Release component/test build passed without warnings/errors; 35 tools tests passed. Browser and final offline checks remain pending.",
+      "evidence": "evidence/1257/tools/README.md"
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
@@ -727,7 +750,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "tool-providers-tool-provider-resource",
@@ -737,7 +761,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "model-provider-details-available-model-response",
@@ -1299,7 +1324,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "tool-governance-audit-tool-execution-hook-evaluation",
@@ -1372,7 +1398,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "adopted",
+      "reason": "Row-owned Actions and on-demand exact-address Preview; see the family entry and current smoke evidence."
     },
     {
       "id": "resource-plan-changes-view-resource-plan-field-difference",
@@ -1587,7 +1614,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "runtime-profile-editor-configuration-summary",
@@ -1597,7 +1625,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "source-provider-details-configuration-summary",
@@ -1648,7 +1677,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "tool-set-configuration-summary",
@@ -1658,7 +1688,8 @@
       ],
       "host": "console",
       "inventoryCategory": "frames",
-      "decision": "assessment-pending"
+      "decision": "non-resource-values",
+      "reason": "Saved configuration/export mapping values shared in the family Summary; no independent resource address or commands are invented."
     },
     {
       "id": "tool-definition-configuration-summary",

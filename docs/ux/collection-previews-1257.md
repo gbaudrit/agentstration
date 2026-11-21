@@ -62,7 +62,7 @@ Validation: Release component/test build passed without warnings/errors; 38 data
 
 Saved identity, runtime type, execution/session/tool/streaming defaults and runtime options. Preview reads one exact snapshot without usages or editor pickers. Row and full-detail URLs retain exact owner/namespace and the current administrative context. The existing service exact-read capability is now exposed by the client and HTTP GET, with no unscoped fallback. The family Preview uses `IRuntimeProfilesClient.GetRuntimeProfileAsync(namespace, name, owner, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 31 runtime profiles tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 31 runtime profiles tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/runtimeprofiles/README.md). Final offline lanes remain pending.
 
 Runtime Profile HTTP GET now accepts the existing exact `scopeRef` plus `resourceNamespace` address. It preserves the Instance-only scope policy and legacy requests without an explicit owner. Focused API integration passed: exact namespace homonyms and ETags, hidden unshared Instance resources from a Workspace context, and missing/unsupported exact targets without fallback.
 
@@ -70,10 +70,16 @@ Runtime Profile HTTP GET now accepts the existing exact `scopeRef` plus `resourc
 
 Saved identity, localized provider type, enabled state, MCP transport/endpoint or command/argument/environment references and AEP Extension reference. Full details retain the existing ownership banner, discovery, tests, toggles and discovered Tools. Preview does not probe a provider or enumerate Tools. The family Preview uses `IToolsClient.GetProviderAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 34 tool providers tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 34 tool providers tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/tools/providers/README.md). Final offline lanes remain pending.
 
 ## Tool
 
 Saved identity/configuration, capability, input/output schema summaries, observed discovery facts and known governance/provider references. Provider/Extension observations are optional saved caller inputs on the full overview, never loaded by Preview. Tools have a read-only inspection definition: Edit definition is not applicable. Preview independently offers the existing execution form only for enabled, available Tools with RunsExecute; it never invokes a Tool. The family Preview uses `IToolsClient.GetToolAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
 
-Validation: Release component/test build passed without warnings/errors; 35 tools tests passed. Browser and final offline checks remain pending.
+Validation: Release component/test build passed without warnings/errors; 35 tools tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/tools/README.md). Final offline lanes remain pending.
+
+## ToolSet
+
+Saved identity, known published version, draft version/publication request, category, exact declared members and annotations. Tool Sets expose an existing read-only definition inspection, so Edit definition is not applicable. Preview independently links to the existing publication history without reading version lists until navigation; deletion remains in the full detail. The family Preview uses `IToolSetsClient.GetToolSetAsync(owner, namespace, name, token)` with exact address validation and cancellation. Its overview reuses the saved Summary, retaining existing metrics/forms/commands. No mutation is introduced in the row menu.
+
+Validation: Release component/test build passed without warnings/errors; 37 tool sets tests passed. All four desktop/mobile English/French light/dark browser variants passed, including keyboard and mobile touch; [observations](evidence/1257/tools/sets/README.md). Final offline lanes remain pending.
