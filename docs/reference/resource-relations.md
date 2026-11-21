@@ -29,6 +29,34 @@ The component retains its own direction/expansion/refresh and stale-response
 protections. Direct fragment navigation retains owner, namespace and actor query
 coordinates. Display-only scope badges do not affect graph authorization.
 
+## Relationship workspace
+
+The product labels this workspace **Relations**; renderer/architecture terminology
+is not part of its heading. The compact toolbar switches dependencies/usages,
+visual depth and Graph/List presentation. Visible-resource counts describe the
+current authorized window, never global inventory. Type labels are localized for
+known families; unknown protocol kinds retain their exact name.
+
+The canvas takes the whole content width. Large graphs open around the focused
+resource at a readable scale; Fit shows the complete graph and Center view
+returns the camera to the focused resource. Camera changes never alter the graph
+or its canonical layout coordinates. Known resource kinds are localized in the
+diagram as well as the list and inspector. Resource and link inspection opens in
+an overlay drawer only on selection or an explicit Details action. Technical
+identities and exact provenance remain available inside expandable details. A
+renderer failure opens the same authorized resources in the styled accessible
+list; failure never causes a broader data read.
+
+**Full screen** maximizes this same workspace in the application's shared
+`ModalFrame`, above global navigation. Native dialogue behavior supplies the
+modal keyboard boundary and Escape; the maximize control regains focus after
+restoring if the resource URL is unchanged. Navigation and resource-coordinate
+changes close the surface. Direction, depth, selection, presentation and the
+received observation remain in the owning component; moving between inline and
+maximized presentation remounts/refits only the renderer, without another stream
+request. The modal retains the host theme and safe-area/short-viewport scrolling.
+No Resource/Graph contract, route, Agent screen or write command changes.
+
 ## Minimal integration
 
 ```razor
@@ -138,7 +166,7 @@ layout is left-to-right, highlights the root and follows the application's theme
 Localized zoom/fit controls change only the viewport. A changed focused diagram
 fits its new bounds after layout; theme-only changes preserve the viewport.
 
-The accessible list works with a disabled or failed diagram. Inspection exposes
+The accessible list works when selected explicitly or after a renderer failure. Inspection exposes
 received identity, ownership and generation/publication evidence. Missing and
 inaccessible roots remain indistinguishable. An empty view states only that no
 relation is visible in the observed scope; global completeness is never claimed.

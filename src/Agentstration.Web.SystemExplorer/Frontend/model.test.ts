@@ -6,9 +6,10 @@ import {resourceIcon} from './resource-icons';
 const node=(id:string,name='same-name')=>({id,identity:{kind:'Agent',name},state:'draft'});
 test('resource focus uses local product icons and native rectangles without changing identities or arrow direction',async()=>{
  const input:GraphPage={nodes:[node('agent'),{...node('data'),identity:{kind:'DataSource',name:'Data'}}],relations:[{source:'agent',target:'data',kind:'exact-dependency'}]};
- const before=JSON.stringify(input);const result=buildModel(input,{}, {},{mode:'resource',root:'data'});
+ const before=JSON.stringify(input);const result=buildModel(input,{'kind:DataSource':'Source de données'}, {},{mode:'resource',root:'data'});
  const view=result.model.view('topology').$view;
  assert.equal(view.autoLayout.direction,'LR');
+ assert.deepEqual(view.nodes.find(n=>n.id===rendererId('data'))?.description,{txt:'Source de données'});
  for(const item of view.nodes){assert.equal(item.shape,'rectangle');assert.match(item.icon??'',/^data:image\/svg\+xml,/);}
  assert.notEqual(view.nodes.find(n=>n.id===rendererId('data'))?.color,view.nodes.find(n=>n.id===rendererId('agent'))?.color);
  assert.notEqual(resourceIcon('Agent'),resourceIcon('Tool'));assert.notEqual(resourceIcon('KnowledgeSource'),resourceIcon('DataSource'));

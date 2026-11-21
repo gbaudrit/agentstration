@@ -4,7 +4,7 @@
 @using Microsoft.JSInterop
 @implements IAsyncDisposable
 @inject IJSRuntime JS
-<div @ref="element" style="height: min(65vh, 640px); min-height: 320px; width:100%" role="region" aria-label="@Label"></div>
+<div @ref="element" style="@(FillContainer ? "height:100%;min-height:0;width:100%" : "height:min(65vh,640px);min-height:320px;width:100%")" role="region" aria-label="@Label"></div>
 @if (ViewportLabels is not null)
 {
     <div role="group" aria-label="@ViewportLabels["controls"]" style="display:flex;gap:.5rem;margin:.5rem 0">
@@ -23,6 +23,8 @@
     [Parameter] public EventCallback<string> LinkSelected { get; set; }
     [Parameter] public EventCallback<string> Selected { get; set; }
     [Parameter] public EventCallback Failed { get; set; }
+    [Parameter] public EventCallback<bool> LoadingChanged { get; set; }
+    [Parameter] public bool FillContainer { get; set; }
     private ElementReference element;
     private IJSObjectReference? module;
     private DotNetObjectReference<SystemGraphDiagram>? callback;
@@ -39,11 +41,16 @@
         var options = renderedOptions = Options;
         try
         {
+            await LoadingChanged.InvokeAsync(true);
             module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.SystemExplorer/system-explorer.js");
             if (disposed) { await module.DisposeAsync(); module = null; return; }
             callback ??= DotNetObjectReference.Create(this);
             var success = await module.InvokeAsync<bool>("render", element, page, RelationshipLabels, callback, notes, options);
-            if (!disposed && ReferenceEquals(page, Page) && ReferenceEquals(notes, OverlayNotes) && ReferenceEquals(options, Options) && !success) await Failed.InvokeAsync();
+            if (!disposed && ReferenceEquals(page, Page) && ReferenceEquals(notes, OverlayNotes) && ReferenceEquals(options, Options))
+            {
+                await LoadingChanged.InvokeAsync(false);
+                if (!success) await Failed.InvokeAsync();
+            }
         }
         catch (JSDisconnectedException) { }
         catch (ObjectDisposedException) when (disposed) { }
@@ -57,6 +64,10 @@
         catch (JSException) { if (!disposed) await Failed.InvokeAsync(); }
         catch (ObjectDisposedException) when (disposed) { }
     }
+    public Task ZoomInAsync() => ChangeViewportAsync("in");
+    public Task ZoomOutAsync() => ChangeViewportAsync("out");
+    public Task FitAsync() => ChangeViewportAsync("fit");
+    public Task FocusRootAsync() => ChangeViewportAsync("focus");
     [JSInvokable] public Task SelectNode(string id) => !disposed && Page.Nodes.Any(node => node.Id == id) ? Selected.InvokeAsync(id) : Task.CompletedTask;
     [JSInvokable] public Task SelectLink(string id) => !disposed && Page.Relations.Any(edge => edge.Kind == id && id.StartsWith("summary:", StringComparison.Ordinal)) ? LinkSelected.InvokeAsync(id) : Task.CompletedTask;
     public async ValueTask DisposeAsync()

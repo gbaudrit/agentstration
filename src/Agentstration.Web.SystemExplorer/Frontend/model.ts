@@ -14,7 +14,7 @@ export function buildModel(page:GraphPage, labels:Record<string,string> = {}, ov
   for(const node of [...page.nodes].sort((a,b)=>a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) {
     if(ids.has(rendererId(node.id))) throw new Error('explorer_duplicate_identity');
     ids.set(rendererId(node.id),node.id);
-    builder=builder.model(({resource},_)=>_((resource as (id:string, props:{title:string;description:string})=>ReturnType<typeof resource>)(rendererId(node.id),{title:(node.displayName??node.identity.name).replace(/[\x00-\x1f]/g,' ').slice(0,200), ...(options?.mode==='resource'?{icon:resourceIcon(node.identity.kind),shape:'rectangle',color:node.id===options.root?'sky':'blue',style:{iconPosition:'top',iconSize:'sm'}}:{}), description:node.identity.kind+(Object.hasOwn(overlayNotes,node.id) && typeof overlayNotes[node.id]==='string' ? '\n'+overlayNotes[node.id].replace(/[\x00-\x1f]/g,' ').slice(0,300) : '')}))) as unknown as Builder.Any;
+    builder=builder.model(({resource},_)=>_((resource as (id:string, props:{title:string;description:string})=>ReturnType<typeof resource>)(rendererId(node.id),{title:(node.displayName??node.identity.name).replace(/[\x00-\x1f]/g,' ').slice(0,200), ...(options?.mode==='resource'?{icon:resourceIcon(node.identity.kind),shape:'rectangle',color:node.id===options.root?'sky':'blue',style:{iconPosition:'top',iconSize:'sm'}}:{}), description:(labels['kind:'+node.identity.kind]??node.identity.kind)+(Object.hasOwn(overlayNotes,node.id) && typeof overlayNotes[node.id]==='string' ? '\n'+overlayNotes[node.id].replace(/[\x00-\x1f]/g,' ').slice(0,300) : '')}))) as unknown as Builder.Any;
   }
   for(const edge of page.relations) {
     const source=rendererId(edge.source),target=rendererId(edge.target);

@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsc --noEmit && vite build",
-    "test": "node --import tsx --test model.test.ts render-queue.test.ts deployment-model.test.ts",
+    "test": "node --import tsx --test model.test.ts render-queue.test.ts deployment-model.test.ts resource-viewport.test.ts",
     "prebuild": "node generate-resource-icons.mjs",
     "pretest": "node generate-resource-icons.mjs"
   },

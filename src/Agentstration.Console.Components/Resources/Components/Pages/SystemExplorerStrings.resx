@@ -175,7 +175,7 @@
   <data name="Perspective" xml:space="preserve"><value>Explorer perspectives</value></data>
   <data name="PerspectiveResources" xml:space="preserve"><value>Resources</value></data>
   <data name="PerspectiveDefinition" xml:space="preserve"><value>Definition</value></data>
-  <data name="PerspectiveDeployment" xml:space="preserve"><value>C4 deployments</value></data>
+  <data name="PerspectiveDeployment" xml:space="preserve"><value>Deployments</value></data>
   <data name="ChooseAgent" xml:space="preserve"><value>Choose an Agent</value></data>
   <data name="DefinitionVersion" xml:space="preserve"><value>Definition version</value></data>
   <data name="DefinitionDraft" xml:space="preserve"><value>Current editable definition</value></data>
@@ -240,11 +240,11 @@
   <data name="SummaryPathHelp" xml:space="preserve"><value>These paths describe received references and selected ToolSet members. An unspecified legacy origin remains unknown; references alone do not establish execution or Worker placement.</value></data>
   <data name="SummaryExactEvidence" xml:space="preserve"><value>Exact received evidence</value></data>
   <data name="SummaryToolDefinitions" xml:space="preserve"><value>ToolDefinition provenance</value></data>
-  <data name="ResourceRelations" xml:space="preserve"><value>Resource relationships</value></data>
+  <data name="ResourceRelations" xml:space="preserve"><value>Relationships</value></data>
   <data name="RelationsDirection" xml:space="preserve"><value>Relationship direction</value></data>
   <data name="RelationsDependencies" xml:space="preserve"><value>Dependencies</value></data>
   <data name="RelationsUsages" xml:space="preserve"><value>Uses of this resource</value></data>
-  <data name="RelationsDepth" xml:space="preserve"><value>Displayed levels</value></data>
+  <data name="RelationsDepth" xml:space="preserve"><value>Depth</value></data>
   <data name="RelationsExpand" xml:space="preserve"><value>Expand one level</value></data>
   <data name="RelationsOpenExplorer" xml:space="preserve"><value>Open in System Explorer</value></data>
   <data name="RelationsDependenciesHelp" xml:space="preserve"><value>Resources referenced by this resource, directly or indirectly.</value></data>
@@ -259,13 +259,46 @@
   <data name="RelationsPartial" xml:space="preserve"><value>Partial observation · Authorized resources only. Missing or unsupported relationships remain unknown.</value></data>
   <data name="RelationsArrows" xml:space="preserve"><value>Arrows point from a referencing resource to its dependency.</value></data>
   <data name="RelationsUnavailable" xml:space="preserve"><value>Relationships are unavailable in the current context. Refresh to try again.</value></data>
-  <data name="RelationsDiagramFailed" xml:space="preserve"><value>The diagram is unavailable. Use the resource list below.</value></data>
+  <data name="RelationsDiagramFailed" xml:space="preserve"><value>The graph is unavailable. You can explore the same resources in this list.</value></data>
   <data name="RelationsTruncated" xml:space="preserve"><value>An exploration limit was reached; additional visible relationships may exist.</value></data>
   <data name="RelationsViewport" xml:space="preserve"><value>Diagram viewport</value></data>
   <data name="RelationsZoomIn" xml:space="preserve"><value>Zoom in</value></data>
   <data name="RelationsZoomOut" xml:space="preserve"><value>Zoom out</value></data>
   <data name="RelationsFit" xml:space="preserve"><value>Fit diagram to view</value></data>
   <data name="RelationsResetFocus" xml:space="preserve"><value>Return to the page resource</value></data>
-  <data name="RelationsC4" xml:space="preserve"><value>C4 view</value></data>
   <data name="RelationsErrorTitle" xml:space="preserve"><value>Relationships unavailable</value></data>
+  <data name="RelationsMaximize" xml:space="preserve"><value>Full screen</value></data>
+  <data name="RelationsRestore" xml:space="preserve"><value>Exit full screen</value></data>
+  <data name="RelationsPresentation" xml:space="preserve"><value>Display mode</value></data>
+  <data name="RelationsGraph" xml:space="preserve"><value>Graph</value></data>
+  <data name="RelationsListView" xml:space="preserve"><value>List</value></data>
+  <data name="RelationsOneLevel" xml:space="preserve"><value>{0} level</value></data>
+  <data name="RelationsLevels" xml:space="preserve"><value>{0} levels</value></data>
+  <data name="RelationsOneResource" xml:space="preserve"><value>{0} resource</value></data>
+  <data name="RelationsResourceCount" xml:space="preserve"><value>{0} resources</value></data>
+  <data name="RelationsShowDetails" xml:space="preserve"><value>Resource details</value></data>
+  <data name="RelationsCloseDetails" xml:space="preserve"><value>Close details</value></data>
+  <data name="RelationsSelectionHint" xml:space="preserve"><value>Drag to explore · Select a resource for details</value></data>
+  <data name="RelationsPartialLabel" xml:space="preserve"><value>Partial observation</value></data>
+  <data name="RelationsKind.Agent" xml:space="preserve"><value>Agent</value></data>
+  <data name="RelationsKind.AgentRevision" xml:space="preserve"><value>Agent revision</value></data>
+  <data name="RelationsKind.AgentDeployment" xml:space="preserve"><value>Agent deployment</value></data>
+  <data name="RelationsKind.Tool" xml:space="preserve"><value>Tool</value></data>
+  <data name="RelationsKind.ToolDefinition" xml:space="preserve"><value>Tool definition</value></data>
+  <data name="RelationsKind.ToolSet" xml:space="preserve"><value>Tool set</value></data>
+  <data name="RelationsKind.ToolProvider" xml:space="preserve"><value>Tool provider</value></data>
+  <data name="RelationsKind.KnowledgeSource" xml:space="preserve"><value>Knowledge source</value></data>
+  <data name="RelationsKind.DataSource" xml:space="preserve"><value>Data source</value></data>
+  <data name="RelationsKind.ConnectedService" xml:space="preserve"><value>Connected service</value></data>
+  <data name="RelationsKind.ModelProfile" xml:space="preserve"><value>Model profile</value></data>
+  <data name="RelationsKind.RuntimeProfile" xml:space="preserve"><value>Runtime profile</value></data>
+  <data name="RelationsKind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="RelationsKind.FlowVersion" xml:space="preserve"><value>Flow version</value></data>
+  <data name="RelationsKind.Entry" xml:space="preserve"><value>Entry</value></data>
+  <data name="RelationsKind.Extension" xml:space="preserve"><value>Extension</value></data>
+  <data name="RelationsKind.ExtensionInstallation" xml:space="preserve"><value>Extension installation</value></data>
+  <data name="RelationsKind.System" xml:space="preserve"><value>System</value></data>
+  <data name="RelationsFocusViewport" xml:space="preserve"><value>Center view on the focused resource</value></data>
+  <data name="RelationsDiagramLabel" xml:space="preserve"><value>Resource relationship graph. The List view provides the same resources.</value></data>
+  <data name="RelationsPreparingGraph" xml:space="preserve"><value>Preparing graph…</value></data>
 </root>

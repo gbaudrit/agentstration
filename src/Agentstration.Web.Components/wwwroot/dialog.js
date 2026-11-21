@@ -9,7 +9,7 @@ export function openDialog(dialog) {
     };
     const keydown = event => {
         if (event.key !== "Tab") return;
-        const focusable = [...dialog.querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]')]
+        const focusable = [...dialog.querySelectorAll('button:not(:disabled):not([hidden]),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],summary,[tabindex="0"]')]
             .filter(element => element.getClientRects().length > 0);
         const first = focusable[0], last = focusable.at(-1);
         if (!first) { event.preventDefault(); dialog.focus(); return; }

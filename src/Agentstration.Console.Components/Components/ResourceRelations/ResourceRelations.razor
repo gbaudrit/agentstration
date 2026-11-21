@@ -6,74 +6,119 @@
 @implements IDisposable
 @inject ISystemGraphStreamClient Client
 @inject IStringLocalizer<SystemExplorerStrings> Localizer
+@inject NavigationManager Navigation
 
-<section class="resource-relations" aria-label="@T("ResourceRelations")" aria-busy="@loading.ToString().ToLowerInvariant()">
-    <div class="relations-toolbar">
-        <h2>@T("ResourceRelations") <span class="relations-root">@T("RelationsC4")</span></h2>
-        <div role="group" aria-label="@T("RelationsDirection")" class="relations-modes">
-            <button type="button" class="@(direction == SystemGraphDirection.Dependencies ? "button-primary" : "button-secondary")" aria-pressed="@((direction == SystemGraphDirection.Dependencies).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Dependencies)">@T("RelationsDependencies")</button>
-            <button type="button" class="@(direction == SystemGraphDirection.Usages ? "button-primary" : "button-secondary")" aria-pressed="@((direction == SystemGraphDirection.Usages).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Usages)">@T("RelationsUsages")</button>
-        </div>
-        <FormField Label="@T("RelationsDepth")">
-            <ClearableSelect TValue="int" AllowClear="false" Value="depth" ValueChanged="ChangeDepth">
-                @for (var level = 1; level <= ResourceRelationsPresentation.MaximumDepth; level++) { <option value="@level">@level</option> }
-            </ClearableSelect>
-        </FormField>
-        <button type="button" class="button-secondary" disabled="@(view?.CanExpand != true)" @onclick="Expand">@T("RelationsExpand")</button>
-        <button type="button" class="button-secondary" @onclick="RefreshAsync">@T("Refresh")</button>
-        @if (focusRoot != Root) { <button type="button" class="button-secondary" @onclick="ResetFocusAsync">@T("RelationsResetFocus")</button> }
-        @if (OpenExplorer.HasDelegate) { <button type="button" class="button-secondary" @onclick="() => OpenExplorer.InvokeAsync(new(Context, focusNamespace, focusRoot, direction, depth))">@T("RelationsOpenExplorer")</button> }
-    </div>
-    <p class="muted">@T(direction == SystemGraphDirection.Usages ? "RelationsUsagesHelp" : "RelationsDependenciesHelp")</p>
-    @if (failed) { <ErrorState Title="@T("RelationsErrorTitle")" Message="@T("RelationsUnavailable")" /> }
-    else if (loading && observation is null) { <LoadingState Message="@T("Loading")" /> }
-    else if (view?.Summary.Graph.Nodes.Count is > 0)
-    {
-        <div class="relations-layout">
-            <div class="relations-content">
-                <label class="relations-diagram-toggle"><input type="checkbox" @bind="showDiagram" /> @T("Diagram")</label>
-                @if (showDiagram && !diagramFailed)
-                {
-                    <SystemGraphDiagram @key="diagramKey" Page="view.Summary.Graph" Label="@T("DiagramLabel")" RelationshipLabels="relationshipLabels" Options="diagramOptions" OverlayNotes="rootNote" ViewportLabels="viewportLabels" Selected="SelectNodeAsync" LinkSelected="SelectLink" Failed="() => diagramFailed = true" />
-                }
-                @if (diagramFailed) { <p role="status">@T("RelationsDiagramFailed")</p> }
-                <details open="@(!showDiagram || diagramFailed)">
-                    <summary>@T("RelationsList")</summary>
-                    <ul class="relations-list">
-                        @foreach (var node in view.Summary.Graph.Nodes)
-                        {
-                            <li @key="node.Id"><button type="button" class="button-link" @onclick="() => SelectNodeAsync(node.Id)">@Name(node)</button> · @node.Identity.Kind
-                                @if (node.Id == focusRoot) { <span class="relations-root">@T("RelationsRoot")</span> }
-                            </li>
-                        }
-                    </ul>
-                </details>
+@{
+    RenderFragment workspace = @<section class="resource-relations @(maximized ? "is-maximized" : null)" aria-labelledby="@titleId" aria-busy="@loading.ToString().ToLowerInvariant()">
+        <header class="relations-header">
+            <div class="relations-heading">
+                <span class="relations-heading-icon"><TablerIcon Name="hierarchy" /></span>
+                <div><h2 id="@titleId">@T("ResourceRelations") @if (FocusNode is { } focus) { <span class="relations-focus-name" title="@Name(focus)">@Name(focus)</span> }</h2><p>@T(direction == SystemGraphDirection.Usages ? "RelationsUsagesHelp" : "RelationsDependenciesHelp")</p></div>
             </div>
-            @if (selected is not null)
-            {
-                <aside class="relations-inspector" aria-label="@T("RelationsSelection")">
-                    <h3>@Name(selected)</h3><p>@selected.Identity.Kind</p>
-                    <dl><dt>@T("Namespace")</dt><dd>@selected.Identity.Namespace.Value</dd><dt>@T("Owner")</dt><dd>@selected.Identity.OwnerScope.Value</dd></dl>
-                    <code>@selected.Id</code>
-                    @if (selected.Evidence?.Publication is { } publication) { <p>@T("Published"): @publication</p> }
-                    @if (selected.Evidence?.Generation is { } generation) { <p>@T(selected.State == "definition" ? "CurrentGeneration" : "RecordedGenerations"): @generation</p> }
-                    @if (selected.Id != focusRoot) { <button type="button" class="button-secondary" @onclick="RecenterAsync">@T("RelationsRecenter")</button> }
-                    @if (OpenResource.HasDelegate) { <button type="button" class="button-secondary" @onclick="() => OpenResource.InvokeAsync(selected)">@T("OpenDetails")</button> }
-                    <details><summary>@T("RelationsTechnicalDetails")</summary><pre>@Serialize(view.Summary.RepresentedNodes[selected.Id])</pre></details>
-                </aside>
-            }
+            <div class="relations-header-actions">
+                @if (view?.Summary.Graph.Nodes.Count is > 0)
+                {
+                    <span class="relations-count">@Localizer[view.Summary.Graph.Nodes.Count == 1 ? "RelationsOneResource" : "RelationsResourceCount", view.Summary.Graph.Nodes.Count]</span>
+                }
+                <button type="button" class="relations-icon-button" title="@T("Refresh")" aria-label="@T("Refresh")" @onclick="RefreshAsync"><TablerIcon Name="refresh" /></button>
+                <button @ref="maximizeButton" type="button" class="button-secondary relations-maximize" autofocus="@maximized" title="@T(maximized ? "RelationsRestore" : "RelationsMaximize")" aria-label="@T(maximized ? "RelationsRestore" : "RelationsMaximize")" @onclick="ToggleMaximized">
+                    <TablerIcon Name="@(maximized ? "arrows-minimize" : "arrows-maximize")" /><span>@T(maximized ? "RelationsRestore" : "RelationsMaximize")</span>
+                </button>
+            </div>
+        </header>
+        <div class="relations-toolbar">
+            <div role="group" aria-label="@T("RelationsDirection")" class="relations-segmented relations-modes">
+                <button type="button" aria-pressed="@((direction == SystemGraphDirection.Dependencies).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Dependencies)">@T("RelationsDependencies")</button>
+                <button type="button" aria-pressed="@((direction == SystemGraphDirection.Usages).ToString().ToLowerInvariant())" @onclick="() => ChangeDirectionAsync(SystemGraphDirection.Usages)">@T("RelationsUsages")</button>
+            </div>
+            <div class="relations-depth">
+                <FormField Label="@T("RelationsDepth")"><ClearableSelect TValue="int" AllowClear="false" Value="depth" ValueChanged="ChangeDepth">
+                    @for (var level = 1; level <= ResourceRelationsPresentation.MaximumDepth; level++) { <option value="@level">@Localizer[level == 1 ? "RelationsOneLevel" : "RelationsLevels", level]</option> }
+                </ClearableSelect></FormField>
+                <button type="button" class="relations-icon-button" title="@T("RelationsExpand")" aria-label="@T("RelationsExpand")" disabled="@(view?.CanExpand != true)" @onclick="Expand"><TablerIcon Name="plus" /></button>
+            </div>
+            @if (focusRoot != Root) { <button type="button" class="button-secondary relations-return" @onclick="ResetFocusAsync"><TablerIcon Name="arrow-back-up" />@T("RelationsResetFocus")</button> }
+            <div class="relations-view-actions">
+                <div role="group" aria-label="@T("RelationsPresentation")" class="relations-segmented relations-view-switch">
+                    <button type="button" aria-pressed="@IsGraphView.ToString().ToLowerInvariant()" @onclick="() => ChangePresentation(true)"><TablerIcon Name="hierarchy" />@T("RelationsGraph")</button>
+                    <button type="button" aria-pressed="@((!IsGraphView).ToString().ToLowerInvariant())" @onclick="() => ChangePresentation(false)"><TablerIcon Name="list" />@T("RelationsListView")</button>
+                </div>
+                <button @ref="inspectorButton" type="button" class="relations-icon-button" title="@T("RelationsShowDetails")" aria-label="@T("RelationsShowDetails")" aria-expanded="@inspectorOpen.ToString().ToLowerInvariant()" disabled="@(selected is null)" @onclick="() => inspectorOpen = !inspectorOpen"><TablerIcon Name="info-circle" /></button>
+            </div>
         </div>
-        @if (selectedLink is not null)
-        {
-            <details open class="relations-link" aria-label="@T("SummaryLinkDetails")">
-                <summary>@relationshipLabels[selectedLink.Id]</summary>
-                <p>@T("SummaryToolDefinitions")</p><pre>@Serialize(selectedLink)</pre>
-            </details>
-        }
-        @if (!loading && view.Summary.Graph.Nodes.Count == 1) { <p role="status">@T("RelationsEmpty")</p> }
-        @if (view.Limited) { <p role="status">@Localizer["RelationsWindowLimit", ResourceRelationsPresentation.NodeLimit]</p> }
-    }
-    else if (!loading) { <EmptyState Title="@T("RelationsEmpty")" Message="@T("RelationsPartial")" /> }
-    <p class="muted" role="status">@T("RelationsPartial") @if (loading) { @T("Loading") } @if (truncated) { @T("RelationsTruncated") }</p>
-    <p class="muted">@T("RelationsArrows")</p>
-</section>
+        <div class="relations-stage">
+            @if (failed) { <div class="relations-stage-state"><ErrorState Title="@T("RelationsErrorTitle")" Message="@T("RelationsUnavailable")" /></div> }
+            else if (loading && observation is null) { <div class="relations-stage-state"><LoadingState Message="@T("Loading")" /></div> }
+            else if (view?.Summary.Graph.Nodes.Count is > 0)
+            {
+                @if (IsGraphView)
+                {
+                    <SystemGraphDiagram @key="diagramKey" @ref="diagram" FillContainer Page="view.Summary.Graph" Label="@T("RelationsDiagramLabel")" RelationshipLabels="relationshipLabels" Options="diagramOptions" OverlayNotes="rootNote" Selected="SelectNodeAsync" LinkSelected="SelectLink" LoadingChanged="value => diagramLoading = value" Failed="() => diagramFailed = true" />
+                    @if (diagramLoading) { <span class="relations-rendering" role="status"><span aria-hidden="true"></span>@T("RelationsPreparingGraph")</span> }
+                    <div class="relations-viewport" role="group" aria-label="@T("RelationsViewport")">
+                        <button type="button" class="relations-icon-button" title="@T("RelationsZoomIn")" aria-label="@T("RelationsZoomIn")" @onclick="() => diagram?.ZoomInAsync() ?? Task.CompletedTask"><TablerIcon Name="plus" /></button>
+                        <button type="button" class="relations-icon-button" title="@T("RelationsZoomOut")" aria-label="@T("RelationsZoomOut")" @onclick="() => diagram?.ZoomOutAsync() ?? Task.CompletedTask"><TablerIcon Name="minus" /></button>
+                        <span class="relations-control-divider"></span>
+                        <button type="button" class="relations-icon-button" title="@T("RelationsFit")" aria-label="@T("RelationsFit")" @onclick="() => diagram?.FitAsync() ?? Task.CompletedTask"><TablerIcon Name="focus-2" /></button>
+                        <button type="button" class="relations-icon-button" title="@T("RelationsFocusViewport")" aria-label="@T("RelationsFocusViewport")" @onclick="() => diagram?.FocusRootAsync() ?? Task.CompletedTask"><TablerIcon Name="target" /></button>
+                    </div>
+                    @if (!inspectorOpen) { <p class="relations-canvas-hint">@T("RelationsSelectionHint")</p> }
+                }
+                else
+                {
+                    <div class="relations-list-view" aria-label="@T("RelationsList")">
+                        @if (diagramFailed) { <p class="relations-fallback" role="status"><TablerIcon Name="info-circle" />@T("RelationsDiagramFailed")</p> }
+                        <ul class="relations-list">
+                            @foreach (var node in view.Summary.Graph.Nodes)
+                            {
+                                <li @key="node.Id"><button type="button" class="relations-resource-row" aria-label="@Name(node)" aria-pressed="@((node.Id == selected?.Id).ToString().ToLowerInvariant())" @onclick="() => SelectNodeAsync(node.Id)">
+                                    <span class="relations-resource-icon"><TablerIcon Name="@KindIcon(node)" /></span>
+                                    <span class="relations-resource-name"><strong>@Name(node)</strong><small>@KindLabel(node) · @node.Identity.Namespace.Value</small></span>
+                                    @if (node.Id == focusRoot) { <span class="relations-root">@T("RelationsRoot")</span> }
+                                    <TablerIcon Name="chevron-right" />
+                                </button></li>
+                            }
+                        </ul>
+                    </div>
+                }
+                @if (inspectorOpen && selected is not null)
+                {
+                    <aside class="relations-inspector" aria-label="@T("RelationsSelection")">
+                        <header><span class="relations-detail-caption">@T(selectedLink is null ? "RelationsSelection" : "SummaryLinkDetails")</span><button type="button" class="relations-icon-button" aria-label="@T("RelationsCloseDetails")" title="@T("RelationsCloseDetails")" @onclick="CloseInspector"><TablerIcon Name="x" /></button></header>
+                        <div class="relations-inspector-body">
+                            @if (selectedLink is not null)
+                            {
+                                <div class="relations-link"><h3>@relationshipLabels[selectedLink.Id]</h3><p class="muted">@T("SummaryToolDefinitions")</p><details><summary>@T("RelationsTechnicalDetails")</summary><pre tabindex="0">@Serialize(selectedLink)</pre></details></div>
+                            }
+                            else
+                            {
+                                <div class="relations-detail-identity"><span class="relations-resource-icon"><TablerIcon Name="@KindIcon(selected)" /></span><div><h3>@Name(selected)</h3><span class="relations-kind">@KindLabel(selected)</span></div></div>
+                                @if (selected.Id == focusRoot) { <span class="relations-root">@T("RelationsRoot")</span> }
+                                <dl><dt>@T("Namespace")</dt><dd>@selected.Identity.Namespace.Value</dd><dt>@T("Owner")</dt><dd><ResourceScopeBadge ScopeRef="selected.Identity.OwnerScope" /></dd>
+                                    @if (selected.Evidence?.Publication is { } publication) { <dt>@T("Published")</dt><dd>@publication</dd> }
+                                    @if (selected.Evidence?.Generation is { } generation) { <dt>@T(selected.State == "definition" ? "CurrentGeneration" : "RecordedGenerations")</dt><dd>@generation</dd> }
+                                </dl>
+                                @if (selected.Id != focusRoot) { <button type="button" class="button-primary relations-recenter" @onclick="RecenterAsync"><TablerIcon Name="focus-2" />@T("RelationsRecenter")</button> }
+                                @if (OpenResource.HasDelegate) { <button type="button" class="button-secondary" @onclick="() => OpenResource.InvokeAsync(selected)">@T("OpenDetails")</button> }
+                                <details class="relations-technical"><summary>@T("RelationsTechnicalDetails")</summary><code>@selected.Id</code><pre tabindex="0">@Serialize(view.Summary.RepresentedNodes[selected.Id])</pre></details>
+                            }
+                        </div>
+                    </aside>
+                }
+            }
+            else if (!loading) { <div class="relations-stage-state"><EmptyState Title="@T("RelationsEmpty")" Message="@T("RelationsPartial")" /></div> }
+        </div>
+        <footer class="relations-footer">
+            <details><summary><TablerIcon Name="info-circle" />@T("RelationsPartialLabel")</summary><div><p>@T("RelationsPartial")</p><p>@T("RelationsArrows")</p></div></details>
+            @if (loading) { <span class="relations-loading" role="status">@T("Loading")</span> }
+            @if (truncated) { <span class="relations-warning" role="status">@T("RelationsTruncated")</span> }
+            @if (view?.Limited == true) { <span class="relations-warning" role="status">@Localizer["RelationsWindowLimit", ResourceRelationsPresentation.NodeLimit]</span> }
+            @if (!loading && view?.Summary.Graph.Nodes.Count == 1) { <span role="status">@T("RelationsEmpty")</span> }
+            @if (OpenExplorer.HasDelegate) { <button type="button" class="relations-explorer-link" @onclick="() => OpenExplorer.InvokeAsync(new(Context, focusNamespace, focusRoot, direction, depth))">@T("RelationsOpenExplorer")<TablerIcon Name="arrow-up-right" /></button> }
+        </footer>
+    </section>;
+}
+<div class="relations-host">
+    @if (!maximized) { @workspace }
+    <ModalFrame IsOpen="maximized" TitleId="@titleId" Class="relations-fullscreen-dialog" OnClose="CloseMaximized" OnClosed="RestoreMaximizeFocusAsync">@workspace</ModalFrame>
+</div>

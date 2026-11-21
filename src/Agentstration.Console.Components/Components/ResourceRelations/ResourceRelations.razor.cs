@@ -4,6 +4,8 @@ using Agentstration.SystemGraph.Contracts;
 using Agentstration.Web.Console;
 using Agentstration.Web.SystemExplorer;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.JSInterop;
 
 namespace Agentstration.Web.Components.ResourceRelations;
 
@@ -21,6 +23,13 @@ public partial class ResourceRelations
     private CancellationTokenSource? cancellation;
     private long requestVersion;
     private bool reload, disposed, loading = true, failed, truncated, diagramFailed, showDiagram = true;
+    private bool maximized, inspectorOpen, diagramLoading;
+    private readonly string titleId = "relations-" + Guid.NewGuid().ToString("N");
+    private string? fullscreenLocation;
+    private ElementReference maximizeButton, inspectorButton;
+    private SystemGraphDiagram? diagram;
+    private bool IsGraphView => showDiagram && !diagramFailed;
+    private SystemGraphNode? FocusNode => view?.Summary.Graph.Nodes.FirstOrDefault(node => node.Id == focusRoot);
     private string focusRoot = string.Empty;
     private ResourceNamespace focusNamespace;
     private SystemGraphDirection direction;
@@ -33,19 +42,66 @@ public partial class ResourceRelations
     private SystemGraphDiagramOptions? diagramOptions;
     private IReadOnlyDictionary<string, string>? rootNote;
     private long diagramKey;
-    private IReadOnlyDictionary<string, string> viewportLabels => new Dictionary<string, string>
-    { ["controls"] = T("RelationsViewport"), ["in"] = T("RelationsZoomIn"), ["out"] = T("RelationsZoomOut"), ["fit"] = T("RelationsFit") };
     private string T(string key) => Localizer[key];
     private string Name(SystemGraphNode node) => node.DisplayName
         ?? observation?.Nodes.FirstOrDefault(value => value.Id == SystemGraphIds.Definition(node.Identity.ResourceUid))?.DisplayName
         ?? node.Identity.Name;
     private static string Serialize(object value) => JsonSerializer.Serialize(value, JsonOptions);
 
+    private string KindLabel(SystemGraphNode node)
+    {
+        var label = Localizer["RelationsKind." + node.Identity.Kind];
+        return label.ResourceNotFound ? node.Identity.Kind : label.Value;
+    }
+    private static string KindIcon(SystemGraphNode node) => node.Identity.Kind switch
+    {
+        "Agent" or "AgentRevision" => "robot",
+        "Tool" or "ToolDefinition" => "tool",
+        "ToolSet" => "package",
+        "KnowledgeSource" => "book",
+        "DataSource" => "database",
+        "ConnectedService" or "ToolProvider" => "plug-connected",
+        "ModelProfile" => "cpu",
+        "RuntimeProfile" or "AgentDeployment" => "server",
+        "Flow" or "FlowVersion" => "route",
+        "Extension" or "ExtensionInstallation" => "puzzle",
+        "System" => "hierarchy",
+        _ => "cube"
+    };
+    protected override void OnInitialized() => Navigation.LocationChanged += LocationChanged;
+    private void ToggleMaximized()
+    {
+        maximized = !maximized;
+        if (maximized) fullscreenLocation = Navigation.Uri;
+    }
+    private void CloseMaximized() => maximized = false;
+    private async Task RestoreMaximizeFocusAsync()
+    {
+        if (disposed || maximized || fullscreenLocation != Navigation.Uri) return;
+        try { await maximizeButton.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+    }
+    private void LocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!maximized) return;
+        _ = InvokeAsync(() => { maximized = false; fullscreenLocation = null; StateHasChanged(); });
+    }
+    private void ChangePresentation(bool graph) { showDiagram = graph; if (graph) diagramFailed = false; }
+    private async Task CloseInspector()
+    {
+        inspectorOpen = false; selectedLink = null;
+        try { await inspectorButton.FocusAsync(preventScroll: true); }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+    }
+
     protected override void OnParametersSet()
     {
         var next = (Context, Namespace, Root, InitialDirection);
         if (parameters == next) return;
         parameters = next;
+        maximized = false; fullscreenLocation = null;
         cancellation?.Cancel(); ++requestVersion;
         focusRoot = Root; focusNamespace = Namespace;
         direction = InitialDirection; depth = 1;
@@ -59,7 +115,7 @@ public partial class ResourceRelations
     }
     private void Clear()
     {
-        observation = null; view = null; selected = null; selectedLink = null;
+        observation = null; view = null; selected = null; selectedLink = null; inspectorOpen = false;
         failed = false; loading = true; truncated = false; diagramFailed = false; ++diagramKey;
     }
     public Task RefreshAsync() => LoadAsync();
@@ -105,6 +161,7 @@ public partial class ResourceRelations
         if (observation is null) { view = null; return; }
         var next = ResourceRelationsPresentation.Create(observation, focusRoot, direction, depth);
         var labels = next.Summary.Links.ToDictionary(link => link.Id, LinkTitle, StringComparer.Ordinal);
+        foreach (var node in next.Summary.Graph.Nodes) labels["kind:" + node.Identity.Kind] = KindLabel(node);
         // Heartbeats and arrivals outside the displayed neighborhood never restart layout.
         if (view is null || !view.Summary.Graph.Nodes.SequenceEqual(next.Summary.Graph.Nodes)
             || !view.Summary.Graph.Relations.SequenceEqual(next.Summary.Graph.Relations)
@@ -127,10 +184,14 @@ public partial class ResourceRelations
     {
         var node = view?.Summary.Graph.Nodes.FirstOrDefault(value => value.Id == id);
         if (node is null || disposed) return;
-        selected = node; selectedLink = null;
+        selected = node; selectedLink = null; inspectorOpen = true;
         await SelectedChanged.InvokeAsync(node);
     }
-    private void SelectLink(string id) => selectedLink = view?.Summary.Links.FirstOrDefault(link => link.Id == id);
+    private void SelectLink(string id)
+    {
+        selectedLink = view?.Summary.Links.FirstOrDefault(link => link.Id == id);
+        inspectorOpen = selectedLink is not null;
+    }
     private Task RecenterAsync()
     {
         if (selected is null) return Task.CompletedTask;
@@ -145,6 +206,7 @@ public partial class ResourceRelations
     public void Dispose()
     {
         disposed = true; ++requestVersion; cancellation?.Cancel(); cancellation?.Dispose();
+        Navigation.LocationChanged -= LocationChanged;
         GC.SuppressFinalize(this);
     }
 }

@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ResourceRelationsTests
+public sealed partial class ResourceRelationsTests
 {
     private static SystemGraphNode Node(string name, ResourceScopeRef? owner = null, string ns = "default")
     {
@@ -22,6 +22,7 @@ public sealed class ResourceRelationsTests
         context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
         context.Services.AddSingleton<ISystemGraphStreamClient>(client);
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupModule("./_content/Agentstration.Web.SystemExplorer/system-explorer.js").Setup<bool>("render", _ => true).SetResult(render);
         return context;
     }
@@ -47,7 +48,7 @@ public sealed class ResourceRelationsTests
         Assert.HasCount(2, client.Calls); Assert.HasCount(3, page.FindComponent<SystemGraphDiagram>().Instance.Page.Nodes);
         Assert.AreEqual("resource", page.FindComponent<SystemGraphDiagram>().Instance.Options!.Mode);
         Assert.AreEqual(root.Id, page.FindComponent<SystemGraphDiagram>().Instance.Options!.Root);
-        await page.Find("input[type=checkbox]").ChangeAsync(false);
+        await page.Find(".relations-view-switch button:nth-child(2)").ClickAsync();
         Assert.HasCount(3, page.FindAll(".relations-list li")); Assert.IsEmpty(page.FindComponents<SystemGraphDiagram>());
     }
 
@@ -60,15 +61,16 @@ public sealed class ResourceRelationsTests
         ResourceRelationsFocus? opened = null;
         page.Render(p => p.Add(c => c.OpenExplorer, focus => opened = focus));
         page.WaitForAssertion(() => Assert.IsFalse(page.Find("section").GetAttribute("aria-busy") == "true"));
-        await page.FindAll("[role=group] button")[1].ClickAsync();
+        await page.Find(".relations-modes button:nth-child(2)").ClickAsync();
         page.WaitForAssertion(() => Assert.HasCount(2, page.FindComponent<SystemGraphDiagram>().Instance.Page.Nodes));
         Assert.AreEqual(SystemGraphDirection.Usages, client.Calls[^1].Query.Direction);
-        await page.FindAll(".relations-list button").Single(button => button.TextContent == "neighbor").ClickAsync();
-        await page.FindAll("aside button").Single(button => button.TextContent == "Center on this resource").ClickAsync();
+        await page.Find(".relations-view-switch button:nth-child(2)").ClickAsync();
+        await page.FindAll(".relations-list button").Single(button => button.GetAttribute("aria-label") == "neighbor").ClickAsync();
+        await page.FindAll("aside button").Single(button => button.TextContent.Trim() == "Center on this resource").ClickAsync();
         page.WaitForAssertion(() => Assert.AreEqual(neighbor.Id, client.Calls[^1].Query.Root));
         Assert.IsTrue(client.Calls.All(call => call.Context == actor));
         Assert.AreEqual(neighbor.Identity.Namespace, client.Calls[^1].Query.Namespace);
-        await page.FindAll(".relations-toolbar > button").Single(button => button.TextContent == "Open in System Explorer").ClickAsync();
+        await page.Find(".relations-explorer-link").ClickAsync();
         Assert.IsNotNull(opened); Assert.AreEqual(actor, opened.Context); Assert.AreEqual(neighbor.Identity.Namespace, opened.Namespace);
         Assert.AreEqual(neighbor.Id, opened.Root); Assert.AreEqual(SystemGraphDirection.Usages, opened.Direction);
     }
@@ -97,7 +99,7 @@ public sealed class ResourceRelationsTests
     {
         var root = Node("<img src=x onerror=alert(1)>"); var client = new Client([root], []);
         using var context = Context(client, render: false); var page = Render(context, root, ResourceScopeRef.Instance);
-        page.WaitForAssertion(() => Assert.Contains("The diagram is unavailable", page.Markup));
+        page.WaitForAssertion(() => Assert.Contains("The graph is unavailable", page.Markup));
         Assert.HasCount(1, page.FindAll(".relations-list li")); Assert.IsEmpty(page.FindAll("img"));
     }
 
