@@ -171,7 +171,17 @@ public sealed partial class TransformationFunctionService(IResourceStore store, 
                 if (validation.Issues.FirstOrDefault(issue => issue.Limit is not null) is { Limit: { } limit } exceeded)
                     throw DataContracts.Failure("transformation_input_invalid", "function-input", mapping.Input.Path, "$.value",
                         exceeded.Code, "bounded XML content", "processing limit exceeded", limit: limit);
-                throw Error("transformation_input_invalid", "The XML content does not satisfy its accepted XSD contract.");
+                var issue = validation.Issues[0];
+                var xml = issue.Xml ?? new XmlContractDiagnostic("contract");
+                if (mapping.Input.Source is { ScopeRef: { } schemaScope, Namespace: { } schemaNamespace } source
+                    && mapping.Input.SchemaUid is { } schemaUid && mapping.Input.SchemaGeneration is { } generation)
+                    xml = xml with
+                    {
+                        Schema = new(source.Name, source.Version, schemaScope, schemaNamespace, schemaUid, generation,
+                        mapping.Input.ParentDefinitionHash ?? mapping.Input.DefinitionHash, source.SchemaPath, mapping.Input.DefinitionHash)
+                    };
+                throw DataContracts.Failure("transformation_input_invalid", "function-input", mapping.Input.Path, "$.value",
+                    issue.Code, "XML matching the accepted XSD", "invalid XML content", xml: xml);
             }
             input = JsonSerializer.SerializeToElement(new { value = input.GetProperty("value"), rules = ParseDeclaration(mapping.Declaration.Content).Rules });
         }

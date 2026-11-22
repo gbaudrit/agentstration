@@ -40,4 +40,30 @@ public sealed class XmlTransformationContentTests : ResourceManagementApiTestBas
         Assert.AreEqual("1.0.0", function.Reference.Version);
         Assert.DoesNotContain(new string('é', 20), error.Message + JsonSerializer.Serialize(error.Failure));
     }
+    [TestMethod]
+    public async Task InvalidXmlCarriesTheExactAcceptedSchemaAndAnActionableCause()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
+        await RssTransformationTestData.CreateAsync(factory.Services, owner);
+        var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
+        var function = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
+        var xml = "<rss version='2.0'>\n<channel><unexpected>private-value</unexpected></channel></rss>";
+        var error = await Assert.ThrowsExactlyAsync<DataContractException>(() => functions.InvokeAsync(function, owner,
+            JsonSerializer.SerializeToElement(new { value = xml }), default));
+        Assert.AreEqual("transformation_input_invalid", error.Code);
+        var diagnostic = error.Failure.Xml!;
+        Assert.AreEqual("contract", diagnostic.Kind);
+        Assert.Contains("unexpected", diagnostic.NodePath!);
+        Assert.AreEqual("rss-xml", diagnostic.Schema!.Name);
+        Assert.AreEqual("1.0.0", diagnostic.Schema.Version);
+        Assert.AreEqual(function.Transformation!.Input.DefinitionHash, diagnostic.Schema.DefinitionHash);
+        var details = JsonSerializer.Serialize(new { contractFailure = error.Failure });
+        Assert.IsTrue(details.Length < 8192);
+        Assert.AreEqual(diagnostic, DataContracts.ParseFailure(details)!.Xml);
+        Assert.DoesNotContain("private-value", details);
+    }
+
 }

@@ -40,11 +40,19 @@ are unchanged. Parsing and mapping continue to observe cancellation.
 
 Failures retain structured numeric metadata: unit, measured count, minimum/maximum
 and, for operator quotas, the exact configuration key. Metadata never contains
-instance content. Function/XSD/mapping failures use the existing data-contract
+instance text or attribute values. Function/XSD/mapping failures use the existing data-contract
 failure channel, including the causal run/step. The localized Console shows the
 measured amount, actual limit, relevant setting and correction; it distinguishes
 schema constraints from operator quotas. Historical string-length failures without
 numeric evidence stay readable and do not fabricate measurements.
+
+XML validation failures also carry bounded structural metadata: syntax versus XSD
+violation versus invalid definition, node path, line/column, declared type or
+particle structure and the exact accepted XSD identity/hash. This uses public XML
+schema information after validation; raw framework messages and rejected text or
+attribute values are never copied. The Function service keeps the diagnostic in
+the existing data-contract failure channel. Historical generic failures explicitly
+state that no detail was recorded and require a new execution.
 
 The unreleased engine, provider and resource versions stay at 1.0.0. Reseed is
 required for changed immutable native invocation digests. No compatibility version,

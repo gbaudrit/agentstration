@@ -25,6 +25,8 @@ public sealed class BuiltinXmlSchemaFormatHandler(XmlContentOptions? options = n
     private ValueTask<SchemaFormatValidationResult> Validate(JsonElement definition, JsonElement? instance, string? dialect, CancellationToken ct)
     {
         var validatingInstance = false;
+        XmlSchemaSet? compiled = null;
+        var invalid = new List<(XObject? Node, XmlSchemaException Error, bool Instance)>();
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -38,17 +40,24 @@ public sealed class BuiltinXmlSchemaFormatHandler(XmlContentOptions? options = n
             var issues = new List<SchemaFormatValidationIssue>();
             void Invalid(object? sender, ValidationEventArgs args)
             {
-                if (issues.Count < 16) issues.Add(new("$", "xml_contract_invalid", "The XML does not satisfy the standalone XSD contract."));
+                if (invalid.Count < 4) invalid.Add((args.Exception is XmlSchemaValidationException validation ? validation.SourceObject as XObject ?? sender as XObject : sender as XObject,
+                    args.Exception, validatingInstance));
             }
             var schemas = new XmlSchemaSet { XmlResolver = null };
+            compiled = schemas;
             schemas.ValidationEventHandler += Invalid;
             using (var reader = document.CreateReader()) schemas.Add(XmlSchema.Read(reader, Invalid)!);
             schemas.Compile();
-            if (issues.Count == 0 && instance is { } value)
+            if (invalid.Count == 0 && instance is { } value)
             {
                 validatingInstance = true;
                 var content = BoundedXml.Parse(Text(value), ct, options);
-                content.Validate(schemas, Invalid, false);
+                content.Validate(schemas, Invalid, true);
+            }
+            foreach (var entry in invalid)
+            {
+                var diagnostic = XmlContractDiagnostics.Describe(entry.Node, schemas, entry.Instance, entry.Error);
+                issues.Add(new("$", entry.Instance ? "xml_contract_invalid" : "xml_definition_invalid", "The XML does not satisfy its schema contract.") { Xml = diagnostic });
             }
             return ValueTask.FromResult(new SchemaFormatValidationResult(issues));
         }
@@ -56,9 +65,19 @@ public sealed class BuiltinXmlSchemaFormatHandler(XmlContentOptions? options = n
         {
             return ValueTask.FromResult(new SchemaFormatValidationResult([new("$", error.Rule, "An XML processing limit was exceeded.") { Limit = validatingInstance ? error.Limit : error.Limit with { Setting = null } }]));
         }
-        catch (Exception error) when (error is XmlException or XmlSchemaException or ArgumentException)
+        catch (XmlSchemaException error)
         {
-            return ValueTask.FromResult(new SchemaFormatValidationResult([new("$", "xml_invalid", "Invalid or unsupported bounded XML/XSD document.")]));
+            var diagnostic = compiled is null ? new XmlContractDiagnostic("definition") : XmlContractDiagnostics.Describe(null, compiled, false, error);
+            return ValueTask.FromResult(new SchemaFormatValidationResult([new("$", "xml_definition_invalid", "The standalone XSD contract is invalid.") { Xml = diagnostic }]));
+        }
+        catch (XmlException error)
+        {
+            return ValueTask.FromResult(new SchemaFormatValidationResult([new("$", validatingInstance ? "xml_syntax_invalid" : "xml_definition_invalid",
+                "The XML is malformed or contains a prohibited construct.") { Xml = XmlContractDiagnostics.Syntax(error, validatingInstance) }]));
+        }
+        catch (ArgumentException)
+        {
+            return ValueTask.FromResult(new SchemaFormatValidationResult([new("$", "xml_definition_invalid", "Invalid or unsupported XML/XSD document.") { Xml = new("definition") }]));
         }
     }
 

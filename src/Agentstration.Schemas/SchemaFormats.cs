@@ -28,6 +28,8 @@ public sealed record SchemaFormatValidationIssue(string Path, string Code, strin
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public DataContractLimit? Limit { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public XmlContractDiagnostic? Xml { get; init; }
 }
 
 public sealed record SchemaFormatValidationResult(IReadOnlyList<SchemaFormatValidationIssue> Issues)

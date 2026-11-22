@@ -117,7 +117,7 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
         await functions.ExposeAsync(RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-mapping", Version = "1.0.0", ScopeRef = ResourceScopeRef.Instance } }, default);
         var accepted = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
         foreach (var xml in new[] { "<rss>", "<wrong />", "<!DOCTYPE rss [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><rss>&x;</rss>", RssTransformationTestData.Feed(1).Replace("<guid>", "<wrong>", StringComparison.Ordinal) })
-            Assert.AreEqual("transformation_input_invalid", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = xml }), default))).Code);
+            Assert.AreEqual("transformation_input_invalid", (await Assert.ThrowsExactlyAsync<DataContractException>(() => functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = xml }), default))).Code);
         var target = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-json", default))!;
         await schemas.PutAsync(ResourceScopeRef.Instance, target.Value.Namespace, target.Value.Name,
             target.Value.Definition with { Content = RssTransformationTestData.Json("""{"type":"object","required":["missing"]}""") }, target.ETag, default);

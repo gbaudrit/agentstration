@@ -46,6 +46,8 @@ public sealed record DataContractFailure(string Boundary, string Origin, string 
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public DataContractLimit? Limit { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public XmlContractDiagnostic? Xml { get; init; }
 }
 
 public sealed record DataContractLimit(string Unit, long Actual, long? Minimum = null, long? Maximum = null, string? Setting = null)
@@ -84,7 +86,7 @@ public static partial class DataContracts
             var failure = (root.TryGetProperty("contractFailure", out var nested) ? nested : root).Deserialize<DataContractFailure>(FailureJson);
             return failure is not null && Valid(failure.Boundary, 128) && Valid(failure.Origin, 512)
                 && Valid(failure.Path, 2048) && Valid(failure.Rule, 128) && Valid(failure.Expected, 256) && Valid(failure.Actual, 256)
-                && (failure.Limit is null || failure.Limit.IsValid) ? failure : null;
+                && (failure.Limit is null || failure.Limit.IsValid) && (failure.Xml is null || failure.Xml.IsValid) ? failure : null;
         }
         catch (JsonException) { return null; }
         static bool Valid(string? value, int maximum) => value is { Length: > 0 } && value.Length <= maximum;
@@ -206,8 +208,8 @@ public static partial class DataContracts
         JsonSerializer.Serialize(new { contract.MediaType, contract.Schema });
 
     public static DataContractException Failure(string code, string boundary, string origin, string path, string rule,
-        string expected, string actual, string? runId = null, string? stepName = null, DataContractLimit? limit = null) =>
-        new(code, new(boundary, origin.Length > 512 ? origin[..512] : origin, path, rule, expected, actual, runId, stepName, code) { Limit = limit });
+        string expected, string actual, string? runId = null, string? stepName = null, DataContractLimit? limit = null, XmlContractDiagnostic? xml = null) =>
+        new(code, new(boundary, origin.Length > 512 ? origin[..512] : origin, path, rule, expected, actual, runId, stepName, code) { Limit = limit, Xml = xml });
 
     private static (string Path, string Expected, string Actual) DescribePath(JsonElement schema, JsonElement value, string requested)
     {

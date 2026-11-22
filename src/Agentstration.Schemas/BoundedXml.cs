@@ -35,7 +35,7 @@ public static class BoundedXml
             Check(reader.AttributeCount, limits.MaximumAttributesPerElement, "xmlAttributes", nameof(limits.MaximumAttributesPerElement));
         }
         using var content = XmlReader.Create(new StringReader(value), settings);
-        return XDocument.Load(content, LoadOptions.PreserveWhitespace);
+        return XDocument.Load(content, LoadOptions.PreserveWhitespace | LoadOptions.SetLineInfo);
     }
 
     private static void Check(long actual, int maximum, string unit, string setting)

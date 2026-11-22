@@ -233,3 +233,25 @@ bytes, text characters, node counts and mapping operations are distinct. Values
 and source content are omitted. Schema length errors refer to their declared
 schema constraints rather than suggesting a server setting can override them.
 Old recorded errors without measurements remain readable. See [ADR-0243](../decisions/0243-xml-processing-uses-operator-content-settings.md).
+
+## Diagnosing rejected XML
+
+`transformation_input_invalid` is a contract failure, not a generic worker failure.
+New executions retain a bounded structured cause through the function, Runtime
+Worker and Flow Run error details. The localized panel distinguishes malformed XML
+or prohibited markup, an XSD mismatch, and an invalid standalone XSD definition.
+It shows XML node path and line/column when available, declared type/structure,
+and the exact accepted XSD name/version and immutable evidence. Declared structure
+is bounded context from the XSD; it is not a reproduction of an untrusted parser
+message or a claim that all other fields have been validated successfully.
+
+For a well-formed document, compare the indicated position with that exact XSD:
+check qualified names, element order, required attributes, types and cardinalities.
+Correct the producer or explicitly adopt a matching input profile. Mapping runs
+only after XML validation succeeds; changing a byte quota cannot fix an XSD mismatch.
+For malformed XML, fix syntax/escaping at the reported position; DTDs and external
+resolution remain prohibited. No rejected scalar values, attribute values, XML
+snippets or raw framework messages are retained in the structured diagnostic.
+Historical failures whose details were discarded cannot be reconstructed; rerun
+with the updated implementation to capture the cause. No Schema/Function version
+or Bootstrap procedure change is required for this diagnostic improvement.
