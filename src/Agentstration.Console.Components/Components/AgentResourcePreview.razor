@@ -31,6 +31,8 @@
         <AdditionalContent>@if (saved.ScopeRef is { } owner)
         {
             <ExtensionManagedResourcePanel Governance="saved.Governance" ScopeRef="owner" Namespace="saved.Namespace" Kind="@saved.Kind" Name="@saved.Name" Uid="saved.Uid" Embedded />
-        }</AdditionalContent>
+        }
+        <BootstrapResourceProvenance AppliedBy="saved.Governance.AppliedBy" Origin="saved.Governance.Origin" />
+        </AdditionalContent>
     </ResourceIdentitySummary>;
 }

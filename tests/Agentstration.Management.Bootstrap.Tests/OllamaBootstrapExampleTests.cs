@@ -133,12 +133,16 @@ public sealed partial class DeclarativeBootstrapTests
         await store.DeleteExactAsync(revisionAddress, revision.ETag, default);
         var agentManifest = Path.Combine(directory.Path, "ollama-workspace", "10-agent.yaml");
         var originalManifest = await File.ReadAllTextAsync(agentManifest);
+        var descriptorPath = Path.Combine(directory.Path, "ollama-workspace", "profile.yaml");
+        var originalDescriptor = await File.ReadAllTextAsync(descriptorPath);
         await File.WriteAllTextAsync(agentManifest, originalManifest.Replace(
             "Tu es un assistant utile.", "Instructions modifiées dans le catalogue.", StringComparison.Ordinal));
+        await File.WriteAllTextAsync(descriptorPath, originalDescriptor.Replace("version: 1.0.0", "version: 1.1.0", StringComparison.Ordinal));
         await ApplyWorkspaceAsync();
         Assert.IsNull(await store.GetExactAsync<AgentRevision>(revisionAddress, default));
 
         await File.WriteAllTextAsync(agentManifest, originalManifest);
+        await File.WriteAllTextAsync(descriptorPath, originalDescriptor);
         await ApplyWorkspaceAsync();
         var resumed = await store.GetExactAsync<AgentRevision>(revisionAddress, default);
         Assert.IsNotNull(resumed);
@@ -154,6 +158,8 @@ public sealed partial class DeclarativeBootstrapTests
                 Definition = agent.Value.Definition with { Instructions = "Manually edited draft." }
             }, agent.ETag, false, default);
         Assert.AreEqual(2L, updated.Value.Generation);
+        Assert.IsNotNull(agent.Value.Governance.AppliedBy);
+        Assert.AreEqual(agent.Value.Governance.AppliedBy, updated.Value.Governance.AppliedBy);
         await ApplyWorkspaceAsync();
         Assert.IsNull(await store.GetExactAsync<AgentRevision>(ScopedResourceAddress.Create(
             ResourceScopeRef.Workspace(workspace.Id), ResourceNamespace.Default,

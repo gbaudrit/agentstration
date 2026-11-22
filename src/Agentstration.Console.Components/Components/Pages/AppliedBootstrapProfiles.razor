@@ -1,0 +1,234 @@
+@page "/settings/bootstrap/applied"
+@page "/settings/bootstrap/applied/{ProfileId}"
+@implements IDisposable
+@using Agentstration.Bootstrap.Contracts
+@inject IBootstrapProfilesApiClient Client
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+<PageTitle>@T("AppliedProfiles")</PageTitle>
+@if (ProfileId is null)
+{
+    <ResourceCollectionTemplate TItem="AppliedBootstrapProfile" Title="@T("AppliedProfiles")"
+        IdentityColumn="ProfileIdentity" Items="profiles" LoadState="load" TestId="applied-bootstrap-profiles"
+        EmptyTitle="@T("NoAppliedProfiles")">
+        <Actions><a class="button-secondary" href="/settings/bootstrap">@T("Title")</a></Actions>
+    </ResourceCollectionTemplate>
+}
+else
+{
+    <ResourceDetailsTemplate Name="@(profile?.DisplayName ?? T("AppliedProfiles"))" ResourceType="@T("Profile")"
+        IconName="cloud-upload" TechnicalName="@profile?.Name" ResourceIdentity="@ProfileId" Sections="Sections"
+        DefaultSection="versions" CollectionHref="/settings/bootstrap/applied" CollectionLabel="@T("AppliedProfiles")"
+        LoadState="load" OnRetry="LoadAsync" TestId="applied-bootstrap-profile">
+        <Content>
+            <FormSection Title="@T("ProfileVersions")" TestId="bootstrap-profile-versions">
+                <FormGrid>
+                    <FormField Label="@T("ProfileVersion")" Id="bootstrap-history-version">
+                        <select id="bootstrap-history-version" value="@version" @onchange="ChangeVersion">
+                            @foreach (var entry in versions)
+                            {
+                                <option value="@entry.Version">@entry.Version</option>
+                            }
+                        </select>
+                    </FormField>
+                    <FormField Label="@T("Target")" Id="bootstrap-history-scope">
+                        <select id="bootstrap-history-scope" value="@scope" @onchange="ChangeScope">
+                            @foreach (var target in targets)
+                            {
+                                <option value="@target.Scope">@target.Label</option>
+                            }
+                        </select>
+                    </FormField>
+                </FormGrid>
+                @if (versions.FirstOrDefault(value => value.Version == version) is { } selected)
+                {
+                    <dl class="resource-details bootstrap-version-facts">
+                        <dt>@T("ProfileDigest")</dt><dd><code>@selected.Digest</code></dd>
+                        @if (selected.Source is { } source)
+                        {
+                            <dt>@T("ProfileSourceVersion")</dt><dd>@source.Publisher/@source.SourceName @source.SourceVersion</dd>
+                        }
+                    </dl>
+                }
+            </FormSection>
+            <FormSection Title="@T("ApplicationHistory")" TestId="bootstrap-version-history">
+                @if (history.Count == 0)
+                {
+                    <EmptyState Title="@T("NoScopedApplications")" />
+                }
+                @foreach (var item in history)
+                {
+                    <details @key="item.Id" class="bootstrap-history-entry" open="@(history.Count == 1 || item.Id == Application)" data-testid="bootstrap-scoped-application">
+                        <summary>@item.StartedAt.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)
+                            · @T($"ApplicationSource.{item.Source}") · @T($"ApplicationStatus.{item.Status}")
+                        </summary>
+                        <CollectionView TItem="BootstrapAppliedResource" Items="item.Resources" IdentityLabel="@T("Resources")"
+                            InformationLabels="@(new[] { T("ManifestLocation"), T("Results") })"
+                            ShowViewSwitch="false">
+                            <Identity Context="row">
+                                <small>@row.Kind</small>
+                                @if (ResourceLink(row) is { } link)
+                                {
+                                    <a class="text-button" href="@link">@row.Name</a>
+                                }
+                                else { <strong>@row.Name</strong> }
+                                @if (row.Pack is not null) { <small>@T("PackOrigin") · @row.Pack</small> }
+                            </Identity>
+                            <Information Context="row">
+                                <CollectionValue Label="@T("ManifestLocation")"><code>@row.Location</code></CollectionValue>
+                                <CollectionValue Label="@T("Results")">@T($"AppliedDisposition.{row.Disposition}")</CollectionValue>
+                            </Information>
+                        </CollectionView>
+                    </details>
+                }
+            </FormSection>
+        </Content>
+    </ResourceDetailsTemplate>
+}
+
+@code {
+    [Parameter] public string? ProfileId { get; set; }
+    [SupplyParameterFromQuery] public string? Version { get; set; }
+    [SupplyParameterFromQuery] public string? Scope { get; set; }
+    [SupplyParameterFromQuery] public Guid? Application { get; set; }
+
+    private readonly CancellationTokenSource lifetime = new();
+    private IReadOnlyList<AppliedBootstrapProfile> profiles = [];
+    private AppliedBootstrapProfile? profile;
+    private IReadOnlyList<AppliedBootstrapVersion> versions = [];
+    private IReadOnlyList<ScopedBootstrapApplication> history = [];
+    private IReadOnlyList<TargetOption> targets = [];
+    private ResourceLoadState load = new(ResourceLoadStatus.Loading);
+    private string? version;
+    private string? scope;
+    private int request;
+    private sealed record TargetOption(string Scope, string Label);
+
+    private IReadOnlyList<ResourceNavigationItem> Sections => [new("versions", T("ProfileVersions"), "history")];
+    private CollectionColumn<AppliedBootstrapProfile> ProfileIdentity => new("profile", T("Profile"), item =>
+        @<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.Name"
+            Href="@($"/settings/bootstrap/applied/{Uri.EscapeDataString(item.Id)}#versions")" IconName="cloud-upload" />);
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var attempt = ++request;
+        load = new(ResourceLoadStatus.Loading);
+        try
+        {
+            var token = lifetime.Token;
+            var available = await Client.ListAppliedProfilesAsync(token);
+            if (ProfileId is null)
+            {
+                if (attempt != request) return;
+                profiles = available;
+                load = new(ResourceLoadStatus.Ready);
+                return;
+            }
+
+            var selected = available.SingleOrDefault(value => value.Id == ProfileId);
+            if (selected is null)
+            {
+                if (attempt == request) load = new(ResourceLoadStatus.NotFound);
+                return;
+            }
+            var versionQuery = Client.ListVersionsAsync(selected.Id, token);
+            var managementQuery = Client.GetAsync(token);
+            await Task.WhenAll(versionQuery, managementQuery);
+            var availableVersions = await versionQuery;
+            var management = await managementQuery;
+            var selectedVersion = Version ?? availableVersions.FirstOrDefault()?.Version;
+            var versionScope = availableVersions.FirstOrDefault(value => value.Version == selectedVersion)?.Scope ?? selected.Scope;
+            TargetOption[] choices = versionScope switch
+            {
+                BootstrapProfileScope.Instance => [new(ResourceScopeRef.Instance.Value, T("Scope.Instance"))],
+                BootstrapProfileScope.Tenant => management.Tenants.Select(item =>
+                    new TargetOption(ResourceScopeRef.Tenant(item.Id).Value, item.DisplayName)).ToArray(),
+                _ => management.Workspaces.Select(item =>
+                    new TargetOption(ResourceScopeRef.Workspace(item.WorkspaceId).Value, $"{item.TenantDisplayName} / {item.WorkspaceDisplayName}")).ToArray()
+            };
+            var selectedScope = Scope ?? choices.FirstOrDefault()?.Scope;
+            if (attempt != request) return;
+            if (selectedVersion is not null && !availableVersions.Any(value => value.Version == selectedVersion)
+                || selectedScope is not null && !choices.Any(value => value.Scope == selectedScope))
+            {
+                load = new(ResourceLoadStatus.NotFound);
+                return;
+            }
+            var entries = selectedVersion is not null && ResourceScopeRef.TryParse(selectedScope, out var target)
+                ? await Client.ListHistoryAsync(selected.Id, selectedVersion, target, token) : [];
+            if (attempt != request) return;
+            profile = selected;
+            versions = availableVersions;
+            targets = choices;
+            version = selectedVersion;
+            scope = selectedScope;
+            history = entries;
+            load = new(ResourceLoadStatus.Ready);
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (AgentstrationApiException exception)
+        {
+            if (attempt == request)
+                load = exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized ? new(ResourceLoadStatus.Forbidden)
+                    : new(ResourceLoadStatus.Failed) { Message = T("HistoryLoadFailed") };
+        }
+    }
+
+    private void ChangeVersion(ChangeEventArgs args)
+    {
+        var requested = args.Value?.ToString();
+        var newScope = versions.FirstOrDefault(item => item.Version == requested)?.Scope;
+        var currentScope = versions.FirstOrDefault(item => item.Version == version)?.Scope;
+        ChangeSelection(requested, newScope == currentScope ? scope : null);
+    }
+    private void ChangeScope(ChangeEventArgs args) => ChangeSelection(version, args.Value?.ToString());
+
+    private void ChangeSelection(string? selectedVersion, string? selectedScope) => Navigation.NavigateTo(
+        Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["version"] = selectedVersion, ["scope"] = selectedScope, ["application"] = null
+        }));
+
+    private static string? ResourceLink(BootstrapAppliedResource row)
+    {
+        if (!row.ResourceAvailable || row.OwnerScope is not { } owner || row.Namespace is not { } ns) return null;
+        if (row.Kind == AgentResourceKinds.Agent)
+            return ConsoleResourceUrls.Agent(ns, row.Name, owner, owner);
+        if (row.Kind == FlowResourceKinds.Flow)
+            return ConsoleResourceUrls.WithOwnerScope(ConsoleResourceUrls.Flow(new(row.Name, ns), owner), owner);
+        if (row.Kind == EntryResourceKinds.Entry)
+        {
+            var name = Uri.EscapeDataString(row.Name);
+            var path = ns.IsDefault ? $"/entries/{name}" : $"/namespaces/{Uri.EscapeDataString(ns.Value)}/entries/{name}";
+            return ConsoleResourceUrls.WithOwnerScope(path, owner);
+        }
+        var collection = row.Kind switch
+        {
+            "Parameter" => "/parameters",
+            "ModelProfile" => "/modelprofiles",
+            "ModelProvider" => "/modelproviders",
+            "RuntimeProfile" => "/runtimeprofiles",
+            "ToolSet" => "/tools/sets",
+            "DataSourceProfile" => "/data-source-profiles",
+            "DataSource" => "/data-sources",
+            "KnowledgeSource" => "/knowledge-sources",
+            "Storage" => "/storages",
+            "StorageType" => "/storage-types",
+            "TransformationFunction" => "/transformation-functions",
+            _ => null
+        };
+        return collection is null ? null : ConsoleResourceUrls.Resource(collection, row.Name, ns, owner);
+    }
+
+    private string T(string key) => Localizer[key].Value;
+
+    public void Dispose()
+    {
+        ++request;
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

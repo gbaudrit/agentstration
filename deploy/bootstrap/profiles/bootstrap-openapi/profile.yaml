@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: bootstrap-openapi
 definition:
+  version: 1.0.0
   displayName: Unattended OpenAPI Bootstrap example
   description: Enrolls an externally started extension and binds its prepared contributions without contacting an upstream API.
   targetScope: instance

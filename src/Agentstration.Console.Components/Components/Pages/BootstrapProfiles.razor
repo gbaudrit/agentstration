@@ -25,7 +25,7 @@
             <MetricCard Label="@T("Applications")" Value="@view.Applications.Count.ToString()" Detail="@T("LatestRetainedRuns")" Status="@(view.Applications.Any(item => item.Definition.Status is BootstrapApplicationStatus.Failed or BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted) ? UiStatus.Warning : UiStatus.Success)" />
         }
     </Metrics>
-    <Actions><button type="button" class="button-secondary" @onclick="() => configurationOpen = true">@T("CatalogConfiguration")</button></Actions>
+    <Actions><a class="button-secondary" href="/settings/bootstrap/applied">@T("AppliedProfiles")</a><button type="button" class="button-secondary" @onclick="() => configurationOpen = true">@T("CatalogConfiguration")</button></Actions>
     <Feedback>
         @if (view is not null && !denied && error is not null) { <p class="error-panel" role="alert">@error</p> }
     </Feedback>
@@ -249,6 +249,7 @@ else
         {
             Filters = [new("scope", T("Target"), CollectionFilterKind.Choice) { Options = Enum.GetValues<BootstrapProfileScope>().Select(scope => new CollectionFilterOption(scope.ToString(), ScopeLabel(scope))).ToArray() }]
         },
+        new("version", T("ProfileVersion"), profile => @<span>@profile.Version</span>),
         new("resources", T("Resources"), profile => @<span>@profile.ResourceCount</span>),
         new("description", T("Details"), profile => @<span>@profile.Description</span>)
     ];

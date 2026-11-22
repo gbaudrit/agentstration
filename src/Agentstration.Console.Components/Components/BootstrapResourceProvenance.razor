@@ -1,0 +1,39 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+@if (AppliedBy is { } application)
+{
+    <section class="bootstrap-resource-provenance" data-testid="bootstrap-resource-provenance" aria-label="@Localizer["AppliedBy"]">
+        <dl class="resource-details">
+            @if (Origin is { Kind: ResourceOriginKind.Pack } pack)
+            {
+                <dt>@Localizer["PackOrigin"]</dt><dd>@pack.Reference @pack.Version</dd>
+            }
+            <dt>@Localizer["AppliedBy"]</dt>
+            <dd>
+                @if (CanReadHistory)
+                {
+                    <a class="text-button" href="@ApplicationUrl(application)">@Localizer["AppliedByProfile", application.Profile, application.Version]</a>
+                }
+                else
+                {
+                    @Localizer["AppliedByProfile", application.Profile, application.Version]
+                }
+            </dd>
+            <dt>@Localizer["ManifestLocation"]</dt><dd><code>@application.Location</code></dd>
+        </dl>
+    </section>
+}
+
+@code {
+    [Parameter] public ResourceBootstrapApplication? AppliedBy { get; set; }
+    [Parameter] public ResourceOrigin? Origin { get; set; }
+
+    private bool CanReadHistory => Services.GetService<ConsoleContextState>()?.Current?.Contexts
+        .Any(context => context.Kind == ConsoleContextKind.Instance) == true;
+
+    private static string ApplicationUrl(ResourceBootstrapApplication application) =>
+        $"/settings/bootstrap/applied/{Uri.EscapeDataString(application.ProfileId)}?version={Uri.EscapeDataString(application.Version)}&scope={Uri.EscapeDataString(application.TargetScope.Value)}&application={application.ApplicationId:D}#versions";
+}

@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: BootstrapProfile
 metadata: { name: ollama-tenant }
 definition:
+  version: 1.0.0
   displayName: Ollama Tenant model
   description: Creates a Tenant-owned model profile and shares it only with dev/default.
   targetScope: tenant

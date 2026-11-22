@@ -58,4 +58,22 @@
   <data name="TargetForProfile" xml:space="preserve"><value>Target for {0}</value></data>
   <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation deferred</value></data>
   <data name="ApplicationTitle" xml:space="preserve"><value>Bootstrap application</value></data>
+  <data name="AppliedProfiles" xml:space="preserve"><value>Applied Bootstrap profiles</value></data>
+  <data name="NoAppliedProfiles" xml:space="preserve"><value>No applied Bootstrap profiles</value></data>
+  <data name="ProfileVersion" xml:space="preserve"><value>Version</value></data>
+  <data name="ProfileVersions" xml:space="preserve"><value>Versions</value></data>
+  <data name="NoScopedApplications" xml:space="preserve"><value>No applications for this version and scope</value></data>
+  <data name="ProfileDigest" xml:space="preserve"><value>Profile digest</value></data>
+  <data name="ProfileSourceVersion" xml:space="preserve"><value>Source version</value></data>
+  <data name="AppliedBy" xml:space="preserve"><value>Applied by</value></data>
+  <data name="AppliedByProfile" xml:space="preserve"><value>Bootstrap {0} {1}</value></data>
+  <data name="PackOrigin" xml:space="preserve"><value>Pack origin</value></data>
+  <data name="ManifestLocation" xml:space="preserve"><value>Manifest location</value></data>
+  <data name="HistoryLoadFailed" xml:space="preserve"><value>The Bootstrap version history could not be loaded.</value></data>
+  <data name="ApplicationSource.Startup" xml:space="preserve"><value>Startup</value></data>
+  <data name="ApplicationSource.Manual" xml:space="preserve"><value>Manual</value></data>
+  <data name="AppliedDisposition.Create" xml:space="preserve"><value>Created</value></data>
+  <data name="AppliedDisposition.Skip" xml:space="preserve"><value>Skipped</value></data>
+  <data name="AppliedDisposition.Conflict" xml:space="preserve"><value>Conflict</value></data>
+  <data name="AppliedDisposition.Failed" xml:space="preserve"><value>Failed</value></data>
 </root>

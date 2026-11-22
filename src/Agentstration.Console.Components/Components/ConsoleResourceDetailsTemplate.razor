@@ -16,7 +16,7 @@
                          ReadOnlyTestId="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? "inherited-resource-notice" : null)"
                          ResourceIdentity="@EffectiveIdentity" SectionState="SectionState" SelectionChanged="SelectionChanged" SectionPresentations="SectionPresentations"
                          DefinitionSections="DefinitionSections" AdditionalSections="AdditionalSections" AdditionalContent="@AdditionalContent"
-                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityContent="@ExtensionProvenance" IdentityLabels="Resource?.Metadata.Tags" ResourceUid="Resource?.Uid" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent" OverviewSummary="@OverviewSummary"
+                         OverviewMetrics="@OverviewMetrics" IdentityDetails="@IdentityDetails" IdentityContent="@Provenance" IdentityLabels="Resource?.Metadata.Tags" ResourceUid="Resource?.Uid" OverviewConfiguration="@OverviewConfiguration" OverviewContent="@OverviewContent" OverviewSummary="@OverviewSummary"
                          DefinitionContent="@DefinitionContent" AccessContent="@(Resource is null ? null : AccessContent ?? (CanManageAccess ? AccessPanel : null))" YamlContent="@YamlEditor"
                          YamlTitle="@YamlTitle" YamlDescription="@YamlDescription"
                          ExpandNavigationGroups="ExpandNavigationGroups" NavigationLabel="@NavigationLabel" NavigationTestId="@NavigationTestId"
@@ -123,10 +123,15 @@
     private RenderFragment YamlEditor => @<ResourceYamlEditor InputTestId="@YamlInputTestId" Value="@Yaml" ValueChanged="YamlChanged" ReadOnly="@(YamlReadOnly || EffectiveReadOnlyReason is not null)" Busy="Busy"
         Error="@YamlError" Label="@YamlLabel" Feedback="@YamlFeedback" />;
 
-    private RenderFragment? ExtensionProvenance => Resource is { ScopeRef: { } owner } saved
-        && saved.Governance.Origin.Kind == ResourceOriginKind.Extension
-        && saved.Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation
-        ? @<ExtensionManagedResourcePanel Governance="saved.Governance" ScopeRef="owner" PresentationScopeRef="PresentationScopeRef" Namespace="saved.Namespace" Kind="@saved.Kind" Name="@saved.Name" Uid="saved.Uid" Embedded />
+    private RenderFragment? Provenance => Resource is { ScopeRef: { } owner } saved
+        ? @<text>
+            @if (saved.Governance.Origin.Kind == ResourceOriginKind.Extension
+                && saved.Governance.ManagedBy?.Kind == ResourceManagementAuthorityKind.ExtensionInstallation)
+            {
+                <ExtensionManagedResourcePanel Governance="saved.Governance" ScopeRef="owner" PresentationScopeRef="PresentationScopeRef" Namespace="saved.Namespace" Kind="@saved.Kind" Name="@saved.Name" Uid="saved.Uid" Embedded />
+            }
+            <BootstrapResourceProvenance AppliedBy="saved.Governance.AppliedBy" Origin="saved.Governance.Origin" />
+        </text>
         : null;
 
     protected override void OnParametersSet()

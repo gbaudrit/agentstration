@@ -378,9 +378,12 @@ public sealed partial class BootstrapProfileManagementService(
                     }
                     finally { applicationLock.State.Release(); }
                 };
+            bool CancellationRequested() => application.Definition.CancellationRequested || (!background && cancellationToken.IsCancellationRequested);
             var execution = selection.Applications is { Count: > 0 }
-                ? await ExecutePlanAsync(selection, application.Definition.ActorPrincipalId.Value, application.Definition.Digest, report, cancellationToken)
-                : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report);
+                ? await ExecutePlanAsync(selection, application.Definition.ActorPrincipalId.Value, application.Definition.Digest, report,
+                    Guid.Parse(application.Metadata.Name), CancellationRequested, cancellationToken)
+                : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report,
+                    correlationId: Guid.Parse(application.Metadata.Name), cancellationRequested: CancellationRequested);
             await applicationLock.State.WaitAsync(CancellationToken.None);
             try
             {

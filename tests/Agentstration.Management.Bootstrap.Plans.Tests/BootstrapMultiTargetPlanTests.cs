@@ -1,6 +1,9 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Flows;
+using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Parameters;
 using Agentstration.ResourceManagement.Contracts;
@@ -63,7 +66,118 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsNotNull(parameter);
         Assert.AreEqual(ResourceScopeRef.Tenant(tenant.Id).Value, catalog.Reference!.Value.GetProperty("scopeRef").GetString());
         Assert.AreEqual("plan-origin", catalog.Reference!.Value.GetProperty("address").GetProperty("name").GetString());
+        var recordedProfiles = await client.GetFromJsonAsync<AppliedBootstrapProfile[]>("/api/bootstrap/applied-profiles");
+        var targets = new Dictionary<string, ResourceScopeRef>
+        {
+            ["instance"] = ResourceScopeRef.Instance,
+            ["tenant"] = ResourceScopeRef.Tenant(tenant.Id),
+            ["workspace"] = ResourceScopeRef.Workspace(workspace.Id)
+        };
+        foreach (var (profileName, targetScope) in targets)
+        {
+            var profile = recordedProfiles!.Single(item => item.Name == profileName);
+            var recorded = (await HistoryAsync(client, profile.Id, "1.0.0", targetScope)).Single();
+            Assert.AreEqual(targetScope, recorded.Scope);
+            Assert.AreEqual(Guid.Parse(application.Metadata.Name), recorded.CorrelationId);
+            Assert.AreEqual(BootstrapApplicationStatus.Succeeded, recorded.Status);
+            Assert.IsTrue(recorded.Resources.All(resource => resource.Profile == profileName && resource.Version == "1.0.0"));
+            Assert.HasCount(0, await HistoryAsync(client, profile.Id, "1.0.0",
+                targetScope == ResourceScopeRef.Instance ? ResourceScopeRef.Tenant(tenant.Id) : ResourceScopeRef.Instance));
+        }
+        Assert.AreEqual("1.0.0", parameter.Value.Governance.AppliedBy?.Version);
     }
+
+    [TestMethod]
+    public async Task VersionedPackKeepsItsOriginAndIsRecordedIndependentlyInTwoWorkspaces()
+    {
+        using var catalog = new PlanCatalog();
+        await catalog.WriteAsync();
+        const string profileName = "pack-profile";
+        const string profileDescriptor = "apiVersion: agentstration.io/v1\nkind: PackInstallation\nmetadata: { name: fixture-pack }\ndefinition: { source: { path: pack.zip } }\n";
+        await catalog.ProfileAsync(profileName, "workspace", profileDescriptor);
+        var profileDir = Path.Combine(catalog.Path, profileName);
+        var fixtureFlow = await File.ReadAllTextAsync(Path.Combine(FindRepositoryRoot(), "deploy", "bootstrap", "profiles", "bootstrap-workspace-example", "10-flow.yaml"));
+        var flowName = "bootstrap-echo";
+        using (var archive = ZipFile.Open(Path.Combine(profileDir, "pack.zip"), ZipArchiveMode.Create))
+        {
+            await WriteZipEntryAsync(archive, "pack.yaml", """
+                apiVersion: agentstration.io/v1
+                kind: Pack
+                metadata: { name: fixture-pack, publisher: example, version: 2.4.0 }
+                definition: { resources: [flow.yaml] }
+                """);
+            await WriteZipEntryAsync(archive, "flow.yaml", fixtureFlow);
+        }
+        await using var factory = PlanFactory(catalog);
+        using var client = factory.CreateClient();
+        var context = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        await using var services = factory.Services.CreateAsyncScope();
+        var scopes = services.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>();
+        var identities = services.ServiceProvider.GetRequiredService<IIdentityStore>();
+        var management = services.ServiceProvider.GetRequiredService<BootstrapProfileManagementService>();
+        var second = new Workspace(Guid.NewGuid(), context.TenantId, "second-workspace", "Second workspace", WorkspaceStatus.Initializing, DateTimeOffset.UtcNow);
+        using (scopes.PushSystem())
+        {
+            await identities.AddWorkspaceAsync(second, default);
+            await services.ServiceProvider.GetRequiredService<IWorkspaceProvisioner>().ProvisionAsync(second, default);
+        }
+
+        var firstTarget = new BootstrapApplicationTarget(context.TenantId, context.WorkspaceId);
+        var secondTarget = new BootstrapApplicationTarget(context.TenantId, second.Id);
+        var profile = new BootstrapProfileSelection([profileName], firstTarget);
+        var preview = await management.PreviewAsync(profile, context.PrincipalId, default);
+        Assert.HasCount(0, await services.ServiceProvider.GetRequiredService<IBootstrapVersionHistory>().ListProfilesAsync(default));
+        foreach (var target in new[] { firstTarget, secondTarget })
+        {
+            var selection = profile with { Target = target };
+            preview = await management.PreviewAsync(selection, context.PrincipalId, default);
+            var completed = await management.ApplyAsync(selection, preview.Digest, context.PrincipalId, default);
+            Assert.AreEqual(BootstrapApplicationStatus.Succeeded, completed.Definition.Status, completed.Definition.Error);
+        }
+
+        var histories = services.ServiceProvider.GetRequiredService<IBootstrapVersionHistory>();
+        var registered = (await histories.ListProfilesAsync(default)).Single();
+        Assert.HasCount(1, await histories.ListVersionsAsync(registered.Id, default));
+        var firstScope = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var secondScope = ResourceScopeRef.Workspace(second.Id);
+        var firstRun = (await HistoryAsync(client, registered.Id, "1.0.0", firstScope)).Single();
+        var secondRun = (await HistoryAsync(client, registered.Id, "1.0.0", secondScope)).Single();
+        Assert.AreNotEqual(firstRun.Id, secondRun.Id);
+        Assert.IsNull(await histories.GetAsync(secondScope, firstRun.Id, default));
+        var installedFlow = firstRun.Resources.Single(row => row.Kind == FlowResourceKinds.Flow);
+        Assert.AreEqual(BootstrapResourceDisposition.Create, installedFlow.Disposition);
+        Assert.AreEqual("example/fixture-pack", installedFlow.Pack);
+        Assert.IsTrue(installedFlow.ResourceAvailable);
+
+        var flows = services.ServiceProvider.GetRequiredService<FlowService>();
+        var flowId = new FlowId(flowName, new ResourceNamespace("example.fixture-pack"));
+        var stored = await flows.GetExactAsync(firstScope, flowId, default);
+        Assert.IsNotNull(stored);
+        Assert.AreEqual(ResourceOriginKind.Pack, stored.Value.Governance.Origin.Kind);
+        Assert.AreEqual("2.4.0", stored.Value.Governance.Origin.Version);
+        Assert.AreEqual(firstRun.Id, stored.Value.Governance.AppliedBy?.ApplicationId);
+
+        await File.AppendAllTextAsync(Path.Combine(profileDir, "10.yaml"), "\n# Same version, different bytes");
+        await Assert.ThrowsAsync<DeclarativeBootstrapException>(() => management.PreviewAsync(profile, context.PrincipalId, default));
+        var descriptor = Path.Combine(profileDir, "profile.yaml");
+        var contents = await File.ReadAllTextAsync(descriptor);
+        await File.WriteAllTextAsync(descriptor, contents.Replace("1.0.0", "1.1.0", StringComparison.Ordinal));
+        preview = await management.PreviewAsync(profile, context.PrincipalId, default);
+        var reapplied = await management.ApplyAsync(profile, preview.Digest, context.PrincipalId, default);
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, reapplied.Definition.Status);
+        Assert.AreEqual(BootstrapResourceDisposition.Skip, (await HistoryAsync(client, registered.Id, "1.1.0", firstScope)).Single().Resources.Single().Disposition);
+        Assert.AreEqual(firstRun.Id, (await flows.GetExactAsync(firstScope, flowId, default))?.Value.Governance.AppliedBy?.ApplicationId);
+    }
+
+    private static async Task WriteZipEntryAsync(ZipArchive archive, string path, string contents)
+    {
+        await using var writer = new StreamWriter(archive.CreateEntry(path).Open());
+        await writer.WriteAsync(contents);
+    }
+
+    private static async Task<ScopedBootstrapApplication[]> HistoryAsync(HttpClient client, string profileId, string version, ResourceScopeRef scope) =>
+        (await client.GetFromJsonAsync<ScopedBootstrapApplication[]>(
+            $"/api/bootstrap/applied-profiles/{profileId}/versions/{version}/applications?scope={Uri.EscapeDataString(scope.Value)}"))!;
 
     [TestMethod]
     public async Task PlanRejectsUnknownFutureTargetsForgedWorkspaceOwnershipAndUnknownBindingProducers()
@@ -224,7 +338,7 @@ public sealed partial class DeclarativeBootstrapTests
         {
             var directory = System.IO.Path.Combine(Path, name);
             Directory.CreateDirectory(directory);
-            await File.WriteAllTextAsync(System.IO.Path.Combine(directory, "profile.yaml"), $"apiVersion: agentstration.io/v1\nkind: BootstrapProfile\nmetadata: {{ name: {name} }}\ndefinition:\n  displayName: {name}\n  targetScope: {scope}\n{bindings}");
+            await File.WriteAllTextAsync(System.IO.Path.Combine(directory, "profile.yaml"), $"apiVersion: agentstration.io/v1\nkind: BootstrapProfile\nmetadata: {{ name: {name} }}\ndefinition:\n  displayName: {name}\n  version: 1.0.0\n  targetScope: {scope}\n{bindings}");
             await File.WriteAllTextAsync(System.IO.Path.Combine(directory, "10.yaml"), content);
         }
         public async Task WriteAsync()

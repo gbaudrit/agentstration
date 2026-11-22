@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: agentstration-assistant-workspace
 definition:
+  version: 1.0.0
   displayName: Agentstration Assistant workspace
   description: Provisions the dedicated Workspace that owns the official Agentstration Assistant for the selected Tenant.
   targetScope: tenant

@@ -392,6 +392,8 @@ public sealed class SqliteResourceStore(
             existing.UpdatedAt = now;
         }
         await SaveAsync(context, cancellationToken);
+        if (existing is null && versioned.Governance.AppliedBy is not null)
+            governanceContext.ObserveBootstrapCreation(scopeRef, versioned.Namespace, versioned.Kind, versioned.Name, uid);
         await AuditReconciliationAsync(versioned.Governance, cancellationToken);
         return new StoredResource<T>(versioned, etag, now);
     }
@@ -422,6 +424,8 @@ public sealed class SqliteResourceStore(
         });
         try { await SaveAsync(context, cancellationToken); }
         catch (ResourceConcurrencyException exception) { throw new ResourceConcurrencyException($"Immutable resource '{resource.Kind}/{resource.Metadata.Name}' already exists: {exception.Message}"); }
+        if (versioned.Governance.AppliedBy is not null)
+            governanceContext.ObserveBootstrapCreation(scopeRef, versioned.Namespace, versioned.Kind, versioned.Name, uid);
         await AuditReconciliationAsync(versioned.Governance, cancellationToken);
         return new StoredResource<T>(versioned, etag, now);
     }
@@ -484,7 +488,8 @@ public sealed class SqliteResourceStore(
         try
         {
             var governance = existing is null
-                ? ResourceGovernanceEnforcement.PrepareCreate(resource.Governance, governanceContext.Current)
+                ? ResourceGovernanceEnforcement.PrepareCreate(resource.Governance, governanceContext.Current,
+                    governanceContext.GetBootstrapApplication(resource.Kind, resource.Namespace, resource.Name))
                 : ResourceGovernanceEnforcement.PrepareUpdate(existing.Governance, resource.Governance, governanceContext.Current);
             return (T)resource.WithGovernance(governance);
         }

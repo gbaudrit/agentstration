@@ -135,10 +135,13 @@ public sealed class FlowService(
         var resource = new FlowResource(scopeRef, new FlowId(command.Name, @namespace), command.Name, command.Description, command.Version, command.Enabled, null,
             command.Definition, Copy(command.Metadata), now, now, command.DisplayName, command.Graph)
         {
-            Governance = ResourceGovernanceEnforcement.PrepareCreate(ResourceGovernance.User, effectiveGovernanceContext.Current)
+            Governance = ResourceGovernanceEnforcement.PrepareCreate(ResourceGovernance.User, effectiveGovernanceContext.Current,
+                effectiveGovernanceContext.GetBootstrapApplication(FlowResourceKinds.Flow, @namespace, command.Name))
         };
         FlowValidator.Validate(resource);
         var created = await repository.CreateAsync(resource, cancellationToken);
+        if (created.Value.Governance.AppliedBy is not null)
+            effectiveGovernanceContext.ObserveBootstrapCreation(scopeRef, @namespace, FlowResourceKinds.Flow, command.Name, created.Value.Uid);
         await AuditReconciliationAsync(resource.Governance, cancellationToken);
         return created;
     }

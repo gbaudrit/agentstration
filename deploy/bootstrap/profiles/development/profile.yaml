@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: development
 definition:
+  version: 1.0.0
   displayName: Local development
   description: Creates the disposable local administrator and Development topology.
   targetScope: instance

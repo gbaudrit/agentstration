@@ -133,6 +133,7 @@ metadata:
   name: workspace-tools
 definition:
   displayName: Workspace tools
+  version: 1.0.0
   description: Reusable tools and agents for one Workspace
   targetScope: workspace
   bindings:
@@ -142,6 +143,8 @@ definition:
       description: Model Profile selected for the reusable agents
       required: true
 ```
+
+Use an explicit `X.Y.Z` version for each profile release. A descriptor without a version uses `1.0.0`. After the first application, changing the profile contents under the same version is rejected. Open **System → Bootstrap profiles → Applied Bootstrap profiles** to see registered versions and the application history for the exact Instance, Tenant, or Workspace. Each application lists the resources it processed. The resource Identity card shows **Applied by** with its Bootstrap profile version. Pack-managed resources keep their Pack origin.
 
 Workspace profiles can declare typed bindings so their ordinary editable resources do not embed environment-specific names. The Console asks for each target before preview; API callers provide the same profile-qualified selections. A binding may define `defaultTarget` for non-interactive use. Only a structured reference object is substituted, never arbitrary YAML text:
 

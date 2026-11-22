@@ -28,6 +28,7 @@ public sealed partial class BootstrapProfileManagementService
         ValidatePlanRequest(selection);
         var applications = selection.Applications!;
         var profiles = await catalog.LoadAsync(applications.Select(item => item.Profile).ToArray(), token);
+        await bootstrap.ValidateVersionsAsync(profiles, token);
         var ordered = applications.Select((application, index) => (Application: application, Profile: profiles[index]))
             .OrderBy(item => item.Profile.Summary.Scope).ToArray();
         var result = new List<PreparedProfile>();
@@ -169,7 +170,7 @@ public sealed partial class BootstrapProfileManagementService
     }
 
     private async Task<BootstrapExecutionResult> ExecutePlanAsync(BootstrapProfileSelection selection, Guid actor,
-        string expectedDigest, Func<BootstrapExecutionProgress, CancellationToken, Task> report, CancellationToken token)
+        string expectedDigest, Func<BootstrapExecutionProgress, CancellationToken, Task> report, Guid correlationId, Func<bool> cancellationRequested, CancellationToken token)
     {
         var preview = await PreviewPlanAsync(selection, actor, token);
         if (!string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal) || !preview.CanApply)
@@ -200,7 +201,7 @@ public sealed partial class BootstrapProfileManagementService
                     expectedDigest: preview.Applications.Single(item => item.Profile == profile.Name).Digest,
                     reportProgress: (progress, cancellation) => report(new(preview,
                         completed.Concat(progress.Resources).ToArray(), progress.CurrentResource is { } current
-                            ? current with { TargetLabel = first?.TargetLabel } : null), cancellation), waitForDependencies: true);
+                            ? current with { TargetLabel = first?.TargetLabel } : null), cancellation), waitForDependencies: true, correlationId: correlationId, cancellationRequested: cancellationRequested);
                 resources.AddRange(execution.Resources);
                 if (execution.Error is not null)
                 {

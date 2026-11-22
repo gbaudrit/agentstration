@@ -1,12 +1,21 @@
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
 public interface IBootstrapProfilesApiClient
 {
     Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<AppliedBootstrapProfile>> ListAppliedProfilesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AppliedBootstrapProfile>>([]);
+    Task<IReadOnlyList<AppliedBootstrapVersion>> ListVersionsAsync(string profileId, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
+    Task<IReadOnlyList<ScopedBootstrapApplication>> ListHistoryAsync(string profileId, string version, ResourceScopeRef scope,
+        CancellationToken cancellationToken) => throw new NotSupportedException();
+    Task<ScopedBootstrapApplication?> GetScopedApplicationAsync(Guid id, ResourceScopeRef scope, CancellationToken cancellationToken) =>
+        throw new NotSupportedException();
     Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, CancellationToken cancellationToken);
     Task<IReadOnlyList<BootstrapBindingTargetOption>> GetBindingTargetsAsync(BootstrapBindingTargetsRequest request, CancellationToken cancellationToken);
     Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken);
@@ -19,6 +28,26 @@ public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstr
 {
     public Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<BootstrapManagementView>(httpClient, "api/bootstrap/profiles", cancellationToken);
+
+    public async Task<IReadOnlyList<AppliedBootstrapProfile>> ListAppliedProfilesAsync(CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<AppliedBootstrapProfile[]>(httpClient, "api/bootstrap/applied-profiles", cancellationToken);
+
+    public async Task<IReadOnlyList<AppliedBootstrapVersion>> ListVersionsAsync(string profileId, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<AppliedBootstrapVersion[]>(httpClient,
+            $"api/bootstrap/applied-profiles/{Uri.EscapeDataString(profileId)}/versions", cancellationToken);
+
+    public async Task<IReadOnlyList<ScopedBootstrapApplication>> ListHistoryAsync(string profileId, string version,
+        ResourceScopeRef scope, CancellationToken cancellationToken) =>
+        await ApiResponse.ReadAsync<ScopedBootstrapApplication[]>(httpClient,
+            $"api/bootstrap/applied-profiles/{Uri.EscapeDataString(profileId)}/versions/{Uri.EscapeDataString(version)}/applications?scope={Uri.EscapeDataString(scope.Value)}",
+            cancellationToken);
+
+    public async Task<ScopedBootstrapApplication?> GetScopedApplicationAsync(Guid id, ResourceScopeRef scope, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.GetAsync($"api/bootstrap/scoped-applications/{id:D}?scope={Uri.EscapeDataString(scope.Value)}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        return await ReadAsync<ScopedBootstrapApplication>(response, "scoped Bootstrap application", cancellationToken);
+    }
 
     public async Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, CancellationToken cancellationToken)
     {

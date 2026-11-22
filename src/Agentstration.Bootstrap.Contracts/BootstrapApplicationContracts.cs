@@ -63,6 +63,13 @@ public sealed record BootstrapFailure(string Category, string Code, string Diagn
 
 public sealed record BootstrapAppliedResource(string Profile, string Location, string Kind, string Name, BootstrapResourceDisposition Disposition, string? Message = null)
 {
+    public string? ProfileId { get; init; }
+    public string? Version { get; init; }
+    public ResourceScopeRef? OwnerScope { get; init; }
+    public ResourceNamespace? Namespace { get; init; }
+    public Guid? ResourceUid { get; init; }
+    public bool ResourceAvailable { get; init; }
+    public string? Pack { get; init; }
     public BootstrapFailure? Failure { get; init; }
 }
 

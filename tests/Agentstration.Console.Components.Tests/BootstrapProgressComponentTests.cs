@@ -234,6 +234,26 @@ public sealed class BootstrapProgressComponentTests
         Assert.HasCount(3, cut.FindAll("input[data-profile-name]:checked"));
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Applied by", "Pack origin")]
+    [DataRow("fr-FR", "Appliqué par", "Pack d’origine")]
+    public void AppliedByShowsBootstrapAlongsidePackOrigin(string locale, string applicationLabel, string originLabel)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = Context(new StubClient(), application: false);
+        var provenance = new ResourceBootstrapApplication("profile-id", "development", "1.2.0", Guid.NewGuid(),
+            ResourceScopeRef.Instance, "development/10-pack.yaml document 1");
+        var rendered = context.Render<BootstrapResourceProvenance>(parameters => parameters
+            .Add(value => value.AppliedBy, provenance)
+            .Add(value => value.Origin, new ResourceOrigin { Kind = ResourceOriginKind.Pack, Reference = "example/fixture", Version = "2.4.0" }));
+        var panel = rendered.Find("[data-testid='bootstrap-resource-provenance']");
+        StringAssert.Contains(panel.TextContent, applicationLabel);
+        StringAssert.Contains(panel.TextContent, originLabel);
+        StringAssert.Contains(panel.TextContent, "Bootstrap development 1.2.0");
+        StringAssert.Contains(panel.TextContent, "example/fixture 2.4.0");
+        Assert.HasCount(0, panel.QuerySelectorAll("a"));
+    }
+
     private static BunitContext Context(StubClient client, bool application = true)
     {
         var context = new BunitContext();

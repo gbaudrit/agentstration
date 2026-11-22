@@ -33,6 +33,7 @@ internal sealed record BootstrapProfileDefinition
 {
     public string? DisplayName { get; init; }
     public string? Description { get; init; }
+    public string? Version { get; init; }
     public string TargetScope { get; init; } = "workspace";
     public IReadOnlyList<BootstrapProfileBindingDefinition> Bindings { get; init; } = [];
 }
@@ -138,6 +139,7 @@ public sealed class BootstrapProfileCatalog(
         if (allFiles.Length > MaximumFilesPerProfile)
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' contains more than {MaximumFilesPerProfile} files.");
         long totalBytes = 0;
+        var manifests = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (var file in allFiles)
         {
@@ -149,17 +151,26 @@ public sealed class BootstrapProfileCatalog(
             var relativePath = Path.GetRelativePath(profilePath, file).Replace('\\', '/');
             digest.AppendData(Encoding.UTF8.GetBytes(relativePath));
             digest.AppendData([0]);
-            digest.AppendData(await File.ReadAllBytesAsync(file, cancellationToken));
+            var bytes = await File.ReadAllBytesAsync(file, cancellationToken);
+            if (bytes.LongLength != info.Length)
+                throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' changed while it was being read.");
+            digest.AppendData(bytes);
+            if (!relativePath.Contains('/') && IsManifest(file))
+            {
+                if (bytes.Length > MaximumManifestBytes)
+                    throw new DeclarativeBootstrapException($"Bootstrap file '{profile}/{relativePath}' exceeds {MaximumManifestBytes} bytes.");
+                manifests.Add(relativePath, bytes);
+            }
         }
 
         var displayName = profile;
         string? description = null;
+        var version = "1.0.0";
         var scope = BootstrapProfileScope.Workspace;
         IReadOnlyList<BootstrapProfileBinding> bindings = [];
-        var descriptorPath = Path.Combine(profilePath, DescriptorFileName);
-        if (File.Exists(descriptorPath))
+        if (manifests.TryGetValue(DescriptorFileName, out var descriptorBytes))
         {
-            var descriptor = await ReadDocumentsAsync(descriptorPath, profile, cancellationToken);
+            var descriptor = ReadDocuments(descriptorBytes, DescriptorFileName, profile);
             if (descriptor.Count != 1)
                 throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' must contain exactly one document.");
             var document = descriptor[0];
@@ -168,26 +179,37 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' must use kind '{BootstrapKinds.BootstrapProfile}'.");
             if (!string.Equals(document.Metadata.Name, profile, StringComparison.Ordinal))
                 throw new DeclarativeBootstrapException($"Bootstrap profile descriptor metadata.name must match directory '{profile}'.");
-            var definition = document.Definition.Deserialize<BootstrapProfileDefinition>(SerializerOptions)
-                ?? throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' requires a definition.");
+            BootstrapProfileDefinition definition;
+            try
+            {
+                definition = document.Definition.Deserialize<BootstrapProfileDefinition>(SerializerOptions)
+                    ?? throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' requires a definition.");
+            }
+            catch (JsonException exception)
+            {
+                throw new DeclarativeBootstrapException($"Bootstrap profile descriptor '{profile}/{DescriptorFileName}' has an invalid definition.", exception);
+            }
             if (!Enum.TryParse<BootstrapProfileScope>(definition.TargetScope, true, out scope))
                 throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' uses unsupported targetScope '{definition.TargetScope}'.");
+            if (definition.Version is { } declaredVersion)
+            {
+                if (!IsVersion(declaredVersion))
+                    throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' requires a version in X.Y.Z format.");
+                version = declaredVersion;
+            }
             displayName = string.IsNullOrWhiteSpace(definition.DisplayName) ? profile : definition.DisplayName.Trim();
             description = string.IsNullOrWhiteSpace(definition.Description) ? null : definition.Description.Trim();
             bindings = ValidateBindings(profile, scope, definition.Bindings);
         }
 
-        var resourceFiles = Directory.EnumerateFiles(profilePath, "*", SearchOption.TopDirectoryOnly)
-            .Where(IsManifest)
-            .Where(path => !string.Equals(Path.GetFileName(path), DescriptorFileName, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(Path.GetFileName, StringComparer.Ordinal)
-            .ToArray();
+        var resourceFiles = manifests.Keys.Where(name => !string.Equals(name, DescriptorFileName, StringComparison.OrdinalIgnoreCase))
+            .Order(StringComparer.Ordinal).ToArray();
         if (resourceFiles.Length > MaximumResourceFilesPerProfile)
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' contains more than {MaximumResourceFilesPerProfile} resource files.");
         var resources = new List<BootstrapResourceSource>();
         foreach (var file in resourceFiles)
         {
-            var documents = await ReadDocumentsAsync(file, profile, cancellationToken);
+            var documents = ReadDocuments(manifests[file], file, profile);
             for (var index = 0; index < documents.Count; index++)
             {
                 var location = $"{profile}/{Path.GetFileName(file)} document {index + 1}";
@@ -202,6 +224,7 @@ public sealed class BootstrapProfileCatalog(
         return new(
             new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings)
             {
+                Version = version,
                 Topology = resources.Where(item => item.Resource.Kind is "Tenant" or "Workspace")
                     .Select(item => new BootstrapTopologyResource(item.Resource.Kind, item.Resource.Metadata.Name,
                         item.Resource.Definition.TryGetProperty("tenantRef", out var tenant) && tenant.TryGetProperty("name", out var name) ? name.GetString() : null)).ToArray()
@@ -210,22 +233,62 @@ public sealed class BootstrapProfileCatalog(
             resources);
     }
 
-    private async Task<IReadOnlyList<BootstrapResourceDocument>> ReadDocumentsAsync(
-        string path,
-        string profile,
-        CancellationToken cancellationToken)
+    internal static bool IsVersion(string value)
     {
-        var info = new FileInfo(path);
-        if (info.Length > MaximumManifestBytes)
-            throw new DeclarativeBootstrapException($"Bootstrap file '{profile}/{Path.GetFileName(path)}' exceeds {MaximumManifestBytes} bytes.");
+        var parts = value.Split('.');
+        return value.Length <= 64 && parts.Length == 3 && parts.All(part =>
+            part.Length > 0 && (part.Length == 1 || part[0] != '0') && part.All(char.IsAsciiDigit));
+    }
+
+    internal async Task<byte[]> ArchiveAsync(LoadedBootstrapProfile profile, CancellationToken cancellationToken)
+    {
+        using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var stream = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var directories = Directory.EnumerateDirectories(profile.DirectoryPath, "*", SearchOption.AllDirectories);
+            foreach (var directory in directories)
+                RejectReparsePoint(new DirectoryInfo(directory), profile.Summary.Name);
+            var files = Directory.EnumerateFiles(profile.DirectoryPath, "*", SearchOption.AllDirectories)
+                .OrderBy(path => Path.GetRelativePath(profile.DirectoryPath, path), StringComparer.Ordinal)
+                .Take(MaximumFilesPerProfile + 1).ToArray();
+            if (files.Length > MaximumFilesPerProfile)
+                throw new DeclarativeBootstrapException("The Bootstrap profile exceeds its archive limits.");
+            long size = 0;
+            foreach (var file in files)
+            {
+                var info = new FileInfo(file);
+                RejectReparsePoint(info, profile.Summary.Name);
+                size += info.Length;
+                if (size > MaximumProfileBytes)
+                    throw new DeclarativeBootstrapException("The Bootstrap profile exceeds its archive limits.");
+                var path = Path.GetRelativePath(profile.DirectoryPath, file).Replace('\\', '/');
+                var bytes = await File.ReadAllBytesAsync(file, cancellationToken);
+                if (bytes.LongLength != info.Length)
+                    throw new DeclarativeBootstrapException("The Bootstrap profile changed while its version was being recorded.");
+                digest.AppendData(Encoding.UTF8.GetBytes(path));
+                digest.AppendData([0]);
+                digest.AppendData(bytes);
+                await using var output = archive.CreateEntry(path).Open();
+                await output.WriteAsync(bytes, cancellationToken);
+            }
+        }
+        if (!string.Equals(Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant(), profile.Summary.Digest, StringComparison.Ordinal))
+            throw new DeclarativeBootstrapException("The Bootstrap profile changed while its version was being recorded.");
+        return stream.ToArray();
+    }
+
+    private static IReadOnlyList<BootstrapResourceDocument> ReadDocuments(byte[] bytes, string name, string profile)
+    {
         try
         {
-            return ResourceManifestSerializer.FromYamlDocuments<BootstrapResourceDocument>(
-                await File.ReadAllTextAsync(path, cancellationToken));
+            using var stream = new MemoryStream(bytes, writable: false);
+            using var reader = new StreamReader(stream);
+            return ResourceManifestSerializer.FromYamlDocuments<BootstrapResourceDocument>(reader.ReadToEnd());
         }
         catch (Exception exception) when (exception is not OperationCanceledException and not DeclarativeBootstrapException)
         {
-            throw new DeclarativeBootstrapException($"Bootstrap file '{profile}/{Path.GetFileName(path)}' contains invalid YAML or an invalid resource envelope.", exception);
+            throw new DeclarativeBootstrapException($"Bootstrap file '{profile}/{name}' contains invalid YAML or an invalid resource envelope.", exception);
         }
     }
 

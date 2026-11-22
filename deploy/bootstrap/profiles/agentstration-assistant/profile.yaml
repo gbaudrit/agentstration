@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: agentstration-assistant
 definition:
+  version: 1.0.0
   displayName: Bootstrap Agentstration Assistant
   description: Creates the official Resource Planning and Assistant resources in the dedicated Assistant Workspace.
   targetScope: workspace

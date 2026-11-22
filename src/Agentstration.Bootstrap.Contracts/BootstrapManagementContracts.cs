@@ -16,6 +16,7 @@ public sealed record BootstrapProfileSummary(
     bool Valid = true,
     string? Error = null)
 {
+    public string Version { get; init; } = "1.0.0";
     public IReadOnlyList<BootstrapTopologyResource> Topology { get; init; } = [];
 }
 

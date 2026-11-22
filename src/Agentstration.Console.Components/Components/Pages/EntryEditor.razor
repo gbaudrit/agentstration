@@ -50,6 +50,7 @@ else
         <Feedback>@feedback</Feedback>
         <OverviewMetrics>@if (saved is not null) { <MetricCard Label="@T("DraftRevision")" Value="@draftRevision.ToString(System.Globalization.CultureInfo.CurrentCulture)" /><MetricCard Label="@T("PublishedVersionLabel")" Value="@(published?.Version.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")" /><MetricCard Label="@T("PublishedDashboards")" Value="@(usageLoaded ? PublishedUsages.Count.ToString(System.Globalization.CultureInfo.CurrentCulture) : "—")" /> }</OverviewMetrics>
         <IdentityDetails><dt>@T("EntryExecutionWorkspace")</dt><dd>@WorkspaceDisplayName</dd></IdentityDetails>
+        <IdentityContent><BootstrapResourceProvenance AppliedBy="saved?.Value.AppliedBy" Origin="saved?.Value.Origin" /></IdentityContent>
         <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
         <DefinitionContent Context="path">@definition</DefinitionContent>
         <AdditionalContent Context="path">@if (path == "preview") { @Preview } else if (path == "usage") { @Usage } else { @Versions }</AdditionalContent>

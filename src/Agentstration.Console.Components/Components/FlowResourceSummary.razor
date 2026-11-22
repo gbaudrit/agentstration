@@ -18,7 +18,9 @@
         Version="@(HeaderOwnsIdentity ? null : EffectivePublishedVersion)" VersionDescription="@T("PublishedVersion")" TestId="flow-identity-summary">
         <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
         <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
-        <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@FlowResourceKinds.Flow" Name="@Resource.Id" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@FlowResourceKinds.Flow" Name="@Resource.Id" Uid="Resource.Uid" Embedded /> }
+            <BootstrapResourceProvenance AppliedBy="Resource.Governance.AppliedBy" Origin="Resource.Governance.Origin" />
+        </AdditionalContent>
     </ResourceIdentitySummary>
     }
     <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="flow-configuration-summary">

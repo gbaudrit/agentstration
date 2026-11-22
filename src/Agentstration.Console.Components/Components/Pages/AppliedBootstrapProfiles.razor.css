@@ -1,0 +1,12 @@
+.bootstrap-version-facts {
+    overflow-wrap: anywhere;
+}
+
+.bootstrap-history-entry + .bootstrap-history-entry {
+    margin-top: .75rem;
+}
+
+.bootstrap-history-entry summary {
+    cursor: pointer;
+    padding-block: .5rem;
+}

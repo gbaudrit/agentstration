@@ -22,7 +22,9 @@ public sealed partial class DeclarativeBootstrapService(
     ILogger<DeclarativeBootstrapService> logger,
     SourceBootstrapProfileLoader? sourceProfiles = null,
     IBootstrapExtensionReferenceResolver? extensionReferences = null,
-    BootstrapStartupState? startup = null)
+    BootstrapStartupState? startup = null,
+    BootstrapVersionHistory? versionHistory = null,
+    IResourceGovernanceContext? governance = null)
 {
     private readonly BootstrapExtensionReferencePreparation extensionPreparation = new(extensionReferences);
     private const string ConfigurationSection = "Agentstration:Bootstrap";
@@ -45,6 +47,9 @@ public sealed partial class DeclarativeBootstrapService(
         return execution.Resources.Count;
     }
 
+    internal Task ValidateVersionsAsync(IReadOnlyList<LoadedBootstrapProfile> profiles, CancellationToken token) =>
+        versionHistory?.ValidateAsync(profiles, null, token) ?? Task.CompletedTask;
+
     public Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken) =>
         PreviewPhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken);
 
@@ -60,6 +65,8 @@ public sealed partial class DeclarativeBootstrapService(
             throw new DeclarativeBootstrapException("Local and Source Bootstrap profiles cannot be composed in one application.");
         await using var loadedSelection = await LoadAsync(selection, cancellationToken, phase);
         var profiles = loadedSelection.Profiles;
+        if (versionHistory is not null)
+            await versionHistory.ValidateAsync(profiles, loadedSelection.SourceProvenance, cancellationToken);
         var scope = profiles[0].Summary.Scope;
         var incompatible = profiles.FirstOrDefault(profile => profile.Summary.Scope != scope);
         if (incompatible is not null)
@@ -130,16 +137,17 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapProfileSelection selection, CancellationToken cancellationToken,
         string? expectedDigest = null,
         Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
-        bool waitForDependencies = false) =>
+        bool waitForDependencies = false, Guid? correlationId = null, Func<bool>? cancellationRequested = null) =>
         ExecutePhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken,
-            expectedDigest: expectedDigest, reportProgress: reportProgress, waitForDependencies: waitForDependencies);
+            expectedDigest: expectedDigest, reportProgress: reportProgress, waitForDependencies: waitForDependencies, correlationId: correlationId, cancellationRequested: cancellationRequested);
 
     internal async Task<BootstrapExecutionResult> ExecutePhaseAsync(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken,
         IReadOnlyList<string>? expectedProfileDigests = null,
         string? expectedDigest = null,
         Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
-        string? startupTargetLevel = null, bool waitForDependencies = false)
+        string? startupTargetLevel = null, bool waitForDependencies = false,
+        Guid? applicationId = null, Guid? correlationId = null, Func<bool>? cancellationRequested = null)
     {
         var preview = await PreviewPhaseAsync(selection, phase, cancellationToken);
         if (expectedProfileDigests is not null && !preview.Profiles.Select(profile => profile.Digest)
@@ -178,72 +186,130 @@ public sealed partial class DeclarativeBootstrapService(
         var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints);
         if (!string.Equals(executionDigest, preview.Digest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog changed while the application was being prepared. Preview the application again.");
+        var scope = BootstrapExtensionReferencePreparation.ConsumerScope(new(
+            loaded[0].Summary.Name, loaded[0].DirectoryPath, preview.Scope, preview.Target));
+        var journalId = applicationId ?? Guid.NewGuid();
+        IReadOnlyList<AppliedBootstrapVersion> versions = versionHistory is null ? [] : await versionHistory.RegisterAsync(loaded, loadedSelection.SourceProvenance, cancellationToken);
+        await using var archivedProfiles = versionHistory is not null && loadedSelection.SourceProvenance is null
+            ? await versionHistory.StageLocalPacksAsync(loaded, versions, cancellationToken) : null;
+        if (versionHistory is not null)
+            await versionHistory.BeginAsync(journalId, correlationId ?? journalId, scope,
+                startupTargetLevel is null ? BootstrapApplicationSource.Manual : BootstrapApplicationSource.Startup,
+                versions, bindings, cancellationToken);
+
+        Task RecordAsync(IReadOnlyList<BootstrapAppliedResource> results, BootstrapApplicationStatus? status) =>
+            versionHistory?.RecordAsync(scope, journalId, results, status, CancellationToken.None) ?? Task.CompletedTask;
+
         var resources = new List<BootstrapAppliedResource>();
-        foreach (var profile in loaded)
+        try
         {
-            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources || waitForDependencies);
-            foreach (var source in profile.Resources)
+            foreach (var (profile, index) in (archivedProfiles?.Profiles ?? loaded).Select((profile, index) => (profile, index)))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var resource = source.Resource;
-                if (reportProgress is not null)
-                    await reportProgress(new(preview, resources.ToArray(),
-                        new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name, BootstrapResourceDisposition.Create)), cancellationToken);
-                string? error = null;
-                string? observationId = null;
-                try
+                var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources || waitForDependencies);
+                foreach (var source in profile.Resources)
                 {
-                    resource = prepared[source.Location];
-                    if (startupTargetLevel is not null)
-                        observationId = startup?.StartResource(startupTargetLevel, profile.Summary.Name, source.Location,
-                            resource.Kind, resource.Metadata.Name, resource.Metadata.Namespace.Value);
-                    var resourceOperation = observationId is { } id
-                        ? operation with { ObserveOperation = (code, state) => startup!.ObserveOperation(id, code, state), StartupResourceId = id, StartupProfileDigest = profile.Summary.Digest }
-                        : operation;
-                    if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name);
-                    var result = await handlers[resource.Kind].ApplyAsync(resource, resourceOperation, cancellationToken);
-                    if (observationId is not null) startup?.FinishResource(observationId, result switch
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var resource = source.Resource;
+                    if (reportProgress is not null)
+                        await reportProgress(new(preview, resources.ToArray(),
+                            new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name, BootstrapResourceDisposition.Create)), cancellationToken);
+                    string? error = null;
+                    string? observationId = null;
+                    BootstrapAppliedResource? outcome = null;
+                    var version = versions.Count == 0 ? null : versions[index];
+                    var created = new List<BootstrapAppliedResource>();
+                    BootstrapAppliedResource Row(BootstrapResourceDisposition disposition, string? message = null) =>
+                        new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name, disposition, message)
+                        { ProfileId = version?.ProfileId, Version = version?.Version, OwnerScope = scope, Namespace = resource.Metadata.Namespace };
+                    try
                     {
-                        BootstrapResourceApplyResult.Created => "created",
-                        BootstrapResourceApplyResult.Skipped => "skipped",
-                        _ => "conflict"
-                    });
-                    if (phase == BootstrapStartupPhase.Resources)
-                        startup?.ObserveResource(resource.Kind, resource.Metadata.Name, result switch
+                        resource = prepared[source.Location];
+                        if (startupTargetLevel is not null)
+                            observationId = startup?.StartResource(startupTargetLevel, profile.Summary.Name, source.Location,
+                                resource.Kind, resource.Metadata.Name, resource.Metadata.Namespace.Value);
+                        var resourceOperation = observationId is { } id
+                            ? operation with { ObserveOperation = (code, state) => startup!.ObserveOperation(id, code, state), StartupResourceId = id, StartupProfileDigest = profile.Summary.Digest }
+                            : operation;
+                        if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name);
+                        using var attribution = version is null ? null : governance?.PushBootstrap(
+                            new(version.ProfileId, profile.Summary.Name, version.Version, journalId, scope, source.Location),
+                            (kind, ns, name, manager) => kind == resource.Kind && ns == resource.Metadata.Namespace && name == resource.Metadata.Name
+                                || resource.Kind == PackBootstrapKinds.PackInstallation
+                                && (kind == PackKinds.InstalledPack || manager?.ManagedBy?.Kind == ResourceManagementAuthorityKind.PackInstallation),
+                            (owner, ns, kind, name, uid) => created.Add(Row(BootstrapResourceDisposition.Create) with
+                            {
+                                Kind = kind, Name = name, OwnerScope = owner, Namespace = ns, ResourceUid = uid,
+                                Pack = resource.Kind == PackBootstrapKinds.PackInstallation ? governance?.Current?.Origin.Reference : null
+                            }));
+                        var result = await handlers[resource.Kind].ApplyAsync(resource, resourceOperation, cancellationToken);
+                        if (observationId is not null) startup?.FinishResource(observationId, result switch
                         {
                             BootstrapResourceApplyResult.Created => "created",
                             BootstrapResourceApplyResult.Skipped => "skipped",
                             _ => "conflict"
                         });
-                    var disposition = result switch
+                        if (phase == BootstrapStartupPhase.Resources)
+                            startup?.ObserveResource(resource.Kind, resource.Metadata.Name, result switch
+                            {
+                                BootstrapResourceApplyResult.Created => "created",
+                                BootstrapResourceApplyResult.Skipped => "skipped",
+                                _ => "conflict"
+                            });
+                        var disposition = result switch
+                        {
+                            BootstrapResourceApplyResult.Created => BootstrapResourceDisposition.Create,
+                            BootstrapResourceApplyResult.Skipped => BootstrapResourceDisposition.Skip,
+                            BootstrapResourceApplyResult.Conflict => BootstrapResourceDisposition.Conflict,
+                            _ => throw new InvalidOperationException($"Unsupported bootstrap result '{result}'.")
+                        };
+                        var actual = created.FirstOrDefault(row => row.Kind == resource.Kind && row.Name == resource.Metadata.Name
+                            && row.Namespace == resource.Metadata.Namespace)
+                            ?? (resource.Kind == PackBootstrapKinds.PackInstallation ? created.FirstOrDefault(row => row.Kind == PackKinds.InstalledPack) : null);
+                        var manifestOutcome = Row(disposition);
+                        outcome = actual ?? manifestOutcome;
+                        resources.Add(manifestOutcome);
+                        if (actual is not null) created.Remove(actual);
+                        LogResult(result, resource, source.Location);
+                    }
+                    catch (Exception exception) when (exception is not OperationCanceledException)
                     {
-                        BootstrapResourceApplyResult.Created => BootstrapResourceDisposition.Create,
-                        BootstrapResourceApplyResult.Skipped => BootstrapResourceDisposition.Skip,
-                        BootstrapResourceApplyResult.Conflict => BootstrapResourceDisposition.Conflict,
-                        _ => throw new InvalidOperationException($"Unsupported bootstrap result '{result}'.")
-                    };
-                    resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name, disposition));
-                    LogResult(result, resource, source.Location);
+                        var diagnostic = Agentstration.Infrastructure.Bootstrap.BootstrapFailureDiagnostics.Describe(exception);
+                        if (observationId is not null) startup?.FinishResource(observationId, "failed", diagnostic);
+                        if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name, "failed");
+                        logger.LogWarning("Bootstrap resource {ResourceKind}/{ResourceName} at {Location} failed ({ExceptionType}, {ReasonCode}, diagnostic {DiagnosticId}).",
+                            resource.Kind, resource.Metadata.Name, source.Location, exception.GetType().Name, diagnostic.Code, diagnostic.DiagnosticId);
+                        var message = "bootstrap_resource_failed";
+                        outcome = Row(BootstrapResourceDisposition.Failed, message) with { Failure = diagnostic };
+                        resources.Add(outcome);
+                        error = message;
+                    }
+                    finally
+                    {
+                        await RecordAsync(outcome is null ? created : [outcome, .. created], null);
+                    }
+                    if (reportProgress is not null)
+                        await reportProgress(new(preview, resources.ToArray(), null), CancellationToken.None);
+                    if (error is not null)
+                    {
+                        await RecordAsync([], BootstrapApplicationStatus.Failed);
+                        return new(preview, resources, error);
+                    }
                 }
-                catch (Exception exception) when (exception is not OperationCanceledException)
-                {
-                    var diagnostic = Agentstration.Infrastructure.Bootstrap.BootstrapFailureDiagnostics.Describe(exception);
-                    if (observationId is not null) startup?.FinishResource(observationId, "failed", diagnostic);
-                    if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name, "failed");
-                    logger.LogWarning("Bootstrap resource {ResourceKind}/{ResourceName} at {Location} failed ({ExceptionType}, {ReasonCode}, diagnostic {DiagnosticId}).",
-                        resource.Kind, resource.Metadata.Name, source.Location, exception.GetType().Name, diagnostic.Code, diagnostic.DiagnosticId);
-                    var message = "bootstrap_resource_failed";
-                    resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
-                        BootstrapResourceDisposition.Failed, message)
-                    { Failure = diagnostic });
-                    error = message;
-                }
-                if (reportProgress is not null)
-                    await reportProgress(new(preview, resources.ToArray(), null), CancellationToken.None);
-                if (error is not null) return new(preview, resources, error);
             }
+            if (phase is BootstrapStartupPhase.All or BootstrapStartupPhase.Resources)
+                await RecordAsync([], BootstrapApplicationStatus.Succeeded);
+            return new(preview, resources);
         }
-        return new(preview, resources);
+        catch (OperationCanceledException)
+        {
+            await RecordAsync([], cancellationRequested?.Invoke() == true ? BootstrapApplicationStatus.Cancelled : BootstrapApplicationStatus.Interrupted);
+            throw;
+        }
+        catch
+        {
+            await RecordAsync([], BootstrapApplicationStatus.Failed);
+            throw;
+        }
     }
 
     private static void ValidateTarget(BootstrapProfileScope scope, BootstrapApplicationTarget? target)

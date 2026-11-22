@@ -1,0 +1,6 @@
+.bootstrap-resource-provenance {
+    border-top: 1px solid var(--border, currentColor);
+    margin-top: .75rem;
+    padding-top: .75rem;
+    overflow-wrap: anywhere;
+}
