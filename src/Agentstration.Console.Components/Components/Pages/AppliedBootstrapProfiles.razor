@@ -25,20 +25,20 @@ else
             <FormSection Title="@T("ProfileVersions")" TestId="bootstrap-profile-versions">
                 <FormGrid>
                     <FormField Label="@T("ProfileVersion")" Id="bootstrap-history-version">
-                        <select id="bootstrap-history-version" value="@version" @onchange="ChangeVersion">
+                        <ClearableSelect TValue="string" AllowClear="false" Value="@version" ValueChanged="ChangeVersion">
                             @foreach (var entry in versions)
                             {
                                 <option value="@entry.Version">@entry.Version</option>
                             }
-                        </select>
+                        </ClearableSelect>
                     </FormField>
                     <FormField Label="@T("Target")" Id="bootstrap-history-scope">
-                        <select id="bootstrap-history-scope" value="@scope" @onchange="ChangeScope">
+                        <ClearableSelect TValue="string" AllowClear="false" Value="@scope" ValueChanged="ChangeScope">
                             @foreach (var target in targets)
                             {
                                 <option value="@target.Scope">@target.Label</option>
                             }
-                        </select>
+                        </ClearableSelect>
                     </FormField>
                 </FormGrid>
                 @if (versions.FirstOrDefault(value => value.Version == version) is { } selected)
@@ -177,14 +177,13 @@ else
         }
     }
 
-    private void ChangeVersion(ChangeEventArgs args)
+    private void ChangeVersion(string? requested)
     {
-        var requested = args.Value?.ToString();
         var newScope = versions.FirstOrDefault(item => item.Version == requested)?.Scope;
         var currentScope = versions.FirstOrDefault(item => item.Version == version)?.Scope;
         ChangeSelection(requested, newScope == currentScope ? scope : null);
     }
-    private void ChangeScope(ChangeEventArgs args) => ChangeSelection(version, args.Value?.ToString());
+    private void ChangeScope(string? requested) => ChangeSelection(version, requested);
 
     private void ChangeSelection(string? selectedVersion, string? selectedScope) => Navigation.NavigateTo(
         Navigation.GetUriWithQueryParameters(new Dictionary<string, object?>
