@@ -3,12 +3,18 @@ import { expect, type Page } from '@playwright/test';
 /** Operate the shared navigation through its desktop rail or mobile drawer. */
 export async function selectResourceSection(page: Page, path: string): Promise<void> {
   const navigation = page.locator('.resource-details-navigation .resource-navigation');
-  await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
   let menu = navigation.locator('.resource-navigation-rail');
   const trigger = page.locator('.resource-header .resource-navigation-trigger');
-  // JS registration can finish before the navigation has a visible layout.
-  await expect(menu.or(trigger).filter({ visible: true }).first()).toBeVisible();
-  if (!await menu.isVisible()) {
+  // A Blazor resource transition can temporarily detach both controls. Only
+  // choose the drawer when its trigger is visible, rather than from a missing rail.
+  let useDrawer = false;
+  await expect.poll(async () => {
+    if (await menu.isVisible()) return true;
+    useDrawer = await trigger.isVisible();
+    return useDrawer;
+  }).toBe(true);
+  await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
+  if (useDrawer) {
     await trigger.click();
     menu = navigation.locator('dialog');
     await expect(menu).toBeVisible();

@@ -35,15 +35,6 @@ on:
       - Directory.Packages.props
       - .github/workflows/browser-ux.yml
   workflow_dispatch:
-    inputs:
-      diagnostic_artifact_id:
-        description: 'Artifact ID to inspect instead of running browser tests'
-        required: false
-        type: string
-      diagnostic_run_id:
-        description: 'Workflow run owning the diagnostic artifact'
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -54,7 +45,6 @@ concurrency:
 
 jobs:
   browser-ux-tests:
-    if: ${{ !inputs.diagnostic_artifact_id }}
     name: browser-ux (${{ matrix.project }}, ${{ matrix.shard }}/${{ matrix.shards }})
     strategy:
       fail-fast: false
@@ -170,7 +160,7 @@ jobs:
   # Preserve the single required check while each shard has isolated hosts/data.
   browser-ux:
     name: browser-ux
-    if: ${{ always() && !inputs.diagnostic_artifact_id }}
+    if: always()
     needs: browser-ux-tests
     runs-on: ubuntu-latest
     steps:
@@ -178,71 +168,3 @@ jobs:
         env:
           BROWSER_PROJECTS_RESULT: ${{ needs.browser-ux-tests.result }}
         run: test "$BROWSER_PROJECTS_RESULT" = success
-
-  inspect-browser-evidence:
-    if: ${{ inputs.diagnostic_artifact_id != '' }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-    steps:
-      - name: Download browser evidence
-        uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ inputs.diagnostic_artifact_id }}
-          run-id: ${{ inputs.diagnostic_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: evidence
-      - name: Summarize failed Worker trace
-        shell: bash
-        run: |
-          python3 - <<'PYTHON'
-          import json
-          from pathlib import Path
-          from zipfile import ZipFile
-          from urllib.parse import urlsplit
-          for path in Path('evidence').rglob('trace.zip'):
-              if 'runtime-worker-observabili' not in str(path):
-                  continue
-              print('TRACE', path)
-              with ZipFile(path) as archive:
-                  for name in archive.namelist():
-                      if name.endswith('.trace'):
-                          calls = []
-                          for line in archive.read(name).decode().splitlines():
-                              event = json.loads(line)
-                              if event.get('type') == 'before':
-                                  params = event.get('params', {})
-                                  calls.append((event.get('callId'), event.get('startTime'), event.get('class'), event.get('method'), params.get('selector'), urlsplit(params.get('url', '')).path))
-                              if event.get('error'):
-                                  print('ERROR', name, event.get('callId'), event.get('error'))
-                          for call in calls[-50:]:
-                              print('CALL', name, call)
-                      elif name.endswith('.network'):
-                          responses = []
-                          for line in archive.read(name).decode().splitlines():
-                              entry = json.loads(line).get('snapshot', {})
-                              url = urlsplit(entry.get('request', {}).get('url', '')).path
-                              if '/api/runtime/' not in url and '/health' not in url:
-                                  continue
-                              response = entry.get('response', {})
-                              content = response.get('content', {})
-                              resource = content.get('_sha1')
-                              state = None
-                              if resource and 'resources/' + resource in archive.namelist():
-                                  try:
-                                      value = json.loads(archive.read('resources/' + resource))
-                                      if isinstance(value, dict):
-                                          state = {key: value[key] for key in ['status', 'presence', 'error', 'workerId'] if key in value}
-                                  except (ValueError, UnicodeDecodeError):
-                                      pass
-                              responses.append((url, response.get('status'), state))
-                          for response in responses[-15:]:
-                              print('RESPONSE', response)
-          for path in Path('evidence').rglob('runtime-worker.log'):
-              print('WORKER LOG', path)
-              lines = path.read_text(errors='replace').splitlines()
-              for index, line in enumerate(lines):
-                  if any(word in line for word in ['fail:', 'Application started', 'Application is shutting', 'Exception', 'error']):
-                      print('\n'.join(lines[index:index+7]))
-              print('LAST LOGS', '\n'.join(lines[-25:]))
-          PYTHON
