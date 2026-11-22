@@ -3,7 +3,7 @@
 An XML-to-JSON mapping is a normal, independent `Schema` with format
 `xml-json-transformation`. Its draft and published versions are available through
 the Schema Console/API before any named function exists. See
-[ADR-0241](../decisions/0241-transformation-schemas-have-explicit-function-exposure.md).
+[ADR-0251](../decisions/0251-transformation-schemas-have-explicit-function-exposure.md).
 
 The local implementation supports standalone XSD 1.0 (`xml-xsd`, native content
 is an XML string), JSON Schema, and a bounded XML child/attribute mapping format.
@@ -30,8 +30,10 @@ identical, omit their installation-specific owner, and keep their
 contract references relative to that owner. The engine reference remains the
 exact Instance-owned `xml-to-json-builtin@1.0.0`. The preview digest includes the
 profile contents, scope and target; change the descriptors **before** previewing.
-Profiles composed in one application must declare the same scope. Changing
-`targetScope` does not move an existing installation to another owner.
+Legacy flat applications require one shared scope and target. The existing Console
+plan can combine per-profile targets ([ADR-0248](../decisions/0248-manual-bootstrap-plans-preserve-profile-targets.md));
+keep these two sample profiles at the same target so their relative references
+resolve. Changing `targetScope` does not move an existing installation to another owner.
 
 Apply `rss-schemas` through **System > Bootstrap profiles**. This synthetic
 example creates and publishes `rss-xml`, `rss-json` and `rss-mapping` at
@@ -43,8 +45,7 @@ a conflict instead of replacing the operator's draft.
 Then either apply `rss-functions` to the same target, or open `rss-mapping`
 under **Schemas > Versions**, select `1.0.0`, and use **Expose as function**.
 The two profiles may also be composed in declaration-first order in one explicit
-application. Profiles with different scopes cannot be composed together; Tenant
-and Workspace applications require their explicit target. Reapplying either
+application. Tenant and Workspace applications require their explicit target. Reapplying either
 profile preserves the existing identities, published versions and accepted pins.
 
 Ownership and use authorization are separate. A single Instance installation can
@@ -163,7 +164,7 @@ adaptation. Explicit `json-select-builtin@1.0.0` with `path: /content` remains v
 and is required for other envelope shapes. An incompatible edit fails before
 persistence. Existing accepted compositions retain their original selection;
 receipts predating this feature continue to use the whole previous result. Changing
-the sequence explicitly resolves and freezes a new selection. See [ADR-0242](../decisions/0242-acquisition-text-content-is-selected-at-admission.md).
+the sequence explicitly resolves and freezes a new selection. See [ADR-0252](../decisions/0252-acquisition-text-content-is-selected-at-admission.md).
 
 Ordinary Flow `transform` steps select the same function and explicitly map its
 `value` argument. Knowledge binding/before-publication transformations receive
@@ -232,7 +233,7 @@ step and exact server setting when applicable. XML UTF-8 bytes, serialized JSON
 bytes, text characters, node counts and mapping operations are distinct. Values
 and source content are omitted. Schema length errors refer to their declared
 schema constraints rather than suggesting a server setting can override them.
-Old recorded errors without measurements remain readable. See [ADR-0243](../decisions/0243-xml-processing-uses-operator-content-settings.md).
+Old recorded errors without measurements remain readable. See [ADR-0253](../decisions/0253-xml-processing-uses-operator-content-settings.md).
 
 ## Diagnosing rejected XML
 

@@ -26,7 +26,7 @@ public partial class ModelProviders
         && (query.Filter("status").Value.Length == 0 || StatusValue(provider.Properties.Status) == query.Filter("status").Value)
         && (query.Filter("type").Value.Length == 0 || provider.Properties.ContributionId == query.Filter("type").Value)
         && (query.Filter("management").Value.Length == 0 || provider.Properties.RegistrationSource == query.Filter("management").Value)
-        && (query.Filter("models").Value.Length == 0 || decimal.TryParse(query.Filter("models").Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var count) && provider.Properties.ModelCount == count)
+        && (query.Filter("models").Value.Length == 0 || provider.Properties.Discovery is not { LastSuccessAt: null } && decimal.TryParse(query.Filter("models").Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var count) && provider.Properties.ModelCount == count)
         && (query.Filter("namespace").Value.Length == 0 || provider.Namespace == query.Filter("namespace").Value)).ToArray();
     private IReadOnlyList<ModelProviderResponse> PageItems => Filtered.Skip(checked((query.Page - 1) * query.PageSize)).Take(query.PageSize).ToArray();
     private CollectionPagination Pagination => new(query.Page, query.PageSize, query.Page * query.PageSize < Filtered.Count)

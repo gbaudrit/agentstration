@@ -39,7 +39,7 @@
         {
             Filters = [new("management", T("Management"), CollectionFilterKind.Choice) { Options = Options(provider => provider.Properties.RegistrationSource), Advanced = true }]
         },
-        new("models", T("Models"), provider => @<span>@ModelCount(provider.Properties.ModelCount)</span>)
+        new("models", T("Models"), provider => @<span>@(provider.Properties.Discovery is { LastSuccessAt: null } ? T("NotDiscovered") : ModelCount(provider.Properties.ModelCount))</span>)
         {
             Filters = [new("models", T("Models"), CollectionFilterKind.Number) { Advanced = true }]
         }

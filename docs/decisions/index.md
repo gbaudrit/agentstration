@@ -284,13 +284,30 @@ Use **Proposed** when implementation or repository evidence does not establish a
 237. [ADR-0237 — Knowledge ToolSets describe and restrict published contributions](0237-knowledge-toolsets-describe-and-restrict-contributions.md)
 
 238. [ADR-0238 — Resource-local sections use URL fragments](0238-fragment-selection-for-resource-navigation.md)
-
 239. [ADR-0239 — Discovered operations can inherit Connected Service access](0239-discovered-operations-can-inherit-connected-service-access.md)
-
 240. [ADR-0240 — Shared Connected Service consumption keeps owner-bound dependencies](0240-shared-connected-service-consumption-keeps-owner-bound-dependencies.md)
 
-241. [ADR-0241 — Transformation Schemas have explicit function exposure](0241-transformation-schemas-have-explicit-function-exposure.md)
+241. [ADR-0241 — Bootstrap declares local descendant resource access](0241-bootstrap-declares-local-descendant-access.md)
 
-242. [ADR-0242 — Acquisition text content is selected at admission](0242-acquisition-text-content-is-selected-at-admission.md)
+242. [ADR-0242 — Model Provider discovery runs asynchronously](0242-model-provider-discovery-runs-asynchronously.md)
 
-243. [ADR-0243 — XML processing uses operator content settings](0243-xml-processing-uses-operator-content-settings.md)
+243. [ADR-0243 — Standalone startup always runs in phases](0243-standalone-startup-always-runs-in-phases.md)
+244. [ADR-0244 — Observe startup through an administrator-only progress screen](0244-authenticated-startup-progress-and-admission.md)
+
+245. [ADR-0245 — Bootstrap policies assign SharedKeyFile extension installations](0245-bootstrap-policies-assign-shared-key-extensions.md)
+
+246. [ADR-0246 — Bootstrap applications run independently of HTTP requests](0246-bootstrap-applications-run-independently-of-http.md)
+
+247. [ADR-0247 — Correct blocked Bootstrap models through versioned plan substitutions](0247-bootstrap-model-substitutions-preserve-plan-and-owner.md)
+
+248. [ADR-0248 — Manual Bootstrap plans preserve per-profile targets](0248-manual-bootstrap-plans-preserve-profile-targets.md)
+
+249. [ADR-0249 — Bootstrap resolves public extension and contribution identities](0249-bootstrap-resolves-public-extension-contribution-identities.md)
+
+250. [ADR-0250 — Initial Bootstrap waits for required extension contributions](0250-initial-bootstrap-waits-for-required-extension-contributions.md)
+
+251. [ADR-0251 — Transformation Schemas have explicit function exposure](0251-transformation-schemas-have-explicit-function-exposure.md)
+
+252. [ADR-0252 — Acquisition text content is selected at admission](0252-acquisition-text-content-is-selected-at-admission.md)
+
+253. [ADR-0253 — XML processing uses operator content settings](0253-xml-processing-uses-operator-content-settings.md)

@@ -1,3 +1,4 @@
+import { waitForModelDiscovery } from './model-discovery.js';
 import { selectResourceSection } from './resource-sections.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
@@ -341,7 +342,12 @@ export class ExecutionScopesPage {
     const apply = await this.page.request.post(`${consoleUrl}/api/bootstrap/applications`, {
       data: { profiles: [siblingProfileName], expectedDigest: preview.digest },
     });
-    expect(apply.status(), await apply.text()).toBe(201);
+    expect(apply.status(), await apply.text()).toBe(202);
+    const application = await apply.json() as { metadata: { name: string } };
+    await expect.poll(async () => {
+      const current = await this.read<{ definition: { status: string } }>(`${consoleUrl}/api/bootstrap/applications/${application.metadata.name}`);
+      return current.definition.status;
+    }, { timeout: 60_000 }).toBe('succeeded');
   }
 
   private async ensureSiblingWorkspace(consoleUrl: string, tenantId: string): Promise<void> {
@@ -433,7 +439,8 @@ export class ExecutionScopesPage {
       `${consoleUrl}/api/modelproviders/${modelProviderName}/models/refresh`,
       { headers: contextHeaders },
     );
-    expect(refreshed.status(), await refreshed.text()).toBe(200);
+    expect(refreshed.status(), await refreshed.text()).toBe(202);
+    await waitForModelDiscovery(this.page, consoleUrl, modelProviderName, contextHeaders);
 
     const profileUrl = `${consoleUrl}/api/modelprofiles/${modelProfileName}?scopeRef=${encodeURIComponent('/instance')}`;
     const currentProfile = await this.page.request.get(profileUrl, { headers: contextHeaders });

@@ -12,10 +12,11 @@ public sealed partial class ApiClientTests
     {
         ApplyBootstrapProfilesRequest? captured = null;
         var application = BootstrapApplication("application-1");
+        var requestId = Guid.NewGuid();
         using var httpClient = new HttpClient(new StubHandler(request =>
         {
             captured = request.Content!.ReadFromJsonAsync<ApplyBootstrapProfilesRequest>().GetAwaiter().GetResult();
-            return new HttpResponseMessage(HttpStatusCode.Created) { Content = JsonContent.Create(application) };
+            return new HttpResponseMessage(HttpStatusCode.Accepted) { Content = JsonContent.Create(application) };
         }))
         { BaseAddress = new Uri("http://localhost/") };
         var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
@@ -24,8 +25,9 @@ public sealed partial class ApiClientTests
         var actual = await new BootstrapProfilesApiClient(httpClient).ApplyAsync(
             new BootstrapProfileSelection(["base", "agents"], target, [binding]),
             "digest-1",
-            CancellationToken.None);
+            CancellationToken.None, requestId);
 
+        Assert.AreEqual(requestId, captured?.RequestId);
         Assert.AreEqual(application.Metadata.Name, actual.Metadata.Name);
         Assert.IsNotNull(captured);
         CollectionAssert.AreEqual(new[] { "base", "agents" }, captured.Profiles.ToArray());

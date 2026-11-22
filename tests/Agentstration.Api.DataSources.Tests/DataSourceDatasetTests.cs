@@ -810,7 +810,18 @@ public sealed partial class DataSourceDatasetTests : ResourceManagementApiTestBa
                 await using var worker = await AwpTestWorker.StartAsync(third);
                 using (scopes.PushSystem()) await third.Services.GetRequiredService<KnowledgeProjectionService>().RecoverPendingAsync(default);
                 using var caller = scopes.PushInstance(fixture.Context);
-                var recovered = await third.Services.GetRequiredService<KnowledgeProjectionService>().GetAsync(retainedProjection.Name, retainedProjection.Namespace, default);
+                var projections = third.Services.GetRequiredService<KnowledgeProjectionService>();
+                var recovered = await projections.GetAsync(retainedProjection.Name, retainedProjection.Namespace, default);
+                // The hosted recovery worker can already own the projection gate,
+                // so an explicit recovery pass may return before that worker finishes.
+                using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30)))
+                {
+                    while (recovered.Value.State == KnowledgeProjectionState.Running)
+                    {
+                        await Task.Delay(20, timeout.Token);
+                        recovered = await projections.GetAsync(retainedProjection.Name, retainedProjection.Namespace, timeout.Token);
+                    }
+                }
                 Assert.AreEqual(KnowledgeProjectionState.Succeeded, recovered.Value.State, recovered.Value.ErrorMessage);
                 Assert.AreEqual(retainedProjection.Uid, recovered.Value.Uid);
                 var active = (await third.Services.GetRequiredService<KnowledgeSnapshotService>().GetActiveAsync(new(retainedKnowledge.Name, ScopeRef: Owner), default))!.Snapshot;

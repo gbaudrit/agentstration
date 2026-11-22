@@ -75,7 +75,15 @@ export class NativeFormsPage {
     await user.fill('admin');
     await this.fields.clearField(user, locale);
     await user.fill('admin');
+    await user.press('Tab');
+    await expect(password).toBeFocused();
+    await password.press('Shift+Tab');
+    await expect(user).toBeFocused();
     await password.fill('WrongFixture973!Password');
+    await password.press('Tab');
+    await expect(this.page.getByRole('checkbox')).toBeFocused();
+    await this.page.keyboard.press('Shift+Tab');
+    await expect(password).toBeFocused();
     await this.page.getByTestId(TestIds.login.submit).click();
     await expect(this.page).toHaveURL(/\/login/);
     await expect(password).toHaveValue('');

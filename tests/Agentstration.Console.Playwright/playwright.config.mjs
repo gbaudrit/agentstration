@@ -17,7 +17,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'dotnet run --project ../../src/Agentstration.Web --configuration Release --launch-profile http --no-build --no-restore --urls http://localhost:5199',
-    url: 'http://localhost:5199/health',
+    url: 'http://localhost:5199/health/ready',
     timeout: 180_000,
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === '1',
     env: {

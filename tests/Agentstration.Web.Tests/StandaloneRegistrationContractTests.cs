@@ -4,6 +4,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.ModelProviders;
 using Agentstration.Models;
 using Agentstration.Packs.Contracts;
@@ -81,6 +82,10 @@ public sealed class StandaloneRegistrationContractTests
                 ValidateOnBuild = true,
                 ValidateScopes = true
             });
+            var hostedServices = provider.GetServices<IHostedService>().ToArray();
+            var deferred = hostedServices.OfType<BootstrapDeferredHostedServices>().Single();
+            Assert.HasCount(1, deferred.Workers.OfType<BootstrapApplicationWorker>());
+            Assert.IsFalse(hostedServices.Any(service => service is BootstrapApplicationWorker));
             Assert.IsInstanceOfType<ModelProfileManagementService>(provider.GetRequiredService<IModelProfileReferenceValidator>());
             Assert.AreEqual(aiProvider == "Managed" ? typeof(ChatClientResolver) : typeof(SingleChatClientResolver),
                 provider.GetRequiredService<IChatClientResolver>().GetType());
@@ -121,7 +126,8 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = 2,
-            [typeof(IBootstrapResourceHandler)] = 25,
+            [typeof(IBootstrapContributionResourceResolver)] = 4,
+            [typeof(IBootstrapResourceHandler)] = 27,
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = 7,
             [typeof(Agentstration.Schemas.ISchemaFormatHandler)] = 3,
             [typeof(IPackResourceHandler)] = 11,

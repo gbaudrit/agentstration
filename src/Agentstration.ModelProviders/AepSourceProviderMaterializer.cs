@@ -1,11 +1,13 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
+using Agentstration.Identity.Contracts;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Sources.Contracts;
 
 namespace Agentstration.ModelProviders;
 
-public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients, ISecretResolver? secrets = null) : ISourceProviderMaterializer
+public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients, ISecretResolver? secrets = null,
+    IRequestContextScopeFactory? requestScopes = null) : ISourceProviderMaterializer
 {
     public async Task<ResolvedSourceRevision> ResolveAsync(
         SourceProviderInvocation invocation,
@@ -61,7 +63,7 @@ public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients
                 invocation.Namespace,
                 invocation.ExtensionScopeRef,
                 invocation.ExtensionName,
-                secrets),
+                secrets, requestScopes),
             expectedExtensionId: invocation.ExpectedExtensionId).CreateSourceProvider(invocation.ContributionId);
     }
 

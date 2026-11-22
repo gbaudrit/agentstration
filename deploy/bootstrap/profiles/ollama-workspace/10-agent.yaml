@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: Agent
+metadata: { name: ollama-assistant }
+definition:
+  displayName: Assistant Ollama
+  description: Assistant local du workspace dev/default.
+  handler: prompt-agent
+  instructions: |
+    Tu es un assistant utile. Réponds en français, de façon claire et concise.
+    Signale tes incertitudes et demande une précision si des informations indispensables manquent.
+  modelProfile: { name: ollama-chat }
+  runtimeProfile: { name: maf-builtin, scopeRef: /instance }
+  tools: []

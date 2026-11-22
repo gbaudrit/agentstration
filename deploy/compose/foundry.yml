@@ -23,8 +23,13 @@ services:
       Foundry__AllowedPrivateHosts: ${FOUNDRY_ALLOWED_PRIVATE_HOSTS:-}
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
+      Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080
+      Aep__SharedKeyFile__PublicEndpoint: http://foundry-extension:8080
+      Aep__SharedKeyFile__StateFile: /var/lib/aep/instance
+      Aep__SharedKeyFile__AllowInsecureHttp: "true"
     volumes:
       - aep-foundry-key:/run/aep-key:ro
+      - aep-foundry-state:/var/lib/aep
 
   agentstration:
     depends_on:
@@ -45,3 +50,4 @@ services:
 
 volumes:
   aep-foundry-key:
+  aep-foundry-state:

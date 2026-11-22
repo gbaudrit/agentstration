@@ -5,6 +5,7 @@ using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.Agents;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Runtime;
@@ -38,7 +39,8 @@ public sealed class RegistrationContractTests
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (24, ServiceLifetime.Scoped),
+            [typeof(IBootstrapContributionResourceResolver)] = (4, ServiceLifetime.Singleton),
+            [typeof(IBootstrapResourceHandler)] = (26, ServiceLifetime.Scoped),
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = (7, ServiceLifetime.Singleton),
             [typeof(Agentstration.Schemas.ISchemaFormatHandler)] = (3, ServiceLifetime.Singleton),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),

@@ -158,6 +158,33 @@ public sealed class InstanceInitializationCoordinatorTests
         }
     }
 
+    [TestMethod]
+    public async Task ExplicitStartupRerunsAtTheSameVersionUnderANewFence()
+    {
+        var directory = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"agentstration-initialization-{Guid.NewGuid():N}"));
+        try
+        {
+            await using var provider = Provider(directory.FullName);
+            var store = provider.GetRequiredService<IResourceStore>();
+            await store.InitializeAsync(default);
+            var coordinator = Coordinator(store);
+            var executions = 0;
+            await coordinator.RunAsync(_ => { executions++; return Task.CompletedTask; }, default);
+            await coordinator.RunAsync(_ => { executions++; return Task.CompletedTask; }, default);
+            Assert.AreEqual(1, executions);
+            await coordinator.RunAsync(_ =>
+            {
+                Assert.IsFalse(coordinator.IsReady);
+                executions++;
+                return Task.CompletedTask;
+            }, default, runWhenReady: true);
+            Assert.AreEqual(2, executions);
+            Assert.IsTrue(coordinator.IsReady);
+            Assert.AreEqual(2L, (await StateAsync(store)).Value.Definition.FencingToken);
+        }
+        finally { Directory.Delete(directory.FullName, true); }
+    }
+
     private static ServiceProvider Provider(string directory)
     {
         var services = new ServiceCollection();

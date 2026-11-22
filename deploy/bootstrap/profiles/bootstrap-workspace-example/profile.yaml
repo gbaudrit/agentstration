@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: bootstrap-workspace-example
+definition:
+  displayName: Unattended Workspace Bootstrap example
+  description: Creates an executable deterministic Flow and Entry in an explicitly selected Workspace.
+  targetScope: workspace

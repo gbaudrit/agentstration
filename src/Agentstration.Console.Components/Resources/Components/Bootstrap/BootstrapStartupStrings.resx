@@ -1,0 +1,221 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <data name="Brand" xml:space="preserve">
+    <value>Agentstration</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>Instance initialization</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>Follow preparation and inspect resources while Bootstrap runs. Execution becomes available once preparation completes.</value>
+  </data>
+  <data name="Running" xml:space="preserve">
+    <value>Bootstrap in progress</value>
+  </data>
+  <data name="Failed" xml:space="preserve">
+    <value>Bootstrap failed</value>
+  </data>
+  <data name="StepCount" xml:space="preserve">
+    <value>{0} of {1} steps completed</value>
+  </data>
+  <data name="Checking" xml:space="preserve">
+    <value>Checking instance availability…</value>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="AccessUnavailable" xml:space="preserve">
+    <value>Access temporarily unavailable</value>
+  </data>
+  <data name="AccessUnavailableDescription" xml:space="preserve">
+    <value>Sign out and try again later.</value>
+  </data>
+  <data name="ConnectionLost" xml:space="preserve">
+    <value>Connection interrupted</value>
+  </data>
+  <data name="ConnectionLostDescription" xml:space="preserve">
+    <value>The instance cannot be reached. Observation will resume when the connection is restored.</value>
+  </data>
+  <data name="Recovery" xml:space="preserve">
+    <value>Bootstrap stopped. Review the failed resource and apply an available model correction here to resume. For other failures, correct the configuration and restart the instance.</value>
+  </data>
+  <data name="Stage_topology" xml:space="preserve">
+    <value>Instance structure</value>
+  </data>
+  <data name="Stage_extensions" xml:space="preserve">
+    <value>Extensions and contributions</value>
+  </data>
+  <data name="Stage_resources" xml:space="preserve">
+    <value>Resources and dependencies</value>
+  </data>
+  <data name="Stage_finalization" xml:space="preserve">
+    <value>Console readiness</value>
+  </data>
+  <data name="Explanation_topology" xml:space="preserve">
+    <value>Preparing storage, identity, tenants, workspaces and enrollment policies.</value>
+  </data>
+  <data name="Explanation_extensions" xml:space="preserve">
+    <value>Waiting for the extensions and contributions required by the selected profiles.</value>
+  </data>
+  <data name="Explanation_resources" xml:space="preserve">
+    <value>Applying the selected resources and checking their required dependencies.</value>
+  </data>
+  <data name="Explanation_finalization" xml:space="preserve">
+    <value>Finishing preparation before making the Console available.</value>
+  </data>
+  <data name="ModelMissing" xml:space="preserve">
+    <value>Waiting for the exact required model.</value>
+  </data>
+  <data name="ProviderUnavailable" xml:space="preserve">
+    <value>The provider is not available yet. Discovery will retry within the Bootstrap deadline.</value>
+  </data>
+  <data name="Resource" xml:space="preserve">
+    <value>Resource</value>
+  </data>
+  <data name="Provider" xml:space="preserve">
+    <value>Provider</value>
+  </data>
+  <data name="ExpectedModel" xml:space="preserve">
+    <value>Required model</value>
+  </data>
+  <data name="OpenProvider" xml:space="preserve">
+    <value>Open the provider configuration</value>
+  </data>
+  <data name="Created" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="Skipped" xml:space="preserve">
+    <value>Already present</value>
+  </data>
+  <data name="Conflicts" xml:space="preserve">
+    <value>Conflicts</value>
+  </data>
+  <data name="ResourceFailures" xml:space="preserve">
+    <value>Failed resources</value>
+  </data>
+  <data name="ContributionMissing" xml:space="preserve">
+    <value>Waiting for a required extension contribution.</value>
+  </data>
+  <data name="Extension" xml:space="preserve">
+    <value>Extension</value>
+  </data>
+  <data name="Contribution" xml:space="preserve">
+    <value>Contribution</value>
+  </data>
+  <data name="GateConnectionLostDescription" xml:space="preserve">
+    <value>The instance is temporarily unavailable. Try again.</value>
+  </data>
+  <data name="Startup" xml:space="preserve">
+    <value>Startup</value>
+  </data>
+  <data name="CurrentStage" xml:space="preserve">
+    <value>Current stage: {0}</value>
+  </data>
+  <data name="WaitingForDependency" xml:space="preserve">
+    <value>Waiting for a required dependency</value>
+  </data>
+  <data name="DependencyUnresolved" xml:space="preserve">
+    <value>Required dependency unresolved</value>
+  </data>
+  <data name="ResourceOutcomes" xml:space="preserve">
+    <value>Resource outcomes</value>
+  </data>
+  <data name="DependencyFailureDescription" xml:space="preserve">
+    <value>A required dependency could not be resolved.</value>
+  </data>
+  <data name="ResourceCount" xml:space="preserve"><value>{0}/{1}</value></data>
+  <data name="ResourceFilters" xml:space="preserve"><value>Bootstrap resource filters</value></data>
+  <data name="SearchResources" xml:space="preserve"><value>Search by resource, profile or scope</value></data>
+  <data name="ResourceState" xml:space="preserve"><value>Result / state</value></data>
+  <data name="AllStates" xml:space="preserve"><value>All states</value></data>
+  <data name="SearchLimit" xml:space="preserve"><value>Search is limited to 128 characters.</value></data>
+  <data name="ResourceReadFailed" xml:space="preserve"><value>Resource details are temporarily unavailable. Observation will resume automatically.</value></data>
+  <data name="LoadingResources" xml:space="preserve"><value>Loading resource details…</value></data>
+  <data name="MatchingResources" xml:space="preserve"><value>{0} matching resources</value></data>
+  <data name="NoResources" xml:space="preserve"><value>No resources match these filters</value></data>
+  <data name="Target" xml:space="preserve"><value>Target scope</value></data>
+  <data name="Profile" xml:space="preserve"><value>Bootstrap profile</value></data>
+  <data name="ResourceDetails" xml:space="preserve"><value>Operations</value></data>
+  <data name="NotStarted" xml:space="preserve"><value>This resource has not been applied yet.</value></data>
+  <data name="State_pending" xml:space="preserve"><value>Not started</value></data>
+  <data name="State_running" xml:space="preserve"><value>In progress</value></data>
+  <data name="State_waiting" xml:space="preserve"><value>Waiting for a dependency</value></data>
+  <data name="State_created" xml:space="preserve"><value>Created</value></data>
+  <data name="State_skipped" xml:space="preserve"><value>Already present</value></data>
+  <data name="State_succeeded" xml:space="preserve"><value>Completed</value></data>
+  <data name="State_conflict" xml:space="preserve"><value>Conflict</value></data>
+  <data name="State_failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="State_blocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="Operation_resource_apply" xml:space="preserve"><value>Apply resource</value></data>
+  <data name="Operation_definition" xml:space="preserve"><value>Save definition</value></data>
+  <data name="Operation_generation_apply" xml:space="preserve"><value>Apply execution generation</value></data>
+  <data name="Operation_model_discovery" xml:space="preserve"><value>Check required model</value></data>
+  <data name="Operation_contribution_availability" xml:space="preserve"><value>Check contribution availability</value></data>
+  <data name="Operation_resource_validation" xml:space="preserve"><value>Validate resource</value></data>
+  <data name="Family_PlatformAdministrator" xml:space="preserve"><value>Platform administrators</value></data>
+  <data name="Family_Tenant" xml:space="preserve"><value>Tenants</value></data>
+  <data name="Family_Workspace" xml:space="preserve"><value>Workspaces</value></data>
+  <data name="Family_PrincipalDefaultContext" xml:space="preserve"><value>Default contexts</value></data>
+  <data name="Family_ExtensionEnrollmentPolicy" xml:space="preserve"><value>Enrollment policies</value></data>
+  <data name="Family_ExtensionContribution" xml:space="preserve"><value>Required contributions</value></data>
+  <data name="Family_ModelProvider" xml:space="preserve"><value>Model providers</value></data>
+  <data name="Family_ModelProfile" xml:space="preserve"><value>Model profiles</value></data>
+  <data name="Family_RuntimeProfile" xml:space="preserve"><value>Runtime profiles</value></data>
+  <data name="Family_Agent" xml:space="preserve"><value>Agents</value></data>
+  <data name="Family_Flow" xml:space="preserve"><value>Flows</value></data>
+  <data name="Family_Parameter" xml:space="preserve"><value>Parameters</value></data>
+  <data name="Family_Secret" xml:space="preserve"><value>Secrets</value></data>
+  <data name="Family_ResourceAccessPolicy" xml:space="preserve"><value>Access policies</value></data>
+  <data name="Family_PackInstallation" xml:space="preserve"><value>Pack installations</value></data>
+  <data name="Family_ToolSet" xml:space="preserve"><value>Tool sets</value></data>
+  <data name="Family_Entry" xml:space="preserve"><value>Entries</value></data>
+  <data name="Family_Storage" xml:space="preserve"><value>Storages</value></data>
+  <data name="ConsultationAvailable" xml:space="preserve"><value>You can inspect resources. Some actions remain unavailable until preparation finishes.</value></data>
+  <data name="ViewProgress" xml:space="preserve"><value>View Bootstrap progress</value></data>
+  <data name="ChangeModel" xml:space="preserve"><value>Change provider or model</value></data>
+  <data name="CorrectionAccepted" xml:space="preserve"><value>The selection was saved. Bootstrap will resume with this provider and model.</value></data>
+  <data name="CorrectionHelp" xml:space="preserve"><value>This change applies to this profile in the current Bootstrap plan and is retained on this instance after restart. Source files are not modified.</value></data>
+  <data name="LoadingModelChoices" xml:space="preserve"><value>Loading known providers and models…</value></data>
+  <data name="ChooseProvider" xml:space="preserve"><value>Choose a provider</value></data>
+  <data name="NoCachedModels" xml:space="preserve"><value>No available model is currently known for this provider. Refresh this list after discovery.</value></data>
+  <data name="ApplyAndResume" xml:space="preserve"><value>Apply and resume</value></data>
+  <data name="RefreshModelChoices" xml:space="preserve"><value>Refresh known models</value></data>
+  <data name="CancelCorrection" xml:space="preserve"><value>Cancel</value></data>
+  <data name="CorrectionStale" xml:space="preserve"><value>The resource or selection changed. Close and reopen the form before applying your correction.</value></data>
+  <data name="CorrectionUnavailable" xml:space="preserve"><value>The correction cannot be loaded or applied right now. Try again.</value></data>
+  <data name="CorrectionInvalid" xml:space="preserve"><value>This model is unavailable or incompatible with the profile settings. Refresh the choices and select another model.</value></data>
+  <data name="SubstitutionApplied" xml:space="preserve"><value>A provider/model substitution was saved for this plan.</value></data>
+  <data name="PreviousSelection" xml:space="preserve"><value>Previous selection</value></data>
+  <data name="NewSelection" xml:space="preserve"><value>New selection</value></data>
+  <data name="Operation_model_substitution" xml:space="preserve"><value>Substitute provider or model</value></data>
+  <data name="Family_ConnectedServiceType" xml:space="preserve"><value>Connected service types</value></data>
+  <data name="Family_StorageType" xml:space="preserve"><value>Storage types</value></data>
+  <data name="Family_FunctionKind" xml:space="preserve"><value>Function kinds</value></data>
+  <data name="Family_TransformationFunction" xml:space="preserve"><value>Transformation functions</value></data>
+  <data name="Family_ConnectedServiceOperationType" xml:space="preserve"><value>Connected service operation types</value></data>
+  <data name="Family_DataSourceProfile" xml:space="preserve"><value>Data source profiles</value></data>
+  <data name="Family_DataSource" xml:space="preserve"><value>Data sources</value></data>
+  <data name="Family_KnowledgeSource" xml:space="preserve"><value>Knowledge sources</value></data>
+  <data name="Family_KnowledgeSourceToolExposure" xml:space="preserve"><value>Knowledge source tool exposures</value></data>
+  <data name="ChooseModel" xml:space="preserve"><value>Choose an available model</value></data>
+  <data name="FamilyOccurrence" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="FailureTitle" xml:space="preserve"><value>Bootstrap diagnostic</value></data>
+  <data name="FailureCode" xml:space="preserve"><value>Reason code</value></data>
+  <data name="DiagnosticId" xml:space="preserve"><value>Log reference</value></data>
+  <data name="FailureLegacy" xml:space="preserve"><value>The precise cause was not recorded for this application. Review the failed resource and its dependencies, then use the application identity to inspect server logs.</value></data>
+  <data name="Failure_validation" xml:space="preserve"><value>Resource validation or publication failed. Check the resource definition and its required Flow, Tool and profile bindings. Resources already created are retained.</value></data>
+  <data name="Failure_configuration" xml:space="preserve"><value>The resource configuration could not be applied. Check its required fields, scope and dependencies; use the log reference for the server diagnostic.</value></data>
+  <data name="Failure_access" xml:space="preserve"><value>Access or resource governance prevented this operation. Check the target scope and the permissions on its dependencies.</value></data>
+  <data name="Failure_dependency" xml:space="preserve"><value>A required resource is unavailable. Check that dependencies are created earlier and are accessible from the target scope.</value></data>
+  <data name="Failure_timeout" xml:space="preserve"><value>The required dependency did not become available before the deadline. Check the provider, extension or required model, then retry after correcting the dependency.</value></data>
+  <data name="Failure_storage" xml:space="preserve"><value>Storage could not complete the operation. Check storage availability and access rights using the log reference.</value></data>
+  <data name="Failure_provider" xml:space="preserve"><value>The provider could not be reached. Check its availability and connection configuration.</value></data>
+  <data name="Failure_unexpected" xml:space="preserve"><value>An unexpected error stopped this resource. Completed resources are retained. Use the reason code and log reference to investigate before preparing a new application.</value></data>
+  <data name="FailureFlowUnavailable" xml:space="preserve"><value>The acquisition or discovery Flow is missing, disabled or incompatible in the target scope. Check its revision and access permissions.</value></data>
+  <data name="FailureToolUnavailable" xml:space="preserve"><value>A required Tool or its provider is missing or unavailable. Check the profile bindings and the Tool and provider configuration in the target scope.</value></data>
+  <data name="FailureProfileUnpublished" xml:space="preserve"><value>The referenced profile has no active published revision. Review and publish the profile before retrying the resource.</value></data>
+  <data name="RecoveryAction" xml:space="preserve"><value>Recovery guidance</value></data>
+  <data name="Completed" xml:space="preserve"><value>Bootstrap completed</value></data>
+  <data name="CompletedDescription" xml:space="preserve"><value>Preparation is complete. Review the results, then open the Console when you are ready.</value></data>
+  <data name="OpenConsole" xml:space="preserve"><value>Open Console</value></data>
+</root>

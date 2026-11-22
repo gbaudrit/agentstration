@@ -104,6 +104,12 @@ export class SharedFormsPage {
   public async clearField(field: Locator, locale: SupportedTestLocale): Promise<void> {
     const clear = field.locator('..').getByRole('button');
     await expect(clear).toHaveAttribute('type', 'button');
+    await expect(clear).toHaveAttribute('tabindex', '-1');
+    await field.focus();
+    await this.page.keyboard.press('Tab');
+    await expect(clear).not.toBeFocused();
+    await this.page.keyboard.press('Shift+Tab');
+    await expect(field).toBeFocused();
     await expect(clear).toHaveAccessibleName(new RegExp(`^${SharedFormTextByLocale[locale].clear}`));
     await clear.click();
     await expect(field).toHaveValue('');

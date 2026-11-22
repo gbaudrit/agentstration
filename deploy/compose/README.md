@@ -46,6 +46,31 @@ docker compose --env-file deploy/compose/.env.foundry -f deploy/compose/base.yml
 
 The overlay adds only the Foundry extension, its own generated AEP shared key, the allowlisted internal host and the Bootstrap catalog. It does not deploy models or enable Foundry by default. Project endpoints, authentication mode and credentials belong to Model Provider Value Bindings, never Compose environment. Apply the `foundry` tenant Bootstrap profile from **Settings → Bootstrap**, or bind the extension manually in **Extensions → Model providers**; then choose a discovered deployment in a Model Profile. See [Foundry integration](../../docs/foundry-integration.md).
 
+## Unattended Bootstrap example
+
+The optional overlay creates the Development topology, enrolls a separately
+started OpenAPI extension, waits for its contributed Tool and DataSourceProfile,
+and creates a ToolSet, DataSource and a Workspace Flow/Entry:
+
+```sh
+docker compose -f deploy/compose/base.yml -f deploy/compose/bootstrap.yml up -d --build
+curl --fail http://localhost:5080/health/ready
+```
+
+Use the public disposable Development account `admin / admin`. Extension keys
+remain isolated in generated volumes and mounted read-only; installation state
+has its own writable volume. Keep these volumes across restarts. The extension
+process is owned by Compose. See the [Bootstrap reference](../../docs/reference/declarative-bootstrap.md#complete-local-bootstrap-with-an-external-extension)
+for scoped applications, readiness, Aspire configuration and recovery.
+
+## Ollama provider, model and Agent Bootstrap
+
+Use `bootstrap-ollama.yml` with `ollama.yml` after pulling `qwen3:1.7b` into the
+Ollama service. It creates the `dev/default` topology, an instance Model Provider,
+a Tenant Model Profile and a Workspace Agent, including their explicit access
+grants. See the [Ollama Bootstrap example](../../docs/reference/declarative-bootstrap.md#ollama-instance-tenant-and-workspace-example)
+for complete startup commands and the disposable Development credentials.
+
 ## PostgreSQL
 
 Create the ignored environment file once, then replace its disposable development password:

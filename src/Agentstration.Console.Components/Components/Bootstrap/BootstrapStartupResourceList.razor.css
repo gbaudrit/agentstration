@@ -1,0 +1,30 @@
+.startup-resource-list { margin-block: 1.25rem; }
+.startup-resource-count { color: var(--muted); font-size: .875rem; }
+.startup-resource-operations { padding: .75rem; }
+.startup-resource-operations h3 { margin-block: 0 .75rem; }
+.startup-resource-operations ol { display: grid; gap: .65rem; padding-inline-start: 1.25rem; }
+.startup-resource-operations li { overflow-wrap: anywhere; }
+.startup-resource-operations time { margin-inline-start: .5rem; color: var(--muted); font-size: .8rem; }
+
+.startup-resource-list ::deep .resource-toolbar, .startup-resource-list ::deep .resource-toolbar-filters { align-items: end; }
+.startup-resource-list ::deep .form-field { margin: 0; }
+.startup-resource-list ::deep .search-box { flex: 1 1 14rem; min-width: 0; height: var(--field-height, 42px); }
+.startup-resource-list ::deep .resource-toolbar input, .startup-resource-list ::deep .resource-toolbar select { height: var(--field-height, 42px); }
+.startup-resource-list ::deep .search-box .clearable-field { height: 100%; }
+.startup-resource-list ::deep .search-box input { height: 100%; }
+
+.startup-resource-list { margin-block: 0; min-width: 0; }
+.startup-resource-count { margin-block: .5rem; font-size: .78rem; }
+.startup-resource-list ::deep .collection-ui { min-width: 0; }
+.startup-resource-list ::deep .data-grid code { white-space: normal; overflow-wrap: anywhere; }
+
+.startup-resource-list ::deep .resource-collection .data-grid { min-width: 0; table-layout: fixed; }
+.startup-resource-list ::deep .data-grid th:first-child { width: 30%; }
+.startup-resource-list ::deep .data-grid th:nth-child(2) { width: auto; }
+.startup-resource-list ::deep .data-grid th:nth-child(3) { width: 9rem; }
+.startup-resource-list ::deep .data-grid th:last-child { width: 8rem; }
+.startup-resource-list ::deep .data-grid td, .startup-resource-list ::deep .data-grid th { white-space: normal; overflow-wrap: anywhere; }
+.startup-resource-list ::deep .data-grid .table-actions { min-width: 0; flex-wrap: wrap; }
+.startup-resource-list ::deep .data-grid button { white-space: normal; }
+
+.startup-resource-list ::deep .data-grid .status-badge { max-width: 100%; white-space: normal; overflow-wrap: normal; }
