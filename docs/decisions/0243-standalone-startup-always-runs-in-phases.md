@@ -43,7 +43,7 @@ Remove PhasedStartupEnabled from the options contract, defaults, launch profiles
 AppHost forwarding and Compose examples. An old value left in external
 configuration is ignored by the ordinary configuration binder and cannot restore
 the former lifecycle. This supersedes the opt-in/default pre-listener choice in
-ADR-0240; that accepted record remains historical evidence.
+ADR-0250; that accepted record remains historical evidence.
 
 ## Consequences
 

@@ -1,4 +1,4 @@
-# ADR-0240: Initial Bootstrap waits for required extension contributions
+# ADR-0250: Initial Bootstrap waits for required extension contributions
 
 ## Status
 

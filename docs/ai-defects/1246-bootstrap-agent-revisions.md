@@ -9,7 +9,7 @@ Prevented — 2026-11-20
 - Issue: [#1246](https://github.com/gbaudrit/agentstration/issues/1246)
 - Introducing integration: [c8e26ec1](https://github.com/gbaudrit/agentstration/commit/c8e26ec1) added the Ollama bootstrap example and its resource/policy regression test. The original introducing change for the generic Agent bootstrap handler is Unknown.
 - Corrective pull request: Not opened; correction is published on `feat/bootstrapping`.
-- Related ADRs: ADR-0240 and ADR-0242 for phased startup/readiness; no new runtime architecture is introduced.
+- Related ADRs: ADR-0250 and ADR-0242 for phased startup/readiness; no new runtime architecture is introduced.
 
 ## Defect
 

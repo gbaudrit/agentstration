@@ -15,7 +15,7 @@ Prevented — 2026-11-20
   (scope-owned, late-bound transport credentials),
   [ADR-0094](../decisions/0094-aep-extensions-initiate-enrollment.md)
   (registration-owned enrollment credentials),
-  [ADR-0240](../decisions/0240-initial-bootstrap-waits-for-required-extension-contributions.md)
+  [ADR-0250](../decisions/0250-initial-bootstrap-waits-for-required-extension-contributions.md)
   and [ADR-0242](../decisions/0242-model-provider-discovery-runs-asynchronously.md).
 
 ## Defect

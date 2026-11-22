@@ -24,6 +24,7 @@ export const TestIds = {
     root: 'connected-service-editor', form: 'connected-service-form', fields: 'connected-service-definition-fields',
     identity: 'connected-service-identity-editor', refresh: 'connected-service-refresh', name: 'connected-service-name', displayName: 'connected-service-display-name',
     type: 'connected-service-type', save: 'connected-service-save', enabled: 'connected-service-enabled',
+    exposeOperations: 'connected-service-expose-operations', operationExposureReview: 'connected-service-operation-exposure-review',
     requirement: 'connected-service-value-requirement', bindingKind: 'connected-service-binding-kind',
     bindingLiteral: 'connected-service-binding-literal', bindingTarget: 'connected-service-binding-target',
   },

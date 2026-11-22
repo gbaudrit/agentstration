@@ -1,4 +1,4 @@
-# ADR-0239: Bootstrap resolves public extension and contribution identities
+# ADR-0249: Bootstrap resolves public extension and contribution identities
 
 ## Status
 

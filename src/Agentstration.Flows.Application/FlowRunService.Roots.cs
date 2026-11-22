@@ -30,6 +30,8 @@ public sealed record EnsureRootFlowRunCommand(
     public bool AcceptedCompositionSchemas { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public ResourceScopeRef? DefinitionUseScopeRef { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 
@@ -47,9 +49,12 @@ public sealed partial class FlowRunService
             return existing;
         }
 
-        var resolved = await ResolveVersionAsync(command.Scope.AccessScopeRef, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
+        if (command.DefinitionUseScopeRef is not null && !command.AcceptedCompositionSchemas)
+            throw new FlowValidationException("flow_definition_authorization_invalid", "Owner-side definition authorization requires an accepted internal composition.");
+        var definitionUseScope = command.DefinitionUseScopeRef ?? command.Scope.AccessScopeRef;
+        var resolved = await ResolveVersionAsync(definitionUseScope, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
         var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
-            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved, command.Compositions, command.Scope.AccessScopeRef, cancellationToken, command.AcceptedCompositionSchemas);
+            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved, command.Compositions, definitionUseScope, cancellationToken, command.AcceptedCompositionSchemas);
         resolved = composed.Definition;
         ValidateInput(resolved.Graph?.ResolveInputSchema(), command.Input, command.SecretInputs);
         var now = timeProvider.GetUtcNow();

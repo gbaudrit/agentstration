@@ -241,6 +241,12 @@ internal static class ConnectedServiceEndpoints
             .Produces<ConnectedServiceOperationResource[]>()
             .WithSummary("List discoverable Connected Service operations")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        operations.MapPost("/contract", async (ConnectedServiceOperationRevisionReference reference,
+            ConnectedServiceOperationService service, CancellationToken token) =>
+            await Execute(async () => Results.Ok(await service.InspectContractAsync(reference, token))))
+            .Produces<ConnectedServiceOperationContract>()
+            .WithSummary("Inspect the exact contract of an authorized Connected Service operation")
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
         operations.MapPut("/{name}/enabled", async (string name, string scopeRef, string? @namespace,
             SetConnectedServiceOperationEnabledRequest body, HttpRequest request, HttpResponse response,
             ConnectedServiceOperationService service, CancellationToken token) => await Execute(async () =>

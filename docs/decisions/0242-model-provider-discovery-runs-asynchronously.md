@@ -39,7 +39,7 @@ Staged Bootstrap's Model Profile handler waits for its exact required model befo
 creation, including retained definitions on create-only reapplication. The wait is
 bounded independently by ModelDependencyTimeout. Manual preview is still read-only.
 The discovery worker starts before execution readiness and owns its System scope.
-This extends ADR-0240: after topology/policy setup, the startup fence permits an
+This extends ADR-0250: after topology/policy setup, the startup fence permits an
 explicit administrative route allowlist, retaining ordinary authentication, scope
 and authorization. Execution stays fenced. Dependency failure keeps administration
 available with readiness false; repair and restart retry the fenced initializer.

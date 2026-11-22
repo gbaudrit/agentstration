@@ -173,6 +173,7 @@ public sealed record ResolvedDataSourceFlowBinding(
     string DefinitionHash)
 {
     public ResourceScopeRef? ScopeRef { get; init; }
+    public ResourceScopeRef? DefinitionUseScopeRef { get; init; }
 }
 
 public sealed record ResolvedDataSourceToolBinding
