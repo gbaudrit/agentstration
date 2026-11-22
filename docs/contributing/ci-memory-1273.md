@@ -1,0 +1,71 @@
+# CI remediation for PR #1273
+
+## Failures
+
+[Run 45040215677](https://github.com/gbaudrit/agentstration/actions/runs/45040215677)
+on head `de066f4a` has two independent causes. Browser UX, compilation, formatting,
+Fast, Resource Plan UX and documentation passed.
+
+- Bootstrap's `AcceptedLoadTestSurvivesClientDisconnectAndReportsMonotonicDurableProgress`
+  expects an exception when reading a Parameter in a nonexistent Tenant. The
+  exact-read behavior introduced by this PR returns `null` for a nonexistent resource scope
+  (`SqliteResourceStore.GetExactAsync`), before evaluating an existing scope's
+  read permissions. The Bootstrap test added on main retained the earlier exception expectation.
+  This integration mismatch fails Integration, coverage shard A and the scenario diagnostic. Change that assertion to require absence. Keep the
+  positive read from the actual Tenant, all 512 resources, durable progress,
+  disconnect, replay and authorization assertions.
+- Management API completes all 164 cases, but its process peaks at 2716.5 MiB
+  against the retained 2560 MiB ceiling. The preceding source run also passed
+  all 164 cases and breached the same ceiling at 2776.9 MiB. This is a repeated
+  working-set budget breach, not evidence of a product memory leak or an OS kill.
+
+The failed run tests merge revision `886c831c3b3920f88b787b5c036a381a796a62f1`.
+The diagnostic uses SDK 10.0.404; do not infer the child runtime patch from the
+PowerShell collector's runtime field.
+
+## Bounded test processes
+
+Following the existing [resource-family](ci-memory-1181.md) and
+[Bootstrap](ci-memory-1224.md) process boundaries, move the five Model/Profile/
+Provider test classes into `Agentstration.Management.Models.Api.Tests`. All 40
+model cases retain their method names, data rows and assertions. The remaining
+Management API module retains 124 cases. Their combined inventory remains 164.
+
+Both modules compile the same test-root host/Worker fixture sources, with private
+per-test state. They keep one class worker per process, the unchanged 1920/2560
+MiB warning/failure limits and the Integration/coverage concurrency limits. The
+diagnostic runs both modules sequentially on its existing Management API runner.
+The minimum counts now require all 124 + 40 cases. Register the new module in the
+root solution, Integration, coverage shard A and hosted diagnostics.
+
+No application logic, UI or memory budget changes. The Worker grants its existing
+internal test access to the additional test assembly. Host metrics use the
+containing assembly name so the two modules' records remain distinguishable.
+This bounds the workload retained in each process; it does not establish an
+allocation fix or recalibrate a Windows baseline.
+
+## Verification
+
+Validation results are recorded after whole-module runs below. Subsequent GitHub
+checks remain authoritative for the hosted runner and complete functional lanes.
+The visual evidence on product revision `1e52fb3e` remains applicable: this
+remediation changes test organization, a test expectation and test inventories;
+the rendered product sources are unchanged.
+
+The corrected source is `59bcdfe583e3a73c7863a5e317ba3e14a75d5ec1`. [Retained local report](/test-diagnostics/ci-1273-local.json) includes inventory and source-byte proofs. The sorted discovery SHA-256 is `5f9aaa7723a4adda2c777c4e9b1a3e91b6c8b7fe1e94e1ef88df94396212fce6`.
+
+| Uninstrumented local execution | Cases | Passed | Failed | Peak working set (MiB) | Failure ceiling (MiB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Before: consolidated Management API | 164 | 164 | 0 | 2667.3 | 2560 |
+| After: Management API | 124 | 124 | 0 | 2125.2 | 2560 |
+| After: Model API | 40 | 40 | 0 | 945.6 | 2560 |
+| Before: Bootstrap scenarios | 10 | 9 | 1 | 577.3 | 700 |
+| After: Bootstrap scenarios | 10 | 10 | 0 | 572.6 | 700 |
+
+Local runs use Release, SDK 10.0.300 and test runtime .NET 10.0.8 on Debian 13. Before runs sample Linux VmRSS every 100ms; after runs use the repository diagnostic scripts. The raw report runtime field belongs to the PowerShell collector, not the child test host. Concurrent collectors/Bootstrap/Fast tests and build servers affect aggregate dotnet memory; the figures above are per-process peaks. Management API and Bootstrap retain visible warnings. No Windows baseline or product allocation improvement is claimed.
+
+The initial Fast check identified the missing explicit architecture allowlist for the new test-root fixture owners. Only the two fixture paths and the new module’s existing metrics link were added to that list; unrelated cross-project source compilation remains rejected. The focused architecture check passes. The Release solution build, formatting verification, diagnostic-classification regression and exact Integration/coverage inventory checks pass. Full Fast/Integration and consolidated coverage results are reported on the PR; final hosted CI is still required.
+
+A subsequent uninstrumented Fast execution overlapped coverage instrumentation and produced Bad IL errors. That execution is discarded as invalid: coverage mutates the same output assemblies while they are loaded. Complete functional validation and instrumentation must be serialized when they use the same output tree. The completed uninstrumented module diagnostics above predate that overlap and are unaffected.
+
+The serialized coverage campaign completed Fast with **3146 passed, zero failed/skipped** before starting Integration. Integration and consolidated report generation were still running when this evidence was committed; use the PR validation status for their completed result.

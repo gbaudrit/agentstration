@@ -584,5 +584,47 @@
       "Only horizontal position preservation is asserted; native close navigation may reset vertical position. Viewport captures do not claim inspection of every Preview section.",
       "Staged Artifact evidence remains historical and was not renewed. Live provider integrations were not rerun locally. #1258 still requires maintainer UX validation and merge."
     ]
+  },
+  "ciFailureFollowup": {
+    "testedCommit": "59bcdfe583e3a73c7863a5e317ba3e14a75d5ec1",
+    "failedRun": 45040215677,
+    "changes": [
+      "Keep all 164 Management cases; split 124 + 40 into separate processes with unchanged budgets and concurrency.",
+      "Require null on the existing Bootstrap exact-read assertion for an unknown Tenant; retain scope isolation, 512-resource progress and disconnect assertions.",
+      "Explicit architecture ownership allowances for the two test-root fixtures and metrics link."
+    ],
+    "localAfter": [
+      {
+        "module": "Agentstration.Management.Api.Tests",
+        "testCount": 124,
+        "passedTestCount": 124,
+        "failedTestCount": 0,
+        "peakWorkingSetMiB": 2125.2,
+        "failureWorkingSetMiB": 2560,
+        "status": "warning"
+      },
+      {
+        "module": "Agentstration.Management.Models.Api.Tests",
+        "testCount": 40,
+        "passedTestCount": 40,
+        "failedTestCount": 0,
+        "peakWorkingSetMiB": 945.6,
+        "failureWorkingSetMiB": 2560,
+        "status": "passed"
+      },
+      {
+        "module": "Agentstration.Management.Bootstrap.Scenarios.Tests",
+        "testCount": 10,
+        "passedTestCount": 10,
+        "failedTestCount": 0,
+        "peakWorkingSetMiB": 572.6,
+        "failureWorkingSetMiB": 700,
+        "status": "warning"
+      }
+    ],
+    "renderSourcesUnchanged": true,
+    "details": "../../../contributing/ci-memory-1273.md",
+    "report": "../../../site/static/test-diagnostics/ci-1273-local.json",
+    "fullFunctionalAndCoverage": "See current PR checks; local complete coverage campaign running at evidence recording."
   }
 }

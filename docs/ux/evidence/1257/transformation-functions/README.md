@@ -1,6 +1,6 @@
 # Revalidation visuelle — transformation-functions
 
-Commit réellement testé : `1e52fb3e06c303b4ad32e10398edef214c1f780b`. Les modifications ultérieures concernent uniquement les évidences et leur documentation. Les empreintes dans [observations.json](observations.json) identifient le code produit testé.
+Commit réellement testé : `1e52fb3e06c303b4ad32e10398edef214c1f780b`. Le commit `de066f4a` ajoute uniquement les évidences et leur documentation. La maintenance CI ultérieure déplace des tests dans des processus distincts et corrige une attente de test ; les sources de rendu restent identiques, voir [l’analyse CI](../../../../contributing/ci-memory-1273.md). Les empreintes dans [observations.json](observations.json) identifient le code produit testé.
 
 8 variantes : desktop 1440 × 1000 / mobile 390 × 844, EN/FR, clair/sombre. Les deux représentations sont contrôlées dans chaque variante. Chaque séquence capture la grille sans Preview, le menu Actions, le Preview ouvert, puis la grille après fermeture. Vues de fenêtre natives, sans montage ni réduction.
 
