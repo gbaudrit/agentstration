@@ -216,7 +216,8 @@ public sealed class LocalAuthenticationService(
     UserManager<LocalIdentityUser> users,
     SignInManager<LocalIdentityUser> signIn,
     IIdentityStore identityStore,
-    ISecurityAuditWriter audit)
+    ISecurityAuditWriter audit,
+    IAuthenticationAdmissionPolicy? admission = null)
 {
     public async Task<LocalCredentialValidation> ValidateCredentialsAsync(
         string userName,
@@ -241,13 +242,16 @@ public sealed class LocalAuthenticationService(
         var outcome = result.Succeeded
             ? LocalLoginOutcome.Succeeded
             : result.IsLockedOut ? LocalLoginOutcome.LockedOut : LocalLoginOutcome.Failed;
+        var admissionDenied = result.Succeeded && admission is not null
+            && (principalId is null || !await admission.CanSignInAsync(principalId.Value, cancellationToken));
+        if (admissionDenied) outcome = LocalLoginOutcome.Failed;
         await audit.WriteAsync(new(
             SecurityAuditActions.LocalLogin,
-            result.Succeeded ? SecurityAuditOutcome.Succeeded : SecurityAuditOutcome.Failed,
-            ActorPrincipalId: result.Succeeded ? principalId : null,
+            outcome == LocalLoginOutcome.Succeeded ? SecurityAuditOutcome.Succeeded : SecurityAuditOutcome.Failed,
+            ActorPrincipalId: outcome == LocalLoginOutcome.Succeeded ? principalId : null,
             TargetPrincipalId: principalId,
             TargetAccountId: account?.Id,
-            ReasonCode: outcome switch
+            ReasonCode: admissionDenied ? "admission-unavailable" : outcome switch
             {
                 LocalLoginOutcome.LockedOut => "locked-out",
                 LocalLoginOutcome.Failed => "invalid-credentials",

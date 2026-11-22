@@ -1,0 +1,17 @@
+apiVersion: agentstration.io/v1
+kind: DataSource
+metadata:
+  name: bootstrap-openapi-source
+definition:
+  displayName: Bootstrap OpenAPI example source
+  description: Explicit example origin; Bootstrap creates the configuration without executing discovery or acquisition.
+  profile:
+    extensionContribution:
+      extensionId: Agentstration.Extensions.OpenApi
+      kind: DataSourceProfile
+      contributionId: openapi-governed
+      version: 1.0.0
+  configuration:
+    origin: https://example.invalid
+    candidatePaths: [/openapi.json]
+    maximumPages: 1

@@ -76,6 +76,16 @@
 <data name="ConfigurationValues"><value>Valeurs de configuration</value></data><data name="ValueBindings"><value>Liaisons de valeurs</value></data><data name="ValueBindingsHelp"><value>Liez chaque exigence AEP à une valeur directe, un paramètre ou un secret. Les valeurs sont revérifiées par le serveur à l’enregistrement et à l’utilisation.</value></data>
   <data name="Input"><value>Entrées</value></data>
   <data name="Output"><value>Sorties</value></data>
+  <data name="Discovery.Requested" xml:space="preserve"><value>Découverte des modèles demandée</value></data>
+  <data name="Discovery.State.never" xml:space="preserve"><value>Les modèles n’ont pas encore été découverts</value></data>
+  <data name="Discovery.State.queued" xml:space="preserve"><value>La découverte des modèles est en attente</value></data>
+  <data name="Discovery.State.running" xml:space="preserve"><value>Découverte des modèles en arrière-plan</value></data>
+  <data name="Discovery.State.succeeded" xml:space="preserve"><value>Découverte des modèles terminée</value></data>
+  <data name="Discovery.State.failed" xml:space="preserve"><value>Échec de la découverte</value></data>
+  <data name="Discovery.Failure" xml:space="preserve"><value>Le fournisseur n’a pas pu être interrogé. Vous pouvez continuer à modifier sa configuration.</value></data>
+  <data name="Discovery.Timeout" xml:space="preserve"><value>Le fournisseur n’a pas répondu dans le délai prévu. Vous pouvez continuer à modifier sa configuration.</value></data>
+  <data name="Discovery.RetryAt" xml:space="preserve"><value>Prochaine tentative automatique : {0}.</value></data>
+  <data name="MetadataUnavailable" xml:space="preserve"><value>Les détails de l’extension sont temporairement indisponibles. Le fournisseur enregistré et son catalogue de modèles restent consultables.</value></data>
   <data name="SpecificationOverrides" xml:space="preserve"><value>Surcharges des spécifications des modèles</value></data>
   <data name="RefreshDraftConflict" xml:space="preserve"><value>Une version enregistrée plus récente est disponible. Abandonnez votre brouillon pour la charger.</value></data>
   <data name="ObservationUnavailable" xml:space="preserve"><value>Le catalogue des modèles disponibles n’a pas pu être chargé. Actualisez pour réessayer.</value></data>

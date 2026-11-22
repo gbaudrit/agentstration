@@ -1,0 +1,273 @@
+@implements IAsyncDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StepProgressStrings> Localizer
+@inject IJSRuntime JS
+
+<div @ref="root" class="step-progress @(FitToViewport ? "fit-viewport" : null) @Class" data-follow-active="@following.ToString().ToLowerInvariant()" data-active-step="@ActiveStepId" data-progress-key="@ProgressKey" data-step-progress data-testid="@TestId">
+    <span class="step-progress-announcement" role="status" aria-live="polite" aria-atomic="true">@ActiveAnnouncement</span>
+    @if (HeaderContent is not null)
+    {
+        <div class="step-progress-header">@HeaderContent</div>
+    }
+    @if (Steps.Count == 0)
+    {
+        <div class="step-progress-empty" role="status">@if (EmptyContent is not null) { @EmptyContent } else { @Localizer["NoSteps"] }</div>
+    }
+    else
+    {
+        <div class="step-progress-layout">
+            <div class="step-progress-navigation">
+                <div class="step-progress-navigation-heading">
+                    <h2 id="@(id + "-title")">@(Label ?? Localizer["Steps"].Value)</h2>
+                    @if (ExpandedParent is { } parent)
+                    {
+                        <button class="step-progress-expand" type="button" aria-expanded="@((!collapsed.Contains(parent.Id)).ToString().ToLowerInvariant())"
+                                aria-label="@Localizer[collapsed.Contains(parent.Id) ? "Expand" : "Collapse", parent.Title]"
+                                title="@Localizer[collapsed.Contains(parent.Id) ? "Expand" : "Collapse", parent.Title]"
+                                @onclick="() => ToggleChildrenAsync(parent.Id)"><UiIcon Name="@(collapsed.Contains(parent.Id) ? "chevron-down" : "chevron-up")" /></button>
+                    }
+                    @if (!following && Selectable(ActiveStepId) is not null)
+                    {
+                        <button type="button" class="step-progress-follow" @onclick="ResumeFollowingAsync">@Localizer["FollowCurrent"]</button>
+                    }
+                </div>
+                <div role="tablist" aria-orientation="vertical" aria-labelledby="@(id + "-title")" data-step-progress-tabs>
+                    @foreach (var step in VisibleSteps)
+                    {
+                        var selected = step.Id == selectedId;
+                        var active = step.Id == ActiveStepId;
+                        <div @key="step.Id" class="step-progress-row @(step.ParentId is not null ? "is-child" : null)">
+                        <button @ref="buttons[step.Id]" id="@TabId(step.Id)" type="button" role="tab"
+                                class="step-progress-step @StatusClass(step.Status) @(selected ? "is-selected" : null) @(active ? "is-active" : null)"
+                                data-step-id="@step.Id" aria-selected="@selected.ToString().ToLowerInvariant()" aria-controls="@PanelId"
+                                aria-expanded="@(HasChildren(step.Id) ? (!collapsed.Contains(step.Id)).ToString().ToLowerInvariant() : null)"
+                                aria-current="@(active ? "step" : null)" tabindex="@(selected ? 0 : -1)" disabled="@(!step.Selectable)"
+                                @onclick="() => ClickStepAsync(step.Id)" @onkeydown="args => KeyDownAsync(args, step.Id)">
+                            <span class="step-progress-marker" aria-hidden="true">
+                                @if (step.Status == ProgressStepStatus.Running) { <span class="step-progress-spinner"></span> }
+                                else if (StatusIcon(step.Status) is { } icon) { <UiIcon Name="@icon" /> }
+                                else { <span>@(step.ParentId is null ? (Steps.Where(item => item.ParentId is null).ToList().IndexOf(step) + 1).ToString() : "·")</span> }
+                            </span>
+                            <span class="step-progress-copy">
+                                <span class="step-progress-step-heading">
+                                    @if (step.IconName is { } titleIcon) { <UiIcon Name="@titleIcon" /> }
+                                    <span class="step-progress-step-title">@step.Title</span>
+                                </span>
+                                <span class="step-progress-state">@Localizer[step.Status.ToString()]</span>
+                                @if (!string.IsNullOrWhiteSpace(step.Summary)) { <span class="step-progress-summary">@step.Summary</span> }
+                            </span>
+                            @if (HasChildren(step.Id)) { <span class="step-progress-disclosure" aria-hidden="true"><UiIcon Name="@(collapsed.Contains(step.Id) ? "chevron-down" : "chevron-up")" /></span> }
+                        </button>
+                        </div>
+                    }
+                </div>
+            </div>
+            @if (Selectable(selectedId) is { } current)
+            {
+                <div @key="current.Id" id="@PanelId" class="step-progress-panel" role="tabpanel" aria-labelledby="@TabId(current.Id)" tabindex="0" data-selected-step="@current.Id">
+                    @current.Content
+                </div>
+            }
+            else
+            {
+                <div id="@PanelId" class="step-progress-panel step-progress-empty" role="region" aria-label="@Localizer["Details"]">@Localizer["NoSelectableSteps"]</div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ProgressStep> Steps { get; set; } = [];
+    [Parameter] public string? ActiveStepId { get; set; }
+    [Parameter] public string? SelectedStepId { get; set; }
+    [Parameter] public EventCallback<string?> SelectedStepIdChanged { get; set; }
+    [Parameter] public bool FollowActiveStep { get; set; } = true;
+    [Parameter] public bool AutoCollapseCompletedGroups { get; set; }
+    [Parameter] public bool FitToViewport { get; set; }
+    [Parameter] public string? ProgressKey { get; set; }
+    [Parameter] public EventCallback<bool> FollowActiveStepChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public RenderFragment? HeaderContent { get; set; }
+    [Parameter] public RenderFragment? EmptyContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public string? TestId { get; set; }
+
+    private readonly string id = "step-progress-" + Guid.NewGuid().ToString("N");
+    private readonly Dictionary<string, ElementReference> buttons = new(StringComparer.Ordinal);
+    private readonly HashSet<string> collapsed = new(StringComparer.Ordinal);
+    private readonly HashSet<string> completedGroups = new(StringComparer.Ordinal);
+    private readonly HashSet<string> parentIds = new(StringComparer.Ordinal);
+    private bool HasChildren(string stepId) => parentIds.Contains(stepId);
+    private ProgressStep? ExpandedParent => Selectable(selectedId) is { } selected
+        && Steps.FirstOrDefault(step => step.Id == (selected.ParentId ?? selected.Id)) is { } parent
+        && HasChildren(parent.Id) ? parent : null;
+    private IEnumerable<ProgressStep> VisibleSteps => Steps.Where(step => step.ParentId is null || !collapsed.Contains(step.ParentId));
+    private ElementReference root;
+    private IJSObjectReference? module;
+    private string? selectedId;
+    private string? previousSelectedParameter;
+    private bool previousFollowParameter = true;
+    private bool following = true;
+    private bool initialized;
+    private string? requestedFocus;
+    private string PanelId => id + "-panel";
+    private string? ActiveAnnouncement => Steps.FirstOrDefault(step => step.Id == ActiveStepId) is { } active
+        ? $"{active.Title}: {Localizer[active.Status.ToString()]}" : null;
+    private string TabId(string stepId) => id + "-tab-" + Uri.EscapeDataString(stepId);
+    private ProgressStep? Selectable(string? stepId) => Steps.FirstOrDefault(step => step.Id == stepId && step.Selectable);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        ArgumentNullException.ThrowIfNull(Steps);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var step in Steps)
+        {
+            if (step is null || string.IsNullOrWhiteSpace(step.Id) || string.IsNullOrWhiteSpace(step.Title)
+                || step.Content is null || !Enum.IsDefined(step.Status) || !ids.Add(step.Id))
+                throw new ArgumentException("Progress steps require unique non-empty IDs, titles, content and valid statuses.", nameof(Steps));
+        }
+        foreach (var removed in buttons.Keys.Where(key => !ids.Contains(key)).ToArray()) buttons.Remove(removed);
+        parentIds.Clear();
+        foreach (var child in Steps.Where(step => step.ParentId is not null))
+            if (!Steps.Any(parent => parent.Id == child.ParentId && parent.ParentId is null))
+                throw new ArgumentException("A progress substep requires an existing top-level parent.", nameof(Steps));
+            else parentIds.Add(child.ParentId!);
+        collapsed.RemoveWhere(key => !ids.Contains(key));
+        completedGroups.RemoveWhere(key => !ids.Contains(key));
+
+        var previous = selectedId;
+        var previousFollowing = following;
+        var selectionParameterChanged = !initialized || SelectedStepId != previousSelectedParameter;
+        if (!initialized || FollowActiveStep != previousFollowParameter) following = FollowActiveStep;
+        if (selectionParameterChanged && SelectedStepId != selectedId)
+        {
+            selectedId = Selectable(SelectedStepId)?.Id;
+            if (selectedId is not null && selectedId != ActiveStepId) following = false;
+        }
+        previousSelectedParameter = SelectedStepId;
+        previousFollowParameter = FollowActiveStep;
+        initialized = true;
+        if (following && Selectable(ActiveStepId) is { } active) selectedId = active.Id;
+        if (Selectable(selectedId) is null) selectedId = Selectable(ActiveStepId)?.Id ?? Steps.FirstOrDefault(step => step.Selectable)?.Id;
+        if (AutoCollapseCompletedGroups)
+            foreach (var parent in Steps.Where(step => step.ParentId is null && HasChildren(step.Id)))
+            {
+                var complete = parent.Status is ProgressStepStatus.Succeeded or ProgressStepStatus.Skipped
+                    && Steps.Where(step => step.ParentId == parent.Id).All(step => step.Status is ProgressStepStatus.Succeeded or ProgressStepStatus.Skipped);
+                if (!complete) { completedGroups.Remove(parent.Id); continue; }
+                if (Selectable(selectedId)?.ParentId == parent.Id && !following) continue;
+                if (completedGroups.Add(parent.Id)) collapsed.Add(parent.Id);
+                if (collapsed.Contains(parent.Id) && following && Selectable(selectedId)?.ParentId == parent.Id)
+                    selectedId = parent.Id;
+            }
+        if (Selectable(selectedId)?.ParentId is { } parentId) collapsed.Remove(parentId);
+        if (previous != selectedId || (selectionParameterChanged && SelectedStepId != selectedId))
+            await SelectedStepIdChanged.InvokeAsync(selectedId);
+        if (previousFollowing != following) await FollowActiveStepChanged.InvokeAsync(following);
+    }
+
+    private async Task ClickStepAsync(string stepId)
+    {
+        if (HasChildren(stepId))
+        {
+            if (selectedId == stepId && !collapsed.Contains(stepId)) await ToggleChildrenAsync(stepId);
+            else { collapsed.Remove(stepId); await SelectAsync(stepId); }
+        }
+        else await SelectAsync(stepId);
+    }
+
+    private async Task SelectAsync(string stepId)
+    {
+        if (Selectable(stepId) is null) return;
+        if (following)
+        {
+            following = false;
+            await FollowActiveStepChanged.InvokeAsync(false);
+        }
+        if (selectedId == stepId) return;
+        selectedId = stepId;
+        await SelectedStepIdChanged.InvokeAsync(selectedId);
+    }
+
+    private async Task ResumeFollowingAsync()
+    {
+        if (Selectable(ActiveStepId) is not { } active) return;
+        requestedFocus = active.Id;
+        if (active.ParentId is { } parentId) collapsed.Remove(parentId);
+        var selectionChanged = selectedId != active.Id;
+        selectedId = active.Id;
+        following = true;
+        if (selectionChanged) await SelectedStepIdChanged.InvokeAsync(selectedId);
+        await FollowActiveStepChanged.InvokeAsync(true);
+    }
+
+    private async Task KeyDownAsync(KeyboardEventArgs args, string stepId)
+    {
+        if (args.AltKey || args.CtrlKey || args.MetaKey || args.ShiftKey) return;
+        var available = VisibleSteps.Where(step => step.Selectable).ToArray();
+        var index = Array.FindIndex(available, step => step.Id == stepId);
+        if (index < 0) return;
+        var next = args.Key switch
+        {
+            "ArrowDown" => (index + 1) % available.Length,
+            "ArrowUp" => (index + available.Length - 1) % available.Length,
+            "Home" => 0,
+            "End" => available.Length - 1,
+            _ => -1
+        };
+        if (next < 0) return;
+        requestedFocus = available[next].Id;
+        await SelectAsync(requestedFocus);
+    }
+
+    private async Task ToggleChildrenAsync(string parentId)
+    {
+        if (collapsed.Remove(parentId)) return;
+        if (Selectable(selectedId)?.ParentId == parentId) await SelectAsync(parentId);
+        collapsed.Add(parentId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/step-progress.js");
+            await module.InvokeVoidAsync("attach", root);
+        }
+        if (requestedFocus is { } target)
+        {
+            requestedFocus = null;
+            if (buttons.TryGetValue(target, out var button)) await button.FocusAsync(preventScroll: true);
+        }
+    }
+
+    public async Task PauseFollowingAsync()
+    {
+        if (!FitToViewport || !following) return;
+        following = false;
+        await FollowActiveStepChanged.InvokeAsync(false);
+        StateHasChanged();
+    }
+
+    private static string StatusClass(ProgressStepStatus status) => "status-" + status.ToString().ToLowerInvariant();
+    private static string? StatusIcon(ProgressStepStatus status) => status switch
+    {
+        ProgressStepStatus.Waiting => "clock",
+        ProgressStepStatus.Succeeded => "check",
+        ProgressStepStatus.Failed => "x",
+        ProgressStepStatus.Skipped => "minus",
+        ProgressStepStatus.Cancelled => "player-stop",
+        ProgressStepStatus.Interrupted => "alert-triangle",
+        _ => null
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is null) return;
+        try
+        {
+            await module.InvokeVoidAsync("detach", root);
+            await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+    }
+}

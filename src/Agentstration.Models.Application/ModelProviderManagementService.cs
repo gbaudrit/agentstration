@@ -25,7 +25,7 @@ public sealed class ModelProviderManagementService(
     ISecretAccessAuthorizer secrets,
     ICurrentRequestContext requestContext,
     IRequestContextScopeFactory requestScopes,
-    TimeProvider timeProvider) : IModelProviderConfigurationStore
+    ModelProviderDiscoveryState discoveryState) : IModelProviderConfigurationStore
 {
     public static string ModelProviderId(string name) => name;
     public async Task ValidateForCreateAsync(ModelProviderResource resource, CancellationToken cancellationToken)
@@ -53,13 +53,15 @@ public sealed class ModelProviderManagementService(
             if (await store.GetExactAsync<ModelProviderResource>(address, token) is not null)
                 throw new ResourceConcurrencyException($"Model provider '{resource.Address}' already exists in scope '{scopeRef}'.");
             var definition = await ValidateAndNormalizeAsync(resource.Namespace, resource.Name, resource.Definition, scopeRef, null, token);
-            return await store.PutExactAsync(scopeRef, resource with
+            var saved = await store.PutExactAsync(scopeRef, resource with
             {
                 ScopeRef = scopeRef,
                 Generation = 1,
                 Definition = definition,
                 Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
             }, null, true, token);
+            await discoveryState.RequestAsync(saved.Value, token);
+            return saved;
         }, cancellationToken);
     }
 
@@ -73,12 +75,14 @@ public sealed class ModelProviderManagementService(
         return await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
             var validated = await ValidateAndNormalizeAsync(existing.Value.Namespace, existing.Value.Name, definition, scopeRef, null, token);
-            return await store.PutExactAsync(scopeRef, existing.Value with
+            var saved = await store.PutExactAsync(scopeRef, existing.Value with
             {
                 Generation = checked(existing.Value.Generation + 1),
                 Definition = validated,
                 Status = new ResourceStatus { ProvisioningState = ProvisioningState.Succeeded }
             }, ifMatch, false, token);
+            await discoveryState.RequestAsync(saved.Value, token);
+            return saved;
         }, cancellationToken);
     }
 
@@ -173,6 +177,7 @@ public sealed class ModelProviderManagementService(
                     model.ETag,
                     token);
             await store.DeleteExactAsync(ScopedResourceAddress.Create(scopeRef, @namespace, ModelResourceKinds.ModelProvider, name), ifMatch, token);
+            await discoveryState.DeleteAsync(existing.Value, token);
             return true;
         }, cancellationToken);
     }
@@ -180,9 +185,10 @@ public sealed class ModelProviderManagementService(
     private async Task<ModelProviderView> InspectAsync(ModelProviderConfiguration provider, bool includeModels, CancellationToken cancellationToken)
     {
         using var dependencyScope = EnterInstanceDependencyScope();
-        var discovery = FindDiscovery(provider.AdapterType);
-        if (discovery is null) return new(provider, new("unknown", "No discovery adapter is registered in this host."), [], timeProvider.GetUtcNow());
-        var health = await discovery.GetHealthAsync(provider, cancellationToken);
+        var resource = await GetExactAsync(ResourceScopeRef.Instance, provider.Namespace, provider.Name, cancellationToken)
+            ?? throw new ModelProviderResourceNotFoundException(provider.Name);
+        var observation = await discoveryState.ReadAsync(resource.Value, cancellationToken);
+        var health = new ModelProviderHealth(observation.Health);
         IReadOnlyList<DiscoveredModel> models = [];
         if (includeModels)
             models = (await ListModelResourcesAsync(provider, cancellationToken))
@@ -190,7 +196,7 @@ public sealed class ModelProviderManagementService(
                     value.Value,
                     provider.SpecificationOverrides.GetValueOrDefault(value.Value.Definition.ExternalId)))
                 .ToArray();
-        return new(provider, health, models, timeProvider.GetUtcNow());
+        return new(provider, health, models, observation.LastAttemptAt ?? DateTimeOffset.MinValue, observation);
     }
 
     private async Task<IReadOnlyList<StoredResource<ModelResource>>> ListModelResourcesAsync(

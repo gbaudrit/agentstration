@@ -76,6 +76,16 @@
 <data name="ConfigurationValues"><value>Configuration values</value></data><data name="ValueBindings"><value>Value Bindings</value></data><data name="ValueBindingsHelp"><value>Bind each AEP requirement to a literal value, a Parameter or a Secret. Values are revalidated by the server when saved and used.</value></data>
   <data name="Input"><value>Input</value></data>
   <data name="Output"><value>Output</value></data>
+  <data name="Discovery.Requested" xml:space="preserve"><value>Model discovery requested</value></data>
+  <data name="Discovery.State.never" xml:space="preserve"><value>Models have not been discovered yet</value></data>
+  <data name="Discovery.State.queued" xml:space="preserve"><value>Model discovery is queued</value></data>
+  <data name="Discovery.State.running" xml:space="preserve"><value>Discovering models in the background</value></data>
+  <data name="Discovery.State.succeeded" xml:space="preserve"><value>Model discovery completed</value></data>
+  <data name="Discovery.State.failed" xml:space="preserve"><value>Model discovery failed</value></data>
+  <data name="Discovery.Failure" xml:space="preserve"><value>The provider could not be queried. You can continue editing its configuration.</value></data>
+  <data name="Discovery.Timeout" xml:space="preserve"><value>The provider did not respond in time. You can continue editing its configuration.</value></data>
+  <data name="Discovery.RetryAt" xml:space="preserve"><value>Next automatic attempt: {0}.</value></data>
+  <data name="MetadataUnavailable" xml:space="preserve"><value>Extension details are temporarily unavailable. You can still view the saved provider and its model catalog.</value></data>
   <data name="SpecificationOverrides" xml:space="preserve"><value>Model specification overrides</value></data>
   <data name="RefreshDraftConflict" xml:space="preserve"><value>A newer saved version is available. Discard your draft to load it.</value></data>
   <data name="ObservationUnavailable" xml:space="preserve"><value>The available model catalog could not be loaded. Refresh to try again.</value></data>

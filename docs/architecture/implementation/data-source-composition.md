@@ -279,9 +279,13 @@ cancellation, foreign references/Workspaces, reserved-prefix isolation, Storage
 envelope refusal, and pending/completed acquisitions across real host restarts.
 
 The protected OpenAPI acquisition fixture grants builtin StorageType use explicitly
-in Workspace context. Tenant administration deliberately cannot read Instance
-resources; its offline acquisition fixture seeds a Tenant-owned Core local type
-and Storage instead. Production authorization and default provisioning are unchanged.
+in Workspace context. The historical Tenant acquisition fixture seeds a Tenant-owned Core local type
+and Storage. Following ADR-0240, Tenant administration can also read Instance
+resources explicitly shared with the selected Tenant. Native operation acquisition
+resolves private type and adapter dependencies under the operation owner while
+retaining the consumer Workspace for execution. The offline shared-service fixture
+covers contract inspection, save and acquisition without consumer type or Flow grants.
+Production provisioning does not create additional grants.
 
 The architecture and route framing was approved before UI work. Explicit
 maintainer approval of the implemented UX and a merged implementation PR are

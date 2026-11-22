@@ -83,6 +83,7 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);
         AddClient<PacksApiClient, IPacksClient>(services, configured.ManagementApi);
         AddClient<BootstrapProfilesApiClient, IBootstrapProfilesApiClient>(services, configured.ManagementApi, resilient: false);
+        AddClient<BootstrapStartupApiClient, IBootstrapStartupApiClient>(services, configured.ManagementApi, resilient: false);
         AddClient<TriggerApiClient, ITriggerApiClient>(services, configured.ManagementApi);
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);

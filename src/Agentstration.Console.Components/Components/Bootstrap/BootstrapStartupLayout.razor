@@ -1,0 +1,15 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+<MainLayout SectionTitle="@SectionTitle" EnableCommandPalette="false" Body="@Body">
+    <NoticeContent>@if (ShowNotice && SectionTitle is null) { <BootstrapStartupNotice /> }</NoticeContent>
+    <StatusContent>
+        <HealthIndicator Label="@Localizer["Brand"]" StatusText="@Localizer["Title"]" Status="UiStatus.Info" />
+    </StatusContent>
+</MainLayout>
+
+@code {
+    [Parameter] public bool ShowNotice { get; set; } = true;
+    private string? SectionTitle => ("/" + Navigation.ToBaseRelativePath(Navigation.Uri)).Split('?', '#')[0] == BootstrapStartupNavigation.ProgressPath ? Localizer["Title"].Value : null;
+}

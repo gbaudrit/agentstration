@@ -62,7 +62,7 @@ public sealed class DataSourceDatasetCompositionService(
                 await publications.ValidateAsync(new(inputStorage, consumerContext, effective), cancellationToken);
             }
         }
-        var flow = await flows.ResolveOperationAsync(consumer, adapter.Flow, cancellationToken);
+        var flow = await flows.ResolveOperationAsync(operation.ScopeRef!.Value, adapter.Flow, cancellationToken);
         if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
             return new(definition, operation, type, input, output, partition, flow)
             { OperationOutputSchema = rawOutput, OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot };

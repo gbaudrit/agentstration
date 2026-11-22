@@ -1388,7 +1388,8 @@
           ],
           "populatedHostCases": [],
           "workplaceObservationIndexes": []
-        }
+        },
+        "currentImplementationEvidence": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md"
       },
       "compactAdoption": {
         "decision": "native-domain-presentation",
@@ -1402,10 +1403,10 @@
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
       },
       "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
+        "decision": "shared-catalog-with-preserved-preview-workflow",
+        "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
+        "review": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md",
+        "uiChanged": true
       }
     },
     {
@@ -1477,7 +1478,8 @@
           ],
           "populatedHostCases": [],
           "workplaceObservationIndexes": []
-        }
+        },
+        "currentImplementationEvidence": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md"
       },
       "compactAdoption": {
         "decision": "native-domain-presentation",
@@ -1491,31 +1493,31 @@
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
       },
       "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
+        "decision": "shared-catalog-with-preserved-preview-workflow",
+        "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
+        "review": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md",
+        "uiChanged": true
       }
     },
     {
       "id": "bootstrap-profiles-bootstrap-applied-resource",
-      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
-      "line": 181,
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationResources.razor",
+      "line": 14,
       "host": "console",
       "routes": [
         "/settings/bootstrap"
       ],
       "renderer": "CollectionView",
-      "itemType": "BootstrapAppliedResource",
+      "itemType": "BootstrapApplicationProgressRow",
       "identityLabel": "Resource",
       "scope": false,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Profile",
-        "Message"
+        "Target"
       ],
-      "validation": "source-adopted-and-regression-mapped",
+      "validation": "current-bootstrap-progress-adapter",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
@@ -1557,7 +1559,7 @@
             "screenshot": null
           }
         ],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering.",
+        "interpretation": "Current implementation checks cover viewport following across bounded pages, pause/resume, failed-group selection, safe diagnostics and same-ID reload; reusable #1217 remains gated by UX validation and merge.",
         "routeEvidencePeriod": "Historical pre-compact captures; current evidence is recorded separately below.",
         "compactEvidence": {
           "routeCases": [
@@ -1566,7 +1568,8 @@
           ],
           "populatedHostCases": [],
           "workplaceObservationIndexes": []
-        }
+        },
+        "currentImplementationEvidence": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md"
       },
       "compactAdoption": {
         "decision": "native-domain-presentation",
@@ -1580,10 +1583,10 @@
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
       },
       "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
+        "decision": "shared-catalog-with-preserved-preview-workflow",
+        "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
+        "review": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md",
+        "uiChanged": true
       }
     },
     {
@@ -7316,6 +7319,112 @@
         "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
       },
       "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
+    },
+    {
+      "id": "bootstrap-profiles-bootstrap-profile-selection",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "ResourceCollectionTemplate",
+      "adaptation": "Shared catalog metrics, search, scope filter and exact local paging over the complete authorized catalog; ordered selection and preview/confirmation remain feature-owned.",
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "native applicable semantics; preserve family interaction",
+        "domainSpecifications": [
+          "tests/distribution.spec.ts"
+        ],
+        "sharedHostSpecifications": [],
+        "routeEvidence": [
+          {
+            "route": "/settings/bootstrap",
+            "language": "en-US",
+            "theme": "Dark",
+            "width": 1920,
+            "identitiesObserved": 0,
+            "screenshot": "evidence/1121/all-lists/settings-bootstrap-desktop-en-dark.png"
+          },
+          {
+            "route": "/settings/bootstrap",
+            "language": "en-US",
+            "theme": "Light",
+            "width": 1920,
+            "identitiesObserved": 0,
+            "screenshot": null
+          },
+          {
+            "route": "/settings/bootstrap",
+            "language": "fr-FR",
+            "theme": "Dark",
+            "width": 390,
+            "identitiesObserved": 0,
+            "screenshot": "evidence/1121/all-lists/settings-bootstrap-mobile-fr-dark.png"
+          },
+          {
+            "route": "/settings/bootstrap",
+            "language": "fr-FR",
+            "theme": "Light",
+            "width": 390,
+            "identitiesObserved": 0,
+            "screenshot": null
+          }
+        ],
+        "interpretation": "Earlier captures describe the previous native grid. Fresh desktop/mobile implementation smoke validates shared catalog metrics, paging, preview/confirmation and durable progress; reusable #1217 remains deferred.",
+        "routeEvidencePeriod": "Historical pre-compact captures; current evidence is recorded separately below.",
+        "compactEvidence": {
+          "routeCases": [
+            "route-settings-bootstrap-en-US-dark",
+            "route-settings-bootstrap-fr-FR-light"
+          ],
+          "populatedHostCases": [],
+          "workplaceObservationIndexes": []
+        },
+        "currentImplementationEvidence": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md"
+      },
+      "compactAdoption": {
+        "decision": "native-domain-presentation",
+        "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
+        "context": "Preserve the existing scope/context contract; no inferred ownership.",
+        "domainSemantics": "Keep native profile selection and nested plan diagnostics; application/history/result tables use the shared frame and existing disposition badges.",
+        "evidenceStatus": "Historical compact-adoption baseline is retained here; current source and implementation evidence are recorded in verification.currentImplementationEvidence.",
+        "implementationPR": 1123,
+        "coveragePR": 1132,
+        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
+        "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
+      },
+      "listLayoutDisposition": {
+        "decision": "shared-catalog-with-preserved-preview-workflow",
+        "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
+        "review": "evidence/1250/startup-progress/catalog-and-step-refinement/README.md",
+        "uiChanged": true
+      },
+      "itemType": "BootstrapProfileSummary"
+    },
+    {
+      "id": "bootstrap-startup-resource-progress",
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapStartupResourceList.razor",
+      "host": "console",
+      "routes": [
+        "/startup/progress"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "BootstrapStartupResource",
+      "validation": "implementation-smoke-and-component-regressions",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionView / BootstrapStartupProgressTests",
+        "domainSpecifications": [],
+        "interpretation": "Administrator-only bounded startup observations, optional focused paging, viewport follow/pause and visible safe failure diagnostics; reusable #1251 remains gated by UX validation and merge.",
+        "currentImplementationEvidence": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md"
+      },
+      "listLayoutDisposition": {
+        "decision": "bounded-startup-resource-progress",
+        "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
+        "review": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md",
+        "uiChanged": true
+      }
     }
   ],
   "specialized": [
@@ -8293,86 +8402,6 @@
         "coveragePR": 1132,
         "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
         "sourceBlob": "d4da83d8375a55148057427f53b5b6d2b1fe7f30"
-      }
-    },
-    {
-      "id": "bootstrap-profiles-bootstrap-profile-selection",
-      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
-      "host": "console",
-      "routes": [
-        "/settings/bootstrap"
-      ],
-      "renderer": "native-specialized",
-      "adaptation": "Keep native profile selection and nested plan diagnostics; application/history/result tables use the shared frame and existing disposition badges.",
-      "validation": "source-adopted-and-regression-mapped",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "native applicable semantics; preserve family interaction",
-        "domainSpecifications": [
-          "tests/distribution.spec.ts"
-        ],
-        "sharedHostSpecifications": [],
-        "routeEvidence": [
-          {
-            "route": "/settings/bootstrap",
-            "language": "en-US",
-            "theme": "Dark",
-            "width": 1920,
-            "identitiesObserved": 0,
-            "screenshot": "evidence/1121/all-lists/settings-bootstrap-desktop-en-dark.png"
-          },
-          {
-            "route": "/settings/bootstrap",
-            "language": "en-US",
-            "theme": "Light",
-            "width": 1920,
-            "identitiesObserved": 0,
-            "screenshot": null
-          },
-          {
-            "route": "/settings/bootstrap",
-            "language": "fr-FR",
-            "theme": "Dark",
-            "width": 390,
-            "identitiesObserved": 0,
-            "screenshot": "evidence/1121/all-lists/settings-bootstrap-mobile-fr-dark.png"
-          },
-          {
-            "route": "/settings/bootstrap",
-            "language": "fr-FR",
-            "theme": "Light",
-            "width": 390,
-            "identitiesObserved": 0,
-            "screenshot": null
-          }
-        ],
-        "interpretation": "Route observations may be empty or only expose the host. Embedded populated interactions are verified by the mapped domain regressions, not inferred from host rendering.",
-        "routeEvidencePeriod": "Historical pre-compact captures; current evidence is recorded separately below.",
-        "compactEvidence": {
-          "routeCases": [
-            "route-settings-bootstrap-en-US-dark",
-            "route-settings-bootstrap-fr-FR-light"
-          ],
-          "populatedHostCases": [],
-          "workplaceObservationIndexes": []
-        }
-      },
-      "compactAdoption": {
-        "decision": "native-domain-presentation",
-        "identity": "Retain meaningful native identities, complete accessible text and existing permitted interaction; do not manufacture resource fields.",
-        "context": "Preserve the existing scope/context contract; no inferred ownership.",
-        "domainSemantics": "Keep native profile selection and nested plan diagnostics; application/history/result tables use the shared frame and existing disposition badges.",
-        "evidenceStatus": "Current source reviewed; applicable route checks, populated host journeys and family regression ownership are recorded in verification.compactEvidence.",
-        "implementationPR": 1123,
-        "coveragePR": 1132,
-        "sourceCommit": "0219023627de7e05b750e5f400e936dee3764174",
-        "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
-      },
-      "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
       }
     },
     {
@@ -15884,7 +15913,7 @@
         "/settings/bootstrap"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Native Bootstrap Tenant targets preserve authorization, exact target IDs and target-scope prerequisites.",
+      "adaptation": "Per-profile explicit or previously declared target; Instance/Tenant/Workspace order is server-owned. Typed bindings may refer to an earlier producer profile and resolve its physical owner at execution.",
       "validation": "source-adopted-and-regression-mapped",
       "discoveredDuring": "2026-11-13 compact rollout reconciliation",
       "verification": {
@@ -15895,7 +15924,7 @@
         ],
         "sharedHostSpecifications": [],
         "routeEvidence": [],
-        "interpretation": "Newly reconciled embedded surface. Historical host captures do not certify populated behavior; use the mapped domain journeys and fresh compact campaign.",
+        "interpretation": "Current staged Bootstrap implementation is covered by component/API tests and temporary executable smoke. Historical captures predate this workflow; reusable #1217 remains deferred pending UX validation and merge.",
         "compactEvidence": {
           "routeCases": [
             "route-settings-bootstrap-en-US-dark",
@@ -15916,10 +15945,9 @@
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
       },
       "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
+        "decision": "staged-bootstrap-preparation-preview-progress",
+        "reason": "Keep the catalog, target preparation, confirmed preview and durable observation as distinct views; no inline catalog-configuration panel.",
+        "uiChanged": true
       }
     },
     {
@@ -15930,7 +15958,7 @@
         "/settings/bootstrap"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Native Bootstrap Workspace targets preserve authorized Tenant/Workspace context and exact IDs.",
+      "adaptation": "Per-profile explicit or previously declared target; Instance/Tenant/Workspace order is server-owned. Typed bindings may refer to an earlier producer profile and resolve its physical owner at execution.",
       "validation": "source-adopted-and-regression-mapped",
       "discoveredDuring": "2026-11-13 compact rollout reconciliation",
       "verification": {
@@ -15941,7 +15969,7 @@
         ],
         "sharedHostSpecifications": [],
         "routeEvidence": [],
-        "interpretation": "Newly reconciled embedded surface. Historical host captures do not certify populated behavior; use the mapped domain journeys and fresh compact campaign.",
+        "interpretation": "Current staged Bootstrap implementation is covered by component/API tests and temporary executable smoke. Historical captures predate this workflow; reusable #1217 remains deferred pending UX validation and merge.",
         "compactEvidence": {
           "routeCases": [
             "route-settings-bootstrap-en-US-dark",
@@ -15962,10 +15990,9 @@
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
       },
       "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
+        "decision": "staged-bootstrap-preparation-preview-progress",
+        "reason": "Keep the catalog, target preparation, confirmed preview and durable observation as distinct views; no inline catalog-configuration panel.",
+        "uiChanged": true
       }
     },
     {
@@ -15976,7 +16003,7 @@
         "/settings/bootstrap"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Declarative Bootstrap bindings preserve authorized typed targets, exact scoped keys, preview digest and apply prerequisites.",
+      "adaptation": "Per-profile explicit or previously declared target; Instance/Tenant/Workspace order is server-owned. Typed bindings may refer to an earlier producer profile and resolve its physical owner at execution.",
       "validation": "source-adopted-and-regression-mapped",
       "discoveredDuring": "2026-11-13 compact rollout reconciliation",
       "verification": {
@@ -15987,7 +16014,7 @@
         ],
         "sharedHostSpecifications": [],
         "routeEvidence": [],
-        "interpretation": "Newly reconciled embedded surface. Historical host captures do not certify populated behavior; use the mapped domain journeys and fresh compact campaign.",
+        "interpretation": "Current staged Bootstrap implementation is covered by component/API tests and temporary executable smoke. Historical captures predate this workflow; reusable #1217 remains deferred pending UX validation and merge.",
         "compactEvidence": {
           "routeCases": [
             "route-settings-bootstrap-en-US-dark",
@@ -16008,10 +16035,9 @@
         "sourceBlob": "8c55b086f4708418f0df4e1648d9afa492391eda"
       },
       "listLayoutDisposition": {
-        "decision": "retain-bootstrap-composition-preview-apply-workflow",
-        "reason": "Protected ordered selection/target/binding/preview/apply form with embedded results and latest-100 history; not a standalone resource catalog.",
-        "review": "evidence/list-layout/bootstrap-profiles/README.md",
-        "uiChanged": false
+        "decision": "staged-bootstrap-preparation-preview-progress",
+        "reason": "Keep the catalog, target preparation, confirmed preview and durable observation as distinct views; no inline catalog-configuration panel.",
+        "uiChanged": true
       }
     },
     {
@@ -18015,6 +18041,37 @@
         "domainSemantics": "Visible fixed-input binding rows remain specialized ValueBindingRequirementEditor forms with exact input paths, allowed sources, restrictions and validation; row ordering and binding identity stay domain-owned.",
         "evidenceStatus": "Fresh validation pending final merged source."
       }
+    },
+    {
+      "id": "bootstrap-plan-profile-targets",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Ordered selected profiles grouped only by their present scopes, with independent existing/planned targets and reordering within a level.",
+      "validation": "implementation-smoke-and-component-tests; reusable-journey-deferred",
+      "verification": {
+        "sourceReviewed": true,
+        "interpretation": "Implementation review only; native UX child #1217 remains blocked by validation and merge. No new reusable journey is claimed.",
+        "currentImplementationEvidence": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md"
+      }
+    },
+    {
+      "id": "bootstrap-plan-preview-targets",
+      "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Read-only ordered profile/target summary with explicit deferred-validation badges; resources remain bounded and paged.",
+      "validation": "implementation-smoke-and-component-tests; reusable-journey-deferred",
+      "verification": {
+        "sourceReviewed": true,
+        "interpretation": "Implementation review only; native UX child #1217 remains blocked by validation and merge. No new reusable journey is claimed."
+      }
     }
   ],
   "sourceAudit": [
@@ -18749,6 +18806,11 @@
       "reason": "Configured creation-step navigation and its content panes, not functional resource datasets. Screen-owned fields and collections keep their own adapters and existing inventory entries."
     },
     {
+      "source": "src/Agentstration.Web.Components/StepProgress.razor",
+      "classification": "non-collection-control",
+      "reason": "Configured progress-step navigation synchronized with a selected content panel; steps are process controls, not independently owned functional datasets. Domain content and collections remain host-owned."
+    },
+    {
       "source": "src/Agentstration.Web.Components/ResourceNavigation.razor",
       "classification": "non-collection-control",
       "reason": "Configured resource-local primary/child navigation entries duplicated into a modal drawer, not functional resource datasets; resource content and collections remain screen-owned."
@@ -18797,6 +18859,26 @@
       "source": "src/Agentstration.Console.Components/Components/ExtensionResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Saved Extension configuration is shared by the persisted overview and exact registration Preview. Quick actions are commands; pending enrollment controls remain in the collection's existing inline editor."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapStartupResourceList.razor",
+      "classification": "inventoried",
+      "reason": "Bounded startup resource pages are classified as their own shared collection frame."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationResources.razor",
+      "classification": "inventoried",
+      "reason": "Paged planned/applied resources in the manual Bootstrap progress panel."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapStartupModelCorrection.razor",
+      "classification": "non-collection-control",
+      "reason": "Provider/model options are bounded form choices, not a resource collection."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationProgress.razor",
+      "classification": "non-collection-control",
+      "reason": "Configured process-step navigation delegates resource rows to BootstrapApplicationResources."
     }
   ],
   "reconciliation": {

@@ -34,8 +34,8 @@ public interface IModelProvidersClient
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetProviderModelsAsync(providerName, cancellationToken);
     Task<IReadOnlyList<AvailableModelResponse>> GetProviderModelsAsync(ResourceNamespace @namespace, string providerName, ResourceScopeRef contextScope, CancellationToken cancellationToken) =>
         GetProviderModelsAsync(@namespace, providerName, cancellationToken);
-    Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
-        Task.FromException<ModelDiscoveryDiffResponse>(new NotSupportedException("This client does not support model discovery refresh."));
+    Task<ModelProviderStatusResponse> RefreshProviderModelsAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
+        Task.FromException<ModelProviderStatusResponse>(new NotSupportedException("This client does not support model discovery refresh."));
     Task<ModelProviderStatusResponse> GetProviderStatusAsync(string providerName, CancellationToken cancellationToken);
     Task<ModelProviderStatusResponse> GetProviderStatusAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetProviderStatusAsync(providerName, cancellationToken);
     Task<ModelProviderStatusResponse> TestProviderAsync(string providerName, CancellationToken cancellationToken);
@@ -359,14 +359,14 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
         CancellationToken cancellationToken) =>
         ReadValuesAsync<AvailableModelResponse>(ChildPath(@namespace, providerName, "models"), contextScope, cancellationToken);
 
-    public async Task<ModelDiscoveryDiffResponse> RefreshProviderModelsAsync(
+    public async Task<ModelProviderStatusResponse> RefreshProviderModelsAsync(
         ResourceNamespace @namespace,
         string providerName,
         CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsync(ChildPath(@namespace, providerName, "models/refresh"), null, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadFromJsonAsync<ModelDiscoveryDiffResponse>(cancellationToken)
+        return await response.Content.ReadFromJsonAsync<ModelProviderStatusResponse>(cancellationToken)
             ?? throw new AgentstrationApiException("Agentstration API returned an empty model discovery result.", Guid.NewGuid().ToString("N"));
     }
 

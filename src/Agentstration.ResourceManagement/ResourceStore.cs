@@ -1,3 +1,4 @@
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 
 namespace Agentstration.ResourceManagement;
@@ -28,7 +29,10 @@ public sealed record ResourceIdentitySnapshot(
     string Name,
     long Generation,
     string? Version,
-    string ETag);
+    string ETag)
+{
+    public ResourceAccessIdentity? AccessPolicySource { get; init; }
+}
 
 public interface IResourceIdentityContributor
 {

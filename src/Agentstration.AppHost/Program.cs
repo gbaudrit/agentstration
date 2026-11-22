@@ -1,5 +1,6 @@
 using Agentstration.AppHost;
 using Aspire.Hosting.ApplicationModel;
+using Microsoft.Extensions.Configuration;
 
 var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions
 {
@@ -381,6 +382,8 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithEnvironment("Agentstration__AwpWorkerTrust__MaximumBodyBytes", "2097152")
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
+foreach (var setting in BootstrapEnrollmentConfiguration.CreateEnvironment(builder.Configuration))
+    console.WithEnvironment(setting.Key, setting.Value);
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");
 if (aepInferenceTimeout is not null)
     console.WithEnvironment("Agentstration__Aep__Inference__Timeout", aepInferenceTimeout);
@@ -402,12 +405,17 @@ var allowedAepHosts = new[] { "localhost", "127.0.0.1", "::1" }
     .Concat(developmentExtensions.Select(extension => extension.ResourceName))
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
-for (var index = 0; index < allowedAepHosts.Length; index++)
-{
-    console
-        .WithEnvironment($"Agentstration__Aep__Transport__AllowedHttpHosts__{index}", allowedAepHosts[index])
-        .WithEnvironment($"Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__{index}", allowedAepHosts[index]);
-}
+var configuredHttpHosts = allowedAepHosts
+    .Concat(builder.Configuration.GetSection("Agentstration:Aep:Transport:AllowedHttpHosts").Get<string[]>() ?? [])
+    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+var configuredPrivateHosts = allowedAepHosts
+    .Concat(builder.Configuration.GetSection("Agentstration:Aep:Transport:AllowedPrivateNetworkHosts").Get<string[]>() ?? [])
+    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+for (var index = 0; index < configuredHttpHosts.Length; index++)
+    console.WithEnvironment($"Agentstration__Aep__Transport__AllowedHttpHosts__{index}", configuredHttpHosts[index]);
+for (var index = 0; index < configuredPrivateHosts.Length; index++)
+    console.WithEnvironment($"Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__{index}", configuredPrivateHosts[index]);
+
 if (string.Equals(storageProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase))
     console.WithPostgreSqlStorage(builder, slot, instanceId);
 else

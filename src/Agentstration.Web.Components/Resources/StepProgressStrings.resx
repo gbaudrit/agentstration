@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Steps" xml:space="preserve"><value>Preparation steps</value></data>
+  <data name="Details" xml:space="preserve"><value>Step details</value></data>
+  <data name="NoSteps" xml:space="preserve"><value>No steps to display.</value></data>
+  <data name="NoSelectableSteps" xml:space="preserve"><value>No step is available for inspection.</value></data>
+  <data name="FollowCurrent" xml:space="preserve"><value>Follow the current step</value></data>
+  <data name="Pending" xml:space="preserve"><value>Not started</value></data>
+  <data name="Running" xml:space="preserve"><value>In progress</value></data>
+  <data name="Waiting" xml:space="preserve"><value>Waiting</value></data>
+  <data name="Succeeded" xml:space="preserve"><value>Completed</value></data>
+  <data name="Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Skipped" xml:space="preserve"><value>Skipped</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Interrupted" xml:space="preserve"><value>Interrupted</value></data>
+  <data name="Expand" xml:space="preserve"><value>Show {0} resources</value></data>
+  <data name="Collapse" xml:space="preserve"><value>Hide {0} resources</value></data>
+</root>

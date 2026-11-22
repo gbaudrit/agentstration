@@ -129,10 +129,52 @@ is validated against the declared operation types before materialization.
 | `POST` | `/api/connected-service-operation-discoveries/{id}/cancel?namespace=...` | Cancel an active discovery |
 | `GET` | `/api/connected-services/{name}/operations?scopeRef=...&namespace=...` | List materialized operations |
 | `GET` | `/api/connected-service-operations/{name}?scopeRef=...&namespace=...` | Read an exact materialized operation |
+| `POST` | `/api/connected-service-operations/contract` | Inspect an authorized exact operation contract |
 
 Materialized operations are read-only. Rediscovery preserves their deterministic
 identity, updates validated definitions and marks operations omitted from the
 latest successful manifest as unavailable instead of deleting them.
+
+### Expose operations to descendant scopes
+
+In the service's **Definition > Access to discovered operations** section (or the creation
+wizard's Access step), use the switch **Expose all discovered operations using the service
+access rules**. The persisted option is `definition.exposeOperationsToDescendants`
+and defaults to `true` when omitted. New Console services start with exposure enabled; an explicit saved `false` remains an opt-out.
+
+When enabled, all current and subsequently discovered operations inherit the
+service's current resource access policy: `discover` controls lists and direct
+reads, and `use` controls consumption. Exact-target and propagated descendant grants
+keep their existing meaning. Revocation and disabling exposure take effect without
+rediscovery. Changing only this access choice updates the ETag without changing the
+connection generation pinned by existing operations. Other configuration changes
+continue to require exact revision reconciliation.
+
+Exposure does not activate operations. Enabled/available operations still require
+valid service and operation-type revisions and the current service `use` permission.
+Service consumption uses the shared resource access policy; the legacy embedded
+service `usePolicy` is retained for faithful round trips but is no longer a second
+consumer authorization gate. Configure scopes/actions in the saved service’s **Access** section.
+
+A consumer can inspect the exact contract through `POST /api/connected-service-operations/contract`
+with its exact operation revision reference. This checks current operation/service
+use and resolves the pinned type in the operation owner’s scope. It does not grant
+standalone discovery/use of that type or Flow. The Console uses this operation-bound
+contract when the administrative type catalogue is unavailable.
+
+The native operation acquisition adapter resolves its exact dependencies under the
+operation owner’s permissions while the Data Source and Flow Run remain in the
+consumer Workspace. Authored compositions retain their existing Flow permissions.
+
+Tenant administration catalogues now include Instance resources explicitly shared
+with the selected Tenant. Unshared ancestors, other Tenants and business Workspaces
+remain excluded. Commands and exact-owner inventory keep their ownership scope.
+
+Unrelated scopes and mismatched service
+UIDs, addresses, namespaces or owners never acquire inherited access. Discovery
+execution permissions are unchanged. Individual operation access editing is deferred.
+
+See [ADR-0239](../decisions/0239-discovered-operations-can-inherit-connected-service-access.md) and the superseding [ADR-0240](../decisions/0240-shared-connected-service-consumption-keeps-owner-bound-dependencies.md).
 
 ## Connected Services
 

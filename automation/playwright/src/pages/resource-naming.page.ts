@@ -27,11 +27,19 @@ export class ResourceNamingPage {
   public async deriveAgentName(displayName: string, expectedTechnicalName: string): Promise<void> {
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.displayName), displayName);
     await expect(this.page.getByTestId(TestIds.agentEditor.name)).toHaveValue(expectedTechnicalName);
+    await expect(this.agentReviewName).toHaveText(`default/${expectedTechnicalName}`);
   }
 
   public async overrideAgentName(technicalName: string, displayName: string): Promise<void> {
-    await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.name), technicalName);
+    // Input values change locally before Blazor acknowledges them. Commit this
+    // idempotent edit against the server-rendered review before editing its peer.
+    await expect(async () => {
+      await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.name), technicalName);
+      await expect(this.agentReviewName).toHaveText(`default/${technicalName}`, { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
     await fillAndCommit(this.page.getByTestId(TestIds.agentEditor.displayName), displayName);
+    await expect(this.agentReviewName.locator('..')).toContainText(displayName);
+    await expect(this.agentReviewName).toHaveText(`default/${technicalName}`);
     await expect(this.page.getByTestId(TestIds.agentEditor.name)).toHaveValue(technicalName);
   }
 
@@ -105,6 +113,8 @@ export class ResourceNamingPage {
     await this.page.getByTestId(TestIds.parameterEditor.save).click();
     await this.page.locator('.form-alert-danger[role="alert"]').waitFor({ state: 'visible' });
   }
+
+  private get agentReviewName() { return this.page.locator('[data-step-id="review"] .resource-details code').first(); }
 
   public get agentIdentity() { return this.page.getByTestId(TestIds.agentEditor.identitySection); }
   public get parameterForm() { return this.page.getByTestId(TestIds.parameterEditor.form); }

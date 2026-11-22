@@ -9,6 +9,6 @@ app.UseAgentstrationHttpDiagnostics();
 
 app.ConfigureAgentstrationStandaloneHost(composition);
 await app.InitializeAgentstrationStandaloneHostAsync(composition);
-await app.RunAsync();
+await app.RunAgentstrationStandaloneHostAsync();
 
 public partial class Program;

@@ -100,6 +100,14 @@ public sealed class ResourceAccessPolicyService(
             return await DecisionAsync(false, ResourceAccessDecisionReasons.ConsumerOutsideOwnerTree,
                 current.ScopeRef, cancellationToken);
 
+        if (current.AccessPolicySource is { } source)
+        {
+            if (source.Uid == current.Uid || source.OwnerScopeRef != current.ScopeRef)
+                return await DecisionAsync(false, ResourceAccessDecisionReasons.RequestInvalid,
+                    current.ScopeRef, cancellationToken);
+            return await EvaluateAsync(source, consumerScopeRef, action, cancellationToken);
+        }
+
         var stored = await policies.GetAsync(resource.Uid, current.ScopeRef, cancellationToken);
         if (stored is null)
             return await DecisionAsync(false, ResourceAccessDecisionReasons.PolicyMissing,

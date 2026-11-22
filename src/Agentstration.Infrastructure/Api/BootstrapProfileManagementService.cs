@@ -1,4 +1,8 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using Agentstration.Bootstrap.Contracts;
+using Agentstration.ConnectedServices.Contracts;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Models;
 using Agentstration.Parameters;
@@ -8,16 +12,21 @@ using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Secrets;
 using Agentstration.Security.Contracts;
+using Agentstration.Storage.Contracts;
 using Agentstration.Tools;
+using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Web.Hosting;
 
 public sealed class BootstrapApplicationLock
 {
-    internal SemaphoreSlim Semaphore { get; } = new(1, 1);
+    internal SemaphoreSlim Execution { get; } = new(1, 1);
+    internal SemaphoreSlim Admission { get; } = new(1, 1);
+    internal SemaphoreSlim State { get; } = new(1, 1);
+    internal string Owner { get; } = Guid.NewGuid().ToString("N");
 }
 
-public sealed class BootstrapProfileManagementService(
+public sealed partial class BootstrapProfileManagementService(
     BootstrapProfileCatalog catalog,
     SourceBootstrapProfileLoader sourceProfiles,
     DeclarativeBootstrapService bootstrap,
@@ -27,7 +36,8 @@ public sealed class BootstrapProfileManagementService(
     IResourceStore store,
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
-    BootstrapApplicationLock applicationLock) : IBootstrapProfileApiService
+    BootstrapApplicationLock applicationLock,
+    ILogger<BootstrapProfileManagementService>? logger = null) : IBootstrapProfileApiService
 {
     public async Task<BootstrapManagementView> GetAsync(Guid actorPrincipalId, CancellationToken cancellationToken)
     {
@@ -66,6 +76,7 @@ public sealed class BootstrapProfileManagementService(
         CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        if (selection.Applications is { Count: > 0 }) return await PreviewPlanAsync(selection, actorPrincipalId, cancellationToken);
         var targetContext = await ResolveTargetContextAsync(selection.Target, actorPrincipalId, cancellationToken);
         using var operationScope = PushTargetScope(targetContext);
         return await bootstrap.PreviewAsync(selection, cancellationToken);
@@ -111,6 +122,15 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.Tool => Options(
                 await store.ListAsync<ToolResource>(ToolResourceKinds.Tool, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.ConnectedServiceType => Options(
+                await store.ListAsync<ConnectedServiceTypeResource>(ConnectedServiceResourceKinds.ConnectedServiceType, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.StorageType => Options(
+                await store.ListAsync<StorageTypeResource>(StorageResourceKinds.StorageType, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.DataSourceProfile => Options(
+                await store.ListAsync<DataSourceProfileResource>(DataSourceResourceKinds.DataSourceProfile, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.Parameter => Options(
                 await store.ListAsync<ParameterResource>(ParameterResourceKinds.Parameter, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
@@ -126,6 +146,9 @@ public sealed class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.RuntimeProfile => RuntimeProfileResourceKinds.RuntimeProfile,
             BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
             BootstrapBindingTargetKind.Tool => ToolResourceKinds.Tool,
+            BootstrapBindingTargetKind.ConnectedServiceType => ConnectedServiceResourceKinds.ConnectedServiceType,
+            BootstrapBindingTargetKind.StorageType => StorageResourceKinds.StorageType,
+            BootstrapBindingTargetKind.DataSourceProfile => DataSourceResourceKinds.DataSourceProfile,
             BootstrapBindingTargetKind.Parameter => ParameterResourceKinds.Parameter,
             BootstrapBindingTargetKind.Secret => SecretResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
@@ -160,20 +183,122 @@ public sealed class BootstrapProfileManagementService(
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (string.IsNullOrWhiteSpace(applicationId)) return null;
-        await applicationLock.Semaphore.WaitAsync(cancellationToken);
+        using var systemScope = scopes.PushSystem();
+        var application = (await store.GetAsync<BootstrapApplicationResource>(
+            new(BootstrapKinds.BootstrapApplication, applicationId), cancellationToken))?.Value;
+        return await RecoverAsync(application, cancellationToken);
+    }
+
+    public async Task<BootstrapApplicationResource?> CancelAsync(string applicationId, Guid actorPrincipalId, CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        await applicationLock.State.WaitAsync(cancellationToken);
         try
         {
             using var systemScope = scopes.PushSystem();
-            var application = (await store.GetAsync<BootstrapApplicationResource>(
-                new(BootstrapKinds.BootstrapApplication, applicationId),
-                cancellationToken))?.Value;
-            if (application?.Definition.Status != BootstrapApplicationStatus.Running) return application;
-            return await SaveApplicationAsync(Interrupt(application), application.ETag, cancellationToken);
+            var application = (await store.GetAsync<BootstrapApplicationResource>(new(BootstrapKinds.BootstrapApplication, applicationId), cancellationToken))?.Value;
+            if (application?.Definition.Status != BootstrapApplicationStatus.Running || application.Definition.CancellationRequested) return application;
+            return await SaveApplicationAsync(application with
+            {
+                Generation = checked(application.Generation + 1),
+                Definition = application.Definition with { CancellationRequested = true }
+            }, application.ETag, cancellationToken);
         }
-        finally
+        finally { applicationLock.State.Release(); }
+    }
+
+    public async Task<BootstrapApplicationResource> StartAsync(
+        ApplyBootstrapProfilesRequest request,
+        Guid actorPrincipalId,
+        CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        if (string.IsNullOrWhiteSpace(request.ExpectedDigest) || request.RequestId == Guid.Empty)
+            throw new DeclarativeBootstrapException("bootstrap_request_identity_required");
+        var selection = new BootstrapProfileSelection(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications);
+        if (selection.Applications is { Count: > 0 })
         {
-            applicationLock.Semaphore.Release();
+            ValidatePlanRequest(selection);
+            foreach (var item in selection.Applications)
+                if (item.Target is not null) _ = await ResolveTargetContextAsync(item.Target, actorPrincipalId, cancellationToken);
         }
+        else
+        {
+            if ((selection.Profiles.Count == 0) == (request.Source is null) || selection.Profiles.Count > catalog.MaximumSelectedProfiles)
+                throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
+            _ = await ResolveTargetContextAsync(request.Target, actorPrincipalId, cancellationToken);
+        }
+        var fingerprint = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
+            new { Selection = selection, request.ExpectedDigest, Actor = actorPrincipalId })));
+        await applicationLock.Admission.WaitAsync(cancellationToken);
+        try
+        {
+            using var systemScope = scopes.PushSystem();
+            var applications = await ListApplicationsWithRecoveryAsync(cancellationToken, limitHistory: false);
+            var id = (request.RequestId ?? Guid.NewGuid()).ToString("N");
+            // Look up the identity directly: retained history is intentionally bounded.
+            var existing = (await store.GetAsync<BootstrapApplicationResource>(new(BootstrapKinds.BootstrapApplication, id), cancellationToken))?.Value;
+            existing ??= applications.FirstOrDefault(value => request.RequestId is { } requestId && value.Definition.RequestIds.Contains(requestId));
+            if (existing is not null)
+            {
+                if (existing.Definition.RequestFingerprint != fingerprint)
+                    throw new DeclarativeBootstrapException("bootstrap_request_identity_conflict");
+                return existing;
+            }
+            var running = applications.Where(value => value.Definition.Status == BootstrapApplicationStatus.Running).ToArray();
+            var duplicate = running.FirstOrDefault(value => value.Definition.RequestFingerprint == fingerprint);
+            if (duplicate is not null)
+            {
+                if (request.RequestId is not { } duplicateRequestId) return duplicate;
+                await applicationLock.State.WaitAsync(cancellationToken);
+                try
+                {
+                    duplicate = (await store.GetAsync<BootstrapApplicationResource>(new(BootstrapKinds.BootstrapApplication, duplicate.Metadata.Name), cancellationToken))!.Value;
+                    if (duplicate.Definition.RequestIds.Count >= 128)
+                        throw new DeclarativeBootstrapException("bootstrap_request_identity_limit");
+                    return await SaveApplicationAsync(duplicate with
+                    {
+                        Generation = checked(duplicate.Generation + 1),
+                        Definition = duplicate.Definition with { RequestIds = [.. duplicate.Definition.RequestIds, duplicateRequestId] }
+                    }, duplicate.ETag, cancellationToken);
+                }
+                finally { applicationLock.State.Release(); }
+            }
+            if (running.Length >= 16)
+                throw new DeclarativeBootstrapException("bootstrap_application_queue_full");
+            var scope = request.Target?.WorkspaceId is not null ? BootstrapProfileScope.Workspace
+                : request.Target?.TenantId is not null ? BootstrapProfileScope.Tenant : BootstrapProfileScope.Instance;
+            return await SaveApplicationAsync(new BootstrapApplicationResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = BootstrapKinds.BootstrapApplication,
+                Metadata = new ResourceMetadata { Name = id },
+                ScopeRef = scope switch
+                {
+                    BootstrapProfileScope.Workspace => ResourceScopeRef.Workspace(request.Target!.WorkspaceId!.Value),
+                    BootstrapProfileScope.Tenant => ResourceScopeRef.Tenant(request.Target!.TenantId!.Value),
+                    _ => ResourceScopeRef.Instance
+                },
+                Generation = 1,
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Creating },
+                Definition = new BootstrapApplicationProperties
+                {
+                    Source = BootstrapApplicationSource.Manual,
+                    ActorPrincipalId = actorPrincipalId,
+                    Profiles = selection.Applications is { Count: > 0 } planEntries ? planEntries.Select(item => item.Profile).ToArray() : selection.Profiles,
+                    Scope = scope,
+                    Target = request.Target,
+                    Bindings = request.Bindings ?? [],
+                    Digest = request.ExpectedDigest,
+                    StartedAt = timeProvider.GetUtcNow(),
+                    Selection = selection,
+                    ExecutionOwner = applicationLock.Owner,
+                    RequestFingerprint = fingerprint,
+                    RequestIds = [Guid.ParseExact(id, "N")]
+                }
+            }, null, cancellationToken);
+        }
+        finally { applicationLock.Admission.Release(); }
     }
 
     public async Task<BootstrapApplicationResource> ApplyAsync(
@@ -185,60 +310,150 @@ public sealed class BootstrapProfileManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (string.IsNullOrWhiteSpace(expectedDigest))
             throw new DeclarativeBootstrapException("The digest returned by preview is required.");
-        await applicationLock.Semaphore.WaitAsync(cancellationToken);
+        await applicationLock.Execution.WaitAsync(cancellationToken);
         try
         {
-            BootstrapCompositionPreview preview;
-            BootstrapExecutionResult execution;
-            var targetContext = await ResolveTargetContextAsync(selection.Target, actorPrincipalId, cancellationToken);
-            using (PushTargetScope(targetContext))
-            {
-                preview = await bootstrap.PreviewAsync(selection, cancellationToken);
-                if (!string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
-                    throw new DeclarativeBootstrapException("The bootstrap catalog or target changed after preview. Preview the application again.");
-                if (!preview.CanApply)
-                    throw new DeclarativeBootstrapException("The bootstrap preview contains invalid resources and cannot be applied.");
-
-                var application = await CreateApplicationAsync(preview, actorPrincipalId, cancellationToken);
-                try
-                {
-                    execution = await bootstrap.ExecuteAsync(selection, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    var interrupted = Interrupt(application);
-                    _ = await SaveApplicationAsync(interrupted, application.ETag, CancellationToken.None);
-                    await audit.WriteAsync(new(
-                        SecurityAuditActions.BootstrapProfileApplied,
-                        SecurityAuditOutcome.Failed,
-                        ActorPrincipalId: actorPrincipalId,
-                        TenantId: selection.Target?.TenantId,
-                        WorkspaceId: selection.Target?.WorkspaceId,
-                        ReasonCode: "application_interrupted"), CancellationToken.None);
-                    throw;
-                }
-                var completed = Complete(application, execution);
-                completed = await SaveApplicationAsync(completed, application.ETag, cancellationToken);
-                await audit.WriteAsync(new(
-                    SecurityAuditActions.BootstrapProfileApplied,
-                    execution.Error is null ? SecurityAuditOutcome.Succeeded : SecurityAuditOutcome.Failed,
-                    ActorPrincipalId: actorPrincipalId,
-                    TenantId: selection.Target?.TenantId,
-                    WorkspaceId: selection.Target?.WorkspaceId,
-                    ReasonCode: execution.Error is null ? null : "application_failed"), CancellationToken.None);
-                return completed;
-            }
+            var preview = await PreviewAsync(selection, actorPrincipalId, cancellationToken);
+            if (!string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
+                throw new DeclarativeBootstrapException("The bootstrap catalog or target changed after preview. Preview the application again.");
+            if (!preview.CanApply)
+                throw new DeclarativeBootstrapException("The bootstrap preview contains invalid resources and cannot be applied.");
+            var application = await CreateApplicationAsync(preview, actorPrincipalId, cancellationToken, selection);
+            return await ExecuteApplicationAsync(application, selection, cancellationToken);
         }
-        finally
-        {
-            applicationLock.Semaphore.Release();
-        }
+        finally { applicationLock.Execution.Release(); }
     }
+
+    public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
+    {
+        await applicationLock.Execution.WaitAsync(cancellationToken);
+        try
+        {
+            var applications = await ListApplicationsWithRecoveryAsync(cancellationToken);
+            var application = applications.LastOrDefault(value => value.Definition.Status == BootstrapApplicationStatus.Running
+                && value.Definition.Selection is not null);
+            if (application is null) return false;
+            _ = await ExecuteApplicationAsync(application, application.Definition.Selection!, cancellationToken, background: true);
+            return true;
+        }
+        finally { applicationLock.Execution.Release(); }
+    }
+
+    private async Task<BootstrapApplicationResource> ExecuteApplicationAsync(
+        BootstrapApplicationResource application,
+        BootstrapProfileSelection selection,
+        CancellationToken cancellationToken,
+        bool background = false)
+    {
+        try
+        {
+            if (application.Definition.CancellationRequested) throw new OperationCanceledException();
+            await EnsurePlatformAdministratorAsync(application.Definition.ActorPrincipalId!.Value, cancellationToken);
+            var context = await ResolveTargetContextAsync(selection.Target, application.Definition.ActorPrincipalId.Value, cancellationToken);
+            using var operationScope = PushTargetScope(context);
+            Func<BootstrapExecutionProgress, CancellationToken, Task> report = async (progress, token) =>
+                {
+                    await applicationLock.State.WaitAsync(token);
+                    try
+                    {
+                        using var systemScope = scopes.PushSystem();
+                        application = (await store.GetAsync<BootstrapApplicationResource>(
+                            new(BootstrapKinds.BootstrapApplication, application.Metadata.Name), token))!.Value;
+                        application = await SaveApplicationAsync(application with
+                        {
+                            Generation = checked(application.Generation + 1),
+                            Definition = application.Definition with
+                            {
+                                TotalResources = progress.Preview.Resources.Count,
+                                Applications = progress.Preview.Applications,
+                                ResourcePlan = application.Definition.ResourcePlan.Count > 0 ? application.Definition.ResourcePlan : ResourcePlan(progress.Preview),
+                                Profiles = progress.Preview.Profiles.Select(profile => profile.Name).ToArray(),
+                                Bindings = progress.Preview.Bindings,
+                                SourceProvenance = progress.Preview.SourceProvenance,
+                                Resources = progress.Resources,
+                                CurrentResource = progress.CurrentResource
+                            }
+                        }, application.ETag, token);
+                        if (application.Definition.CancellationRequested) throw new OperationCanceledException();
+                    }
+                    finally { applicationLock.State.Release(); }
+                };
+            var execution = selection.Applications is { Count: > 0 }
+                ? await ExecutePlanAsync(selection, application.Definition.ActorPrincipalId.Value, application.Definition.Digest, report, cancellationToken)
+                : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report);
+            await applicationLock.State.WaitAsync(CancellationToken.None);
+            try
+            {
+                using var systemScope = scopes.PushSystem();
+                application = (await store.GetAsync<BootstrapApplicationResource>(
+                    new(BootstrapKinds.BootstrapApplication, application.Metadata.Name), CancellationToken.None))!.Value;
+                if (application.Definition.CancellationRequested) throw new OperationCanceledException();
+                application = await SaveApplicationAsync(Complete(application, execution), application.ETag, CancellationToken.None);
+            }
+            finally { applicationLock.State.Release(); }
+        }
+        catch (OperationCanceledException)
+        {
+            application = await SaveTerminalAsync(application.Metadata.Name, current =>
+            {
+                var interrupted = Interrupt(current);
+                return current.Definition.CancellationRequested || (!background && cancellationToken.IsCancellationRequested)
+                    ? interrupted with { Definition = interrupted.Definition with { Status = BootstrapApplicationStatus.Cancelled, Error = "bootstrap_application_cancelled" } }
+                    : interrupted;
+            });
+            await WriteAuditAsync(application);
+            if (!background) throw;
+            return application;
+        }
+        catch (Exception exception)
+        {
+            var diagnostic = Agentstration.Infrastructure.Bootstrap.BootstrapFailureDiagnostics.Describe(exception);
+            logger?.LogWarning("Bootstrap application {ApplicationId} failed ({ReasonCode}, diagnostic {DiagnosticId}).", application.Metadata.Name, diagnostic.Code, diagnostic.DiagnosticId);
+            // Persist only a safe diagnostic. Provider exceptions may contain resource contents.
+            application = await SaveTerminalAsync(application.Metadata.Name, current => current with
+            {
+                Generation = checked(current.Generation + 1),
+                Status = new ResourceStatus { ProvisioningState = ProvisioningState.Failed },
+                Definition = current.Definition with
+                {
+                    Status = current.Definition.Resources.Any(value => value.Disposition == BootstrapResourceDisposition.Create)
+                        ? BootstrapApplicationStatus.PartiallyApplied : BootstrapApplicationStatus.Failed,
+                    CompletedAt = timeProvider.GetUtcNow(),
+                    CurrentResource = null,
+                    Error = "bootstrap_application_failed",
+                    Failure = diagnostic
+                }
+            });
+        }
+        await WriteAuditAsync(application);
+        return application;
+    }
+
+    private async Task<BootstrapApplicationResource> SaveTerminalAsync(string id, Func<BootstrapApplicationResource, BootstrapApplicationResource> transition)
+    {
+        await applicationLock.State.WaitAsync(CancellationToken.None);
+        try
+        {
+            using var systemScope = scopes.PushSystem();
+            var current = (await store.GetAsync<BootstrapApplicationResource>(new(BootstrapKinds.BootstrapApplication, id), CancellationToken.None))!.Value;
+            return await SaveApplicationAsync(transition(current), current.ETag, CancellationToken.None);
+        }
+        finally { applicationLock.State.Release(); }
+    }
+
+    private Task WriteAuditAsync(BootstrapApplicationResource application) => audit.WriteAsync(new(
+        SecurityAuditActions.BootstrapProfileApplied,
+        application.Definition.Status == BootstrapApplicationStatus.Succeeded ? SecurityAuditOutcome.Succeeded : SecurityAuditOutcome.Failed,
+        ActorPrincipalId: application.Definition.ActorPrincipalId,
+        TenantId: application.Definition.Target?.TenantId,
+        WorkspaceId: application.Definition.Target?.WorkspaceId,
+        ReasonCode: application.Definition.Status == BootstrapApplicationStatus.Succeeded ? null : "application_incomplete"), CancellationToken.None);
 
     private async Task<BootstrapApplicationResource> CreateApplicationAsync(
         BootstrapCompositionPreview preview,
         Guid actorPrincipalId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BootstrapProfileSelection? selection = null)
     {
         var id = Guid.NewGuid();
         var resource = new BootstrapApplicationResource
@@ -253,13 +468,18 @@ public sealed class BootstrapProfileManagementService(
             {
                 Source = BootstrapApplicationSource.Manual,
                 ActorPrincipalId = actorPrincipalId,
+                Selection = selection,
                 Profiles = preview.Profiles.Select(profile => profile.Name).ToArray(),
                 Scope = preview.Scope,
                 Target = preview.Target,
                 Bindings = preview.Bindings,
                 SourceProvenance = preview.SourceProvenance,
                 Digest = preview.Digest,
-                StartedAt = timeProvider.GetUtcNow()
+                StartedAt = timeProvider.GetUtcNow(),
+                TotalResources = preview.Resources.Count,
+                Applications = preview.Applications,
+                ResourcePlan = ResourcePlan(preview),
+                ExecutionOwner = applicationLock.Owner
             }
         };
         return await SaveApplicationAsync(resource, null, cancellationToken);
@@ -283,6 +503,10 @@ public sealed class BootstrapProfileManagementService(
             : createdBeforeFailure
                 ? BootstrapApplicationStatus.PartiallyApplied
                 : BootstrapApplicationStatus.Failed;
+        var diagnostic = execution.Resources.LastOrDefault(row => row.Failure is not null)?.Failure
+            ?? (execution.Error is not null ? new BootstrapFailure("validation", "bootstrap_application_invalid", Guid.NewGuid().ToString("N")) : null);
+        if (diagnostic is not null)
+            logger?.LogWarning("Bootstrap application {ApplicationId} stopped ({ReasonCode}, diagnostic {DiagnosticId}).", application.Metadata.Name, diagnostic.Code, diagnostic.DiagnosticId);
         return application with
         {
             Generation = checked(application.Generation + 1),
@@ -294,11 +518,23 @@ public sealed class BootstrapProfileManagementService(
             {
                 CompletedAt = timeProvider.GetUtcNow(),
                 Status = status,
-                Error = execution.Error,
-                Resources = execution.Resources
+                Error = execution.Error is null ? null
+                    : execution.Error == "bootstrap_resource_failed" ? "bootstrap_resource_failed" : "bootstrap_application_invalid",
+                Failure = diagnostic,
+                Profiles = execution.Preview.Profiles.Select(profile => profile.Name).ToArray(),
+                Bindings = execution.Preview.Bindings,
+                Resources = execution.Resources,
+                TotalResources = execution.Preview.Resources.Count,
+                Applications = execution.Preview.Applications,
+                ResourcePlan = ResourcePlan(execution.Preview),
+                CurrentResource = null,
+                SourceProvenance = execution.Preview.SourceProvenance
             }
         };
     }
+
+    private static IReadOnlyList<BootstrapPlannedResource> ResourcePlan(BootstrapCompositionPreview preview) =>
+        preview.Resources.Select(resource => new BootstrapPlannedResource(resource.Profile, resource.Location, resource.Kind, resource.Name) { TargetLabel = resource.TargetLabel }).ToArray();
 
     private BootstrapApplicationResource Interrupt(BootstrapApplicationResource application) => application with
     {
@@ -308,7 +544,8 @@ public sealed class BootstrapProfileManagementService(
         {
             CompletedAt = timeProvider.GetUtcNow(),
             Status = BootstrapApplicationStatus.Interrupted,
-            Error = "The bootstrap application was interrupted before completion."
+            CurrentResource = null,
+            Error = "bootstrap_application_interrupted"
         }
     };
 
@@ -322,28 +559,32 @@ public sealed class BootstrapProfileManagementService(
     }
 
     private async Task<IReadOnlyList<BootstrapApplicationResource>> ListApplicationsWithRecoveryAsync(
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool limitHistory = true)
     {
-        await applicationLock.Semaphore.WaitAsync(cancellationToken);
+        using var systemScope = scopes.PushSystem();
+        var applications = (await store.ListAllAsync<BootstrapApplicationResource>(
+            BootstrapKinds.BootstrapApplication, cancellationToken)).Select(value => value.Value).ToArray();
+        var recovered = new List<BootstrapApplicationResource>(applications.Length);
+        foreach (var application in applications)
+            recovered.Add((await RecoverAsync(application, cancellationToken))!);
+        var ordered = recovered.OrderByDescending(value => value.Definition.Status == BootstrapApplicationStatus.Running)
+            .ThenByDescending(value => value.Definition.StartedAt);
+        return (limitHistory ? ordered.Take(100) : ordered).ToArray();
+    }
+
+    private async Task<BootstrapApplicationResource?> RecoverAsync(BootstrapApplicationResource? application, CancellationToken cancellationToken)
+    {
+        if (application?.Definition.Status != BootstrapApplicationStatus.Running
+            || application.Definition.ExecutionOwner == applicationLock.Owner) return application;
+        await applicationLock.State.WaitAsync(cancellationToken);
         try
         {
             using var systemScope = scopes.PushSystem();
-            var applications = (await store.ListAllAsync<BootstrapApplicationResource>(
-                BootstrapKinds.BootstrapApplication,
-                cancellationToken)).Select(value => value.Value).ToArray();
-            var recovered = new List<BootstrapApplicationResource>(applications.Length);
-            foreach (var application in applications)
-            {
-                recovered.Add(application.Definition.Status == BootstrapApplicationStatus.Running
-                    ? await SaveApplicationAsync(Interrupt(application), application.ETag, cancellationToken)
-                    : application);
-            }
-            return recovered.OrderByDescending(value => value.Definition.StartedAt).Take(100).ToArray();
+            application = (await store.GetAsync<BootstrapApplicationResource>(new(BootstrapKinds.BootstrapApplication, application.Metadata.Name), cancellationToken))!.Value;
+            return application.Definition.Status == BootstrapApplicationStatus.Running
+                ? await SaveApplicationAsync(Interrupt(application), application.ETag, cancellationToken) : application;
         }
-        finally
-        {
-            applicationLock.Semaphore.Release();
-        }
+        finally { applicationLock.State.Release(); }
     }
 
     private async Task<RequestContext?> ResolveTargetContextAsync(
