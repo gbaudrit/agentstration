@@ -58,9 +58,13 @@ public static class BootstrapProfileEndpoints
             .WithSummary("Accept a versioned provider and model substitution for a pending Bootstrap profile");
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/profiles", GetAsync);
-        group.MapGet("/applied-profiles", (IBootstrapVersionHistory history, CancellationToken token) => history.ListProfilesAsync(token));
+        group.MapGet("/applied-profiles", (IBootstrapVersionHistory history, CancellationToken token) => history.ListProfilesAsync(token))
+            .Produces<IReadOnlyList<AppliedBootstrapProfile>>()
+            .WithSummary("List durable Bootstrap profiles");
         group.MapGet("/applied-profiles/{profileId}/versions", (string profileId, IBootstrapVersionHistory history, CancellationToken token) =>
-            history.ListVersionsAsync(profileId, token));
+            history.ListVersionsAsync(profileId, token))
+            .Produces<IReadOnlyList<AppliedBootstrapVersion>>()
+            .WithSummary("List the immutable versions of a Bootstrap profile");
         group.MapGet("/applied-profiles/{profileId}/versions/{version}/applications", ListScopedHistoryAsync)
             .Produces<IReadOnlyList<ScopedBootstrapApplication>>().ProducesProblem(400)
             .WithSummary("List the applications of an exact Bootstrap version at one scope");
