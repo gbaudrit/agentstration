@@ -61,3 +61,27 @@ inventory is `823486dc986c304ab37958fa4fb4cef03560ac8dbe41eaada48702daa70ea6e0`.
 Integration equals the union of coverage shards A/B, with no duplicate projects
 and no overlap with Fast. The subsequent CI run must still enforce the original
 diagnostic rules for both complete modules.
+
+## Multi-target plan follow-up in PR #1260
+
+[Run 44955436632](https://github.com/gbaudrit/agentstration/actions/runs/44955436632)
+passed compilation and both functional lanes, but the scenario module now contained
+16 cases after the addition of six ordered multi-target plan tests. All 16 passed;
+its 758.4 MiB peak exceeded the unchanged 700 MiB failure ceiling. A local Release
+reproduction on .NET 10.0.8 also passed all 16, with an 815.6 MiB peak measured from
+Linux VmRSS at 100 ms intervals. Repeated isolated test hosts accumulated memory
+over the process lifetime; these measurements do not establish a product leak.
+
+Move the six plan cases, without changing their names or assertions, into
+`Agentstration.Management.Bootstrap.Plans.Tests`. The existing scenario module
+returns to its original ten cases. Share only the API-only host fixture and the
+existing application test helpers from the test root; production behavior is
+unchanged. All three Bootstrap modules retain one class worker, their own process,
+and the same 500/700 MiB warning/failure limits. The plan module requires all six
+cases. Register it in the main solution, Integration, coverage shard A and hosted
+diagnostics. The coverage shards must still equal Integration exactly.
+
+The Release solution build and coverage inventory check passed locally. The Cloud
+execution environment became unavailable during subsequent diagnostics and browser
+setup, so post-split memory and complete-suite results must be verified by the new
+CI run before claiming that the failure is resolved.

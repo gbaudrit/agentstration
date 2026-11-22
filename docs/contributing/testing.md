@@ -86,6 +86,7 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 | `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2560 | 112 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 31 |
 | `Agentstration.Management.Bootstrap.Scenarios.Tests` | Pending CI baseline after split | 500 | 700 | 10 |
+| `Agentstration.Management.Bootstrap.Plans.Tests` | Pending CI baseline after split | 500 | 700 | 6 |
 | `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1664 | 64 |
 | `Agentstration.Management.Aep.Tests` | 763.4 | 832 | 1024 | 29 |
 
@@ -122,6 +123,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
 | `Agentstration.Management.Bootstrap.Tests` | Integration | Bootstrap framework, catalog, enrollment and startup contracts using the API-only test profile |
 | `Agentstration.Management.Bootstrap.Scenarios.Tests` | Integration | Durable profile application/progress and versioned Assistant/documentation profile scenarios |
+| `Agentstration.Management.Bootstrap.Plans.Tests` | Integration | Ordered multi-target plans, future targets, producer bindings, cancellation and deferred validation |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |

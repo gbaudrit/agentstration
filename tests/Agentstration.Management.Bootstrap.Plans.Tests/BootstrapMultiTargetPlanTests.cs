@@ -10,8 +10,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
+using static Agentstration.Management.Tests.BootstrapApplicationTestFixture;
+
 namespace Agentstration.Management.Tests;
 
+[TestClass]
 public sealed partial class DeclarativeBootstrapTests
 {
     [TestMethod]
