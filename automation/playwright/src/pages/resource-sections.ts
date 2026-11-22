@@ -14,9 +14,18 @@ export async function selectResourceSection(page: Page, path: string): Promise<v
     return useDrawer;
   }).toBe(true);
   await expect(navigation).toHaveAttribute('data-navigation-ready', 'true');
+  const railLink = navigation.locator(`.resource-navigation-rail a[data-resource-section="${path}"]`);
+  const dialog = navigation.locator('dialog');
+  // Direct fragment navigation can still be reconciling its selected section.
+  // Wait for that selection instead of opening a drawer it will immediately close.
+  if (new URL(page.url()).hash === '#' + path && await dialog.count() === 0) {
+    await expect(railLink).toHaveAttribute('aria-current', 'page');
+    await expect(page).toHaveURL(url => url.hash === '#' + path);
+    return;
+  }
   if (useDrawer) {
     await trigger.click();
-    menu = navigation.locator('dialog');
+    menu = dialog;
     await expect(menu).toBeVisible();
   }
   const link = menu.locator(`a[data-resource-section="${path}"]`);
@@ -29,6 +38,6 @@ export async function selectResourceSection(page: Page, path: string): Promise<v
   await expect(link).toBeVisible();
   await link.click();
   await expect(page).toHaveURL(url => url.hash === '#' + path);
-  await expect(navigation.locator(`.resource-navigation-rail a[data-resource-section="${path}"]`)).toHaveAttribute('aria-current', 'page');
-  await expect(navigation.locator('dialog')).toHaveCount(0);
+  await expect(railLink).toHaveAttribute('aria-current', 'page');
+  await expect(dialog).toHaveCount(0);
 }

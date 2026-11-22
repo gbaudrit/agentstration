@@ -4,8 +4,8 @@ import { selectResourceSection } from '../src/pages/resource-sections.js';
 test.use({ actionTimeout: 1_000 });
 
 for (const mobile of [false, true]) {
-  for (const remount of [false, true]) {
-    test(`resource section automation ${mobile ? 'drawer @responsive' : 'rail'} ${remount ? 'during remount' : 'stable'} @smoke`, async ({ page }) => {
+  for (const state of ['stable', 'remount', 'selected'] as const) {
+    test(`resource section automation ${mobile ? 'drawer @responsive' : 'rail'} ${state} @smoke`, async ({ page }) => {
       await page.setContent(`
         <header class="resource-header">
           <button class="resource-navigation-trigger" style="display: ${mobile ? 'block' : 'none'}">Sections</button>
@@ -33,9 +33,21 @@ for (const mobile of [false, true]) {
         </script>
       `);
 
+      if (state === 'selected') {
+        await page.evaluate(() => {
+          location.hash = 'worker';
+          document.querySelector('.resource-navigation-rail a')!.setAttribute('aria-current', 'page');
+          // Reconciliation of a direct fragment can close a drawer opened too
+          // early. Selecting an already active section must not reopen it.
+          document.querySelector('.resource-navigation-trigger')!.addEventListener('click', () => {
+            queueMicrotask(() => document.querySelector('dialog')?.remove());
+          });
+        });
+      }
+
       // Reproduce the CI trace: the rail detaches between the readiness check
       // and layout selection, while the desktop drawer trigger stays hidden.
-      const subject = remount ? remountBeforeLayoutRead(page) : page;
+      const subject = state === 'remount' ? remountBeforeLayoutRead(page) : page;
       await selectResourceSection(subject, 'worker');
 
       await expect(page).toHaveURL(url => url.hash === '#worker');
