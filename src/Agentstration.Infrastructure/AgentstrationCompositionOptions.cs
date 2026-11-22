@@ -13,6 +13,7 @@ public sealed record AgentstrationCompositionOptions
     public AgentstrationStorageOptions Storage { get; init; } = new();
     public Agentstration.Storage.StorageContentOptions StorageContent { get; init; } = new();
     public Agentstration.DataSources.DataSourceContentOptions DataSourceContent { get; init; } = new();
+    public Agentstration.Schemas.XmlContentOptions XmlContent { get; init; } = new();
     public Agentstration.Functions.FunctionContentOptions FunctionContent { get; init; } = new();
     public Agentstration.Flows.Application.FlowContentOptions FlowContent { get; init; } = new();
     public string? ControlPlaneConnectionString { get; init; }

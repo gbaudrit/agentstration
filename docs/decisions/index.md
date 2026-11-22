@@ -288,3 +288,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 239. [ADR-0239 — Transformation Schemas have explicit function exposure](0239-transformation-schemas-have-explicit-function-exposure.md)
 
 240. [ADR-0240 — Acquisition text content is selected at admission](0240-acquisition-text-content-is-selected-at-admission.md)
+
+241. [ADR-0241 — XML processing uses operator content settings](0241-xml-processing-uses-operator-content-settings.md)

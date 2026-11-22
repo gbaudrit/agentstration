@@ -24,7 +24,11 @@ public sealed record SchemaFormatDescriptor(
     bool IsAvailable = true,
     string? UnavailableReason = null);
 
-public sealed record SchemaFormatValidationIssue(string Path, string Code, string Message);
+public sealed record SchemaFormatValidationIssue(string Path, string Code, string Message)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DataContractLimit? Limit { get; init; }
+}
 
 public sealed record SchemaFormatValidationResult(IReadOnlyList<SchemaFormatValidationIssue> Issues)
 {

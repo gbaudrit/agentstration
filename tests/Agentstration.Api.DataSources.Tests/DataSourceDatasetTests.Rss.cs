@@ -22,15 +22,24 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    [DataRow(0)]
-    [DataRow(2)]
-    public async Task RssMappingRunsThroughSourcesFlowsAndSingleArtifactRecordPublication(int itemCount)
+    [DataRow(0, 0)]
+    [DataRow(2, 0)]
+    [DataRow(1, 80000)]
+    public async Task RssMappingRunsThroughSourcesFlowsAndSingleArtifactRecordPublication(int itemCount, int titleLength)
     {
         await using var factory = Factory().WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(
             new Dictionary<string, string?> { ["Agentstration:Aep:SecretAccess:PublicBaseUrl"] = "http://localhost" })));
         await using var worker = await AwpTestWorker.StartAsync(factory);
+        var feed = RssTransformationTestData.Feed(itemCount);
+        // Grow one mapped scalar rather than changing the declared cardinality contract.
+        if (titleLength > 0)
+        {
+            var document = System.Xml.Linq.XDocument.Parse(feed);
+            document.Root!.Element("channel")!.Element("item")!.Element("title")!.Value = new string('a', titleLength);
+            feed = document.ToString();
+        }
         var fixture = await PrepareAsync(factory.Services, declareAcquisitionOutput: false,
-            operationResult: JsonSerializer.SerializeToElement(new { mediaType = "application/rss+xml", content = RssTransformationTestData.Feed(itemCount) }),
+            operationResult: JsonSerializer.SerializeToElement(new { mediaType = "application/rss+xml", content = feed }),
             operationOutputSchema: JsonSerializer.Deserialize<JsonElement>("""
                 {"type":"object","properties":{"mediaType":{"type":"string"},"content":{"type":"string"}},"required":["mediaType","content"],"additionalProperties":false}
                 """));
@@ -39,7 +48,7 @@ public sealed partial class DataSourceDatasetTests
         if (itemCount == 0) await VerifyAcquisitionContentAdmissionAsync(factory.Services);
         using var client = factory.CreateClient();
         SelectConsoleContext(client, Owner);
-        (string Point, bool DocumentStorage, bool Explode)[] cases = itemCount == 0
+        (string Point, bool DocumentStorage, bool Explode)[] cases = itemCount == 0 || titleLength > 0
             ? [("data-source", false, false)]
             : [("data-source", false, false), ("data-source", false, true), ("data-source", true, true),
                 ("binding", false, true), ("postAggregate", false, true)];
@@ -155,10 +164,21 @@ public sealed partial class DataSourceDatasetTests
         var artifact = snapshot.Artifacts.Single();
         Assert.HasCount(explode ? 2 : 1, artifact.Content!.Records!.Members);
         var member = artifact.Content.Records.Members[0];
-        using var read = await client.GetAsync($"/api/artifacts/flow-run-artifacts/{artifact.ArtifactId}/records/{member.Id}/content");
-        Assert.AreEqual(HttpStatusCode.OK, read.StatusCode, await read.Content.ReadAsStringAsync());
-        var content = (await read.Content.ReadFromJsonAsync<ArtifactRecordContent>())!;
-        using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
+        using var recordBytes = new MemoryStream();
+        ArtifactRecordContent content;
+        do
+        {
+            using var read = await client.GetAsync($"/api/artifacts/flow-run-artifacts/{artifact.ArtifactId}/records/{member.Id}/content?offset={recordBytes.Length}&length=65536");
+            Assert.AreEqual(HttpStatusCode.OK, read.StatusCode, await read.Content.ReadAsStringAsync());
+            content = (await read.Content.ReadFromJsonAsync<ArtifactRecordContent>())!;
+            Assert.AreEqual(recordBytes.Length, content.Offset);
+            var bytes = Convert.FromBase64String(content.ContentBase64);
+            Assert.IsTrue(content.EndOfRecord || bytes.Length > 0, "A bounded record read must make progress.");
+            recordBytes.Write(bytes);
+            Assert.IsTrue(recordBytes.Length <= member.Length);
+        } while (!content.EndOfRecord);
+        Assert.AreEqual(member.Length, recordBytes.Length);
+        using var json = JsonDocument.Parse(recordBytes.ToArray());
         Assert.AreEqual(explode ? "opaque:0:not-a-uuid" : "Synthetic feed", json.RootElement.GetProperty(explode ? "guid" : "title").GetString());
         if (explode)
         {

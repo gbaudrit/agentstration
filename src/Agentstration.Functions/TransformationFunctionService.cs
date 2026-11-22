@@ -166,7 +166,13 @@ public sealed partial class TransformationFunctionService(IResourceStore store, 
             var validator = await schemaFormats.ResolveAsync(mapping.Input.Format, SchemaFormatCapabilities.ValidateInstance,
                 new("builtin/xml-xsd", "1.0"), ct);
             var validation = await validator.ValidateInstanceAsync(mapping.Input.Content, input.GetProperty("value"), mapping.Input.Dialect, ct);
-            if (!validation.IsValid) throw Error("transformation_input_invalid", "The XML content does not satisfy its accepted XSD contract.");
+            if (!validation.IsValid)
+            {
+                if (validation.Issues.FirstOrDefault(issue => issue.Limit is not null) is { Limit: { } limit } exceeded)
+                    throw DataContracts.Failure("transformation_input_invalid", "function-input", mapping.Input.Path, "$.value",
+                        exceeded.Code, "bounded XML content", "processing limit exceeded", limit: limit);
+                throw Error("transformation_input_invalid", "The XML content does not satisfy its accepted XSD contract.");
+            }
             input = JsonSerializer.SerializeToElement(new { value = input.GetProperty("value"), rules = ParseDeclaration(mapping.Declaration.Content).Rules });
         }
         var output = await registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).ExecuteAsync(input, ct);
@@ -177,8 +183,13 @@ public sealed partial class TransformationFunctionService(IResourceStore store, 
     public static void ValidateValue(JsonElement schema, JsonElement value, string boundary,
         int maximumValueBytes = FunctionContentOptions.DefaultMaximumValueBytes)
     {
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumValueBytes)
-            throw Error("function_value_too_large", "The function value exceeds the bounded JSON invocation limit.");
+        if (value.ValueKind == JsonValueKind.Undefined)
+            throw Error("function_value_too_large", "The function value is undefined.");
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value).LongLength;
+        if (bytes > maximumValueBytes)
+            throw DataContracts.Failure("function_value_too_large", boundary, boundary, "$", "function_value_bytes",
+                "bounded JSON value", "processing limit exceeded", limit: new("jsonBytes", bytes, Maximum: maximumValueBytes,
+                    Setting: FunctionContentOptions.SectionName + ":MaximumValueBytes"));
         DataContracts.Validate(DataContracts.Declared(schema, boundary), value, boundary);
     }
 

@@ -321,4 +321,29 @@
   <data name="ToolStatus.Unknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="RunIdentifier"><value>Run identifier</value></data>
   <data name="IdentityMismatch"><value>The response does not match the requested run and execution scope.</value></data>
+  <data name="ContractTitle.Limit" xml:space="preserve"><value>Data limit not satisfied</value></data>
+  <data name="ContractSummary.LimitMaximum" xml:space="preserve"><value>Measured: {0}. The permitted maximum is {1}.</value></data>
+  <data name="ContractSummary.LimitMinimum" xml:space="preserve"><value>Measured: {0}. The required minimum is {1}.</value></data>
+  <data name="ContractAdvice.OperatorLimit" xml:space="preserve"><value>Reduce the input size or mapping work, or ask an instance administrator to adjust the setting shown below and restart the server. Other acquisition, function, Flow and Storage limits still apply. Start a new execution after correction.</value></data>
+  <data name="ContractAdvice.SchemaLimit" xml:space="preserve"><value>Adjust the produced value or explicitly adopt a compatible schema contract, then start a new execution. Server settings do not override schema constraints.</value></data>
+  <data name="ContractLimit.Setting" xml:space="preserve"><value>Server setting:</value></data>
+  <data name="ContractLimit.Measured" xml:space="preserve"><value>Measured value</value></data>
+  <data name="ContractLimit.Minimum" xml:space="preserve"><value>Minimum</value></data>
+  <data name="ContractLimit.Maximum" xml:space="preserve"><value>Maximum</value></data>
+  <data name="ContractLimit.Value" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="ContractLimit.AtMost" xml:space="preserve"><value>At most {0}</value></data>
+  <data name="ContractLimit.AtLeast" xml:space="preserve"><value>At least {0}</value></data>
+  <data name="ContractLimit.Unit.utf8Bytes" xml:space="preserve"><value>UTF-8 bytes</value></data>
+  <data name="ContractLimit.Unit.jsonBytes" xml:space="preserve"><value>serialized JSON bytes</value></data>
+  <data name="ContractLimit.Unit.characters" xml:space="preserve"><value>characters</value></data>
+  <data name="ContractLimit.Unit.items" xml:space="preserve"><value>items</value></data>
+  <data name="ContractLimit.Unit.xmlDepth" xml:space="preserve"><value>XML nesting levels</value></data>
+  <data name="ContractLimit.Unit.xmlNodes" xml:space="preserve"><value>XML nodes</value></data>
+  <data name="ContractLimit.Unit.xmlAttributes" xml:space="preserve"><value>attributes per XML element</value></data>
+  <data name="ContractLimit.Unit.selectedNodes" xml:space="preserve"><value>selected nodes</value></data>
+  <data name="ContractLimit.Unit.arrayItems" xml:space="preserve"><value>array items</value></data>
+  <data name="ContractLimit.Unit.mappingOperations" xml:space="preserve"><value>mapping operations</value></data>
+  <data name="ContractLevel.FunctionInput" xml:space="preserve"><value>Function input</value></data>
+  <data name="ContractLevel.FunctionOutput" xml:space="preserve"><value>Function output</value></data>
+  <data name="ContractSummary.LengthLegacy" xml:space="preserve"><value>The text length does not satisfy the minimum or maximum declared by its schema. This recorded execution does not include the measured length.</value></data>
 </root>

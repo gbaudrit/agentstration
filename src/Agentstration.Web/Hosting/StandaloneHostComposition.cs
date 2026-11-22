@@ -130,6 +130,8 @@ internal static class StandaloneHostCompositionExtensions
                 .Get<Agentstration.Storage.StorageContentOptions>() ?? new(),
             DataSourceContent = builder.Configuration.GetSection(Agentstration.DataSources.DataSourceContentOptions.SectionName)
                 .Get<Agentstration.DataSources.DataSourceContentOptions>() ?? new(),
+            XmlContent = builder.Configuration.GetSection(Agentstration.Schemas.XmlContentOptions.SectionName)
+                .Get<Agentstration.Schemas.XmlContentOptions>() ?? new(),
             FunctionContent = builder.Configuration.GetSection(Agentstration.Functions.FunctionContentOptions.SectionName)
                 .Get<Agentstration.Functions.FunctionContentOptions>() ?? new(),
             FlowContent = builder.Configuration.GetSection(Agentstration.Flows.Application.FlowContentOptions.SectionName)

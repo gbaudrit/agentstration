@@ -321,4 +321,29 @@
   <data name="ToolStatus.Unknown" xml:space="preserve"><value>Inconnu</value></data>
   <data name="RunIdentifier"><value>Identifiant d’exécution</value></data>
   <data name="IdentityMismatch"><value>La réponse ne correspond pas à l’exécution et au périmètre demandés.</value></data>
+  <data name="ContractTitle.Limit" xml:space="preserve"><value>Limite de données non respectée</value></data>
+  <data name="ContractSummary.LimitMaximum" xml:space="preserve"><value>Valeur mesurée : {0}. Le maximum autorisé est de {1}.</value></data>
+  <data name="ContractSummary.LimitMinimum" xml:space="preserve"><value>Valeur mesurée : {0}. Le minimum requis est de {1}.</value></data>
+  <data name="ContractAdvice.OperatorLimit" xml:space="preserve"><value>Réduisez la taille des données ou le travail du mapping, ou demandez à un administrateur d’instance d’ajuster le réglage indiqué ci-dessous puis de redémarrer le serveur. Les autres limites d’acquisition, de fonction, de Flow et de Storage continuent de s’appliquer. Démarrez une nouvelle exécution après correction.</value></data>
+  <data name="ContractAdvice.SchemaLimit" xml:space="preserve"><value>Adaptez la valeur produite ou adoptez explicitement un contrat de schéma compatible, puis démarrez une nouvelle exécution. Les réglages du serveur ne remplacent pas les contraintes du schéma.</value></data>
+  <data name="ContractLimit.Setting" xml:space="preserve"><value>Réglage du serveur :</value></data>
+  <data name="ContractLimit.Measured" xml:space="preserve"><value>Valeur mesurée</value></data>
+  <data name="ContractLimit.Minimum" xml:space="preserve"><value>Minimum</value></data>
+  <data name="ContractLimit.Maximum" xml:space="preserve"><value>Maximum</value></data>
+  <data name="ContractLimit.Value" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="ContractLimit.AtMost" xml:space="preserve"><value>Au maximum {0}</value></data>
+  <data name="ContractLimit.AtLeast" xml:space="preserve"><value>Au minimum {0}</value></data>
+  <data name="ContractLimit.Unit.utf8Bytes" xml:space="preserve"><value>octets UTF-8</value></data>
+  <data name="ContractLimit.Unit.jsonBytes" xml:space="preserve"><value>octets JSON sérialisés</value></data>
+  <data name="ContractLimit.Unit.characters" xml:space="preserve"><value>caractères</value></data>
+  <data name="ContractLimit.Unit.items" xml:space="preserve"><value>éléments</value></data>
+  <data name="ContractLimit.Unit.xmlDepth" xml:space="preserve"><value>niveaux d’imbrication XML</value></data>
+  <data name="ContractLimit.Unit.xmlNodes" xml:space="preserve"><value>nœuds XML</value></data>
+  <data name="ContractLimit.Unit.xmlAttributes" xml:space="preserve"><value>attributs par élément XML</value></data>
+  <data name="ContractLimit.Unit.selectedNodes" xml:space="preserve"><value>nœuds sélectionnés</value></data>
+  <data name="ContractLimit.Unit.arrayItems" xml:space="preserve"><value>éléments de tableau</value></data>
+  <data name="ContractLimit.Unit.mappingOperations" xml:space="preserve"><value>opérations de mapping</value></data>
+  <data name="ContractLevel.FunctionInput" xml:space="preserve"><value>Entrée de fonction</value></data>
+  <data name="ContractLevel.FunctionOutput" xml:space="preserve"><value>Sortie de fonction</value></data>
+  <data name="ContractSummary.LengthLegacy" xml:space="preserve"><value>La longueur du texte ne respecte pas le minimum ou le maximum déclaré par son schéma. Cette exécution enregistrée ne contient pas la longueur mesurée.</value></data>
 </root>

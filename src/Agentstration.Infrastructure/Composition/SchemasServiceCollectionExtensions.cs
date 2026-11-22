@@ -8,8 +8,9 @@ namespace Agentstration.Infrastructure;
 
 internal static class SchemasServiceCollectionExtensions
 {
-    internal static IServiceCollection AddAgentstrationSchemas(this IServiceCollection services)
+    internal static IServiceCollection AddAgentstrationSchemas(this IServiceCollection services, AgentstrationCompositionContext context)
     {
+        services.AddSingleton(context.Options.XmlContent);
         services.AddSingleton<ISchemaFormatHandler, BuiltinJsonSchemaFormatHandler>();
         services.AddSingleton<ISchemaFormatHandler, BuiltinXmlSchemaFormatHandler>();
         services.AddSingleton<ISchemaFormatHandler, Agentstration.Functions.TransformationSchemaFormatHandler>();

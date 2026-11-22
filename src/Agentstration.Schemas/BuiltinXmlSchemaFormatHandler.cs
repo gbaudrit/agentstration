@@ -7,8 +7,9 @@ using System.Xml.Schema;
 namespace Agentstration.Schemas;
 
 /// <summary>One local XSD 1.0 document. Neither schemas nor instances can retrieve resources.</summary>
-public sealed class BuiltinXmlSchemaFormatHandler : ISchemaFormatHandler
+public sealed class BuiltinXmlSchemaFormatHandler(XmlContentOptions? options = null) : ISchemaFormatHandler
 {
+    private static readonly XmlContentOptions DefinitionLimits = new() { MaximumDocumentBytes = DataContracts.MaximumSchemaCharacters };
     public const string Format = "xml-xsd";
     public const string Dialect = "http://www.w3.org/2001/XMLSchema";
     public SchemaFormatDescriptor Descriptor { get; } = new(Format, "XML Schema (XSD 1.0)",
@@ -21,13 +22,14 @@ public sealed class BuiltinXmlSchemaFormatHandler : ISchemaFormatHandler
     public ValueTask<SchemaFormatValidationResult> ValidateInstanceAsync(JsonElement definition, JsonElement instance, string? dialect, CancellationToken cancellationToken) =>
         Validate(definition, instance, dialect, cancellationToken);
 
-    private static ValueTask<SchemaFormatValidationResult> Validate(JsonElement definition, JsonElement? instance, string? dialect, CancellationToken ct)
+    private ValueTask<SchemaFormatValidationResult> Validate(JsonElement definition, JsonElement? instance, string? dialect, CancellationToken ct)
     {
+        var validatingInstance = false;
         try
         {
             ct.ThrowIfCancellationRequested();
             if (dialect is not null && dialect != Dialect) throw new XmlException("Unsupported XSD dialect.");
-            var document = BoundedXml.Parse(Text(definition), ct);
+            var document = BoundedXml.Parse(Text(definition), ct, DefinitionLimits);
             XNamespace xs = Dialect;
             if (document.Root?.Name != xs + "schema" || document.Descendants().Any(e =>
                 e.Name == xs + "import" || e.Name == xs + "include" || e.Name == xs + "redefine"
@@ -44,10 +46,15 @@ public sealed class BuiltinXmlSchemaFormatHandler : ISchemaFormatHandler
             schemas.Compile();
             if (issues.Count == 0 && instance is { } value)
             {
-                var content = BoundedXml.Parse(Text(value), ct);
+                validatingInstance = true;
+                var content = BoundedXml.Parse(Text(value), ct, options);
                 content.Validate(schemas, Invalid, false);
             }
             return ValueTask.FromResult(new SchemaFormatValidationResult(issues));
+        }
+        catch (XmlContentLimitException error)
+        {
+            return ValueTask.FromResult(new SchemaFormatValidationResult([new("$", error.Rule, "An XML processing limit was exceeded.") { Limit = validatingInstance ? error.Limit : error.Limit with { Setting = null } }]));
         }
         catch (Exception error) when (error is XmlException or XmlSchemaException or ArgumentException)
         {
@@ -57,30 +64,4 @@ public sealed class BuiltinXmlSchemaFormatHandler : ISchemaFormatHandler
 
     private static string Text(JsonElement value) => value.ValueKind == JsonValueKind.String ? value.GetString()!
         : throw new XmlException("XML native content must be a string.");
-}
-
-public static class BoundedXml
-{
-    public const int MaximumBytes = 65_536;
-    public static XDocument Parse(string value, CancellationToken ct)
-    {
-        if (Encoding.UTF8.GetByteCount(value) > MaximumBytes) throw new XmlException("XML size limit exceeded.");
-        var settings = new XmlReaderSettings
-        {
-            DtdProcessing = DtdProcessing.Prohibit,
-            XmlResolver = null,
-            MaxCharactersInDocument = MaximumBytes,
-            MaxCharactersFromEntities = 1024
-        };
-        using var reader = XmlReader.Create(new StringReader(value), settings);
-        var nodes = 0;
-        while (reader.Read())
-        {
-            ct.ThrowIfCancellationRequested();
-            if (reader.Depth > 32 || ++nodes > 8192 || reader.AttributeCount > 64)
-                throw new XmlException("XML structural limit exceeded.");
-        }
-        using var content = XmlReader.Create(new StringReader(value), settings);
-        return XDocument.Load(content, LoadOptions.PreserveWhitespace);
-    }
 }

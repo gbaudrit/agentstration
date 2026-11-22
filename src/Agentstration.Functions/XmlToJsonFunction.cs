@@ -9,10 +9,10 @@ using Agentstration.Schemas;
 namespace Agentstration.Functions;
 
 /// <summary>A deliberately small child/attribute XPath subset; no expression evaluator or external I/O.</summary>
-public sealed class XmlToJsonFunction : INativeTransformationFunction
+public sealed class XmlToJsonFunction(XmlContentOptions? xmlOptions = null, FunctionContentOptions? functionOptions = null) : INativeTransformationFunction
 {
     public NativeFunctionDescriptor Descriptor { get; } = new("xml.to_json", "1.0.0",
-        JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{"type":"string","maxLength":65536},"rules":{"type":"object"}},"required":["value","rules"],"additionalProperties":false}"""),
+        JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{"type":"string"},"rules":{"type":"object"}},"required":["value","rules"],"additionalProperties":false}"""),
         JsonSerializer.Deserialize<JsonElement>("""{"type":"object"}"""));
 
     public ValueTask<JsonElement> ExecuteAsync(JsonElement input, CancellationToken cancellationToken)
@@ -21,13 +21,18 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         {
             var rules = input.GetProperty("rules");
             ValidateRules(rules);
-            var document = BoundedXml.Parse(input.GetProperty("value").GetString()!, cancellationToken);
-            var budget = new MappingBudget(cancellationToken);
+            var document = BoundedXml.Parse(input.GetProperty("value").GetString()!, cancellationToken, xmlOptions);
+            var budget = new MappingBudget(xmlOptions ?? new(), functionOptions ?? new(), cancellationToken);
             var namespaces = Namespaces(rules);
             var output = Map(document, rules.GetProperty("root"), namespaces, budget);
             var result = JsonSerializer.SerializeToElement(output);
-            if (JsonSerializer.SerializeToUtf8Bytes(result).Length > 65_536) throw Error("xml_output_limit");
+            budget.CheckOutput(JsonSerializer.SerializeToUtf8Bytes(result).Length);
             return ValueTask.FromResult(result);
+        }
+        catch (XmlContentLimitException error)
+        {
+            throw DataContracts.Failure("xml_input_limit", "function-input", "xml.to_json", "$.value", error.Rule,
+                "bounded XML content", "processing limit exceeded", limit: error.Limit);
         }
         catch (Exception error) when (error is XmlException or FormatException or OverflowException)
         { throw Error("xml_value_invalid"); }
@@ -121,12 +126,12 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         var type = rule.GetProperty("type").GetString();
         if (type == "array")
         {
-            if (selected.Count > 100) throw Error("xml_selection_limit");
+            budget.Array(selected.Count);
             budget.Output(2);
             var array = new JsonArray();
             foreach (var item in selected)
             {
-                budget.Output(1);
+                budget.Output(array.Count == 0 ? 0 : 1);
                 array.Add(Fields(item, rule, ns, budget));
             }
             return array;
@@ -174,7 +179,7 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
             var value = Map(context, field.Value, ns, budget);
             if (value is not null)
             {
-                budget.Output(JsonSerializer.SerializeToUtf8Bytes(field.Name).Length + 2);
+                budget.Output(JsonSerializer.SerializeToUtf8Bytes(field.Name).Length + 1 + (result.Count == 0 ? 0 : 1));
                 result.Add(field.Name, value);
             }
         }
@@ -199,7 +204,7 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
                     budget.Spend();
                     if (!(text ? candidate is XText : attribute ? candidate is XAttribute a && a.Name == name
                         : candidate is XElement e && e.Name == name)) continue;
-                    if (next.Count == 8192) throw Error("xml_selection_limit");
+                    budget.Selection((long)next.Count + 1);
                     next.Add(candidate);
                 }
             }
@@ -208,18 +213,35 @@ public sealed class XmlToJsonFunction : INativeTransformationFunction
         return current;
     }
 
-    private sealed class MappingBudget(CancellationToken ct)
+    private sealed class MappingBudget
     {
-        private int remaining = 32_768;
-        private int outputBytes = 65_536;
-        public void Output(int bytes)
+        private readonly CancellationToken token;
+        private readonly XmlContentOptions xml;
+        private readonly FunctionContentOptions functions;
+        private long operations, outputBytes;
+        public MappingBudget(XmlContentOptions xmlOptions, FunctionContentOptions functionOptions, CancellationToken ct)
         {
-            if ((outputBytes -= bytes) < 0) throw Error("xml_output_limit");
+            xmlOptions.Validate();
+            functionOptions.Validate();
+            (token, xml, functions) = (ct, xmlOptions, functionOptions);
         }
+        public void Output(int bytes) { outputBytes += bytes; CheckOutput(outputBytes); }
+        public void CheckOutput(long bytes) => Check(bytes, functions.MaximumValueBytes, "jsonBytes",
+            FunctionContentOptions.SectionName + ":MaximumValueBytes", "xml_output_limit", "function-output");
+        public void Selection(long count) => Check(count, xml.MaximumSelectedNodes, "selectedNodes",
+            XmlContentOptions.SectionName + ":MaximumSelectedNodes", "xml_selection_limit");
+        public void Array(long count) => Check(count, xml.MaximumArrayItems, "arrayItems",
+            XmlContentOptions.SectionName + ":MaximumArrayItems", "xml_array_limit");
         public void Spend()
         {
-            ct.ThrowIfCancellationRequested();
-            if (--remaining < 0) throw Error("xml_mapping_limit");
+            token.ThrowIfCancellationRequested();
+            Check(++operations, xml.MaximumMappingOperations, "mappingOperations",
+                XmlContentOptions.SectionName + ":MaximumMappingOperations", "xml_mapping_limit");
+        }
+        private static void Check(long actual, int maximum, string unit, string setting, string rule, string boundary = "function-input")
+        {
+            if (actual > maximum) throw DataContracts.Failure(rule, boundary, "xml.to_json", boundary == "function-input" ? "$.value" : "$",
+                rule, "bounded value", "processing limit exceeded", limit: new(unit, actual, Maximum: maximum, Setting: setting));
         }
     }
     private static TransformationFunctionException Error(string code) => new(code, "The bounded XML mapping could not be validated or executed.");

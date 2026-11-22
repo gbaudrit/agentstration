@@ -6,7 +6,7 @@ namespace Agentstration.Functions.Contracts;
 public static class FunctionInvocationSchemas
 {
     public static JsonElement XmlContent { get; } = JsonSerializer.Deserialize<JsonElement>("""
-        {"type":"object","properties":{"value":{"type":"string","maxLength":65536}},"required":["value"],"additionalProperties":false}
+        {"type":"object","properties":{"value":{"type":"string"}},"required":["value"],"additionalProperties":false}
         """);
     // Declaration metadata belongs to the implementation contract, never to invocation values.
     public const string SchemaBindingKeyword = "x-agentstration-schema-binding";

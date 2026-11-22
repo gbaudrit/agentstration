@@ -127,9 +127,11 @@ RFC 1123, explicit numeric-offset timestamps or ISO timestamps with a timezone,
 and normalize to UTC. Opaque identifiers remain strings. Escaped HTML and CDATA
 remain data; nested markup is rejected as a scalar, never rendered or executed.
 
-XML limits: 64 KiB, depth 32, 8192 reader nodes, 64 attributes per element.
-Mapping limits: 128 rule nodes, nesting 8, 512-character/16-segment paths, 32768
-operations, 100 array members and 64 KiB output. Limits reject the whole result.
+XML instance bytes and structural processing use the configurable operator ceilings
+below (10 MiB by default for document bytes). Rule authoring still allows 128 nodes,
+nesting 8 and 512-character/16-segment paths. Mapping work and array cardinality
+use the XML settings; encoded output uses the function value budget. Exceeded
+limits reject the whole result.
 DTDs, external entities/resolvers, XSD import/include/redefine and regex patterns
 are rejected. No schemaLocation is fetched implicitly.
 
@@ -187,3 +189,47 @@ Historic publications retain their original evidence and content.
 
 The separate reusable UX scenario [#1215](https://github.com/gbaudrit/agentstration/issues/1215)
 remains blocked until maintainer UX validation and implementation merge.
+
+## XML processing settings and limit diagnostics
+
+The unreleased installation is reseeded for this change. Engine/provider/function
+versions stay at `1.0.0`; no compatibility version or Bootstrap workflow is added.
+The authority reads the following settings at startup:
+
+```json
+{
+  "Agentstration": {
+    "XmlContent": {
+      "MaximumDocumentBytes": 10485760,
+      "MaximumDepth": 32,
+      "MaximumNodes": 8192,
+      "MaximumAttributesPerElement": 64,
+      "MaximumSelectedNodes": 8192,
+      "MaximumArrayItems": 100,
+      "MaximumMappingOperations": 32768
+    },
+    "FunctionContent": { "MaximumValueBytes": 10485760 }
+  }
+}
+```
+
+`MaximumDocumentBytes` measures XML instance UTF-8 bytes. The same parser settings
+apply to XSD instance validation and transformation. The separate XSD definition
+profile keeps its 64 KiB authoring ceiling. Mapping output and native invocation
+JSON use `FunctionContent.MaximumValueBytes`; escaping and wrappers can increase
+serialized size relative to XML bytes. There is no additional 65536-character
+invocation restriction. Schema `maxLength`, XSD cardinalities, raw HTTP, Flow,
+Storage and remote protocol limits remain independent and still apply.
+
+All operator values must be positive. Restart the authority after changing them;
+for example `Agentstration__XmlContent__MaximumDocumentBytes` overrides document
+bytes through an environment variable. Raising an array-item quota does not widen
+the input XSD or the output JSON Schema. The sample profile still declares at most
+100 input items, independently of engine quotas.
+
+A limit error shows the measured quantity, permitted bound, unit, causal function
+step and exact server setting when applicable. XML UTF-8 bytes, serialized JSON
+bytes, text characters, node counts and mapping operations are distinct. Values
+and source content are omitted. Schema length errors refer to their declared
+schema constraints rather than suggesting a server setting can override them.
+Old recorded errors without measurements remain readable. See [ADR-0241](../decisions/0241-xml-processing-uses-operator-content-settings.md).
