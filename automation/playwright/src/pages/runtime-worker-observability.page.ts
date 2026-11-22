@@ -116,7 +116,10 @@ export class RuntimeWorkerObservabilityPage {
     const link = row.locator(`a.worker-run-link[href^="/runs/${runId}"], a.worker-run-link[href^="/flow-runs/${runId}"]`);
     const href = await link.getAttribute('href');
     await link.click();
-    await selectResourceSection(this.page, href?.startsWith('/flow-runs/') ? 'worker' : 'execution/worker');
+    const isFlow = href?.startsWith('/flow-runs/') === true;
+    await expect(this.page).toHaveURL(url => url.pathname === `${isFlow ? '/flow-runs' : '/runs'}/${runId}`);
+    await expect(this.page.getByTestId(isFlow ? TestIds.flowObservability.runDetails : TestIds.flowObservability.agentRunner)).toBeVisible();
+    await selectResourceSection(this.page, isFlow ? 'worker' : 'execution/worker');
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.placement)).toHaveAttribute('data-assignment-id', assignmentId);
   }
 
