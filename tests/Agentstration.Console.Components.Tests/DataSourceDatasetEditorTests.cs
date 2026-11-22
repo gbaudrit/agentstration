@@ -20,6 +20,22 @@ namespace Agentstration.Web.Tests;
 public sealed partial class DataSourceDatasetEditorTests
 {
     [TestMethod]
+    public async Task AuthorizedOperationContractCanBeSavedWithoutTypeCatalogueAccess()
+    {
+        using var handler = new DatasetHandler { HideTypeCatalogue = true };
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+        Assert.IsEmpty(rendered.FindAll("[data-testid='dataset-operation-ineligible']"));
+        Assert.IsTrue(ConfigurationComplete(rendered));
+        await CompleteCreationAsync(rendered);
+        rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
+        Assert.AreEqual(handler.Operation.Uid, handler.Created!.Properties.Dataset!.Acquisition.Operation.OperationUid);
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Freshness duration (hh:mm:ss)")]
     [DataRow("fr-FR", "Durée de fraîcheur (hh:mm:ss)")]
     public async Task DirectModeRequiresExplicitPermissionAndRejectsRetentionWithoutStorage(string cultureName, string expected)
@@ -479,6 +495,7 @@ public sealed partial class DataSourceDatasetEditorTests
             };
         }
         public IReadOnlyList<StorageTypeResource> StorageTypes { get; set; } = [];
+        public bool HideTypeCatalogue { get; set; }
         public bool MissingAdapter { get; set; }
         public bool FailSave { get; set; }
         public string SaveFailureCode { get; set; } = "data_source_rule_invalid";
@@ -653,7 +670,12 @@ public sealed partial class DataSourceDatasetEditorTests
                     Definition = Created.Properties
                 };
             }
-            else if (path == "/api/connected-service-operation-types") body = new[] { OperationType };
+            else if (path == "/api/connected-service-operation-types") body = HideTypeCatalogue ? Array.Empty<ConnectedServiceOperationTypeResource>() : new[] { OperationType };
+            else if (path == "/api/connected-service-operations/contract")
+            {
+                var reference = await request.Content!.ReadFromJsonAsync<ConnectedServiceOperationRevisionReference>(cancellationToken);
+                body = new ConnectedServiceOperationContract(reference!, OperationType.Definition.Versions.Single());
+            }
             else if (path == "/api/connected-service-operations") body = new[] { NewerOperation ? Operation with { Generation = Operation.Generation + 1 } : Operation, OtherOperation };
             else if (path == "/api/connected-services/fixture/operations") body = new[] { NewerOperation ? Operation with { Generation = Operation.Generation + 1 } : Operation, OtherOperation };
             else if (path == "/api/connected-services/other/operations") body = new[] { OtherOperation, Operation };

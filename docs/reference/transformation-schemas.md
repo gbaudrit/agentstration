@@ -3,7 +3,7 @@
 An XML-to-JSON mapping is a normal, independent `Schema` with format
 `xml-json-transformation`. Its draft and published versions are available through
 the Schema Console/API before any named function exists. See
-[ADR-0239](../decisions/0239-transformation-schemas-have-explicit-function-exposure.md).
+[ADR-0241](../decisions/0241-transformation-schemas-have-explicit-function-exposure.md).
 
 The local implementation supports standalone XSD 1.0 (`xml-xsd`, native content
 is an XML string), JSON Schema, and a bounded XML child/attribute mapping format.
@@ -163,7 +163,7 @@ adaptation. Explicit `json-select-builtin@1.0.0` with `path: /content` remains v
 and is required for other envelope shapes. An incompatible edit fails before
 persistence. Existing accepted compositions retain their original selection;
 receipts predating this feature continue to use the whole previous result. Changing
-the sequence explicitly resolves and freezes a new selection. See [ADR-0240](../decisions/0240-acquisition-text-content-is-selected-at-admission.md).
+the sequence explicitly resolves and freezes a new selection. See [ADR-0242](../decisions/0242-acquisition-text-content-is-selected-at-admission.md).
 
 Ordinary Flow `transform` steps select the same function and explicitly map its
 `value` argument. Knowledge binding/before-publication transformations receive
@@ -232,4 +232,4 @@ step and exact server setting when applicable. XML UTF-8 bytes, serialized JSON
 bytes, text characters, node counts and mapping operations are distinct. Values
 and source content are omitted. Schema length errors refer to their declared
 schema constraints rather than suggesting a server setting can override them.
-Old recorded errors without measurements remain readable. See [ADR-0241](../decisions/0241-xml-processing-uses-operator-content-settings.md).
+Old recorded errors without measurements remain readable. See [ADR-0243](../decisions/0243-xml-processing-uses-operator-content-settings.md).

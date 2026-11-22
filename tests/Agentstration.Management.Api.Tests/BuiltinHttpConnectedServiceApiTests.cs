@@ -62,6 +62,7 @@ public sealed partial class ConnectedServiceApiTests
     [TestMethod]
     [DataRow("instance")]
     [DataRow("workspace")]
+    [DataRow("instance-shared")]
     public async Task BuiltinHttpDiscoveryAndAcquisitionUseOnlyIndependentDatasetParameters(string ownerKind)
     {
         var requests = new ConcurrentQueue<Uri>();
@@ -76,7 +77,8 @@ public sealed partial class ConnectedServiceApiTests
         });
         using var client = factory.CreateClient();
         var context = await GetBootstrapContextAsync(factory);
-        var owner = ownerKind == "instance" ? ResourceScopeRef.Instance : ResourceScopeRef.Workspace(context.WorkspaceId);
+        var owner = ownerKind is "instance" or "instance-shared" ? ResourceScopeRef.Instance : ResourceScopeRef.Workspace(context.WorkspaceId);
+        var consumer = ownerKind == "instance-shared" ? ResourceScopeRef.Workspace(context.WorkspaceId) : owner;
         SelectConsoleContext(client, owner);
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         var store = factory.Services.GetRequiredService<IResourceStore>();
@@ -179,8 +181,37 @@ public sealed partial class ConnectedServiceApiTests
             operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
         var storagePin = new StorageRevisionReference(new(owner, storage.Namespace, storage.Kind, storage.Name),
             storage.Uid, storage.Generation, storage.ObservedState!.BindingDigest!);
+        if (ownerKind == "instance-shared")
+        {
+            using (scopes.PushSystem())
+            {
+                var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
+                _ = await policies.PutAsync(new(new(service.Uid, owner, service.Namespace, service.Kind),
+                    [new(consumer, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+                _ = await policies.PutAsync(new(new(storage.Uid, owner, storage.Namespace, storage.Kind),
+                    [new(consumer, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+                var localType = (await store.GetExactAsync<StorageTypeResource>(new(ResourceScopeRef.Instance,
+                    ResourceNamespace.Default, StorageResourceKinds.StorageType, "local"), default))!.Value;
+                _ = await policies.PutAsync(new(new(localType.Uid, ResourceScopeRef.Instance, localType.Namespace, localType.Kind),
+                    [new(consumer, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+            }
+            SelectConsoleContext(client, consumer);
+            Assert.IsFalse((await client.GetFromJsonAsync<ConnectedServiceOperationTypeResource[]>("/api/connected-service-operation-types", timeout.Token))!.Any(t => t.Uid == operation.Definition.Type.TypeUid));
+            using (scopes.PushSystem())
+            {
+                var adapter = operation.Definition.Type;
+                var operationType = (await store.GetExactAsync<ConnectedServiceOperationTypeResource>(new(adapter.Type.ScopeRef!.Value,
+                    adapter.Type.Namespace ?? operation.Namespace, ConnectedServiceResourceKinds.ConnectedServiceOperationType, adapter.Type.Name), timeout.Token))!.Value;
+                var acquisition = operationType.Definition.Versions.Single(v => v.Version == adapter.Version).Acquisition!.Flow;
+                Assert.IsFalse((await factory.Services.GetRequiredService<IResourceAccessPolicyService>().EvaluateAsync(
+                    new(acquisition.FlowUid, acquisition.Flow.ScopeRef!.Value, acquisition.Flow.Namespace ?? ResourceNamespace.Default,
+                        FlowResourceKinds.Flow, Version: acquisition.Version), consumer, ResourceAccessAction.Use, timeout.Token)).Allowed);
+            }
+            using var contract = await client.PostAsJsonAsync("/api/connected-service-operations/contract", pin, timeout.Token);
+            Assert.AreEqual(HttpStatusCode.OK, contract.StatusCode, await contract.Content.ReadAsStringAsync(timeout.Token));
+        }
         using var invalid = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest("http-invalid",
-            new() { DisplayName = "Invalid", Dataset = new(storagePin, new(Write: true), new(pin, JsonSerializer.SerializeToElement(new { q = 42 }))) }, ScopeRef: owner));
+            new() { DisplayName = "Invalid", Dataset = new(storagePin, new(Write: true), new(pin, JsonSerializer.SerializeToElement(new { q = 42 }))) }, ScopeRef: consumer));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
         var results = new List<DataSourceAcquisitionResource>();
         foreach (var (name, parameters) in new[]
@@ -191,10 +222,10 @@ public sealed partial class ConnectedServiceApiTests
         })
         {
             using var saved = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest("http-" + name,
-                new() { DisplayName = name, Dataset = new(storagePin, new(Write: true), new(pin, parameters)) }, ScopeRef: owner), timeout.Token);
+                new() { DisplayName = name, Dataset = new(storagePin, new(Write: true), new(pin, parameters)) }, ScopeRef: consumer), timeout.Token);
             Assert.AreEqual(HttpStatusCode.Created, saved.StatusCode, await saved.Content.ReadAsStringAsync(timeout.Token));
             Assert.DoesNotContain("Nantes", await saved.Content.ReadAsStringAsync(timeout.Token), StringComparison.Ordinal);
-            using var start = await client.PostAsJsonAsync($"/api/datasources/http-{name}/acquisitions?scopeRef={Uri.EscapeDataString(owner.Value)}",
+            using var start = await client.PostAsJsonAsync($"/api/datasources/http-{name}/acquisitions?scopeRef={Uri.EscapeDataString(consumer.Value)}",
                 new StartDataSourceAcquisitionRequest(), timeout.Token);
             Assert.AreEqual(HttpStatusCode.Accepted, start.StatusCode, await start.Content.ReadAsStringAsync(timeout.Token));
             var acquisition = (await start.Content.ReadFromJsonAsync<DataSourceAcquisitionResource>(timeout.Token))!;
@@ -221,6 +252,7 @@ public sealed partial class ConnectedServiceApiTests
         Assert.AreEqual("?q=Brest", urls[1].Query);
         Assert.AreEqual("", urls[2].Query);
         Assert.HasCount(3, results.Select(result => result.Content!.Key).Distinct());
+        SelectConsoleContext(client, owner);
         _ = await DiscoverAsync();
         var rediscovered = (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(operationsUrl, timeout.Token))!.Single();
         Assert.AreEqual(operation.Uid, rediscovered.Uid);

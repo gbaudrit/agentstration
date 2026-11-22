@@ -168,4 +168,7 @@
   <data name="RequiredBindingsMissing" xml:space="preserve"><value>Configurez les liaisons obligatoires : {0}.</value></data>
   <data name="ConfigurationInvalid" xml:space="preserve"><value>Corrigez les erreurs de configuration avant d’enregistrer.</value></data>
   <data name="ConcurrencyConflict" xml:space="preserve"><value>Ce service a été modifié sur le serveur. Votre brouillon est conservé. Abandonnez-le pour adopter la ressource actualisée avant d’enregistrer à nouveau.</value></data>
+  <data name="OperationAccess" xml:space="preserve"><value>Accès aux opérations découvertes</value></data>
+  <data name="ExposeOperationsToDescendants" xml:space="preserve"><value>Exposer toutes les opérations découvertes selon les règles d’accès du service</value></data>
+  <data name="ExposeOperationsToDescendantsHelp" xml:space="preserve"><value>Gérez les périmètres descendants et les actions autorisées dans la section Accès du service. Les descendants autorisés peuvent découvrir et utiliser toutes les opérations selon les règles d’accès actuelles du service. Les opérations doivent toujours être activées et leurs références au service et au type doivent être valides.</value></data>
 </root>

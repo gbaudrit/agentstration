@@ -195,6 +195,7 @@ public sealed record ConnectedServiceProperties
     public required JsonElement Options { get; init; }
     public IReadOnlyList<ConnectedServiceValueBinding> Bindings { get; init; } = [];
     public DescendantUsePolicy UsePolicy { get; init; } = new();
+    public bool ExposeOperationsToDescendants { get; init; } = true;
 }
 
 public sealed record ConnectedServiceResource : Resource
@@ -269,6 +270,9 @@ public sealed record ConnectedServiceOperationRevisionReference(
     ScopedResourceAddress Operation, Guid OperationUid, long Generation, string DefinitionDigest);
 
 public sealed record SetConnectedServiceOperationEnabledRequest(bool Enabled);
+
+public sealed record ConnectedServiceOperationContract(
+    ConnectedServiceOperationRevisionReference Operation, ConnectedServiceOperationTypeVersionDescriptor Type);
 
 [JsonConverter(typeof(JsonStringEnumConverter<ConnectedServiceOperationDiscoveryState>))]
 public enum ConnectedServiceOperationDiscoveryState

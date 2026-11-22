@@ -168,4 +168,7 @@
   <data name="RequiredBindingsMissing" xml:space="preserve"><value>Configure the required bindings: {0}.</value></data>
   <data name="ConfigurationInvalid" xml:space="preserve"><value>Correct the configuration errors before saving.</value></data>
   <data name="ConcurrencyConflict" xml:space="preserve"><value>This service changed on the server. Your draft is retained. Discard it to adopt the refreshed resource before saving again.</value></data>
+  <data name="OperationAccess" xml:space="preserve"><value>Discovered operation access</value></data>
+  <data name="ExposeOperationsToDescendants" xml:space="preserve"><value>Expose all discovered operations using the service access rules</value></data>
+  <data name="ExposeOperationsToDescendantsHelp" xml:space="preserve"><value>Manage descendant scopes and permitted actions in the service’s Access section. Authorized descendants can discover and use all operations under the current service access rules. Operations still require activation and valid service and type revisions.</value></data>
 </root>

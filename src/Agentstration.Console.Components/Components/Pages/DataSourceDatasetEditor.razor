@@ -74,6 +74,9 @@
         : Enum.TryParse<DatasetTab>(sectionState.CurrentPath, true, out var tab) ? tab : DatasetTab.Overview;
 
     private ConnectedServiceOperationResource? savedOperation;
+    private ConnectedServiceOperationContract? operationContract;
+    private long contractVersion;
+    private bool loadingOperationContract;
     private string contentAcquisitionKey = "";
     private enum DatasetTab { Overview, Definition, Acquisitions, Content, Queries, Tools, Access, Yaml }
     private IEnumerable<DataSourceAcquisitionResource> OrderedHistory => history.OrderByDescending(item => item.CreatedAt);
@@ -139,6 +142,11 @@
         {
             if (SelectedOperation is not { } operation) return null;
             var reference = operation.Definition.Type;
+            if (operationContract is { } inspected && inspected.Operation.OperationUid == operation.Uid
+                && inspected.Operation.Operation == new ScopedResourceAddress(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name)
+                && inspected.Operation.Generation == operation.Generation && inspected.Operation.DefinitionDigest == operation.Definition.DefinitionDigest
+                && inspected.Type.Version == operation.Definition.Type.Version && inspected.Type.SchemaDigest == operation.Definition.Type.SchemaDigest)
+                return inspected.Type;
             return operationTypes.FirstOrDefault(type => type.Uid == reference.TypeUid && type.Definition.Enabled
                 && type.ScopeRef == reference.Type.ScopeRef && type.Name == reference.Type.Name
                 && type.Namespace == (reference.Type.Namespace ?? operation.Namespace))?.Definition.Versions.FirstOrDefault(version =>
@@ -236,6 +244,7 @@
         var records = current is null ? [] : await Client.GetAcquisitionsAsync(current.Namespace, current.Name, current.ScopeRef!.Value, cancellation.Token);
         if (version != loadVersion || disposed || selection != model.ServiceKey) return;
         connectedServices = services; operationTypes = types; operations = choices; storages = stores; storageTypes = storeTypes; readiness = state; history = records;
+        await RefreshOperationContractAsync();
     }
     private async Task RefreshAsync()
     {
@@ -262,8 +271,33 @@
     }
     private async Task ChangeScopeAsync(ResourceScopeRef? value) { if (!IsNew) return; scope = model.Scope = value; model.StorageKey = ""; model.DocumentCollectionUid = Guid.Empty; model.ServiceKey = ""; ResetOperation(); await RefreshAsync(); }
     private async Task ChangeServiceAsync(ChangeEventArgs value) { model.ServiceKey = value.Value?.ToString() ?? ""; ResetOperation(); await RefreshAsync(); }
-    private void ResetOperation() { model.OperationKey = ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
-    private void ChangeOperation(ChangeEventArgs value) { model.OperationKey = value.Value?.ToString() ?? ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; }
+    private void ResetOperation() { ++contractVersion; operationContract = null; loadingOperationContract = false; model.OperationKey = ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
+    private async Task ChangeOperation(ChangeEventArgs value)
+    {
+        model.OperationKey = value.Value?.ToString() ?? "";
+        model.Parameters = JsonSerializer.SerializeToElement(new { });
+        parametersValid = true;
+        await RefreshOperationContractAsync();
+    }
+    private async Task RefreshOperationContractAsync()
+    {
+        var request = ++contractVersion;
+        var revision = loadVersion;
+        operationContract = null;
+        loadingOperationContract = false;
+        if (SelectedOperation is not { } selected || SelectedType is not null) return;
+        loadingOperationContract = true;
+        try
+        {
+            var contract = await Operations.GetContractAsync(selected, cancellation.Token);
+            if (!disposed && request == contractVersion && revision == loadVersion && SelectedOperation?.Uid == selected.Uid)
+                operationContract = contract;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or NotSupportedException or OperationCanceledException)
+        { /* Keep the existing localized unavailable-contract feedback. */ }
+        finally { if (request == contractVersion && revision == loadVersion) loadingOperationContract = false; }
+    }
     private bool LifecycleValid => model.LifecycleValid;
     private DataSourceAcquisitionPolicy? LifecycleSelection() => model.LifecycleSelection();
     private RenderFragment IdentityContent => @<ResourceIdentityEditor ResourceKind="@DataSourceResourceKinds.DataSource"
@@ -290,7 +324,8 @@
                     @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != model.OperationKey)) { <option value="@model.OperationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
                 </ClearableSelect></ChildContent><Validation><ValidationMessage For="@(() => model.OperationKey)" /></Validation></FormField>
                 @if (SelectedService is not null && !ServiceOperations.Any() && !HasSavedOperationPin) { <p class="form-field-wide" role="status">@T("DatasetNoServiceOperations")</p> }
-                @if (SelectedOperation is not null && AcquisitionIssue is { } issue)
+                @if (loadingOperationContract) { <p class="form-field-wide" role="status">@T("Loading")</p> }
+                else if (SelectedOperation is not null && AcquisitionIssue is { } issue)
                 { <p class="form-field-wide form-alert" role="status" data-testid="dataset-operation-ineligible">@T(issue)</p> }
                 <div class="form-field-wide" data-testid="dataset-parameters"><span>@T("Parameters")</span>
                     @if (string.IsNullOrEmpty(model.OperationKey)) { <p>@T("DatasetSelectOperationFirst")</p> }
@@ -550,6 +585,7 @@
       System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed);
     private void ClearPrivateState()
     {
+        ++contractVersion; operationContract = null; loadingOperationContract = false;
         source = null; newerSnapshot = null; readiness = null; etag = null; model = new(); baseline = "";
         storages = []; storageTypes = []; connectedServices = []; operations = []; operationTypes = []; history = []; savedOperation = null;
         preview = null; contentAcquisitionKey = ""; definitionTouched = invalidInput = false; error = errorCode = errorId = compositionErrorCode = null;

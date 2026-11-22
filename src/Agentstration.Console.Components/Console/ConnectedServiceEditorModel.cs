@@ -21,6 +21,7 @@ public sealed class ConnectedServiceEditorModel
     public string Tags { get; set; } = string.Empty;
     private ConnectedServiceTypeReference? originalType;
     public bool Enabled { get; set; } = true;
+    public bool ExposeOperationsToDescendants { get; set; } = true;
     public JsonElement Options { get; set; } = JsonSerializer.SerializeToElement(new { });
     public List<ConnectedServiceBindingEditorModel> Bindings { get; set; } = [];
     public List<DescendantUseGrant> UseGrants { get; set; } = [];
@@ -35,6 +36,7 @@ public sealed class ConnectedServiceEditorModel
             DisplayName = DisplayName.Trim(),
             Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
             Enabled = Enabled,
+            ExposeOperationsToDescendants = ExposeOperationsToDescendants,
             Type = originalType is { } original && original.TypeUid == type.Uid && original.Type.Name == type.Name
                 && (original.Type.Namespace ?? ResourceNamespace.Parse(Namespace)) == type.Namespace
                 && original.Type.ScopeRef == type.ScopeRef && original.Version == version.Version && original.SchemaDigest == version.SchemaDigest
@@ -62,6 +64,7 @@ public sealed class ConnectedServiceEditorModel
         DisplayName = resource.Definition.DisplayName,
         Description = resource.Definition.Description,
         Enabled = resource.Definition.Enabled,
+        ExposeOperationsToDescendants = resource.Definition.ExposeOperationsToDescendants,
         Options = resource.Definition.Options.Clone(),
         Bindings = resource.Definition.Bindings.Select(ConnectedServiceBindingEditorModel.From).ToList(),
         UseGrants = resource.Definition.UsePolicy.Grants.ToList()

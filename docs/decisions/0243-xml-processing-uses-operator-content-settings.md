@@ -1,4 +1,4 @@
-# ADR-0241: XML processing uses operator content settings
+# ADR-0243: XML processing uses operator content settings
 
 ## Status
 
@@ -49,7 +49,7 @@ numeric evidence stay readable and do not fabricate measurements.
 The unreleased engine, provider and resource versions stay at 1.0.0. Reseed is
 required for changed immutable native invocation digests. No compatibility version,
 implicit rebind, bootstrap-procedure change or automatic data reset is introduced.
-This supersedes ADR-0239's fixed instance and mapping payload ceilings. Accepted
+This supersedes ADR-0241's fixed instance and mapping payload ceilings. Accepted
 schema/mapping references and version adoption rules otherwise remain unchanged.
 
 ## Consequences

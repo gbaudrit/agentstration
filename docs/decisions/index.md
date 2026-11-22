@@ -285,8 +285,12 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 238. [ADR-0238 — Resource-local sections use URL fragments](0238-fragment-selection-for-resource-navigation.md)
 
-239. [ADR-0239 — Transformation Schemas have explicit function exposure](0239-transformation-schemas-have-explicit-function-exposure.md)
+239. [ADR-0239 — Discovered operations can inherit Connected Service access](0239-discovered-operations-can-inherit-connected-service-access.md)
 
-240. [ADR-0240 — Acquisition text content is selected at admission](0240-acquisition-text-content-is-selected-at-admission.md)
+240. [ADR-0240 — Shared Connected Service consumption keeps owner-bound dependencies](0240-shared-connected-service-consumption-keeps-owner-bound-dependencies.md)
 
-241. [ADR-0241 — XML processing uses operator content settings](0241-xml-processing-uses-operator-content-settings.md)
+241. [ADR-0241 — Transformation Schemas have explicit function exposure](0241-transformation-schemas-have-explicit-function-exposure.md)
+
+242. [ADR-0242 — Acquisition text content is selected at admission](0242-acquisition-text-content-is-selected-at-admission.md)
+
+243. [ADR-0243 — XML processing uses operator content settings](0243-xml-processing-uses-operator-content-settings.md)
