@@ -6060,5 +6060,16 @@
     "adoptedLists": 42,
     "nonResourceLists": 5,
     "history": "All original adoption IDs retained. One former Knowledge Source frame is explicitly aliased to its shared physical renderer; newly discovered concrete frames are added."
+  },
+  "mainIntegrationVisualFollowup": {
+    "baseCommit": "ac4567464395ed75ca4831112703faa8e5dea78d",
+    "currentCatalogSurfaceIds": 397,
+    "additionalMainSurfaceIds": [
+      "bootstrap-plan-preview-targets",
+      "bootstrap-plan-profile-targets",
+      "bootstrap-startup-resource-progress"
+    ],
+    "scope": "Original 42 adopted lists and five decisions remain the 47-commit rollout. New main Bootstrap progress surfaces retain their own bounded progress contracts and gated UX follow-ups; they are inventoried in collection-surfaces-1121.json, outside the original 395 assessed IDs.",
+    "inventoryChecks": "collection-surface-catalog.spec.ts: three passing checks after integration"
   }
 }

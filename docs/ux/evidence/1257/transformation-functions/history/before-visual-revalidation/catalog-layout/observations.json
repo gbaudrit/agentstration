@@ -1,0 +1,343 @@
+{
+  "date": "2026-11-22",
+  "baseline": "8107ebbec76237eafe9cf42ebf9b332d9d9eb8b9",
+  "browser": "System Chromium headless; deterministic local product; frozen Release hosts",
+  "redRegression": {
+    "variant": "desktop French light",
+    "viewport": {
+      "width": 1659,
+      "height": 1000
+    },
+    "expectedMinimumDescriptionCellWidth": 240,
+    "actualDescriptionCellWidth": 0.03125,
+    "screenshot": "before-desktop-fr-FR-light.png",
+    "result": "failed before CSS correction"
+  },
+  "source": {
+    "path": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.css",
+    "beforeSha256": "79186520a08e5b68cf45584421103d78b096afdc6ca5d617283c6c08d91157ac",
+    "afterSha256": "16a9512496ae965350afa9190a45122f584c2ea08bc5fd44f614a352d3edb9b0"
+  },
+  "cases": [
+    {
+      "variant": "desktop English dark",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "status": "passed",
+      "table": "desktop-en-US-dark-table.png",
+      "cards": "desktop-en-US-dark-cards.png",
+      "rows": [
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 204.09375,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 100.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 100.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 189.09375,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 100.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 143.59375,
+          "descriptionWidth": 313.296875
+        }
+      ]
+    },
+    {
+      "variant": "mobile French light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "table": "mobile-fr-FR-light-table.png",
+      "cards": "mobile-fr-FR-light-cards.png",
+      "rows": [
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 234.09375,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 115.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 115.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 219.09375,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 115.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 173.59375,
+          "descriptionWidth": 313.296875
+        }
+      ]
+    },
+    {
+      "variant": "mobile English dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "table": "mobile-en-US-dark-table.png",
+      "cards": "mobile-en-US-dark-cards.png",
+      "rows": [
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 204.09375,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 100.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 100.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 189.09375,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 100.65625,
+          "descriptionWidth": 313.296875
+        },
+        {
+          "widths": [
+            269.109375,
+            102.078125,
+            83.515625,
+            345.296875,
+            128
+          ],
+          "height": 143.59375,
+          "descriptionWidth": 313.296875
+        }
+      ]
+    },
+    {
+      "variant": "desktop French light",
+      "viewport": {
+        "width": 1659,
+        "height": 1000
+      },
+      "status": "passed",
+      "table": "desktop-fr-FR-light-table.png",
+      "cards": "desktop-fr-FR-light-cards.png",
+      "rows": [
+        {
+          "widths": [
+            372.640625,
+            141.34375,
+            115.640625,
+            527.375,
+            128
+          ],
+          "height": 174.09375,
+          "descriptionWidth": 495.375
+        },
+        {
+          "widths": [
+            372.640625,
+            141.34375,
+            115.640625,
+            527.375,
+            128
+          ],
+          "height": 85.65625,
+          "descriptionWidth": 495.375
+        },
+        {
+          "widths": [
+            372.640625,
+            141.34375,
+            115.640625,
+            527.375,
+            128
+          ],
+          "height": 85.65625,
+          "descriptionWidth": 495.375
+        },
+        {
+          "widths": [
+            372.640625,
+            141.34375,
+            115.640625,
+            527.375,
+            128
+          ],
+          "height": 159.09375,
+          "descriptionWidth": 495.375
+        },
+        {
+          "widths": [
+            372.640625,
+            141.34375,
+            115.640625,
+            527.375,
+            128
+          ],
+          "height": 85.65625,
+          "descriptionWidth": 495.375
+        },
+        {
+          "widths": [
+            372.640625,
+            141.34375,
+            115.640625,
+            527.375,
+            128
+          ],
+          "height": 128.59375,
+          "descriptionWidth": 495.375
+        }
+      ]
+    }
+  ],
+  "assertions": [
+    "Five distinct columns; description cells at least 240px and visible text at least 200px",
+    "Actions column between 104px and 160px; menu opens and Escape closes it",
+    "Native fixture row heights stay below 360px; header text stays inside its column",
+    "Cards preserve readable descriptions and visible Actions controls",
+    "No horizontal document overflow in either view; explicit mobile tables scroll within their container",
+    "Actions menus open and close in both table and cards, using touch on mobile and Escape to close."
+  ]
+}

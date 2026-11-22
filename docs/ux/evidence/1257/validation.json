@@ -455,5 +455,134 @@
       ],
       "evidence": "transformation-functions/catalog-layout/README.md"
     }
+  },
+  "visualRevalidation": {
+    "date": "2026-11-22",
+    "testedCommit": "1e52fb3e06c303b4ad32e10398edef214c1f780b",
+    "baseMainCommit": "ac4567464395ed75ca4831112703faa8e5dea78d",
+    "provenance": "The original validation and CI-remediation records above remain historical at their recorded revisions. This block supersedes visual claims only for the three families below. Later changes are evidence/documentation only; sourceProof hashes in each family were checked against git show of testedCommit.",
+    "scope": [
+      "durable Artifact grids",
+      "saved Query grids",
+      "Transformation Function catalogue"
+    ],
+    "browserRuntime": "Linux, Chromium 154, Playwright 1.63.0, seven prebuilt frozen Release hosts, disposable local persisted fixtures",
+    "matrix": {
+      "locales": [
+        "en-US",
+        "fr-FR"
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 1000
+        },
+        {
+          "width": 390,
+          "height": 844
+        }
+      ],
+      "views": [
+        "table",
+        "cards"
+      ],
+      "phases": [
+        "closed",
+        "actions",
+        "preview",
+        "after-close"
+      ],
+      "corePngCount": 192,
+      "additionalFunctionWidths": [
+        760,
+        761,
+        1024,
+        1280,
+        1659,
+        1920
+      ],
+      "totalPngCount": 198
+    },
+    "visualInspection": {
+      "status": "completed",
+      "method": "All 198 original viewport PNGs individually inspected at native readable size via view_image. No thumbnail-only validation. SHA-256 matches reviewed images to committed evidence.",
+      "outstandingTargetedDefects": [],
+      "historicalPngsPreservedByteForByte": 25,
+      "intermediateRejectedRun": "7461e99a: query Actions compressed vertically and Artifact table unnecessarily oversized; preserved under each family history/intermediate-rejected-7461e99a and fixed before final run."
+    },
+    "browser": {
+      "targeted": {
+        "command": "npm run test:smoke -- collection-layout.spec.ts --config=/tmp/1257-layout-evidence.config.mts",
+        "stats": {
+          "startTime": "2026-11-22T15:28:12.263Z",
+          "duration": 224384.26700000002,
+          "expected": 8,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        },
+        "reportSha256": "71652ea4918126f7c4d95583753b038bb2c2e31fe9732cbc134589b69d655e9f"
+      },
+      "broader": {
+        "command": "npm run test:smoke -- collection-contract.spec.ts --config=/tmp/1257-collection-regression.config.mts",
+        "stats": {
+          "startTime": "2026-11-22T15:30:03.679Z",
+          "duration": 858947.0850000001,
+          "expected": 102,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        },
+        "reportSha256": "12befe427980541d790d721413135d3b882cf29890f6e6669bd76b70c1f2fe6a"
+      },
+      "configurationOverrides": "Temporary configs extend the repository config, set Chromium executablePath=/usr/bin/chromium, attach sourceRevision metadata and choose JSON/PNG output directories. Product hosts are prebuilt; AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true. Portable rerun: omit --config and use installed Playwright Chromium."
+    },
+    "otherChecks": {
+      "consoleComponentsPassed": 2113,
+      "webComponentsPassed": 273,
+      "typescript": "passed",
+      "javascriptComponentsPassed": 25,
+      "fixtureChecksPassed": 5,
+      "surfaceCatalogPassed": 3,
+      "restore": "190 projects passed",
+      "build": "seven Release browser hosts passed, zero warnings/errors",
+      "format": "347 changed C#/Razor files checked after main integration; only seed formatting required correction, then its project verify-no-changes passed. CI build-linux formatting verification also passed.",
+      "documentation": "Full npm run build in docs/site passed: ADR validation, LikeC4 validation/code generation, Docusaurus static generation."
+    },
+    "ciAtEvidenceRecording": {
+      "sourceCommit": "1e52fb3e06c303b4ad32e10398edef214c1f780b",
+      "buildLinux": "passed",
+      "fastFunctionalLane": "passed",
+      "integrationFunctionalLane": "in progress",
+      "browserUxShards": "in progress, no reported failure",
+      "note": "Current GitHub checks are authoritative. Build and Fast passed; Integration and remaining browser shards were pending. Hosted Management API diagnostics failed its memory budget despite all 164 functional cases passing. No claim that the global CI is green.",
+      "hostedManagementApiDiagnostics": {
+        "status": "failed",
+        "testsPassed": 164,
+        "testsFailed": 0,
+        "peakWorkingSetMiB": 2776.9,
+        "workingSetFailureBudgetMiB": 2560,
+        "reason": "working-set-budget-exceeded",
+        "jobUrl": "https://github.com/gbaudrit/agentstration/actions/runs/45038657236/job/137260213566"
+      }
+    },
+    "evidence": [
+      "artifacts/README.md",
+      "data-source-queries/README.md",
+      "transformation-functions/README.md"
+    ],
+    "limits": [
+      "Historical Artifact clipping at exactly 1440px was not reproduced with the initial pre-fix fixture; the same horizontal reveal mechanism was reproduced at 390px (0 to 648px).",
+      "Transformation Function letter-per-line defect was already fixed on starting revision 9132710e; final multi-resource and width regressions verify that correction remains effective.",
+      "Query fixture validates persisted disabled synthetic metadata and layout only: no acquisition, document collection provisioning, query execution or query publication.",
+      "Artifact and Query contracts have no persisted Description field; long names/technical identities and native metadata are used. Functions include long descriptions.",
+      "Forced tables on mobile still require horizontal scrolling. Query and Function identities can leave the viewport when reaching Actions; durable Artifact identity remains sticky. Cards are the narrow representation.",
+      "Only horizontal position preservation is asserted; native close navigation may reset vertical position. Viewport captures do not claim inspection of every Preview section.",
+      "Staged Artifact evidence remains historical and was not renewed. Live provider integrations were not rerun locally. #1258 still requires maintainer UX validation and merge."
+    ]
   }
 }
