@@ -238,7 +238,11 @@ public sealed partial class DeclarativeBootstrapService(
                                 && (kind == PackKinds.InstalledPack || manager?.ManagedBy?.Kind == ResourceManagementAuthorityKind.PackInstallation),
                             (owner, ns, kind, name, uid) => created.Add(Row(BootstrapResourceDisposition.Create) with
                             {
-                                Kind = kind, Name = name, OwnerScope = owner, Namespace = ns, ResourceUid = uid,
+                                Kind = kind,
+                                Name = name,
+                                OwnerScope = owner,
+                                Namespace = ns,
+                                ResourceUid = uid,
                                 Pack = resource.Kind == PackBootstrapKinds.PackInstallation ? governance?.Current?.Origin.Reference : null
                             }));
                         var result = await handlers[resource.Kind].ApplyAsync(resource, resourceOperation, cancellationToken);

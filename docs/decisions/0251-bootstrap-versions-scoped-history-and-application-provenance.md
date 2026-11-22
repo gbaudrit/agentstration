@@ -1,4 +1,4 @@
-# ADR-0251 Bootstrap versions, scoped history and application provenance
+# ADR-0251 — Bootstrap versions, scoped history and application provenance
 
 Status: Proposed — 2026-11-22
 
