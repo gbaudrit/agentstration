@@ -1,3 +1,4 @@
+import { waitForModelDiscovery } from './model-discovery.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { LoginPage } from './login.page.js';
@@ -388,7 +389,8 @@ export class RuntimeWorkerObservabilityPage {
       `${consoleUrl}/api/modelproviders/${observabilityProviderName}/models/refresh`,
       { headers: instanceHeaders },
     );
-    expect(refreshed.status(), await refreshed.text()).toBe(200);
+    expect(refreshed.status(), await refreshed.text()).toBe(202);
+    await waitForModelDiscovery(this.page, consoleUrl, observabilityProviderName, instanceHeaders);
     const created = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
       headers: workspaceHeaders,
       data: {

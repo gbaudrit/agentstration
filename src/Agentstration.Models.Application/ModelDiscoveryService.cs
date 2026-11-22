@@ -17,7 +17,10 @@ public sealed record ModelDiscoveryDiff(
     int Total);
 
 public sealed class ModelDiscoveryFailedException(string providerName, string message, Exception? innerException = null)
-    : Exception($"Model discovery for provider '{providerName}' failed: {message}", innerException);
+    : Exception($"Model discovery for provider '{providerName}' failed: {message}", innerException)
+{
+    public string Health { get; init; } = "unknown";
+}
 
 public sealed class ModelDiscoveryService(
     IResourceStore store,
@@ -106,12 +109,13 @@ public sealed class ModelDiscoveryService(
         var existing = await ListProviderModelsAsync(providerResource, cancellationToken);
         var now = timeProvider.GetUtcNow();
         IReadOnlyList<DiscoveredModel> observed;
+        ModelProviderHealth? health = null;
 
         try
         {
             var discovery = discoveries.SingleOrDefault(candidate => candidate.CanHandle(provider.AdapterType))
                 ?? throw new InvalidOperationException("No discovery adapter is registered in this host.");
-            var health = await discovery.GetHealthAsync(provider, cancellationToken);
+            health = await discovery.GetHealthAsync(provider, cancellationToken);
             if (!string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException(health.Details ?? $"Provider health is '{health.Status}'.");
             observed = await discovery.ListModelsAsync(provider, cancellationToken);
@@ -120,9 +124,13 @@ public sealed class ModelDiscoveryService(
         catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             await MarkFailedAsync(scopeRef, existing, now, exception.Message, cancellationToken);
-            throw new ModelDiscoveryFailedException(provider.Name, exception.Message, exception);
+            throw new ModelDiscoveryFailedException(provider.Name, exception.Message, exception) { Health = health?.Status ?? "unavailable" };
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        var currentProvider = await providers.GetExactAsync(scopeRef, providerResource.Namespace, providerResource.Name, cancellationToken);
+        if (currentProvider?.Value.Uid != providerResource.Uid || currentProvider.Value.Generation != providerResource.Generation)
+            throw new ResourceConcurrencyException("The model provider changed during discovery.");
         var byExternalId = existing.ToDictionary(
             value => value.Value.Definition.ExternalId,
             StringComparer.Ordinal);

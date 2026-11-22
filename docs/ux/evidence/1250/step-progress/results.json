@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "case": "desktop-fr",
+      "layout": "460.375px 759.625px",
+      "interactions": "selection, bound-follow, update focus/draft, action, keyboard/no-scroll, Tab, instance isolation, empty/restore"
+    },
+    {
+      "case": "mobile-en",
+      "stacked": true,
+      "noOverflow": true
+    },
+    {
+      "case": "desktop-fr-dark",
+      "reducedMotion": true
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,15 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: bootstrap-openapi
+definition:
+  displayName: Unattended OpenAPI Bootstrap example
+  description: Enrolls an externally started extension and binds its prepared contributions without contacting an upstream API.
+  targetScope: instance
+  bindings:
+    - name: discover-tool
+      targetKind: tool
+      extensionTarget:
+        extensionId: Agentstration.Extensions.OpenApi
+        kind: Tool
+        contributionId: openapi.contract.discover

@@ -389,6 +389,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
     journey: 'inspect-artifact-content', specification: 'tests/artifact-content.spec.ts', coverage: 'covered',
   },
   coveredDistribution('bootstrap-profiles', `${consolePages}/BootstrapProfiles.razor`, ['/settings/bootstrap']),
+  planned('bootstrap-startup-progress', `${consolePages}/BootstrapStartupProgress.razor`, ['/startup/progress'], 1251),
   coveredDistribution('packs', `${consolePages}/Packs.razor`, ['/packs']),
   coveredDistribution('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], [], 'create-pack-project'),
   coveredDistribution('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], ['projectId'], 'create-pack-project'),

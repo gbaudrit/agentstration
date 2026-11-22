@@ -21,4 +21,41 @@
   <data name="SourceSelection" xml:space="preserve"><value>Source {0}/{1} · content locale {2}</value></data><data name="SourceVersion" xml:space="preserve"><value>Source version</value></data><data name="ContentLocale" xml:space="preserve"><value>Content locale</value></data><data name="ContentPath" xml:space="preserve"><value>Content path</value></data>
 <data name="BindingTargetKind.Parameter"><value>Parameter</value></data><data name="InheritedScope"><value>visible scope</value></data>
   <data name="BindingTargetKind.Tool" xml:space="preserve"><value>Tool</value></data>
+  <data name="BindingTargetKind.ConnectedServiceType" xml:space="preserve"><value>Connected service type</value></data>
+  <data name="BindingTargetKind.StorageType" xml:space="preserve"><value>Storage type</value></data>
+  <data name="BindingTargetKind.DataSourceProfile" xml:space="preserve"><value>Data source profile</value></data>
+
+  <data name="ProcessedCount" xml:space="preserve"><value>Processed {0} of {1} resources</value></data>
+  <data name="ProgressLabel" xml:space="preserve"><value>Bootstrap application progress</value></data>
+  <data name="PreparingApplication" xml:space="preserve"><value>Preparing the application…</value></data>
+  <data name="CurrentResource" xml:space="preserve"><value>Resource {0}:</value></data>
+  <data name="ObservationInterrupted" xml:space="preserve"><value>Progress updates are temporarily unavailable. Reconnecting to the same application…</value></data>
+  <data name="ApplicationStatus.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="CancelApplication" xml:space="preserve"><value>Cancel application</value></data>
+  <data name="CancellationRequested" xml:space="preserve"><value>Cancellation requested. The current resource may finish first.</value></data>
+<data name="ApplicationCancelled" xml:space="preserve"><value>The application was cancelled. Already created resources are retained.</value></data>
+<data name="ApplicationInterrupted" xml:space="preserve"><value>The application was interrupted. Preview the profiles before starting a new application.</value></data>
+<data name="ApplicationFailed" xml:space="preserve"><value>The application could not complete. Preview the profiles before retrying.</value></data>
+<data name="ApplicationInvalid" xml:space="preserve"><value>The profiles or target changed, or validation failed. Preview the application again.</value></data>
+<data name="ProcessedResources" xml:space="preserve"><value>Processed {0} resources</value></data>
+<data name="RequestIdentityConflict" xml:space="preserve"><value>This request identity already belongs to a different application. Preview the profiles again.</value></data>
+<data name="ApplicationQueueFull" xml:space="preserve"><value>Follow the current applications before submitting another application.</value></data>
+  <data name="SearchProfiles" xml:space="preserve"><value>Search profiles</value></data>
+  <data name="SearchResources" xml:space="preserve"><value>Search resources</value></data>
+  <data name="Resources" xml:space="preserve"><value>Resources</value></data>
+  <data name="Preparation" xml:space="preserve"><value>Preparation</value></data>
+  <data name="PreparationDescription" xml:space="preserve"><value>Validate the selected profiles and their exact source before applying resources.</value></data>
+  <data name="ObservedResourcesOnly" xml:space="preserve"><value>This older application retains only observed resources; unobserved resource groups are not reconstructed.</value></data>
+  <data name="CatalogConfiguration" xml:space="preserve"><value>Catalog configuration</value></data>
+  <data name="CloseConfiguration" xml:space="preserve"><value>Close</value></data>
+  <data name="BackToSelection" xml:space="preserve"><value>Back to preparation</value></data>
+  <data name="PlanOrderHelp" xml:space="preserve"><value>Each profile has its own target. Instance profiles run first, then Tenant profiles, then Workspace profiles. You can reorder profiles within the same level.</value></data>
+  <data name="PlanTargets" xml:space="preserve"><value>Profiles and targets</value></data>
+  <data name="ValidationDeferred" xml:space="preserve"><value>Validation of this profile will complete after the preceding resources and target are available. Execution stops at the first failure; resources already created are retained.</value></data>
+  <data name="PlanTargetInvalid" xml:space="preserve"><value>Choose a valid target for every selected profile. Planned targets must be created by an earlier profile.</value></data>
+  <data name="PlanBindingsInvalid" xml:space="preserve"><value>Check required bindings and their producer profiles.</value></data>
+  <data name="MultipleTargets" xml:space="preserve"><value>Multiple targets</value></data>
+  <data name="TargetForProfile" xml:space="preserve"><value>Target for {0}</value></data>
+  <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation deferred</value></data>
+  <data name="ApplicationTitle" xml:space="preserve"><value>Bootstrap application</value></data>
 </root>

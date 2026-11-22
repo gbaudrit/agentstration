@@ -1,6 +1,7 @@
 @page "/modelproviders/new"
 @page "/modelproviders/{Name}"
-@implements IDisposable
+@implements IAsyncDisposable
+@inject TimeProvider Clock
 @inject IModelProvidersClient Client
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProvidersStrings> CollectionLabels
 @inject IExtensionsClient ExtensionsClient
@@ -45,8 +46,8 @@ else
         <PrimaryActions>@if (CanWrite && resource is not null) { <a class="button-primary" href="@CreateModelProfileUrl()">@T("CreateModelProfile")</a> }</PrimaryActions>
         <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-provider-delete">@T("Delete")</button> }</Actions>
         <Feedback>@Feedback</Feedback>
-        <OverviewMetrics><MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
-            <MetricCard Label="@T("AvailableModels")" Value="@(modelsKnown ? ModelCount(models.Count) : "—")" Detail="@T("Discovery")" />
+        <OverviewMetrics><MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusLabel(status.Status))" Detail="@(status is null || status.CheckedAt == DateTimeOffset.MinValue ? T("NotObserved") : T("LastTest", status.CheckedAt.ToLocalTime().ToString("g")))" Status="@(status is null ? UiStatus.Neutral : ModelManagementUi.Status(status.Status))" />
+            <MetricCard Label="@T("AvailableModels")" Value="@(status?.Discovery is { LastSuccessAt: null } ? T("NotObserved") : modelsKnown ? ModelCount(models.Count) : "—")" Detail="@DiscoveryStateLabel" />
             <MetricCard Label="@T("ModelProfileUsages")" Value="@(usagesKnown ? ProfileCount(usages.Count) : "—")" Detail="@T("UsagesHelp")" />
         </OverviewMetrics>
         <OverviewConfiguration>@SavedConfiguration</OverviewConfiguration>
@@ -87,6 +88,8 @@ else
     private ModelDiscoveryDiffResponse? discoveryResult;
     private bool hydrated, loading, persisted, saving, testing, refreshing, confirmDelete, invalidInput, touched, modelsKnown, usagesKnown, catalogueForbidden;
     private long loadVersion;
+    private Task? observationPolling;
+    private readonly List<Task> metadataLoads = [];
     private readonly HashSet<ModelProviderValueBindingEditorModel> creators = [];
     private bool IsNew => !persisted;
     private bool interactive => hydrated && !loading;
@@ -152,7 +155,7 @@ else
     </div>; } }
     private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => Identity, "definition/configuration" => Configuration, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
     private RenderFragment TestActions => @<button class="button-secondary" type="button" disabled="@Busy" @onclick="TestAsync" data-testid="model-provider-test">@(testing ? T("Testing") : T("TestConnection"))</button>;
-    private RenderFragment DiscoveryActions => @<button class="button-secondary" type="button" disabled="@Busy" @onclick="RefreshModelsAsync" data-testid="model-provider-refresh">@(refreshing ? T("RefreshingModels") : T("RefreshModels"))</button>;
+    private RenderFragment DiscoveryActions => @<button class="button-secondary" type="button" disabled="@(Busy || DiscoveryPending || !CanOperate)" @onclick="RefreshModelsAsync" data-testid="model-provider-refresh">@(refreshing || DiscoveryPending ? T("RefreshingModels") : T("RefreshModels"))</button>;
     private bool IdentityComplete => model is not null && model.ScopeRef == ResourceScopeRef.Instance
         && System.ComponentModel.DataAnnotations.Validator.TryValidateObject(model, new(model), null, validateAllProperties: true);
     private bool ConfigurationComplete => model is not null && !invalidInput
@@ -168,7 +171,10 @@ else
     private IEnumerable<Setting> SavedEntries => resource is null ? [] : new Setting[] { new(T("ExtensionRegistration"), $"{resource.Definition.Extension.ScopeRef} {(resource.Definition.Extension.Namespace ?? resource.Namespace).Value}/{resource.Definition.Extension.Name}".Trim()), new(T("ModelProviderContribution"), resource.Definition.ContributionId), new(T("ValueBindings"), JsonSerializer.Serialize(resource.Definition.ValueBindings)), new(T("SpecificationOverrides"), JsonSerializer.Serialize(resource.Definition.SpecificationOverrides)) };
     private RenderFragment SavedConfiguration => @<CollectionView TItem="Setting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
     private RenderFragment AdditionalContent(string path) => path switch { "models" => ModelsPanel, "usages" => UsagesPanel, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
-    private RenderFragment ModelsPanel => @<FormSection Title="@T("AvailableModels")">@if (modelsError is not null) { <p role="alert">@modelsError</p> }@if (discoveryResult is not null) { <p role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</p> }@if (!modelsKnown) { <p>@T("ObservationUnavailable")</p> } else if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> } else { <CollectionView TItem="AvailableModelResponse" Items="models" IdentityLabel="@T("Model")" InformationLabels="@(new[] { T("Capabilities"), T("Input"), T("Output") })"><Identity Context="item"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.ResourceName is null ? null : resource?.Namespace.Value)" Name="@(item.ResourceName ?? item.Name)" Href="@(item.ResourceName is null ? null : ModelDetailsUrl(item))" IconName="layers" Domain="model" data-testid="open-model-details"><IconBadges>@if (item.ResourceName is not null) { <ResourceScopeBadge ScopeRef="resource?.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(resource?.ScopeRef, Services))" IconOnly /> }<StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" IconOnly /></IconBadges></CollectionIdentity><code>@item.Name</code></Identity><Information Context="item"><CollectionValue Label="@T("Capabilities")">@Features(item)</CollectionValue><CollectionValue Label="@T("Input")">@ContentTypes(item.Specification.Input)</CollectionValue><CollectionValue Label="@T("Output")">@ContentTypes(item.Specification.Output)</CollectionValue></Information><Actions Context="item">@if (CanWrite && item.Status.Equals("available", StringComparison.OrdinalIgnoreCase)) { <CollectionActions ResourceName="@item.DisplayName"><Primary><a class="button-secondary" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a></Primary></CollectionActions> }</Actions></CollectionView> }</FormSection>;
+    private RenderFragment ModelsPanel => @<FormSection Title="@T("AvailableModels")">
+        <p role="status" data-testid="model-discovery-state">@DiscoveryStateLabel</p>
+        @if (status?.Discovery?.State == "failed") { <div class="form-alert form-alert-warning" role="status">@T(status.Discovery.ErrorCode == "discovery_timeout" ? "Discovery.Timeout" : "Discovery.Failure") @if (status.Discovery.NextAttemptAt is { } nextAttempt) { @T("Discovery.RetryAt", nextAttempt.ToLocalTime().ToString("g")) }</div> }
+        @if (modelsError is not null) { <p role="alert">@modelsError</p> }@if (discoveryResult is not null) { <p role="status" data-testid="model-discovery-result">@DiscoverySummary(discoveryResult)</p> }@if (!modelsKnown) { <p>@T("ObservationUnavailable")</p> } else if (models.Count == 0) { <EmptyState Title="@T("NoModelsDiscovered")" Message="@T("NoModelsMessage")" /> } else { <CollectionView TItem="AvailableModelResponse" Items="models" IdentityLabel="@T("Model")" InformationLabels="@(new[] { T("Capabilities"), T("Input"), T("Output") })"><Identity Context="item"><CollectionIdentity DisplayName="@item.DisplayName" Namespace="@(item.ResourceName is null ? null : resource?.Namespace.Value)" Name="@(item.ResourceName ?? item.Name)" Href="@(item.ResourceName is null ? null : ModelDetailsUrl(item))" IconName="layers" Domain="model" data-testid="open-model-details"><IconBadges>@if (item.ResourceName is not null) { <ResourceScopeBadge ScopeRef="resource?.ScopeRef" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(resource?.ScopeRef, Services))" IconOnly /> }<StatusBadge Text="@StatusLabel(item.Status)" Status="@ModelManagementUi.Status(item.Status)" IconOnly /></IconBadges></CollectionIdentity><code>@item.Name</code></Identity><Information Context="item"><CollectionValue Label="@T("Capabilities")">@Features(item)</CollectionValue><CollectionValue Label="@T("Input")">@ContentTypes(item.Specification.Input)</CollectionValue><CollectionValue Label="@T("Output")">@ContentTypes(item.Specification.Output)</CollectionValue></Information><Actions Context="item">@if (CanWrite && item.Status.Equals("available", StringComparison.OrdinalIgnoreCase)) { <CollectionActions ResourceName="@item.DisplayName"><Primary><a class="button-secondary" href="@CreateModelProfileUrl(item.Name)" data-testid="create-profile-for-model">@T("CreateProfileForModel")</a></Primary></CollectionActions> }</Actions></CollectionView> }</FormSection>;
     private RenderFragment UsagesPanel => @<FormSection Title="@T("ModelProfileUsages")">@if (!usagesKnown) { <p>@T("UsagesUnavailable")</p> } else if (usages.Count == 0) { <p>@T("UsagesHelp")</p> } else { <CollectionView TItem="ModelProviderUsageResponse" Items="usages" IdentityLabel="@T("ModelProfileUsages")" InformationLabels="Array.Empty<string>()"><Identity Context="usage">@if (usage.Namespace is { } ns && usage.ScopeRef is { } owner) { <CollectionIdentity DisplayName="@usage.DisplayName" Namespace="@ns.Value" Name="@usage.Name" Href="@ResourceOwnershipContext.Resource(Services, "/modelprofiles", usage.Name, ns, owner)" IconName="layers" Domain="model"><IconBadges><ResourceScopeBadge ScopeRef="owner" IconOnly /></IconBadges></CollectionIdentity> } else { <strong>@usage.DisplayName</strong><code>@usage.Name</code> }</Identity><Information Context="usage"></Information></CollectionView> }</FormSection>;
     private sealed record ProviderBundle(ResourceSnapshot<ModelProviderResource> Snapshot, IReadOnlyList<ExtensionResponse> Extensions, IReadOnlyList<ParameterResource> Parameters, IReadOnlyList<SecretResponse> Secrets, IReadOnlyList<ResourceScopeTargetResponse> Targets, IReadOnlyList<ModelProviderUsageResponse> Usages, ModelProviderStatusResponse? Status, IReadOnlyList<AvailableModelResponse> Models, bool ModelsKnown, bool UsagesKnown, string? ObservationError, string? CatalogueWarning, bool CatalogueForbidden = false);
     protected override Task OnParametersSetAsync()
@@ -180,7 +186,7 @@ else
     }
     protected override void OnAfterRender(bool firstRender)
     {
-        if (firstRender) { hydrated = true; StateHasChanged(); }
+        if (firstRender) { hydrated = true; observationPolling = PollObservationsAsync(); StateHasChanged(); }
         if (pendingNavigation is { } target) { pendingNavigation = null; Navigation.NavigateTo(target); }
     }
     private void ClearPrivate()
@@ -201,7 +207,14 @@ else
             requestedNamespace = SelectedNamespace;
             if (IsNew)
             {
-                var loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (request != loadVersion) return;
+                using var metadataDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(3), Clock);
+                using var metadataCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token, metadataDeadline.Token);
+                IReadOnlyList<ExtensionResponse> loadedExtensions = [];
+                try { loadedExtensions = await ExtensionsClient.GetExtensionsAsync(metadataCancellation.Token); }
+                catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized) { throw; }
+                catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { catalogueWarning = T("MetadataUnavailable"); }
+                catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException) { catalogueWarning = T("MetadataUnavailable"); }
+                if (request != loadVersion) return;
                 var loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token); if (request != loadVersion) return;
                 var loadedSecrets = await SecretsClient.GetSecretsAsync(cancellation.Token); if (request != loadVersion) return;
                 var targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, cancellation.Token); if (request != loadVersion) return;
@@ -230,6 +243,8 @@ else
             }
             else Adopt(bundle);
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            metadataLoads.RemoveAll(task => task.IsCompleted);
+            metadataLoads.Add(LoadMetadataAsync(snapshot.Value, request));
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception)
@@ -249,18 +264,7 @@ else
     }
     private async Task<ProviderBundle> ReadBundleAsync(ResourceSnapshot<ModelProviderResource> snapshot, long request)
     {
-        IReadOnlyList<ExtensionResponse> loadedExtensions = []; IReadOnlyList<ParameterResource> loadedParameters = []; IReadOnlyList<SecretResponse> loadedSecrets = []; IReadOnlyList<ResourceScopeTargetResponse> targets = [];
-        string? warning = null; var catalogueForbidden = false;
-        try
-        {
-            loadedExtensions = await ExtensionsClient.GetExtensionsAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
-            loadedParameters = await ParametersClient.GetParametersAsync(cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
-            loadedSecrets = await SecretsClient.GetSecretsAsync(snapshot.Value.ScopeRef!.Value, cancellation.Token); if (request != loadVersion) return EmptyBundle(snapshot);
-            targets = await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, cancellation.Token);
-        }
-        catch (AgentstrationApiException exception) when (exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized)
-        { loadedExtensions = []; loadedParameters = []; loadedSecrets = []; targets = []; catalogueForbidden = true; warning = exception.Message; }
-        if (request != loadVersion) return EmptyBundle(snapshot);
+        string? warning = catalogueWarning;
         IReadOnlyList<ModelProviderUsageResponse> loadedUsages = []; var knowUsages = false;
         try { loadedUsages = (await Client.GetModelProviderUsagesAsync(snapshot.Value.Namespace, snapshot.Value.Name, cancellation.Token)).Value; knowUsages = true; }
         catch (AgentstrationApiException exception)
@@ -270,18 +274,76 @@ else
         }
         if (request != loadVersion) return EmptyBundle(snapshot);
         var observed = await ReadObservedAsync(snapshot.Value);
-        return new(snapshot, loadedExtensions, loadedParameters, loadedSecrets, targets.Where(target => target.Kind == ResourceScopeKind.Instance).ToArray(), loadedUsages, observed.Status, observed.Models, observed.Known, knowUsages, observed.Error, warning, catalogueForbidden);
+        return new(snapshot, extensions, parameters, secrets, scopeTargets, loadedUsages, observed.Status, observed.Models, observed.Known, knowUsages, observed.Error, warning, catalogueForbidden);
     }
     private static ProviderBundle EmptyBundle(ResourceSnapshot<ModelProviderResource> snapshot) => new(snapshot, [], [], [], [], [], null, [], false, false, null, null);
     private async Task<(ModelProviderStatusResponse? Status, IReadOnlyList<AvailableModelResponse> Models, bool Known, string? Error)> ReadObservedAsync(ModelProviderResource saved)
     {
         ModelProviderStatusResponse? observed = null;
         try { observed = await Client.GetProviderStatusAsync(saved.Namespace, saved.Name, cancellation.Token); return (observed, await Client.GetProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token), true, null); }
-        catch (AgentstrationApiException exception)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { throw; }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException or OperationCanceledException)
         {
-            return exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized
-                ? (null, [], false, exception.Message)
-                : (observed ?? status, models, modelsKnown, exception.Message);
+            return exception is AgentstrationApiException { StatusCode: System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized }
+                ? (null, [], false, T("ObservationUnavailable"))
+                : (observed ?? status, models, modelsKnown, T("ObservationUnavailable"));
+        }
+    }
+    private bool DiscoveryPending => status?.Discovery?.State is "queued" or "running";
+    private string DiscoveryStateLabel => T($"Discovery.State.{status?.Discovery?.State ?? "never"}");
+    private async Task PollObservationsAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2), Clock);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellation.Token))
+            {
+                if (resource is null || IsNew || Busy) continue;
+                await InvokeAsync(async () => { await LoadObservedAsync(loadVersion); StateHasChanged(); });
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+    }
+    private async Task LoadMetadataAsync(ModelProviderResource saved, long request)
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(3), Clock);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token, deadline.Token);
+        try
+        {
+            var loadedExtensions = await ExtensionsClient.GetExtensionsAsync(linked.Token);
+            var loadedParameters = await ParametersClient.GetParametersAsync(linked.Token);
+            var loadedSecrets = await SecretsClient.GetSecretsAsync(saved.ScopeRef!.Value, linked.Token);
+            var targets = (await Scopes.GetTargetsAsync(ModelResourceKinds.ModelProvider, linked.Token)).Where(target => target.Kind == ResourceScopeKind.Instance).ToArray();
+            if (request != loadVersion || cancellation.IsCancellationRequested || resource is null || !Matches(resource, saved.Namespace, saved.Name, saved)) return;
+            await InvokeAsync(() =>
+            {
+                if (request != loadVersion || cancellation.IsCancellationRequested) return;
+                var pristine = !HasDraft && creators.Count == 0;
+                extensions = loadedExtensions; parameters = loadedParameters; secrets = loadedSecrets; scopeTargets = targets;
+                catalogueForbidden = false; catalogueWarning = null;
+                SyncBindings(false);
+                if (pristine) baseline = Fingerprint;
+                if (baselineBundle is not null) baselineBundle = baselineBundle with { Extensions = extensions, Parameters = parameters, Secrets = secrets, Targets = scopeTargets, CatalogueWarning = null, CatalogueForbidden = false };
+                if (newerBundle is not null) newerBundle = newerBundle with { Extensions = extensions, Parameters = parameters, Secrets = secrets, Targets = scopeTargets, CatalogueWarning = null, CatalogueForbidden = false };
+                StateHasChanged();
+            });
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or AgentstrationApiException)
+        {
+            if (request != loadVersion || cancellation.IsCancellationRequested) return;
+            await InvokeAsync(() =>
+            {
+                if (request != loadVersion || cancellation.IsCancellationRequested) return;
+                catalogueWarning = T("MetadataUnavailable");
+                if (exception is AgentstrationApiException { StatusCode: System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized })
+                {
+                    extensions = []; parameters = []; secrets = []; scopeTargets = []; creators.Clear(); catalogueForbidden = true;
+                    if (baselineBundle is not null) baselineBundle = baselineBundle with { Extensions = [], Parameters = [], Secrets = [], Targets = [], CatalogueForbidden = true, CatalogueWarning = catalogueWarning };
+                    newerBundle = null;
+                }
+                StateHasChanged();
+            });
         }
     }
     private void Adopt(ProviderBundle bundle)
@@ -360,7 +422,6 @@ else
             persisted = true;
             Adopt(new(saved, extensions, parameters, secrets, scopeTargets, usages, status, models, modelsKnown, usagesKnown, modelsError, catalogueWarning));
             Notifications.Add(new(Guid.NewGuid(), T(wasNew ? "CreatedNotification" : "UpdatedNotification"), saved.Value.Name, DateTimeOffset.Now, UiStatus.Success));
-            if (wasNew) discoveryResult = await DiscoverAfterCreationAsync(saved.Value, request);
             if (request != loadVersion) return;
             await LoadObservedAsync(request);
             if (request != loadVersion) return;
@@ -375,9 +436,11 @@ else
     {
         if (resource is not { } saved) return;
         var observed = await ReadObservedAsync(saved);
-        if (request != loadVersion) return;
+        if (request != loadVersion || resource is null || !Matches(resource, saved.Namespace, saved.Name, saved)) return;
         modelsError = observed.Error;
         status = observed.Status; models = observed.Models; modelsKnown = observed.Known;
+        if (status?.Discovery is { State: "succeeded", Result: { } result })
+            discoveryResult = new(result.Created, result.Updated, result.Unchanged, result.Missing, result.Reappeared, result.Total);
     }
     private async Task TestAsync()
     {
@@ -387,16 +450,11 @@ else
         catch (AgentstrationApiException exception) { if (request == loadVersion) error = exception; }
         finally { if (request == loadVersion) testing = false; }
     }
-    private async Task<ModelDiscoveryDiffResponse?> DiscoverAfterCreationAsync(ModelProviderResource saved, long request)
-    {
-        try { var result = await Client.RefreshProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token); if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("InitialDiscoveryComplete"), DiscoverySummary(result), DateTimeOffset.Now, UiStatus.Success)); return result; }
-        catch (AgentstrationApiException exception) { if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("InitialDiscoveryFailed"), exception.Message, DateTimeOffset.Now, UiStatus.Warning)); return null; }
-    }
     private async Task RefreshModelsAsync()
     {
-        if (!CanOperate || Busy || resource is not { } saved) return;
+        if (!CanOperate || Busy || DiscoveryPending || resource is not { } saved) return;
         var request = loadVersion; refreshing = true; modelsError = null; discoveryResult = null;
-        try { var result = await Client.RefreshProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token); if (request != loadVersion) return; discoveryResult = result; await LoadObservedAsync(request); if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("DiscoveryRefreshed"), DiscoverySummary(result), DateTimeOffset.Now, UiStatus.Success)); }
+        try { var result = await Client.RefreshProviderModelsAsync(saved.Namespace, saved.Name, cancellation.Token); if (request != loadVersion) return; status = result; await LoadObservedAsync(request); if (request == loadVersion) Notifications.Add(new(Guid.NewGuid(), T("Discovery.Requested"), string.Empty, DateTimeOffset.Now, UiStatus.Info)); }
         catch (AgentstrationApiException exception) { if (request == loadVersion) modelsError = exception.Message; }
         finally { if (request == loadVersion) refreshing = false; }
     }
@@ -509,5 +567,12 @@ else
         return ResourceOwnershipContext.PreserveNavigation($"/modelprofiles/new?namespace={Uri.EscapeDataString(ns)}&provider={Uri.EscapeDataString(name)}&providerNamespace={Uri.EscapeDataString(ns)}" + (modelName is null ? string.Empty : $"&model={Uri.EscapeDataString(modelName)}"), Services);
     }
     private string DetailsUrl(ModelProviderResource saved) => ResourceOwnershipContext.Resource(Services, "/modelproviders", saved.Name, saved.Namespace, saved.ScopeRef);
-    public void Dispose() { ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
+    public async ValueTask DisposeAsync()
+    {
+        ++loadVersion;
+        await cancellation.CancelAsync();
+        if (observationPolling is not null) await observationPolling;
+        await Task.WhenAll(metadataLoads);
+        cancellation.Dispose();
+    }
 }

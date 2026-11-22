@@ -78,7 +78,7 @@ SQLite and PostgreSQL rows are alternatives. The standalone host selects local-a
 
 | Owner/source | Complete registration scope |
 | --- | --- |
-| `AddAgentstrationBootstrapTransport` in API composition | Bootstrap catalog, Source loader, lock, profile management and API alias. |
+| `AddAgentstrationBootstrapTransport` in API composition | Bootstrap catalog, Source loader, admission/execution locks, profile management/API alias and the hosted durable application processor (ADR-0246). |
 | `AddAgentstrationConsoleResourceQueries` in API composition | Source Console query service/alias and Resource scope API service. |
 | `AddAgentstrationRealtimeProjection` in API composition | Workplace Flow conversation projection and explicit composite Flow sink selection. |
 | `AddIdentityApi` in `Identity.Api/IdentityApiModule.cs` | Façade over `AddAgentstrationWorkloadTrust` (BFF/AWP/delegation options, keys/caches/services and trust-audit worker), `AddAgentstrationEnrollmentRateLimiting`, `AddAgentstrationApiAuthentication` (scheme selection/token validation), and `AddAgentstrationApiAuthorization` (handlers/policies). |

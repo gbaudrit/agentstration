@@ -87,11 +87,11 @@ internal sealed class GetModelProviderUsagesEndpoint : IModelManagementEndpoint
 internal sealed class TestModelProviderEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/test", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderDiscoveryLifecycle service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
-            var provider = await service.GetStatusAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
-            return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details));
+            var observation = await service.RequestAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Accepted(value: new ModelProviderStatusResponse(providerName, observation.Health, observation.LastAttemptAt ?? DateTimeOffset.MinValue, null, observation));
         });
 }
 
@@ -118,17 +118,12 @@ internal sealed class ListProviderModelsEndpoint : IModelManagementEndpoint
 internal sealed class RefreshProviderModelsEndpoint : IModelManagementEndpoint
 {
     public static void Map(RouteGroupBuilder group) => group.MapPost("/{providerName}/models/refresh", HandleAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
-    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelDiscoveryService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> HandleAsync(string providerName, string? resourceNamespace, ModelProviderDiscoveryLifecycle service, CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
-            var diff = await service.RefreshAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
-            return Results.Ok(new ModelDiscoveryDiffResponse(
-                diff.Created,
-                diff.Updated,
-                diff.Unchanged,
-                diff.Missing,
-                diff.Reappeared,
-                diff.Total));
+            var observation = await service.RequestAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
+            return Results.Accepted(value: new ModelProviderStatusResponse(providerName, observation.Health,
+                observation.LastAttemptAt ?? DateTimeOffset.MinValue, null, observation));
         });
 }
 
@@ -139,7 +134,7 @@ internal sealed class GetModelProviderStatusEndpoint : IModelManagementEndpoint
         ModelsApiHttp.ExecuteAsync(async () =>
         {
             var provider = await service.GetStatusAsync(ModelsApiHttp.Namespace(resourceNamespace), providerName, cancellationToken);
-            return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details));
+            return Results.Ok(new ModelProviderStatusResponse(provider.Configuration.Name, provider.Health.Status, provider.CheckedAt, provider.Health.Details, provider.Discovery));
         });
 }
 
@@ -159,7 +154,7 @@ internal static class ModelProviderMappings
             provider.Configuration.EndpointDisplayName,
             provider.Models.Count,
             includeEndpoint ? provider.Configuration.Endpoint : null,
-            provider.CheckedAt),
+            provider.CheckedAt == DateTimeOffset.MinValue ? null : provider.CheckedAt, provider.Discovery),
         provider.Configuration.Namespace.Value,
         provider.Configuration.ScopeRef);
 }
