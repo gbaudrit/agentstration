@@ -100,8 +100,9 @@ public sealed partial class DeclarativeBootstrapTests
             using var systemScope = scope.ServiceProvider.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
             var parameters = scope.ServiceProvider.GetRequiredService<ParameterManagementService>();
             Assert.IsNotNull(await parameters.GetExactAsync(ResourceScopeRef.Tenant(context.TenantId), "bootstrap-load-test-001", default));
-            await Assert.ThrowsAsync<InvalidOperationException>(() => parameters.GetExactAsync(
-                ResourceScopeRef.Tenant(Guid.NewGuid()), "bootstrap-load-test-001", default));
+            Assert.IsNull(await parameters.GetExactAsync(
+                ResourceScopeRef.Tenant(Guid.NewGuid()), "bootstrap-load-test-001", default),
+                "An exact read from an unknown Tenant must not fall back to the applied Tenant.");
         }
         finally { gate.Release.TrySetResult(); }
     }

@@ -253,7 +253,7 @@ public abstract class ModelManagementApiTestBase
 internal class ApiOnlyWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override Microsoft.Extensions.Hosting.IHost CreateHost(Microsoft.Extensions.Hosting.IHostBuilder builder) =>
-        Agentstration.Tests.TestHostMetrics.Start("Management.Api", () => base.CreateHost(builder));
+        Agentstration.Tests.TestHostMetrics.Start(typeof(ApiOnlyWebApplicationFactory).Assembly.GetName().Name!, () => base.CreateHost(builder));
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

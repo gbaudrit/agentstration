@@ -1517,7 +1517,8 @@ public sealed class DependencyTests
 
                 // This opt-in instrumentation is owned by the test root, not another module.
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests"
+                        or "Agentstration.Management.Models.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
                 // This fixture belongs to the test root and is compiled into
                 // independently bounded Bootstrap test processes.
@@ -1537,6 +1538,13 @@ public sealed class DependencyTests
                         or "../ApiResourceTestFixtures/AwpTestWorker.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Resources.Tests"
                         or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests") continue;
+
+                // These test-root fixtures are compiled into the independently
+                // bounded Management API and Model API test processes.
+                if (include.Replace('\\', '/') is "../ManagementApiTestFixtures/ModelManagementApiTestBase.cs"
+                        or "../ManagementApiTestFixtures/AwpTestWorker.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Api.Tests"
+                        or "Agentstration.Management.Models.Api.Tests") continue;
 
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));

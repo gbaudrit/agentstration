@@ -27,5 +27,6 @@
     <InternalsVisibleTo Include="Agentstration.Api.DataSources.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Artifacts.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Models.Api.Tests" />
   </ItemGroup>
 </Project>
