@@ -19,7 +19,7 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
     ConnectedServiceManagementService services, ConnectedServiceOperationTypeManagementService operationTypes,
     ConnectedServiceBoundValues boundValues, ISecretResolver secrets, ICurrentRequestContext current,
     IHttpClientFactory clients,
-    BuiltinHttpOperationExecutor httpOperations)
+    BuiltinHttpOperationExecutor httpOperations, IRequestContextScopeFactory requestScopes)
 {
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -51,12 +51,18 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
         var service = await services.AuthorizeAsync(operation.Definition.Service.Service,
             new(consumer, operation.Address), cancellationToken) ?? throw Error("connected_service_unavailable");
         var typeReference = service.Definition.Type;
-        var type = (await store.GetExactAsync<ConnectedServiceTypeResource>(new(typeReference.Type.ScopeRef!.Value,
-            typeReference.Type.Namespace ?? service.Namespace, ConnectedServiceResourceKinds.ConnectedServiceType,
-            typeReference.Type.Name), cancellationToken))!.Value;
+        ConnectedServiceTypeResource type;
+        ConnectedServiceOperationTypeResource operationType;
+        ConnectedServiceOperationTypeVersionDescriptor operationVersion;
+        using (requestScopes.PushSystem())
+        {
+            type = (await store.GetExactAsync<ConnectedServiceTypeResource>(new(typeReference.Type.ScopeRef!.Value,
+                typeReference.Type.Namespace ?? service.Namespace, ConnectedServiceResourceKinds.ConnectedServiceType,
+                typeReference.Type.Name), cancellationToken))!.Value;
+            (operationType, operationVersion) = await operationTypes.ResolveExactAsync(operation.Definition.Type,
+                operation.Namespace, operation.ScopeRef!.Value, cancellationToken);
+        }
         var version = type.Definition.Versions.Single(item => item.Version == typeReference.Version);
-        var (operationType, operationVersion) = await operationTypes.ResolveExactAsync(operation.Definition.Type,
-            operation.Namespace, consumer, cancellationToken);
         if (BuiltinHttpOperation.Owns(type, version)
             && BuiltinHttpOperation.IsCore(operationType, BuiltinHttpOperation.TypeName)
             && operationVersion.Version == BuiltinHttpOperation.Version

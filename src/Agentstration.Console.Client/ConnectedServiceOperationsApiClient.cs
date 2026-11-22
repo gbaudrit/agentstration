@@ -6,6 +6,8 @@ namespace Agentstration.Web.Console;
 
 public interface IConnectedServiceOperationsClient
 {
+    Task<ConnectedServiceOperationContract> GetContractAsync(ConnectedServiceOperationResource operation, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support operation contract inspection.");
     Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetForServiceAsync(ConnectedServiceResource service, CancellationToken token);
@@ -16,6 +18,15 @@ public interface IConnectedServiceOperationsClient
 
 public sealed class ConnectedServiceOperationsApiClient(HttpClient http) : IConnectedServiceOperationsClient
 {
+    public async Task<ConnectedServiceOperationContract> GetContractAsync(ConnectedServiceOperationResource operation, CancellationToken token)
+    {
+        using var response = await http.PostAsJsonAsync("api/connected-service-operations/contract", new ConnectedServiceOperationRevisionReference(
+            new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid,
+            operation.Generation, operation.Definition.DefinitionDigest), token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return (await response.Content.ReadFromJsonAsync<ConnectedServiceOperationContract>(token))!;
+    }
+
     public Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token) =>
         ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationTypeResource>>(http, "api/connected-service-operation-types", token);
 

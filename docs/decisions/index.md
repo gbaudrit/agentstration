@@ -284,3 +284,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 237. [ADR-0237 — Knowledge ToolSets describe and restrict published contributions](0237-knowledge-toolsets-describe-and-restrict-contributions.md)
 
 238. [ADR-0238 — Resource-local sections use URL fragments](0238-fragment-selection-for-resource-navigation.md)
+239. [ADR-0239 — Discovered operations can inherit Connected Service access](0239-discovered-operations-can-inherit-connected-service-access.md)
+240. [ADR-0240 — Shared Connected Service consumption keeps owner-bound dependencies](0240-shared-connected-service-consumption-keeps-owner-bound-dependencies.md)

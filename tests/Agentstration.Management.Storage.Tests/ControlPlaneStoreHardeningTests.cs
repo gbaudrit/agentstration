@@ -303,7 +303,7 @@ public sealed class ControlPlaneStoreHardeningTests
     }
 
     [TestMethod]
-    public async Task WorkspaceDiscoveryIsDefaultDenyWhileTenantAdministrationIsExactScoped()
+    public async Task WorkspaceAndTenantAdministrationDiscoverOnlyExplicitlySharedAncestors()
     {
         var principalId = Guid.NewGuid();
         var tenantId = Guid.NewGuid();
@@ -344,15 +344,22 @@ public sealed class ControlPlaneStoreHardeningTests
         context.UseTenantAdministration(principalId, tenantId);
         var tenantVisible = await fixture.Store.ListAsync<ExtensionResource>("MemoryProvider", 0, 20, default);
         CollectionAssert.AreEquivalent(
-            new[] { sharedTenant.Value.Name, tenantOnly.Value.Name },
+            new[] { sharedInstance.Value.Name, sharedTenant.Value.Name, tenantOnly.Value.Name },
             tenantVisible.Select(value => value.Value.Name).ToArray());
         var tenantDesignerVisible = await fixture.Store.ListVisibleAsync<ExtensionResource>(
             ResourceScopeRef.Tenant(tenantId), "MemoryProvider", 0, 20, default);
         CollectionAssert.AreEquivalent(
             new[] { sharedInstance.Value.Name, sharedTenant.Value.Name, tenantOnly.Value.Name },
             tenantDesignerVisible.Select(value => value.Value.Name).ToArray());
-        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.IsNotNull(await fixture.Store.GetByUidAsync<ExtensionResource>(sharedInstance.Value.Uid, default));
+        Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(hiddenInstance.Value.Uid, default));
         Assert.IsNull(await fixture.Store.GetByUidAsync<ExtensionResource>(workspaceOwned.Value.Uid, default));
+        await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+            fixture.Store.ListExactInventoryAsync(ResourceScopeRef.Instance, 0, 20, default));
+        await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+            fixture.Store.ListExactAsync<ExtensionResource>(ResourceScopeRef.Instance, "MemoryProvider", 0, 20, default));
+        await Assert.ThrowsExactlyAsync<ResourceScopeAccessDeniedException>(() =>
+            ((IAgentProfileUsageQueries)fixture.Store).FindProfileCandidatesAsync(ResourceScopeRef.Instance, "private-profile", null, 0, 20, default));
     }
 
     [TestMethod]
