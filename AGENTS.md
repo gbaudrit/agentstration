@@ -43,6 +43,7 @@ src/
   Agentstration.ResourceManagement.Contracts/ Generic resource and Bootstrap handler contracts
   Agentstration.Extensions/      Extension registration and inventory use cases
   Agentstration.Extensions.Aep/  AEP enrollment use cases
+  extensions/                   Autonomous AEP extension executables (Foundry, OpenAPI, OpenDAL, Crawl4AI, PostgreSQL, Ollama, llama.cpp, LocalAI, Git and Utilities)
   Agentstration.Identity.Contracts/ Identity, authorization and PAT contracts
   Agentstration.Identity/        Identity, authorization, scope and audit use cases
   Agentstration.Security.Contracts/ Provider-neutral security audit contracts

@@ -76,16 +76,16 @@
     <Project Path="src/Agentstration.Extensions.Api/Agentstration.Extensions.Api.csproj" />
     <Project Path="src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <Project Path="src/Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
-    <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
-    <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
-    <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
-    <Project Path="src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
-    <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
-    <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
-    <Project Path="src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
-    <Project Path="src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
-    <Project Path="src/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
-    <Project Path="src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
   </Folder>
   <Folder Name="/src/Flows/">
     <Project Path="src/Agentstration.Flows/Agentstration.Flows.csproj" />

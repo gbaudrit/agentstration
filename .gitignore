@@ -18,6 +18,7 @@ deploy/compose/.env.foundry
 *.db-shm
 *.db-wal
 *.log
+__pycache__/
 docs/site/node_modules/
 tests/Agentstration.Console.Playwright/node_modules/
 tests/Agentstration.Console.Playwright/test-results/

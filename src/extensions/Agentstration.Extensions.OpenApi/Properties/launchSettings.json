@@ -21,7 +21,7 @@
         "Aep__EnrollmentMode": "PairingCode",
         "Aep__PairingCode__AuthorityUrl": "http://localhost:5100",
         "Aep__PairingCode__PublicEndpoint": "http://localhost:5311",
-        "Aep__PairingCode__StateFile": "../../.agentstration/slots/main/aep-pairing/openapi-standalone.json",
+        "Aep__PairingCode__StateFile": "../../../.agentstration/slots/main/aep-pairing/openapi-standalone.json",
         "Aep__PairingCode__AllowInsecureHttp": "true",
         "OpenApi__AllowedDomains__0": "example.test"
       }
