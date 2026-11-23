@@ -5,9 +5,9 @@ $shared = '^(global\.json$|Directory\.(Build|Packages)\.(props|targets)$|\.githu
 # Only the implemented Foundry vertical may replace transverse product validation.
 # Unknown extensions, shared test fixtures and mixed product changes stay conservative.
 $foundry = '^(src/extensions/Agentstration\.Extensions\.Foundry/|tests/Agentstration\.ModelProviders\.Tests/Foundry(Provider|Live)Tests\.cs$)'
-$imageTooling = '^(deploy/images/(extensions/foundry|workers/maf-worker)\.json$|scripts/packaging/|Dockerfile\.extension$|\.github/workflows/(extension-images|validate-extension-image)\.yml$)'
-$commonImages = '^(scripts/packaging/(images|test_images|smoke)\.py$|Dockerfile\.extension$|\.github/workflows/(extension-images|validate-extension-image)\.yml$|\.dockerignore$)'
-$foundryImages = "$foundry|^(deploy/images/extensions/foundry\.json$|scripts/packaging/(enrollment_smoke|test_enrollment_smoke)\.py$|scripts/packaging/foundry\.smoke\.compose\.yml$|aep/|tests/Agentstration\.ModelProviders\.Tests/)"
+$imageTooling = '^(deploy/images/(extensions/foundry|workers/maf-worker)\.json$|scripts/packaging/|Dockerfile\.extension$|\.github/workflows/(oci-images|validate-oci-image)\.yml$)'
+$commonImages = '^(scripts/packaging/(images|test_images|smoke)\.py$|Dockerfile\.extension$|\.github/workflows/(oci-images|validate-oci-image)\.yml$|\.dockerignore$)'
+$foundryImages = "$foundry|^(deploy/images/extensions/foundry\.json$|scripts/packaging/(enrollment_smoke|test_enrollment_smoke)\.py$|scripts/packaging/aep-extension\.smoke\.compose\.yml$|aep/|tests/Agentstration\.ModelProviders\.Tests/)"
 $workerImages = '^(src/Agentstration\.Runtime\.(Worker\.MicrosoftAgentFramework|MicrosoftAgentFramework|Abstractions|Core|Api)/|src/Agentstration\.Identity[^/]*/[^/]*Awp|awp/|tests/Agentstration\.(Runtime|Awp)\.Tests/|Dockerfile\.worker$|deploy/images/workers/maf-worker\.json$|scripts/packaging/(worker_smoke|test_worker_smoke)\.py$|scripts/packaging/maf-worker\.smoke\.compose\.yml$)'
 $imageIds = @()
 if ($RunEverything.IsPresent -or @($Paths | Where-Object { $_ -match "$foundryImages|$commonImages|$shared" }).Count -gt 0) { $imageIds += 'foundry' }

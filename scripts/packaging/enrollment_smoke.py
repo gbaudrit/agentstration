@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the exact Foundry image against a real SQLite authority in isolated Compose."""
+"""Validate an exact AEP extension image against a real SQLite authority in isolated Compose."""
 import argparse
 import base64
 import hmac
@@ -21,11 +21,24 @@ import smoke
 from images import delivery_entry
 
 ROOT = Path(__file__).resolve().parents[2]
+EXTENSION_ENDPOINT = "http://extension:8080/"
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def authority_environment(delivery):
+    """Configure trust for the selected AEP identity without fixed provider names."""
+    entry = delivery_entry(delivery)
+    require(entry.get("kind", "aep-extension") == "aep-extension", "Enrollment smoke requires an AEP extension.")
+    extension_id = entry.get("extensionId", "")
+    require(re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]*", extension_id) and "__" not in extension_id,
+            "Invalid AEP extension configuration identity.")
+    prefix = "Agentstration__Extensions__" + extension_id
+    return {prefix + "__EnrollmentMode": "SharedKeyFile",
+            prefix + "__SharedKeyFile__Path": "/run/secrets/aep-key"}
 
 
 def enrollment_snapshot(database, delivery, instance_id):
@@ -51,7 +64,7 @@ def enrollment_snapshot(database, delivery, instance_id):
     require(properties["enabled"] and properties["expectedExtensionId"] == definition["extensionId"]
             and properties["enrollmentMode"] == "sharedKeyFile"
             and properties["authenticationMode"] == "staticBearer"
-            and properties["endpoint"] == definition["endpoint"] == "http://foundry:8080/",
+            and properties["endpoint"] == definition["endpoint"] == EXTENSION_ENDPOINT,
             "Authority registration has unexpected identity, endpoint or authentication.")
     return {"instanceId": instance_id, "enrollmentUid": enrollment["uid"],
             "enrollmentGeneration": enrollment["generation"], "registrationUid": registration["uid"],
@@ -72,10 +85,10 @@ def request(base, path, body=None, headers=None, expected=200):
     return json.loads(payload) if payload and "json" in content_type else None
 
 
-def announce(authority, manifest, instance_id, key, expected=200):
+def announce(authority, manifest, instance_id, key, expected=200, endpoint=EXTENSION_ENDPOINT):
     # Match AEP's documented HMAC JSON payload/property order, including nullable pairingUri.
     identity = {field: manifest["extension"].get(field) for field in ("id", "name", "version", "description")}
-    announcement = {"instanceId": instance_id, "extension": identity, "endpoint": "http://foundry:8080/",
+    announcement = {"instanceId": instance_id, "extension": identity, "endpoint": endpoint,
                     "pairingUri": None, "method": "sharedKeyFile"}
     timestamp = int(time.time())
     payload = json.dumps({"timestamp": timestamp, "announcement": announcement}, separators=(",", ":")).encode()
@@ -86,7 +99,7 @@ def announce(authority, manifest, instance_id, key, expected=200):
 
 def run(delivery_path, image, authority_image, output):
     delivery = json.loads(delivery_path.read_text(encoding="utf-8"))
-    require(delivery_entry(delivery)["id"] == "foundry", "This enrollment scenario is specific to Foundry.")
+    trust = authority_environment(delivery)
     require(images.DIGEST.fullmatch(delivery["digest"]) and image.endswith("@" + delivery["digest"]),
             "Enrollment smoke must consume the exact OCI delivery digest.")
     subprocess.run(["docker", "pull", image], check=True)
@@ -94,19 +107,21 @@ def run(delivery_path, image, authority_image, output):
     require(authority_metadata["Config"]["Labels"].get("org.opencontainers.image.revision") == delivery["sourceSha"],
             "The authority fixture must be built from the same source revision as the delivery.")
     authority_id = authority_metadata["Id"]
-    project = "foundry-smoke-" + uuid.uuid4().hex[:12]
+    project = "aep-enrollment-smoke-" + uuid.uuid4().hex[:12]
     with tempfile.TemporaryDirectory(prefix=project + "-") as temporary:
         directory = Path(temporary)
-        for name in ("authority", "foundry"):
+        for name in ("authority", "extension"):
             (directory / name).mkdir()
+        (directory / "authority-aep.env").write_text(
+            "".join(name + "=" + value + "\n" for name, value in trust.items()), encoding="utf-8")
         key = secrets.token_urlsafe(48)
         with open(directory / "key", "w", opener=lambda path, flags: os.open(path, flags, 0o600)) as stream:
             stream.write(key)
         environment = {name: value for name, value in os.environ.items() if not name.startswith("COMPOSE_")}
         environment.update(SMOKE_UID=str(os.getuid()), SMOKE_GID=str(os.getgid()), SMOKE_DIRECTORY=str(directory), SMOKE_BOOTSTRAP_DIRECTORY=str(ROOT / "deploy/bootstrap/profiles"),
-                           SMOKE_AUTHORITY_IMAGE=authority_id, SMOKE_FOUNDRY_IMAGE=image,
+                           SMOKE_AUTHORITY_IMAGE=authority_id, SMOKE_EXTENSION_IMAGE=image,
                            SMOKE_ADMIN_PASSWORD=secrets.token_urlsafe(40))
-        command = ["docker", "compose", "--project-name", project, "--file", str(ROOT / "scripts/packaging/foundry.smoke.compose.yml")]
+        command = ["docker", "compose", "--project-name", project, "--file", str(ROOT / "scripts/packaging/aep-extension.smoke.compose.yml")]
 
         def compose(*arguments, capture=False):
             return subprocess.run([*command, *arguments], env=environment, check=True, text=True,
@@ -130,21 +145,21 @@ def run(delivery_path, image, authority_image, output):
                     except (ValueError, urllib.error.URLError, TimeoutError):
                         require(time.monotonic() < deadline, "Authority did not become ready.")
                         time.sleep(1)
-                compose("up", "--detach", "--no-build", "foundry")
-                endpoint = address("foundry")
+                compose("up", "--detach", "--no-build", "extension")
+                endpoint = address("extension")
                 smoke.wait_for_health(endpoint)
                 request(endpoint, "/.well-known/aep", expected=401)
                 request(endpoint, "/.well-known/aep", headers={"Authorization": "Bearer " + secrets.token_urlsafe(48)}, expected=401)
                 manifest = request(endpoint, "/.well-known/aep", headers={"Authorization": "Bearer " + key})
                 smoke.check_manifest(manifest, delivery)
-                instance_id = str(uuid.UUID((directory / "foundry/instance").read_text().strip()))
+                instance_id = str(uuid.UUID((directory / "extension/instance").read_text().strip()))
                 deadline = time.monotonic() + 120
                 while True:
                     try:
                         snapshot = enrollment_snapshot(directory / "authority/control-plane.db", delivery, instance_id)
                         break
                     except (ValueError, sqlite3.OperationalError) as error:
-                        require(time.monotonic() < deadline, f"Authority did not persist an available Foundry enrollment: {error}")
+                        require(time.monotonic() < deadline, f"Authority did not persist an available AEP enrollment: {error}")
                         time.sleep(1)
                 # Prove idempotency of a signed reannouncement; an invalid proof must be rejected even for an existing ID.
                 response = announce(authority, manifest, instance_id, key)
@@ -159,8 +174,9 @@ def run(delivery_path, image, authority_image, output):
                     compose("down", "--timeout", "20")
                 else:
                     require(before == snapshot, "Container recreation changed installation, registration or scope assignment.")
-                print(f"PASS Foundry {'startup' if iteration == 0 else 'recreation'}: authenticated discovery, available enrollment and stable identity.", flush=True)
+                print(f"PASS AEP {'startup' if iteration == 0 else 'recreation'}: authenticated discovery, available enrollment and stable identity.", flush=True)
             report = {"reference": image, "sourceSha": delivery["sourceSha"], "version": delivery_entry(delivery)["version"],
+                      "catalogueId": delivery_entry(delivery)["id"], "extensionId": delivery_entry(delivery)["extensionId"],
                       "authorityImageId": authority_id, "aepVersion": manifest["protocolVersion"],
                       "platform": delivery_entry(delivery)["platform"], "scopeRef": "/instance",
                       "storage": "Sqlite", "enrollmentMode": "SharedKeyFile",

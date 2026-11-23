@@ -1,8 +1,8 @@
-# Extension image packaging
+# OCI image packaging
 
 [Packaging milestone #16](https://github.com/gbaudrit/agentstration/milestone/16)
 owns common OCI build/publication tooling and independently versioned extension
-images. [Preview environments #15](https://github.com/gbaudrit/agentstration/milestone/15)
+and Worker images. [Preview environments #15](https://github.com/gbaudrit/agentstration/milestone/15)
 consumes those artifacts; deployment selection, infrastructure and Bootstrap
 composition remain external deployment concerns.
 
@@ -73,6 +73,13 @@ retain the transverse checks described in [Testing](testing.md#ci-inventory-and-
 The reusable workflow has read-only repository access and contains no publication
 job. There is one PR image build, not a second independently triggered image run.
 
+The workflow files are `.github/workflows/oci-images.yml` (delivery) and
+`.github/workflows/validate-oci-image.yml` (reusable validation). Automation that
+dispatched `extension-images.yml` must use `oci-images.yml`; callers of
+`validate-extension-image.yml` must use `validate-oci-image.yml`. The existing
+`extension` input still accepts either catalogue family. Internal job IDs and
+artifact names remain compatible with existing result gates and delivery receipts.
+
 The **OCI images** delivery workflow reuses that same validation for
 extension release tags and manual dispatch. A manual dispatch takes an implemented
 catalogue ID and defaults to validation only. Opting into `publish_preview`
@@ -85,19 +92,28 @@ archive checksum and OCI digest. Build outputs are stored under ignored
 `artifacts/`; credentials and generated state are excluded from build context.
 
 Skopeo stages that exact archive in a disposable loopback-only registry. The
-image smoke checks health, unauthenticated discovery rejection, authenticated AEP
+AEP image smoke checks health, unauthenticated discovery rejection, authenticated AEP
 identity/version/contribution, OCI labels and restart using a temporary
 SharedKeyFile mounted read-only. It makes no Foundry/model request and contains
 no Azure credential.
 
-For Foundry, the same validation job also builds a disposable authoritative
+For every AEP image, the same validation job also builds a disposable authoritative
 server from the same source revision, using the generic Dockerfile and the same
-pinned SDK/runtime bases. `scripts/packaging/foundry.smoke.compose.yml` runs only that
-server and the exact staged Foundry digest. The server uses SQLite, deterministic
+pinned SDK/runtime bases. `scripts/packaging/aep-extension.smoke.compose.yml` runs only that
+server and the exact staged extension digest. The server uses SQLite, deterministic
 AI and the existing Development bootstrap with a newly generated disposable
 administrator password. The test uses its own Compose network and exposes ports
 only on loopback; no local inference server, Worker, Azure resource or downstream
 credential is needed for enrollment.
+
+The Compose service is named `extension`. The smoke derives its expected identity,
+version, protocol and contribution from the selected catalogue entry. It generates
+the authority's per-extension trust settings from `extensionId`, supplying only the
+SharedKeyFile mode and the mounted key path in a temporary environment file. No
+provider ID or provider-specific endpoint is embedded in the scenario. The real
+image validation currently exercises Foundry, the implemented AEP catalogue entry;
+offline regression cases also cover other extension identities. A new AEP image
+uses this same enrollment scenario when its catalogue/build vertical is added.
 
 The enrollment smoke verifies:
 

@@ -8,7 +8,7 @@ on:
         type: string
         required: true
       release-tag:
-        description: Optional extension release tag to validate before delivery
+        description: Optional image release tag to validate before delivery
         type: string
         default: ''
     outputs:
@@ -38,7 +38,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os, re, subprocess
-          extension = os.environ.get('REQUESTED_EXTENSION') or 'foundry'
+          extension = os.environ.get('REQUESTED_EXTENSION', '')
           arguments = []
           tag = os.environ.get('RELEASE_TAG')
           if tag:
@@ -83,7 +83,7 @@ jobs:
         run: |
           docker run --detach --name packaging-registry --publish 127.0.0.1:5000:5000 registry:3
           skopeo copy --all --preserve-digests --retry-times 5 --dest-tls-verify=false oci-archive:artifacts/extension/image.oci.tar docker://localhost:5000/extension:smoke
-      - name: Smoke the staged AEP image and restart without Azure or a model
+      - name: Verify AEP image health, discovery and restart
         if: steps.select.outputs.kind == 'aep-extension'
         run: |
           python3 - <<'PY'
@@ -107,8 +107,8 @@ jobs:
                           '--label', 'org.opencontainers.image.revision=' + delivery['sourceSha'],
                           '--tag', 'agentstration-packaging-smoke-authority:local', '.'], check=True)
           PYBUILD
-      - name: Verify Foundry enrollment and persisted identity against the SQLite authority
-        if: steps.select.outputs.extension == 'foundry'
+      - name: Verify AEP enrollment and persisted identity against the SQLite authority
+        if: steps.select.outputs.kind == 'aep-extension'
         run: |
           python3 - <<'PYSMOKE'
           import json, subprocess
