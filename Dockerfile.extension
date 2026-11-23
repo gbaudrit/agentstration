@@ -1,12 +1,15 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0
+ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0
+FROM ${SDK_IMAGE} AS build
 WORKDIR /src
 COPY . .
 ARG PROJECT
 RUN dotnet publish "$PROJECT" -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM ${RUNTIME_IMAGE}
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY --from=build /src/LICENSE /src/NOTICE ./licenses/
 ARG ENTRYPOINT_DLL
 ENV APP_DLL=$ENTRYPOINT_DLL
 ENV ASPNETCORE_URLS=http://+:8080

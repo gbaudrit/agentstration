@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "foundry",
+  "extensionId": "Agentstration.Extensions.Foundry",
+  "project": "src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj",
+  "entrypoint": "Agentstration.Extensions.Foundry.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/Agentstration.Extensions.Foundry/version.txt",
+  "testProject": "tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj",
+  "testFilter": "FullyQualifiedName~FoundryProviderTests",
+  "imageName": "extension-foundry",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "modelProviders",
+  "contributionId": "microsoft-foundry"
+}
