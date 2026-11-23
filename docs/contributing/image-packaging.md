@@ -92,8 +92,9 @@ server from the same source revision, using the generic Dockerfile and the same
 pinned SDK/runtime bases. `scripts/packaging/foundry.compose.yml` runs only that
 server and the exact staged Foundry digest. The server uses SQLite, deterministic
 AI and the existing Development bootstrap with a newly generated disposable
-administrator password. The test network is internal; no local inference server,
-Worker, Azure resource or downstream credential is needed for enrollment.
+administrator password. The test uses its own Compose network and exposes ports
+only on loopback; no local inference server, Worker, Azure resource or downstream
+credential is needed for enrollment.
 
 The enrollment smoke verifies:
 

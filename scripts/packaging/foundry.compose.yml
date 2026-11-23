@@ -44,6 +44,3 @@ services:
       - ${SMOKE_DIRECTORY}/key:/run/secrets/aep-key:ro
       - ${SMOKE_DIRECTORY}/foundry:/var/lib/aep
 
-networks:
-  default:
-    internal: true
