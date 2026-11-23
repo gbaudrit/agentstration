@@ -41,6 +41,26 @@ class ImageContracts(unittest.TestCase):
             with self.subTest(extension=extension), self.assertRaises(ValueError):
                 images.catalogue(extension)
 
+    def test_awp_worker_has_an_independent_catalogue_and_release_namespace(self):
+        worker = images.catalogue("maf-worker")
+        self.assertEqual("awp-worker", worker["kind"])
+        self.assertEqual((images.ROOT / worker["versionFile"]).read_text().strip(), worker["version"])
+        self.assertEqual("Dockerfile.worker", worker["dockerfile"])
+        self.assertNotIn("aepVersion", worker)
+        images.release_tag(worker, "worker/maf-worker/v" + worker["version"])
+        with self.assertRaises(ValueError):
+            images.release_tag(worker, "extension/maf-worker/v" + worker["version"])
+        with self.assertRaises(ValueError):
+            images.release_tag(self.entry, "worker/foundry/v" + self.entry["version"])
+
+    def test_delivery_accepts_legacy_aep_and_neutral_worker_metadata_without_ambiguity(self):
+        worker = images.catalogue("maf-worker")
+        self.assertEqual(self.entry, images.delivery_entry({"extension": self.entry}))
+        self.assertEqual(worker, images.delivery_entry({"component": worker}))
+        for delivery in ({}, {"component": worker, "extension": self.entry}):
+            with self.subTest(delivery=delivery), self.assertRaises(ValueError):
+                images.delivery_entry(delivery)
+
     def test_release_tag_is_extension_specific_and_matches_its_version(self):
         entry = {**self.entry, "version": "1.0.0"}
         images.release_tag(entry, "extension/foundry/v1.0.0")
@@ -142,6 +162,24 @@ class ImageContracts(unittest.TestCase):
         self.assertEqual(2, api.call_count)
         receipt = json.loads((self.directory / "publication-ghcr.json").read_text())
         self.assertEqual("ghcr.io/owner/repo-extension-foundry@" + delivery["digest"], receipt["reference"])
+
+    def test_worker_publication_reuses_the_privacy_gate_and_digest_receipt(self):
+        path, delivery = self.delivery()
+        del delivery["extension"]
+        delivery.update(component=images.catalogue("maf-worker"), repository="owner/repo")
+        path.write_text(json.dumps(delivery))
+        arguments = argparse.Namespace(action="publish", delivery=path, registry="ghcr",
+                                       authfile=self.directory / "auth.json", release_tag=None, namespace=None)
+        with patch.object(images.argparse.ArgumentParser, "parse_args", return_value=arguments), \
+                patch.object(images, "output", return_value="a" * 40), \
+                patch.object(images, "private_package") as privacy, \
+                patch.object(images, "copy_archive") as copy_archive, patch("builtins.print"):
+            images.main()
+        copy_archive.assert_called_once()
+        self.assertEqual(2, privacy.call_count)
+        privacy.assert_called_with("owner/repo", "repo-worker-maf")
+        receipt = json.loads((self.directory / "publication-ghcr.json").read_text())
+        self.assertEqual("ghcr.io/owner/repo-worker-maf@" + delivery["digest"], receipt["reference"])
 
     def test_real_aep_manifest_shape_checks_identity_protocol_and_contribution(self):
         _, delivery = self.delivery()

@@ -21,12 +21,17 @@ def output(command):
 def catalogue(extension):
     if not SLUG.fullmatch(extension):
         raise ValueError("Invalid extension catalogue ID.")
-    path = ROOT / "deploy/images/extensions" / f"{extension}.json"
-    if not path.is_file():
-        raise ValueError("The extension has no implemented image catalogue entry.")
+    paths = [ROOT / "deploy/images" / family / f"{extension}.json" for family in ("extensions", "workers")]
+    matches = [path for path in paths if path.is_file()]
+    if len(matches) != 1:
+        raise ValueError("The image ID must identify exactly one implemented catalogue entry.")
+    path = matches[0]
     entry = json.loads(path.read_text(encoding="utf-8"))
     if entry.get("schemaVersion") != 1 or entry.get("id") != extension:
         raise ValueError("Invalid image catalogue identity/version.")
+    kind = entry.get("kind", "aep-extension")
+    if kind not in ("aep-extension", "awp-worker") or (path.parent.name == "workers") != (kind == "awp-worker"):
+        raise ValueError("Catalogue family and executable kind do not match.")
     for name in ("project", "dockerfile", "versionFile", "testProject"):
         resolved = (ROOT / entry[name]).resolve()
         if not resolved.is_relative_to(ROOT) or not resolved.is_file():
@@ -43,8 +48,17 @@ def catalogue(extension):
 
 
 def release_tag(entry, tag):
-    if tag != f"extension/{entry['id']}/v{entry['version']}":
+    family = "worker" if entry.get("kind") == "awp-worker" else "extension"
+    if tag != f"{family}/{entry['id']}/v{entry['version']}":
         raise ValueError("Release tag does not match the extension's own version.")
+
+
+def delivery_entry(delivery):
+    # Accept existing Foundry receipts while writing neutral metadata for new deliveries.
+    keys = [key for key in ("component", "extension") if key in delivery]
+    if len(keys) != 1:
+        raise ValueError("Delivery must identify exactly one component.")
+    return delivery[keys[0]]
 
 
 def resolve_image(reference):
@@ -85,7 +99,7 @@ def build(extension, directory, repository):
         raise ValueError("Build did not produce an immutable image digest.")
     with archive.open("rb") as stream:
         archive_hash = hashlib.file_digest(stream, "sha256").hexdigest()
-    delivery = {"schemaVersion": 1, "extension": entry, "sourceSha": sha, "repository": repository,
+    delivery = {"schemaVersion": 1, ("component" if entry.get("kind") == "awp-worker" else "extension"): entry, "sourceSha": sha, "repository": repository,
                 "digest": digest, "buildImages": bases, "archive": archive.name,
                 "archiveSha256": archive_hash}
     (directory / "delivery.json").write_text(json.dumps(delivery, indent=2) + "\n", encoding="utf-8")
@@ -127,10 +141,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="action", required=True)
     describe = sub.add_parser("describe")
-    describe.add_argument("--extension", required=True)
+    describe.add_argument("--image", "--extension", dest="extension", required=True)
     describe.add_argument("--release-tag")
     builder = sub.add_parser("build")
-    builder.add_argument("--extension", required=True)
+    builder.add_argument("--image", "--extension", dest="extension", required=True)
     builder.add_argument("--directory", required=True, type=Path)
     builder.add_argument("--repository", required=True)
     publisher = sub.add_parser("publish")
@@ -149,8 +163,8 @@ def main():
         build(args.extension, args.directory, args.repository)
     else:
         delivery = json.loads(args.delivery.read_text(encoding="utf-8"))
-        entry = catalogue(delivery["extension"]["id"])
-        if delivery["extension"] != entry or delivery["sourceSha"] != output(["git", "rev-parse", "HEAD"]):
+        entry = catalogue(delivery_entry(delivery)["id"])
+        if delivery_entry(delivery) != entry or delivery["sourceSha"] != output(["git", "rev-parse", "HEAD"]):
             raise ValueError("Publication checkout does not match the validated delivery.")
         if args.release_tag:
             release_tag(entry, args.release_tag)

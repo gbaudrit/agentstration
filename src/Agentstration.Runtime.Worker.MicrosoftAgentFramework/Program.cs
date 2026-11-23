@@ -66,12 +66,15 @@ builder.Services.AddSingleton<AwpAssignmentExecutor>();
 builder.Services.AddSingleton<AwpAssignmentRunner>();
 builder.Services.AddHostedService<AwpRuntimeWorkerService>();
 builder.Services.AddHealthChecks()
-    .AddCheck<RuntimeWorkerLivenessCheck>("runtime-worker-live")
+    .AddCheck<RuntimeWorkerLivenessCheck>("runtime-worker-live", tags: ["live"])
     .AddCheck<RuntimeWorkerReadinessCheck>("runtime-worker-ready", tags: ["ready"]);
 
 var app = builder.Build();
 app.UseAgentstrationHttpDiagnostics();
-app.MapHealthChecks("/health/live");
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live", StringComparer.Ordinal)
+});
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready", StringComparer.Ordinal)

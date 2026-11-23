@@ -1,11 +1,14 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0
+ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0
+FROM ${SDK_IMAGE} AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM ${RUNTIME_IMAGE}
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY --from=build /src/LICENSE /src/NOTICE ./licenses/
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Agentstration.Runtime.Worker.MicrosoftAgentFramework.dll"]

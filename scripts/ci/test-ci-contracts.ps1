@@ -26,6 +26,16 @@ foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Exten
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', $path)
     Require ($selection.dotnet -and $selection.container -and $selection.extensionImages) "Mixed/unknown changes must retain product and image validation: $path"
 }
+foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'scripts/packaging/enrollment_smoke.py')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path"
+}
+foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Program.cs', 'Dockerfile.worker', 'deploy/images/workers/maf-worker.json', 'scripts/packaging/worker_smoke.py', 'awp/src/Agentstration.Awp.Abstractions/AwpProtocol.cs')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker') "Worker-only inputs must select the Worker image: $path"
+}
+$selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
+Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker') 'Shared packaging tooling must validate both image families.'
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.OpenApi/Program.cs')
 Require ($selection.dotnet -and $selection.container -and -not $selection.extensionImages) 'Unimplemented packaging verticals must retain current validation.'
 foreach ($project in Get-ChildItem (Join-Path $root 'src') -Directory -Filter '*PostgreSql*') {
@@ -74,6 +84,7 @@ $ci = Get-Content (Join-Path $root '.github/workflows/ci.yml') -Raw
 Require ($ci.Contains('needs: [changes, build, functional-tests, aep-tests, extension-images]')) 'The required check must wait for the selected image validation.'
 Require ($ci.Contains('EXTENSION_IMAGES_SELECTED: ${{ needs.changes.outputs.extension-images }}') -and $ci.Contains('EXTENSION_IMAGES_RESULT: ${{ needs.extension-images.result }}')) 'The result gate must receive image selection and status.'
 Require ($ci.Contains('run: ./scripts/ci/assert-validation-results.ps1')) 'CI must execute the tested result gate.'
+Require ($ci.Contains('matrix: ${{ fromJSON(needs.changes.outputs.image-matrix) }}') -and $ci.Contains('extension: ${{ matrix.image }}')) 'Image validation must consume the classified matrix.'
 $delivery = Get-Content (Join-Path $root '.github/workflows/extension-images.yml') -Raw
 Require (-not $delivery.Contains('pull_request:')) 'PR images must not build a second time in the delivery workflow.'
 foreach ($workflow in @($ci, $delivery)) {
