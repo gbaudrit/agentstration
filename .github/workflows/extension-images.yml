@@ -19,14 +19,18 @@ jobs:
     env:
       DOCKER_CONFIG: /tmp/ghcr-init-auth-${{ github.run_id }}
     steps:
+      - name: Require the owner credential for this one-time empty-image test
+        env:
+          OWNER_PACKAGE_TOKEN: ${{ secrets.GHCR_BOOTSTRAP_TOKEN }}
+        run: test -n "$OWNER_PACKAGE_TOKEN"
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ github.token }}
+          password: ${{ secrets.GHCR_BOOTSTRAP_TOKEN }}
       - name: Initialize with an empty image and verify privacy before application upload
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GHCR_BOOTSTRAP_TOKEN }}
         run: |
           python3 - <<'PY'
           import datetime, json, os, pathlib, subprocess, tempfile, urllib.request, urllib.error
