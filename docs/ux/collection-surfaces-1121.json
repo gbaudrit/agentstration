@@ -1329,11 +1329,13 @@
       ],
       "renderer": "ResourceCollectionTemplate",
       "itemType": "AppliedBootstrapProfile",
-      "identityLabel": "Profile",
+      "identityLabel": "BootstrapProfileType",
       "scope": false,
       "state": false,
       "actions": false,
-      "informationKeys": [],
+      "informationKeys": [
+        "ProfileScope"
+      ],
       "validation": "source-adopted",
       "verification": {
         "sourceReviewed": true,
@@ -1344,7 +1346,7 @@
     {
       "id": "applied-bootstrap-version-resources",
       "source": "src/Agentstration.Console.Components/Components/Pages/AppliedBootstrapProfiles.razor",
-      "line": 66,
+      "line": 101,
       "host": "console",
       "routes": [
         "/settings/bootstrap/applied/{ProfileId}"
@@ -1353,11 +1355,10 @@
       "itemType": "BootstrapAppliedResource",
       "identityLabel": "Resources",
       "scope": false,
-      "state": false,
+      "state": true,
       "actions": false,
       "informationKeys": [
-        "ManifestLocation",
-        "Results"
+        "ManifestLocation"
       ],
       "validation": "source-adopted",
       "verification": {

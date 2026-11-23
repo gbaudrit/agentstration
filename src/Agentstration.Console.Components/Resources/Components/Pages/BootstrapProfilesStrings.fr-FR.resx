@@ -58,10 +58,20 @@
   <data name="TargetForProfile" xml:space="preserve"><value>Cible de {0}</value></data>
   <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation différée</value></data>
   <data name="ApplicationTitle" xml:space="preserve"><value>Application du bootstrap</value></data>
-  <data name="AppliedProfiles" xml:space="preserve"><value>Profils Bootstrap appliqués</value></data>
-  <data name="NoAppliedProfiles" xml:space="preserve"><value>Aucun profil Bootstrap appliqué</value></data>
+  <data name="AppliedProfiles" xml:space="preserve"><value>Profils de bootstrap appliqués</value></data>
+  <data name="AppliedProfilesDescription" xml:space="preserve"><value>Consultez les versions appliquées de chaque profil et le résultat de chaque application par cible.</value></data>
+  <data name="AppliedProfilesTotal" xml:space="preserve"><value>Profils appliqués</value></data>
+  <data name="AppliedProfilesLoadFailed" xml:space="preserve"><value>Impossible de charger les profils de bootstrap appliqués.</value></data>
+  <data name="NoAppliedProfiles" xml:space="preserve"><value>Aucun profil de bootstrap appliqué</value></data>
+  <data name="BootstrapCatalog" xml:space="preserve"><value>Catalogue de bootstrap</value></data>
+  <data name="BootstrapProfileType" xml:space="preserve"><value>Profil de bootstrap</value></data>
+  <data name="ProfileScope" xml:space="preserve"><value>Périmètre</value></data>
   <data name="ProfileVersion" xml:space="preserve"><value>Version</value></data>
   <data name="ProfileVersions" xml:space="preserve"><value>Versions</value></data>
+  <data name="VersionTechnicalDetails" xml:space="preserve"><value>Détails techniques</value></data>
+  <data name="ScopedApplicationHistoryDescription" xml:space="preserve"><value>Applications de la version sélectionnée sur cette cible, de la plus récente à la plus ancienne.</value></data>
+  <data name="OneResource" xml:space="preserve"><value>1 ressource</value></data>
+  <data name="ApplicationResourceCount" xml:space="preserve"><value>{0} ressources</value></data>
   <data name="NoScopedApplications" xml:space="preserve"><value>Aucune application pour cette version et ce périmètre</value></data>
   <data name="ProfileDigest" xml:space="preserve"><value>Empreinte du profil</value></data>
   <data name="ProfileSourceVersion" xml:space="preserve"><value>Version de la source</value></data>
@@ -75,5 +85,6 @@
   <data name="AppliedDisposition.Create" xml:space="preserve"><value>Créée</value></data>
   <data name="AppliedDisposition.Skip" xml:space="preserve"><value>Ignorée</value></data>
   <data name="AppliedDisposition.Conflict" xml:space="preserve"><value>En conflit</value></data>
+  <data name="AppliedDisposition.Invalid" xml:space="preserve"><value>Non valide</value></data>
   <data name="AppliedDisposition.Failed" xml:space="preserve"><value>En échec</value></data>
 </root>

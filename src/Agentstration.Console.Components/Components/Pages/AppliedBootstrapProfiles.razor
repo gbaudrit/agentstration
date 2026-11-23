@@ -6,85 +6,127 @@
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
 
-<PageTitle>@T("AppliedProfiles")</PageTitle>
+<PageTitle>@(ProfileId is null ? T("AppliedProfiles") : VisibleProfile?.DisplayName ?? T("BootstrapProfileType")) · Agentstration</PageTitle>
 @if (ProfileId is null)
 {
-    <ResourceCollectionTemplate TItem="AppliedBootstrapProfile" Title="@T("AppliedProfiles")"
-        IdentityColumn="ProfileIdentity" Items="profiles" LoadState="load" TestId="applied-bootstrap-profiles"
-        EmptyTitle="@T("NoAppliedProfiles")">
-        <Actions><a class="button-secondary" href="/settings/bootstrap">@T("Title")</a></Actions>
+    <ResourceCollectionTemplate TItem="AppliedBootstrapProfile" Title="@T("AppliedProfiles")" Description="@T("AppliedProfilesDescription")"
+        IconName="cloud-upload" IdentityColumn="ProfileIdentity" Columns="ProfileColumns" Items="FilteredProfiles"
+        Query="listQuery" QueryChanged="query => listQuery = query"
+        SearchEnabled SearchLabel="@T("SearchProfiles")" SearchPlaceholder="@T("SearchProfiles")"
+        LoadState="load" OnRefresh="RefreshListAsync" OnRetry="RefreshListAsync"
+        TestId="applied-bootstrap-profiles" RowTestId="applied-bootstrap-profile-row" EmptyTitle="@T("NoAppliedProfiles")">
+        <Actions><a class="button-secondary" href="/settings/bootstrap">@T("BootstrapCatalog")</a></Actions>
+        <Metrics>
+            @if (!load.BlocksContent)
+            {
+                <MetricCard Label="@T("AppliedProfilesTotal")" Value="@profiles.Count.ToString()" Status="UiStatus.Info" />
+                @foreach (var profileScope in Enum.GetValues<BootstrapProfileScope>())
+                {
+                    <MetricCard Label="@ScopeLabel(profileScope)" Value="@profiles.Count(item => item.Scope == profileScope).ToString()" />
+                }
+            }
+        </Metrics>
     </ResourceCollectionTemplate>
 }
 else
 {
-    <ResourceDetailsTemplate Name="@(profile?.DisplayName ?? T("AppliedProfiles"))" ResourceType="@T("Profile")"
-        IconName="cloud-upload" TechnicalName="@profile?.Name" ResourceIdentity="@ProfileId" Sections="Sections"
-        DefaultSection="versions" CollectionHref="/settings/bootstrap/applied" CollectionLabel="@T("AppliedProfiles")"
-        LoadState="load" OnRetry="LoadAsync" TestId="applied-bootstrap-profile">
-        <Content>
-            <FormSection Title="@T("ProfileVersions")" TestId="bootstrap-profile-versions">
-                <FormGrid>
-                    <FormField Label="@T("ProfileVersion")" Id="bootstrap-history-version">
-                        <ClearableSelect TValue="string" AllowClear="false" Value="@version" ValueChanged="ChangeVersion">
-                            @foreach (var entry in versions)
-                            {
-                                <option value="@entry.Version">@entry.Version</option>
-                            }
-                        </ClearableSelect>
-                    </FormField>
-                    <FormField Label="@T("Target")" Id="bootstrap-history-scope">
-                        <ClearableSelect TValue="string" AllowClear="false" Value="@scope" ValueChanged="ChangeScope">
-                            @foreach (var target in targets)
-                            {
-                                <option value="@target.Scope">@target.Label</option>
-                            }
-                        </ClearableSelect>
-                    </FormField>
-                </FormGrid>
-                @if (versions.FirstOrDefault(value => value.Version == version) is { } selected)
-                {
-                    <dl class="resource-details bootstrap-version-facts">
-                        <dt>@T("ProfileDigest")</dt><dd><code>@selected.Digest</code></dd>
-                        @if (selected.Source is { } source)
-                        {
-                            <dt>@T("ProfileSourceVersion")</dt><dd>@source.Publisher/@source.SourceName @source.SourceVersion</dd>
-                        }
-                    </dl>
-                }
-            </FormSection>
-            <FormSection Title="@T("ApplicationHistory")" TestId="bootstrap-version-history">
-                @if (history.Count == 0)
-                {
-                    <EmptyState Title="@T("NoScopedApplications")" />
-                }
-                @foreach (var item in history)
-                {
-                    <details @key="item.Id" class="bootstrap-history-entry" open="@(history.Count == 1 || item.Id == Application)" data-testid="bootstrap-scoped-application">
-                        <summary>@item.StartedAt.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)
-                            · @T($"ApplicationSource.{item.Source}") · @T($"ApplicationStatus.{item.Status}")
-                        </summary>
-                        <CollectionView TItem="BootstrapAppliedResource" Items="item.Resources" IdentityLabel="@T("Resources")"
-                            InformationLabels="@(new[] { T("ManifestLocation"), T("Results") })"
-                            ShowViewSwitch="false">
-                            <Identity Context="row">
-                                <small>@row.Kind</small>
-                                @if (ResourceLink(row) is { } link)
+    <div id="versions">
+        <ResourceDetailsTemplate Name="@(VisibleProfile?.DisplayName ?? T("BootstrapProfileType"))" ResourceType="@T("BootstrapProfileType")"
+            IconName="cloud-upload" TechnicalName="@VisibleProfile?.Name" Version="@(load.BlocksContent ? null : version)" ScopeRef="SelectedScope"
+            CollectionHref="/settings/bootstrap/applied" CollectionLabel="@T("AppliedProfiles")"
+            LoadState="load" OnRetry="LoadAsync" TestId="applied-bootstrap-profile">
+            <Content>
+                <FormSection Title="@T("ProfileVersions")" TestId="bootstrap-profile-versions">
+                    <div class="bootstrap-version-selectors">
+                        <FormGrid>
+                            <FormField Label="@T("ProfileVersion")" Id="bootstrap-history-version">
+                                <ClearableSelect TValue="string" AllowClear="false" Value="@version" ValueChanged="ChangeVersion">
+                                    @foreach (var entry in versions)
+                                    {
+                                        <option value="@entry.Version">@entry.Version</option>
+                                    }
+                                </ClearableSelect>
+                            </FormField>
+                            <FormField Label="@T("Target")" Id="bootstrap-history-scope">
+                                <ClearableSelect TValue="string" AllowClear="false" Value="@scope" ValueChanged="ChangeScope">
+                                    @foreach (var target in targets)
+                                    {
+                                        <option value="@target.Scope">@target.Label</option>
+                                    }
+                                </ClearableSelect>
+                            </FormField>
+                        </FormGrid>
+                    </div>
+                    @if (versions.FirstOrDefault(value => value.Version == version) is { } selected)
+                    {
+                        <details class="bootstrap-version-details">
+                            <summary>@T("VersionTechnicalDetails")</summary>
+                            <dl class="resource-details bootstrap-version-facts">
+                                <dt>@T("ProfileDigest")</dt><dd><CopyableValue Value="@selected.Digest" /></dd>
+                                @if (selected.Source is { } source)
                                 {
-                                    <a class="text-button" href="@link">@row.Name</a>
+                                    <dt>@T("ProfileSourceVersion")</dt><dd>@source.Publisher/@source.SourceName @source.SourceVersion</dd>
                                 }
-                                else { <strong>@row.Name</strong> }
-                                @if (row.Pack is not null) { <small>@T("PackOrigin") · @row.Pack</small> }
-                            </Identity>
-                            <Information Context="row">
-                                <CollectionValue Label="@T("ManifestLocation")"><code>@row.Location</code></CollectionValue>
-                                <CollectionValue Label="@T("Results")">@T($"AppliedDisposition.{row.Disposition}")</CollectionValue>
-                            </Information>
-                        </CollectionView>
-                    </details>
-                }
-            </FormSection>
-        </Content>
-    </ResourceDetailsTemplate>
+                            </dl>
+                        </details>
+                    }
+                </FormSection>
+                <FormSection Title="@T("ApplicationHistory")" Description="@T("ScopedApplicationHistoryDescription")" TestId="bootstrap-version-history">
+                    @if (history.Count == 0)
+                    {
+                        <EmptyState Title="@T("NoScopedApplications")" />
+                    }
+                    @{ var expandedApplication = history.FirstOrDefault(item => item.Id == Application) ?? history.FirstOrDefault(); }
+                    @foreach (var item in history)
+                    {
+                        <details @key="item.Id" class="bootstrap-history-entry" open="@(item.Id == expandedApplication?.Id)" data-testid="bootstrap-scoped-application">
+                            <summary class="bootstrap-history-summary">
+                                <span class="bootstrap-history-chevron" aria-hidden="true"><TablerIcon Name="chevron-right" /></span>
+                                <span class="bootstrap-history-when">
+                                    <time datetime="@item.StartedAt.ToString("O")">@item.StartedAt.ToLocalTime().ToString("g")</time>
+                                    <small>@T($"ApplicationSource.{item.Source}")</small>
+                                </span>
+                                <span class="bootstrap-history-outcome">
+                                    <StatusBadge Text="@T($"ApplicationStatus.{item.Status}")" Status="@ApplicationTone(item.Status)" />
+                                    <small>@ResourceCount(item.Resources.Count)</small>
+                                </span>
+                            </summary>
+                            <div class="bootstrap-history-resources">
+                                @if (item.Resources.Count == 0)
+                                {
+                                    <p class="bootstrap-no-outcomes">@T("NoResourceOutcome")</p>
+                                }
+                                else
+                                {
+                                    <CollectionView TItem="BootstrapAppliedResource" Items="item.Resources" IdentityLabel="@T("Resources")"
+                                        StateLabel="@T("Results")" InformationLabels="@(new[] { T("ManifestLocation") })"
+                                        ShowViewSwitch="false" Compact>
+                                        <Identity Context="row">
+                                            <div class="bootstrap-resource-identity">
+                                                @if (ResourceLink(row) is { } link)
+                                                {
+                                                    <a class="resource-name-link" href="@link">@row.Name</a>
+                                                }
+                                                else { <strong>@row.Name</strong> }
+                                                <small>@row.Kind</small>
+                                                @if (row.Pack is not null) { <small>@T("PackOrigin") · @row.Pack</small> }
+                                            </div>
+                                        </Identity>
+                                        <State Context="row">
+                                            <StatusBadge Text="@T($"AppliedDisposition.{row.Disposition}")" Status="@DispositionTone(row.Disposition)" />
+                                        </State>
+                                        <Information Context="row">
+                                            <CollectionValue Label="@T("ManifestLocation")"><code>@row.Location</code></CollectionValue>
+                                        </Information>
+                                    </CollectionView>
+                                }
+                            </div>
+                        </details>
+                    }
+                </FormSection>
+            </Content>
+        </ResourceDetailsTemplate>
+    </div>
 }
 
 @code {
@@ -99,23 +141,43 @@ else
     private IReadOnlyList<AppliedBootstrapVersion> versions = [];
     private IReadOnlyList<ScopedBootstrapApplication> history = [];
     private IReadOnlyList<TargetOption> targets = [];
+    private CollectionQuery listQuery = new();
     private ResourceLoadState load = new(ResourceLoadStatus.Loading);
     private string? version;
     private string? scope;
     private int request;
     private sealed record TargetOption(string Scope, string Label);
 
-    private IReadOnlyList<ResourceNavigationItem> Sections => [new("versions", T("ProfileVersions"), "history")];
-    private CollectionColumn<AppliedBootstrapProfile> ProfileIdentity => new("profile", T("Profile"), item =>
+    private AppliedBootstrapProfile? VisibleProfile => load.BlocksContent ? null : profile;
+    private ResourceScopeRef? SelectedScope => !load.BlocksContent && ResourceScopeRef.TryParse(scope, out var target) ? target : null;
+    private IReadOnlyList<AppliedBootstrapProfile> FilteredProfiles => profiles.Where(item =>
+        (string.IsNullOrWhiteSpace(listQuery.Search) || item.Name.Contains(listQuery.Search, StringComparison.OrdinalIgnoreCase)
+            || item.DisplayName.Contains(listQuery.Search, StringComparison.OrdinalIgnoreCase))
+        && (string.IsNullOrEmpty(listQuery.Filter("scope").Value) || item.Scope.ToString() == listQuery.Filter("scope").Value)).ToArray();
+    private CollectionColumn<AppliedBootstrapProfile> ProfileIdentity => new("profile", T("BootstrapProfileType"), item =>
         @<CollectionIdentity DisplayName="@item.DisplayName" Name="@item.Name"
-            Href="@($"/settings/bootstrap/applied/{Uri.EscapeDataString(item.Id)}#versions")" IconName="cloud-upload" />);
+            Href="@($"/settings/bootstrap/applied/{Uri.EscapeDataString(item.Id)}")" IconName="cloud-upload" />);
+    private IReadOnlyList<CollectionColumn<AppliedBootstrapProfile>> ProfileColumns =>
+    [
+        new("scope", T("ProfileScope"), item => @<span>@ScopeLabel(item.Scope)</span>)
+        {
+            Filters = [new("scope", T("ProfileScope"), CollectionFilterKind.Choice)
+            {
+                Options = Enum.GetValues<BootstrapProfileScope>().Select(value => new CollectionFilterOption(value.ToString(), ScopeLabel(value))).ToArray()
+            }]
+        }
+    ];
 
     protected override Task OnParametersSetAsync() => LoadAsync();
 
-    private async Task LoadAsync()
+    private Task LoadAsync() => LoadAsync(retainList: false);
+
+    private Task RefreshListAsync() => LoadAsync(retainList: !load.BlocksContent);
+
+    private async Task LoadAsync(bool retainList)
     {
         var attempt = ++request;
-        load = new(ResourceLoadStatus.Loading);
+        load = retainList ? new(ResourceLoadStatus.Refreshing) { HasContent = true } : new(ResourceLoadStatus.Loading);
         try
         {
             var token = lifetime.Token;
@@ -173,9 +235,29 @@ else
         {
             if (attempt == request)
                 load = exception.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized ? new(ResourceLoadStatus.Forbidden)
-                    : new(ResourceLoadStatus.Failed) { Message = T("HistoryLoadFailed") };
+                    : new(ResourceLoadStatus.Failed) { HasContent = retainList, Message = T(ProfileId is null ? "AppliedProfilesLoadFailed" : "HistoryLoadFailed") };
         }
     }
+
+    private string ScopeLabel(BootstrapProfileScope value) => T($"Scope.{value}");
+    private string ResourceCount(int count) => count == 1 ? T("OneResource") : Localizer["ApplicationResourceCount", count].Value;
+
+    private static UiStatus ApplicationTone(BootstrapApplicationStatus status) => status switch
+    {
+        BootstrapApplicationStatus.Succeeded => UiStatus.Success,
+        BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted => UiStatus.Warning,
+        BootstrapApplicationStatus.Running => UiStatus.Info,
+        BootstrapApplicationStatus.Failed => UiStatus.Danger,
+        _ => UiStatus.Neutral
+    };
+
+    private static UiStatus DispositionTone(BootstrapResourceDisposition disposition) => disposition switch
+    {
+        BootstrapResourceDisposition.Create => UiStatus.Success,
+        BootstrapResourceDisposition.Conflict => UiStatus.Warning,
+        BootstrapResourceDisposition.Invalid or BootstrapResourceDisposition.Failed => UiStatus.Danger,
+        _ => UiStatus.Neutral
+    };
 
     private void ChangeVersion(string? requested)
     {
