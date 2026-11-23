@@ -55,15 +55,29 @@ jobs:
               path = pathlib.Path(temporary)
               (path / 'Dockerfile').write_text(
                   'FROM scratch\n'
-                  'LABEL org.opencontainers.image.source="https://github.com/gbaudrit/agentstration"\n'
                   'LABEL org.opencontainers.image.title="Empty registry initialization; no application files"\n')
               subprocess.run(['docker', 'build', '--provenance=false', '--sbom=false', '--tag', reference, str(path)], check=True)
               subprocess.run(['docker', 'push', reference], check=True)
           metadata = api(endpoint)
           print('Bootstrap package visibility:', metadata['visibility'], flush=True)
+          allowed_tags = {tag}
           if metadata['visibility'] == 'private':
-              print('Private package initialized. The only uploaded image is empty; no application image was uploaded.', flush=True)
-              raise SystemExit(0)
+              linked_tag = 'registry-link-' + os.environ['GITHUB_RUN_ID']
+              allowed_tags.add(linked_tag)
+              linked = 'ghcr.io/gbaudrit/' + package + ':' + linked_tag
+              with tempfile.TemporaryDirectory(prefix='empty-ghcr-link-') as temporary:
+                  path = pathlib.Path(temporary)
+                  (path / 'Dockerfile').write_text(
+                      'FROM scratch\n'
+                      'LABEL org.opencontainers.image.source="https://github.com/gbaudrit/agentstration"\n'
+                      'LABEL org.opencontainers.image.title="Empty registry repository-link verification; no application files"\n')
+                  subprocess.run(['docker', 'build', '--provenance=false', '--sbom=false', '--tag', linked, str(path)], check=True)
+                  subprocess.run(['docker', 'push', linked], check=True)
+              metadata = api(endpoint)
+              print('Visibility after repository link:', metadata['visibility'], flush=True)
+              if metadata['visibility'] == 'private':
+                  print('Private package initialized and repository link verified with empty images only.', flush=True)
+                  raise SystemExit(0)
           assert metadata['visibility'] == 'public', 'Unexpected package visibility.'
           run = api('repos/' + repository + '/actions/runs/' + os.environ['GITHUB_RUN_ID'])
           created = datetime.datetime.fromisoformat(metadata['created_at'].replace('Z', '+00:00'))
@@ -71,7 +85,7 @@ jobs:
           assert created >= started, 'Package predates this empty initialization.'
           versions = api(endpoint + '/versions?per_page=100')
           tags = [value for version in versions for value in version.get('metadata', {}).get('container', {}).get('tags', [])]
-          assert tags and set(tags) == {tag}, 'Package has content outside this empty initialization.'
+          assert tags and set(tags) <= allowed_tags, 'Package has content outside this empty initialization.'
           api(endpoint, 'DELETE')
           try:
               api(endpoint)
