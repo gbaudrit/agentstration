@@ -130,6 +130,12 @@ verify visibility again with a second empty image carrying the same source label
 as the application. Grant the Agentstration repository Actions access only to the
 verified private destination.
 
+In the package settings, open **Manage Actions access**, choose **Add repository**,
+select `gbaudrit/agentstration` and grant **Write**. Connecting the package to a
+repository is distinct from granting this Actions role. Verify that the normal
+repository `GITHUB_TOKEN` can read the private package before publishing; an owner
+token successfully reading it does not establish repository Actions access.
+
 If either check reports public/internal visibility or metadata cannot be read,
 stop before the application upload and remove only the just-created placeholder
 content. Do not assume repository access inheritance implies private visibility.
