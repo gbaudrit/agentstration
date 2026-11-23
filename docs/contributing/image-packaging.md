@@ -39,9 +39,10 @@ is delivered; tracking an issue does not imply an image is already published.
 
 Foundry's `version.txt` is its own version source. The project assembly,
 advertised AEP extension version and image labels use that version. The initial
-value remains `1.0.0`, matching its previously advertised identity; this is not
-evidence that an official image release has been published. AEP protocol and
-contribution versions remain separate contracts. See
+value is `0.1.0`, replacing the previous development identity `1.0.0`. Each
+extension starts its independently packaged release cycle at `0.1.0` and then
+evolves independently; an official image release is not implied by this baseline.
+AEP protocol and contribution versions remain separate contracts. See
 [ADR-0252](../decisions/0252-extension-images-have-independent-oci-releases.md).
 
 Inspect the catalogue and run the offline packaging contracts:
@@ -94,11 +95,11 @@ private visibility after publication, and uses the job-scoped `GITHUB_TOKEN`.
 Grant this repository Actions access when a package already exists. New GHCR
 packages default to private. No broad registry credential enters the build.
 
-An official Foundry release uses Git tag `extension/foundry/v1.0.0`. The workflow
+An official Foundry release uses Git tag `extension/foundry/v0.1.0`. The workflow
 checks that the tag matches `version.txt` and belongs to `main`. It then builds
 and validates once, publishes the same OCI archive to private GHCR with the
 extension version tag, and copies it to
-`docker.io/agentstration/extension-foundry:1.0.0` without rebuilding.
+`docker.io/agentstration/extension-foundry:0.1.0` without rebuilding.
 
 Docker Hub publication reuses repository secrets `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN`. Optional repository variable `DOCKERHUB_NAMESPACE` overrides

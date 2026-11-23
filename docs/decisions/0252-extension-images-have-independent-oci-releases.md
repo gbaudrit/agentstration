@@ -18,6 +18,16 @@ contribution versions remain distinct. Foundry's version file feeds its assembly
 advertised AEP extension identity and OCI metadata. Its initial version preserves
 the existing `1.0.0` identity.
 
+### Initial release baseline clarification — 2026-11-23
+
+Before the first independently packaged release, the maintainer chose `0.1.0`
+as the initial version for each extension, including Foundry. This supersedes
+carrying forward Foundry's earlier development identity `1.0.0`. Subsequent
+extension versions remain independent of one another and of Agentstration.
+AEP protocol and contribution versions are unchanged by this baseline decision.
+
+### Artifact delivery
+
 Build one OCI archive with pinned base images, source/version labels, provenance,
 SBOM, digest and archive checksum. Smoke that artifact in a disposable local
 registry, then copy the same archive using digest-preserving OCI tooling. Private
