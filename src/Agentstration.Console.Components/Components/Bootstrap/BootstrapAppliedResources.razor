@@ -1,0 +1,97 @@
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<div class="bootstrap-applied-resources" data-testid="bootstrap-applied-resources">
+    <CollectionView TItem="BootstrapAppliedResource" Items="PageRows" IdentityLabel="@T("Resources")"
+        StateLabel="@T("Results")" InformationLabels="@(new[] { T("ManifestLocation") })"
+        ShowItems="@(filtered.Count > 0)" ShowViewSwitch="false" Compact RowTestId="bootstrap-applied-resource-row">
+        <Toolbar>
+            <ResourceToolbar Label="@T("SearchResources")">
+                <SearchBox Value="@query.Search" ValueChanged="@(value => SetQuery(query with { Search = value, Page = 1 }))"
+                           Label="@T("SearchResources")" Placeholder="@T("SearchResources")" />
+                <CollectionFilterField Filter="KindFilter" Value="@query.Filter("kind")" ValueChanged="@(value => SetQuery(query.WithFilter("kind", value)))" />
+                <CollectionFilterField Filter="ResultFilter" Value="@query.Filter("result")" ValueChanged="@(value => SetQuery(query.WithFilter("result", value)))" />
+            </ResourceToolbar>
+        </Toolbar>
+        <ContentState>
+            <EmptyState Title="@Shared["NoMatches"]" Message="@Shared["NoMatchesHelp"]">
+                <button type="button" class="button-secondary" @onclick="@(() => SetQuery(new() { PageSize = query.PageSize }))">@Shared["ClearFilters"]</button>
+            </EmptyState>
+        </ContentState>
+        <Identity Context="row">
+            <div class="bootstrap-resource-identity">
+                @if (ResourceHref(row) is { } link)
+                {
+                    <a class="resource-name-link" href="@link">@row.Name</a>
+                }
+                else { <strong>@row.Name</strong> }
+                <small>@row.Kind</small>
+                @if (row.Pack is not null) { <small>@T("PackOrigin") · @row.Pack</small> }
+            </div>
+        </Identity>
+        <State Context="row">
+            <StatusBadge Text="@ResultLabel(row.Disposition)" Status="@DispositionTone(row.Disposition)" />
+        </State>
+        <Information Context="row">
+            <CollectionValue Label="@T("ManifestLocation")"><code>@row.Location</code></CollectionValue>
+        </Information>
+    </CollectionView>
+    @if (filtered.Count > 0)
+    {
+        <CollectionPager Page="query.Page" PageSize="query.PageSize" Total="filtered.Count"
+                         HasMore="@(query.Page * query.PageSize < filtered.Count)" SupportsDirectNavigation
+                         PageSizes="PageSizes" PageChanged="@(value => query = query with { Page = value })"
+                         PageSizeChanged="@(value => query = query with { PageSize = value, Page = 1 })" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<BootstrapAppliedResource> Rows { get; set; } = [];
+    [Parameter, EditorRequired] public Func<BootstrapAppliedResource, string?> ResourceHref { get; set; } = null!;
+
+    private static readonly int[] PageSizes = [10, 25, 50, 100];
+    private CollectionQuery query = new() { PageSize = PageSizes[0] };
+    private IReadOnlyList<BootstrapAppliedResource> filtered = [];
+    private IReadOnlyList<BootstrapAppliedResource> PageRows => filtered.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray();
+    private CollectionFilter KindFilter => new("kind", T("AppliedResourceKind"), CollectionFilterKind.Choice)
+    {
+        Options = Rows.Select(row => row.Kind).Distinct(StringComparer.Ordinal).Order(StringComparer.CurrentCulture)
+            .Select(kind => new CollectionFilterOption(kind, kind)).ToArray()
+    };
+    private CollectionFilter ResultFilter => new("result", T("Results"), CollectionFilterKind.Choice)
+    {
+        Options = Rows.Select(row => row.Disposition).Distinct().Order()
+            .Select(result => new CollectionFilterOption(result.ToString(), ResultLabel(result))).ToArray()
+    };
+
+    protected override void OnParametersSet() => SetQuery(query);
+
+    private void SetQuery(CollectionQuery requested)
+    {
+        var search = requested.Search.Trim();
+        var kind = requested.Filter("kind").Value;
+        var filterByResult = Enum.TryParse<BootstrapResourceDisposition>(requested.Filter("result").Value, out var result);
+        filtered = search.Length == 0 && kind.Length == 0 && !filterByResult ? Rows : Rows.Where(row =>
+            (kind.Length == 0 || row.Kind == kind)
+            && (!filterByResult || row.Disposition == result)
+            && (search.Length == 0
+                || row.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || row.Kind.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || row.Location.Contains(search, StringComparison.OrdinalIgnoreCase)
+                || row.Pack?.Contains(search, StringComparison.OrdinalIgnoreCase) == true)).ToArray();
+        var lastPage = Math.Max(1, (filtered.Count + requested.PageSize - 1) / requested.PageSize);
+        query = requested with { Page = Math.Clamp(requested.Page, 1, lastPage) };
+    }
+
+    private string T(string key) => Localizer[key].Value;
+    private string ResultLabel(BootstrapResourceDisposition disposition) => T($"AppliedDisposition.{disposition}");
+
+    private static UiStatus DispositionTone(BootstrapResourceDisposition disposition) => disposition switch
+    {
+        BootstrapResourceDisposition.Create => UiStatus.Success,
+        BootstrapResourceDisposition.Conflict => UiStatus.Warning,
+        BootstrapResourceDisposition.Invalid or BootstrapResourceDisposition.Failed => UiStatus.Danger,
+        _ => UiStatus.Neutral
+    };
+}

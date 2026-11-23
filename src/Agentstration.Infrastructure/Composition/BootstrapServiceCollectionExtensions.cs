@@ -11,6 +11,9 @@ internal static class BootstrapServiceCollectionExtensions
 {
     internal static IServiceCollection AddAgentstrationBootstrapHandlers(this IServiceCollection services)
     {
+        services.AddScoped<Agentstration.Web.Hosting.BootstrapVersionHistory>();
+        services.AddScoped<Agentstration.Bootstrap.Contracts.IBootstrapVersionHistory>(provider =>
+            provider.GetRequiredService<Agentstration.Web.Hosting.BootstrapVersionHistory>());
         services.AddScoped<Agentstration.Bootstrap.Contracts.IBootstrapStartupModelCorrections, BootstrapStartupModelCorrectionService>();
         services.TryAddSingleton<AepEnrollmentPolicyOptions>();
         services.AddSingleton<ExtensionEnrollmentPolicyService>();

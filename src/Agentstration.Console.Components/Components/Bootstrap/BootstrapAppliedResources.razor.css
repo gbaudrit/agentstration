@@ -1,0 +1,75 @@
+.bootstrap-applied-resources {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.bootstrap-applied-resources ::deep .collection-toolbar {
+    margin: 0 0 var(--space-3);
+}
+
+.bootstrap-applied-resources ::deep .resource-toolbar {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.bootstrap-applied-resources ::deep .resource-toolbar-filters {
+    width: 100%;
+    align-items: end;
+}
+
+.bootstrap-applied-resources ::deep .search-box {
+    flex: 1 1 14rem;
+    min-width: min(100%, 12rem);
+    height: var(--field-height);
+}
+
+.bootstrap-applied-resources ::deep .search-box input {
+    height: auto;
+}
+
+.bootstrap-applied-resources ::deep .collection-filter-field {
+    flex: 0 1 12rem;
+    min-width: min(100%, 10rem);
+}
+
+.bootstrap-applied-resources ::deep .resource-toolbar .form-field,
+.bootstrap-applied-resources ::deep .collection-pager {
+    margin: 0;
+}
+
+.bootstrap-applied-resources ::deep .resource-collection .data-grid {
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.bootstrap-applied-resources ::deep .data-grid th:first-child {
+    width: 34%;
+}
+
+.bootstrap-applied-resources ::deep .data-grid th:nth-child(2) {
+    width: 22%;
+}
+
+.bootstrap-applied-resources ::deep .data-grid th:last-child {
+    width: 44%;
+}
+
+.bootstrap-resource-identity {
+    display: grid;
+    gap: var(--space-1);
+}
+
+.bootstrap-resource-identity small {
+    color: var(--muted);
+}
+
+@media (max-width: 620px) {
+    .bootstrap-applied-resources ::deep .collection-filter-field {
+        flex: 1 1 8rem;
+        min-width: min(100%, 8rem);
+    }
+}

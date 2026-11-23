@@ -33,6 +33,10 @@ public sealed record ResourceManagementAuthority
     public string? Version { get; init; }
 }
 
+public sealed record ResourceBootstrapApplication(
+    string ProfileId, string Profile, string Version, Guid ApplicationId,
+    ResourceScopeRef TargetScope, string Location);
+
 public sealed record ResourceGovernance
 {
     public static ResourceGovernance User { get; } = new()
@@ -42,6 +46,8 @@ public sealed record ResourceGovernance
 
     public required ResourceOrigin Origin { get; init; }
     public ResourceManagementAuthority? ManagedBy { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ResourceBootstrapApplication? AppliedBy { get; init; }
 
     [JsonIgnore]
     public bool IsManaged => ManagedBy is not null;
@@ -99,13 +105,57 @@ public interface IResourceGovernanceContext
 {
     ResourceGovernance? Current { get; }
     IDisposable Push(ResourceGovernance governance);
+    IDisposable PushBootstrap(ResourceBootstrapApplication application, Func<string, ResourceNamespace, string, ResourceGovernance?, bool> matches,
+        Action<ResourceScopeRef, ResourceNamespace, string, string, Guid?> observe);
+    ResourceBootstrapApplication? GetBootstrapApplication(string kind, ResourceNamespace @namespace, string name);
+    void ObserveBootstrapCreation(ResourceScopeRef scope, ResourceNamespace @namespace, string kind, string name, Guid? uid);
 }
 
 public sealed class ResourceGovernanceContext : IResourceGovernanceContext
 {
     private readonly AsyncLocal<ResourceGovernance?> current = new();
 
+    private readonly AsyncLocal<BootstrapScope?> bootstrap = new();
+
     public ResourceGovernance? Current => current.Value;
+
+    public IDisposable PushBootstrap(ResourceBootstrapApplication application, Func<string, ResourceNamespace, string, ResourceGovernance?, bool> matches,
+        Action<ResourceScopeRef, ResourceNamespace, string, string, Guid?> observe)
+    {
+        var previous = bootstrap.Value;
+        var frame = new BootstrapScope(application, matches, observe);
+        bootstrap.Value = frame;
+        return new RestoreBootstrap(bootstrap, frame, previous);
+    }
+
+    public ResourceBootstrapApplication? GetBootstrapApplication(string kind, ResourceNamespace @namespace, string name)
+    {
+        var frame = bootstrap.Value;
+        if (frame is null || !frame.Active) return null;
+        return frame.Matches(kind, @namespace, name, Current) ? frame.Application : null;
+    }
+
+    public void ObserveBootstrapCreation(ResourceScopeRef scope, ResourceNamespace @namespace, string kind, string name, Guid? uid)
+    {
+        if (GetBootstrapApplication(kind, @namespace, name) is not null)
+            bootstrap.Value!.Observe(scope, @namespace, kind, name, uid);
+    }
+
+    private sealed record BootstrapScope(ResourceBootstrapApplication Application,
+        Func<string, ResourceNamespace, string, ResourceGovernance?, bool> Matches,
+        Action<ResourceScopeRef, ResourceNamespace, string, string, Guid?> Observe)
+    {
+        public volatile bool Active = true;
+    }
+
+    private sealed class RestoreBootstrap(AsyncLocal<BootstrapScope?> slot, BootstrapScope frame, BootstrapScope? previous) : IDisposable
+    {
+        public void Dispose()
+        {
+            frame.Active = false;
+            slot.Value = previous;
+        }
+    }
 
     public IDisposable Push(ResourceGovernance governance)
     {
@@ -137,37 +187,41 @@ public sealed class ResourceGovernanceViolationException(string code, string mes
 
 public static class ResourceGovernanceEnforcement
 {
-    public static ResourceGovernance PrepareCreate(ResourceGovernance requested, ResourceGovernance? authority)
+    public static ResourceGovernance PrepareCreate(ResourceGovernance requested, ResourceGovernance? authority,
+        ResourceBootstrapApplication? appliedBy = null)
     {
         ArgumentNullException.ThrowIfNull(requested);
         if (authority is null)
         {
             if (requested != ResourceGovernance.User)
                 throw Violation("resource_governance_reserved", "Resource governance is assigned only by a trusted management authority.");
-            return ResourceGovernance.User;
+            return ResourceGovernance.User with { AppliedBy = appliedBy };
         }
 
         EnsureManagedAuthority(authority);
         if (requested != ResourceGovernance.User && requested != authority)
             throw Violation("resource_governance_authority_mismatch", "The supplied governance does not match the active management authority.");
-        return authority;
+        return authority with { AppliedBy = appliedBy };
     }
 
     public static ResourceGovernance PrepareUpdate(ResourceGovernance existing, ResourceGovernance requested, ResourceGovernance? authority)
     {
         ArgumentNullException.ThrowIfNull(existing);
         ArgumentNullException.ThrowIfNull(requested);
+        if (requested.AppliedBy is not null && requested.AppliedBy != existing.AppliedBy)
+            throw Violation("resource_governance_immutable", "Resource application provenance is immutable.");
+        requested = requested with { AppliedBy = null };
         if (!existing.IsManaged)
         {
             if (requested != ResourceGovernance.User || authority is not null)
                 throw Violation("resource_governance_adoption_forbidden", "An existing user-managed resource cannot be adopted through an update.");
-            return ResourceGovernance.User;
+            return existing;
         }
 
         EnsureManager(existing, authority);
         if (requested != ResourceGovernance.User && !SameIdentity(requested, existing))
             throw Violation("resource_governance_immutable", "Resource origin and management authority are immutable.");
-        return authority!;
+        return authority! with { AppliedBy = existing.AppliedBy };
     }
 
     public static void EnsureManager(ResourceGovernance governance, ResourceGovernance? authority)

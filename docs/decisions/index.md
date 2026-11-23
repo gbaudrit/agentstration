@@ -305,3 +305,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 249. [ADR-0249 — Bootstrap resolves public extension and contribution identities](0249-bootstrap-resolves-public-extension-contribution-identities.md)
 
 250. [ADR-0250 — Initial Bootstrap waits for required extension contributions](0250-initial-bootstrap-waits-for-required-extension-contributions.md)
+
+251. [ADR-0251 — Bootstrap versions, scoped history and application provenance](0251-bootstrap-versions-scoped-history-and-application-provenance.md)

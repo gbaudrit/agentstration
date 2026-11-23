@@ -1,0 +1,28 @@
+.collection-pager ::deep .form-field.collection-page-size {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-inline-end: auto;
+}
+
+.collection-pager ::deep .collection-page-size label {
+    white-space: nowrap;
+}
+
+.collection-pager ::deep .collection-page-size .clearable-field {
+    width: 6rem;
+}
+
+.collection-pager ::deep .collection-page-size select {
+    padding-inline-end: 2rem;
+}
+
+@media (max-width: 820px) {
+    .collection-pager:has(> .collection-page-size) {
+        justify-content: flex-start;
+    }
+
+    .collection-pager ::deep .collection-page-size {
+        flex-basis: 100%;
+    }
+}

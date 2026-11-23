@@ -439,6 +439,7 @@ public sealed partial class DeclarativeBootstrapTests
         using var health = await client.GetAsync("/health");
         health.EnsureSuccessStatusCode();
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "99-interrupt.yaml"), Resource("Interrupting", "stop"));
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "profile.yaml"), Profile(Path.GetFileName(directory.Path), "instance", "1.1.0"));
 
         await using var scope = factory.Services.CreateAsyncScope();
         var account = await scope.ServiceProvider.GetRequiredService<UserManager<LocalIdentityUser>>()
@@ -830,6 +831,7 @@ public sealed partial class DeclarativeBootstrapTests
         var created = await users.CreateAsync(account, ChangedPassword);
         Assert.IsTrue(created.Succeeded, string.Join("; ", created.Errors.Select(error => error.Description)));
         await File.WriteAllTextAsync(Path.Combine(directory.Path, "00-platform-admin.yaml"), PlatformAdministrator());
+        await File.WriteAllTextAsync(Path.Combine(directory.Path, "profile.yaml"), Profile(Path.GetFileName(directory.Path), "instance", "1.1.0"));
         factory.Services.GetRequiredService<IConfiguration>()["Agentstration:Bootstrap:Secrets:AdminPassword"] = null;
 
         var result = await scope.ServiceProvider.GetRequiredService<DeclarativeBootstrapService>().ApplyAsync(default);
@@ -911,6 +913,14 @@ public sealed partial class DeclarativeBootstrapTests
             registration = await registrations.GetAsync(ResourceNamespace.Default, "startup-order", default);
 
         Assert.IsNull(registration);
+        await using var historyScope = factory.Services.CreateAsyncScope();
+        var historyService = historyScope.ServiceProvider.GetRequiredService<IBootstrapVersionHistory>();
+        var appliedProfile = (await historyService.ListProfilesAsync(default)).Single();
+        var application = (await historyService.ListHistoryAsync(ResourceScopeRef.Instance, appliedProfile.Id, "1.0.0", default)).Single();
+        Assert.AreEqual(BootstrapApplicationSource.Startup, application.Source);
+        Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Status);
+        Assert.HasCount(4, application.Resources);
+        Assert.IsTrue(application.Resources.All(resource => resource.Version == "1.0.0"));
         using var instanceScope = scopes.PushInstance(new RequestContext(localIdentity.PrincipalId, tenant.Id, workspace.Id));
         var exact = await registrations.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default,
             "startup-order", default);
@@ -1096,13 +1106,14 @@ public sealed partial class DeclarativeBootstrapTests
         definition: {}
         """;
 
-    private static string Profile(string name, string targetScope) => $$"""
+    private static string Profile(string name, string targetScope, string version = "1.0.0") => $$"""
         apiVersion: {{ResourceApiVersions.CoreV1}}
         kind: BootstrapProfile
         metadata:
           name: {{name}}
         definition:
           displayName: {{name}}
+          version: {{version}}
           targetScope: {{targetScope}}
         """;
 

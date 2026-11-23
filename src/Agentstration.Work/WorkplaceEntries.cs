@@ -113,6 +113,8 @@ public sealed record EntryDraft
     public EntryExposure Exposure { get; init; } = new();
     public required EntryBinding Binding { get; init; }
     public EntryBinding? PublishedBinding { get; init; }
+    public ResourceOrigin? Origin { get; init; }
+    public ResourceBootstrapApplication? AppliedBy { get; init; }
     public EntryBehavior Behavior { get; init; } = new();
     public long Revision { get; init; } = 1;
     public DateTimeOffset UpdatedAt { get; init; }
@@ -130,6 +132,8 @@ public sealed record EntryResource
     public required EntryPresentation Presentation { get; init; }
     public EntryExposure Exposure { get; init; } = new();
     public required EntryResolvedTarget ResolvedTarget { get; init; }
+    public ResourceOrigin? Origin { get; init; }
+    public ResourceBootstrapApplication? AppliedBy { get; init; }
     public EntryBehavior Behavior { get; init; } = new();
     public int Version { get; init; } = 1;
     public DateTimeOffset PublishedAt { get; init; }

@@ -28,7 +28,8 @@ public sealed class EntryAdministrationService(
     IEntryTargetResolver targetResolver,
     WorkplaceService workplace,
     TimeProvider timeProvider,
-    IWorkplaceContext context)
+    IWorkplaceContext context,
+    IResourceGovernanceContext? governance = null)
 {
     public Task<IReadOnlyList<EntryDraft>> ListAsync(CancellationToken cancellationToken) => ListAsync(context.WorkspaceId, cancellationToken);
     public Task<IReadOnlyList<EntryDraft>> ListAsync(WorkspaceId workspaceId, CancellationToken cancellationToken) => repository.ListEntryDraftsAsync(workspaceId, cancellationToken);
@@ -52,14 +53,24 @@ public sealed class EntryAdministrationService(
         var current = await repository.GetEntryDraftAsync(draft.WorkspaceId, draft.Id, cancellationToken);
         if (enforceRevision && current?.Revision != expectedRevision)
             throw new WorkValidationException("entry_revision_conflict", "The Entry changed since the proposal was verified.");
+        var appliedBy = current is null
+            ? governance?.GetBootstrapApplication(EntryResourceKinds.Entry, draft.Id.Namespace, draft.Name)
+            : current.AppliedBy;
         var saved = draft with
         {
             Revision = current is null ? 1 : checked(current.Revision + 1),
             UpdatedAt = timeProvider.GetUtcNow(),
-            PublishedBinding = current?.PublishedBinding
+            PublishedBinding = current?.PublishedBinding,
+            AppliedBy = appliedBy,
+            Origin = governance?.Current?.ManagedBy?.Kind == ResourceManagementAuthorityKind.PackInstallation
+                ? governance.Current.Origin : current?.Origin
         };
-        if (enforceRevision) await repository.UpsertEntryDraftAsync(saved, expectedRevision, cancellationToken);
+        if (enforceRevision || (current is null && appliedBy is not null))
+            await repository.UpsertEntryDraftAsync(saved, expectedRevision, cancellationToken);
         else await repository.UpsertEntryDraftAsync(saved, cancellationToken);
+        if (current is null && appliedBy is not null)
+            governance?.ObserveBootstrapCreation(ResourceScopeRef.Workspace(saved.WorkspaceId.Value), saved.Id.Namespace,
+                EntryResourceKinds.Entry, saved.Name, null);
         return saved;
     }
 
@@ -114,6 +125,8 @@ public sealed class EntryAdministrationService(
             Presentation = draft.Presentation,
             Exposure = draft.Exposure,
             ResolvedTarget = resolved,
+            AppliedBy = draft.AppliedBy,
+            Origin = draft.Origin,
             Behavior = draft.Behavior,
             Version = previous is null ? 1 : checked(previous.Version + 1),
             PublishedAt = timeProvider.GetUtcNow()

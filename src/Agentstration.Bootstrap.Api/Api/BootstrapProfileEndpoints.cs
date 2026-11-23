@@ -1,6 +1,7 @@
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Security;
 
@@ -57,6 +58,19 @@ public static class BootstrapProfileEndpoints
             .WithSummary("Accept a versioned provider and model substitution for a pending Bootstrap profile");
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/profiles", GetAsync);
+        group.MapGet("/applied-profiles", (IBootstrapVersionHistory history, CancellationToken token) => history.ListProfilesAsync(token))
+            .Produces<IReadOnlyList<AppliedBootstrapProfile>>()
+            .WithSummary("List durable Bootstrap profiles");
+        group.MapGet("/applied-profiles/{profileId}/versions", (string profileId, IBootstrapVersionHistory history, CancellationToken token) =>
+            history.ListVersionsAsync(profileId, token))
+            .Produces<IReadOnlyList<AppliedBootstrapVersion>>()
+            .WithSummary("List the immutable versions of a Bootstrap profile");
+        group.MapGet("/applied-profiles/{profileId}/versions/{version}/applications", ListScopedHistoryAsync)
+            .Produces<IReadOnlyList<ScopedBootstrapApplication>>().ProducesProblem(400)
+            .WithSummary("List the applications of an exact Bootstrap version at one scope");
+        group.MapGet("/scoped-applications/{id:guid}", GetScopedApplicationAsync)
+            .Produces<ScopedBootstrapApplication>().Produces(404).ProducesProblem(400)
+            .WithSummary("Get a Bootstrap application by its exact scope and identifier");
         group.MapPost("/source-profile", GetSourceProfileAsync);
         group.MapPost("/binding-targets", GetBindingTargetsAsync);
         group.MapPost("/profiles/preview", PreviewAsync);
@@ -64,6 +78,23 @@ public static class BootstrapProfileEndpoints
         group.MapGet("/applications/{applicationId}", GetApplicationAsync);
         group.MapPost("/applications/{applicationId}/cancel", CancelAsync);
         return endpoints;
+    }
+
+    private static async Task<IResult> ListScopedHistoryAsync(string profileId, string version, string scope,
+        IBootstrapVersionHistory history, CancellationToken token)
+    {
+        if (!ResourceScopeRef.TryParse(scope, out var exactScope))
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "bootstrap_scope_invalid");
+        return Results.Ok(await history.ListHistoryAsync(exactScope, profileId, version, token));
+    }
+
+    private static async Task<IResult> GetScopedApplicationAsync(Guid id, string scope,
+        IBootstrapVersionHistory history, CancellationToken token)
+    {
+        if (!ResourceScopeRef.TryParse(scope, out var exactScope))
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "bootstrap_scope_invalid");
+        var application = await history.GetAsync(exactScope, id, token);
+        return application is null ? Results.NotFound() : Results.Ok(application);
     }
 
     private static async Task<IResult> GetSourceProfileAsync(

@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: foundry
 definition:
+  version: 1.0.0
   displayName: Microsoft Foundry model provider
   description: Binds the optional Foundry extension for one workspace. Select a discovered deployment in a Model Profile afterward.
   targetScope: workspace

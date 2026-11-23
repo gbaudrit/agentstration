@@ -23,10 +23,14 @@ public sealed class BootstrapStartupCoordinator(
     IWorkspacePlatformResourceProvisioner platformResources,
     TimeProvider timeProvider,
     BootstrapStartupState startup,
-    ILogger<BootstrapStartupCoordinator> logger)
+    ILogger<BootstrapStartupCoordinator> logger, BootstrapVersionHistory? versionHistory = null)
 {
     private sealed record InitialApplication(
-        IReadOnlyList<string> Profiles, string TargetLevel, IReadOnlyList<LoadedBootstrapProfile> Snapshot);
+        IReadOnlyList<string> Profiles, string TargetLevel, IReadOnlyList<LoadedBootstrapProfile> Snapshot)
+    {
+        public Guid ApplicationId { get; } = Guid.NewGuid();
+        public ResourceScopeRef? Scope { get; set; }
+    }
 
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -57,44 +61,57 @@ public sealed class BootstrapStartupCoordinator(
                             : source.Resource.Kind == ExtensionKinds.ExtensionEnrollmentPolicy ? "extensions" : "resources",
                         source.Resource.Kind, source.Resource.Metadata.Name, source.Resource.Metadata.Namespace.Value);
 
-        foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
-            await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Topology, application.Snapshot, application.TargetLevel, cancellationToken);
-        await operationalTopology.EnsureAllAsync(cancellationToken);
-        await platformResources.EnsureAllAsync(cancellationToken);
-        foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
-            await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Policies, application.Snapshot, application.TargetLevel, cancellationToken);
-        await automaticEnrollment.ActivateAsync(cancellationToken);
-
-        startup.EnableAdministration();
-        startup.MoveTo("extensions");
-        var selections = new List<BootstrapProfileSelection>();
-        foreach (var application in applications)
-            selections.Add(await SelectAsync(application, cancellationToken));
-        var requirements = new List<BootstrapExtensionRequirement>();
-        foreach (var selection in selections)
-            requirements.AddRange(await bootstrap.GetExtensionRequirementsAsync(selection, cancellationToken));
-        await WaitForContributionsAsync(requirements, options.ExtensionDependencyTimeout, cancellationToken);
-        startup.MoveTo("resources");
-
-        // Re-read the bounded catalog before dependent resource mutation. Never apply
-        // a different file set merely because the extension took time to arrive.
-        foreach (var application in applications)
+        var correlation = Guid.NewGuid();
+        try
         {
-            var current = await catalog.LoadAsync(application.Profiles, cancellationToken);
-            if (!current.Select(value => value.Summary.Digest)
-                .SequenceEqual(application.Snapshot.Select(value => value.Summary.Digest), StringComparer.Ordinal))
-                throw new DeclarativeBootstrapException("The Bootstrap catalog changed while waiting for extension contributions.");
+            foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
+                await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Topology, application, correlation, cancellationToken);
+            await operationalTopology.EnsureAllAsync(cancellationToken);
+            await platformResources.EnsureAllAsync(cancellationToken);
+            foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
+                await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Policies, application, correlation, cancellationToken);
+            await automaticEnrollment.ActivateAsync(cancellationToken);
+
+            startup.EnableAdministration();
+            startup.MoveTo("extensions");
+            var selections = new List<BootstrapProfileSelection>();
+            foreach (var application in applications)
+                selections.Add(await SelectAsync(application, cancellationToken));
+            var requirements = new List<BootstrapExtensionRequirement>();
+            foreach (var selection in selections)
+                requirements.AddRange(await bootstrap.GetExtensionRequirementsAsync(selection, cancellationToken));
+            await WaitForContributionsAsync(requirements, options.ExtensionDependencyTimeout, cancellationToken);
+            startup.MoveTo("resources");
+
+            // Re-read the bounded catalog before dependent resource mutation. Never apply
+            // a different file set merely because the extension took time to arrive.
+            foreach (var application in applications)
+            {
+                var current = await catalog.LoadAsync(application.Profiles, cancellationToken);
+                if (!current.Select(value => value.Summary.Digest)
+                    .SequenceEqual(application.Snapshot.Select(value => value.Summary.Digest), StringComparer.Ordinal))
+                    throw new DeclarativeBootstrapException("The Bootstrap catalog changed while waiting for extension contributions.");
+            }
+            for (var index = 0; index < selections.Count; index++)
+            {
+                var selection = selections[index];
+                var context = await ResolveApplicationContextAsync(selection, cancellationToken);
+                using var operation = context is null ? scopes.PushSystem()
+                    : selection.Target!.WorkspaceId is not null ? scopes.Push(context)
+                    : scopes.PushTenant(context.PrincipalId, context.TenantId);
+                await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index], correlation, cancellationToken);
+            }
+            startup.MoveTo("finalization");
         }
-        for (var index = 0; index < selections.Count; index++)
+        catch (Exception exception)
         {
-            var selection = selections[index];
-            var context = await ResolveApplicationContextAsync(selection, cancellationToken);
-            using var operation = context is null ? scopes.PushSystem()
-                : selection.Target!.WorkspaceId is not null ? scopes.Push(context)
-                : scopes.PushTenant(context.PrincipalId, context.TenantId);
-            await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index].Snapshot, applications[index].TargetLevel, cancellationToken);
+            if (versionHistory is not null)
+                foreach (var application in applications.Where(value => value.Scope is not null))
+                    await versionHistory.RecordAsync(application.Scope!.Value, application.ApplicationId, [],
+                        exception is OperationCanceledException ? BootstrapApplicationStatus.Interrupted : BootstrapApplicationStatus.Failed,
+                        CancellationToken.None);
+            throw;
         }
-        startup.MoveTo("finalization");
     }
 
     private async Task<InitialApplication> PrepareAsync(
@@ -104,6 +121,7 @@ public sealed class BootstrapStartupCoordinator(
             throw new DeclarativeBootstrapException("An initial application requires an explicit TargetLevel.");
         ExtensionEnrollmentPolicyService.ValidateLevel(level);
         var loaded = await catalog.LoadAsync(profiles, cancellationToken);
+        await bootstrap.ValidateVersionsAsync(loaded, cancellationToken);
         bootstrap.ValidateStartupProfiles(loaded);
         var expected = level == "/instance" ? BootstrapProfileScope.Instance
             : level.Split('/').Length == 3 ? BootstrapProfileScope.Tenant : BootstrapProfileScope.Workspace;
@@ -134,11 +152,15 @@ public sealed class BootstrapStartupCoordinator(
     }
 
     private async Task ApplyPhaseAsync(BootstrapProfileSelection selection, BootstrapStartupPhase phase,
-        IReadOnlyList<LoadedBootstrapProfile> expected, string targetLevel, CancellationToken cancellationToken)
+        InitialApplication application, Guid correlationId, CancellationToken cancellationToken)
     {
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("Applying Bootstrap phase {Phase} for profiles {Profiles}.", phase, string.Join(",", selection.Profiles));
-        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: targetLevel);
+        application.Scope = selection.Target?.WorkspaceId is Guid workspace ? ResourceScopeRef.Workspace(workspace)
+            : selection.Target?.TenantId is Guid tenant ? ResourceScopeRef.Tenant(tenant) : ResourceScopeRef.Instance;
+        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken,
+            application.Snapshot.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: application.TargetLevel,
+            applicationId: application.ApplicationId, correlationId: correlationId);
         if (result.Error is not null) throw new DeclarativeBootstrapException(result.Error);
     }
 

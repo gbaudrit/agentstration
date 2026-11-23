@@ -1,3 +1,4 @@
+using Agentstration.Bootstrap.Contracts;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Sources.Contracts;
@@ -234,6 +235,139 @@ public sealed class BootstrapProgressComponentTests
         Assert.HasCount(3, cut.FindAll("input[data-profile-name]:checked"));
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Applied by", "Pack origin")]
+    [DataRow("fr-FR", "Appliqué par", "Pack d’origine")]
+    public void AppliedByShowsBootstrapAlongsidePackOrigin(string locale, string applicationLabel, string originLabel)
+    {
+        using var culture = new TestCultureScope(locale);
+        using var context = Context(new StubClient(), application: false);
+        var provenance = new ResourceBootstrapApplication("profile-id", "development", "1.2.0", Guid.NewGuid(),
+            ResourceScopeRef.Instance, "development/10-pack.yaml document 1");
+        var rendered = context.Render<BootstrapResourceProvenance>(parameters => parameters
+            .Add(value => value.AppliedBy, provenance)
+            .Add(value => value.Origin, new ResourceOrigin { Kind = ResourceOriginKind.Pack, Reference = "example/fixture", Version = "2.4.0" }));
+        var panel = rendered.Find("[data-testid='bootstrap-resource-provenance']");
+        StringAssert.Contains(panel.TextContent, applicationLabel);
+        StringAssert.Contains(panel.TextContent, originLabel);
+        StringAssert.Contains(panel.TextContent, "Bootstrap development 1.2.0");
+        StringAssert.Contains(panel.TextContent, "example/fixture 2.4.0");
+        Assert.HasCount(0, panel.QuerySelectorAll("a"));
+    }
+
+    [TestMethod]
+    public void AppliedProfileListUsesTheSharedBannerAndFiltersTheAuthorizedProfiles()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var client = new StubClient
+        {
+            AppliedProfiles =
+            [
+                new("base", "base", "Local development", BootstrapProfileScope.Instance),
+                new("workspace", "workspace-example", "Workspace example", BootstrapProfileScope.Workspace)
+            ]
+        };
+        using var context = Context(client, application: false);
+        var cut = context.Render<AppliedBootstrapProfiles>();
+
+        Assert.AreEqual("Profils de bootstrap appliqués", cut.Find(".page-header h1").TextContent);
+        Assert.AreEqual("Profil de bootstrap", cut.Find("th").TextContent);
+        Assert.AreEqual("2", cut.Find(".metric-card strong").TextContent);
+        Assert.HasCount(2, cut.FindAll("[data-testid='applied-bootstrap-profile-row']"));
+
+        cut.Find("[data-filter-key='scope'] select").Change("Workspace");
+        Assert.HasCount(1, cut.FindAll("[data-testid='applied-bootstrap-profile-row']"));
+        Assert.AreEqual("Workspace example", cut.Find(".resource-name-link").TextContent);
+        cut.Find("input[type='search']").Input("workspace-example");
+        cut.Find("[data-testid='applied-bootstrap-profiles-refresh']").Click();
+        Assert.AreEqual("Workspace example", cut.Find(".resource-name-link").TextContent);
+        Assert.AreEqual("2", cut.Find(".metric-card strong").TextContent);
+        cut.Find("input[type='search']").Input("Local development");
+        Assert.HasCount(0, cut.FindAll("[data-testid='applied-bootstrap-profile-row']"));
+    }
+
+    [TestMethod]
+    public void AppliedProfileDetailShowsTheSelectedVersionAndItsResourceOutcomes()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var registered = new AppliedBootstrapVersion("base", "1.2.3", BootstrapProfileScope.Instance, "profile-digest", DateTimeOffset.UnixEpoch, null);
+        var latest = new ScopedBootstrapApplication(Guid.NewGuid(), Guid.NewGuid(), ResourceScopeRef.Instance, BootstrapApplicationSource.Startup,
+            DateTimeOffset.UnixEpoch.AddMinutes(1), null, BootstrapApplicationStatus.Succeeded, [registered], [],
+            [new("base", "parameter.yaml", "Parameter", "fixture", BootstrapResourceDisposition.Create)]);
+        var client = new StubClient
+        {
+            AppliedProfiles = [new("base", "base", "Local development", BootstrapProfileScope.Instance)],
+            AppliedVersions = [registered],
+            AppliedHistory = [latest, latest with { Id = Guid.NewGuid(), StartedAt = DateTimeOffset.UnixEpoch, Resources = [] }]
+        };
+        using var context = Context(client, application: false);
+        var cut = context.Render<AppliedBootstrapProfiles>(parameters => parameters.Add(page => page.ProfileId, "base"));
+
+        Assert.AreEqual("Profil de bootstrap", cut.Find(".resource-type").TextContent);
+        StringAssert.Contains(cut.Find(".resource-version-badge").TextContent, "1.2.3");
+        Assert.AreEqual(("base", "1.2.3", ResourceScopeRef.Instance), client.HistoryRequest);
+        var applications = cut.FindAll("[data-testid='bootstrap-scoped-application']");
+        Assert.HasCount(2, applications);
+        Assert.IsTrue(applications[0].HasAttribute("open"));
+        Assert.IsFalse(applications[1].HasAttribute("open"));
+        StringAssert.Contains(applications[0].QuerySelector("summary")!.TextContent, "1 ressource");
+        StringAssert.Contains(applications[0].QuerySelector("tbody")!.TextContent, "fixture");
+        StringAssert.Contains(applications[0].QuerySelector("tbody")!.TextContent, "Créée");
+        Assert.IsFalse(cut.Find("[data-testid='bootstrap-profile-versions']").TextContent.Contains("profile-digest", StringComparison.Ordinal));
+        var identity = cut.Find("[data-testid='resource-identity-popover']");
+        StringAssert.Contains(identity.TextContent, "Empreinte du profil");
+        StringAssert.Contains(identity.TextContent, "profile-digest");
+    }
+
+    [TestMethod]
+    public void AppliedResourcesSearchAndFilterBeforePagingAndKeepEachApplicationIndependent()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var registered = new AppliedBootstrapVersion("base", "1.0.0", BootstrapProfileScope.Instance, "digest", DateTimeOffset.UnixEpoch, null);
+        var rows = Enumerable.Range(1, 512).Select(index => new BootstrapAppliedResource("base", $"manifest.yaml document {index}",
+            index == 512 ? "Flow" : "Parameter", $"resource-{index:D3}",
+            index > 510 ? BootstrapResourceDisposition.Conflict : BootstrapResourceDisposition.Create)).ToArray();
+        var latest = new ScopedBootstrapApplication(Guid.NewGuid(), Guid.NewGuid(), ResourceScopeRef.Instance, BootstrapApplicationSource.Manual,
+            DateTimeOffset.UnixEpoch.AddMinutes(1), null, BootstrapApplicationStatus.Succeeded, [registered], [], rows);
+        var previous = latest with { Id = Guid.NewGuid(), StartedAt = DateTimeOffset.UnixEpoch, Resources = [rows[0]] };
+        var client = new StubClient
+        {
+            AppliedProfiles = [new("base", "base", "Local development", BootstrapProfileScope.Instance)],
+            AppliedVersions = [registered],
+            AppliedHistory = [latest, previous]
+        };
+        using var context = Context(client, application: false);
+        var cut = context.Render<AppliedBootstrapProfiles>(parameters => parameters.Add(page => page.ProfileId, "base"));
+        var grids = cut.FindComponents<BootstrapAppliedResources>();
+        Assert.HasCount(2, grids);
+        var grid = grids[0];
+        const string resourceRow = "[data-testid='bootstrap-applied-resource-row']";
+
+        Assert.HasCount(10, grid.FindAll(resourceRow));
+        CollectionAssert.AreEqual(new[] { "10", "25", "50", "100" }, grid.FindAll(".collection-pager select option")
+            .Select(option => option.GetAttribute("value")).ToArray());
+        StringAssert.Contains(grid.Find(".collection-pager [role='status']").TextContent, "512");
+        grid.Find(".collection-pager button[aria-label='Page 52']").Click();
+        Assert.HasCount(2, grid.FindAll(resourceRow));
+        StringAssert.Contains(grid.FindAll(resourceRow)[^1].TextContent, "resource-512");
+
+        grid.Find("[data-filter-key='result'] select").Change("Conflict");
+        Assert.HasCount(2, grid.FindAll(resourceRow));
+        grid.Find("[data-filter-key='kind'] select").Change("Flow");
+        StringAssert.Contains(grid.Find(resourceRow).TextContent, "resource-512");
+        Assert.HasCount(1, grid.FindAll(resourceRow));
+        grid.Find("input[type='search']").Input("resource-001");
+        Assert.HasCount(0, grid.FindAll(resourceRow));
+        grid.FindAll("button").Single(button => button.TextContent.Trim() == "Effacer les filtres").Click();
+        Assert.HasCount(10, grid.FindAll(resourceRow));
+        grid.Find(".collection-pager select").Change("50");
+        Assert.HasCount(50, grid.FindAll(resourceRow));
+        grid.Find("input[type='search']").Input("document 512");
+        Assert.HasCount(1, grid.FindAll(resourceRow));
+        StringAssert.Contains(grid.Find(resourceRow).TextContent, "resource-512");
+        StringAssert.Contains(grids[1].Find(resourceRow).TextContent, "resource-001");
+    }
+
     private static BunitContext Context(StubClient client, bool application = true)
     {
         var context = new BunitContext();
@@ -266,6 +400,10 @@ public sealed class BootstrapProgressComponentTests
         };
         public bool ExposeCatalog { get; init; }
         public bool MixedCatalog { get; init; }
+        public IReadOnlyList<AppliedBootstrapProfile> AppliedProfiles { get; init; } = [];
+        public IReadOnlyList<AppliedBootstrapVersion> AppliedVersions { get; init; } = [];
+        public IReadOnlyList<ScopedBootstrapApplication> AppliedHistory { get; init; } = [];
+        public (string ProfileId, string Version, ResourceScopeRef Scope) HistoryRequest { get; private set; }
         public BootstrapProfileSelection? LastSelection { get; private set; }
         public static Guid TenantId { get; } = Guid.NewGuid();
         public static Guid WorkspaceId { get; } = Guid.NewGuid();
@@ -290,6 +428,13 @@ public sealed class BootstrapProgressComponentTests
         public string? CancelledId { get; private set; }
         public Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken) => Task.FromResult(
             new BootstrapManagementView(new(null, false, [], MixedCatalog ? MixedProfiles : ExposeCatalog ? [CatalogProfile] : []), MixedCatalog ? [new(TenantId, "current", "Current Tenant")] : [], MixedCatalog ? [new(TenantId, "current", "Current Tenant", WorkspaceId, "current", "Current Workspace")] : [], IncludeNewerApplication ? [Newer, application] : [application]));
+        public Task<IReadOnlyList<AppliedBootstrapProfile>> ListAppliedProfilesAsync(CancellationToken cancellationToken) => Task.FromResult(AppliedProfiles);
+        public Task<IReadOnlyList<AppliedBootstrapVersion>> ListVersionsAsync(string profileId, CancellationToken cancellationToken) => Task.FromResult(AppliedVersions);
+        public Task<IReadOnlyList<ScopedBootstrapApplication>> ListHistoryAsync(string profileId, string version, ResourceScopeRef scope, CancellationToken cancellationToken)
+        {
+            HistoryRequest = (profileId, version, scope);
+            return Task.FromResult(AppliedHistory);
+        }
         public Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken)
         {
             if (submitted?.Metadata.Name == applicationId) return Task.FromResult<BootstrapApplicationResource?>(submitted);

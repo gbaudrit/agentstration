@@ -2,6 +2,7 @@ apiVersion: agentstration.io/v1
 kind: BootstrapProfile
 metadata: { name: ollama-instance }
 definition:
+  version: 1.0.0
   displayName: Ollama instance infrastructure
   description: Enrolls the externally started Ollama extension and shares its instance Model Provider with the dev Tenant.
   targetScope: instance

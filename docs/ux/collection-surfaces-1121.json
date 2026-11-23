@@ -1320,6 +1320,54 @@
       }
     },
     {
+      "id": "applied-bootstrap-profile-list",
+      "source": "src/Agentstration.Console.Components/Components/Pages/AppliedBootstrapProfiles.razor",
+      "line": 13,
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap/applied"
+      ],
+      "renderer": "ResourceCollectionTemplate",
+      "itemType": "AppliedBootstrapProfile",
+      "identityLabel": "BootstrapProfileType",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "ProfileScope"
+      ],
+      "validation": "source-adopted",
+      "verification": {
+        "sourceReviewed": true,
+        "routeEvidence": [],
+        "trackingIssue": 1277
+      }
+    },
+    {
+      "id": "applied-bootstrap-version-resources",
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapAppliedResources.razor",
+      "line": 6,
+      "host": "console",
+      "routes": [
+        "/settings/bootstrap/applied/{ProfileId}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "BootstrapAppliedResource",
+      "identityLabel": "Resources",
+      "scope": false,
+      "state": true,
+      "actions": false,
+      "informationKeys": [
+        "ManifestLocation"
+      ],
+      "validation": "source-adopted",
+      "verification": {
+        "sourceReviewed": true,
+        "routeEvidence": [],
+        "trackingIssue": 1277
+      }
+    },
+    {
       "id": "bootstrap-profiles-bootstrap-resource-preview",
       "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",
       "line": 113,
@@ -18349,6 +18397,16 @@
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMembers.razor",
       "classification": "inventoried",
       "reason": "Functional collections are enumerated in the surface entries, including the compact-rollout reconciliation. Fixed navigation, tabs, enum options and schema-generated form fields remain controls, not extra collections."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/AppliedBootstrapProfiles.razor",
+      "classification": "inventoried",
+      "reason": "Registered profiles use a shared collection. Version and scope selectors and application disclosures provide navigation and grouping."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapAppliedResources.razor",
+      "classification": "inventoried",
+      "reason": "The shared collection shows paginated and filtered resource outcomes for one application."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",

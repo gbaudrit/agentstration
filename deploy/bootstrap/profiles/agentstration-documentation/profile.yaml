@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: agentstration-documentation
 definition:
+  version: 1.0.0
   displayName: Agentstration documentation Knowledge Source
   description: Projects the governed documentation Data Source into a retrievable Knowledge Snapshot.
   targetScope: workspace

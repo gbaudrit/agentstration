@@ -48,6 +48,7 @@
                 <dt>@T("Source")</dt><dd>@selected.Value.Definition.Source</dd>
                 <dt>@T("Installed")</dt><dd>@selected.Value.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
             </dl>
+            <BootstrapResourceProvenance AppliedBy="selected.Value.Governance.AppliedBy" />
             @if (selected.Value.Definition.SourceProvenance is { } source)
             {
                 <section class="pack-source-provenance">

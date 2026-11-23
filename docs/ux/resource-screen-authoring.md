@@ -85,6 +85,8 @@ Declared section actions render in the content column below the section and befo
 
 Existing adopters using `Content` and `Sections` remain supported during migration. Do not combine that compatibility contract with standard region content. Agent demonstrates the standard contract; this increment does not migrate other resource families or creation flows.
 
+Bootstrap creation provenance appears in the same Identity content slot through `BootstrapResourceProvenance`. It reads `AppliedBy` from the saved resource and shows the profile, immutable version, and relative manifest location. Platform administrators can follow the link to the exact version, application and target. Pack origin remains visible alongside Bootstrap provenance. Use the same component in previews and legacy Identity layouts for resources that carry `AppliedBy`.
+
 ## Extensions adoption
 
 The Extension detail route `/extensions/{RegistrationName}` uses `ConsoleResourceDetailsTemplate`, `ResourceDefinitionForm` and `ResourceIdentityEditor`. Its persisted registration remains the authority for UID, namespace, scope, enablement, validation and ETag. The saved observed version belongs in the header, while availability, contributions and bundle counts occupy the metrics region. Creation uses the shared `CreationWizard` inside the registration dialog, with retained Identity, Connection, Authentication and Review stages. Authorization to create a Tenant registration remains independent of permission to read the aggregated inventory.

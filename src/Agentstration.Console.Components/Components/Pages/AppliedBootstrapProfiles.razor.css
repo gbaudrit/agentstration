@@ -1,0 +1,76 @@
+.bootstrap-version-selectors {
+    max-inline-size: 52rem;
+}
+
+.bootstrap-history-entry {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.bootstrap-history-entry + .bootstrap-history-entry {
+    margin-block-start: var(--space-3);
+}
+
+.bootstrap-history-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: inherit;
+    background: var(--surface-2);
+    cursor: pointer;
+    list-style: none;
+}
+
+.bootstrap-history-summary::-webkit-details-marker {
+    display: none;
+}
+
+.bootstrap-history-entry[open] > .bootstrap-history-summary {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+}
+
+.bootstrap-history-chevron {
+    display: inline-flex;
+    color: var(--muted);
+}
+
+.bootstrap-history-entry[open] .bootstrap-history-chevron {
+    transform: rotate(90deg);
+}
+
+.bootstrap-history-when {
+    display: grid;
+    flex: 1 1 auto;
+    gap: var(--space-1);
+}
+
+.bootstrap-history-when time {
+    font-weight: 650;
+}
+
+.bootstrap-history-outcome {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+}
+
+.bootstrap-history-summary small,
+.bootstrap-no-outcomes {
+    color: var(--muted);
+}
+
+.bootstrap-history-resources {
+    min-width: 0;
+    padding: var(--space-3);
+    border-block-start: 1px solid var(--border);
+    overflow-wrap: anywhere;
+}
+
+.bootstrap-no-outcomes {
+    margin: 0;
+}

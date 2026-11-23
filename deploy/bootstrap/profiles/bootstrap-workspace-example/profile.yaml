@@ -3,6 +3,7 @@ kind: BootstrapProfile
 metadata:
   name: bootstrap-workspace-example
 definition:
+  version: 1.0.0
   displayName: Unattended Workspace Bootstrap example
   description: Creates an executable deterministic Flow and Entry in an explicitly selected Workspace.
   targetScope: workspace
