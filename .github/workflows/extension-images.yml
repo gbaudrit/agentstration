@@ -102,3 +102,35 @@ jobs:
           path: delivery/*.json
           if-no-files-found: error
           retention-days: 30
+
+  cleanup-empty-initialization:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Remove only the two empty initialization versions after successful verification
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_BOOTSTRAP_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          endpoint = 'users/gbaudrit/packages/container/agentstration-extension-foundry'
+          expected = {'registry-init-45217660738', 'registry-link-45217660738'}
+          def api(path, method='GET'):
+              request = urllib.request.Request('https://api.github.com/' + path, method=method,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                           'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  content = response.read()
+                  return json.loads(content) if content else None
+          assert api(endpoint)['visibility'] == 'private'
+          versions = api(endpoint + '/versions?per_page=100')
+          removed = 0
+          for version in versions:
+              tags = set(version.get('metadata', {}).get('container', {}).get('tags', []))
+              if tags and tags <= expected:
+                  api(endpoint + '/versions/' + str(version['id']), 'DELETE')
+                  removed += 1
+          assert api(endpoint)['visibility'] == 'private'
+          print('Removed empty initialization versions:', removed)
+          PY
