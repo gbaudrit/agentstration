@@ -140,9 +140,32 @@ The autonomous AEP SDK keeps its own `aep/Aep.slnx` validation because it can be
 
 Run `./scripts/ci/test-ci-contracts.ps1` to check coverage partition completeness and path-selection regressions. The classifier also runs these checks before selecting jobs. Rename detection is disabled when gathering changed paths so both the removed and added paths contribute to validation selection. Storage/application families, including Resource Planning and Security, and every PostgreSQL project select PostgreSQL checks; Console Web, Client and Components select Browser UX on pull requests and main pushes. The required `build-and-test` check keeps its existing name and documentation-only success path.
 
+Foundry is the first independently validated extension. Changes confined to
+`src/extensions/Agentstration.Extensions.Foundry/`, its two Foundry-specific
+Model Providers test files, its image catalogue entry or shared image tooling
+select the reusable OCI validation instead of the product build, Windows lifecycle,
+server container, hosted diagnostics and functional/coverage lanes. Documentation
+may accompany those changes. The OCI workflow runs the existing offline Foundry
+tests, exports the image with attestations, stages the exact digest and checks
+protected discovery and restart. It does not publish images from CI.
+
+The required `build-and-test` check waits for the selected OCI job and rejects a
+failed, cancelled or unexpectedly skipped result. Local regression checks exercise
+both selection and the same result-gate script used by Actions. Shared test
+fixtures, the Model Providers test project, AEP, build/package settings and mixed
+product changes retain transverse validation. Image inputs also select OCI
+validation. Other extensions and unknown paths keep their existing checks until
+their packaging vertical explicitly supplies equivalent validation. Manual CI
+runs select everything. CodeQL and dependency review remain independent.
+
+Resource Plan UX excludes isolated Foundry source changes from its `src/**`
+trigger. A simultaneous product-source change still triggers it. No new live
+model or Azure dependency is introduced; full coverage inventories and collectors
+remain unchanged when transverse validation is selected.
+
 Coverage emits one assembly-named TRX per module. Collection and publication check each required module's TRX coverage attachment against its actual Cobertura file; missing, reused, malformed or unexpected reports fail publication; byte-identical TRX attachment copies are consolidated once. Fast and Integration remain authoritative inventories; Coverage A/B must partition Integration exactly. Performance and live-provider execution remain optional.
 
-Linux validation compiles `Agentstration.slnx` once in `build-linux`, plus the autonomous AEP solution when selected. Fast and Integration then run in parallel on separate runners; AEP, both coverage shards, both hosted diagnostic groups and selected PostgreSQL checks also consume that build with `--no-build`. Consumers wait for compilation and artifact publication, not for another test job. Windows lifecycle and container builds remain independent. The required `build-and-test` check aggregates the build and selected functional/AEP results, fails on failed or unexpectedly skipped dependencies, and retains documentation-only success.
+Linux validation compiles `Agentstration.slnx` once in `build-linux`, plus the autonomous AEP solution when selected. Fast and Integration then run in parallel on separate runners; AEP, both coverage shards, both hosted diagnostic groups and selected PostgreSQL checks also consume that build with `--no-build`. Consumers wait for compilation and artifact publication, not for another test job. Windows lifecycle and container builds remain independent. The required `build-and-test` check aggregates the build and selected functional/AEP and extension-image results, fails on failed or unexpectedly skipped dependencies, and retains documentation-only success.
 
 The run-scoped Linux artifact contains tracked projects' `bin` and `obj` directories in a Zstandard-compressed tar archive, preserving executable modes, hidden generated files and timestamps. Its context manifest binds it to the checkout revision, exact SDK, OS, architecture, checkout path and NuGet package path; consumers reject mismatches before extraction. GitHub-hosted Linux runners must use matching checkout/package paths because generated static-web-asset files can contain absolute paths. Each consumer still restores and audits packages so a partial NuGet cache cannot silently omit dependencies. The build archive is retained for three days; rerun the producer too if it expires. Archive size and packaging duration appear in the build job summary. Compare artifact transfer costs, total runner minutes and complete elapsed time before claiming a speedup.
 

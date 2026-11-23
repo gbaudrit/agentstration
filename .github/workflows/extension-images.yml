@@ -1,18 +1,6 @@
 name: Extension OCI images
 
 on:
-  pull_request:
-    paths:
-      - 'deploy/images/**'
-      - 'scripts/packaging/**'
-      - 'src/extensions/Agentstration.Extensions.Foundry/**'
-      - 'tests/Agentstration.ModelProviders.Tests/**'
-      - 'aep/**'
-      - 'Dockerfile.extension'
-      - '.dockerignore'
-      - 'Directory.*.props'
-      - 'global.json'
-      - '.github/workflows/extension-images.yml'
   push:
     tags: ['extension/**']
   workflow_dispatch:
@@ -35,83 +23,10 @@ concurrency:
 
 jobs:
   validate-and-build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      extension: ${{ steps.select.outputs.extension }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Validate catalogue and independent release version
-        id: select
-        env:
-          REQUESTED_EXTENSION: ${{ inputs.extension }}
-        run: |
-          python3 - <<'PY'
-          import json, os, re, subprocess
-          extension = os.environ.get('REQUESTED_EXTENSION') or 'foundry'
-          arguments = []
-          if os.environ['GITHUB_REF_TYPE'] == 'tag':
-              tag = os.environ['GITHUB_REF_NAME']
-              match = re.fullmatch(r'extension/([a-z][a-z0-9-]*)/v(.+)', tag)
-              if not match:
-                  raise ValueError('Expected an extension/<id>/v<version> tag.')
-              extension = match[1]
-              arguments = ['--release-tag', tag]
-              subprocess.run(['git', 'fetch', 'origin', 'main'], check=True)
-              subprocess.run(['git', 'merge-base', '--is-ancestor', 'HEAD', 'origin/main'], check=True)
-          entry = json.loads(subprocess.check_output(['python3', 'scripts/packaging/images.py', 'describe', '--extension', extension, *arguments], text=True))
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f"extension={entry['id']}\n")
-          PY
-      - name: Offline packaging contracts
-        run: python3 -m unittest discover -s scripts/packaging -p 'test_*.py' -v
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-      - name: Extension offline MSTest contracts
-        env:
-          EXTENSION_ID: ${{ steps.select.outputs.extension }}
-        run: |
-          python3 - <<'PY'
-          import json, os, subprocess
-          entry = json.loads(subprocess.check_output(['python3', 'scripts/packaging/images.py', 'describe', '--extension', os.environ['EXTENSION_ID']], text=True))
-          subprocess.run(['dotnet', 'test', '--project', entry['testProject'], '--configuration', 'Release', '--filter', entry['testFilter'], '--minimum-expected-tests', '1'], check=True)
-          PY
-      - uses: docker/setup-buildx-action@v4
-      - name: Build once to an OCI archive with provenance and SBOM
-        env:
-          EXTENSION_ID: ${{ steps.select.outputs.extension }}
-          SOURCE_REPOSITORY: ${{ github.repository }}
-        run: >-
-          python3 scripts/packaging/images.py build --extension "$EXTENSION_ID"
-          --repository "$SOURCE_REPOSITORY" --directory artifacts/extension
-      - name: Install OCI copy tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-      - name: Stage the exact archive in a disposable loopback registry
-        run: |
-          docker run --detach --name packaging-registry --publish 127.0.0.1:5000:5000 registry:3
-          skopeo copy --all --preserve-digests --retry-times 5 --dest-tls-verify=false oci-archive:artifacts/extension/image.oci.tar docker://localhost:5000/extension:smoke
-      - name: Smoke the staged image and restart without Azure or a model
-        run: |
-          python3 - <<'PY'
-          import json, subprocess
-          delivery = json.load(open('artifacts/extension/delivery.json'))
-          subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', 'artifacts/extension/delivery.json', '--image', 'localhost:5000/extension@' + delivery['digest']], check=True)
-          PY
-      - uses: actions/upload-artifact@v7
-        with:
-          name: extension-image-${{ github.run_id }}-${{ github.run_attempt }}
-          path: artifacts/extension/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Remove disposable registry
-        if: always()
-        run: docker rm --force packaging-registry || true
+    uses: ./.github/workflows/validate-extension-image.yml
+    with:
+      extension: ${{ inputs.extension || 'foundry' }}
+      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
 
   publish:
     needs: validate-and-build
