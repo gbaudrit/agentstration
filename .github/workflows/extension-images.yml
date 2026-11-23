@@ -1,4 +1,4 @@
-name: Recover first Foundry publication
+name: Initialize private Foundry registry package
 
 on:
   workflow_dispatch:
@@ -9,62 +9,76 @@ permissions:
   packages: write
 
 concurrency:
-  group: recover-first-foundry-package
+  group: initialize-private-foundry-package
   cancel-in-progress: false
 
 jobs:
-  recover:
+  initialize:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      DOCKER_CONFIG: /tmp/ghcr-init-auth-${{ github.run_id }}
     steps:
-      - name: Recover privacy of the newly created test package
-        id: recover
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Initialize with an empty image and verify privacy before application upload
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import datetime, json, os, urllib.request, urllib.error
+          import datetime, json, os, pathlib, subprocess, tempfile, urllib.request, urllib.error
           repository = 'gbaudrit/agentstration'
           package = 'agentstration-extension-foundry'
-          source = 'd322a0a83d3bad7952f3bdd89b3c8c767b5ec904'
           endpoint = 'users/gbaudrit/packages/container/' + package
-          def api(path, method='GET', data=None):
+          def api(path, method='GET'):
               request = urllib.request.Request('https://api.github.com/' + path, method=method,
-                  data=json.dumps(data).encode() if data is not None else None,
                   headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                           'Accept': 'application/vnd.github+json',
-                           'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'})
+                           'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
               with urllib.request.urlopen(request, timeout=30) as response:
                   content = response.read()
                   return json.loads(content) if content else None
+          try:
+              existing = api(endpoint)
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+          else:
+              assert existing['visibility'] == 'private', 'Existing package is not private; refusing initialization.'
+              print('Existing package is private; no bootstrap upload required.', flush=True)
+              raise SystemExit(0)
+          tag = 'registry-init-' + os.environ['GITHUB_RUN_ID']
+          reference = 'ghcr.io/gbaudrit/' + package + ':' + tag
+          with tempfile.TemporaryDirectory(prefix='empty-ghcr-init-') as temporary:
+              path = pathlib.Path(temporary)
+              (path / 'Dockerfile').write_text(
+                  'FROM scratch\n'
+                  'LABEL org.opencontainers.image.source="https://github.com/gbaudrit/agentstration"\n'
+                  'LABEL org.opencontainers.image.title="Empty registry initialization; no application files"\n')
+              subprocess.run(['docker', 'build', '--provenance=false', '--sbom=false', '--tag', reference, str(path)], check=True)
+              subprocess.run(['docker', 'push', reference], check=True)
           metadata = api(endpoint)
-          visibility = metadata['visibility']
-          print('Package visibility:', visibility, flush=True)
-          if visibility != 'private':
-              assert visibility == 'public', 'Unexpected package visibility.'
-              run = api('repos/' + repository + '/actions/runs/45205494328')
-              created = datetime.datetime.fromisoformat(metadata['created_at'].replace('Z', '+00:00'))
-              started = datetime.datetime.fromisoformat(run['created_at'].replace('Z', '+00:00'))
-              assert created >= started, 'Package predates the authorized first publication.'
-              versions = api(endpoint + '/versions?per_page=100')
-              tags = [tag for version in versions for tag in version.get('metadata', {}).get('container', {}).get('tags', [])]
-              assert tags and set(tags) == {'sha-' + source}, 'Package has content outside this first publication.'
-              try:
-                  api(endpoint, 'PATCH', {'visibility': 'private'})
-              except urllib.error.HTTPError as error:
-                  if error.code not in (404, 405, 422):
-                      raise
-                  print('Visibility update unavailable; removing only the newly created public test package.', flush=True)
-                  api(endpoint, 'DELETE')
-              try:
-                  metadata = api(endpoint)
-              except urllib.error.HTTPError as error:
-                  if error.code != 404:
-                      raise
-                  metadata = None
-          private = metadata is not None and metadata['visibility'] == 'private'
-          assert metadata is None or private, 'Package remains non-private.'
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write('private=' + str(private).lower() + '\n')
-          print('Recovery result:', 'private' if private else 'public test package removed', flush=True)
+          print('Bootstrap package visibility:', metadata['visibility'], flush=True)
+          if metadata['visibility'] == 'private':
+              print('Private package initialized. The only uploaded image is empty; no application image was uploaded.', flush=True)
+              raise SystemExit(0)
+          assert metadata['visibility'] == 'public', 'Unexpected package visibility.'
+          run = api('repos/' + repository + '/actions/runs/' + os.environ['GITHUB_RUN_ID'])
+          created = datetime.datetime.fromisoformat(metadata['created_at'].replace('Z', '+00:00'))
+          started = datetime.datetime.fromisoformat(run['created_at'].replace('Z', '+00:00'))
+          assert created >= started, 'Package predates this empty initialization.'
+          versions = api(endpoint + '/versions?per_page=100')
+          tags = [value for version in versions for value in version.get('metadata', {}).get('container', {}).get('tags', [])]
+          assert tags and set(tags) == {tag}, 'Package has content outside this empty initialization.'
+          api(endpoint, 'DELETE')
+          try:
+              api(endpoint)
+          except urllib.error.HTTPError as error:
+              if error.code != 404:
+                  raise
+          else:
+              raise RuntimeError('Empty public package was not removed.')
+          raise SystemExit('Registry created a public empty package; it was removed. No application image was uploaded.')
           PY
