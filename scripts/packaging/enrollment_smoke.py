@@ -101,7 +101,7 @@ def run(delivery_path, image, authority_image, output):
         with open(directory / "key", "w", opener=lambda path, flags: os.open(path, flags, 0o600)) as stream:
             stream.write(key)
         environment = {name: value for name, value in os.environ.items() if not name.startswith("COMPOSE_")}
-        environment.update(SMOKE_DIRECTORY=str(directory), SMOKE_BOOTSTRAP_DIRECTORY=str(ROOT / "deploy/bootstrap/profiles"),
+        environment.update(SMOKE_UID=str(os.getuid()), SMOKE_GID=str(os.getgid()), SMOKE_DIRECTORY=str(directory), SMOKE_BOOTSTRAP_DIRECTORY=str(ROOT / "deploy/bootstrap/profiles"),
                            SMOKE_AUTHORITY_IMAGE=authority_id, SMOKE_FOUNDRY_IMAGE=image,
                            SMOKE_ADMIN_PASSWORD=secrets.token_urlsafe(40))
         command = ["docker", "compose", "--project-name", project, "--file", str(ROOT / "scripts/packaging/foundry.compose.yml")]

@@ -130,7 +130,8 @@ python3 scripts/packaging/enrollment_smoke.py \
   --output artifacts/extension/enrollment-smoke.json
 ```
 
-Docker Compose v2 is required. Only a locally present server fixture is accepted;
+A Linux Docker host and Compose v2 are required. Both containers run with the
+invoking user/group so mounted test data remains removable. Only a locally present server fixture is accepted;
 this server image is never published by extension packaging. The scenario is a
 packaging test fixture, not the preview topology tracked by #1281. Live inference
 and creation of Model Providers remain separate opt-in validation.

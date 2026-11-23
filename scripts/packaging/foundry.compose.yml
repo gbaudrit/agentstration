@@ -3,6 +3,7 @@ services:
   authority:
     image: ${SMOKE_AUTHORITY_IMAGE:?Supply the locally built test authority image}
     pull_policy: never
+    user: "${SMOKE_UID:?Supply the host test user}:${SMOKE_GID:?Supply the host test group}"
     ports: ["127.0.0.1::8080"]
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -29,6 +30,7 @@ services:
   foundry:
     image: ${SMOKE_FOUNDRY_IMAGE:?Supply the exact Foundry delivery digest}
     pull_policy: never
+    user: "${SMOKE_UID:?Supply the host test user}:${SMOKE_GID:?Supply the host test group}"
     ports: ["127.0.0.1::8080"]
     environment:
       Logging__LogLevel__Default: Warning
