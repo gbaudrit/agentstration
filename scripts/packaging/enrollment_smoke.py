@@ -63,11 +63,11 @@ def request(base, path, body=None, headers=None, expected=200):
         call.add_header("Content-Type", "application/json")
     try:
         with urllib.request.urlopen(call, timeout=10) as response:
-            status, payload = response.status, response.read()
+            status, payload, content_type = response.status, response.read(), response.headers.get("Content-Type", "")
     except urllib.error.HTTPError as error:
-        status, payload = error.code, error.read()
+        status, payload, content_type = error.code, error.read(), error.headers.get("Content-Type", "")
     require(status == expected, f"Unexpected HTTP status for {path}: {status}, expected {expected}.")
-    return json.loads(payload) if payload else None
+    return json.loads(payload) if payload and "json" in content_type else None
 
 
 def announce(authority, manifest, instance_id, key, expected=200):
@@ -104,7 +104,7 @@ def run(delivery_path, image, authority_image, output):
         environment.update(SMOKE_UID=str(os.getuid()), SMOKE_GID=str(os.getgid()), SMOKE_DIRECTORY=str(directory), SMOKE_BOOTSTRAP_DIRECTORY=str(ROOT / "deploy/bootstrap/profiles"),
                            SMOKE_AUTHORITY_IMAGE=authority_id, SMOKE_FOUNDRY_IMAGE=image,
                            SMOKE_ADMIN_PASSWORD=secrets.token_urlsafe(40))
-        command = ["docker", "compose", "--project-name", project, "--file", str(ROOT / "scripts/packaging/foundry.compose.yml")]
+        command = ["docker", "compose", "--project-name", project, "--file", str(ROOT / "scripts/packaging/foundry.smoke.compose.yml")]
 
         def compose(*arguments, capture=False):
             return subprocess.run([*command, *arguments], env=environment, check=True, text=True,

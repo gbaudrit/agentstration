@@ -89,7 +89,7 @@ no Azure credential.
 
 For Foundry, the same validation job also builds a disposable authoritative
 server from the same source revision, using the generic Dockerfile and the same
-pinned SDK/runtime bases. `scripts/packaging/foundry.compose.yml` runs only that
+pinned SDK/runtime bases. `scripts/packaging/foundry.smoke.compose.yml` runs only that
 server and the exact staged Foundry digest. The server uses SQLite, deterministic
 AI and the existing Development bootstrap with a newly generated disposable
 administrator password. The test uses its own Compose network and exposes ports

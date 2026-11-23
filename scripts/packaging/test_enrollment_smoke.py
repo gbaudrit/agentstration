@@ -1,5 +1,7 @@
 """Offline regression checks for the real authority enrollment smoke's assertions."""
 import copy
+import http.server
+import threading
 import json
 from pathlib import Path
 import sqlite3
@@ -7,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from enrollment_smoke import announce, enrollment_snapshot
+from enrollment_smoke import announce, enrollment_snapshot, request
 
 
 class EnrollmentEvidenceTests(unittest.TestCase):
@@ -66,6 +68,31 @@ class EnrollmentEvidenceTests(unittest.TestCase):
                 self.store(self.enrollment, registration)
                 with self.assertRaises(ValueError):
                     enrollment_snapshot(self.database, self.delivery, self.instance)
+
+    def test_http_probe_accepts_plain_text_health_and_reads_json_protocol_responses(self):
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                pass
+
+            def do_GET(self):
+                health = self.path == "/health/ready"
+                body = b"Healthy" if health else b'{"state":"available"}'
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain" if health else "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        with http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+            worker = threading.Thread(target=server.serve_forever)
+            worker.start()
+            try:
+                base = f"http://127.0.0.1:{server.server_port}"
+                self.assertIsNone(request(base, "/health/ready"))
+                self.assertEqual({"state": "available"}, request(base, "/protocol"))
+            finally:
+                server.shutdown()
+                worker.join()
 
     def test_signed_reannouncement_matches_the_aep_dotnet_protocol_vector(self):
         # Generated with AepEnrollmentProofs.Sign and AepProtocol.JsonOptions, not Python serialization.
