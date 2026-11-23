@@ -1,4 +1,4 @@
-# ADR-0253: MAF Worker images have independent AWP releases
+# ADR-0254: MAF Worker images have independent AWP releases
 
 Status: Accepted — 2026-11-23
 

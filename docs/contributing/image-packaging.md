@@ -222,7 +222,7 @@ mutable convenience tag at deployment time.
 `Dockerfile.worker` accepts the same pinned base-image inputs and uses a direct
 `dotnet` entrypoint. The independent initial version is `0.1.0`; AWP `1.0`, workload
 authentication `1`, capability `microsoft-agent-framework/1.0`, and execution
-material versions `1.0`/`1.1` remain separate. See [ADR-0253](../decisions/0253-maf-worker-images-have-independent-awp-releases.md).
+material versions `1.0`/`1.1` remain separate. See [ADR-0254](../decisions/0254-maf-worker-images-have-independent-awp-releases.md).
 
 ```sh
 python3 scripts/packaging/images.py describe --image maf-worker

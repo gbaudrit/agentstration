@@ -44,12 +44,12 @@ class ImageContracts(unittest.TestCase):
     def test_awp_worker_has_an_independent_catalogue_and_release_namespace(self):
         worker = images.catalogue("maf-worker")
         self.assertEqual("awp-worker", worker["kind"])
-        self.assertEqual("0.1.0", worker["version"])
+        self.assertEqual((images.ROOT / worker["versionFile"]).read_text().strip(), worker["version"])
         self.assertEqual("Dockerfile.worker", worker["dockerfile"])
         self.assertNotIn("aepVersion", worker)
-        images.release_tag(worker, "worker/maf-worker/v0.1.0")
+        images.release_tag(worker, "worker/maf-worker/v" + worker["version"])
         with self.assertRaises(ValueError):
-            images.release_tag(worker, "extension/maf-worker/v0.1.0")
+            images.release_tag(worker, "extension/maf-worker/v" + worker["version"])
         with self.assertRaises(ValueError):
             images.release_tag(self.entry, "worker/foundry/v" + self.entry["version"])
 
