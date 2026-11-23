@@ -114,6 +114,29 @@ inaccessible metadata and non-private visibility stop publication before any
 image copy; the publisher never relies on automatic package creation or registry
 visibility defaults. No broad registry credential enters the build.
 
+### First package initialization
+
+GitHub creates a GHCR package on its first push; the Packages page does not offer
+creation of an empty package. Preparing a private destination is therefore a
+separate registry initialization operation, not a prerequisite that can be met
+by creating an empty repository through that page.
+
+Before sending an application image, an administrator can use an empty directory
+containing only a `FROM scratch` Dockerfile to publish a reserved `registry-init-*`
+image. This placeholder must contain no application code, configuration, model
+or credential. Verify the resulting package visibility through the authenticated
+Packages API and the owner interface. If linking the package to a repository,
+verify visibility again with a second empty image carrying the same source label
+as the application. Grant the Agentstration repository Actions access only to the
+verified private destination.
+
+If either check reports public/internal visibility or metadata cannot be read,
+stop before the application upload and remove only the just-created placeholder
+content. Do not assume repository access inheritance implies private visibility.
+Investigate the registry/owner creation behavior instead of repeatedly publishing
+the real image. Registry-owner access may be needed for this one-time operation;
+normal publication continues to use the job-scoped `GITHUB_TOKEN`.
+
 An official Foundry release uses Git tag `extension/foundry/v0.1.0`. The workflow
 checks that the tag matches `version.txt` and belongs to `main`. It then builds
 and validates once, publishes the same OCI archive to private GHCR with the
