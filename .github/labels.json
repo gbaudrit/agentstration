@@ -53,5 +53,55 @@
     "name": "ai-defect",
     "color": "A371F7",
     "description": "Structural, architectural, or code-quality defect introduced by AI."
+  },
+  {
+    "name": "extension:foundry",
+    "color": "0E8A16",
+    "description": "Work affecting the Foundry extension."
+  },
+  {
+    "name": "extension:openapi",
+    "color": "0E8A16",
+    "description": "Work affecting the OpenAPI extension."
+  },
+  {
+    "name": "extension:opendal",
+    "color": "0E8A16",
+    "description": "Work affecting the OpenDAL extension."
+  },
+  {
+    "name": "extension:crawl4ai",
+    "color": "0E8A16",
+    "description": "Work affecting the Crawl4AI extension."
+  },
+  {
+    "name": "extension:postgresql",
+    "color": "0E8A16",
+    "description": "Work affecting the PostgreSQL extension."
+  },
+  {
+    "name": "extension:ollama",
+    "color": "0E8A16",
+    "description": "Work affecting the Ollama extension."
+  },
+  {
+    "name": "extension:llama-cpp",
+    "color": "0E8A16",
+    "description": "Work affecting the llama.cpp extension."
+  },
+  {
+    "name": "extension:localai",
+    "color": "0E8A16",
+    "description": "Work affecting the LocalAI extension."
+  },
+  {
+    "name": "extension:git",
+    "color": "0E8A16",
+    "description": "Work affecting the Git extension."
+  },
+  {
+    "name": "extension:utilities",
+    "color": "0E8A16",
+    "description": "Work affecting the Utilities extension."
   }
 ]

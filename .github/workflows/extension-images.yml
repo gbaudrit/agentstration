@@ -1,0 +1,173 @@
+name: Extension OCI images
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/images/**'
+      - 'scripts/packaging/**'
+      - 'src/Agentstration.Extensions.Foundry/**'
+      - 'tests/Agentstration.ModelProviders.Tests/**'
+      - 'aep/**'
+      - 'Dockerfile.extension'
+      - '.dockerignore'
+      - 'Directory.*.props'
+      - 'global.json'
+      - '.github/workflows/extension-images.yml'
+  push:
+    tags: ['extension/**']
+  workflow_dispatch:
+    inputs:
+      extension:
+        description: Implemented image catalogue ID
+        default: foundry
+        required: true
+      publish_preview:
+        description: Publish the validated archive to private GHCR (no Docker Hub release)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      extension: ${{ steps.select.outputs.extension }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate catalogue and independent release version
+        id: select
+        env:
+          REQUESTED_EXTENSION: ${{ inputs.extension }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          extension = os.environ.get('REQUESTED_EXTENSION') or 'foundry'
+          arguments = []
+          if os.environ['GITHUB_REF_TYPE'] == 'tag':
+              tag = os.environ['GITHUB_REF_NAME']
+              match = re.fullmatch(r'extension/([a-z][a-z0-9-]*)/v(.+)', tag)
+              if not match:
+                  raise ValueError('Expected an extension/<id>/v<version> tag.')
+              extension = match[1]
+              arguments = ['--release-tag', tag]
+              subprocess.run(['git', 'fetch', 'origin', 'main'], check=True)
+              subprocess.run(['git', 'merge-base', '--is-ancestor', 'HEAD', 'origin/main'], check=True)
+          entry = json.loads(subprocess.check_output(['python3', 'scripts/packaging/images.py', 'describe', '--extension', extension, *arguments], text=True))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"extension={entry['id']}\n")
+          PY
+      - name: Offline packaging contracts
+        run: python3 -m unittest discover -s scripts/packaging -p 'test_*.py' -v
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Extension offline MSTest contracts
+        env:
+          EXTENSION_ID: ${{ steps.select.outputs.extension }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          entry = json.loads(subprocess.check_output(['python3', 'scripts/packaging/images.py', 'describe', '--extension', os.environ['EXTENSION_ID']], text=True))
+          subprocess.run(['dotnet', 'test', '--project', entry['testProject'], '--configuration', 'Release', '--filter', entry['testFilter'], '--minimum-expected-tests', '1'], check=True)
+          PY
+      - uses: docker/setup-buildx-action@v4
+      - name: Build once to an OCI archive with provenance and SBOM
+        env:
+          EXTENSION_ID: ${{ steps.select.outputs.extension }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: >-
+          python3 scripts/packaging/images.py build --extension "$EXTENSION_ID"
+          --repository "$SOURCE_REPOSITORY" --directory artifacts/extension
+      - name: Install OCI copy tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Stage the exact archive in a disposable loopback registry
+        run: |
+          docker run --detach --name packaging-registry --publish 127.0.0.1:5000:5000 registry:3
+          skopeo copy --all --preserve-digests --retry-times 5 --dest-tls-verify=false oci-archive:artifacts/extension/image.oci.tar docker://localhost:5000/extension:smoke
+      - name: Smoke the staged image and restart without Azure or a model
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          delivery = json.load(open('artifacts/extension/delivery.json'))
+          subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', 'artifacts/extension/delivery.json', '--image', 'localhost:5000/extension@' + delivery['digest']], check=True)
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: extension-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/extension/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove disposable registry
+        if: always()
+        run: docker rm --force packaging-registry || true
+
+  publish:
+    needs: validate-and-build
+    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: extension-image-${{ github.run_id }}-${{ github.run_attempt }}
+          path: delivery
+      - name: Install OCI copy tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish the validated archive to private GHCR without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_arguments=()
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
+          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
+      - name: Log in to Docker Hub for an official extension release
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish the same archive to official Docker Hub
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
+        run: >-
+          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
+          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
+          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
+      - name: Retain immutable publication references
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            delivery/delivery.json
+            delivery/publication-*.json
+          if-no-files-found: warn
+          retention-days: 30
