@@ -1,4 +1,5 @@
 """Offline publication contracts; no registry, cloud credential or model access."""
+import argparse
 import copy
 import hashlib
 import http.server
@@ -103,6 +104,44 @@ class ImageContracts(unittest.TestCase):
         with patch.object(images, "output", return_value="User"), patch.object(images.subprocess, "run", return_value=result):
             with self.assertRaises(ValueError):
                 images.private_package("owner/repo", "repo-extension-foundry")
+
+    def test_unknown_or_nonprivate_package_stops_before_any_image_copy(self):
+        path, delivery = self.delivery()
+        delivery["repository"] = "owner/repo"
+        path.write_text(json.dumps(delivery))
+        arguments = argparse.Namespace(action="publish", delivery=path, registry="ghcr",
+                                       authfile=self.directory / "auth.json", release_tag=None, namespace=None)
+        responses = [subprocess.CompletedProcess([], 1, stdout="", stderr=f"HTTP {status}")
+                     for status in (404, 403, 500)]
+        responses += [subprocess.CompletedProcess([], 0, stdout=json.dumps({"visibility": visibility}), stderr="")
+                      for visibility in ("public", "internal")]
+        for response in responses:
+            with self.subTest(response=response), \
+                    patch.object(images.argparse.ArgumentParser, "parse_args", return_value=arguments), \
+                    patch.object(images, "output", side_effect=lambda command: "a" * 40 if command[0] == "git" else "User"), \
+                    patch.object(images.subprocess, "run", return_value=response), \
+                    patch.object(images, "copy_archive") as copy_archive:
+                with self.assertRaises(ValueError):
+                    images.main()
+                copy_archive.assert_not_called()
+                self.assertFalse((self.directory / "publication-ghcr.json").exists())
+
+    def test_verified_private_package_records_digest_after_copy_and_privacy_recheck(self):
+        path, delivery = self.delivery()
+        delivery["repository"] = "owner/repo"
+        path.write_text(json.dumps(delivery))
+        arguments = argparse.Namespace(action="publish", delivery=path, registry="ghcr",
+                                       authfile=self.directory / "auth.json", release_tag=None, namespace=None)
+        response = subprocess.CompletedProcess([], 0, stdout='{"visibility":"private"}', stderr="")
+        with patch.object(images.argparse.ArgumentParser, "parse_args", return_value=arguments), \
+                patch.object(images, "output", side_effect=lambda command: "a" * 40 if command[0] == "git" else "User"), \
+                patch.object(images.subprocess, "run", return_value=response) as api, \
+                patch.object(images, "copy_archive") as copy_archive, patch("builtins.print"):
+            images.main()
+        copy_archive.assert_called_once()
+        self.assertEqual(2, api.call_count)
+        receipt = json.loads((self.directory / "publication-ghcr.json").read_text())
+        self.assertEqual("ghcr.io/owner/repo-extension-foundry@" + delivery["digest"], receipt["reference"])
 
     def test_real_aep_manifest_shape_checks_identity_protocol_and_contribution(self):
         _, delivery = self.delivery()

@@ -92,15 +92,13 @@ def build(extension, directory, repository):
     return delivery
 
 
-def private_package(repository, package, required=False):
+def private_package(repository, package):
     owner = repository.split("/")[0]
     owner_type = output(["gh", "api", f"repos/{repository}", "--jq", ".owner.type"])
     endpoint = f"{'orgs' if owner_type == 'Organization' else 'users'}/{owner}/packages/container/{package}"
     result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True)
     if result.returncode:
-        if not required and "HTTP 404" in result.stderr:
-            return  # New GHCR packages are private by default.
-        raise ValueError("Cannot verify private GHCR package access.")
+        raise ValueError("Cannot verify private GHCR package access. Provision the private package and grant repository Actions access before publishing.")
     if json.loads(result.stdout)["visibility"] != "private":
         raise ValueError("Refusing publication to a non-private GHCR package.")
 
@@ -168,7 +166,7 @@ def main():
             destination = f"ghcr.io/{repository.split('/')[0]}/{package}:{tag}"
         copy_archive(args.delivery, destination, args.authfile)
         if args.registry == "ghcr":
-            private_package(repository, package, required=True)
+            private_package(repository, package)
         publication = {"image": destination, "digest": delivery["digest"], "sourceSha": delivery["sourceSha"],
                        "reference": destination.rsplit(":", 1)[0] + "@" + delivery["digest"]}
         (args.delivery.parent / f"publication-{args.registry}.json").write_text(
