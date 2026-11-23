@@ -114,7 +114,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, os, urllib.request
-          endpoint = 'users/gbaudrit/packages/container/agentstration-extension-foundry'
+          endpoint = 'user/packages/container/agentstration-extension-foundry'
           expected = {'registry-init-45217660738', 'registry-link-45217660738'}
           def api(path, method='GET'):
               request = urllib.request.Request('https://api.github.com/' + path, method=method,
@@ -123,6 +123,7 @@ jobs:
               with urllib.request.urlopen(request, timeout=30) as response:
                   content = response.read()
                   return json.loads(content) if content else None
+          assert api('user')['login'].lower() == 'gbaudrit', 'Owner credential does not belong to the package owner.'
           assert api(endpoint)['visibility'] == 'private'
           versions = api(endpoint + '/versions?per_page=100')
           removed = 0
