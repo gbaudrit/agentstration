@@ -25,7 +25,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Ollama.dll
     depends_on:
       aep-key-provisioner:
@@ -49,7 +49,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll
     environment:
       Aep__EnrollmentMode: SharedKeyFile

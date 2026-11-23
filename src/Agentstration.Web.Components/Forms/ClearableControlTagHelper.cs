@@ -34,6 +34,7 @@ public sealed class ClearableControlTagHelper(IStringLocalizer<SharedFormStrings
         output.PreElement.AppendHtml($"<span class=\"{wrapper}\">");
         var button = new TagBuilder("button");
         button.Attributes["type"] = "button";
+        button.Attributes["tabindex"] = "-1";
         button.Attributes["class"] = "field-clear";
         button.Attributes["data-native-field-clear"] = string.Empty;
         button.Attributes["aria-label"] = localizer["ClearField", Label];

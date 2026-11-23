@@ -48,12 +48,17 @@ src/
   Agentstration.ResourcePlanning*/ Resource Plan contracts, lifecycle, API and relational storage
   ../aep/                            autonomous AEP SDK, CLI, Inspector, samples and tests
   ../awp/src/Agentstration.Awp.Abstractions/ provider-neutral AWP v1 wire contracts
-  Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
-  Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
-  Agentstration.Extensions.LocalAI/  autonomous AEP-to-LocalAI service
-  Agentstration.Extensions.Git/      bounded AEP Git Source Provider service
-  Agentstration.Extensions.Crawl4AI/ optional bounded AEP web-acquisition Tool Provider service
-  Agentstration.Extensions.OpenApi/ optional bounded AEP OpenAPI schema-format and acquisition service
+  extensions/                      autonomous AEP extension executables
+    Agentstration.Extensions.Foundry/ optional Microsoft Foundry model provider
+    Agentstration.Extensions.Ollama/   AEP-to-Ollama service
+    Agentstration.Extensions.LlamaCpp/ AEP-to-llama.cpp service
+    Agentstration.Extensions.LocalAI/  AEP-to-LocalAI service
+    Agentstration.Extensions.Git/      bounded Git Source Provider service
+    Agentstration.Extensions.Crawl4AI/ bounded web-acquisition Tool Provider service
+    Agentstration.Extensions.OpenApi/ bounded OpenAPI schema-format and acquisition service
+    Agentstration.Extensions.OpenDal/ native OpenDAL storage service
+    Agentstration.Extensions.PostgreSql/ PostgreSQL document storage service
+    Agentstration.Extensions.Utilities/ deterministic utility Tool Provider service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/

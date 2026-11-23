@@ -18,7 +18,7 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.extension
-      args: { PROJECT: src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.Ollama.dll }
+      args: { PROJECT: src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.Ollama.dll }
     environment:
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
@@ -35,7 +35,7 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.extension
-      args: { PROJECT: src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.LlamaCpp.dll }
+      args: { PROJECT: src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.LlamaCpp.dll }
     environment:
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
@@ -52,7 +52,7 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.extension
-      args: { PROJECT: src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.LocalAI.dll }
+      args: { PROJECT: src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.LocalAI.dll }
     environment:
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
@@ -69,7 +69,7 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.extension
-      args: { PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll }
+      args: { PROJECT: src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj, ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll }
     environment:
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token

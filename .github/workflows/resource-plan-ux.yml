@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/resource-plan-ux.yml'
       - 'src/**'
+      - '!src/extensions/Agentstration.Extensions.Foundry/**'
       - 'tests/Agentstration.Console.Playwright/**'
       - 'deploy/bootstrap/**'
       - 'Directory.*.props'

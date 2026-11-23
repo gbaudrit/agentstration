@@ -308,4 +308,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 251. [ADR-0251 — Bootstrap configures resource graphs and discovers operations](0251-bootstrap-configures-resource-graphs-and-discovers-operations.md)
 
+252. [ADR-0252 — Extension images have independent OCI releases](0252-extension-images-have-independent-oci-releases.md)
+
 253. [ADR-0253 — Initial Bootstrap admits its own Worker assignments](0253-initial-bootstrap-admits-its-own-worker-assignments.md)
