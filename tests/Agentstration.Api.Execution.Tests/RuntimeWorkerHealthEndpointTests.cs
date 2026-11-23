@@ -1,12 +1,11 @@
 extern alias awpworker;
-
-using Worker = awpworker::Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Net;
+using Worker = awpworker::Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 
 namespace Agentstration.Runtime.Tests;
 
