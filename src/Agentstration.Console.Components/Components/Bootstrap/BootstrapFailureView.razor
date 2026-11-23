@@ -18,6 +18,9 @@
     [Parameter] public BootstrapFailure? Failure { get; set; }
     private string DescriptionKey => Failure?.Code switch
     {
+        "bootstrap_discovery_actor_required" => "FailureDiscoveryActorRequired",
+        "bootstrap_discovery_timeout" => "FailureDiscoveryTimeout",
+        "bootstrap_discovery_requires_manual_application" => "FailureDiscoveryRequiresManualApplication",
         "data_source_acquisition_flow_unavailable" or "data_source_discovery_flow_unavailable" or "flow_composition_child_unavailable" => "FailureFlowUnavailable",
         "data_source_profile_not_published" => "FailureProfileUnpublished",
         "data_source_dependency_access_denied" => "Failure_access",

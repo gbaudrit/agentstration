@@ -1,0 +1,39 @@
+@using Agentstration.Bootstrap.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@inject TimeProvider Time
+
+<div class="startup-activity-details" data-testid="startup-activity-details">
+    @if (Activity.WaitReason is not null)
+    {
+        <div class="startup-dependency-callout @(Failed ? "is-failed" : null)" role="status">
+            <span aria-hidden="true"><UiIcon Name="@(Failed ? "alert-triangle" : "clock")" /></span>
+            <div><strong>@Localizer[Failed ? "DependencyUnresolved" : Activity.WaitReason == "waiting_worker" ? "WaitingForWorker" : Activity.WaitReason is "discovery_running" or "discovery_validation" ? "DiscoveryInProgress" : "WaitingForDependency"]</strong><p>@Localizer[Failed ? "DependencyFailureDescription" : Activity.WaitReason switch { "waiting_worker" => "WorkerWaitDescription", "discovery_running" => "DiscoveryRunningDescription", "discovery_validation" => "DiscoveryValidationDescription", "required_model_missing" => "ModelMissing", "contribution_unavailable" => "ContributionMissing", "extension_unavailable" => "RequiredExtensionUnavailable", _ => "ProviderUnavailable" }]</p></div>
+        </div>
+    }
+    <dl class="startup-resource-facts">
+        @if (ShowIdentity && Activity.ResourceName is not null) { <div><dt>@Localizer["Resource"]</dt><dd><code>@Activity.ResourceKind / @Activity.ResourceName</code></dd></div> }
+        @if (ShowIdentity && Activity.TargetLevel is not null) { <div><dt>@Localizer["Target"]</dt><dd><code>@Activity.TargetLevel</code></dd></div> }
+        @if (Activity.ProviderName is not null) { <div><dt>@Localizer["Provider"]</dt><dd>@Activity.ProviderName</dd></div> }
+        @if (Activity.ModelName is not null) { <div><dt>@Localizer["ExpectedModel"]</dt><dd><code>@Activity.ModelName</code></dd></div> }
+        @if (Activity.ExtensionId is not null) { <div><dt>@Localizer["Extension"]</dt><dd><code>@Activity.ExtensionId</code></dd></div> }
+        @if (Activity.ContributionId is not null) { <div><dt>@Localizer["Contribution"]</dt><dd>@Activity.ContributionId</dd></div> }
+        @if (Activity.RuntimeCapability is not null) { <div><dt>@Localizer["RuntimeCapability"]</dt><dd><code>@Activity.RuntimeCapability</code></dd></div> }
+        @if (Activity.StageStartedAt is { } started) { <div><dt>@Localizer["Elapsed"]</dt><dd>@Localizer["ElapsedSeconds", Math.Max(0, (Time.GetUtcNow() - started).TotalSeconds).ToString("F0", System.Globalization.CultureInfo.CurrentCulture)]</dd></div> }
+        @if (Activity.Deadline is { } deadline) { <div><dt>@Localizer["DiscoveryDeadline"]</dt><dd>@deadline.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture)</dd></div> }
+    </dl>
+    @if (Activity.FlowRunId is { } run && Activity.FlowRunContext is { } context)
+    {
+        <a href="@("/flow-runs/" + Uri.EscapeDataString(run) + "?context=" + Uri.EscapeDataString(context))">@Localizer["DiscoveryFlowRun"]</a>
+    }
+    @if (Activity.CanChangeModel && Activity.ResourceId is { } resourceId)
+    {
+        <BootstrapStartupModelCorrection AttemptId="@AttemptId" ResourceId="@resourceId" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public BootstrapStartupActivity Activity { get; set; } = default!;
+    [Parameter] public Guid AttemptId { get; set; }
+    [Parameter] public bool Failed { get; set; }
+    [Parameter] public bool ShowIdentity { get; set; } = true;
+}

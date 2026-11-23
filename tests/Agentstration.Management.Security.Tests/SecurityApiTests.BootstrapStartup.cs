@@ -35,6 +35,10 @@ public sealed partial class SecurityApiTests
         Assert.AreEqual(HttpStatusCode.Unauthorized, publicRead.StatusCode);
         using var denied = await member.GetAsync("/api/bootstrap/startup");
         Assert.AreEqual(HttpStatusCode.Forbidden, denied.StatusCode);
+        using var anonymousFiles = await anonymous.PostAsJsonAsync("/api/bootstrap/profiles/files", new BootstrapProfileFilesRequest("startup"));
+        Assert.AreEqual(HttpStatusCode.Unauthorized, anonymousFiles.StatusCode);
+        using var deniedFiles = await member.PostAsJsonAsync("/api/bootstrap/profiles/files", new BootstrapProfileFilesRequest("startup"));
+        Assert.AreEqual(HttpStatusCode.Forbidden, deniedFiles.StatusCode);
         Assert.IsFalse((await denied.Content.ReadAsStringAsync()).Contains("expected:tag", StringComparison.Ordinal));
         using var freshMember = UnredirectedClient(factory);
         using var rejected = await freshMember.PostAsJsonAsync("/api/auth/local/login", new { userName = "startup-member", password = LocalPassword });

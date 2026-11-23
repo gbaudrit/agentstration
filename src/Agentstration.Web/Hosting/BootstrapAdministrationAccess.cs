@@ -4,7 +4,7 @@ internal static class BootstrapAdministrationAccess
 {
     internal static bool IsInspectionRead(HttpRequest request) =>
         (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
-        && new[] { "/api/agents", "/api/deployments", "/api/flows", "/api/schemas", "/api/runtimeprofiles", "/api/tools", "/api/data-sources",
+        && new[] { "/api/agents", "/api/deployments", "/api/flows", "/api/flowRuns", "/api/schemas", "/api/runtimeprofiles", "/api/tools", "/api/data-sources",
             "/api/data-source-profiles", "/api/knowledge-sources", "/api/storages", "/api/storage-types", "/api/connected-services",
             "/api/packs", "/api/resource-plans", "/api/entries", "/api/transformation-functions" }
             .Any(prefix => request.Path.StartsWithSegments(prefix));
@@ -16,7 +16,7 @@ internal static class BootstrapAdministrationAccess
             "/api/parameters", "/api/secrets",
             "/api/auth", "/api/resource-scopes", "/api/resource-access-policies",
             "/api/identity", "/api/authorization", "/api/tenants", "/api/workspaces", "/api/principals",
-            "/api/bootstrap", "/api/internal/bff", "/api/notifications", "/api/navigation", "/api/console", "/_blazor" }
+            "/api/bootstrap", "/api/internal/bff", "/api/notifications", "/api/navigation", "/api/console", "/_blazor", "/hubs/flow-runs" }
             .Any(prefix => path.StartsWithSegments(prefix));
 
     // Let document navigations reach authentication and the post-authentication

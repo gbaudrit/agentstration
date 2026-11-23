@@ -1,0 +1,21 @@
+@using Agentstration.Bootstrap.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+<div class="bootstrap-dependency-details @(Reason is null ? null : Failed ? "is-failed" : "is-waiting")" role="@(Reason is null ? null : "status")" data-testid="bootstrap-dependency-details">
+    <strong>@Localizer[Reason is null ? "RequiredDependency" : Failed ? "DependencyUnresolved" : "WaitingForDependency"]</strong>
+    <p>@Localizer[Reason is null ? "RequiredDependency" : Reason == "extension_unavailable" ? "RequiredExtensionUnavailable" : "RequiredContributionUnavailable"]</p>
+    <dl>
+        <dt>@Localizer["Extension"]</dt><dd><code>@Dependency.ExtensionId</code></dd>
+        <dt>@Localizer["ContributionType"]</dt><dd><code>@Dependency.ContributionKind</code></dd>
+        <dt>@Localizer["Contribution"]</dt><dd><code>@Dependency.ContributionId</code></dd>
+        @if (Dependency.Version is { } version) { <dt>@Localizer["RequiredVersion"]</dt><dd><code>@version</code></dd> }
+        @if (Dependency.InstanceId is { } installation) { <dt>@Localizer["RequiredInstallation"]</dt><dd><code>@installation</code></dd> }
+        <dt>@Localizer["RequiredByResource"]</dt><dd><code>@Dependency.ConsumerKind/@Dependency.ConsumerName</code></dd>
+    </dl>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public BootstrapStartupDependency Dependency { get; set; } = default!;
+    [Parameter] public string? Reason { get; set; }
+    [Parameter] public bool Failed { get; set; }
+}

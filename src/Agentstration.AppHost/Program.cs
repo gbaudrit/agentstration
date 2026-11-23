@@ -384,6 +384,16 @@ var console = builder.AddProject<Projects.Agentstration_Web>("agentstration-cons
     .WithDynamicHostPorts(dynamicApplicationPorts);
 foreach (var setting in BootstrapEnrollmentConfiguration.CreateEnvironment(builder.Configuration))
     console.WithEnvironment(setting.Key, setting.Value);
+foreach (var setting in BootstrapEnrollmentConfiguration.SecretEnvironment(builder.Configuration))
+{
+    var parameterName = "bootstrap-secret-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+        System.Text.Encoding.UTF8.GetBytes(setting.Key)))[..16].ToLowerInvariant();
+    var parameter = builder.AddParameter(parameterName, () => setting.Value, secret: true);
+    console.WithEnvironment(setting.Key, parameter);
+}
+// AppHost resolves these values relative to its own content root and launch profile.
+console.WithEnvironment("Agentstration__Bootstrap__Path", bootstrapPath)
+    .WithEnvironment("Agentstration__Bootstrap__InitialBootstrapEnabled", initialBootstrapEnabled.ToString());
 console.WithEnvironment("Agentstration__Extensions__DiscoverOnStartup", "false");
 if (aepInferenceTimeout is not null)
     console.WithEnvironment("Agentstration__Aep__Inference__Timeout", aepInferenceTimeout);
@@ -455,7 +465,7 @@ for (var index = 0; index < runtimeWorkerCredentials.Count; index++)
         .WithEnvironment("Agentstration__RuntimeWorker__AllowInsecureHttp", "true")
         .WithHttpHealthCheck("/health")
         .WithDynamicHostPorts(dynamicApplicationPorts)
-        .WaitFor(console);
+        .WaitForStart(console);
 }
 
 var workplace = builder.AddProject<Projects.Agentstration_Workplace_Web>("agentstration-workplace")

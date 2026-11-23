@@ -65,7 +65,7 @@ public static class BootstrapStartupNavigation
     public static bool IsRepairPath(string path) => new[] { "/modelproviders", "/modelprofiles", "/extensions" }
         .Any(prefix => path.Equals(prefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));
     public static bool IsInspectionPath(string path) => new[]
-        { "/agents", "/flows", "/schemas", "/modelproviders", "/modelprofiles", "/runtimeprofiles", "/extensions", "/tools",
+        { "/agents", "/flows", "/flow-runs", "/schemas", "/modelproviders", "/modelprofiles", "/runtimeprofiles", "/extensions", "/tools",
           "/data-sources", "/data-source-profiles", "/knowledge-sources", "/parameters", "/secrets", "/storages", "/storage-types",
           "/connected-services", "/workspaces", "/tenants", "/packs", "/settings", "/entries", "/resource-plans", "/transformation-functions" }
         .Any(prefix => path.Equals(prefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase));

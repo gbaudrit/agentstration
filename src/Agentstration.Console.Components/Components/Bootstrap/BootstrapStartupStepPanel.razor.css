@@ -1,41 +1,4 @@
-.startup-step-content { min-width: 0; }
-.startup-step-heading { display: flex; align-items: flex-start; flex-wrap: wrap; justify-content: space-between; gap: .75rem; }
-.startup-step-heading h2 { margin: 0; font-size: 1.3rem; line-height: 1.4; }
-.startup-step-description { margin: .6rem 0 1.5rem; color: var(--muted); line-height: 1.6; }
-.startup-dependency-callout { display: flex; align-items: flex-start; gap: .85rem; padding: 1rem; border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-warning) 9%, var(--surface)); color: var(--text); }
-.startup-dependency-callout > span { color: var(--color-warning); padding-top: .1rem; }
-.startup-dependency-callout ::deep .ui-icon { width: 1.35rem; height: 1.35rem; }
-.startup-dependency-callout p { margin: .4rem 0 0; font-size: .875rem; line-height: 1.55; color: var(--muted); }
-.startup-dependency-callout.is-failed { border-color: color-mix(in srgb, var(--color-danger) 35%, var(--border)); background: color-mix(in srgb, var(--color-danger) 6%, var(--surface)); }
-.startup-dependency-callout.is-failed > span { color: var(--color-danger); }
-.startup-resource-facts { margin: 1.25rem 0 0; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
-.startup-resource-facts > div { display: grid; grid-template-columns: minmax(7rem, .65fr) minmax(0, 1fr); gap: .75rem; align-items: baseline; padding: .8rem 1rem; }
-.startup-resource-facts > div + div { border-top: 1px solid var(--border); }
-.startup-resource-facts dt { color: var(--muted); font-size: .82rem; }
-.startup-resource-facts dd { margin: 0; overflow-wrap: anywhere; font-size: .9rem; font-weight: 500; }
-.startup-resource-facts code { font-family: var(--font-family-mono); font-size: .85rem; }
-.startup-step-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; margin: 1rem 0 0; }
-.startup-step-actions a { gap: .5rem; }
-.startup-resource-outcomes { margin-block: 1rem 1.25rem; }
-.startup-resource-outcomes h3 { margin: 0 0 .85rem; font-size: .9rem; color: var(--muted); font-weight: 600; }
-.startup-resource-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .65rem; }
-.startup-resource-metrics ::deep .metric-card { padding: .85rem; min-width: 0; box-shadow: none; }
-.startup-resource-metrics ::deep .metric-card > div { align-items: flex-start; }
-.startup-resource-metrics ::deep .metric-label { font-size: .75rem; }
-.startup-resource-metrics ::deep strong { font-size: 1.35rem; }
-@media (max-width: 75rem) { .startup-resource-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 32rem) { .startup-resource-facts > div { grid-template-columns: minmax(0, 1fr); gap: .35rem; } .startup-step-actions a { width: 100%; justify-content: center; text-align: center; } }
-
-.startup-step-content { display: grid; gap: .75rem; }
-.startup-step-heading { align-items: center; }
-.startup-step-heading h2 { font-size: 1.1rem; }
-.startup-step-description { margin: 0; font-size: .85rem; }
-.startup-dependency-callout { padding: .7rem .85rem; gap: .65rem; }
-.startup-dependency-callout p { margin-top: .2rem; font-size: .8rem; }
-.startup-resource-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0; }
-.startup-resource-facts > div { padding: .55rem .75rem; grid-template-columns: minmax(0,.7fr) minmax(0,1fr); gap: .5rem; }
-.startup-resource-facts > div + div { border-top: 0; }
-.startup-resource-facts > div:nth-child(n+3) { border-top: 1px solid var(--border); }
-.startup-resource-facts > div:nth-child(even) { border-inline-start: 1px solid var(--border); }
-.startup-resource-facts dd, .startup-resource-facts code { font-size: .8rem; }
-@media(max-width:64rem) { .startup-resource-facts { grid-template-columns: minmax(0,1fr); } .startup-resource-facts > div + div { border-top: 1px solid var(--border); border-inline-start: 0; } }
+.startup-step-content { display: grid; gap: .75rem; min-width: 0; }
+.startup-step-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: .75rem; }
+.startup-step-heading h2 { margin: 0; font-size: 1.1rem; line-height: 1.4; }
+.startup-step-description { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.6; }

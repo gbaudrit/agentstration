@@ -17,6 +17,43 @@ namespace Agentstration.Runtime.Tests;
 public sealed class AwpWorkerClientTests
 {
     [TestMethod]
+    public async Task EnrollmentWaitsForAuthorityStartupAndStopsOnCancellation()
+    {
+        var configured = Microsoft.Extensions.Options.Options.Create(new RuntimeWorkerOptions
+        {
+            WorkerId = Guid.NewGuid(), AuthorityUrl = "https://authority.invalid",
+            CredentialStateFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "credential.json")
+        });
+        using var handler = new UnavailableEnrollmentHandler();
+        var factory = new EnrollmentHttpFactory(handler);
+        var provider = new AwpWorkerCredentialProvider(configured, factory, NullLogger<AwpWorkerCredentialProvider>.Instance);
+        using var service = new AwpRuntimeWorkerService(configured, provider,
+            new AwpAssignmentRunner(new AwpAssignmentExecutor(NullLoggerFactory.Instance, NullLogger<AwpAssignmentExecutor>.Instance),
+                TimeProvider.System, NullLogger<AwpRuntimeWorkerService>.Instance),
+            new RuntimeWorkerReadiness(), TimeProvider.System, factory, NullLogger<AwpRuntimeWorkerService>.Instance);
+        await service.StartAsync(default);
+        await handler.Retried.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.IsFalse(service.ExecuteTask!.IsCompleted);
+        using var stopping = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await service.StopAsync(stopping.Token);
+        Assert.IsTrue(service.ExecuteTask.IsCompleted);
+    }
+
+    private sealed class EnrollmentHttpFactory(HttpMessageHandler handler) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+    }
+    private sealed class UnavailableEnrollmentHandler : HttpMessageHandler
+    {
+        private int requests;
+        public TaskCompletionSource Retried { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref requests) >= 2) Retried.TrySetResult();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        }
+    }
+    [TestMethod]
     public async Task FactoryClientPreservesAwpSignaturesWithHttpDiagnosticsEnabled()
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = Environments.Development });

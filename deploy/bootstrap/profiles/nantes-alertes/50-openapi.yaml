@@ -1,0 +1,24 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedService
+metadata:
+  name: nantes-alertes-openapi
+  namespace: default
+definition:
+  options:
+    candidatePaths:
+    - /api/explore/v2.1/swagger.json
+  type:
+    extensionContribution:
+      extensionId: Agentstration.Extensions.OpenApi
+      contributionId: openapi
+      version: 1.0.0
+      kind: ConnectedServiceType
+  bindings:
+  - inputId: baseUrl
+    literal:
+      valueFrom:
+        configuration: Agentstration:Bootstrap:Parameters:NantesOpenApiUrl
+        type: string
+        default: https://data.nantesmetropole.fr
+    kind: literal
+  displayName: Nantes Métropole - OpenAPI

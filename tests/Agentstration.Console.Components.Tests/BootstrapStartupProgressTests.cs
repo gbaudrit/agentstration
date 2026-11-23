@@ -17,6 +17,183 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapStartupProgressTests
 {
     [TestMethod]
+    [DataRow("en-US", "Worker communications", "Built-in resources", "Waiting for a compatible Worker")]
+    [DataRow("fr-FR", "Communication avec les Workers", "Ressources builtin", "Attente d’un Worker compatible")]
+    public void InitialDiscoveryShowsLocalizedPreparationAndTheExactWorkerWait(string culture, string workers, string builtins, string waiting)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            Steps = [new("workers", "succeeded"), new("builtins", "succeeded"), new("resources", "waiting")],
+            ActiveStepId = "resources",
+            Activity = new("ConnectedServiceOperationDiscovery", "discover", WaitReason: "waiting_worker", ResourceId: "discovery",
+                FlowRunId: "flowrun-discovery", FlowRunContext: "/instance", StageStartedAt: DateTimeOffset.UnixEpoch,
+                RuntimeCapability: "microsoft-agent-framework", Deadline: DateTimeOffset.UnixEpoch.AddMinutes(10)),
+            Families = [new("resources", "ConnectedServiceOperationDiscovery", "waiting", 1, 0, 0, 0, 0, 0, 0)]
+        };
+        api.ResourceRows = [new("discovery", "resources", "fixture", "discovery.yaml", "ConnectedServiceOperationDiscovery", "discover", "default", "/instance", "waiting", [])];
+        using var context = Context(api);
+        foreach (var step in new[] { ("workers", workers), ("builtins", builtins) })
+        {
+            var panel = context.Render<BootstrapStartupStepPanel>(p => p.Add(x => x.Snapshot, api.Snapshot).Add(x => x.StepId, step.Item1));
+            Assert.AreEqual(step.Item2, panel.Find("h2").TextContent);
+        }
+        var cut = context.Render<BootstrapStartupResourceList>(p => p.Add(x => x.Snapshot, api.Snapshot).Add(x => x.StepId, "resources"));
+        var details = cut.Find("[data-testid='startup-activity-details']");
+        StringAssert.Contains(details.TextContent, waiting);
+        StringAssert.Contains(details.TextContent, "microsoft-agent-framework");
+        Assert.AreEqual("/flow-runs/flowrun-discovery?context=%2Finstance", details.QuerySelector("a")!.GetAttribute("href"));
+    }
+    [TestMethod]
+    [DataRow("en-US", "This resource was not applied because Bootstrap stopped", "initial Bootstrap", "System > Bootstrap profiles")]
+    [DataRow("fr-FR", "le bootstrap s’est arrêté sur l’erreur", "bootstrap initial", "Système > Profils Bootstrap")]
+    public void BlockedResourcesShowTheCausalFailureWithoutBlamingTheirOwnConfiguration(string culture, string explanation, string cause, string recovery)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            State = "failed",
+            Failure = new("configuration", "bootstrap_discovery_requires_manual_application", "shared-log-reference"),
+            Activity = new("ConnectedServiceOperationDiscovery", "nantes-operations", ResourceId: "discovery", GroupId: "discovery"),
+            Families = [new("resources", "ModelProvider", "blocked", 1, 0, 0, 0, 0, 0, 0) { GroupId = "models", Profile = "ollama-instance" },
+                new("resources", "ConnectedServiceOperationDiscovery", "failed", 1, 1, 0, 0, 1, 0, 0) { GroupId = "discovery", Profile = "nantes-alertes" }]
+        };
+        api.ResourceRows = [new("provider", "resources", "ollama-instance", "20-model-provider.yaml", "ModelProvider", "bootstrap-ollama", "default", "/instance", "blocked", []) { GroupId = "models" }];
+        using var context = Context(api);
+        var cut = context.Render<BootstrapStartupResourceList>(p => p.Add(x => x.Snapshot, api.Snapshot)
+            .Add(x => x.StepId, "resources").Add(x => x.Kind, "ModelProvider"));
+        var blocked = cut.Find("[data-testid='startup-resource-blocker']").TextContent;
+        foreach (var expected in new[] { explanation, cause, recovery, "bootstrap_discovery_requires_manual_application", "shared-log-reference", "nantes-alertes/ConnectedServiceOperationDiscovery/nantes-operations" })
+            StringAssert.Contains(blocked, expected);
+        Assert.IsNull(api.ResourceRows[0].Failure, "A blocked consumer must not be recorded as a failed resource.");
+        Assert.DoesNotContain(culture == "fr-FR" ? "champs requis" : "required fields", blocked, StringComparison.Ordinal);
+        Assert.DoesNotContain(culture == "fr-FR" ? "Cette ressource n’a pas encore été appliquée." : "This resource has not been applied yet.", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "initial Bootstrap", "Operation discovery")]
+    [DataRow("fr-FR", "bootstrap initial", "Découverte des opérations")]
+    public void TheFailedInstructionUsesTheSharedStartupDiagnosticWhenItHasNoSeparateFailure(string culture, string cause, string family)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            State = "failed", Failure = new("configuration", "bootstrap_discovery_requires_manual_application", "startup-reference"),
+            Activity = new("ConnectedServiceOperationDiscovery", "nantes-operations", ResourceId: "discovery"),
+            Families = [new("resources", "ConnectedServiceOperationDiscovery", "failed", 1, 1, 0, 0, 1, 0, 0)]
+        };
+        api.ResourceRows = [new("discovery", "resources", "nantes-alertes", "60-discovery.yaml", "ConnectedServiceOperationDiscovery", "nantes-operations", "default", "/instance", "failed", [new("resource_validation", "failed", DateTimeOffset.UnixEpoch)])];
+        using var context = Context(api);
+        var cut = context.Render<BootstrapStartupStepPanel>(p => p.Add(x => x.Snapshot, api.Snapshot)
+            .Add(x => x.StepId, "resources").Add(x => x.Kind, "ConnectedServiceOperationDiscovery"));
+        Assert.AreEqual(family, cut.Find(".startup-step-heading h2").TextContent);
+        var failure = cut.Find("[data-testid='bootstrap-failure']").TextContent;
+        StringAssert.Contains(failure, cause);
+        StringAssert.Contains(failure, "startup-reference");
+        Assert.AreEqual(0, cut.FindAll("[data-testid='startup-resource-blocker']").Count);
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void AWaitingContributionShowsItsOwnDependencyEvenWhenAnotherRowIsActive(string culture)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = new StartupClient();
+        api.ResourceRows = [new("postgres", "extensions", "nantes-alertes", "contribution:nantes-alertes/30-postgresql.yaml", "ExtensionContribution",
+            "postgresql", "default", "/instance", "waiting", [new("contribution_availability", "waiting", DateTimeOffset.UnixEpoch)])
+        {
+            WaitReason = "extension_unavailable",
+            Dependency = new("agentstration.extensions.postgresql", "ConnectedServiceType", "postgresql", "1.0.0", null, "ConnectedService", "nantes-alertes-postgresql")
+        }];
+        using var context = Context(api);
+        var cut = context.Render<BootstrapStartupResourceList>(p => p.Add(x => x.Snapshot, api.Snapshot).Add(x => x.StepId, "extensions"));
+        cut.WaitForAssertion(() =>
+        {
+            var details = cut.Find("[data-testid='bootstrap-dependency-details']").TextContent;
+            foreach (var value in new[] { "agentstration.extensions.postgresql", "ConnectedServiceType", "1.0.0", "ConnectedService/nantes-alertes-postgresql" })
+                StringAssert.Contains(details, value);
+            Assert.AreEqual(1, cut.FindAll("[data-testid='bootstrap-source-viewer']").Count);
+        });
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void TheFirstBlockingContributionOpensWithItsOwnDescriptionAndNoRepeatedPanel(string culture)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = ContributionClient();
+        using var context = Context(api);
+        var cut = context.Render<BootstrapStartupStepPanel>(p => p.Add(x => x.Snapshot, api.Snapshot)
+            .Add(x => x.StepId, "extensions").Add(x => x.Kind, "ExtensionContribution").Add(x => x.FollowCurrent, true));
+        cut.WaitForAssertion(() =>
+        {
+            Assert.AreEqual("true", cut.Find("[data-progress-resource='postgres'] .collection-actions button").GetAttribute("aria-expanded"));
+            Assert.AreEqual("false", cut.Find("[data-progress-resource='openapi'] .collection-actions button").GetAttribute("aria-expanded"));
+            var details = cut.Find("[data-testid='startup-resource-operations']");
+            StringAssert.Contains(details.TextContent, "ConnectedService/nantes-alertes-postgresql");
+            Assert.DoesNotContain("nantes-alertes-openapi", details.TextContent, StringComparison.Ordinal);
+            Assert.AreEqual(1, details.QuerySelectorAll("[data-testid='bootstrap-dependency-details']").Length);
+            Assert.AreEqual(0, cut.FindAll("[data-testid='startup-activity-details']").Count);
+            Assert.AreEqual(0, cut.FindAll(".startup-step-content > .startup-resource-facts").Count);
+        });
+    }
+
+    [TestMethod]
+    public void PollingPreservesManualExpansionAndClosingUntilFollowingIsResumed()
+    {
+        var api = ContributionClient();
+        using var context = Context(api);
+        var following = true;
+        var cut = context.Render<BootstrapStartupResourceList>(p => p.Add(x => x.Snapshot, api.Snapshot)
+            .Add(x => x.StepId, "extensions").Add(x => x.FollowCurrent, following)
+            .Add(x => x.FollowCurrentChanged, value => following = value));
+        cut.Find("[data-progress-resource='jsonb'] .collection-actions button").Click();
+        Assert.IsFalse(following);
+        api.Snapshot = api.Snapshot with { Revision = 2 };
+        cut.Render(p => p.Add(x => x.Snapshot, api.Snapshot).Add(x => x.FollowCurrent, following));
+        StringAssert.Contains(cut.Find("[data-testid='startup-resource-operations']").TextContent, "Storage/nantes-alertes-jsonb");
+        cut.Find("[data-progress-resource='jsonb'] .collection-actions button").Click();
+        api.Snapshot = api.Snapshot with { Revision = 3 };
+        cut.Render(p => p.Add(x => x.Snapshot, api.Snapshot));
+        Assert.AreEqual(0, cut.FindAll("[data-testid='startup-resource-operations']").Count);
+        cut.Render(p => p.Add(x => x.FollowCurrent, true));
+        StringAssert.Contains(cut.Find("[data-testid='startup-resource-operations']").TextContent, "ConnectedService/nantes-alertes-postgresql");
+        api.ResourceRows = api.ResourceRows.Select(row => row.Id == "postgres" ? row with { State = "succeeded", WaitReason = null } : row).ToArray();
+        api.Snapshot = api.Snapshot with { Revision = 4 };
+        cut.Render(p => p.Add(x => x.Snapshot, api.Snapshot));
+        StringAssert.Contains(cut.Find("[data-testid='startup-resource-operations']").TextContent, "Storage/nantes-alertes-jsonb");
+    }
+
+    [TestMethod]
+    [DataRow("en-US")]
+    [DataRow("fr-FR")]
+    public void AModelWaitAndItsCorrectionAreShownOnlyInsideTheExpandedModelRow(string culture)
+    {
+        using var cultures = new TestCultureScope(culture);
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            Activity = api.Snapshot.Activity! with { ResourceId = "model", CanChangeModel = true },
+            Families = [new("resources", "ModelProfile", "waiting", 1, 0, 0, 0, 0, 0, 1)]
+        };
+        api.ResourceRows = [new("model", "resources", "models", "profile.yaml", "ModelProfile", "profile", "default", "/instance", "waiting", [])];
+        using var context = Context(api);
+        var cut = context.Render<BootstrapStartupStepPanel>(p => p.Add(x => x.Snapshot, api.Snapshot)
+            .Add(x => x.StepId, "resources").Add(x => x.Kind, "ModelProfile").Add(x => x.FollowCurrent, true));
+        var details = cut.Find("[data-testid='startup-resource-operations']");
+        Assert.AreEqual(1, details.QuerySelectorAll("[data-testid='startup-activity-details']").Length);
+        Assert.AreEqual(1, cut.FindAll("[data-testid='startup-activity-details']").Count);
+        StringAssert.Contains(details.TextContent, "model:exact");
+        cut.Find("[data-testid='startup-change-model']").Click();
+        Assert.AreEqual(1, cut.FindAll("[data-testid='startup-model-provider']").Count);
+    }
+
+    [TestMethod]
     public void StartupProgressDoesNotRepeatItsOwnNavigationNotice()
     {
         using var context = Context(new StartupClient());
@@ -313,12 +490,40 @@ public sealed class BootstrapStartupProgressTests
         Assert.AreEqual("http://localhost/startup/progress", navigation.Uri);
     }
 
+    private static StartupClient ContributionClient()
+    {
+        var api = new StartupClient();
+        api.Snapshot = api.Snapshot with
+        {
+            ActiveStepId = "extensions",
+            Activity = new("ConnectedService", "nantes-alertes-openapi", WaitReason: "contribution_unavailable", ResourceId: "openapi"),
+            Families = [new("extensions", "ExtensionContribution", "waiting", 4, 1, 0, 0, 0, 0, 3)]
+        };
+        api.ResourceRows =
+        [
+            new("ollama", "extensions", "ollama", "ollama.yaml", "ExtensionContribution", "ollama", "default", "/instance", "succeeded", []),
+            Contribution("postgres", "postgresql", "ConnectedServiceType", "ConnectedService", "nantes-alertes-postgresql"),
+            Contribution("jsonb", "postgresql.jsonb", "StorageType", "Storage", "nantes-alertes-jsonb"),
+            Contribution("openapi", "openapi", "ConnectedServiceType", "ConnectedService", "nantes-alertes-openapi")
+        ];
+        return api;
+    }
+
+    private static BootstrapStartupResource Contribution(string id, string contribution, string kind, string consumerKind, string consumerName) =>
+        new(id, "extensions", "nantes-alertes", contribution + ".yaml", "ExtensionContribution", "extension/" + contribution,
+            "default", "/instance", "waiting", [new("contribution_availability", "waiting", DateTimeOffset.UnixEpoch)])
+        {
+            WaitReason = "contribution_unavailable",
+            Dependency = new("extension", kind, contribution, "1.0.0", null, consumerKind, consumerName)
+        };
+
     private static BunitContext Context(StartupClient api, TimeProvider? clock = null)
     {
         var context = new BunitContext();
         context.Services.AddAgentstrationWebComponents();
         context.Services.AddSingleton<TimeProvider>(clock ?? TimeProvider.System);
         context.Services.AddSingleton<IBootstrapStartupApiClient>(api);
+        context.Services.AddSingleton<IBootstrapProfilesApiClient>(new BootstrapProfilesApiClient(new HttpClient()));
         context.Services.AddSingleton<AuthenticationStateProvider>(new UserState());
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/step-progress.js").Mode = JSRuntimeMode.Loose;

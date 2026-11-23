@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Infrastructure;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Microsoft.Extensions.Configuration;
@@ -22,7 +23,9 @@ public sealed partial class DeclarativeBootstrapService(
     ILogger<DeclarativeBootstrapService> logger,
     SourceBootstrapProfileLoader? sourceProfiles = null,
     IBootstrapExtensionReferenceResolver? extensionReferences = null,
-    BootstrapStartupState? startup = null)
+    BootstrapStartupState? startup = null,
+    BootstrapResourcePreparation? resourcePreparation = null,
+    TimeProvider? timeProvider = null)
 {
     private readonly BootstrapExtensionReferencePreparation extensionPreparation = new(extensionReferences);
     private const string ConfigurationSection = "Agentstration:Bootstrap";
@@ -52,6 +55,7 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(selection);
+        BootstrapInputSelectionValidation.Validate(selection.Inputs);
         if (selection.Bindings?.Any(binding => binding.TargetProfile is not null) == true)
             throw new DeclarativeBootstrapException("Profile-relative bindings require a Bootstrap plan.");
         if (selection.Source is null && selection.Profiles.Count == 0)
@@ -70,10 +74,12 @@ public sealed partial class DeclarativeBootstrapService(
         var bindings = await ResolveBindingsAsync(profiles, selection, fingerprints, cancellationToken);
 
         var planning = new BootstrapPlanningContext();
+        var inputs = new List<BootstrapConfigurationInput>();
         var resources = new List<BootstrapResourcePreview>();
         foreach (var profile in profiles)
         {
-            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target);
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target)
+            { Inputs = selection.Inputs ?? [] };
             foreach (var source in profile.Resources)
             {
                 BootstrapResourceDocument resource;
@@ -104,9 +110,16 @@ public sealed partial class DeclarativeBootstrapService(
                 }
                 try
                 {
-                    var plan = await handler.PlanAsync(resource, operation, planning, cancellationToken);
+                    var original = resource;
+                    var deferred = false;
+                    if (resourcePreparation is not null)
+                        (resource, deferred) = await resourcePreparation.PrepareAsync(resource, operation, planning, false, inputs, fingerprints, cancellationToken);
+                    var plan = deferred ? new BootstrapResourcePlanResult(BootstrapResourceDisposition.Create, BootstrapResourcePreparation.PendingDependencies(resource))
+                        : await handler.PlanAsync(resource, operation, planning, cancellationToken);
+                    planning.Register(original.Kind, original.Metadata.Name, original.Metadata.Namespace.Value, original);
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
-                        plan.Disposition, Details: plan.Details));
+                        plan.Disposition, deferred ? "bootstrap_validation_after_dependencies" : null, Details: plan.Details)
+                    { ValidationDeferred = deferred || resource.Kind == "ConnectedServiceOperationDiscovery" && plan.Disposition == BootstrapResourceDisposition.Create });
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
@@ -116,6 +129,10 @@ public sealed partial class DeclarativeBootstrapService(
             }
         }
 
+        if (selection.Inputs is { } selections && (selections.Count > 128
+            || selections.GroupBy(input => (input.Profile, input.Configuration)).Any(group => group.Count() > 1)
+            || selections.Any(input => !inputs.Any(declaration => declaration.Profile == input.Profile && declaration.Configuration == input.Configuration))))
+            throw new DeclarativeBootstrapException("bootstrap_input_selection_invalid");
         return new(
             profiles.Select(profile => profile.Summary).ToArray(),
             scope,
@@ -123,23 +140,23 @@ public sealed partial class DeclarativeBootstrapService(
             bindings,
             ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints),
             resources,
-            loadedSelection.SourceProvenance);
+            loadedSelection.SourceProvenance) { Inputs = inputs.Distinct().ToArray() };
     }
 
     public Task<BootstrapExecutionResult> ExecuteAsync(
         BootstrapProfileSelection selection, CancellationToken cancellationToken,
         string? expectedDigest = null,
         Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
-        bool waitForDependencies = false) =>
+        bool waitForDependencies = false, Guid? actorPrincipalId = null) =>
         ExecutePhaseAsync(selection, BootstrapStartupPhase.All, cancellationToken,
-            expectedDigest: expectedDigest, reportProgress: reportProgress, waitForDependencies: waitForDependencies);
+            expectedDigest: expectedDigest, reportProgress: reportProgress, waitForDependencies: waitForDependencies, actorPrincipalId: actorPrincipalId);
 
     internal async Task<BootstrapExecutionResult> ExecutePhaseAsync(
         BootstrapProfileSelection selection, BootstrapStartupPhase phase, CancellationToken cancellationToken,
         IReadOnlyList<string>? expectedProfileDigests = null,
         string? expectedDigest = null,
         Func<BootstrapExecutionProgress, CancellationToken, Task>? reportProgress = null,
-        string? startupTargetLevel = null, bool waitForDependencies = false)
+        string? startupTargetLevel = null, bool waitForDependencies = false, Guid? actorPrincipalId = null)
     {
         var preview = await PreviewPhaseAsync(selection, phase, cancellationToken);
         if (expectedProfileDigests is not null && !preview.Profiles.Select(profile => profile.Digest)
@@ -148,6 +165,18 @@ public sealed partial class DeclarativeBootstrapService(
         if (expectedDigest is not null && !string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog or target changed after preview. Preview the application again.");
         var invalid = preview.Resources.FirstOrDefault(resource => resource.Disposition == BootstrapResourceDisposition.Invalid);
+        if (invalid is null && !preview.CanApply) return new(preview, [], "bootstrap_configuration_required");
+        if (actorPrincipalId is null && preview.Resources.FirstOrDefault(resource => resource.Kind == "ConnectedServiceOperationDiscovery") is { } discovery)
+        {
+            if (startupTargetLevel is not null)
+            {
+                var id = BootstrapStartupState.ResourceId(startupTargetLevel, discovery.Profile, discovery.Location);
+                startup?.ObserveOperation(id, "resource_validation", "failed");
+                startup?.FinishResource(id, "failed");
+                startup?.ObserveResource(discovery.Kind, discovery.Name, "failed");
+            }
+            return new(preview, [], "bootstrap_discovery_actor_required");
+        }
         if (invalid is not null)
         {
             if (startupTargetLevel is not null)
@@ -164,24 +193,32 @@ public sealed partial class DeclarativeBootstrapService(
         var fingerprints = new List<string>();
         var bindings = await ResolveBindingsAsync(loaded, selection, fingerprints, cancellationToken);
         var prepared = new Dictionary<string, BootstrapResourceDocument>(StringComparer.Ordinal);
+        var preparationPlanning = new BootstrapPlanningContext();
         foreach (var profile in loaded)
         {
-            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target);
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target)
+            { Inputs = selection.Inputs ?? [] };
             foreach (var source in profile.Resources)
             {
                 var resource = ResolveResource(source, profile, bindings);
-                prepared.Add(source.Location, await extensionPreparation.ResolveDocumentAsync(resource,
+                var resolved = await extensionPreparation.ResolveDocumentAsync(resource,
                     handlers[resource.Kind].ExtensionReferencePaths,
-                    BootstrapExtensionReferencePreparation.ConsumerScope(operation), fingerprints, cancellationToken));
+                    BootstrapExtensionReferencePreparation.ConsumerScope(operation), fingerprints, cancellationToken);
+                prepared.Add(source.Location, resolved);
+                if (resourcePreparation is not null)
+                    _ = await resourcePreparation.PrepareAsync(resolved, operation, preparationPlanning, false, [], fingerprints, cancellationToken);
+                preparationPlanning.Register(resolved.Kind, resolved.Metadata.Name, resolved.Metadata.Namespace.Value, resolved);
             }
         }
         var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints);
         if (!string.Equals(executionDigest, preview.Digest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog changed while the application was being prepared. Preview the application again.");
         var resources = new List<BootstrapAppliedResource>();
+        var executionPlanning = new BootstrapPlanningContext();
         foreach (var profile in loaded)
         {
-            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources || waitForDependencies);
+            var operation = new BootstrapResourceOperationContext(profile.Summary.Name, profile.DirectoryPath, profile.Summary.Scope, selection.Target, WaitForDependencies: phase == BootstrapStartupPhase.Resources || waitForDependencies)
+            { Inputs = selection.Inputs ?? [], ActorPrincipalId = actorPrincipalId };
             foreach (var source in profile.Resources)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -200,8 +237,32 @@ public sealed partial class DeclarativeBootstrapService(
                     var resourceOperation = observationId is { } id
                         ? operation with { ObserveOperation = (code, state) => startup!.ObserveOperation(id, code, state), StartupResourceId = id, StartupProfileDigest = profile.Summary.Digest }
                         : operation;
+                    var stageStartedAt = (timeProvider ?? TimeProvider.System).GetUtcNow();
+                    string? currentStage = null;
+                    string? currentRun = null;
+                    resourceOperation = resourceOperation with
+                    {
+                        ReportStage = async (stage, run, token) =>
+                        {
+                            if (stage != currentStage) stageStartedAt = (timeProvider ?? TimeProvider.System).GetUtcNow();
+                            currentStage = stage;
+                            currentRun = run ?? currentRun;
+                            resourceOperation.ObserveOperation?.Invoke(stage, "running");
+                            if (observationId is { } startupId && resource.Kind == "ConnectedServiceOperationDiscovery")
+                                startup?.ObserveDiscovery(startupId, stage, currentRun, stageStartedAt,
+                                    DataSourceProfileBootstrapResourceHandler.TargetScope(resourceOperation).Value);
+                            if (reportProgress is not null)
+                                await reportProgress(new(preview, resources.ToArray(), new(profile.Summary.Name, source.Location,
+                                    resource.Kind, resource.Metadata.Name, BootstrapResourceDisposition.Create))
+                                { Operation = new(stage, stageStartedAt, currentRun) }, token);
+                        }
+                    };
+                    var declared = resource;
+                    if (resourcePreparation is not null)
+                        (resource, _) = await resourcePreparation.PrepareAsync(resource, resourceOperation, executionPlanning, true, [], [], cancellationToken);
                     if (phase == BootstrapStartupPhase.Resources) startup?.ObserveResource(resource.Kind, resource.Metadata.Name);
                     var result = await handlers[resource.Kind].ApplyAsync(resource, resourceOperation, cancellationToken);
+                    executionPlanning.Register(declared.Kind, declared.Metadata.Name, declared.Metadata.Namespace.Value, declared);
                     if (observationId is not null) startup?.FinishResource(observationId, result switch
                     {
                         BootstrapResourceApplyResult.Created => "created",

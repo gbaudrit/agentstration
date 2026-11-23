@@ -17,7 +17,9 @@ internal static class BootstrapStartupRetry
             try
             {
                 await using var execution = services.CreateAsyncScope();
-                await execution.ServiceProvider.GetRequiredService<BootstrapStartupCoordinator>().ExecuteAsync(cancellationToken);
+                await execution.ServiceProvider.GetRequiredService<BootstrapStartupCoordinator>().ExecuteAsync(
+                    services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync,
+                    cancellationToken);
                 return;
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
