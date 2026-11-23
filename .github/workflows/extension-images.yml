@@ -100,3 +100,10 @@ jobs:
               raise RuntimeError('Empty public package was not removed.')
           raise SystemExit('Registry created a public empty package; it was removed. No application image was uploaded.')
           PY
+      - name: Verify repository Actions can read the private package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          package_visibility=$(gh api users/gbaudrit/packages/container/agentstration-extension-foundry --jq .visibility)
+          test "$package_visibility" = private
+          echo 'Private visibility confirmed with the repository Actions token.'
