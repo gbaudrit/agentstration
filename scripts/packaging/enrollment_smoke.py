@@ -159,7 +159,9 @@ def run(delivery_path, image, authority_image, output):
                     require(before == snapshot, "Container recreation changed installation, registration or scope assignment.")
                 print(f"PASS Foundry {'startup' if iteration == 0 else 'recreation'}: authenticated discovery, available enrollment and stable identity.", flush=True)
             report = {"reference": image, "sourceSha": delivery["sourceSha"], "version": delivery["extension"]["version"],
-                      "authorityImageId": authority_id, "storage": "Sqlite", "enrollmentMode": "SharedKeyFile",
+                      "authorityImageId": authority_id, "aepVersion": manifest["protocolVersion"],
+                      "platform": delivery["extension"]["platform"], "scopeRef": "/instance",
+                      "storage": "Sqlite", "enrollmentMode": "SharedKeyFile",
                       "authenticatedDiscovery": True, "invalidBearerRejected": True, "invalidAnnouncementProofRejected": True,
                       "signedReannouncementIdempotent": True, "containerRecreationPreservesIdentity": True, **before}
             output.parent.mkdir(parents=True, exist_ok=True)

@@ -43,4 +43,3 @@ services:
     volumes:
       - ${SMOKE_DIRECTORY}/key:/run/secrets/aep-key:ro
       - ${SMOKE_DIRECTORY}/foundry:/var/lib/aep
-
