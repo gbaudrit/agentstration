@@ -7,5 +7,5 @@ $shared = '^(global\.json$|Directory\.(Build|Packages)\.(props|targets)$|\.githu
     aep = $RunEverything.IsPresent -or @($Paths | Where-Object { $_ -match "^(aep/)|$shared" }).Count -gt 0
     container = $RunEverything.IsPresent -or @($Paths | Where-Object { $_ -match "^(src/|aep/src/|deploy/|Dockerfile$|\.dockerignore$|Agentstration\.slnx$)|$shared" }).Count -gt 0
     # Include provider implementations as well as their application/composition inputs.
-    storage = $RunEverything.IsPresent -or @($Paths | Where-Object { $_ -match "^(src/Agentstration\.(Application|Flow|Infrastructure|Management|ResourceManagement|ResourcePlanning|Runtime|Security|Web|Work)|src/Agentstration\.[^/]*PostgreSql/|tests/Agentstration\.(Application|Performance|Web)\.Tests/|Agentstration\.Tests\.Performance\.slnx$|\.github/workflows/storage-performance\.yml$)|$shared" }).Count -gt 0
+    storage = $RunEverything.IsPresent -or @($Paths | Where-Object { $_ -match "^(src/Agentstration\.(Application|Flow|Infrastructure|Management|ResourceManagement|ResourcePlanning|Runtime|Security|Web|Work)|src/(extensions/)?Agentstration\.[^/]*PostgreSql/|tests/Agentstration\.(Application|Performance|Web)\.Tests/|Agentstration\.Tests\.Performance\.slnx$|\.github/workflows/storage-performance\.yml$)|$shared" }).Count -gt 0
 }

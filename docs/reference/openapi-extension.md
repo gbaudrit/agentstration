@@ -7,7 +7,7 @@
 Configure at least one destination domain and start the extension independently:
 
 ```powershell
-dotnet run --project src/Agentstration.Extensions.OpenApi --launch-profile http `
+dotnet run --project src/extensions/Agentstration.Extensions.OpenApi --launch-profile http `
   -e OpenApi__AllowedDomains__0=api.example.com
 ```
 
@@ -41,7 +41,7 @@ For a different local slot, supply its API URL, a separate pairing state file
 and the allowed domain for your OpenAPI documents:
 
 ```powershell
-dotnet run --project src/Agentstration.Extensions.OpenApi --launch-profile existing-instance `
+dotnet run --project src/extensions/Agentstration.Extensions.OpenApi --launch-profile existing-instance `
   -e Aep__PairingCode__AuthorityUrl=http://localhost:5200 `
   -e Aep__PairingCode__StateFile=../../.agentstration/slots/integration/aep-pairing/openapi-standalone.json `
   -e OpenApi__AllowedDomains__0=api.example.com

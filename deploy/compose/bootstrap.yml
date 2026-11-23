@@ -16,7 +16,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.OpenApi.dll
     environment:
       OpenApi__AllowedDomains__0: example.invalid
