@@ -78,6 +78,7 @@
   <data name="AppliedByProfile" xml:space="preserve"><value>Bootstrap {0} {1}</value></data>
   <data name="PackOrigin" xml:space="preserve"><value>Pack origin</value></data>
   <data name="ManifestLocation" xml:space="preserve"><value>Manifest location</value></data>
+  <data name="AppliedResourceKind" xml:space="preserve"><value>Resource type</value></data>
   <data name="HistoryLoadFailed" xml:space="preserve"><value>The Bootstrap version history could not be loaded.</value></data>
   <data name="ApplicationSource.Startup" xml:space="preserve"><value>Startup</value></data>
   <data name="ApplicationSource.Manual" xml:space="preserve"><value>Manual</value></data>

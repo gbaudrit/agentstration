@@ -2,6 +2,7 @@
 @page "/settings/bootstrap/applied/{ProfileId}"
 @implements IDisposable
 @using Agentstration.Bootstrap.Contracts
+@using Agentstration.Web.Components.Bootstrap
 @inject IBootstrapProfilesApiClient Client
 @inject NavigationManager Navigation
 @inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
@@ -98,27 +99,7 @@ else
                                 }
                                 else
                                 {
-                                    <CollectionView TItem="BootstrapAppliedResource" Items="item.Resources" IdentityLabel="@T("Resources")"
-                                        StateLabel="@T("Results")" InformationLabels="@(new[] { T("ManifestLocation") })"
-                                        ShowViewSwitch="false" Compact>
-                                        <Identity Context="row">
-                                            <div class="bootstrap-resource-identity">
-                                                @if (ResourceLink(row) is { } link)
-                                                {
-                                                    <a class="resource-name-link" href="@link">@row.Name</a>
-                                                }
-                                                else { <strong>@row.Name</strong> }
-                                                <small>@row.Kind</small>
-                                                @if (row.Pack is not null) { <small>@T("PackOrigin") · @row.Pack</small> }
-                                            </div>
-                                        </Identity>
-                                        <State Context="row">
-                                            <StatusBadge Text="@T($"AppliedDisposition.{row.Disposition}")" Status="@DispositionTone(row.Disposition)" />
-                                        </State>
-                                        <Information Context="row">
-                                            <CollectionValue Label="@T("ManifestLocation")"><code>@row.Location</code></CollectionValue>
-                                        </Information>
-                                    </CollectionView>
+                                    <BootstrapAppliedResources Rows="item.Resources" ResourceHref="ResourceLink" />
                                 }
                             </div>
                         </details>
@@ -248,14 +229,6 @@ else
         BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted => UiStatus.Warning,
         BootstrapApplicationStatus.Running => UiStatus.Info,
         BootstrapApplicationStatus.Failed => UiStatus.Danger,
-        _ => UiStatus.Neutral
-    };
-
-    private static UiStatus DispositionTone(BootstrapResourceDisposition disposition) => disposition switch
-    {
-        BootstrapResourceDisposition.Create => UiStatus.Success,
-        BootstrapResourceDisposition.Conflict => UiStatus.Warning,
-        BootstrapResourceDisposition.Invalid or BootstrapResourceDisposition.Failed => UiStatus.Danger,
         _ => UiStatus.Neutral
     };
 

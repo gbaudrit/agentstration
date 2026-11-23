@@ -1322,7 +1322,7 @@
     {
       "id": "applied-bootstrap-profile-list",
       "source": "src/Agentstration.Console.Components/Components/Pages/AppliedBootstrapProfiles.razor",
-      "line": 12,
+      "line": 13,
       "host": "console",
       "routes": [
         "/settings/bootstrap/applied"
@@ -1345,8 +1345,8 @@
     },
     {
       "id": "applied-bootstrap-version-resources",
-      "source": "src/Agentstration.Console.Components/Components/Pages/AppliedBootstrapProfiles.razor",
-      "line": 101,
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapAppliedResources.razor",
+      "line": 6,
       "host": "console",
       "routes": [
         "/settings/bootstrap/applied/{ProfileId}"
@@ -18401,7 +18401,12 @@
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/AppliedBootstrapProfiles.razor",
       "classification": "inventoried",
-      "reason": "Registered profiles and per-application resource outcomes use shared collections. Version and scope selectors and application disclosures provide navigation and grouping."
+      "reason": "Registered profiles use a shared collection. Version and scope selectors and application disclosures provide navigation and grouping."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapAppliedResources.razor",
+      "classification": "inventoried",
+      "reason": "The shared collection shows paginated and filtered resource outcomes for one application."
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/BootstrapProfiles.razor",

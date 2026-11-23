@@ -319,6 +319,53 @@ public sealed class BootstrapProgressComponentTests
         StringAssert.Contains(identity.TextContent, "profile-digest");
     }
 
+    [TestMethod]
+    public void AppliedResourcesSearchAndFilterBeforePagingAndKeepEachApplicationIndependent()
+    {
+        using var culture = new TestCultureScope("fr-FR");
+        var registered = new AppliedBootstrapVersion("base", "1.0.0", BootstrapProfileScope.Instance, "digest", DateTimeOffset.UnixEpoch, null);
+        var rows = Enumerable.Range(1, 512).Select(index => new BootstrapAppliedResource("base", $"manifest.yaml document {index}",
+            index == 512 ? "Flow" : "Parameter", $"resource-{index:D3}",
+            index > 510 ? BootstrapResourceDisposition.Conflict : BootstrapResourceDisposition.Create)).ToArray();
+        var latest = new ScopedBootstrapApplication(Guid.NewGuid(), Guid.NewGuid(), ResourceScopeRef.Instance, BootstrapApplicationSource.Manual,
+            DateTimeOffset.UnixEpoch.AddMinutes(1), null, BootstrapApplicationStatus.Succeeded, [registered], [], rows);
+        var previous = latest with { Id = Guid.NewGuid(), StartedAt = DateTimeOffset.UnixEpoch, Resources = [rows[0]] };
+        var client = new StubClient
+        {
+            AppliedProfiles = [new("base", "base", "Local development", BootstrapProfileScope.Instance)],
+            AppliedVersions = [registered],
+            AppliedHistory = [latest, previous]
+        };
+        using var context = Context(client, application: false);
+        var cut = context.Render<AppliedBootstrapProfiles>(parameters => parameters.Add(page => page.ProfileId, "base"));
+        var grids = cut.FindComponents<BootstrapAppliedResources>();
+        Assert.HasCount(2, grids);
+        var grid = grids[0];
+        const string resourceRow = "[data-testid='bootstrap-applied-resource-row']";
+
+        Assert.HasCount(25, grid.FindAll(resourceRow));
+        StringAssert.Contains(grid.Find(".collection-pager [role='status']").TextContent, "512");
+        grid.Find(".collection-pager button[aria-label='Page 21']").Click();
+        Assert.HasCount(12, grid.FindAll(resourceRow));
+        StringAssert.Contains(grid.FindAll(resourceRow)[^1].TextContent, "resource-512");
+
+        grid.Find("[data-filter-key='result'] select").Change("Conflict");
+        Assert.HasCount(2, grid.FindAll(resourceRow));
+        grid.Find("[data-filter-key='kind'] select").Change("Flow");
+        StringAssert.Contains(grid.Find(resourceRow).TextContent, "resource-512");
+        Assert.HasCount(1, grid.FindAll(resourceRow));
+        grid.Find("input[type='search']").Input("resource-001");
+        Assert.HasCount(0, grid.FindAll(resourceRow));
+        grid.FindAll("button").Single(button => button.TextContent.Trim() == "Effacer les filtres").Click();
+        Assert.HasCount(25, grid.FindAll(resourceRow));
+        grid.Find(".collection-pager select").Change("50");
+        Assert.HasCount(50, grid.FindAll(resourceRow));
+        grid.Find("input[type='search']").Input("document 512");
+        Assert.HasCount(1, grid.FindAll(resourceRow));
+        StringAssert.Contains(grid.Find(resourceRow).TextContent, "resource-512");
+        StringAssert.Contains(grids[1].Find(resourceRow).TextContent, "resource-001");
+    }
+
     private static BunitContext Context(StubClient client, bool application = true)
     {
         var context = new BunitContext();

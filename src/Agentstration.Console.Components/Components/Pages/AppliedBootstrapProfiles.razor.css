@@ -60,7 +60,6 @@
 }
 
 .bootstrap-history-summary small,
-.bootstrap-resource-identity small,
 .bootstrap-no-outcomes {
     color: var(--muted);
 }
@@ -70,28 +69,6 @@
     padding: var(--space-3);
     border-block-start: 1px solid var(--border);
     overflow-wrap: anywhere;
-}
-
-.bootstrap-history-resources ::deep .resource-collection .data-grid {
-    min-width: 0;
-    table-layout: fixed;
-}
-
-.bootstrap-history-resources ::deep .data-grid th:first-child {
-    width: 34%;
-}
-
-.bootstrap-history-resources ::deep .data-grid th:nth-child(2) {
-    width: 22%;
-}
-
-.bootstrap-history-resources ::deep .data-grid th:last-child {
-    width: 44%;
-}
-
-.bootstrap-resource-identity {
-    display: grid;
-    gap: var(--space-1);
 }
 
 .bootstrap-no-outcomes {
