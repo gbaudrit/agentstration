@@ -63,10 +63,17 @@ dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration R
 
 ## Build once and validate
 
-The **Extension OCI images** workflow validates relevant PRs without publication
-credentials. A manual dispatch takes an implemented catalogue ID and defaults to
-validation only. Opting into `publish_preview` publishes the tested archive to
-private GHCR after the build/smoke job succeeds.
+Product **CI** calls the reusable **Validate extension OCI image** workflow for
+Foundry image inputs. The required `build-and-test` check includes its result;
+Foundry-only changes use this targeted validation while shared or mixed inputs
+retain the transverse checks described in [Testing](testing.md#ci-inventory-and-execution-safeguards).
+The reusable workflow has read-only repository access and contains no publication
+job. There is one PR image build, not a second independently triggered image run.
+
+The **Extension OCI images** delivery workflow reuses that same validation for
+extension release tags and manual dispatch. A manual dispatch takes an implemented
+catalogue ID and defaults to validation only. Opting into `publish_preview`
+publishes the tested archive to private GHCR after the build/smoke job succeeds.
 
 The build pins SDK and ASP.NET base images by digest, requires a clean source
 checkout, and emits an OCI archive, metadata and `delivery.json`. It includes OCI
