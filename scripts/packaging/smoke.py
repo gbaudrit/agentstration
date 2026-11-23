@@ -60,10 +60,12 @@ def main():
                             "--mount", f"type=bind,source={key_path},target=/run/secrets/aep-key,readonly",
                             "--env", "Aep__EnrollmentMode=SharedKeyFile",
                             "--env", "Aep__SharedKeyFile__Path=/run/secrets/aep-key", args.image], check=True)
-            container = json.loads(subprocess.check_output(["docker", "inspect", name], text=True))[0]
-            port = container["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"]
-            base = f"http://127.0.0.1:{port}"
             for iteration in range(2):
+                # Docker can allocate a new ephemeral host port when the container restarts.
+                container = json.loads(subprocess.check_output(["docker", "inspect", name], text=True))[0]
+                port = container["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"]
+                base = f"http://127.0.0.1:{port}"
+                print(f"Checking {'startup' if iteration == 0 else 'restart'} at {base}.", flush=True)
                 wait_for_health(base)
                 try:
                     urllib.request.urlopen(base + "/.well-known/aep", timeout=5).close()

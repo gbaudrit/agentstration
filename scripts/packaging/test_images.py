@@ -170,6 +170,64 @@ class ImageContracts(unittest.TestCase):
             server.server_close()
             worker.join()
 
+    def test_smoke_reinspects_the_mapped_port_after_container_restart(self):
+        path, delivery = self.delivery()
+        visited_ports = []
+        current = [0]
+        entry = delivery["extension"]
+        manifest = {"protocolVersion": entry["aepVersion"],
+                    "extension": {"id": entry["extensionId"], "version": entry["version"]},
+                    "contributions": {entry["contributionKind"]: [{"id": entry["contributionId"]}]}}
+
+        class Extension(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path == "/health":
+                    visited_ports.append(self.server.server_port)
+                    self.send_response(200)
+                elif not self.headers.get("Authorization", "").startswith("Bearer "):
+                    self.send_response(401)
+                else:
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(manifest).encode())
+                    return
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        servers = [http.server.HTTPServer(("127.0.0.1", 0), Extension) for _ in range(2)]
+        workers = [threading.Thread(target=server.serve_forever, daemon=True) for server in servers]
+        for worker in workers:
+            worker.start()
+
+        def inspect(command, **kwargs):
+            if command[:3] == ["docker", "image", "inspect"]:
+                return json.dumps([{"Config": {"Labels": {"org.opencontainers.image.version": entry["version"],
+                                                          "org.opencontainers.image.revision": delivery["sourceSha"]}}}])
+            self.assertEqual(["docker", "inspect"], command[:2])
+            return json.dumps([{"NetworkSettings": {"Ports": {"8080/tcp": [
+                {"HostPort": str(servers[current[0]].server_port)}]}}}])
+
+        def run(command, **kwargs):
+            if command[:2] == ["docker", "restart"]:
+                current[0] = 1
+            return subprocess.CompletedProcess(command, 0)
+
+        try:
+            image = "localhost:5000/extension@" + delivery["digest"]
+            with patch("sys.argv", ["smoke.py", "--delivery", str(path), "--image", image]), \
+                    patch.object(smoke.subprocess, "run", side_effect=run), \
+                    patch.object(smoke.subprocess, "check_output", side_effect=inspect), patch("builtins.print"):
+                smoke.main()
+            self.assertEqual([server.server_port for server in servers], visited_ports)
+        finally:
+            for server in servers:
+                server.shutdown()
+                server.server_close()
+            for worker in workers:
+                worker.join()
+
 
 if __name__ == "__main__":
     unittest.main()
