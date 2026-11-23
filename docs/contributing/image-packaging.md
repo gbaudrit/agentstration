@@ -85,8 +85,57 @@ Skopeo stages that exact archive in a disposable loopback-only registry. The
 image smoke checks health, unauthenticated discovery rejection, authenticated AEP
 identity/version/contribution, OCI labels and restart using a temporary
 SharedKeyFile mounted read-only. It makes no Foundry/model request and contains
-no Azure credential. It verifies the extension side of authentication; complete
-enrollment against the real authority remains a separate integration check.
+no Azure credential.
+
+For Foundry, the same validation job also builds a disposable authoritative
+server from the same source revision, using the generic Dockerfile and the same
+pinned SDK/runtime bases. `scripts/packaging/foundry.smoke.compose.yml` runs only that
+server and the exact staged Foundry digest. The server uses SQLite, deterministic
+AI and the existing Development bootstrap with a newly generated disposable
+administrator password. The test uses its own Compose network and exposes ports
+only on loopback; no local inference server, Worker, Azure resource or downstream
+credential is needed for enrollment.
+
+The enrollment smoke verifies:
+
+- Health/readiness and protected AEP identity, including rejection of an invalid bearer.
+- A real extension-initiated SharedKeyFile announcement, automatic Instance assignment,
+  and an available persisted registration with the expected version and endpoint.
+- Rejection of an announcement signed with another key, including for an existing instance.
+- Idempotent signed reannouncement and preservation of enrollment/registration UIDs,
+  generations and assignment after **both containers are removed and recreated**.
+
+The generated key is mounted read-only into both processes. Extension instance
+state and server data are separate writable mounts; the extension receives no
+server database mount. The smoke observes only technical enrollment/registration
+records through a read-only SQLite connection. Temporary keys, passwords and
+stores are removed during cleanup; container logs/configuration and database
+payloads are not uploaded. `enrollment-smoke.json` records the extension digest,
+source SHA, version, local authority image ID and tested identity checks beside
+`delivery.json`. This is a tested source/digest combination, not a claim of
+compatibility with every Agentstration version.
+
+To repeat the check after staging an archive, build the server fixture with
+`Dockerfile.extension`, `PROJECT=src/Agentstration.Web/Agentstration.Web.csproj`,
+`ENTRYPOINT_DLL=Agentstration.Web.dll`, and the `SDK_IMAGE`/`RUNTIME_IMAGE` values
+from `delivery.json.buildImages`. Label it with
+`org.opencontainers.image.revision=<delivery sourceSha>`. The checked-out source
+and bootstrap catalog must match that revision. The reusable workflow contains
+the exact build command. Then run:
+
+```sh
+python3 scripts/packaging/enrollment_smoke.py \
+  --delivery artifacts/extension/delivery.json \
+  --image localhost:5000/extension@sha256:<delivery-digest> \
+  --authority-image agentstration-foundry-smoke-authority:local \
+  --output artifacts/extension/enrollment-smoke.json
+```
+
+A Linux Docker host and Compose v2 are required. Both containers run with the
+invoking user/group so mounted test data remains removable. Only a locally present server fixture is accepted;
+this server image is never published by extension packaging. The scenario is a
+packaging test fixture, not the preview topology tracked by #1281. Live inference
+and creation of Model Providers remain separate opt-in validation.
 
 Local build from a committed clean checkout:
 
@@ -173,6 +222,17 @@ tracked separately. Its old Workspace-scoped Bootstrap example must be reconcile
 with Instance-only Model Providers before unattended preview reuse.
 
 Registry publication and full image smoke require a successful workflow run.
-Until that evidence exists, keep #1291 open. The first pilot does not claim a
-complete Agentstration/extension compatibility matrix or a published Docker Hub
-release. No extension tag or image is published merely by adding the catalogue.
+The initial Foundry `0.1.0` private delivery was published from source
+`d322a0a83d3bad7952f3bdd89b3c8c767b5ec904` with OCI index digest
+`sha256:501fb133896951312433d1fe370e0d744a5300ec22629edcb59132df3430abab`.
+[Publication](https://github.com/gbaudrit/agentstration/actions/runs/45218954877)
+and [authenticated pull/discovery/restart verification](https://github.com/gbaudrit/agentstration/actions/runs/45219616968/job/137850022403)
+used repository Actions tokens; anonymous pull was denied. That original check
+did not include authority enrollment; subsequent deliveries add the Compose gate
+above. Linux amd64 is the currently supported image platform.
+
+Docker Hub publication remains deferred by maintainer decision. Do not create an
+`extension/foundry/v0.1.0` release tag to validate private previews: that tag also
+requests Docker Hub publication. Keep #1291 open for its deferred public delivery
+criteria; the pilot does not claim a complete compatibility matrix or a published
+Docker Hub release. No extension tag or image is published merely by adding the catalogue.
