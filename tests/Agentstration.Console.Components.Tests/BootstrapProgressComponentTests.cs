@@ -343,10 +343,12 @@ public sealed class BootstrapProgressComponentTests
         var grid = grids[0];
         const string resourceRow = "[data-testid='bootstrap-applied-resource-row']";
 
-        Assert.HasCount(25, grid.FindAll(resourceRow));
+        Assert.HasCount(10, grid.FindAll(resourceRow));
+        CollectionAssert.AreEqual(new[] { "10", "25", "50", "100" }, grid.FindAll(".collection-pager select option")
+            .Select(option => option.GetAttribute("value")).ToArray());
         StringAssert.Contains(grid.Find(".collection-pager [role='status']").TextContent, "512");
-        grid.Find(".collection-pager button[aria-label='Page 21']").Click();
-        Assert.HasCount(12, grid.FindAll(resourceRow));
+        grid.Find(".collection-pager button[aria-label='Page 52']").Click();
+        Assert.HasCount(2, grid.FindAll(resourceRow));
         StringAssert.Contains(grid.FindAll(resourceRow)[^1].TextContent, "resource-512");
 
         grid.Find("[data-filter-key='result'] select").Change("Conflict");
@@ -357,7 +359,7 @@ public sealed class BootstrapProgressComponentTests
         grid.Find("input[type='search']").Input("resource-001");
         Assert.HasCount(0, grid.FindAll(resourceRow));
         grid.FindAll("button").Single(button => button.TextContent.Trim() == "Effacer les filtres").Click();
-        Assert.HasCount(25, grid.FindAll(resourceRow));
+        Assert.HasCount(10, grid.FindAll(resourceRow));
         grid.Find(".collection-pager select").Change("50");
         Assert.HasCount(50, grid.FindAll(resourceRow));
         grid.Find("input[type='search']").Input("document 512");

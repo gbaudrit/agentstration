@@ -36,7 +36,7 @@
     min-width: min(100%, 10rem);
 }
 
-.bootstrap-applied-resources ::deep .form-field,
+.bootstrap-applied-resources ::deep .resource-toolbar .form-field,
 .bootstrap-applied-resources ::deep .collection-pager {
     margin: 0;
 }

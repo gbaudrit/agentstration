@@ -50,7 +50,7 @@
     [Parameter, EditorRequired] public IReadOnlyList<BootstrapAppliedResource> Rows { get; set; } = [];
     [Parameter, EditorRequired] public Func<BootstrapAppliedResource, string?> ResourceHref { get; set; } = null!;
 
-    private static readonly int[] PageSizes = [25, 50, 100];
+    private static readonly int[] PageSizes = [10, 25, 50, 100];
     private CollectionQuery query = new() { PageSize = PageSizes[0] };
     private IReadOnlyList<BootstrapAppliedResource> filtered = [];
     private IReadOnlyList<BootstrapAppliedResource> PageRows => filtered.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray();
