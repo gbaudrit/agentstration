@@ -2,22 +2,6 @@
     max-inline-size: 52rem;
 }
 
-.bootstrap-version-details {
-    margin-block-start: var(--space-3);
-    color: var(--muted);
-    font-size: var(--font-size-sm);
-}
-
-.bootstrap-version-details > summary {
-    width: fit-content;
-    cursor: pointer;
-}
-
-.bootstrap-version-facts {
-    margin-block-end: 0;
-    overflow-wrap: anywhere;
-}
-
 .bootstrap-history-entry {
     min-width: 0;
     border: 1px solid var(--border);

@@ -313,8 +313,10 @@ public sealed class BootstrapProgressComponentTests
         StringAssert.Contains(applications[0].QuerySelector("summary")!.TextContent, "1 ressource");
         StringAssert.Contains(applications[0].QuerySelector("tbody")!.TextContent, "fixture");
         StringAssert.Contains(applications[0].QuerySelector("tbody")!.TextContent, "Créée");
-        Assert.IsFalse(cut.Find(".bootstrap-version-details").HasAttribute("open"));
-        StringAssert.Contains(cut.Find(".bootstrap-version-details").TextContent, "profile-digest");
+        Assert.IsFalse(cut.Find("[data-testid='bootstrap-profile-versions']").TextContent.Contains("profile-digest", StringComparison.Ordinal));
+        var identity = cut.Find("[data-testid='resource-identity-popover']");
+        StringAssert.Contains(identity.TextContent, "Empreinte du profil");
+        StringAssert.Contains(identity.TextContent, "profile-digest");
     }
 
     private static BunitContext Context(StubClient client, bool application = true)

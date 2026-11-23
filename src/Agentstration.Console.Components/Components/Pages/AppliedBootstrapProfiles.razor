@@ -35,6 +35,19 @@ else
             IconName="cloud-upload" TechnicalName="@VisibleProfile?.Name" Version="@(load.BlocksContent ? null : version)" ScopeRef="SelectedScope"
             CollectionHref="/settings/bootstrap/applied" CollectionLabel="@T("AppliedProfiles")"
             LoadState="load" OnRetry="LoadAsync" TestId="applied-bootstrap-profile">
+            <IdentityDetails>
+                @if (versions.FirstOrDefault(value => value.Version == version) is { } selected)
+                {
+                    <dt>@T("ProfileDigest")</dt>
+                    <dd>
+                        <CopyableValue Value="@selected.Digest" PlainText />
+                    </dd>
+                    @if (selected.Source is { } source)
+                    {
+                        <dt>@T("ProfileSourceVersion")</dt><dd>@source.Publisher/@source.SourceName @source.SourceVersion</dd>
+                    }
+                }
+            </IdentityDetails>
             <Content>
                 <FormSection Title="@T("ProfileVersions")" TestId="bootstrap-profile-versions">
                     <div class="bootstrap-version-selectors">
@@ -57,19 +70,6 @@ else
                             </FormField>
                         </FormGrid>
                     </div>
-                    @if (versions.FirstOrDefault(value => value.Version == version) is { } selected)
-                    {
-                        <details class="bootstrap-version-details">
-                            <summary>@T("VersionTechnicalDetails")</summary>
-                            <dl class="resource-details bootstrap-version-facts">
-                                <dt>@T("ProfileDigest")</dt><dd><CopyableValue Value="@selected.Digest" /></dd>
-                                @if (selected.Source is { } source)
-                                {
-                                    <dt>@T("ProfileSourceVersion")</dt><dd>@source.Publisher/@source.SourceName @source.SourceVersion</dd>
-                                }
-                            </dl>
-                        </details>
-                    }
                 </FormSection>
                 <FormSection Title="@T("ApplicationHistory")" Description="@T("ScopedApplicationHistoryDescription")" TestId="bootstrap-version-history">
                     @if (history.Count == 0)

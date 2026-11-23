@@ -68,7 +68,6 @@
   <data name="ProfileScope" xml:space="preserve"><value>Périmètre</value></data>
   <data name="ProfileVersion" xml:space="preserve"><value>Version</value></data>
   <data name="ProfileVersions" xml:space="preserve"><value>Versions</value></data>
-  <data name="VersionTechnicalDetails" xml:space="preserve"><value>Détails techniques</value></data>
   <data name="ScopedApplicationHistoryDescription" xml:space="preserve"><value>Applications de la version sélectionnée sur cette cible, de la plus récente à la plus ancienne.</value></data>
   <data name="OneResource" xml:space="preserve"><value>1 ressource</value></data>
   <data name="ApplicationResourceCount" xml:space="preserve"><value>{0} ressources</value></data>

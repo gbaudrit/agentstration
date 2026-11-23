@@ -68,7 +68,6 @@
   <data name="ProfileScope" xml:space="preserve"><value>Scope</value></data>
   <data name="ProfileVersion" xml:space="preserve"><value>Version</value></data>
   <data name="ProfileVersions" xml:space="preserve"><value>Versions</value></data>
-  <data name="VersionTechnicalDetails" xml:space="preserve"><value>Technical details</value></data>
   <data name="ScopedApplicationHistoryDescription" xml:space="preserve"><value>Applications of the selected version to this target, most recent first.</value></data>
   <data name="OneResource" xml:space="preserve"><value>1 resource</value></data>
   <data name="ApplicationResourceCount" xml:space="preserve"><value>{0} resources</value></data>
