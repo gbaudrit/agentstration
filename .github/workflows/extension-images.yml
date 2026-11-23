@@ -1,88 +1,104 @@
-name: Extension OCI images
+name: Verify first private Foundry delivery
 
 on:
-  push:
-    tags: ['extension/**']
   workflow_dispatch:
     inputs:
-      extension:
-        description: Implemented image catalogue ID
-        default: foundry
+      publication_run:
+        description: Successful main publication run ID
+        type: string
         required: true
-      publish_preview:
-        description: Publish the validated archive to private GHCR (no Docker Hub release)
-        type: boolean
-        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
-  cancel-in-progress: false
+  actions: read
+  packages: read
 
 jobs:
-  validate-and-build:
-    uses: ./.github/workflows/validate-extension-image.yml
-    with:
-      extension: ${{ inputs.extension || 'foundry' }}
-      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-
-  publish:
-    needs: validate-and-build
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 10
     env:
-      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+      DOCKER_CONFIG: /tmp/ghcr-verification-auth-${{ github.run_id }}
     steps:
+      - name: Verify main publication provenance and private visibility
+        id: provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLICATION_RUN: ${{ inputs.publication_run }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          run_id = os.environ['PUBLICATION_RUN']
+          assert re.fullmatch(r'[0-9]+', run_id), 'Invalid publication run ID.'
+          def api(path):
+              request = urllib.request.Request('https://api.github.com/' + path,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                           'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+          run = api('repos/gbaudrit/agentstration/actions/runs/' + run_id)
+          assert run['head_branch'] == 'main' and run['event'] == 'workflow_dispatch'
+          assert run['conclusion'] == 'success' and run['path'] == '.github/workflows/extension-images.yml'
+          assert re.fullmatch(r'[0-9a-f]{40}', run['head_sha'])
+          package = api('users/gbaudrit/packages/container/agentstration-extension-foundry')
+          assert package['visibility'] == 'private', 'GHCR package is not private.'
+          print('Private visibility confirmed using the read-only repository Actions token.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('source=' + run['head_sha'] + '\n')
+              output.write('artifact=extension-publication-' + run_id + '-' + str(run['run_attempt']) + '\n')
+          PY
       - uses: actions/checkout@v7
         with:
+          ref: ${{ steps.provenance.outputs.source }}
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: extension-image-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ${{ steps.provenance.outputs.artifact }}
+          run-id: ${{ inputs.publication_run }}
+          github-token: ${{ github.token }}
           path: delivery
-      - name: Install OCI copy tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Publish the validated archive to private GHCR without rebuilding
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Pull the exact GHCR digest and smoke startup and restart
         run: |
-          release_arguments=()
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
-      - name: Log in to Docker Hub for an official extension release
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        uses: docker/login-action@v3
+          python3 - <<'PY'
+          import json, pathlib, re, subprocess, urllib.error, urllib.request
+          directory = pathlib.Path('delivery')
+          delivery = json.loads((directory / 'delivery.json').read_text())
+          publication = json.loads((directory / 'publication-ghcr.json').read_text())
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert delivery['sourceSha'] == publication['sourceSha'] == source
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', delivery['digest'])
+          reference = 'ghcr.io/gbaudrit/agentstration-extension-foundry@' + delivery['digest']
+          assert publication['reference'] == reference
+          assert publication['digest'] == delivery['digest']
+          anonymous_denied = False
+          try:
+              with urllib.request.urlopen('https://ghcr.io/token?service=ghcr.io&scope=repository:gbaudrit/agentstration-extension-foundry:pull', timeout=15) as response:
+                  token = json.load(response)['token']
+              request = urllib.request.Request('https://ghcr.io/v2/gbaudrit/agentstration-extension-foundry/manifests/' + delivery['digest'],
+                  headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json'})
+              with urllib.request.urlopen(request, timeout=15):
+                  pass
+          except urllib.error.HTTPError as error:
+              if error.code not in (401, 403, 404):
+                  raise
+              anonymous_denied = True
+          assert anonymous_denied, 'Anonymous registry access unexpectedly succeeded.'
+          subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', str(directory / 'delivery.json'), '--image', reference], check=True)
+          inspected = json.loads(subprocess.check_output(['docker', 'image', 'inspect', reference], text=True))[0]
+          proof = {'reference': reference, 'sourceSha': source, 'version': delivery['extension']['version'],
+                   'visibility': 'private', 'anonymousPullDenied': True, 'authenticatedPullByDigest': True,
+                   'healthAndAuthenticatedDiscoveryAndRestart': True, 'imageSizeBytes': inspected['Size']}
+          (directory / 'verification.json').write_text(json.dumps(proof, indent=2) + '\n')
+          print(json.dumps(proof, indent=2))
+          PY
+      - uses: actions/upload-artifact@v7
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish the same archive to official Docker Hub
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        env:
-          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
-        run: >-
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
-          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
-          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
-      - name: Retain immutable publication references
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            delivery/delivery.json
-            delivery/publication-*.json
-          if-no-files-found: warn
+          name: first-private-foundry-verification
+          path: delivery/*.json
+          if-no-files-found: error
           retention-days: 30
