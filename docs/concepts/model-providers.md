@@ -17,7 +17,7 @@ Aspire starts only the Agentstration extension. For direct startup:
 ```powershell
 $env:LocalAI__Endpoint = "http://localhost:8081"
 # Optional: $env:LocalAI__ApiKey = "..."
-dotnet run --project src/Agentstration.Extensions.LocalAI
+dotnet run --project src/extensions/Agentstration.Extensions.LocalAI
 ```
 
 The extension listens on `http://localhost:5280` with its development launch profile. Register that AEP endpoint, then bind the Model Provider to its `localai` contribution:
@@ -70,7 +70,7 @@ Aspire starts the Agentstration extension and points it at `http://localhost:808
 
 ```powershell
 $env:LlamaCpp__Endpoint = "http://localhost:8080"
-dotnet run --project src/Agentstration.Extensions.LlamaCpp
+dotnet run --project src/extensions/Agentstration.Extensions.LlamaCpp
 ```
 
 The extension listens on `http://localhost:5270` with its development launch profile. Declare that AEP endpoint—not port 8080—as the Model Provider endpoint:

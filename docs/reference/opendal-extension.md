@@ -77,7 +77,7 @@ Directory.Packages.props; package restore requires access to NuGet or a populate
 
 ```sh
 dotnet build samples/OpenDalSmoke --configuration Release
-dotnet publish src/Agentstration.Extensions.OpenDal --configuration Release --runtime linux-x64 --self-contained false --output artifacts/opendal/linux-x64
+dotnet publish src/extensions/Agentstration.Extensions.OpenDal --configuration Release --runtime linux-x64 --self-contained false --output artifacts/opendal/linux-x64
 python scripts/opendal/smoke.py --publish-dir artifacts/opendal/linux-x64
 ```
 

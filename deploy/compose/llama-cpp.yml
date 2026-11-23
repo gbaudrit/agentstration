@@ -30,7 +30,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.LlamaCpp.dll
     depends_on:
       aep-key-provisioner:
@@ -54,7 +54,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll
     environment:
       Aep__EnrollmentMode: SharedKeyFile

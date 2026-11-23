@@ -5,7 +5,7 @@ on:
     paths:
       - 'deploy/images/**'
       - 'scripts/packaging/**'
-      - 'src/Agentstration.Extensions.Foundry/**'
+      - 'src/extensions/Agentstration.Extensions.Foundry/**'
       - 'tests/Agentstration.ModelProviders.Tests/**'
       - 'aep/**'
       - 'Dockerfile.extension'

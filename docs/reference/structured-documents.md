@@ -131,7 +131,7 @@ unavailable exact version. Errors and traces do not log document bodies or Secre
 
 ## Optional PostgreSQL extension
 
-Publish or run `src/Agentstration.Extensions.PostgreSql` independently, enroll it
+Publish or run `src/extensions/Agentstration.Extensions.PostgreSql` independently, enroll it
 through the existing AEP workflow and explicitly create its Connected Service and
 Storage. The contributed `postgresql.jsonb@1.0.0` requirements are typed `host`,
 `port`, `database`, `username` and secured `password`. No automatic connection or

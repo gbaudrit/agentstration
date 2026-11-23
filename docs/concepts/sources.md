@@ -65,7 +65,7 @@ configuration:
 
 Branches and tags are resolved to an immutable commit SHA before content is acquired. Materialization fetches that exact commit and returns a bounded ZIP; it never checks out or executes repository code, hooks, submodules, or build scripts. The provider accepts no implicit default branch and supports public repositories only. `credentialsRef` is reserved but rejected until private authentication has a complete local Secret boundary.
 
-The standalone extension requires `git` on `PATH` and can be started with `dotnet run --project src/Agentstration.Extensions.Git`; its default development endpoint is `http://localhost:5290`. `GitSourceProvider:GitExecutable`, `GitSourceProvider:MaximumRepositoryBytes`, and `GitSourceProvider:ResolveTimeoutSeconds` configure its executable and hard limits. Local file repositories remain disabled unless `GitSourceProvider:AllowLocalRepositories=true` is set explicitly for development or offline tests. Aspire starts and registers the extension automatically.
+The standalone extension requires `git` on `PATH` and can be started with `dotnet run --project src/extensions/Agentstration.Extensions.Git`; its default development endpoint is `http://localhost:5290`. `GitSourceProvider:GitExecutable`, `GitSourceProvider:MaximumRepositoryBytes`, and `GitSourceProvider:ResolveTimeoutSeconds` configure its executable and hard limits. Local file repositories remain disabled unless `GitSourceProvider:AllowLocalRepositories=true` is set explicitly for development or offline tests. Aspire starts and registers the extension automatically.
 
 ## Local Source Providers
 

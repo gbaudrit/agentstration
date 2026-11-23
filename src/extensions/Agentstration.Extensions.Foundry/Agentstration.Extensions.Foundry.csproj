@@ -3,9 +3,9 @@
     <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/version.txt').Trim())</Version>
   </PropertyGroup>
   <ItemGroup Condition="'$(UseLocalAepProjects)' == 'true'">
-    <ProjectReference Include="../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
-    <ProjectReference Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
-    <ProjectReference Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
+    <ProjectReference Include="../../../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+    <ProjectReference Include="../../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
+    <ProjectReference Include="../../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(UseLocalAepProjects)' != 'true'">
     <PackageReference Include="Agentstration.Aep.Abstractions" />

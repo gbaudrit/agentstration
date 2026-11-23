@@ -83,7 +83,7 @@ dotnet run --project src/Agentstration.Web
 ```powershell
 # Autonomous extension; retain the usual AEP enrollment settings as well.
 $env:Ollama__Inference__Timeout = "00:10:00"
-dotnet run --project src/Agentstration.Extensions.Ollama
+dotnet run --project src/extensions/Agentstration.Extensions.Ollama
 ```
 
 For Aspire, set both keys on **Agentstration.AppHost**, either in its configuration

@@ -11,7 +11,7 @@ on:
       - src/Agentstration.Web.FlowDesigner/**
       - src/Agentstration.Workplace.*/**
       - src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/**
-      - src/Agentstration.Extensions.Utilities/**
+      - src/extensions/Agentstration.Extensions.Utilities/**
       - global.json
       - Directory.Build.props
       - Directory.Build.targets
@@ -28,7 +28,7 @@ on:
       - src/Agentstration.Web.FlowDesigner/**
       - src/Agentstration.Workplace.*/**
       - src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/**
-      - src/Agentstration.Extensions.Utilities/**
+      - src/extensions/Agentstration.Extensions.Utilities/**
       - global.json
       - Directory.Build.props
       - Directory.Build.targets
@@ -105,10 +105,10 @@ jobs:
           dotnet restore automation/playwright/fixtures/SourcePolicyHost/SourcePolicyHost.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Web/Agentstration.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
-          dotnet restore src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
-          dotnet restore src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
-          dotnet restore src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
-          dotnet restore src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
+          dotnet restore src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
           dotnet restore src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj -p:NuGetAudit=true -p:NuGetAuditMode=all
       - name: Build browser hosts
         run: |
@@ -118,10 +118,10 @@ jobs:
           dotnet build automation/playwright/fixtures/SourcePolicyHost/SourcePolicyHost.csproj --configuration Release --no-restore
           dotnet build src/Agentstration.Web/Agentstration.Web.csproj --configuration Release --no-restore
           dotnet build src/Agentstration.Workplace.Web/Agentstration.Workplace.Web.csproj --configuration Release --no-restore
-          dotnet build src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj --configuration Release --no-restore
-          dotnet build src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj --configuration Release --no-restore
-          dotnet build src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj --configuration Release --no-restore
-          dotnet build src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj --configuration Release --no-restore
+          dotnet build src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj --configuration Release --no-restore
+          dotnet build src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj --configuration Release --no-restore
+          dotnet build src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj --configuration Release --no-restore
+          dotnet build src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj --configuration Release --no-restore
           dotnet build src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj --configuration Release --no-restore
       - name: Install browser automation dependencies
         working-directory: automation/playwright

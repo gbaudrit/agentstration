@@ -14,7 +14,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Foundry.dll
     depends_on:
       foundry-key-provisioner:

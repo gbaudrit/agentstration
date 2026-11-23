@@ -8,6 +8,14 @@ composition remain external deployment concerns.
 
 ## Tracked executables
 
+Autonomous extension projects live under `src/extensions/`, retaining their
+`Agentstration.Extensions.<Name>` project and assembly names. Product-owned
+extension management modules (`Agentstration.Extensions`, `.Aep`, `.Api` and
+`.Contracts`) remain directly under `src/`. The MAF AWP Worker also remains outside
+the extension directory. Moving a project does not change its extension identity,
+version or image name; catalogue paths and source-based launch commands use the
+new directory.
+
 | Component | Packaging issue | Tracking label |
 | --- | --- | --- |
 | Shared catalogue and publisher | [#1289](https://github.com/gbaudrit/agentstration/issues/1289) | — |

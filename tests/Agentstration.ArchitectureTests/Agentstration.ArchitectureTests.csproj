@@ -10,12 +10,12 @@
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.AspNetCore/Agentstration.Aep.AspNetCore.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <ProjectReference Condition="'$(UseLocalAepProjects)' == 'true'" Include="../../aep/src/Agentstration.Aep.MicrosoftExtensionsAI/Agentstration.Aep.MicrosoftExtensionsAI.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../../src/Agentstration.Console.Client/Agentstration.Console.Client.csproj" />

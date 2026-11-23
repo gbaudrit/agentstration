@@ -2,7 +2,7 @@
   <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
     <None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
     <ProjectReference Include="../../asp/samples/StructuredDocuments/StructuredDocuments.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
