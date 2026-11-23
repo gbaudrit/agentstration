@@ -1,12 +1,17 @@
 """Offline publication contracts; no registry, cloud credential or model access."""
 import copy
 import hashlib
+import http.server
 import json
 from pathlib import Path
+import socket
+import struct
 import subprocess
 import tempfile
+import threading
 import unittest
-from unittest.mock import patch
+import urllib.error
+from unittest.mock import MagicMock, patch
 
 import images
 import smoke
@@ -113,6 +118,57 @@ class ImageContracts(unittest.TestCase):
         manifest["contributions"]["modelProviders"] = []
         with self.assertRaises(ValueError):
             smoke.check_manifest(manifest, delivery)
+
+    def test_health_wait_retries_startup_transport_failures(self):
+        errors = (ConnectionResetError("reset"), ConnectionRefusedError("refused"),
+                  TimeoutError("timeout"), urllib.error.URLError("not listening"))
+        for error in errors:
+            with self.subTest(error=type(error).__name__):
+                healthy = MagicMock()
+                healthy.__enter__.return_value.status = 200
+                with patch.object(smoke.urllib.request, "urlopen", side_effect=[error, healthy]) as request, \
+                        patch.object(smoke.time, "sleep") as pause:
+                    smoke.wait_for_health("http://127.0.0.1:8080")
+                self.assertEqual(2, request.call_count)
+                pause.assert_called_once_with(1)
+
+    def test_health_wait_stops_when_the_startup_deadline_expires(self):
+        with patch.object(smoke.urllib.request, "urlopen", side_effect=ConnectionResetError("reset")) as request, \
+                patch.object(smoke.time, "monotonic", side_effect=[0, 1]), \
+                patch.object(smoke.time, "sleep") as pause:
+            with self.assertRaisesRegex(ValueError, "within 1 seconds"):
+                smoke.wait_for_health("http://127.0.0.1:8080", timeout_seconds=1)
+        self.assertEqual(1, request.call_count)
+        pause.assert_not_called()
+
+    def test_health_wait_recovers_from_a_real_tcp_reset(self):
+        attempts = [0]
+
+        class StartingServer(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                attempts[0] += 1
+                if attempts[0] == 1:
+                    self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+                    self.close_connection = True
+                    return
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.HTTPServer(("127.0.0.1", 0), StartingServer)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            for _ in range(2):  # Initial startup and the same transport race after restart.
+                attempts[0] = 0
+                smoke.wait_for_health(f"http://127.0.0.1:{server.server_port}", timeout_seconds=5)
+                self.assertGreaterEqual(attempts[0], 2)
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join()
 
 
 if __name__ == "__main__":

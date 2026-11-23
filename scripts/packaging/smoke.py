@@ -25,6 +25,21 @@ def check_manifest(manifest, delivery):
         raise ValueError("Expected extension contribution is missing.")
 
 
+def wait_for_health(base, timeout_seconds=60):
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            with urllib.request.urlopen(base + "/health", timeout=3) as response:
+                if response.status != 200:
+                    raise ValueError("Image is not healthy.")
+            return
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            # Docker's published port can accept TCP before the application is listening.
+            if time.monotonic() >= deadline:
+                raise ValueError(f"Image did not become healthy within {timeout_seconds} seconds.") from None
+            time.sleep(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--delivery", required=True, type=Path)
@@ -49,17 +64,7 @@ def main():
             port = container["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"]
             base = f"http://127.0.0.1:{port}"
             for iteration in range(2):
-                deadline = time.monotonic() + 60
-                while True:
-                    try:
-                        with urllib.request.urlopen(base + "/health", timeout=3) as response:
-                            if response.status != 200:
-                                raise ValueError("Image is not healthy.")
-                        break
-                    except (urllib.error.URLError, TimeoutError):
-                        if time.monotonic() >= deadline:
-                            raise ValueError("Image did not become healthy within 60 seconds.") from None
-                        time.sleep(1)
+                wait_for_health(base)
                 try:
                     urllib.request.urlopen(base + "/.well-known/aep", timeout=5).close()
                     raise ValueError("AEP discovery unexpectedly accepted an unauthenticated request.")
