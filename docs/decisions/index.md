@@ -307,3 +307,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 250. [ADR-0250 — Initial Bootstrap waits for required extension contributions](0250-initial-bootstrap-waits-for-required-extension-contributions.md)
 
 252. [ADR-0252 — Extension images have independent OCI releases](0252-extension-images-have-independent-oci-releases.md)
+
+253. [ADR-0253 — MAF Worker images have independent AWP releases](0253-maf-worker-images-have-independent-awp-releases.md)

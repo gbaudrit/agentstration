@@ -18,6 +18,7 @@ import uuid
 
 import images
 import smoke
+from images import delivery_entry
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -39,8 +40,8 @@ def enrollment_snapshot(database, delivery, instance_id):
     enrollment, registration = enrollments[0], registrations[0]
     definition = enrollment["definition"]
     require(definition["instanceId"] == instance_id, "Authority enrollment does not match the persisted instance.")
-    require(definition["extensionId"] == delivery["extension"]["extensionId"]
-            and definition["extensionVersion"] == delivery["extension"]["version"], "Authority identity/version mismatch.")
+    require(definition["extensionId"] == delivery_entry(delivery)["extensionId"]
+            and definition["extensionVersion"] == delivery_entry(delivery)["version"], "Authority identity/version mismatch.")
     require(definition["state"] == "available" and definition["targetScopeRef"] == "/instance",
             f"Enrollment state={definition['state']}, outcome={definition.get('outcome')}; expected available at /instance.")
     require(definition["enrollmentMode"] == "sharedKeyFile", "Wrong enrollment method.")
@@ -85,7 +86,7 @@ def announce(authority, manifest, instance_id, key, expected=200):
 
 def run(delivery_path, image, authority_image, output):
     delivery = json.loads(delivery_path.read_text(encoding="utf-8"))
-    require(delivery["extension"]["id"] == "foundry", "This enrollment scenario is specific to Foundry.")
+    require(delivery_entry(delivery)["id"] == "foundry", "This enrollment scenario is specific to Foundry.")
     require(images.DIGEST.fullmatch(delivery["digest"]) and image.endswith("@" + delivery["digest"]),
             "Enrollment smoke must consume the exact OCI delivery digest.")
     subprocess.run(["docker", "pull", image], check=True)
@@ -159,9 +160,9 @@ def run(delivery_path, image, authority_image, output):
                 else:
                     require(before == snapshot, "Container recreation changed installation, registration or scope assignment.")
                 print(f"PASS Foundry {'startup' if iteration == 0 else 'recreation'}: authenticated discovery, available enrollment and stable identity.", flush=True)
-            report = {"reference": image, "sourceSha": delivery["sourceSha"], "version": delivery["extension"]["version"],
+            report = {"reference": image, "sourceSha": delivery["sourceSha"], "version": delivery_entry(delivery)["version"],
                       "authorityImageId": authority_id, "aepVersion": manifest["protocolVersion"],
-                      "platform": delivery["extension"]["platform"], "scopeRef": "/instance",
+                      "platform": delivery_entry(delivery)["platform"], "scopeRef": "/instance",
                       "storage": "Sqlite", "enrollmentMode": "SharedKeyFile",
                       "authenticatedDiscovery": True, "invalidBearerRejected": True, "invalidAnnouncementProofRejected": True,
                       "signedReannouncementIdempotent": True, "containerRecreationPreservesIdentity": True, **before}

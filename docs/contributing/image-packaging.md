@@ -40,8 +40,9 @@ The labels also live in `.github/labels.json` for maintenance through the existi
 
 ## Foundry pilot
 
-The implemented catalogue currently contains only `foundry`, under
-`deploy/images/extensions/foundry.json`. Its recipe reuses `Dockerfile.extension`
+The AEP catalogue contains `foundry`, under
+`deploy/images/extensions/foundry.json`. The AWP Worker is described separately
+below. Foundry’s recipe reuses `Dockerfile.extension`
 for Linux amd64. Future entries are added when their actual build/smoke vertical
 is delivered; tracking an issue does not imply an image is already published.
 
@@ -63,14 +64,16 @@ dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration R
 
 ## Build once and validate
 
-Product **CI** calls the reusable **Validate extension OCI image** workflow for
-Foundry image inputs. The required `build-and-test` check includes its result;
+Product **CI** calls the reusable **Validate OCI image** workflow for the
+implemented image catalogue entries. Foundry-only inputs select Foundry; Worker/AWP
+inputs select the Worker; shared packaging inputs select both. Worker product
+changes retain conservative product validation. The required `build-and-test` check includes its result;
 Foundry-only changes use this targeted validation while shared or mixed inputs
 retain the transverse checks described in [Testing](testing.md#ci-inventory-and-execution-safeguards).
 The reusable workflow has read-only repository access and contains no publication
 job. There is one PR image build, not a second independently triggered image run.
 
-The **Extension OCI images** delivery workflow reuses that same validation for
+The **OCI images** delivery workflow reuses that same validation for
 extension release tags and manual dispatch. A manual dispatch takes an implemented
 catalogue ID and defaults to validation only. Opting into `publish_preview`
 publishes the tested archive to private GHCR after the build/smoke job succeeds.
@@ -127,7 +130,7 @@ the exact build command. Then run:
 python3 scripts/packaging/enrollment_smoke.py \
   --delivery artifacts/extension/delivery.json \
   --image localhost:5000/extension@sha256:<delivery-digest> \
-  --authority-image agentstration-foundry-smoke-authority:local \
+  --authority-image agentstration-packaging-smoke-authority:local \
   --output artifacts/extension/enrollment-smoke.json
 ```
 
@@ -211,6 +214,96 @@ cannot preserve the artifact fails publication. The publisher validates the
 archive checksum and refuses replacement of a tag with a different digest.
 Deployment consumers must retain the actual digest reference, not resolve a
 mutable convenience tag at deployment time.
+
+## MAF AWP Worker
+
+[#1300](https://github.com/gbaudrit/agentstration/issues/1300) adds `maf-worker` under
+`deploy/images/workers/`. It is an **AWP Worker**, not an AEP extension. Its existing
+`Dockerfile.worker` accepts the same pinned base-image inputs and uses a direct
+`dotnet` entrypoint. The independent initial version is `0.1.0`; AWP `1.0`, workload
+authentication `1`, capability `microsoft-agent-framework/1.0`, and execution
+material versions `1.0`/`1.1` remain separate. See [ADR-0253](../decisions/0253-maf-worker-images-have-independent-awp-releases.md).
+
+```sh
+python3 scripts/packaging/images.py describe --image maf-worker
+python3 scripts/packaging/images.py build --image maf-worker \
+  --repository gbaudrit/agentstration --directory artifacts/worker
+```
+
+The historical `--extension` spelling and workflow dispatch input `extension`
+remain supported for compatibility; they select a catalogue image ID. The manual
+**OCI images** selector offers `foundry` and `maf-worker` and defaults to validation
+without publication. Private Worker previews target
+`ghcr.io/gbaudrit/agentstration-worker-maf:sha-<full-source-sha>`. Establish private
+package visibility and repository Actions Write access before opting into
+`publish_preview`; missing/inaccessible/public metadata blocks the upload.
+
+An official tag would be `worker/maf-worker/v0.1.0` and would copy the same archive
+to `docker.io/agentstration/worker-maf:0.1.0`. **Docker Hub and official tags remain
+deferred**; do not create this tag merely to validate a private preview. Image
+validation is not evidence of an actual registry publication.
+
+New Worker delivery documents contain `component` metadata; existing AEP receipts
+retain `extension`. The shared publisher reads either format and rejects ambiguous
+documents. Per-image OCI artifacts are named `oci-image-<id>-<run>-<attempt>`;
+small delivery/smoke evidence is retained separately as
+`oci-evidence-<id>-<run>-<attempt>` for 30 days. Archives remain retained seven days.
+
+### Worker configuration and lifecycle
+
+Supply `Agentstration:RuntimeWorker:AuthorityUrl`, stable `WorkerId`, `CredentialId`,
+`InstanceId` and `SharedKeyFile`. The authority configures the same IDs and file
+under `Agentstration:AwpWorkerTrust:Credentials`. Keep the key outside images and
+mount it read-only. Distinct installations need distinct Worker and credential
+IDs/files. HTTP requires explicit `AllowInsecureHttp=true` for isolated Development;
+use HTTPS outside that fixture. Never supply a database connection or server data
+mount to the Worker.
+
+Alternatively, the existing outbound pairing path uses `CredentialStateFile` and
+a one-time code through standard input or protected `PairingCodeFile`. Persist the
+credential-state directory outside the container, restrict access, and remove the
+pairing file after use. Do not place a code or credential in command-line arguments,
+images or logs. Pairing is not AEP enrollment.
+
+`MaximumConcurrentAssignments` bounds whole Runs (default 1, range 1–64);
+`MaximumConcurrentProcessRuns` bounds process units (default 4, range 1–16).
+`/health/live` reports process liveness independently from registration;
+`/health/ready` and the existing aggregate `/health` require successful AWP
+registration. A restarted process keeps its Worker identity/credential and creates
+a fresh session. Restart does not resume active assignments; ADR-0168's explicit
+Worker-loss behavior remains authoritative.
+
+### Worker image validation
+
+`scripts/packaging/maf-worker.smoke.compose.yml` uses only the exact Worker digest
+and a locally built SQLite authority from the same source/pinned bases. It reuses
+the existing Development and deterministic echo Flow bootstrap profiles, with a
+random temporary administrator password. Published ports bind only to loopback.
+The Worker has only a read-only key mount; server data is a separate mount.
+
+The smoke starts the Worker while the authority is absent and requires live=200,
+ready=503. It then authenticates an administrator, verifies that unsigned AWP
+registration is rejected, submits a Flow that remains pending without a Worker,
+and checks the exact echo output and the assignment's Worker/session. After
+removing and recreating both containers, it repeats execution with the same Worker
+and credential, requiring a new session. No model or Azure credential is used.
+
+After staging an archive and building the same local authority fixture as the
+reusable workflow, run on a Linux Docker host with Compose v2:
+
+```sh
+python3 scripts/packaging/worker_smoke.py \
+  --delivery artifacts/worker/delivery.json \
+  --image localhost:5000/extension@sha256:<delivery-digest> \
+  --authority-image agentstration-packaging-smoke-authority:local \
+  --output artifacts/worker/worker-smoke.json
+```
+
+`worker-smoke.json` records the source, Worker digest/version, authority image ID,
+Worker/credential identifiers, sessions and assignment identifiers. Keys, passwords,
+full logs and generated databases are not retained. This proves the recorded
+source/digest combination, not compatibility with all server versions or live
+inference. The fixture is not the preview composition tracked by #1281.
 
 ## Boundaries and remaining validation
 
