@@ -1,88 +1,70 @@
-name: Extension OCI images
+name: Recover first Foundry publication
 
 on:
-  push:
-    tags: ['extension/**']
   workflow_dispatch:
-    inputs:
-      extension:
-        description: Implemented image catalogue ID
-        default: foundry
-        required: true
-      publish_preview:
-        description: Publish the validated archive to private GHCR (no Docker Hub release)
-        type: boolean
-        default: false
 
 permissions:
   contents: read
+  actions: read
+  packages: write
 
 concurrency:
-  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
+  group: recover-first-foundry-package
   cancel-in-progress: false
 
 jobs:
-  validate-and-build:
-    uses: ./.github/workflows/validate-extension-image.yml
-    with:
-      extension: ${{ inputs.extension || 'foundry' }}
-      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-
-  publish:
-    needs: validate-and-build
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+  recover:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: write
-    env:
-      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v8
-        with:
-          name: extension-image-${{ github.run_id }}-${{ github.run_attempt }}
-          path: delivery
-      - name: Install OCI copy tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Publish the validated archive to private GHCR without rebuilding
+      - name: Recover privacy of the newly created test package
+        id: recover
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          release_arguments=()
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
-      - name: Log in to Docker Hub for an official extension release
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish the same archive to official Docker Hub
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        env:
-          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
-        run: >-
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
-          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
-          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
-      - name: Retain immutable publication references
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            delivery/delivery.json
-            delivery/publication-*.json
-          if-no-files-found: warn
-          retention-days: 30
+          python3 - <<'PY'
+          import datetime, json, os, urllib.request, urllib.error
+          repository = 'gbaudrit/agentstration'
+          package = 'agentstration-extension-foundry'
+          source = 'd322a0a83d3bad7952f3bdd89b3c8c767b5ec904'
+          endpoint = 'users/gbaudrit/packages/container/' + package
+          def api(path, method='GET', data=None):
+              request = urllib.request.Request('https://api.github.com/' + path, method=method,
+                  data=json.dumps(data).encode() if data is not None else None,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                           'Accept': 'application/vnd.github+json',
+                           'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json'})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  content = response.read()
+                  return json.loads(content) if content else None
+          metadata = api(endpoint)
+          visibility = metadata['visibility']
+          print('Package visibility:', visibility, flush=True)
+          if visibility != 'private':
+              assert visibility == 'public', 'Unexpected package visibility.'
+              run = api('repos/' + repository + '/actions/runs/45205494328')
+              created = datetime.datetime.fromisoformat(metadata['created_at'].replace('Z', '+00:00'))
+              started = datetime.datetime.fromisoformat(run['created_at'].replace('Z', '+00:00'))
+              assert created >= started, 'Package predates the authorized first publication.'
+              versions = api(endpoint + '/versions?per_page=100')
+              tags = [tag for version in versions for tag in version.get('metadata', {}).get('container', {}).get('tags', [])]
+              assert tags and set(tags) == {'sha-' + source}, 'Package has content outside this first publication.'
+              try:
+                  api(endpoint, 'PATCH', {'visibility': 'private'})
+              except urllib.error.HTTPError as error:
+                  if error.code not in (404, 405, 422):
+                      raise
+                  print('Visibility update unavailable; removing only the newly created public test package.', flush=True)
+                  api(endpoint, 'DELETE')
+              try:
+                  metadata = api(endpoint)
+              except urllib.error.HTTPError as error:
+                  if error.code != 404:
+                      raise
+                  metadata = None
+          private = metadata is not None and metadata['visibility'] == 'private'
+          assert metadata is None or private, 'Package remains non-private.'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('private=' + str(private).lower() + '\n')
+          print('Recovery result:', 'private' if private else 'public test package removed', flush=True)
+          PY
