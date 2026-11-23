@@ -107,8 +107,12 @@ The default private destination is
 `ghcr.io/gbaudrit/agentstration-extension-foundry:sha-<full-source-sha>`.
 The publisher checks existing GHCR package visibility before copying, verifies
 private visibility after publication, and uses the job-scoped `GITHUB_TOKEN`.
-Grant this repository Actions access when a package already exists. New GHCR
-packages default to private. No broad registry credential enters the build.
+The package must already exist with explicitly verified private visibility and
+grant this repository Actions access. Provision it through the registry owner's
+administration process before enabling preview publication. Missing packages,
+inaccessible metadata and non-private visibility stop publication before any
+image copy; the publisher never relies on automatic package creation or registry
+visibility defaults. No broad registry credential enters the build.
 
 An official Foundry release uses Git tag `extension/foundry/v0.1.0`. The workflow
 checks that the tag matches `version.txt` and belongs to `main`. It then builds
