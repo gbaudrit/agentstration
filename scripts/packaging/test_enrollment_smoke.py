@@ -5,8 +5,9 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from enrollment_smoke import enrollment_snapshot
+from enrollment_smoke import announce, enrollment_snapshot
 
 
 class EnrollmentEvidenceTests(unittest.TestCase):
@@ -65,6 +66,16 @@ class EnrollmentEvidenceTests(unittest.TestCase):
                 self.store(self.enrollment, registration)
                 with self.assertRaises(ValueError):
                     enrollment_snapshot(self.database, self.delivery, self.instance)
+
+    def test_signed_reannouncement_matches_the_aep_dotnet_protocol_vector(self):
+        # Generated with AepEnrollmentProofs.Sign and AepProtocol.JsonOptions, not Python serialization.
+        manifest = {"extension": {"id": "Agentstration.Extensions.Foundry", "name": "Microsoft Foundry",
+                    "version": "0.1.0", "description": "Optional Microsoft Foundry model-deployment discovery for Agentstration."}}
+        with patch("enrollment_smoke.time.time", return_value=1), patch("enrollment_smoke.request") as request:
+            announce("http://authority:8080", manifest, self.instance, "public-disposable-protocol-test-fixture")
+        self.assertEqual("sharedKeyFile", request.call_args.args[2]["method"])
+        self.assertEqual("vdwgwdeVSHD7A7ekwfOkpgp6QA73Y5U68cfXyot9Zqo=",
+                         request.call_args.args[3]["X-AEP-Enrollment-Signature"])
 
     def test_duplicate_installation_is_not_accepted_as_restart_success(self):
         self.store(self.enrollment, self.registration, duplicate=True)

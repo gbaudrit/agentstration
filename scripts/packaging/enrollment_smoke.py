@@ -74,7 +74,7 @@ def announce(authority, manifest, instance_id, key, expected=200):
     # Match AEP's documented HMAC JSON payload/property order, including nullable pairingUri.
     identity = {field: manifest["extension"].get(field) for field in ("id", "name", "version", "description")}
     announcement = {"instanceId": instance_id, "extension": identity, "endpoint": "http://foundry:8080/",
-                    "pairingUri": None, "method": "SharedKeyFile"}
+                    "pairingUri": None, "method": "sharedKeyFile"}
     timestamp = int(time.time())
     payload = json.dumps({"timestamp": timestamp, "announcement": announcement}, separators=(",", ":")).encode()
     signature = base64.b64encode(hmac.digest(key.encode(), payload, "sha256")).decode()
