@@ -5,6 +5,7 @@ import base64
 import hmac
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import sqlite3
@@ -34,14 +35,14 @@ def enrollment_snapshot(database, delivery, instance_id):
             ("AepEnrollmentRequest", "ExtensionRegistration")).fetchall()
     enrollments = [json.loads(payload) for kind, payload in rows if kind == "AepEnrollmentRequest"]
     registrations = [json.loads(payload) for kind, payload in rows if kind == "ExtensionRegistration"]
-    require(len(enrollments) == len(registrations) == 1, "Expected exactly one enrollment and one registration.")
+    require(len(enrollments) == len(registrations) == 1, f"Expected one enrollment and one registration; found {len(enrollments)} and {len(registrations)}.")
     enrollment, registration = enrollments[0], registrations[0]
     definition = enrollment["definition"]
     require(definition["instanceId"] == instance_id, "Authority enrollment does not match the persisted instance.")
     require(definition["extensionId"] == delivery["extension"]["extensionId"]
             and definition["extensionVersion"] == delivery["extension"]["version"], "Authority identity/version mismatch.")
     require(definition["state"] == "available" and definition["targetScopeRef"] == "/instance",
-            "SharedKeyFile enrollment is not available at the configured scope.")
+            f"Enrollment state={definition['state']}, outcome={definition.get('outcome')}; expected available at /instance.")
     require(definition["enrollmentMode"] == "sharedKeyFile", "Wrong enrollment method.")
     require(registration["metadata"]["name"] == definition["registrationName"]
             and registration["scopeRef"] == "/instance", "Registration is not bound to the enrollment scope.")
@@ -141,8 +142,8 @@ def run(delivery_path, image, authority_image, output):
                     try:
                         snapshot = enrollment_snapshot(directory / "authority/control-plane.db", delivery, instance_id)
                         break
-                    except (ValueError, sqlite3.OperationalError):
-                        require(time.monotonic() < deadline, "Authority did not persist an available Foundry enrollment.")
+                    except (ValueError, sqlite3.OperationalError) as error:
+                        require(time.monotonic() < deadline, f"Authority did not persist an available Foundry enrollment: {error}")
                         time.sleep(1)
                 # Prove idempotency of a signed reannouncement; an invalid proof must be rejected even for an existing ID.
                 response = announce(authority, manifest, instance_id, key)
@@ -166,6 +167,16 @@ def run(delivery_path, image, authority_image, output):
                       "signedReannouncementIdempotent": True, "containerRecreationPreservesIdentity": True, **before}
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            # Emit only recognized technical failure categories, never raw logs/configuration.
+            logs = subprocess.run([*command, "logs", "--no-log-prefix", "--tail", "100"], env=environment,
+                                  capture_output=True, text=True, check=False).stdout
+            statuses = re.findall(r"Response status code does not indicate success: ([0-9]{3})", logs)
+            reasons = re.findall(r"Automatic AEP enrollment .*? could not complete: ([a-z_]+)", logs)
+            print("Enrollment diagnostics:", json.dumps({"announcementHttpFailures": statuses,
+                  "automaticEnrollmentFailures": reasons, "connectionRefused": "Connection refused" in logs,
+                  "dnsFailure": "Name or service not known" in logs}), flush=True)
+            raise
         finally:
             # Do not dump container logs/configuration or archive key files and generated stores.
             compose("down", "--volumes", "--remove-orphans", "--timeout", "20")
