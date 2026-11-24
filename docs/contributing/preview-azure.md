@@ -78,9 +78,21 @@ Storage providers and check regional B-family vCPU quota before provisioning.
 3. Create an Entra application/service principal with GitHub federation:
    issuer `https://token.actions.githubusercontent.com`, audience
    `api://AzureADTokenExchange`, subject
-   `repo:gbaudrit/agentstration:environment:preview-deployment`. Create no client secret.
+   `repo:gbaudrit@248441222/agentstration@1318041041:environment:preview-deployment`.
+   This repository uses GitHub immutable subjects, verified with
+   `gh api repos/gbaudrit/agentstration/actions/oidc/customization/sub`
+   (`use_immutable_subject: true`, `use_default: true`). For another repository,
+   inspect its actual `sub_claim_prefix` and append
+   `:environment:preview-deployment`; do not assume the older name-only subject.
+   See [GitHub immutable subjects](https://docs.github.com/en/actions/reference/security/oidc#immutable-subject-claims).
+   Create no client secret.
 4. Render `deploy/preview/azure/operator-role.json` with `AssignableScopes` set
-   to the exact resource group ID and create that custom role. Assign it to
+   to the exact resource group ID and create that custom role through Azure CLI
+   (`az role definition create --role-definition @rendered-role.json`). This is
+   an **Azure RBAC** role under the resource group’s **Access control (IAM)**,
+   not an Entra application role. The checked-in file uses Azure CLI format;
+   [portal imports use a `properties` wrapper](https://learn.microsoft.com/en-us/azure/role-based-access-control/custom-roles-portal#start-from-json).
+   Assign it to
    the federated principal **at the resource group only**. Its actions allow
    the required VM/disk/network operations and deployments, not role assignment,
    user-assigned identity assignment or storage-key access. VM write permission
