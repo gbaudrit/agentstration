@@ -225,7 +225,8 @@ class PreviewContracts(unittest.TestCase):
         self.assertIn("Password=" + secret, configuration["ConnectionStrings"]["Agentstration"])
         self.assertNotIn(secret, json.dumps(first))
         _, environment = preview.compose_command(self.directory)
-        self.assertNotIn(secret, json.dumps(environment))
+        self.assertFalse(any(secret in value for value in environment.values()),
+                         "A database credential must not enter the Compose process environment.")
         repeated = self.prepare()
         self.assertEqual(first, repeated)
         self.assertEqual(secret, (self.directory / "postgres.password").read_text())
