@@ -32,7 +32,8 @@ public sealed class RuntimeWorkerAssignmentService(
     RuntimeWorkerLeaseOptions options,
     RuntimeAssignmentAvailabilitySignal availability,
     RuntimeAssignmentLeaseGuardRegistry leaseGuards,
-    IRuntimeAssignmentProjection? configuredProjection = null)
+    IRuntimeAssignmentProjection? configuredProjection = null,
+    IRuntimeAssignmentAdmission? admission = null)
 {
     private const int MaximumEventPayloadLength = 2 * 1024 * 1024;
 
@@ -146,6 +147,7 @@ public sealed class RuntimeWorkerAssignmentService(
         var token = CreateOwnershipToken();
         var request = new RuntimeWorkerClaimRequest
         {
+            AllowedAssignmentIds = admission?.ClaimableAssignmentIds,
             AttemptId = new RuntimeAssignmentAttemptId(Guid.NewGuid()),
             WorkerId = workerId,
             WorkerSessionId = workerSessionId,
@@ -154,8 +156,14 @@ public sealed class RuntimeWorkerAssignmentService(
             ExecutionMaterialVersions = executionMaterialVersions,
             MaximumConcurrentAssignments = maximumConcurrentAssignments
         };
+        if (request.AllowedAssignmentIds is { Count: 0 }) return null;
         var claimed = await assignments.ClaimNextAsync(request, Digest(token), now, now.Add(options.LeaseDuration), cancellationToken);
         if (claimed is null) return null;
+        if (admission?.ClaimableAssignmentIds is { } currentAdmission && !currentAdmission.Contains(claimed.Value.Id))
+        {
+            _ = await assignments.RequestCancellationExactAsync(claimed.Value.ExecutionScopeRef, claimed.Value.Id, timeProvider.GetUtcNow(), cancellationToken);
+            return null;
+        }
         var attempt = claimed.Value.CurrentAttempt ?? throw new InvalidOperationException("The claimed assignment has no active attempt.");
         return new ClaimedRuntimeWorkerAssignment(
             claimed.Value,
@@ -175,6 +183,7 @@ public sealed class RuntimeWorkerAssignmentService(
 
     public async Task<RuntimeAssignmentHeartbeat> HeartbeatAsync(RuntimeAssignmentOwnershipProof proof, CancellationToken cancellationToken)
     {
+        EnsureAdmitted(proof);
         var renewed = await RetryAssignmentMutationAsync(() =>
         {
             var observed = timeProvider.GetUtcNow();
@@ -202,8 +211,11 @@ public sealed class RuntimeWorkerAssignmentService(
 
     public Task<RuntimeAssignmentAuthorization> AuthorizeAsync(
         RuntimeAssignmentOwnershipProof proof,
-        CancellationToken cancellationToken) =>
-        assignments.ValidateOwnershipAsync(proof, Digest(proof.OwnershipToken), timeProvider.GetUtcNow(), cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        EnsureAdmitted(proof);
+        return assignments.ValidateOwnershipAsync(proof, Digest(proof.OwnershipToken), timeProvider.GetUtcNow(), cancellationToken);
+    }
 
     public Task<RuntimeAssignmentStepExecution> OpenStepExecutionAsync(
         RuntimeAssignmentOwnershipProof proof,
@@ -230,6 +242,7 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken)
     {
         if (commandId == Guid.Empty) throw new ArgumentException("The command identity must not be empty.", nameof(commandId));
+        EnsureAdmitted(proof);
         ArgumentException.ThrowIfNullOrWhiteSpace(flowRunId);
         ArgumentException.ThrowIfNullOrWhiteSpace(flowVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(flowDefinitionHash);
@@ -269,6 +282,7 @@ public sealed class RuntimeWorkerAssignmentService(
         CancellationToken cancellationToken)
     {
         if (commandId == Guid.Empty) throw new ArgumentException("The command identity must not be empty.", nameof(commandId));
+        EnsureAdmitted(proof);
         ArgumentException.ThrowIfNullOrWhiteSpace(runId);
         var now = timeProvider.GetUtcNow();
         return RetryAssignmentMutationAsync(() => assignments.OpenTurnAsync(proof, Digest(proof.OwnershipToken), new RuntimeAssignmentTurn
@@ -287,6 +301,7 @@ public sealed class RuntimeWorkerAssignmentService(
     public Task RegisterChildFlowAsync(RuntimeAssignmentOwnershipProof proof, string childFlowRunId,
         CancellationToken cancellationToken)
     {
+        EnsureAdmitted(proof);
         ArgumentException.ThrowIfNullOrWhiteSpace(childFlowRunId);
         return RetryAssignmentMutationAsync(() => assignments.RegisterChildFlowAsync(proof, Digest(proof.OwnershipToken), childFlowRunId,
             timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
@@ -297,6 +312,7 @@ public sealed class RuntimeWorkerAssignmentService(
         IReadOnlyList<RuntimeAssignmentExecutionEvent> events,
         CancellationToken cancellationToken)
     {
+        EnsureAdmitted(proof);
         if (events.Any(value => string.IsNullOrWhiteSpace(value.Kind) || value.Kind.Length > 128
             || value.Payload?.GetRawText().Length > MaximumEventPayloadLength))
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.LimitExceeded,
@@ -316,6 +332,7 @@ public sealed class RuntimeWorkerAssignmentService(
         System.Text.Json.JsonElement payload,
         CancellationToken cancellationToken)
     {
+        EnsureAdmitted(proof);
         ArgumentException.ThrowIfNullOrWhiteSpace(checkpointId);
         ArgumentException.ThrowIfNullOrWhiteSpace(schemaVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(compatibilityKey);
@@ -332,6 +349,7 @@ public sealed class RuntimeWorkerAssignmentService(
         string checkpointId,
         CancellationToken cancellationToken)
     {
+        EnsureAdmitted(proof);
         ArgumentException.ThrowIfNullOrWhiteSpace(checkpointId);
         return assignments.GetCheckpointAsync(proof, Digest(proof.OwnershipToken), checkpointId,
             timeProvider.GetUtcNow(), cancellationToken);
@@ -365,6 +383,7 @@ public sealed class RuntimeWorkerAssignmentService(
         RuntimeAssignmentTerminalCommand command,
         CancellationToken cancellationToken)
     {
+        EnsureAdmitted(proof);
         var result = await RetryAssignmentMutationAsync(() => assignments.CompleteAsync(proof, Digest(proof.OwnershipToken), command, timeProvider.GetUtcNow(), cancellationToken), cancellationToken);
         leaseGuards.Revoke(proof.WorkspaceId, proof.AssignmentId);
         await projection.ProjectTerminalAsync(result, cancellationToken);
@@ -432,6 +451,12 @@ public sealed class RuntimeWorkerAssignmentService(
         var stored = await assignments.CreateAsync(assignment, cancellationToken);
         availability.Pulse();
         return stored;
+    }
+
+    private void EnsureAdmitted(RuntimeAssignmentOwnershipProof proof)
+    {
+        if (admission?.ClaimableAssignmentIds is { } allowed && !allowed.Contains(proof.AssignmentId))
+            throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.ExecutionSuspended, "Assignment execution is suspended by the host.");
     }
 
     private static string CreateOwnershipToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))

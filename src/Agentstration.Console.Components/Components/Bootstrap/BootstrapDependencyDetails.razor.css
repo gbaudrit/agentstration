@@ -1,0 +1,9 @@
+.bootstrap-dependency-details { overflow-wrap: anywhere; }
+.is-waiting, .is-failed { padding: .75rem 1rem; border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-warning) 9%, var(--surface)); }
+.is-failed { border-color: color-mix(in srgb, var(--color-danger) 35%, var(--border)); background: color-mix(in srgb, var(--color-danger) 6%, var(--surface)); }
+p { margin: .35rem 0 .75rem; color: var(--muted); }
+dl { margin-block-end: 0; }
+dl { display: grid; grid-template-columns: minmax(7rem, auto) minmax(0, 1fr); gap: .35rem 1rem; }
+dt { color: var(--muted); }
+dd { margin: 0; }
+@media (max-width: 540px) { dl { grid-template-columns: minmax(0, 1fr); } dd { margin-block-end: .5rem; } }

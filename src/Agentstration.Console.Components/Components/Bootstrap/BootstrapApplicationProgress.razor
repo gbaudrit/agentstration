@@ -27,14 +27,33 @@
             else { <span>@Localizer["ProcessedResources", Application.Definition.Resources.Count]</span> }
         </div>
         @if (Application.Definition.CurrentResource is { } current) { <p>@Localizer["CurrentResource", Application.Definition.Resources.Count + 1] <code>@current.Kind/@current.Name</code></p> }
+        @if (Application.Definition.Operation is { } operation && Application.Definition.Status == BootstrapApplicationStatus.Running)
+        {
+            <div role="status" data-testid="bootstrap-operation-stage">
+                <p>@Localizer["OperationStage." + operation.Stage] · @Localizer["OperationElapsed", Math.Max(0, (Time.GetUtcNow() - operation.StartedAt).TotalSeconds).ToString("F0", System.Globalization.CultureInfo.CurrentCulture)]</p>
+                @if (operation.FlowRunId is { } run) { <a href="@("/flow-runs/" + Uri.EscapeDataString(run) + "?context=" + Uri.EscapeDataString(FlowRunContext.Value))">@Localizer["DiscoveryFlowRun"]</a> }
+                <p>@Localizer["ConsumersPending"]</p>
+            </div>
+        }
         @if (Application.Definition.ResourcePlan.Count == 0 && Application.Definition.TotalResources > 0) { <p>@Localizer["ObservedResourcesOnly"]</p> }
     </HeaderContent>
 </StepProgress>
 
 @code {
+    [Parameter] public TimeProvider Time { get; set; } = TimeProvider.System;
     [Parameter] public string? TargetLabel { get; set; }
     [Parameter, EditorRequired] public BootstrapApplicationResource Application { get; set; } = default!;
     private bool following = true;
+    private Agentstration.Resources.ResourceScopeRef FlowRunContext
+    {
+        get
+        {
+            var current = Application.Definition.Applications.FirstOrDefault(item => item.Profile == Application.Definition.CurrentResource?.Profile);
+            var target = current?.ResolvedTarget ?? Application.Definition.Target;
+            return target?.WorkspaceId is { } workspace ? Agentstration.Resources.ResourceScopeRef.Workspace(workspace)
+                : target?.TenantId is { } tenant ? Agentstration.Resources.ResourceScopeRef.Tenant(tenant) : Agentstration.Resources.ResourceScopeRef.Instance;
+        }
+    }
     private string? observedApplication;
     private string ProgressKey => Application.Definition.Resources.Count + ":" + Application.Definition.CurrentResource?.Location + ":" + Application.Definition.Status;
     private Task FollowChanged(bool value) { following = value; return Task.CompletedTask; }
@@ -87,6 +106,11 @@
             return steps;
         }
     }
-    private RenderFragment Preparation => @<section><h2>@Localizer["Preparation"]</h2><p>@Localizer["PreparationDescription"]</p><p>@string.Join(" → ", Application.Definition.Profiles)</p></section>;
+    private RenderFragment Preparation => @<section><h2>@Localizer["Preparation"]</h2><p>@Localizer["PreparationDescription"]</p><p>@string.Join(" → ", Application.Definition.Profiles)</p>
+        @foreach (var profile in Application.Definition.Profiles)
+        {
+            <div><strong>@profile</strong><BootstrapProfileSourceViewer @key="profile" Profile="@profile" Source="@Application.Definition.Selection?.Source" /></div>
+        }
+    </section>;
     private RenderFragment Panel(IReadOnlyList<BootstrapApplicationProgressRow> rows, string title) => @<BootstrapApplicationResources Rows="rows" Title="@title" TargetLabel="@TargetLabel" FollowCurrent="@following" FollowCurrentChanged="FollowChanged" />;
 }

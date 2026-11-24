@@ -16,6 +16,82 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapProgressComponentTests
 {
     [TestMethod]
+    [DataRow("en-US", "View YAML files", "Profile file")]
+    [DataRow("fr-FR", "Voir les fichiers YAML", "Fichier du profil")]
+    public void OriginalProfileYamlIsLoadedOnDemandAndRemainsReadOnly(string cultureName, string button, string fileLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var api = new StubClient();
+        using var context = Context(api, application: false);
+        var cut = context.Render<BootstrapProfileSourceViewer>(p => p.Add(x => x.Profile, "nantes-alertes"));
+        Assert.AreEqual(0, api.FileReads);
+        cut.Find("button").Click();
+        cut.WaitForAssertion(() => Assert.AreEqual("kind: BootstrapProfile", cut.Find("textarea").GetAttribute("value")));
+        Assert.IsTrue(cut.Find("textarea").HasAttribute("readonly"));
+        StringAssert.Contains(cut.Markup, button);
+        StringAssert.Contains(cut.Markup, fileLabel);
+        Assert.AreEqual(2, api.FileReads);
+        cut.Render(p => p.Add(x => x.Profile, "another-profile"));
+        Assert.AreEqual(0, cut.FindAll("textarea").Count);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Required version", "Required by resource")]
+    [DataRow("fr-FR", "Version attendue", "Requise par la ressource")]
+    public void MissingContributionShowsItsExactSelectorAndConsumer(string cultureName, string versionLabel, string consumerLabel)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = Context(new StubClient(), application: false);
+        var cut = context.Render<BootstrapDependencyDetails>(p => p
+            .Add(x => x.Dependency, new("agentstration.extensions.postgresql", "StorageType", "postgresql.jsonb", "1.0.0", null, "Storage", "nantes-alertes-jsonb"))
+            .Add(x => x.Reason, "contribution_unavailable"));
+        foreach (var value in new[] { versionLabel, consumerLabel, "StorageType", "postgresql.jsonb", "1.0.0", "Storage/nantes-alertes-jsonb" })
+            StringAssert.Contains(cut.Find("[data-testid='bootstrap-dependency-details']").TextContent, value);
+    }
+
+    [TestMethod]
+    public void SourceReadFailuresExposeNoTransportDetailsAndCanBeRetried()
+    {
+        var api = new StubClient { FailFiles = true };
+        using var context = Context(api, application: false);
+        var cut = context.Render<BootstrapProfileSourceViewer>(p => p.Add(x => x.Profile, "nantes-alertes"));
+        cut.Find("button").Click();
+        cut.WaitForAssertion(() => Assert.AreEqual(1, cut.FindAll("[role='alert']").Count));
+        Assert.DoesNotContain("private-transport-sentinel", cut.Markup, StringComparison.Ordinal);
+        Assert.AreEqual(0, cut.FindAll("textarea").Count);
+        api.FailFiles = false;
+        cut.Find(".button-secondary").Click();
+        cut.WaitForAssertion(() => Assert.AreEqual("kind: BootstrapProfile", cut.Find("textarea").GetAttribute("value")));
+        Assert.AreEqual(0, cut.FindAll("[role='alert']").Count);
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Waiting for a Worker", "View discovery Flow Run")]
+    [DataRow("fr-FR", "En attente d’un Worker", "Voir l’exécution de la découverte")]
+    public void DiscoveryWaitUsesLocalizedDurableStageAndLogicalRunContext(string cultureName, string stage, string link)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = Context(new StubClient());
+        var application = new BootstrapApplicationResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Metadata = new() { Name = "discovery" },
+            Definition = new()
+            {
+                Profiles = ["nantes-alertes"],
+                CurrentResource = new("nantes-alertes", "60.yaml", "ConnectedServiceOperationDiscovery", "nantes", BootstrapResourceDisposition.Create),
+                Operation = new("waiting_worker", DateTimeOffset.UnixEpoch, "flowrun-discovery")
+            }
+        };
+        var cut = context.Render<BootstrapApplicationProgress>(p => p.Add(x => x.Application, application));
+        StringAssert.Contains(cut.Find("[data-testid='bootstrap-operation-stage']").TextContent, stage);
+        var anchor = cut.Find("[data-testid='bootstrap-operation-stage'] a");
+        Assert.AreEqual(link, anchor.TextContent);
+        Assert.AreEqual("/flow-runs/flowrun-discovery?context=%2Finstance", anchor.GetAttribute("href"));
+        Assert.HasCount(0, cut.FindAll("[data-testid='bootstrap-operation-stage'] progress"));
+    }
+
+    [TestMethod]
     public async Task FollowingTracksTheActiveResourcePageAndTerminalFailureWithoutStealingManualInspection()
     {
         using var culture = new TestCultureScope("en-US");
@@ -248,6 +324,15 @@ public sealed class BootstrapProgressComponentTests
 
     private sealed class StubClient : IBootstrapProfilesApiClient
     {
+        public int FileReads { get; private set; }
+        public bool FailFiles { get; set; }
+        public Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, CancellationToken cancellationToken)
+        {
+            FileReads++;
+            if (FailFiles) throw new HttpRequestException("private-transport-sentinel");
+            return Task.FromResult(new BootstrapProfileFiles(request.Profile, "digest", ["profile.yaml"], request.File,
+                request.File is null ? null : "kind: BootstrapProfile"));
+        }
         private readonly BootstrapApplicationResource application = new()
         {
             ApiVersion = ResourceApiVersions.CoreV1,

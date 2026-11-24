@@ -8,29 +8,11 @@
         <StatusBadge Text="@StepLocalizer[PresentationState.ToString()]" Status="@BadgeStatus" />
     </header>
     @if (Kind is null) { <p class="startup-step-description">@Localizer["Explanation_" + StepId]</p> }
-    @if (Snapshot.ActiveStepId == StepId && Snapshot.Activity is { } activity && (GroupId is null || activity.GroupId == GroupId) && (Kind is null || Kind == activity.ResourceKind || StepId == "extensions" && Kind == "ExtensionContribution"))
+    @if (!HasResourceRows && Snapshot.ActiveStepId == StepId && Snapshot.Activity is { } activity && (GroupId is null || activity.GroupId == GroupId) && (Kind is null || Kind == activity.ResourceKind || StepId == "extensions" && Kind == "ExtensionContribution"))
     {
-        @if (activity.WaitReason is not null)
-        {
-            <div class="startup-dependency-callout @(Snapshot.State == "failed" ? "is-failed" : null)" role="status">
-                <span aria-hidden="true"><UiIcon Name="@(Snapshot.State == "failed" ? "alert-triangle" : "clock")" /></span>
-                <div><strong>@Localizer[Snapshot.State == "failed" ? "DependencyUnresolved" : "WaitingForDependency"]</strong><p>@Localizer[Snapshot.State == "failed" ? "DependencyFailureDescription" : activity.WaitReason switch { "required_model_missing" => "ModelMissing", "contribution_unavailable" => "ContributionMissing", _ => "ProviderUnavailable" }]</p></div>
-            </div>
-        }
-        <dl class="startup-resource-facts">
-            @if (activity.ResourceName is not null) { <div><dt>@Localizer["Resource"]</dt><dd><code>@activity.ResourceKind / @activity.ResourceName</code></dd></div> }
-            @if (activity.TargetLevel is not null) { <div><dt>@Localizer["Target"]</dt><dd><code>@activity.TargetLevel</code></dd></div> }
-            @if (activity.ProviderName is not null) { <div><dt>@Localizer["Provider"]</dt><dd>@activity.ProviderName</dd></div> }
-            @if (activity.ModelName is not null) { <div><dt>@Localizer["ExpectedModel"]</dt><dd><code>@activity.ModelName</code></dd></div> }
-            @if (activity.ExtensionId is not null) { <div><dt>@Localizer["Extension"]</dt><dd><code>@activity.ExtensionId</code></dd></div> }
-            @if (activity.ContributionId is not null) { <div><dt>@Localizer["Contribution"]</dt><dd>@activity.ContributionId</dd></div> }
-        </dl>
-        @if (activity.CanChangeModel && activity.ResourceId is { } resourceId)
-        {
-            <BootstrapStartupModelCorrection AttemptId="@Snapshot.AttemptId" ResourceId="@resourceId" />
-        }
+        <BootstrapStartupActivityDetails Activity="@activity" AttemptId="@Snapshot.AttemptId" Failed="@(Snapshot.State == "failed")" />
     }
-    @if (Snapshot.Families.Any(family => family.StepId == StepId))
+    @if (HasResourceRows)
     {
         <BootstrapStartupResourceList Snapshot="@Snapshot" StepId="@StepId" Kind="@Kind" GroupId="@GroupId" FollowCurrent="@FollowCurrent" FollowCurrentChanged="@FollowCurrentChanged" />
     }
@@ -45,6 +27,8 @@
     [Parameter] public string? Kind { get; set; }
     [Parameter] public string? GroupId { get; set; }
     [Parameter] public string? GroupTitle { get; set; }
+    private bool HasResourceRows => Snapshot.Families.Any(family => family.StepId == StepId
+        && (Kind is null || family.Kind == Kind) && (GroupId is null || family.GroupId == GroupId));
     private BootstrapStartupFamily? SelectedFamily => Snapshot.Families.FirstOrDefault(family => family.StepId == StepId && family.Kind == Kind && (GroupId is null || family.GroupId == GroupId));
     private string FamilyLabel(string kind)
     {

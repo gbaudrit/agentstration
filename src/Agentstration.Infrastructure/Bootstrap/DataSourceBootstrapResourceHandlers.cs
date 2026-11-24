@@ -71,11 +71,17 @@ public sealed class DataSourceBootstrapResourceHandler(
         var value = WorkspaceBootstrapResource.Parse<DataSourceResource>(resource);
         var scope = value.ScopeRef ?? DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         value = value with { ScopeRef = scope };
-        if (await service.GetAsync(value.Namespace, value.Name, scope, cancellationToken) is not null)
+        if (await service.GetAsync(value.Namespace, value.Name, scope, cancellationToken) is { } existing)
+        {
+            EnsureSameDependencies(existing.Value, value);
             return new(BootstrapResourceDisposition.Skip);
+        }
         DataSourceManagementService.Validate(value);
         if (value.Definition.Dataset is not null)
+        {
+            await service.ValidateForCreateAsync(value, cancellationToken);
             return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
+        }
         var reference = value.Definition.Profile;
         var profileNamespace = reference!.Namespace ?? value.Namespace;
         var planned = WorkspaceBootstrapResource.IsAvailable(planning,
@@ -94,9 +100,19 @@ public sealed class DataSourceBootstrapResourceHandler(
         var value = WorkspaceBootstrapResource.Parse<DataSourceResource>(resource);
         var scope = value.ScopeRef ?? DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         value = value with { ScopeRef = scope };
-        if (await service.GetAsync(value.Namespace, value.Name, scope, cancellationToken) is not null)
+        if (await service.GetAsync(value.Namespace, value.Name, scope, cancellationToken) is { } existing)
+        {
+            EnsureSameDependencies(existing.Value, value);
             return BootstrapResourceApplyResult.Skipped;
+        }
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
+    }
+
+    private static void EnsureSameDependencies(DataSourceResource existing, DataSourceResource desired)
+    {
+        if (existing.Definition.Dataset is { } actual && desired.Definition.Dataset is { } requested
+            && (actual.Storage != requested.Storage || actual.Acquisition.Operation != requested.Acquisition.Operation))
+            throw new InvalidOperationException("bootstrap_dependency_revision_changed");
     }
 }

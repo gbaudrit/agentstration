@@ -5,6 +5,7 @@ namespace Agentstration.Bootstrap.Contracts;
 
 public interface IBootstrapProfileApiService
 {
+    Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapManagementView> GetAsync(Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, Guid actorPrincipalId, CancellationToken cancellationToken);

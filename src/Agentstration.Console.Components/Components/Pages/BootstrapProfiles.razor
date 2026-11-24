@@ -73,6 +73,7 @@ else
                                 <button type="button" class="text-button" disabled="@(busy || !CanMove(index, -1))" @onclick="() => Move(index, -1)">@T("Up")</button>
                                 <button type="button" class="text-button" disabled="@(busy || !CanMove(index, 1))" @onclick="() => Move(index, 1)">@T("Down")</button>
                             </span>
+                            <div class="bootstrap-profile-source"><BootstrapProfileSourceViewer Profile="@name" Source="@sourceSelection" ExpectedDigest="@profile.Digest" /></div>
                         </li>
                     }
                     </ol></div>
@@ -128,6 +129,17 @@ else
     }
     else if (screen == BootstrapScreen.Preview && preview is not null)
     {
+        <FormSection Title="@T("ViewSourceFiles")"><ChildContent>
+            @foreach (var profile in preview.Profiles)
+            {
+                <div><strong>@profile.DisplayName</strong><BootstrapProfileSourceViewer @key="profile.Name" Profile="@profile.Name" Source="@sourceSelection" ExpectedDigest="@profile.Digest" /></div>
+            }
+        </ChildContent></FormSection>
+        @if (preview.Inputs.Count > 0)
+        {
+            <BootstrapConfigurationInputs Inputs="@preview.Inputs" Selections="@inputSelections" SelectionChanged="InputChanged" Disabled="@busy" />
+            <FormActions><button class="button-secondary" disabled="@busy" @onclick="PreviewAsync">@T("ReviewInputs")</button></FormActions>
+        }
         <FormSection Title="@T("PlanTargets")"><ChildContent>
             @if (PreviewTargets.Any(item => item.ValidationDeferred)) { <p class="inline-warning" role="status">@T("ValidationDeferred")</p> }
             <ol class="bootstrap-preview-targets">@foreach (var item in PreviewTargets) { <li><strong>@item.Profile</strong><span class="bootstrap-preview-target-label">@ScopeLabel(item.Scope) · @item.TargetLabel</span>@if (item.ValidationDeferred) { <StatusBadge Text="@T("ValidationDeferredLabel")" Status="UiStatus.Warning" /> }</li> }</ol>
@@ -136,17 +148,17 @@ else
             <div class="bootstrap-preview-summary"><StatusBadge Text="@(!preview.CanApply ? T("Invalid") : PreviewTargets.Any(item => item.ValidationDeferred) ? T("ValidationDeferredLabel") : T("Ready"))" Status="@(!preview.CanApply ? UiStatus.Danger : PreviewTargets.Any(item => item.ValidationDeferred) ? UiStatus.Warning : UiStatus.Success)" /><span><code>@preview.Digest[..12]</code></span><span>@T("ResourceCount", preview.Resources.Count)</span></div>
             <CollectionView TItem="BootstrapResourcePreview" Items="@preview.Resources.Skip((previewPage - 1) * 25).Take(25).ToArray()" InformationLabels="@(new string[] { T("Profile"), T("Target"), T("Details") })" IdentityLabel="@T("Resource")" StateLabel="@T("ExpectedAction")">
         <Identity Context="item">
-<strong>@item.Kind/@item.Name</strong><br /><small>@item.Location</small></Identity>
+<strong class="bootstrap-preview-identity">@item.Kind/@item.Name</strong><br /><small>@item.Location</small></Identity>
         <State Context="item">
 <StatusBadge Text="@DispositionLabel(item.Disposition)" Status="@DispositionTone(item.Disposition)" /></State>
         <Information Context="item">
             <CollectionValue Label="@T("Profile")"><code>@item.Profile</code></CollectionValue>
             <CollectionValue Label="@T("Target")">@item.TargetLabel</CollectionValue>
-            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <StatusBadge Text="@(item.Message == "bootstrap_validation_after_dependencies" ? T("ValidationDeferredLabel") : item.Message)" Status="UiStatus.Warning" /> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@detail.Description</small></li> }</ul> }</CollectionValue>
+            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <StatusBadge Text="@PreviewMessage(item.Message)" Status="UiStatus.Warning" /> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@(detail.Description is null ? null : PreviewMessage(detail.Description))</small></li> }</ul> }</CollectionValue>
         </Information>
     </CollectionView>
             <CollectionPager Page="@previewPage" Total="@preview.Resources.Count" PageSize="25" HasMore="@(previewPage * 25 < preview.Resources.Count)" SupportsDirectNavigation="true" PageChanged="value => previewPage = value" />
-            <div class="bootstrap-apply"><p>@T("ApplyDescription")</p><button class="button-primary" disabled="@(!preview.CanApply || busy)" @onclick="() => confirmApply = true">@T("ApplyPreview")</button></div>
+            <div class="bootstrap-apply"><p>@T("ApplyDescription")</p><button class="button-primary" disabled="@(!preview.CanApply || busy || inputsChanged)" @onclick="() => confirmApply = true">@T("ApplyPreview")</button></div>
         </ChildContent></FormSection>
     }
     else if (screen == BootstrapScreen.Application)
@@ -212,6 +224,13 @@ else
 </div>
 
 @code {
+    private IReadOnlyList<BootstrapInputSelection> inputSelections = [];
+    private bool inputsChanged;
+    private void InputChanged(BootstrapInputSelection input)
+    {
+        inputSelections = inputSelections.Where(item => item.Profile != input.Profile || item.Configuration != input.Configuration).Append(input).ToArray();
+        inputsChanged = true;
+    }
     [SupplyParameterFromQuery(Name = "stage")] public string? Stage { get; set; }
     [SupplyParameterFromQuery(Name = "applicationId")] public string? ApplicationId { get; set; }
     [SupplyParameterFromQuery(Name = "sourceScope")] public string? SourceScope { get; set; }
@@ -285,7 +304,8 @@ else
     private int previewPage = 1;
     private string InitialProfilesLabel => view is null || view.Catalog.InitialProfiles.Count == 0 ? T("None") : string.Join(" → ", view.Catalog.InitialProfiles);
     private IReadOnlyList<BootstrapProfileApplicationPreview> PreviewTargets => preview?.Applications is { Count: > 0 } entries ? entries
-        : preview?.Profiles.Select(item => new BootstrapProfileApplicationPreview(item.Name, item.Scope, TargetLabel(preview.Target), false)).ToArray() ?? [];
+        : preview?.Profiles.Select(item => new BootstrapProfileApplicationPreview(item.Name, item.Scope, TargetLabel(preview.Target),
+            preview.Resources.Any(resource => resource.Profile == item.Name && resource.ValidationDeferred))).ToArray() ?? [];
     private BootstrapProfileSummary Profile(string name) => sourceProfile?.Name == name ? sourceProfile : view!.Catalog.Profiles.Single(profile => profile.Name == name);
 
     protected override Task OnInitializedAsync() => LoadAsync();
@@ -436,6 +456,7 @@ else
         {
             previewSelection = Selection();
             preview = await Client.PreviewAsync(previewSelection, lifetime.Token); previewPage = 1; requestId = Guid.NewGuid();
+            inputsChanged = false;
             screen = BootstrapScreen.Preview;
             Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["stage"] = "preview", ["applicationId"] = null }));
         }
@@ -547,11 +568,19 @@ else
         return T("Instance");
     }
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
+    private string PreviewMessage(string message)
+    {
+        if (message == "bootstrap_validation_after_dependencies") return T("ValidationDeferredLabel");
+        var parts = message.Split(':', 2);
+        var value = Localizer["Diagnostic." + parts[0]];
+        return value.ResourceNotFound ? message : value.Value + (parts.Length == 2 ? ":" + parts[1] : string.Empty);
+    }
     private BootstrapProfileSelection Selection()
     {
         if (sourceSelection is not null || selectedProfiles.Count == 1)
-            return new(sourceSelection is null ? selectedProfiles.ToArray() : [], SelectedTarget(selectedProfiles[0])?.Target, Bindings(), sourceSelection);
-        return new([], Applications: Applications());
+            return new(sourceSelection is null ? selectedProfiles.ToArray() : [], SelectedTarget(selectedProfiles[0])?.Target, Bindings(), sourceSelection,
+                Inputs: inputSelections.Where(input => selectedProfiles.Contains(input.Profile)).ToArray());
+        return new([], Applications: Applications(), Inputs: inputSelections.Where(input => selectedProfiles.Contains(input.Profile)).ToArray());
     }
     private IReadOnlyList<BootstrapProfileApplication> Applications() => selectedProfiles.Select(name => new BootstrapProfileApplication(name,
         SelectedTarget(name)?.Target, Bindings().Where(binding => binding.Profile == name).ToArray(), SelectedTarget(name)?.Planned)).ToArray();
@@ -570,6 +599,7 @@ else
     {
         "bootstrap_target_invalid" or "bootstrap_target_not_planned" or "bootstrap_target_not_ready" => T("PlanTargetInvalid"),
         "bootstrap_bindings_invalid" => T("PlanBindingsInvalid"),
+        "bootstrap_input_selection_invalid" => T("Diagnostic.bootstrap_input_selection_invalid"),
         "bootstrap_application_cancelled" => T("ApplicationCancelled"),
         "bootstrap_application_interrupted" => T("ApplicationInterrupted"),
         "bootstrap_application_failed" or "bootstrap_resource_failed" => T("ApplicationFailed"),

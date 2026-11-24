@@ -156,11 +156,14 @@ public sealed class PostgreSqlRuntimeWorkerAssignmentStore(
             if (activeCount >= request.MaximumConcurrentAssignments) return null;
             var versions = request.RuntimeCapabilityVersions.ToArray();
             var materials = request.ExecutionMaterialVersions.ToArray();
-            var document = await context.WorkerAssignments
+            var admitted = request.AllowedAssignmentIds?.Select(value => value.Value).ToArray();
+            var candidates = context.WorkerAssignments
                 .Where(value => value.State == nameof(RuntimeAssignmentState.Pending)
                     && value.RuntimeCapability == request.RuntimeCapability
                     && versions.Contains(value.RuntimeCapabilityVersion)
-                    && materials.Contains(value.ExecutionMaterialVersion))
+                    && materials.Contains(value.ExecutionMaterialVersion));
+            if (admitted is not null) candidates = candidates.Where(value => admitted.Contains(value.AssignmentId));
+            var document = await candidates
                 .OrderBy(value => value.CreatedAt)
                 .FirstOrDefaultAsync(cancellationToken);
             if (document is null) return null;

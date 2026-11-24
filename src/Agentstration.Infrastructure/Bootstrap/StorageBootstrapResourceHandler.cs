@@ -20,8 +20,11 @@ public sealed class StorageBootstrapResourceHandler(
         var value = WorkspaceBootstrapResource.Parse<StorageResource>(resource);
         var scopeRef = value.ScopeRef ?? DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         value = value with { ScopeRef = scopeRef };
-        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is { } existing)
+        {
+            EnsureSameDependencies(existing.Value, value);
             return new(BootstrapResourceDisposition.Skip);
+        }
         await service.ValidateForCreateAsync(value, cancellationToken);
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Name, value.Namespace, resource);
     }
@@ -34,9 +37,19 @@ public sealed class StorageBootstrapResourceHandler(
         var value = WorkspaceBootstrapResource.Parse<StorageResource>(resource);
         var scopeRef = value.ScopeRef ?? DataSourceProfileBootstrapResourceHandler.TargetScope(operation);
         value = value with { ScopeRef = scopeRef };
-        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is not null)
+        if (await service.GetExactAsync(scopeRef, value.Namespace, value.Name, cancellationToken) is { } existing)
+        {
+            EnsureSameDependencies(existing.Value, value);
             return BootstrapResourceApplyResult.Skipped;
+        }
         _ = await service.CreateAsync(value, cancellationToken);
         return BootstrapResourceApplyResult.Created;
+    }
+
+    private static void EnsureSameDependencies(StorageResource existing, StorageResource desired)
+    {
+        if (existing.Definition.Type != desired.Definition.Type || existing.Definition.ConnectedService != desired.Definition.ConnectedService
+            || existing.Definition.ConnectedServiceType != desired.Definition.ConnectedServiceType)
+            throw new InvalidOperationException("bootstrap_dependency_revision_changed");
     }
 }

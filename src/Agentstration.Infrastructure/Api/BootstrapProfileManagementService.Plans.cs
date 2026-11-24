@@ -127,6 +127,7 @@ public sealed partial class BootstrapProfileManagementService
         var plan = await LoadPlanAsync(selection, actor, token);
         var resources = new List<BootstrapResourcePreview>();
         var applications = new List<BootstrapProfileApplicationPreview>();
+        var inputs = new List<BootstrapConfigurationInput>();
         var predecessorCreates = false;
         foreach (var item in plan)
         {
@@ -139,7 +140,9 @@ public sealed partial class BootstrapProfileManagementService
                 using var scope = PushTargetScope(await ResolveTargetContextAsync(item.ResolvedTarget, actor, token));
                 try
                 {
-                    preview = await bootstrap.PreviewAsync(new([item.Application.Profile], item.ResolvedTarget, await ResolvePlanBindingsAsync(item.Application, plan, token)), token);
+                    preview = await bootstrap.PreviewAsync(new([item.Application.Profile], item.ResolvedTarget, await ResolvePlanBindingsAsync(item.Application, plan, token),
+                        Inputs: selection.Inputs?.Where(input => input.Profile == item.Application.Profile).ToArray()), token);
+                    inputs.AddRange(preview.Inputs);
                     deferred = predecessorCreates && !preview.CanApply;
                 }
                 catch (DeclarativeBootstrapException) when (predecessorCreates) { deferred = true; }
@@ -152,7 +155,7 @@ public sealed partial class BootstrapProfileManagementService
                 Disposition = deferred && row.Disposition == BootstrapResourceDisposition.Invalid ? BootstrapResourceDisposition.Create : row.Disposition,
                 Message = deferred ? "bootstrap_validation_after_dependencies" : row.Message
             }));
-            applications.Add(new(item.Application.Profile, item.Profile.Summary.Scope, item.TargetLabel, deferred, deferred ? null : preview?.Digest) { ResolvedTarget = item.ResolvedTarget });
+            applications.Add(new(item.Application.Profile, item.Profile.Summary.Scope, item.TargetLabel, deferred || rows.Any(row => row.ValidationDeferred), deferred ? null : preview?.Digest) { ResolvedTarget = item.ResolvedTarget });
             predecessorCreates |= deferred || rows.Any(row => row.Disposition == BootstrapResourceDisposition.Create);
         }
         // Pin the ordered source bytes, original target identities and explicit bindings, not mutable outcomes.
@@ -165,7 +168,7 @@ public sealed partial class BootstrapProfileManagementService
         })))).ToLowerInvariant();
         return new(plan.Select(item => item.Profile.Summary).ToArray(), BootstrapProfileScope.Instance, null,
             plan.SelectMany(item => item.Application.Bindings ?? []).ToArray(), digest, resources)
-        { Applications = applications };
+        { Applications = applications, Inputs = inputs };
     }
 
     private async Task<BootstrapExecutionResult> ExecutePlanAsync(BootstrapProfileSelection selection, Guid actor,
@@ -196,11 +199,13 @@ public sealed partial class BootstrapProfileManagementService
                 preview = preview with { Applications = preview.Applications.Select(item => item.Profile == profile.Name ? item with { ResolvedTarget = target } : item).ToArray() };
                 if (first is not null) await report(new(preview, resources.ToArray(), first), token);
                 var completed = resources.ToArray();
-                var execution = await bootstrap.ExecuteAsync(new([profile.Name], target, await ResolvePlanBindingsAsync(application, await LoadPlanAsync(selection, actor, token), token)), token,
+                var execution = await bootstrap.ExecuteAsync(new([profile.Name], target, await ResolvePlanBindingsAsync(application, await LoadPlanAsync(selection, actor, token), token),
+                    Inputs: selection.Inputs?.Where(input => input.Profile == profile.Name).ToArray()), token,
                     expectedDigest: preview.Applications.Single(item => item.Profile == profile.Name).Digest,
                     reportProgress: (progress, cancellation) => report(new(preview,
                         completed.Concat(progress.Resources).ToArray(), progress.CurrentResource is { } current
-                            ? current with { TargetLabel = first?.TargetLabel } : null), cancellation), waitForDependencies: true);
+                            ? current with { TargetLabel = first?.TargetLabel } : null)
+                    { Operation = progress.Operation }, cancellation), waitForDependencies: true, actorPrincipalId: actor);
                 resources.AddRange(execution.Resources);
                 if (execution.Error is not null)
                 {

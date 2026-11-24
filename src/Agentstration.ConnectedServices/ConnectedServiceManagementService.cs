@@ -361,9 +361,15 @@ public sealed class ConnectedServiceManagementService(
         }, cancellationToken);
     }
 
+    public async Task ValidateForCreateAsync(ConnectedServiceResource resource, CancellationToken cancellationToken,
+        IReadOnlySet<string>? deferredInputs = null, IReadOnlySet<ScopedResourceAddress>? plannedSecrets = null) =>
+        _ = await ValidateAsync(resource, cancellationToken, deferredInputs, plannedSecrets);
+
     private async Task<ConnectedServiceObservedState> ValidateAsync(
         ConnectedServiceResource resource,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? deferredInputs = null,
+        IReadOnlySet<ScopedResourceAddress>? plannedSecrets = null)
     {
         if (resource.Kind != ConnectedServiceResourceKinds.ConnectedService
             || resource.ApiVersion != ResourceApiVersions.CoreV1)
@@ -396,7 +402,7 @@ public sealed class ConnectedServiceManagementService(
         await useAuthorizer.ValidateAsync(scopeRef, resource.Definition.UsePolicy, cancellationToken);
         var (_, version) = await ResolveTypeAsync(resource, cancellationToken);
         ValidateOptions(resource.Definition.Options, version.Schema);
-        await ValidateBindingsAsync(resource, version, cancellationToken);
+        await ValidateBindingsAsync(resource, version, cancellationToken, deferredInputs, plannedSecrets);
         return resource.Definition.Enabled
             ? Observed(ConnectedServiceAvailability.Ready)
             : Observed(ConnectedServiceAvailability.Disabled, "disabled", "The Connected Service is disabled.");
@@ -462,7 +468,9 @@ public sealed class ConnectedServiceManagementService(
     private async Task ValidateBindingsAsync(
         ConnectedServiceResource resource,
         ConnectedServiceTypeVersionDescriptor version,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlySet<string>? deferredInputs = null,
+        IReadOnlySet<ScopedResourceAddress>? plannedSecrets = null)
     {
         var duplicate = resource.Definition.Bindings.GroupBy(value => value.InputId, StringComparer.Ordinal)
             .FirstOrDefault(value => value.Count() > 1);
@@ -473,6 +481,8 @@ public sealed class ConnectedServiceManagementService(
         {
             if (!declared.TryGetValue(binding.InputId, out var input))
                 throw new ConnectedServiceValidationException($"Input '{binding.InputId}' is not declared by the pinned type revision.");
+            if (deferredInputs?.Contains(binding.InputId) == true && binding.Kind == ConnectedServiceBindingKind.Literal
+                && input.Protection == ConnectedServiceValueProtection.Standard) continue;
             ValidateBindingShape(binding, input);
             if (binding.Kind == ConnectedServiceBindingKind.Parameter)
             {
@@ -482,6 +492,9 @@ public sealed class ConnectedServiceManagementService(
             }
             else if (binding.Kind == ConnectedServiceBindingKind.Secret)
             {
+                var reference = binding.Secret!;
+                var address = new ScopedResourceAddress(reference.ScopeRef!.Value, reference.Address.Namespace, reference.Address.Kind, reference.Address.Name);
+                if (plannedSecrets?.Contains(address) == true && address.ScopeRef == resource.ScopeRef) continue;
                 await ValidateSecretReferenceAsync(binding, resource, cancellationToken);
             }
             else if (JsonSerializer.SerializeToUtf8Bytes(binding.Literal!.Value).Length > MaximumLiteralBytes)

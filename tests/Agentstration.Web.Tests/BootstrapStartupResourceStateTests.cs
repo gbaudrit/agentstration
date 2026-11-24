@@ -8,6 +8,51 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapStartupResourceStateTests
 {
     [TestMethod]
+    public void LaterContributionWaitsKeepTheirReasonsWithoutReplacingTheFirstBlockingResource()
+    {
+        var state = new BootstrapStartupState(); state.Begin(); state.MoveTo("extensions");
+        var first = state.RegisterResource("/instance", "nantes", "postgres.yaml", "extensions", "ExtensionContribution", "postgres");
+        var later = state.RegisterResource("/instance", "nantes", "openapi.yaml", "extensions", "ExtensionContribution", "openapi");
+        state.ObserveContributionWait("ConnectedService", "database", "postgres", "postgresql", first, "extension_unavailable");
+        state.ObserveOperation(first, "contribution_availability", "waiting");
+        state.ObserveContributionWait("ConnectedService", "alerts", "openapi", "openapi", later, makeCurrent: false);
+        state.ObserveOperation(later, "contribution_availability", "waiting");
+        var snapshot = state.Read();
+        Assert.AreEqual(first, snapshot.Activity?.ResourceId);
+        var rows = state.ReadResources(new(snapshot.AttemptId))!.Items;
+        Assert.AreEqual("extension_unavailable", rows[0].WaitReason);
+        Assert.AreEqual("contribution_unavailable", rows[1].WaitReason);
+        state.ObserveContributionWait("ConnectedService", "database", "postgres", "postgresql", first, "extension_unavailable");
+        state.ObserveContributionWait("ConnectedService", "alerts", "openapi", "openapi", later, makeCurrent: false);
+        Assert.AreEqual(snapshot.Revision, state.Read().Revision, "Polling unchanged dependencies must not rotate the active resource.");
+    }
+
+    [TestMethod]
+    public void ContributionWaitIdentifiesTheExactDependencyAndActiveFamilyWithoutLosingOtherWaits()
+    {
+        var state = new BootstrapStartupState(); state.Begin(); state.MoveTo("extensions");
+        var first = state.RegisterResource("/instance", "nantes", "contribution:postgresql", "extensions", "ExtensionContribution", "postgresql",
+            dependency: new("extension.postgresql", "ConnectedServiceType", "postgresql", "1.0.0", null, "ConnectedService", "database"));
+        var second = state.RegisterResource("/instance", "nantes", "contribution:jsonb", "extensions", "ExtensionContribution", "jsonb",
+            dependency: new("extension.postgresql", "StorageType", "postgresql.jsonb", "2.0.0", null, "Storage", "documents"));
+        state.ObserveContributionWait("ConnectedService", "database", "extension.postgresql", "postgresql", first, "extension_unavailable");
+        state.ObserveOperation(first, "contribution_availability", "waiting");
+        state.ObserveContributionWait("Storage", "documents", "extension.postgresql", "postgresql.jsonb", second);
+        state.ObserveOperation(second, "contribution_availability", "waiting");
+        var snapshot = state.Read();
+        var page = state.ReadResources(new(snapshot.AttemptId))!;
+        Assert.AreEqual(second, snapshot.Activity?.ResourceId);
+        Assert.AreEqual(page.Items[1].GroupId, snapshot.Activity?.GroupId);
+        Assert.AreEqual("/instance", snapshot.Activity?.TargetLevel);
+        Assert.AreEqual("extension_unavailable", page.Items[0].WaitReason);
+        Assert.AreEqual("StorageType", page.Items[1].Dependency?.ContributionKind);
+        Assert.AreEqual("2.0.0", page.Items[1].Dependency?.Version);
+        state.FinishResource(first, "succeeded");
+        Assert.IsNull(state.ReadResources(new(snapshot.AttemptId))!.Items[0].WaitReason);
+        Assert.AreEqual("extension_unavailable", page.Items[0].WaitReason, "Already returned pages remain immutable.");
+    }
+
+    [TestMethod]
     public void OnlySelectedFamiliesAreSummarizedAndResourceIdentityIncludesTargetAndProfile()
     {
         var state = new BootstrapStartupState(); state.Begin();

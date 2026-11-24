@@ -766,15 +766,20 @@ retain the last snapshot and polling resumes automatically. At readiness the pag
 keeps the completed results visible and stops polling. An explicit **Open Console**
 action opens a validated local return destination; completion never navigates away
 from the results automatically. These observations are not a durable
-startup journal or the manual Bootstrap application history. Existing startup
-readiness semantics remain authoritative; this delivery adds no critical-worker
-startup barrier.
+startup journal or the manual Bootstrap application history. Startup readiness
+remains false until finalization. Worker communications open after structure
+creation, before the explicit built-in-resource and extension-contribution phases.
+A compatible Worker is required only by an instruction that needs execution;
+purely declarative profiles complete without one.
 
 Administrators can still open provider/profile/extension repair pages with existing
-authorization and scope checks. Health readiness and execution routes remain
-unavailable, and execution workers stay suspended until all Bootstrap phases
-succeed. Provider discovery runs independently of this fence. See
-[ADR-0244](../decisions/0244-authenticated-startup-progress-and-admission.md).
+authorization and scope checks. Health readiness and ordinary execution routes
+remain unavailable. Authenticated AWP communication is admitted so Bootstrap can
+run discoveries through the normal durable Flow/Worker path. Atomic claims admit
+only server-selected Bootstrap assignments until final readiness; older pending
+work, recovery workers and Quartz scheduling remain suspended. Provider discovery
+runs independently of this fence. See [ADR-0253](../decisions/0253-initial-bootstrap-admits-its-own-worker-assignments.md)
+and [ADR-0244](../decisions/0244-authenticated-startup-progress-and-admission.md).
 
 If the deadline expires, the diagnostic identifies the profile, provider and exact
 missing model. The staged listener remains available for administrative repair;
@@ -808,6 +813,43 @@ administrator does not replace the selected application after reload. A temporar
 failure reconnects to the same identity without submitting again. Progress is
 persisted at resource boundaries. It stores resource identifiers and outcomes,
 never manifest bodies or resolved Secret/Parameter values.
+
+The Console can inspect each original profile YAML file from preparation, preview,
+the application's preparation step, or a startup resource's operation details.
+The read-only viewer includes `profile.yaml` and all top-level `.yaml`/`.yml`
+resource files, including every document in a multi-document file. It preserves
+authored `valueFrom.configuration` and reference markers: no configuration value
+is substituted. It reads the current catalogue, not an archived application
+snapshot. An existing preview digest is checked before displaying its source;
+when that catalogue changes, review a fresh preview before applying it.
+
+`POST /api/bootstrap/profiles/files` accepts a `profile`, optional `file`, optional
+pinned `source` selection and optional `expectedDigest`. Without `file`, it returns
+the permitted filenames and profile digest; with `file`, it also returns the
+original YAML. The endpoint is Platform-administrator-only, including while
+startup waits, sends `Cache-Control: no-store`, retains catalogue size/link checks,
+and rejects paths outside that profile's top-level manifest allowlist.
+
+Startup contribution rows retain their own expected extension ID, optional
+installation ID, contribution kind/ID/version and consuming resource. Operation
+details distinguish an unavailable extension from an unavailable contribution;
+they remain inspectable when another dependency becomes the active wait. Extension
+startup and enrollment still happen through their normal deployment mechanisms.
+The progress view opens the first unresolved dependency in plan order and places
+its expectation directly inside that resource's operation details. Model waits and
+their correction controls use the same row placement. Selecting or closing a row
+pauses automatic following; polling preserves that choice until following resumes.
+When a failure stops the plan, unopened resources are marked blocked rather than
+failed. Their operation details show the shared causal diagnostic and log reference,
+with the failing resource's identity when available. Initial discoveries run under
+an authorized Platform administrator created or retained by the structure phase.
+Their expanded resource rows show the expected Runtime capability, deadline,
+elapsed stage time and scoped Flow Run link. Missing Workers produce a bounded
+wait; timeout or cancellation prevents dependent creation. Attempt-bound admission
+is revoked on failure or retry, and create-only replay reuses materialized results.
+An explicit new application skips previously failed/cancelled discovery attempt
+keys, resumes an unfinished attempt and preserves successful discovery evidence.
+A failure in the current application stops it without an automatic retry loop.
 
 `POST /api/bootstrap/applications/{applicationId}/cancel` requests cooperative
 cancellation. Already-created resources remain. The current resource may finish
@@ -924,3 +966,95 @@ wait ends and Bootstrap resumes applying resources. Scrolling a pane does not
 disable following. Selecting a different step or using resource filters/paging
 pauses inspection temporarily; resuming following clears those filters so they
 cannot hide the current resource. Terminal failures retain their diagnostic view.
+
+## Configured resource graphs and operation discovery
+
+The opt-in [Nantes - Alertes profile](https://github.com/gbaudrit/agentstration/blob/main/deploy/bootstrap/profiles/nantes-alertes/README.md)
+is a complete Instance example applicable from `/settings/bootstrap`. ConnectedService,
+Vault, Secret and Schema handlers compose with Storage, DataSource and KnowledgeSource.
+A Schema may declare `definition.publishVersion`; publication delegates to the normal
+immutable Schema service.
+
+`resourceRef` is accepted only at typed Bootstrap revision fields:
+
+```yaml
+dataset:
+  storage:
+    resourceRef: {name: nantes-alertes-jsonb}
+  documentCollection: alertes
+  acquisition:
+    operation:
+      resourceRef: {name: nantes-operations, output: alertes}
+    parameters:
+      path: {dataset_id: 244400404_alertes-notifications-nantes-metropole}
+      query: {limit: 20}
+```
+
+The default namespace and logical scope are the consuming resource's application
+target. `namespace` and `scopeRef` are explicit selectors, subject to normal family
+permissions. Missing, wrong-kind, ambiguous and unsupported forward references fail.
+Type selectors also require `version`; extension-owned types continue to use
+`extensionContribution`. Storage `connectedService.resourceRef` resolves its exact
+revision and type; each explicit `{requirementId, exportName}` mapping resolves the
+complete authoritative export descriptor. `documentCollection` resolves a unique
+collection name within the selected Storage, never across storages.
+
+An explicit `ConnectedServiceOperationDiscovery` instruction declares
+`connectedService: {resourceRef: {name: ...}}` and an `operations` array of
+`{name, selector, enabled}`. Selectors match protocol fields exactly (`operationId`,
+`method`, `path` or HTTP `endpoint`, optionally `responseStatus` and
+`responseMediaType`). An output alias does not rename an operation. Only an
+unambiguous, available, read-only operation can satisfy acquisition. An already
+modified/disabled operation is retained for explicit operator review.
+
+Preview never invokes discovery. Rows identify deferred contract/parameter checks
+when earlier dependencies have not yet materialized. Execution validates resolved
+native definitions before creating consumers, stopping after the first failure.
+Discovery-bearing profiles support both initial Bootstrap and manual application.
+Their compatible Worker can connect before readiness, and only Bootstrap-owned
+assignments are admitted during initialization. Successful prerequisites remain
+after a partial application.
+
+Ordinary literal fields may use an initializer wrapper:
+
+```yaml
+literal:
+  valueFrom:
+    configuration: Agentstration:Bootstrap:Parameters:NantesPostgreSqlPort
+    type: integer
+    default: 5432
+```
+
+`type` supports string, integer, number, boolean, object and array. A nonempty
+configured value is parsed/validated as that type; an authored ordinary default is
+used only when configuration is absent/empty. A Secret's top-level
+`valueFrom.configuration` must use `Agentstration:Bootstrap:Secrets:*`; it has no
+plaintext manifest default. Values are evaluated on the authoritative server using
+normal IConfiguration precedence. Reapplication never rotates a configured Secret.
+
+Preview exposes `inputs` containing profile/resource/key, type, protection,
+availability and logical creation scope, without resolved values. Preview/apply
+requests accept optional application-local `inputs` selections with profile,
+configuration key, kind (`literal`, `parameter`, `secret`) and the corresponding
+literal or exact scoped reference. Secured inputs accept only configured Secret
+references. Ordinary Parameter choices are limited to supported native bindings;
+Parameter creation retains Tenant ownership. The Console reuses the shared value
+binding editor and contextual creators. Explicit contextual creation is a separate
+user command; it does not make preview a write operation. Review again after
+changing a selection. Selections neither rewrite manifests nor host configuration.
+
+AppHost forwards effective `Agentstration:Bootstrap:*` configuration to the authority
+also under NoBootstrap. Protected leaves use sensitive Aspire parameters; computed
+absolute catalogue path/activation and ordered initial profiles retain precedence.
+Other process configurations are unchanged. External configuration providers still
+require normal registration on the relevant host.
+
+Discovery progress extends the existing durable application with `operation`
+(stage, start time and optional Flow Run ID). Console polling displays Worker wait,
+discovery execution and selection/validation, elapsed time and a logical-context
+Flow Run link. Unknown remote progress has no fabricated percentage. Cancellation
+and the bounded `DiscoveryTimeout` stop consumers and request cancellation through
+the existing discovery boundary. Stable instruction keys reconnect to unfinished
+runs or reuse completed evidence. Process restarts retain existing Interrupted
+semantics; there is no automatic replay, rollback, consumer repinning or operation
+reactivation.

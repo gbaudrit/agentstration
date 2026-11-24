@@ -1,8 +1,9 @@
 using Agentstration.Bootstrap.Contracts;
+using Agentstration.Runtime.Abstractions;
 
 namespace Agentstration.Infrastructure;
 
-public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = null) : IBootstrapStartupStatus
+public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = null) : IBootstrapStartupStatus, IRuntimeAssignmentAdmission
 {
     private readonly object sync = new();
     private TaskCompletionSource? completion;
@@ -12,6 +13,23 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
     private string? failure;
     private BootstrapFailure? failureDiagnostic;
     private bool administrationReady;
+    private bool workerCommunicationOpen;
+    private readonly HashSet<RuntimeAssignmentId> admittedAssignments = [];
+    public bool WorkerCommunicationOpen { get { lock (sync) return workerCommunicationOpen; } }
+    public IReadOnlySet<RuntimeAssignmentId>? ClaimableAssignmentIds
+    {
+        get { lock (sync) return IsReady ? null : failure is null ? admittedAssignments.ToHashSet() : new HashSet<RuntimeAssignmentId>(); }
+    }
+    public void OpenWorkerCommunication() { lock (sync) { workerCommunicationOpen = true; revision++; } }
+    public void AdmitAssignment(Guid attempt, RuntimeAssignmentId assignment)
+    {
+        lock (sync)
+        {
+            if (attempt != attemptId || failure is not null || !workerCommunicationOpen)
+                throw new InvalidOperationException("bootstrap_execution_not_admitted");
+            admittedAssignments.Add(assignment);
+        }
+    }
     private string? activeStep;
     private BootstrapStartupActivity? activity;
     private int created, skipped, conflicts, failed;
@@ -29,10 +47,11 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
             attemptChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
             completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
             attemptId = Guid.NewGuid(); revision = 1; failure = null; failureDiagnostic = null; administrationReady = false;
+            workerCommunicationOpen = false; admittedAssignments.Clear();
             created = skipped = conflicts = failed = 0; activity = null;
             resourceRows.Clear(); lastGroupByStep.Clear(); activeResourceId = null;
             steps.Clear();
-            foreach (var id in new[] { "topology", "extensions", "resources", "finalization" }) steps.Add(id, "pending");
+            foreach (var id in new[] { "topology", "workers", "builtins", "extensions", "resources", "finalization" }) steps.Add(id, "pending");
             activeStep = "topology"; steps[activeStep] = "running";
         }
     }
@@ -85,12 +104,21 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
             ObserveOperationCore(activeResourceId, "model_discovery", "waiting");
         }
     }
-    public void ObserveContributionWait(string kind, string resource, string extension, string contribution)
+    public void ObserveContributionWait(string kind, string resource, string extension, string contribution,
+        string? resourceId = null, string reason = "contribution_unavailable", bool makeCurrent = true)
     {
         lock (sync)
         {
             if (activeStep != "extensions" || failure is not null) return;
-            var next = new BootstrapStartupActivity(kind, resource, WaitReason: "contribution_unavailable", ExtensionId: extension, ContributionId: contribution);
+            resourceRows.TryGetValue(resourceId ?? string.Empty, out var row);
+            if (row is not null && row.WaitReason != reason)
+            {
+                resourceRows[row.Id] = row with { WaitReason = reason };
+                revision++;
+            }
+            if (!makeCurrent) return;
+            var next = new BootstrapStartupActivity(kind, resource, WaitReason: reason, ExtensionId: extension, ContributionId: contribution,
+                ResourceId: row?.Id, TargetLevel: row?.TargetLevel, GroupId: row?.GroupId);
             if (activity == next && steps[activeStep] == "waiting") return;
             activity = next; steps[activeStep] = "waiting"; revision++;
         }
@@ -100,6 +128,7 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
         lock (sync)
         {
             if (failure is not null) return;
+            admittedAssignments.Clear();
             foreach (var id in steps.Keys) steps[id] = steps[id] == "pending" ? "skipped" : "succeeded";
             activeStep = null; activity = null; revision++;
             completion?.TrySetResult();
@@ -113,6 +142,7 @@ public sealed partial class BootstrapStartupState(TimeProvider? timeProvider = n
         {
             if (completion?.Task.IsCompleted == true) return;
             failure = reason;
+            admittedAssignments.Clear();
             failureDiagnostic = diagnostic;
             if (activeResourceId is { } id && resourceRows.TryGetValue(id, out var row)
                 && row.State is "running" or "waiting")

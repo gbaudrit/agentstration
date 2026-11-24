@@ -40,7 +40,8 @@ public sealed record BootstrapProfileSelection(
     BootstrapApplicationTarget? Target = null,
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
     BootstrapSourceProfileSelection? Source = null,
-    IReadOnlyList<BootstrapProfileApplication>? Applications = null);
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null,
+    IReadOnlyList<BootstrapInputSelection>? Inputs = null);
 
 public sealed record BootstrapResourcePreview(
     string Profile,
@@ -52,6 +53,7 @@ public sealed record BootstrapResourcePreview(
     IReadOnlyList<BootstrapResourcePlanDetail>? Details = null)
 {
     public string? TargetLabel { get; init; }
+    public bool ValidationDeferred { get; init; }
 }
 
 public sealed record BootstrapCompositionPreview(
@@ -63,8 +65,16 @@ public sealed record BootstrapCompositionPreview(
     IReadOnlyList<BootstrapResourcePreview> Resources,
     BootstrapSourceProvenance? SourceProvenance = null)
 {
+    public IReadOnlyList<BootstrapConfigurationInput> Inputs { get; init; } = [];
     public IReadOnlyList<BootstrapProfileApplicationPreview> Applications { get; init; } = [];
-    public bool CanApply => Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid);
+    public bool CanApply => Inputs.All(input => input.Configured) && Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid);
+}
+
+public sealed record BootstrapConfigurationInput(string Profile, string Resource, string Configuration,
+    string ValueType, bool Secured, bool Configured, ResourceScopeRef ScopeRef, ResourceNamespace Namespace)
+{
+    public bool AllowsParameter { get; init; }
+    public ResourceScopeRef? ParameterCreationScope { get; init; }
 }
 
 public sealed record BootstrapExecutionResult(
@@ -101,7 +111,8 @@ public sealed record BootstrapProfilePreviewRequest(
     BootstrapApplicationTarget? Target = null,
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
     BootstrapSourceProfileSelection? Source = null,
-    IReadOnlyList<BootstrapProfileApplication>? Applications = null);
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null,
+    IReadOnlyList<BootstrapInputSelection>? Inputs = null);
 
 public sealed record ApplyBootstrapProfilesRequest(
     IReadOnlyList<string> Profiles,
@@ -110,12 +121,18 @@ public sealed record ApplyBootstrapProfilesRequest(
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
     BootstrapSourceProfileSelection? Source = null,
     Guid? RequestId = null,
-    IReadOnlyList<BootstrapProfileApplication>? Applications = null);
+    IReadOnlyList<BootstrapProfileApplication>? Applications = null,
+    IReadOnlyList<BootstrapInputSelection>? Inputs = null);
 
 public sealed record BootstrapExecutionProgress(
     BootstrapCompositionPreview Preview,
     IReadOnlyList<BootstrapAppliedResource> Resources,
-    BootstrapResourcePreview? CurrentResource);
+    BootstrapResourcePreview? CurrentResource)
+{
+    public BootstrapOperationProgress? Operation { get; init; }
+}
+
+public sealed record BootstrapOperationProgress(string Stage, DateTimeOffset StartedAt, string? FlowRunId = null);
 
 public sealed record BootstrapBindingTargetsRequest(
     BootstrapApplicationTarget? Target,

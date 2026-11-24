@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: nantes-alertes
+definition:
+  displayName: Nantes - Alertes
+  description: Alertes Nantes Métropole, actualités RSS et Knowledge Source, sans transformation. Nécessite les extensions OpenAPI et PostgreSQL et un Worker.
+  targetScope: instance

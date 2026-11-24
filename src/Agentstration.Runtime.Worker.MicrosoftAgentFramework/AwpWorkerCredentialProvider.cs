@@ -112,6 +112,9 @@ internal sealed class AwpWorkerCredentialProvider(
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode) return;
+        if (response.StatusCode is System.Net.HttpStatusCode.ServiceUnavailable or System.Net.HttpStatusCode.BadGateway
+            or System.Net.HttpStatusCode.GatewayTimeout or System.Net.HttpStatusCode.RequestTimeout or System.Net.HttpStatusCode.TooManyRequests)
+            throw new HttpRequestException("AWP Worker enrollment is temporarily unavailable.", null, response.StatusCode);
         var detail = await response.Content.ReadAsStringAsync(cancellationToken);
         throw new InvalidOperationException($"AWP Worker enrollment failed with HTTP {(int)response.StatusCode}: {detail}");
     }
