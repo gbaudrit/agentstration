@@ -1,90 +1,162 @@
-name: OCI images
+name: Preview environment
 
 on:
-  push:
-    tags: ['extension/**', 'worker/**']
   workflow_dispatch:
     inputs:
-      extension:
-        description: Catalogue image ID (server, AEP extension or AWP Worker)
+      operation:
+        description: Lifecycle operation (reset is explicit destroy only)
         type: choice
-        options: [server, foundry, maf-worker]
-        default: foundry
+        options: [validate, deploy, status, destroy]
+        default: validate
         required: true
-      publish_preview:
-        description: Publish the validated archive to private GHCR (no Docker Hub release)
-        type: boolean
-        default: false
+      request:
+        description: Version 1 deployment request JSON (public metadata only, no credentials)
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      operation:
+        type: string
+        required: true
+      request:
+        type: string
+        required: true
+    outputs:
+      result:
+        description: Versioned safe lifecycle result JSON
+        value: ${{ jobs.execute.outputs.result || jobs.validate.outputs.result }}
+      environment-id:
+        value: ${{ jobs.validate.outputs.environment-id }}
+      state:
+        value: ${{ jobs.execute.outputs.state || 'validated' }}
+      url:
+        value: ${{ jobs.execute.outputs.url }}
+      resource-ids:
+        value: ${{ jobs.execute.outputs.resource-ids || '{}' }}
 
 permissions:
   contents: read
 
-concurrency:
-  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
-  cancel-in-progress: false
-
 jobs:
-  validate-and-build:
-    uses: ./.github/workflows/validate-oci-image.yml
-    with:
-      extension: ${{ inputs.extension || 'foundry' }}
-      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-
-  publish:
-    needs: validate-and-build
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+  validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      environment-id: ${{ steps.contract.outputs.environment-id }}
+      runner-labels: ${{ steps.contract.outputs.runner-labels }}
+      result: ${{ steps.contract.outputs.result }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate the deployment contract and execution boundary
+        id: contract
+        env:
+          REQUEST_JSON: ${{ inputs.request }}
+          OPERATION: ${{ inputs.operation }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS || '["self-hosted","linux","agentstration-preview"]' }}
+          CONFIGURED_RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS }}
+          STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import contract, lifecycle, preview
+          request = contract.loads(os.environ['REQUEST_JSON'])
+          operation = os.environ['OPERATION']
+          contract.operation(operation, request)
+          preview.require(request['registry'] == 'ghcr.io', 'Actions deployments require private GHCR deliveries.')
+          preview.require(all(item['repository'].lower() == os.environ['SOURCE_REPOSITORY'].lower()
+                              for item in request['deliveries'].values()), 'Actions deliveries must belong to this repository.')
+          labels = json.loads(os.environ['RUNNER_LABELS'])
+          preview.require(isinstance(labels, list) and 1 <= len(labels) <= 8
+                          and all(isinstance(label, str) and 1 <= len(label) <= 64 for label in labels), 'Invalid trusted runner labels.')
+          if operation != 'validate':
+              preview.require(os.environ['GITHUB_EVENT_NAME'] in ('workflow_dispatch', 'push')
+                              and os.environ['GITHUB_REF'] == 'refs/heads/main', 'Mutating/host operations require a trusted main workflow.')
+              preview.require(bool(os.environ['STATE_ROOT']) and Path(os.environ['STATE_ROOT']).is_absolute(),
+                              'Configure an absolute PREVIEW_STATE_ROOT on the trusted persistent host.')
+              preview.require(bool(os.environ['CONFIGURED_RUNNER_LABELS']) and 'self-hosted' in labels and 'linux' in labels,
+                              'Configure persistent self-hosted Linux runner labels pinned to the requested Docker host.')
+          path = Path(os.environ['RUNNER_TEMP']) / 'preview-request.json'
+          preview.private_write(path, json.dumps(request) + '\n')
+          result = lifecycle.execute('validate', request, None)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('environment-id=' + request['environmentId'] + '\n')
+              output.write('runner-labels=' + json.dumps(labels) + '\n')
+              output.write('result=' + json.dumps(result) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Validated preview `' + request['environmentId'] + '` for `' + request['provider'] + '`; operation `' + operation + '`.\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-request-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-request.json
+          retention-days: 1
+          if-no-files-found: error
+
+  execute:
+    needs: validate
+    if: inputs.operation != 'validate'
+    runs-on: ${{ fromJSON(needs.validate.outputs.runner-labels) }}
     timeout-minutes: 15
+    environment: preview-deployment
+    concurrency:
+      group: preview-${{ needs.validate.outputs.environment-id }}
+      cancel-in-progress: false
     permissions:
       contents: read
-      packages: write
+      packages: read
     env:
-      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+      DOCKER_CONFIG: /tmp/agentstration-preview-auth-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      result: ${{ steps.lifecycle.outputs.result }}
+      state: ${{ steps.lifecycle.outputs.state }}
+      url: ${{ steps.lifecycle.outputs.url }}
+      resource-ids: ${{ steps.lifecycle.outputs.resource-ids }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: oci-image-${{ needs.validate-and-build.outputs.image }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: delivery
-      - name: Install OCI copy tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
+          name: preview-request-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-request
       - uses: docker/login-action@v3
+        if: inputs.operation == 'deploy'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Publish the validated archive to private GHCR without rebuilding
+      - name: Execute the owned Docker lifecycle operation
+        id: lifecycle
         env:
-          GH_TOKEN: ${{ github.token }}
+          OPERATION: ${{ inputs.operation }}
+          STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
+          BOOTSTRAP_CONFIG: ${{ vars.PREVIEW_BOOTSTRAP_CONFIG }}
         run: |
-          release_arguments=()
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
-      - name: Log in to Docker Hub for an official image release
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish the same archive to official Docker Hub
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        env:
-          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
-        run: >-
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
-          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
-          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
-      - name: Retain immutable publication references
+          arguments=("$OPERATION" --request "$RUNNER_TEMP/preview-request/preview-request.json" --state-root "$STATE_ROOT" --output "$RUNNER_TEMP/preview-result.json")
+          if [[ "$OPERATION" == deploy && -n "$BOOTSTRAP_CONFIG" ]]; then arguments+=(--bootstrap-config "$BOOTSTRAP_CONFIG"); fi
+          python3 scripts/preview/lifecycle.py "${arguments[@]}"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'preview-result.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, value in {'result': json.dumps(result), 'state': result['state'], 'url': result['url'] or '',
+                                  'resource-ids': json.dumps(result['providerResourceIds'])}.items():
+                  output.write(name + '=' + value + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Preview `' + result['environmentId'] + '`: **' + result['state'] + '**\n\n')
+              summary.write('Host-local URL: ' + (result['url'] or '(none)') + '\n')
+              summary.write('\nExpiry: ' + (result['expiresAt'] or '(none)') + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
         if: always()
-        uses: actions/upload-artifact@v7
         with:
-          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            delivery/delivery.json
-            delivery/publication-*.json
-          if-no-files-found: warn
+          name: preview-result-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-result.json
           retention-days: 30
+          if-no-files-found: warn
