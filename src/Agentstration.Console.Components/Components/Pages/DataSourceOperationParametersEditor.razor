@@ -44,6 +44,7 @@
     [Parameter] public ResourceScopeRef? Scope { get; set; }
     [Parameter] public ResourceNamespace? Namespace { get; set; } = ResourceNamespace.Default;
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public IReadOnlyCollection<string> SingleLineTextFields { get; set; } = [];
     [CascadingParameter] private EditContext? EditContext { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<ParameterResource> parameters = [];
@@ -95,7 +96,8 @@
     }
     private ValueBindingRequirement Requirement(string name, JsonElement schema) => new(name,
         Schema is { } root && root.TryGetProperty("required", out var required) && required.EnumerateArray().Any(v => v.GetString() == name),
-        Type(schema) ?? "any", Description: Text(schema, "description"), Format: Text(schema, "format"), LiteralSchema: schema);
+        Type(schema) ?? "any", Description: Text(schema, "description"), Format: Text(schema, "format"), LiteralSchema: schema)
+        { SingleLineText = SingleLineTextFields.Contains(name, StringComparer.Ordinal) };
     private static string? Type(JsonElement schema) => Text(schema, "type");
     private static string? Text(JsonElement schema, string key) => schema.TryGetProperty(key, out var value)
         && value.ValueKind == JsonValueKind.String ? value.GetString() : null;

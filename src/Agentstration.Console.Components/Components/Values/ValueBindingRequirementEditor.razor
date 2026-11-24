@@ -23,7 +23,7 @@
             @if (Requirement.LiteralSchema is { } schema)
             {
                 <div class="binding-value-editor" data-testid="@(TestIdPrefix + "-binding-literal")">
-                    <JsonSchemaInputEditor Schema="schema" Value="@(selection.Literal ?? default)" AllowAnyRoot="true" Required="Requirement.Required"
+                    <JsonSchemaInputEditor Schema="schema" Value="@(selection.Literal ?? default)" AllowAnyRoot="true" Required="Requirement.Required" SingleLineText="Requirement.SingleLineText"
                         ValueChanged="SchemaLiteralChangedAsync" ValidationChanged="SchemaValidationChanged" Disabled="Disabled" Compact="true" ValueLabel="@T("Value")" />
                 </div>
             }

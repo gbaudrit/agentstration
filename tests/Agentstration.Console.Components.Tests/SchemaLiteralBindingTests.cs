@@ -11,6 +11,34 @@ namespace Agentstration.Web.Tests;
 public sealed partial class ModelProviderNavigationTests
 {
     [TestMethod]
+    public void SingleLineLiteralRetainsSchemaLengthValidationAndAdvancedEditing()
+    {
+        using var context = CreateContext(out _);
+        var editContext = new EditContext(new object());
+        ValueBindingSelection? selected = null;
+        var schema = ParseLiteral("""{"type":"string","minLength":1,"maxLength":2048}""");
+        var rendered = RenderSchemaLiteral(context, editContext, schema.GetRawText(), value => selected = value);
+        rendered.FindComponent<ValueBindingRequirementEditor>().Render(parameters => parameters.Add(value => value.Requirement,
+            new("query", true, "string", LiteralSchema: schema) { SingleLineText = true }));
+
+        var input = rendered.Find("[data-schema-path='$'] input");
+        Assert.AreEqual("1", input.GetAttribute("minlength"));
+        Assert.AreEqual("2048", input.GetAttribute("maxlength"));
+        Assert.HasCount(0, rendered.FindAll("textarea"));
+        input.Input("RSS search");
+        Assert.AreEqual("RSS search", selected!.Literal!.Value.GetString());
+        Assert.IsTrue(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
+
+        input.Input(new string('x', 2049));
+        Assert.IsFalse(context.Renderer.Dispatcher.InvokeAsync(editContext.Validate).GetAwaiter().GetResult());
+        input.Input("RSS search");
+        rendered.Find("[data-testid='schema-raw-mode']").Click();
+        Assert.AreEqual("\"RSS search\"", rendered.Find("textarea").GetAttribute("value"));
+        rendered.Find("[data-testid='schema-form-mode']").Click();
+        Assert.AreEqual("RSS search", rendered.Find("[data-schema-path='$'] input").GetAttribute("value"));
+    }
+
+    [TestMethod]
     [DataRow("en-US", "Value", "Advanced editing", "Enter a value.")]
     [DataRow("fr-FR", "Valeur", "Édition avancée", "Saisissez une valeur.")]
     public void CompactTextLiteralIsDirectlyEditableAndDoesNotRepeatItsDescription(string locale, string label, string advanced, string hint)

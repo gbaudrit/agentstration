@@ -22,7 +22,7 @@
         </FormField>
         @if (SelectedVariantIndex is >= 0 and var selected)
         {
-            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" Compact="Compact" />
+            <JsonSchemaField Schema="@(Schema.Variants![selected] with { Required = Schema.Required, Title = Schema.Variants[selected].Title ?? Schema.Title })" Value="Value" ValueChanged="ValueChanged" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="@Issues.Where(issue => issue.Path != Schema.Path).ToArray()" PreservePresence="PreservePresence" IsPresent="IsPresent" Compact="Compact" SingleLineText="SingleLineText" />
         }
     }
     else if (Schema.Kind == JsonSchemaInputKind.Map)
@@ -31,7 +31,7 @@
         <div class="schema-object-fields">
             @foreach (var property in Schema.Properties)
             {
-                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" PreservePresence="PreservePresence" IsPresent="@(Value is JsonObject current && current.ContainsKey(property.Name))" ValueRemoved="() => RemovePropertyAsync(property.Name)" />
+                <JsonSchemaField Schema="property" Value="@ObjectValue(property.Name)" ValueChanged="value => ChangePropertyAsync(property, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" PreservePresence="PreservePresence" IsPresent="@(Value is JsonObject current && current.ContainsKey(property.Name))" ValueRemoved="() => RemovePropertyAsync(property.Name)" SingleLineText="SingleLineText" />
             }
         </div>
     }
@@ -40,7 +40,7 @@
         <fieldset disabled="@FieldDisabled"><legend>@Label @RequiredMark @RulesTooltip</legend>@Help
             @foreach (var item in ArrayItems.Select((value, index) => (value, index)))
             {
-                <div class="schema-array-item"><JsonSchemaField Schema="@(JsonSchemaInputModel.AtPath(Schema.Items!, $"{Schema.Path}[{item.index}]") with { Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" PreservePresence="PreservePresence" /><button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
+                <div class="schema-array-item"><JsonSchemaField Schema="@(JsonSchemaInputModel.AtPath(Schema.Items!, $"{Schema.Path}[{item.index}]") with { Name = $"{Schema.Name} {item.index + 1}" })" Value="item.value" ValueChanged="value => ChangeArrayItemAsync(item.index, value)" Disabled="FieldDisabled" LockedPaths="LockedPaths" Issues="Issues" PreservePresence="PreservePresence" SingleLineText="SingleLineText" /><button type="button" class="button-secondary" disabled="@FieldDisabled" @onclick="() => RemoveArrayItemAsync(item.index)">@Localizer["RemoveItem"]</button></div>
             }
             <button type="button" class="button-secondary" @onclick="AddArrayItemAsync" disabled="@(FieldDisabled || ArrayItems.Count >= EffectiveMaximumItems)">@Localizer["AddItem"]</button>
         </fieldset>
@@ -116,6 +116,7 @@
     [Parameter] public bool IsPresent { get; set; } = true;
     [Parameter] public EventCallback ValueRemoved { get; set; }
     [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool SingleLineText { get; set; }
     private bool IsEditableScalar => Schema.Kind is JsonSchemaInputKind.Text or JsonSchemaInputKind.WholeNumber or JsonSchemaInputKind.DecimalNumber or JsonSchemaInputKind.Toggle;
     private bool AllowsEmptyString => Schema.Kind == JsonSchemaInputKind.Text
         && JsonSchemaInputModel.Validate(JsonSerializer.SerializeToElement(string.Empty), Schema).Count == 0;
@@ -167,7 +168,7 @@
     private string RequiredMark => Schema.Required ? Localizer[AllowsEmptyString ? "RequiredEmptyStringMarker" : "RequiredMarker"] : string.Empty;
     private string StringValue => Value is JsonValue value && value.TryGetValue<string>(out var text) ? text : string.Empty;
     private string NumberValue => Value?.ToJsonString() ?? string.Empty;
-    private bool UsesMultilineText => Schema.MaximumLength is >= 1000;
+    private bool UsesMultilineText => !SingleLineText && Schema.MaximumLength is >= 1000;
     private bool BooleanValue => Value is JsonValue value && value.TryGetValue<bool>(out var result) && result;
     private string SerializedValue => Value?.ToJsonString() ?? (PreservePresence && IsPresent ? "null" : string.Empty);
     private IReadOnlyList<JsonNode?> ArrayItems => Value is JsonArray array ? array.Take(JsonSchemaInputModel.MaximumRenderedItems).ToArray() : [];

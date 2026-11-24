@@ -158,6 +158,10 @@
         && operation.Definition.Definition.TryGetProperty(property, out var schema) && schema.ValueKind == JsonValueKind.Object ? schema : null;
     private JsonElement? InputSchema => SelectedType?.Acquisition is { } adapter ? DefinitionSchema(adapter.InputSchemaProperty)
         : HasSavedOperationPin ? readiness?.Dataset?.InputSchema : null;
+    private IReadOnlyCollection<string> SingleLineTextFields => SelectedOperation is { } operation
+        && operation.Definition.Definition.ValueKind == JsonValueKind.Object
+        && operation.Definition.Definition.TryGetProperty("queryParameters", out var names) && names.ValueKind == JsonValueKind.Array
+        ? names.EnumerateArray().Where(name => name.ValueKind == JsonValueKind.String).Select(name => name.GetString()!).ToArray() : [];
     private string? AcquisitionIssue => SelectedType is not { } type ? "DatasetOperationTypeUnavailable"
         : type.Acquisition is not { } adapter ? "DatasetOperationAdapterUnavailable"
         : type.Interaction != ConnectedServiceOperationInteraction.RequestResponse
@@ -330,7 +334,7 @@
                         <div class="dataset-parameters-heading"><h3>@T("DatasetParametersTitle")</h3><p>@T("DatasetBoundParametersHelp")</p></div>
                         @if (AcquisitionIssue is not null && SelectedOperation is not null) { <p class="muted">@T("DatasetParametersUnavailable")</p> }
                         else if (NoConfiguration) { <p class="muted">@T("DatasetNoConfiguration")</p> }
-                        else { <DataSourceOperationParametersEditor @key="model.OperationKey" Schema="InputSchema" @bind-Value="model.Parameters" @bind-Bindings="model.ParameterBindings"
+                        else { <DataSourceOperationParametersEditor @key="model.OperationKey" Schema="InputSchema" SingleLineTextFields="SingleLineTextFields" @bind-Value="model.Parameters" @bind-Bindings="model.ParameterBindings"
                             ValidationField="@FormContext.Field(nameof(model.Parameters))" ValidityChanged="valid => parametersValid = valid" Scope="model.Scope" Namespace="@(model.NamespaceValid ? ResourceNamespace.Parse(DraftNamespace) : (ResourceNamespace?)null)" Disabled="@(busy || !CanManage)" /> }
                     </div>
                 }

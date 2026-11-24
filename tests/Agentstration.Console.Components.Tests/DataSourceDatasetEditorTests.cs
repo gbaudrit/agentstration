@@ -23,6 +23,25 @@ namespace Agentstration.Web.Tests;
 public sealed partial class DataSourceDatasetEditorTests
 {
     [TestMethod]
+    public async Task HttpQueryParametersUseSingleLineSharedValueInputsWithTheirSchemaConstraints()
+    {
+        using var handler = new DatasetHandler(withParameters: true);
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+
+        var input = rendered.Find("[data-testid='dataset-parameter-query-binding-literal'] input");
+        Assert.AreEqual("2048", input.GetAttribute("maxlength"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='dataset-parameter-query-binding-literal'] textarea"));
+        await input.InputAsync("RSS search");
+        rendered.WaitForAssertion(() => Assert.IsTrue(ConfigurationComplete(rendered)));
+        await CompleteCreationAsync(rendered);
+        rendered.WaitForAssertion(() => Assert.AreEqual("RSS search", handler.Created!.Properties.Dataset!.Acquisition.Parameters.GetProperty("query").GetString()));
+    }
+
+    [TestMethod]
     public async Task InvalidNamespaceKeepsTheValueEditorMountedAndDisablesContextualCreation()
     {
         using var handler = new DatasetHandler(withParameters: true);
@@ -542,9 +561,10 @@ public sealed partial class DataSourceDatasetEditorTests
                     Definition = JsonSerializer.SerializeToElement(new
                     {
                         isReadOnly = true,
+                        queryParameters = new[] { "query" },
                         responseShape = new { type = "object" },
                         requestShape = new
-                        { type = "object", properties = new { query = new { type = "string" } }, required = new[] { "query" }, additionalProperties = false }
+                        { type = "object", properties = new { query = new { type = "string", maxLength = 2048 } }, required = new[] { "query" }, additionalProperties = false }
                     })
                 }
             };

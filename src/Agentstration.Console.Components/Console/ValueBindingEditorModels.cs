@@ -13,7 +13,10 @@ public sealed record ValueBindingRequirement(
     string? Description = null,
     string? Format = null,
     IReadOnlyList<JsonElement>? AllowedValues = null,
-    JsonElement? LiteralSchema = null);
+    JsonElement? LiteralSchema = null)
+{
+    public bool SingleLineText { get; init; }
+}
 
 public sealed record ValueBindingOption(
     ValueBindingSourceKind Kind,
