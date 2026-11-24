@@ -1,90 +1,77 @@
 name: OCI images
 
 on:
-  push:
-    tags: ['extension/**', 'worker/**']
   workflow_dispatch:
-    inputs:
-      extension:
-        description: Catalogue image ID (server, AEP extension or AWP Worker)
-        type: choice
-        options: [server, foundry, maf-worker]
-        default: foundry
-        required: true
-      publish_preview:
-        description: Publish the validated archive to private GHCR (no Docker Hub release)
-        type: boolean
-        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
-  cancel-in-progress: false
+  actions: read
+  packages: read
 
 jobs:
-  validate-and-build:
-    uses: ./.github/workflows/validate-oci-image.yml
-    with:
-      extension: ${{ inputs.extension || 'foundry' }}
-      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-
-  publish:
-    needs: validate-and-build
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+  verify-private-lifecycle:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: write
     env:
-      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+      DOCKER_CONFIG: /tmp/lifecycle-auth-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: 668763bcaf2ea84c40d1ef804f6a25909001e860
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: oci-image-${{ needs.validate-and-build.outputs.image }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: delivery
-      - name: Install OCI copy tooling
+          name: extension-publication-45361771257-1
+          run-id: 45361771257
+          github-token: ${{ github.token }}
+          path: receipts/server
+      - uses: actions/download-artifact@v8
+        with:
+          name: extension-publication-45265550611-1
+          run-id: 45265550611
+          github-token: ${{ github.token }}
+          path: receipts/worker
+      - name: Verify private publication identities
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y skopeo
+          set -euo pipefail
+          for package in agentstration-server agentstration-worker-maf; do
+            test "$(gh api "/users/gbaudrit/packages/container/$package" --jq .visibility)" = private
+            echo "$package: private"
+          done
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          expected = {
+              "server": ("28e38606cb1a236886c4996d4d6791aa4fc24aaf", "sha256:e573710f4de9f25a33f51cfcda026f83844238e3f8d87d17cc7a78856e388e89", "server"),
+              "worker": ("b9d6e97e076229ec6b258327dabfb29f0a17e21d", "sha256:2f85c63e1d55ebe6cdad21acc045e735aec2370b1f4cd2eec2f062ca9549663a", "worker-maf")
+          }
+          for name, (source, digest, image) in expected.items():
+              folder = Path("receipts") / name
+              delivery = json.loads((folder / "delivery.json").read_text())
+              published = json.loads((folder / "publication-ghcr.json").read_text())
+              assert delivery["sourceSha"] == published["sourceSha"] == source
+              assert delivery["digest"] == published["digest"] == digest
+              assert published["reference"] == f"ghcr.io/gbaudrit/agentstration-{image}@{digest}"
+          PY
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Publish the validated archive to private GHCR without rebuilding
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Verify both database lifecycle implementations from private deliveries
         run: |
-          release_arguments=()
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
-      - name: Log in to Docker Hub for an official image release
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish the same archive to official Docker Hub
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        env:
-          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
-        run: >-
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
-          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
-          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
-      - name: Retain immutable publication references
+          set -euo pipefail
+          for database in sqlite postgresql; do
+            python3 scripts/preview/preview_smoke.py \
+              --server-delivery receipts/server/delivery.json --worker-delivery receipts/worker/delivery.json \
+              --database "$database" --registry ghcr.io --output "artifacts/lifecycle-$database-smoke.json"
+          done
+      - uses: actions/upload-artifact@v7
         if: always()
-        uses: actions/upload-artifact@v7
         with:
-          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            delivery/delivery.json
-            delivery/publication-*.json
+          name: private-lifecycle-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/*-smoke.json
           if-no-files-found: warn
           retention-days: 30
