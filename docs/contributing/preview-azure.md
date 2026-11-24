@@ -150,7 +150,8 @@ registry image digests stay immutable.
 ## Failure recovery and costs
 
 Inspect the safe result and ARM provisioning state first. CLI failures identify
-the operation and a bounded Azure error code when present; parameter values and
+the operation and up to six Azure error codes, including nested ARM JSON details,
+when present; parameter values, error messages/targets and
 raw provider output remain withheld. Raw command output,
 cloud-init logs, agent settings, guest credential files and private archives are
 not uploaded as workflow artifacts. A failed transfer can be retried using the
