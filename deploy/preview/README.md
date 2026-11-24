@@ -12,3 +12,7 @@ Use the [operating and validation instructions](../../docs/contributing/preview-
 for receipt selection, `scripts/preview/preview.py`, initialization, state
 preservation and cleanup. This completes the local database profiles of #1281, not a cloud
 provisioner or the source-built Development topology.
+
+The [portable lifecycle guide](../../docs/contributing/preview-lifecycle.md)
+documents managed deploy/status/destroy, ownership, safe result JSON and reusable
+GitHub Actions entrypoints for the first #1282 increment.
