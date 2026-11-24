@@ -8,6 +8,8 @@ public enum SecurityAuditOutcome
 
 public static class SecurityAuditActions
 {
+    public const string WorkPlanningToolInvoked = "work.planning.tool.invoked";
+    public const string WorkTaskProviderInvoked = "work.task-provider.invoked";
     public const string StorageDocumentAccessed = "storage.document.accessed";
     public const string InstanceBootstrapped = "instance.bootstrapped";
     public const string PlatformAdministratorGranted = "platform-administrator.granted";

@@ -66,6 +66,13 @@ public static partial class WorkplaceEndpoints
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(256 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapGet("/projects", ListWorkProjectsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapGet("/projects/{projectId:guid}", GetWorkProjectAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/projects/{projectId:guid}/task-provider", DiscoverTaskProviderAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/projects/{projectId:guid}/task-operations", BeginTaskProviderOperationAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(512 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/projects/{projectId:guid}/task-operations/{operationId:guid}/resume", ResumeTaskProviderOperationAsync)
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapGet("/projects/{projectId:guid}/task-operations", ListTaskProviderOperationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/projects/{projectId:guid}/task-operations/{operationId:guid}", GetTaskProviderOperationAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapGet("/projects/{projectId:guid}/context", GetWorkProjectContextAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/projects", CreateWorkProjectAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(64 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);

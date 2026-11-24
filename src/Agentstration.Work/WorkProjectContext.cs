@@ -2,7 +2,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
-public enum WorkProjectBindingPurpose { Context, Sharing, Repository }
+public enum WorkProjectBindingPurpose { Context, Sharing, Repository, TaskOperations }
 public sealed record WorkProjectResourceReference(ScopedResourceAddress Address, Guid Uid, long Generation, string? Version = null);
 public sealed record WorkProjectContextBinding(string Name, WorkProjectBindingPurpose Purpose, WorkProjectResourceReference Target);
 public sealed record WorkProjectResolvedBinding(WorkProjectContextBinding Binding, string ETag, string DiscoverDecision, string UseDecision);
@@ -24,6 +24,7 @@ public static class WorkProjectContextRules
             && target.Address.ScopeRef != default && target.Address.Name is { Length: > 0 and <= 512 }
             && target.Address.Kind is "ToolProvider" or "ConnectedService" or "SourceVersion"
             && target.Version?.Length is not > 128
+            && (binding.Purpose != WorkProjectBindingPurpose.TaskOperations || target.Address.Kind == "ToolProvider")
             && (binding.Purpose != WorkProjectBindingPurpose.Sharing || target.Address.Kind == "ToolProvider")
             && (binding.Purpose != WorkProjectBindingPurpose.Repository || target.Address.Kind is "ToolProvider" or "ConnectedService"));
 }

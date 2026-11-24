@@ -176,3 +176,55 @@ invocation. Functional acceptance remains an explicit review with evidence, inde
 of technical Flow completion. No task tracker, template or model is needed for the
 local deterministic execution path. `dryRun` validates declared structure without
 writes and reports that canonical execution validation is still required.
+
+## Optional external task operations
+
+A Project can explicitly bind a `ToolProvider` with purpose `TaskOperations`. Local
+plans and internal child tasks continue to work with no such binding. External reads,
+updates and publication use a separate receipt; none of these operations activates a
+plan or gives functional acceptance to a task.
+
+| Endpoint under `/api/workspaces/{workspaceName}/projects/{projectId}` | Result |
+| --- | --- |
+| `GET /task-provider?bindingName=tracker&operation=Publish` | Resolve one authorized capability route |
+| `POST /task-operations` | Admit and invoke an operation; return its current receipt with HTTP 202 |
+| `POST /task-operations/{operationId}/resume` | Explicitly recover an uncertain operation |
+| `GET /task-operations/{operationId}` | Read the private receipt |
+| `GET /task-operations?skip=0&take=25` | Page private receipts, up to 100 per page |
+
+A request includes a stable operation `id`, `expectedProjectVersion`, explicit
+`bindingName`, and an `input` with `operation` (`Read`, `Update` or `Publish`) and
+`repository`. Reads and updates select `taskId`; publication supplies `title` and
+optional `body`. Updates require `expectedRevision`. Optional labels and relations
+remain provider-neutral data; consumers must use relation kinds supported by their
+provider. Associate an operation with a plan by supplying `planId`, `planRevision`
+and `planDigest` together. A rejected operation returns Problem Details and retains
+its receipt for inspection.
+
+The provider's AEP Tool metadata declares:
+
+```json
+{
+  "agentstration.work.task-provider": {
+    "version": "1.0",
+    "operations": ["Read", "Update", "Publish"],
+    "idempotentOperations": true,
+    "operationRecovery": true
+  }
+}
+```
+
+The selected MCP Tool accepts `{mode, operationKey, intentDigest, input}`, where
+`mode` is `execute` or `recover`. Its structured result is
+`{operationKey, intentDigest, status, task?, errorCode?}`. Status is `Missing`,
+`Succeeded`, `Rejected` or `Uncertain`. Successful snapshots include repository,
+external task ID, exact observed revision, title/body/state, optional URL, labels
+and relations. The provider must atomically deduplicate writes by operation key and
+must not return `Missing` when a prior write could have succeeded. Generic adapters
+cannot manufacture that guarantee for a vendor API.
+
+A lost response or cancelled call remains `Uncertain`. Replay retains the captured
+provider, Tool generation and intent; it recovers the old receipt before considering
+another call with the same key. Changed bindings and obsolete plan intents cannot
+silently republish. Providers unable to establish the outcome must keep it uncertain
+for explicit operator reconciliation. These contracts introduce no automatic retries.

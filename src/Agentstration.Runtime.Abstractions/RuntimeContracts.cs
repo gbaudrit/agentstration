@@ -312,7 +312,7 @@ public interface IToolCatalog
         CancellationToken cancellationToken = default) => ResolveAsync(tools.Select(value => value.Id), cancellationToken);
 }
 
-public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console, Mcp }
+public enum ToolExecutionOwnerKind { Unspecified, RuntimeRun, FlowRun, ArtifactService, Console, Mcp, WorkOperation }
 
 public sealed record ToolExecutionScope
 {

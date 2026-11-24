@@ -77,10 +77,7 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
             ToolInputSchemaValidator.Validate(Definition.InputSchema, invocation.Arguments);
             var arguments = invocation.Arguments;
             var workspace = invocation.WorkspaceId;
-            var commandId = new Guid(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                invocation.TenantId, invocation.WorkspaceId, invocation.PrincipalId, Tool = Definition.Name, invocation.CallId
-            })).AsSpan(0, 16));
+            var commandId = CommandId(invocation.TenantId, invocation.WorkspaceId, invocation.PrincipalId, Definition.Name, invocation.CallId);
             var planId = arguments.TryGetProperty("planId", out _) ? new WorkPlanId(Read<Guid>(arguments, "planId")) : default;
             var version = arguments.TryGetProperty("expectedVersion", out _) ? Read<long>(arguments, "expectedVersion") : 0;
             if (arguments.TryGetProperty(ToolDryRunContract.ParameterName, out var dry) && dry.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
@@ -133,6 +130,10 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
         catch (ArgumentException) { throw Error("work_planning_arguments_invalid"); }
 
     }
+
+    internal static Guid CommandId(Guid tenantId, WorkspaceId workspaceId, Guid principalId, string tool, string callId) =>
+        new(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+        { TenantId = tenantId, WorkspaceId = workspaceId, PrincipalId = principalId, Tool = tool, CallId = callId })).AsSpan(0, 16));
 
     private static WorkProjectPageResponse ProjectPage(WorkProjectPage page, JsonElement arguments) =>
         new(page.Items.Select(ToProjectResponse).ToArray(), page.HasMore, OptionalInt(arguments, "skip", 0), OptionalInt(arguments, "take", 25));

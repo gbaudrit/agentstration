@@ -173,6 +173,10 @@ internal static class OpenApiSuccessResponseCatalog
         if (method == "GET" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectPageResponse>(200, "List private Workspace Projects");
         if (method == "POST" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(201, "Create a private Workspace Project");
         if (path.EndsWith("/projects/{projectId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(200, method == "PUT" ? "Update Project work associations" : "Get a Workspace Project");
+        if (method == "GET" && path.EndsWith("/projects/{projectId}/task-provider", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskProviderRoute>(200, "Discover an explicitly bound external task operation");
+        if (method == "POST" && path.Contains("/projects/{projectId}/task-operations", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskOperationResponse>(202, "Accept or resume an external task operation");
+        if (method == "GET" && path.EndsWith("/task-operations", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskOperationPageResponse>(200, "List private external task operation receipts");
+        if (method == "GET" && path.EndsWith("/task-operations/{operationId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskOperationResponse>(200, "Get an external task operation receipt");
         if (method == "GET" && path.EndsWith("/projects/{projectId}/context", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectContextResponse>(200, "Resolve current Project binding availability");
         if (method == "POST" && path.Contains("/work-plans/{planId}/execution", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(202, "Configure or advance durable WorkPlan execution");
         if (method == "POST" && path.EndsWith("/work-plans", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(201, "Create a WorkPlan");

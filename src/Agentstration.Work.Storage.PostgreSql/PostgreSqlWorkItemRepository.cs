@@ -102,6 +102,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
         ConfigureWorkPlans(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
+        ConfigureWorkTaskOperations(modelBuilder);
     }
 
     private static void ConfigureConversationMessage(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<ConversationMessageDocument> entity)
@@ -1037,6 +1038,7 @@ public static class PostgreSqlWorkServiceCollectionExtensions
         services.AddSingleton<IWorkItemRepository, PostgreSqlWorkItemRepository>();
         services.AddSingleton<IWorkPlanRepository, PostgreSqlWorkPlanRepository>();
         services.AddSingleton<IWorkProjectRepository, PostgreSqlWorkProjectRepository>();
+        services.AddSingleton<IWorkTaskOperationRepository, PostgreSqlWorkTaskOperationRepository>();
         services.AddSingleton<IWorkplaceRepository, PostgreSqlWorkplaceRepository>();
         return services;
     }

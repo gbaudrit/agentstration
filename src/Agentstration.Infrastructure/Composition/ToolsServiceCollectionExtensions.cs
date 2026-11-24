@@ -39,6 +39,7 @@ internal static class ToolsServiceCollectionExtensions
         services.AddSingleton<Agentstration.Secrets.ISecretUsageProvider, ToolDefinitionValueUsages>();
         services.AddSingleton<ToolExecutionHookManagementService>();
         services.AddSingleton<IToolExecutionHook, ArtifactStagingExecutionGuard>();
+        services.AddSingleton<IToolExecutionHook, Agentstration.Infrastructure.Work.WorkToolSecurityAuditHook>();
         services.TryAddSingleton(new ToolExecutionCaptureOptions());
         services.AddSingleton<IToolExecutionEventSink, RuntimeToolExecutionEventSink>();
         services.AddSingleton<IToolExecutionEventSink, FlowToolExecutionEventSink>();
