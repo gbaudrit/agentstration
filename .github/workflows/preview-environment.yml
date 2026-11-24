@@ -24,11 +24,11 @@ on:
     outputs:
       result:
         description: Versioned safe lifecycle result JSON
-        value: ${{ jobs.execute.outputs.result || jobs.validate.outputs.result }}
+        value: ${{ inputs.operation == 'validate' && jobs.validate.outputs.result || jobs.execute.outputs.result }}
       environment-id:
         value: ${{ jobs.validate.outputs.environment-id }}
       state:
-        value: ${{ jobs.execute.outputs.state || 'validated' }}
+        value: ${{ jobs.execute.outputs.state || (inputs.operation == 'validate' && jobs.validate.outputs.result && 'validated') || 'failed' }}
       url:
         value: ${{ jobs.execute.outputs.url }}
       resource-ids:

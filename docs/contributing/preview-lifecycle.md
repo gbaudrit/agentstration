@@ -40,7 +40,9 @@ Results contain `schemaVersion`, `environmentId`, `provider`, `sourceSha`, selec
 `providerResourceIds`. The selected receipts describe the desired deployment;
 `observedImages` exposes actual container references when resources exist. States
 include `validated`, `absent`, `running`, `stopped`, `unhealthy`, `drifted` and
-the `destroyed` operation outcome. Validation returns no provider resources.
+the `destroyed` operation outcome. The reusable workflow reports `failed` for
+failed operations; it does not substitute a successful validation result for a
+failed deployment. Validation returns no provider resources.
 
 ## Run against a trusted Docker host
 
@@ -127,7 +129,8 @@ are uploaded; host keys/configuration/logs are excluded. URLs are host-local in
 this first provider. Azure provisioning and accessible URLs remain #1283–#1285.
 
 The reusable outputs expose result JSON, environment ID, state, URL and provider
-resource IDs. To call the workflow, pass request JSON as a string to `request` and
+resource IDs. Calling workflows grant `contents: read` and `packages: read` so
+the called workflow's package-read job has permission. Pass request JSON as a string to `request` and
 one of `validate`, `deploy`, `status`, `destroy` to `operation`.
 
 OCI validation exercises this same lifecycle against both database profiles,
