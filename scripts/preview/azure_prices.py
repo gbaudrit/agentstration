@@ -19,7 +19,8 @@ def fetch(region, currency, expression):
     rows = []
     for _ in range(5):
         parsed = urlsplit(url)
-        if parsed.scheme != 'https' or parsed.hostname != 'prices.azure.com' or parsed.port not in (None, 443):
+        if (parsed.scheme != 'https' or parsed.hostname != 'prices.azure.com' or parsed.port not in (None, 443)
+                or parsed.username is not None or parsed.password is not None):
             raise ValueError('Unexpected retail-price pagination origin.')
         with urlopen(url, timeout=30) as response:
             payload = response.read(2 * 1024 * 1024 + 1)
@@ -35,11 +36,15 @@ def fetch(region, currency, expression):
 
 def quote(rows, region, currency, hours=2):
     candidates = [r for r in rows if r.get('armRegionName') == region and r.get('currencyCode') == currency
-                  and r.get('type') == 'Consumption' and r.get('isPrimaryMeterRegion') is True
+                  and r.get('type') == 'Consumption'
                   and r.get('tierMinimumUnits') == 0 and r.get('retailPrice', 0) > 0]
 
     def one(predicate):
         found = [r for r in candidates if predicate(r)]
+        if len(found) > 1:
+            primary = [r for r in found if r.get('isPrimaryMeterRegion') is True]
+            if len(primary) == 1:
+                found = primary
         if len(found) != 1:
             raise ValueError('Retail meter selection must be unambiguous; inspect the public candidate snapshot.')
         return {key: found[0].get(key) for key in FIELDS}
@@ -50,7 +55,7 @@ def quote(rows, region, currency, hours=2):
              and r['unitOfMeasure'] == '1 Hour')
     estimates = {}
     for size in ('Standard_B2ms', 'Standard_B4ms'):
-        vm = one(lambda r: r.get('armSkuName') == size and 'Windows' not in r['productName']
+        vm = one(lambda r: r.get('armSkuName') == size and r['productName'] == 'Virtual Machines BS Series'
                  and r['skuName'] == size.removeprefix('Standard_') and r['unitOfMeasure'] == '1 Hour')
         hourly = Decimal(str(vm['retailPrice'])) + Decimal(str(ip['retailPrice']))
         hourly += sum(Decimal(str(d['retailPrice'])) for d in disks) / Decimal(730)
@@ -72,7 +77,7 @@ def main():
     if not re.fullmatch(r'[a-z][a-z0-9]{1,31}', args.region):
         parser.error('Invalid region.')
     rows = []
-    for expression in ("(armSkuName eq 'Standard_B2ms' or armSkuName eq 'Standard_B4ms')",
+    for expression in ("serviceName eq 'Virtual Machines' and (armSkuName eq 'Standard_B2ms' or armSkuName eq 'Standard_B4ms')",
                        "productName eq 'Standard SSD Managed Disks'", "productName eq 'IP Addresses'"):
         rows.extend(fetch(args.region, args.currency, expression))
     args.output.parent.mkdir(parents=True, exist_ok=True)

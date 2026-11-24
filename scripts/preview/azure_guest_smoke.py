@@ -29,12 +29,14 @@ def smoke(server_path, worker_path, database, output):
             preview.require(first['state'] == 'running', 'Guest never became healthy.')
             preview.require(azure_host.run('status', value, root=root)['state'] == 'running', 'Guest status drifted.')
             azure_host.run('destroy', value, root=root)
+            # A legacy v1 guest must accept the now-explicit equivalent OS profile.
+            value['target']['osProfile'] = contract.AZURE_OS_PROFILE
             second = azure_host.run('deploy', value, image, root)
             preview.require(first['expiresAt'] == second['expiresAt'], 'Guest retry renewed expiry.')
             for name in ('server', 'worker'):
                 preview.require(second['observedImages'][name].endswith('@' + value['deliveries'][name]['digest']), 'Guest digest changed during transport.')
             evidence = {'database': database, 'state': 'passed', 'exactDigestTransport': True, 'preserveRecreate': True,
-                        'expiryPreserved': True, 'observedImages': second['observedImages'],
+                        'expiryPreserved': True, 'legacyOsProfileCompatible': True, 'observedImages': second['observedImages'],
                         'memoryAvailableKiB': second['memoryAvailableKiB'], 'guestOperationSeconds': second['guestOperationSeconds']}
             preview.private_write(output, json.dumps(evidence, indent=2) + '\n')
         finally:

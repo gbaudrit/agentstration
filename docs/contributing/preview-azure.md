@@ -124,6 +124,37 @@ including conditional jobs. All reusable callers must therefore grant
 job actually receives OIDC permission. Both operations and selected scope are checked before authentication.
 No PAT, `GHCR_BOOTSTRAP_TOKEN`, Azure client secret or account key is required.
 
+### GitHub deployment defaults
+
+Create these non-secret **repository** variables under **Settings > Secrets and
+variables > Actions > Variables**. They are read before the protected Azure job;
+the six environment-scoped identity/storage variables above keep their existing
+scope.
+
+| Variable | Example | Behavior |
+| --- | --- | --- |
+| `AZURE_PREVIEW_OS_PROFILE` | `ubuntu-24.04` | Only the qualified Ubuntu profile is supported |
+| `AZURE_PREVIEW_IMAGE_VERSION` | Exact regionally verified version | Default only when omitted from the input target |
+| `AZURE_PREVIEW_VM_SIZE1` | `Standard_B2ms` | Default size when omitted from the input target |
+| `AZURE_PREVIEW_VM_SIZE2` | `Standard_B4ms` | Optional second size slot |
+| `AZURE_PREVIEW_VM_SIZE3` through `SIZE5` | Unset | Optional slots; empty/unsupported selections fail before Azure access |
+
+The manual and reusable workflow exposes `azure_vm_size_profile`: `request`
+(default), or slots `1` through `5`. `request` preserves explicit target values
+and fills a missing size from slot 1. An explicit slot must be configured to
+`Standard_B2ms` or `Standard_B4ms` and must agree with an explicitly supplied size;
+omit that target field when choosing another slot. GitHub's static choice list
+keeps unused slots visible.
+
+Only `deploy` and `validate` resolve defaults. The resulting request artifact
+contains the exact `vmSize`, `imageVersion` and `osProfile`; use that artifact for
+later operations. `status` and `destroy` require the recorded target and ignore
+changed defaults. They reject slot overrides. Legacy v1 requests without
+`osProfile` still mean `ubuntu-24.04` and remain inspectable/removable. The local
+CLI continues to require a complete request; GitHub defaults belong only to the
+external workflow boundary. Other distributions require their own tested
+bootstrap and are not activated by setting a variable to an arbitrary value.
+
 ### Verify the exact Ubuntu image before deployment
 
 Use a maintainer session such as Azure Cloud Shell to inspect the regional image
@@ -212,6 +243,20 @@ actual duration and estimated cost with the trial evidence. No capacity or cost
 claim is made before that run.
 
 ## Offline and CI validation
+
+The optional public-price snapshot needs no Azure login:
+
+```bash
+gh workflow run preview-azure-validation.yml --ref main \
+  -f retail_prices=true -f pricing_region=westeurope
+```
+
+Its `azure-public-retail-prices` artifact retains the selected meter IDs, units,
+currency, effective dates and candidate records. Ordinary PR/push checks skip
+this online pricing job; the deterministic test suite uses offline meter fixtures.
+The collector refuses missing/ambiguous meters and excludes Windows, Spot,
+reservations and managed PostgreSQL compute. A regional IP meter can legitimately
+have `isPrimaryMeterRegion: false`; that flag alone does not invalidate its rate.
 
 `Preview Azure contracts` compiles Bicep and runs offline ownership/transport
 contracts without OIDC or Azure provisioning. When Azure CLI is installed, an

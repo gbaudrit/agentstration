@@ -17,7 +17,8 @@ def meters():
     rows += [{**base, 'productName': 'Standard SSD Managed Disks', 'meterName': tier + ' LRS Disk',
               'skuName': tier, 'retailPrice': price, 'unitOfMeasure': '1/Month'}
              for tier, price in [('E4', 3.65), ('E6', 7.3)]]
-    rows.append({**base, 'productName': 'IP Addresses', 'skuName': 'Standard IPv4',
+    # The real regional public-IP meter is not marked as a primary meter region.
+    rows.append({**base, 'isPrimaryMeterRegion': False, 'productName': 'IP Addresses', 'skuName': 'Standard IPv4',
                  'meterName': 'Standard IPv4 Static Public IP', 'retailPrice': 0.005, 'unitOfMeasure': '1 Hour'})
     return rows
 
@@ -25,7 +26,9 @@ def meters():
 class AzurePriceTests(unittest.TestCase):
     def test_fixed_estimate_uses_linux_payg_and_both_retained_disks(self):
         rows = meters()
-        for change in ({'productName': 'Virtual Machines BS Series Windows'}, {'skuName': 'B2ms Spot'},
+        for change in ({'productName': 'Virtual Machines BS Series Windows'},
+                       {'productName': 'Azure Database for PostgreSQL Flexible Server Burstable BS Series Compute'},
+                       {'skuName': 'B2ms Spot'},
                        {'currencyCode': 'USD'}, {'armRegionName': 'eastus'}, {'type': 'Reservation'},
                        {'tierMinimumUnits': 10}, {'isPrimaryMeterRegion': False}):
             rows.append({**rows[0], **change, 'retailPrice': 99})

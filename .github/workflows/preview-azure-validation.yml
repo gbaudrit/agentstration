@@ -7,11 +7,20 @@ on:
     branches: [main]
     paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
   workflow_dispatch:
+    inputs:
+      retail_prices:
+        description: Collect optional public PAYG rates (no Azure login)
+        type: boolean
+        default: false
+      pricing_region:
+        description: Azure region for the optional public price snapshot
+        type: string
+        default: westeurope
 permissions:
   contents: read
 jobs:
   retail-prices:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' && inputs.retail_prices
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -19,7 +28,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Snapshot public Azure PAYG rates without cloud credentials
-        run: python3 scripts/preview/azure_prices.py --output "$RUNNER_TEMP/azure-prices.json"
+        env:
+          PRICING_REGION: ${{ inputs.pricing_region }}
+        run: python3 scripts/preview/azure_prices.py --region "$PRICING_REGION" --output "$RUNNER_TEMP/azure-prices.json"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
