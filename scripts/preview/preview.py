@@ -65,6 +65,8 @@ def validate_state(state):
             "Choose port 0 for a disposable test or a port between 1024 and 65535.")
     for name in ("instanceId", "workerId", "credentialId"):
         uuid.UUID(state[name])
+    if "deploymentOwnerId" in state:
+        uuid.UUID(state["deploymentOwnerId"])
     expected = {"server", "worker", "postgres"} if state["database"] == "postgresql" else {"server", "worker"}
     require(set(state["images"]) == expected, "Preview images must match its selected database.")
     if state["database"] == "postgresql":
@@ -143,6 +145,7 @@ def compose_command(directory):
     environment.update(PREVIEW_STATE_DIRECTORY=str(directory), PREVIEW_ENVIRONMENT_ID=state["environmentId"],
         PREVIEW_PORT=str(state["port"]), PREVIEW_INSTANCE_ID=state["instanceId"],
         PREVIEW_WORKER_ID=state["workerId"], PREVIEW_CREDENTIAL_ID=state["credentialId"])
+    environment["PREVIEW_OWNER_ID"] = state.get("deploymentOwnerId", "unmanaged")
     for name, image in state["images"].items():
         environment["PREVIEW_" + name.upper() + "_IMAGE"] = image["reference"]
         if name != "postgres":

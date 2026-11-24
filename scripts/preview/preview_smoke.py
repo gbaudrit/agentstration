@@ -10,6 +10,8 @@ import uuid
 import urllib.request
 
 import preview
+import contract
+import lifecycle
 from worker_smoke import Api, completed_flow, until, worker_evidence
 
 
@@ -64,7 +66,12 @@ def database_evidence(directory, database):
 def run(server_delivery, worker_delivery, registry, output, database="sqlite", postgres_image=None):
     environment_id = "smoke-" + uuid.uuid4().hex[:12]
     with tempfile.TemporaryDirectory(prefix="preview-smoke-") as temporary:
-        directory = Path(temporary)
+        root = Path(temporary)
+        directory = root / environment_id
+        request = contract.plan(server_delivery, worker_delivery, environment_id, database=database,
+                                target={"port": 0, "daemonId": lifecycle.docker("info", "--format", "{{.ID}}")},
+                                registry=registry, postgres_image=postgres_image)
+        reset_request = {**request, "dataMode": "reset"}
         state = preview.prepare(directory, server_delivery, worker_delivery, environment_id, port=0, registry=registry,
                                 database=database, postgres_image=postgres_image)
         password = bootstrap_password()
@@ -73,20 +80,41 @@ def run(server_delivery, worker_delivery, registry, output, database="sqlite", p
                          "Profiles": ["bootstrap-workspace-example"], "TargetLevel": "/tenants/dev/workspaces/default"}]}
         sessions, executions = [], []
         phase = "default"
+        other_volume = "preview-other-" + uuid.uuid4().hex[:12]
         try:
+            lifecycle.docker("volume", "create", "--label", lifecycle.PROJECT + "=" + other_volume, other_volume)
+            lifecycle.execute("validate", request, root)
+            preview.require(lifecycle.execute("status", request, root)["state"] == "absent", "New lifecycle was not absent.")
+            # An unmanaged same-name volume must survive a refused destroy.
+            foreign_volume = "preview-" + environment_id + "-foreign-fixture"
+            lifecycle.docker("volume", "create", "--label", lifecycle.PROJECT + "=preview-" + environment_id, foreign_volume)
+            try:
+                try:
+                    lifecycle.execute("destroy", reset_request, root)
+                except ValueError:
+                    lifecycle.docker("volume", "inspect", foreign_volume)
+                else:
+                    raise ValueError("The lifecycle accepted unmanaged resources.")
+            finally:
+                lifecycle.docker("volume", "rm", foreign_volume)
             # Test the actual non-Development default before explicitly applying any fixture data.
-            preview.compose(directory, "up", "--detach", "--wait", "--wait-timeout", "180")
+            baseline_result = lifecycle.execute("deploy", request, root)
+            expiry = baseline_result["expiresAt"]
             baseline = preview.verify(directory)
             storage = database_evidence(directory, database)
             Api(baseline["url"]).call("/api/auth/local/login", {"userName": "admin", "password": "admin"}, expected=401)
             with urllib.request.urlopen(baseline["url"] + "/bootstrap", timeout=10) as response:
                 preview.require(response.status == 200, "Manual initialization page is not available.")
-            preview.compose(directory, "down", "--volumes", "--timeout", "20")
+            lifecycle.execute("destroy", reset_request, root)
+            preview.require(lifecycle.execute("status", request, root)["state"] == "absent", "Reset retained application resources.")
             state = preview.prepare(directory, server_delivery, worker_delivery, environment_id, port=0,
                                     registry=registry, bootstrap=bootstrap)
             for iteration in range(2):
                 phase = "bootstrap" if iteration == 0 else "recreation"
-                preview.compose(directory, "up", "--detach", "--wait", "--wait-timeout", "180")
+                deployed = lifecycle.execute("deploy", request, root)
+                state = preview.read_json(directory / "deployment.json")
+                preview.require(deployed["expiresAt"] == expiry, "Retry/recreation silently renewed the environment TTL.")
+                preview.require(lifecycle.execute("status", request, root)["state"] == "running", "Lifecycle status did not observe healthy exact images.")
                 base = preview.verify(directory)["url"]
                 api = Api(base)
                 api.call("/api/auth/local/login", {"userName": "admin", "password": password}, expected=204)
@@ -101,7 +129,9 @@ def run(server_delivery, worker_delivery, registry, output, database="sqlite", p
                                         "preview deterministic execution"))
                 if iteration == 0:
                     preview.compose(directory, "exec", "-T", "server", "touch", "/data/preview-smoke-persistence")
-                    preview.compose(directory, "down", "--timeout", "20")
+                    lifecycle.execute("destroy", request, root)
+                    lifecycle.execute("destroy", request, root)
+                    preview.require(lifecycle.execute("status", request, root)["state"] == "stopped", "Preserve removed retained data volumes.")
                 else:
                     preview.require(completed_flow(api, executions[0]["runId"], {"echo": "preview-smoke-0"},
                                                    state["workerId"], sessions[0]), "First execution was not retained in the selected database.")
@@ -114,7 +144,14 @@ def run(server_delivery, worker_delivery, registry, output, database="sqlite", p
                       "workerId": state["workerId"], "credentialId": state["credentialId"], "sessions": sessions,
                       "executions": executions, "nonDevelopmentDefault": True, "defaultCredentialRejected": True,
                       "manualBootstrapAvailable": True, "bootstrapExplicitlySelected": True,
-                      "recreationPreservesDataAndIdentity": True, "workerDatabaseAccess": False}
+                      "recreationPreservesDataAndIdentity": True, "workerDatabaseAccess": False,
+                      "lifecycle": {"deployStatusDestroy": True, "resetAndPreserve": True, "unmanagedResourcesRejected": True,
+                                    "expiryPreserved": True, "providerResourceIds": deployed["providerResourceIds"]}}
+            lifecycle.execute("destroy", reset_request, root)
+            lifecycle.execute("destroy", reset_request, root)
+            preview.require(lifecycle.execute("status", request, root)["state"] == "absent", "Repeated reset left resources.")
+            lifecycle.docker("volume", "inspect", other_volume)
+            report["lifecycle"]["otherEnvironmentPreserved"] = True
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         except Exception:
@@ -128,7 +165,8 @@ def run(server_delivery, worker_delivery, registry, output, database="sqlite", p
             raise
         finally:
             # Only this randomly named project's containers and data volumes are removed.
-            preview.compose(directory, "down", "--volumes", "--remove-orphans", "--timeout", "20")
+            lifecycle.execute("destroy", reset_request, root)
+            lifecycle.docker("volume", "rm", other_volume)
 
 
 def main():
