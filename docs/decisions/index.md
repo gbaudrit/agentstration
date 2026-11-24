@@ -313,3 +313,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 253. [ADR-0253 — Initial Bootstrap admits its own Worker assignments](0253-initial-bootstrap-admits-its-own-worker-assignments.md)
 
 254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
+255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)

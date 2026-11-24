@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 SLUG = re.compile(r"[a-z][a-z0-9-]*")
@@ -18,10 +19,17 @@ def output(command):
     return subprocess.check_output(command, text=True).strip()
 
 
+def valid_version(value):
+    match = VERSION.fullmatch(value) if isinstance(value, str) else None
+    return bool(match and not (match[4] and any(part.isdigit() and len(part) > 1 and part[0] == "0"
+                                              for part in match[4].split("."))))
+
+
 def catalogue(extension):
     if not SLUG.fullmatch(extension):
         raise ValueError("Invalid extension catalogue ID.")
-    paths = [ROOT / "deploy/images" / family / f"{extension}.json" for family in ("extensions", "workers")]
+    families = {"extensions": "aep-extension", "workers": "awp-worker", "applications": "server"}
+    paths = [ROOT / "deploy/images" / family / f"{extension}.json" for family in families]
     matches = [path for path in paths if path.is_file()]
     if len(matches) != 1:
         raise ValueError("The image ID must identify exactly one implemented catalogue entry.")
@@ -30,7 +38,7 @@ def catalogue(extension):
     if entry.get("schemaVersion") != 1 or entry.get("id") != extension:
         raise ValueError("Invalid image catalogue identity/version.")
     kind = entry.get("kind", "aep-extension")
-    if kind not in ("aep-extension", "awp-worker") or (path.parent.name == "workers") != (kind == "awp-worker"):
+    if families[path.parent.name] != kind:
         raise ValueError("Catalogue family and executable kind do not match.")
     for name in ("project", "dockerfile", "versionFile", "testProject"):
         resolved = (ROOT / entry[name]).resolve()
@@ -40,14 +48,20 @@ def catalogue(extension):
         raise ValueError("Invalid image name or unsupported platform.")
     if not re.fullmatch(r"[A-Za-z0-9.]+\.dll", entry["entrypoint"]):
         raise ValueError("Invalid extension DLL name.")
-    version = (ROOT / entry["versionFile"]).read_text(encoding="utf-8").strip()
-    match = VERSION.fullmatch(version)
-    if not match or match[4] and any(part.isdigit() and len(part) > 1 and part[0] == "0" for part in match[4].split(".")):
+    if kind == "server":
+        properties = ET.parse(ROOT / entry["versionFile"])
+        prefix, suffix = properties.findtext("./PropertyGroup/VersionPrefix"), properties.findtext("./PropertyGroup/VersionSuffix")
+        version = (prefix or "") + ("-" + suffix if suffix else "")
+    else:
+        version = (ROOT / entry["versionFile"]).read_text(encoding="utf-8").strip()
+    if not valid_version(version):
         raise ValueError("Extension version must be SemVer without build metadata.")
     return {**entry, "version": version}
 
 
 def release_tag(entry, tag):
+    if entry.get("kind") == "server":
+        raise ValueError("This server catalogue supports private previews; official server releases use the existing product release workflow.")
     family = "worker" if entry.get("kind") == "awp-worker" else "extension"
     if tag != f"{family}/{entry['id']}/v{entry['version']}":
         raise ValueError("Release tag does not match the extension's own version.")
@@ -82,15 +96,19 @@ def build_command(entry, archive, metadata, bases, sha, repository):
             "--label", "org.opencontainers.image.licenses=Apache-2.0", str(ROOT)]
 
 
-def build(extension, directory, repository):
+def build(extension, directory, repository, bases=None):
     entry = catalogue(extension)
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ValueError("Expected an owner/repository name.")
     if output(["git", "-C", str(ROOT), "status", "--porcelain"]):
         raise ValueError("Build a clean checkout so the image identifies an exact source revision.")
     sha = output(["git", "-C", str(ROOT), "rev-parse", "HEAD"])
-    bases = {"sdk": resolve_image("mcr.microsoft.com/dotnet/sdk:10.0.300"),
-             "runtime": resolve_image("mcr.microsoft.com/dotnet/aspnet:10.0")}
+    if bases is None:
+        bases = {"sdk": resolve_image("mcr.microsoft.com/dotnet/sdk:10.0.300"),
+                 "runtime": resolve_image("mcr.microsoft.com/dotnet/aspnet:10.0")}
+    if set(bases) != {"sdk", "runtime"} or not all(
+            re.fullmatch(r"[a-z0-9./_-]+@sha256:[0-9a-f]{64}", value) for value in bases.values()):
+        raise ValueError("SDK and runtime build inputs must be pinned by digest.")
     directory.mkdir(parents=True, exist_ok=True)
     archive, metadata = directory / "image.oci.tar", directory / "build-metadata.json"
     subprocess.run(build_command(entry, archive, metadata, bases, sha, repository), check=True)
@@ -99,7 +117,7 @@ def build(extension, directory, repository):
         raise ValueError("Build did not produce an immutable image digest.")
     with archive.open("rb") as stream:
         archive_hash = hashlib.file_digest(stream, "sha256").hexdigest()
-    delivery = {"schemaVersion": 1, ("component" if entry.get("kind") == "awp-worker" else "extension"): entry, "sourceSha": sha, "repository": repository,
+    delivery = {"schemaVersion": 1, ("extension" if entry.get("kind", "aep-extension") == "aep-extension" else "component"): entry, "sourceSha": sha, "repository": repository,
                 "digest": digest, "buildImages": bases, "archive": archive.name,
                 "archiveSha256": archive_hash}
     (directory / "delivery.json").write_text(json.dumps(delivery, indent=2) + "\n", encoding="utf-8")
