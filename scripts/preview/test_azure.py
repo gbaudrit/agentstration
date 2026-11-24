@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -297,6 +299,41 @@ class AzureTests(unittest.TestCase):
             with self.assertRaises(RuntimeError) as error:
                 azure.command(['az', 'rest', '--body', secret])
         self.assertNotIn(secret, str(error.exception))
+
+    def test_provider_error_identifies_the_storage_operation_without_echoing_parameters(self):
+        secret = 'https://private.example.test/bundle?sig=disposable-fixture'
+        failure = subprocess.CompletedProcess([], 1, secret, 'ERROR: (AuthorizationPermissionMismatch) ' + secret)
+        with patch.object(subprocess, 'run', return_value=failure):
+            with self.assertRaises(RuntimeError) as error:
+                azure.command(['az', 'storage', 'container', 'show', '--name', 'previews', '--connection-string', secret])
+        self.assertIn('az storage container show', str(error.exception))
+        self.assertIn('[AuthorizationPermissionMismatch]', str(error.exception))
+        self.assertNotIn(secret, str(error.exception))
+        self.assertNotIn('--connection-string', str(error.exception))
+
+    @unittest.skipUnless(shutil.which('az'), 'Azure CLI is needed for the offline command-line boundary check.')
+    def test_storage_arguments_match_the_installed_azure_cli_without_authentication(self):
+        client = object.__new__(azure.Azure)
+        client.account, client.container = 'accountfixture', 'previews'
+        calls = []
+        client.az = lambda *args, **kwargs: calls.append(args)
+        operations = [('container', 'show'), ('blob', 'exists', '--name', 'owner.json'),
+                      ('blob', 'lease', 'acquire', '--blob-name', 'owner.json', '--lease-duration', '-1'),
+                      ('blob', 'lease', 'release', '--blob-name', 'owner.json', '--lease-id', 'disposable-fixture'),
+                      ('blob', 'generate-sas', '--name', 'bundle.tar.gz', '--permissions', 'r', '--https-only', '--as-user', '--full-uri')]
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = {**os.environ, 'AZURE_CONFIG_DIR': temporary, 'AZURE_CORE_COLLECT_TELEMETRY': 'false',
+                           'AZURE_EXTENSION_USE_DYNAMIC_INSTALL': 'no', 'NO_COLOR': '1'}
+            for operation in operations:
+                client.storage(*operation)
+                command_name = list(operation[:next((i for i, arg in enumerate(operation) if arg.startswith('--')), len(operation))])
+                help_text = subprocess.run(['az', 'storage', *command_name, '--help'], env=environment,
+                                           text=True, capture_output=True, check=True, timeout=60).stdout
+                supported = set(re.findall(r'(?m)^\s+(--[a-z][a-z0-9-]*)\b', help_text))
+                for argument in calls[-1]:
+                    if argument.startswith('--'):
+                        with self.subTest(operation=command_name, argument=argument):
+                            self.assertIn(argument, supported)
 
     def test_guest_wrapper_is_valid_shell_and_never_embeds_a_download_credential(self):
         for action in ('deploy', 'status', 'destroy'):
