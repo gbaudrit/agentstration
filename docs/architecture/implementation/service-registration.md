@@ -49,7 +49,7 @@ The following extensions retain their complete registration bodies. Calling them
 | `ResourcePlanning.Storage.PostgreSql/PostgreSqlResourcePlanRepository.cs` | `AddPostgreSqlResourcePlanning` | PostgreSQL EF factory and Plan/ChangeSet persistence. |
 | `Runtime.Storage.Sqlite/SqliteRuntimeRunStore.cs` | `AddSqliteRuntimeRuns` | Runtime EF factory and Run/event/assignment persistence. |
 | `Runtime.Storage.PostgreSql/PostgreSqlRuntimeRunStore.cs` | `AddPostgreSqlRuntimeRuns` | Equivalent PostgreSQL Runtime persistence. |
-| `Work.Storage.Sqlite/WorkStorageSchema.cs` | `AddSqliteWorkPlane` | Work EF factory and Work/Interaction/Task/Entry/Dashboard/notification persistence. |
+| `Work.Storage.Sqlite/WorkStorageSchema.cs` | `AddSqliteWorkPlane` | Work EF factory and Work/Interaction/Task/Entry/Dashboard/notification persistence, plus WorkPlan and private Project repositories. |
 | `Work.Storage.PostgreSql/PostgreSqlWorkItemRepository.cs` | `AddPostgreSqlWorkPlane` | Equivalent PostgreSQL Work persistence. |
 | `Flows.Storage.Sqlite/SqliteFlowRepository.cs` | `AddSqliteFlowStorage` | Flow EF factory and definition/Run persistence. |
 | `Flows.Storage.PostgreSql/PostgreSqlFlowRepository.cs` | `AddPostgreSqlFlowStorage` | Equivalent PostgreSQL Flow persistence. |

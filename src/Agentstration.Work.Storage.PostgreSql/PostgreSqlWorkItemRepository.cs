@@ -101,6 +101,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskResultDocument>(), "WorkTaskResults");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
         ConfigureWorkPlans(modelBuilder);
+        ConfigureWorkProjects(modelBuilder);
     }
 
     private static void ConfigureConversationMessage(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<ConversationMessageDocument> entity)
@@ -1035,6 +1036,7 @@ public static class PostgreSqlWorkServiceCollectionExtensions
         services.AddDbContextFactory<WorkDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "work").EnableRetryOnFailure()).AddInterceptors(new UtcDateTimeOffsetInterceptor()));
         services.AddSingleton<IWorkItemRepository, PostgreSqlWorkItemRepository>();
         services.AddSingleton<IWorkPlanRepository, PostgreSqlWorkPlanRepository>();
+        services.AddSingleton<IWorkProjectRepository, PostgreSqlWorkProjectRepository>();
         services.AddSingleton<IWorkplaceRepository, PostgreSqlWorkplaceRepository>();
         return services;
     }

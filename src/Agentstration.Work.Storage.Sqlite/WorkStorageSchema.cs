@@ -43,6 +43,7 @@ public static class SqliteWorkServiceCollectionExtensions
         services.AddDbContextFactory<WorkDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IWorkItemRepository, SqliteWorkItemRepository>();
         services.AddSingleton<IWorkPlanRepository, SqliteWorkPlanRepository>();
+        services.AddSingleton<IWorkProjectRepository, SqliteWorkProjectRepository>();
         services.AddSingleton<IWorkplaceRepository, SqliteWorkplaceRepository>();
         return services;
     }

@@ -1,0 +1,7 @@
+apiVersion: agentstration.io/v1
+kind: Project
+metadata:
+  name: operations
+definition:
+  displayName: Operations
+  description: Groups local plans and tasks in this Workspace.

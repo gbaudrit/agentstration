@@ -49,6 +49,7 @@ internal static class BootstrapServiceCollectionExtensions
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, KnowledgeSourceToolExposureBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ProjectBootstrapResourceHandler>();
         return services;
     }
 }

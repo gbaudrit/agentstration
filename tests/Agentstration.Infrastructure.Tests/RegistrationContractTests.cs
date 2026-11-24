@@ -40,7 +40,7 @@ public sealed class RegistrationContractTests
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
             [typeof(IBootstrapContributionResourceResolver)] = (4, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (29, ServiceLifetime.Scoped),
+            [typeof(IBootstrapResourceHandler)] = (30, ServiceLifetime.Scoped),
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = (6, ServiceLifetime.Singleton),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
@@ -63,6 +63,9 @@ public sealed class RegistrationContractTests
                 directImplementations.Select(descriptor => descriptor.ImplementationType).Distinct().ToArray(),
                 $"Duplicate contribution for {contract.FullName}.");
         }
+
+        Assert.IsTrue(services.Any(descriptor => descriptor.ServiceType == typeof(IBootstrapResourceHandler)
+            && descriptor.ImplementationType == typeof(ProjectBootstrapResourceHandler)), "Workspace Project Bootstrap must use its canonical scoped handler.");
 
         var accidentalDuplicates = services
             .Where(descriptor => descriptor.ServiceType.Namespace?.StartsWith("Agentstration", StringComparison.Ordinal) == true)

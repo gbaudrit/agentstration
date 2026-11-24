@@ -20,6 +20,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkItemService>();
         services.AddSingleton<WorkTaskTreeService>();
         services.AddSingleton<WorkPlanService>();
+        services.AddSingleton<WorkProjectService>();
         services.AddSingleton<WorkPlanExecutionService>();
         services.AddSingleton<IWorkPlanFlowObserver, WorkPlanFlowObserver>();
         services.AddSingleton<WorkplaceService>();

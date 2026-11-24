@@ -169,6 +169,9 @@ internal static class OpenApiSuccessResponseCatalog
         if (!path.StartsWith("/api/workspaces/{workspaceName}", StringComparison.OrdinalIgnoreCase)) return null;
 
         if (path == "/api/workspaces/{workspaceName}") return Json<WorkplaceWorkspaceResponse>(200, "Get a Workplace workspace");
+        if (method == "GET" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectPageResponse>(200, "List private Workspace Projects");
+        if (method == "POST" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(201, "Create a private Workspace Project");
+        if (path.EndsWith("/projects/{projectId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(200, method == "PUT" ? "Update Project work associations" : "Get a Workspace Project");
         if (method == "POST" && path.Contains("/work-plans/{planId}/execution", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(202, "Configure or advance durable WorkPlan execution");
         if (method == "POST" && path.EndsWith("/work-plans", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(201, "Create a WorkPlan");
         if (method == "POST" && path.EndsWith("/work-plans/{planId}/revisions", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(201, "Revise an inactive WorkPlan");

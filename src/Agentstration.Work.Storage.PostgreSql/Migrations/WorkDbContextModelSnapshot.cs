@@ -443,6 +443,47 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.ToTable("WorkPlanRevisions", "work");
                 });
 
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkProjectDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Namespace")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("WorkspaceId", "Id");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "Namespace", "Name")
+                        .IsUnique();
+
+                    b.ToTable("WorkProjects", "work");
+                });
+
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkTaskActivityDocument", b =>
                 {
                     b.Property<string>("Id")

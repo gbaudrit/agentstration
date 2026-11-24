@@ -1,6 +1,6 @@
-using Agentstration.Flows.Storage.Sqlite;
 using System.Text.Json;
 using Agentstration.Application.Work;
+using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -435,6 +435,7 @@ public sealed partial class WorkPlanTests
         public string ConnectionString => $"Data Source={Path.Combine(directory, "work.db")};Pooling=False";
         public IWorkItemRepository Tasks => provider!.GetRequiredService<IWorkItemRepository>();
         public IWorkPlanRepository Store => provider!.GetRequiredService<IWorkPlanRepository>();
+        public IWorkProjectRepository Projects => provider!.GetRequiredService<IWorkProjectRepository>();
         public Agentstration.Flows.Storage.Abstractions.IFlowRepository FlowStore => provider!.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>();
         public static async Task<Fixture> CreateAsync()
         {
