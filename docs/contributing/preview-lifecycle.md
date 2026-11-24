@@ -26,12 +26,13 @@ image references and invalid provider/database combinations are rejected.
 | `target` | Provider-specific, credential-free fields below |
 
 Docker targets contain `daemonId` and host `port` (default 5080; 0 allocates a
-disposable test port). Azure targets contain `subscriptionId`, `region` and
+disposable test port). Azure targets contain `subscriptionId`, `resourceGroup`, `region`, `imageVersion` and
 `vmSize` (`Standard_B2ms` or `Standard_B4ms`). SSH targets contain `host`, `sshPort`,
 `user`, public `hostKeyFingerprint` and application `port`.
 
-Azure and SSH requests can be validated now; their execution is explicitly
-unavailable until #1283 and #1288. They never fall back to local Docker. Example
+Azure requests route to the [external VM adapter](preview-azure.md). SSH requests
+can be validated; execution remains unavailable until #1288. Remote targets never
+fall back to local Docker. Example
 targets live under `deploy/preview/targets`; replace their sample identities.
 No provisioning framework, empty adapter or provider field is added to packaging.
 

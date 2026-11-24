@@ -1,0 +1,25 @@
+name: Preview Azure contracts
+on:
+  pull_request:
+    branches: [main]
+    paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
+  push:
+    branches: [main]
+    paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check deployment and ownership contracts without cloud credentials
+        run: python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
+      - name: Compile the Azure template without provisioning
+        run: |
+          az bicep install --version v0.44.1
+          az bicep build --file deploy/preview/azure/main.bicep --outfile "$RUNNER_TEMP/preview-azure.json"

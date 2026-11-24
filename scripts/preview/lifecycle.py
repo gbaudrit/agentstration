@@ -99,6 +99,10 @@ def execute(action, request, state_root, bootstrap=None, now=None):
     contract.operation(action, request)
     if action == "validate":
         return result(request, "validated")
+    if request["provider"] == "azure-vm":
+        import azure
+        return azure.execute(action, request)
+    preview.require(state_root is not None, "Docker operations require a protected persistent state root.")
     root = Path(state_root).resolve()
     directory = root / request["environmentId"]
     preview.require(not directory.is_symlink(), "Lifecycle state directories must not be symlinks.")
@@ -196,7 +200,7 @@ def main():
         command = commands.add_parser(action)
         command.add_argument("--request", type=Path, required=True)
         if action != "validate":
-            command.add_argument("--state-root", type=Path, required=True)
+            command.add_argument("--state-root", type=Path)
         if action == "deploy":
             command.add_argument("--bootstrap-config", type=Path)
         command.add_argument("--output", type=Path)
