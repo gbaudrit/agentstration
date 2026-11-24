@@ -53,3 +53,10 @@ class GitHubRequestTests(unittest.TestCase):
             github_request.resolve(json.dumps(value), self.variables)
         with self.assertRaises(ValueError):
             github_request.resolve('{"provider":"azure-vm","provider":"docker"}', self.variables)
+
+    def test_resolved_defaults_cannot_exceed_the_portable_request_size_limit(self):
+        value = azure_request()
+        del value['target']['imageVersion']
+        variables = {**self.variables, 'AZURE_PREVIEW_IMAGE_VERSION': '24.04.' + '1' * 65536}
+        with self.assertRaises(ValueError):
+            github_request.resolve(json.dumps(value), variables)

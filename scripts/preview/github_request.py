@@ -1,4 +1,6 @@
-"""Resolve public GitHub defaults once, before the portable request is validated."""
+"""Resolve public GitHub environment defaults once before portable validation."""
+import json
+
 import contract
 import preview
 
@@ -21,4 +23,4 @@ def resolve(text, variables, size_profile='request', action='validate'):
         target.setdefault('vmSize', variables.get('AZURE_PREVIEW_VM_SIZE1', ''))
     target.setdefault('imageVersion', variables.get('AZURE_PREVIEW_IMAGE_VERSION', ''))
     target.setdefault('osProfile', variables.get('AZURE_PREVIEW_OS_PROFILE') or contract.AZURE_OS_PROFILE)
-    return contract.validate(request)
+    return contract.loads(json.dumps(request))

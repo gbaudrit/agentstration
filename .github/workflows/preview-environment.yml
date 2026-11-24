@@ -13,11 +13,6 @@ on:
         description: Version 1 deployment request JSON (public metadata only, no credentials)
         type: string
         required: true
-      azure_vm_size_profile:
-        description: Azure deploy size slot; request keeps the explicit size and uses slot 1 only when omitted
-        type: choice
-        options: [request, '1', '2', '3', '4', '5']
-        default: request
   workflow_call:
     inputs:
       operation:
@@ -26,9 +21,6 @@ on:
       request:
         type: string
         required: true
-      azure_vm_size_profile:
-        type: string
-        default: request
     outputs:
       result:
         description: Versioned safe lifecycle result JSON
@@ -67,23 +59,14 @@ jobs:
           RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS || '["self-hosted","linux","agentstration-preview"]' }}
           CONFIGURED_RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS }}
           STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
-          AZURE_SIZE_PROFILE: ${{ inputs.azure_vm_size_profile }}
-          AZURE_PREVIEW_IMAGE_VERSION: ${{ vars.AZURE_PREVIEW_IMAGE_VERSION }}
-          AZURE_PREVIEW_OS_PROFILE: ${{ vars.AZURE_PREVIEW_OS_PROFILE }}
-          AZURE_PREVIEW_VM_SIZE1: ${{ vars.AZURE_PREVIEW_VM_SIZE1 }}
-          AZURE_PREVIEW_VM_SIZE2: ${{ vars.AZURE_PREVIEW_VM_SIZE2 }}
-          AZURE_PREVIEW_VM_SIZE3: ${{ vars.AZURE_PREVIEW_VM_SIZE3 }}
-          AZURE_PREVIEW_VM_SIZE4: ${{ vars.AZURE_PREVIEW_VM_SIZE4 }}
-          AZURE_PREVIEW_VM_SIZE5: ${{ vars.AZURE_PREVIEW_VM_SIZE5 }}
         run: |
           python3 - <<'PY'
           import json, os, sys
           from pathlib import Path
           sys.path.insert(0, 'scripts/preview')
-          import contract, github_request, lifecycle, preview
+          import contract, lifecycle, preview
+          request = contract.loads(os.environ['REQUEST_JSON'])
           operation = os.environ['OPERATION']
-          request = github_request.resolve(os.environ['REQUEST_JSON'], os.environ,
-                                           os.environ['AZURE_SIZE_PROFILE'], operation)
           contract.operation(operation, request)
           preview.require(request['registry'] == 'ghcr.io', 'Actions deployments require private GHCR deliveries.')
           preview.require(all(item['repository'].lower() == os.environ['SOURCE_REPOSITORY'].lower()

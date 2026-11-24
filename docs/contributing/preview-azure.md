@@ -126,10 +126,11 @@ No PAT, `GHCR_BOOTSTRAP_TOKEN`, Azure client secret or account key is required.
 
 ### GitHub deployment defaults
 
-Create these non-secret **repository** variables under **Settings > Secrets and
-variables > Actions > Variables**. They are read before the protected Azure job;
-the six environment-scoped identity/storage variables above keep their existing
-scope.
+Keep these non-secret variables in **Settings > Environments >
+preview-deployment > Environment variables**, alongside the six identity/storage
+variables above. The **Preview Azure environment** manual entrypoint reads them
+from a protected main-only job with no Azure authentication, freezes the resolved
+request, then calls the existing generic lifecycle workflow.
 
 | Variable | Example | Behavior |
 | --- | --- | --- |
@@ -139,7 +140,7 @@ scope.
 | `AZURE_PREVIEW_VM_SIZE2` | `Standard_B4ms` | Optional second size slot |
 | `AZURE_PREVIEW_VM_SIZE3` through `SIZE5` | Unset | Optional slots; empty/unsupported selections fail before Azure access |
 
-The manual and reusable workflow exposes `azure_vm_size_profile`: `request`
+The Azure manual entrypoint exposes `azure_vm_size_profile`: `request`
 (default), or slots `1` through `5`. `request` preserves explicit target values
 and fills a missing size from slot 1. An explicit slot must be configured to
 `Standard_B2ms` or `Standard_B4ms` and must agree with an explicitly supplied size;
@@ -151,8 +152,12 @@ contains the exact `vmSize`, `imageVersion` and `osProfile`; use that artifact f
 later operations. `status` and `destroy` require the recorded target and ignore
 changed defaults. They reject slot overrides. Legacy v1 requests without
 `osProfile` still mean `ubuntu-24.04` and remain inspectable/removable. The local
-CLI continues to require a complete request; GitHub defaults belong only to the
-external workflow boundary. Other distributions require their own tested
+CLI and generic **Preview environment** workflow continue to require a complete
+request; GitHub defaults belong only to the external Azure entrypoint. A complete
+request can be validated without accessing the protected environment. Testing its
+configured environment defaults requires the Azure entrypoint on trusted `main`;
+`validate` resolves them without Azure login or infrastructure operations.
+Other distributions require their own tested
 bootstrap and are not activated by setting a variable to an arbitrary value.
 
 ### Verify the exact Ubuntu image before deployment

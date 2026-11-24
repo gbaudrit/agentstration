@@ -50,7 +50,7 @@ Azure deletes the VM's OS disk with its parent. Shared bootstrap infrastructure
 is retained. Do not return a public application URL before #1285 verifies Access.
 TTL enforcement remains #1286. The adapter records measured startup duration,
 available guest memory and Azure CPU/credit metrics when available. Resolve public
-GitHub OS/image/size defaults once into the canonical request; later status/destroy
+GitHub protected-environment OS/image/size defaults once into the canonical request; later status/destroy
 operations use the recorded selection. The only qualified OS profile is Ubuntu
 24.04; legacy v1 requests without an explicit profile retain that meaning.
 
