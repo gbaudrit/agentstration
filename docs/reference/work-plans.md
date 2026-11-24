@@ -228,3 +228,7 @@ provider, Tool generation and intent; it recovers the old receipt before conside
 another call with the same key. Changed bindings and obsolete plan intents cannot
 silently republish. Providers unable to establish the outcome must keep it uncertain
 for explicit operator reconciliation. These contracts introduce no automatic retries.
+
+Concrete repository and PR operations use [Coding GitHub connections](coding-github.md).
+An exact published Tool relay may also be selected for a TaskOperations binding;
+its immutable capability declaration and source pins are checked before dispatch.

@@ -26,7 +26,7 @@ public static class OpenApiConfiguration
                 {
                     Title = "Agentstration HTTP API",
                     Version = DocumentName,
-                    Description = "Authoritative HTTP API for Agentstration's Management, Runtime, Work, Flow, identity and Workplace surfaces. SignalR and MCP are separate transports and are not represented by this document."
+                    Description = "Authoritative HTTP API for Agentstration's Management, Runtime, Work, Coding, Flow, identity and Workplace surfaces. SignalR and MCP are separate transports and are not represented by this document."
                 };
                 document.Components ??= new OpenApiComponents();
                 document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>(StringComparer.Ordinal);
@@ -305,6 +305,7 @@ public static class OpenApiConfiguration
             || value.Contains("/deployments", StringComparison.Ordinal)
             || value.StartsWith("/api/routing", StringComparison.Ordinal)) return "Management";
         if (value.StartsWith("/api/diagnostics", StringComparison.Ordinal)) return "Diagnostics";
+        if (value.StartsWith("/api/workspaces", StringComparison.Ordinal) && value.Contains("/coding/", StringComparison.Ordinal)) return "Coding";
         if (value.StartsWith("/api/workspaces", StringComparison.Ordinal)) return "Workplace";
         return "API";
     }

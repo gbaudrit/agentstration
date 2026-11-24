@@ -322,3 +322,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 261. [ADR-0261 — Project context is authorized and captured at task admission](0261-project-context-is-authorized-and-captured-at-task-admission.md)
 262. [ADR-0262 — Governed Work planning Tools reuse Work services](0262-governed-work-planning-tools-reuse-work-services.md)
 263. [ADR-0263 — Task providers use Project bindings and durable operation receipts](0263-task-providers-use-project-bindings-and-durable-operation-receipts.md)
+264. [ADR-0264 — Coding GitHub operations use protected relays and native recovery](0264-coding-github-operations-use-protected-relays-and-native-recovery.md)

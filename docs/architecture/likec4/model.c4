@@ -115,6 +115,10 @@ model {
             description 'Tool catalog, providers, hooks, governance audit, and MCP transport'
           }
 
+          codingApi = component 'Coding.Api' {
+            description 'Authorized Project/task repository selection and provider-specific PR transport'
+          }
+
           workApi = component 'Work.Api' {
             description 'Work resource lifecycle and interaction transport'
           }
@@ -135,6 +139,10 @@ model {
 
       distribution = component 'Distribution and bootstrap' {
         description 'API-driven Bootstrap profiles, Pack and Source distribution, plus bounded startup initialization'
+      }
+
+      coding = component 'Coding application' {
+        description 'Private Project/task repository selection and native PR intent through protected published Tool connections'
       }
 
       work = component 'Work and Workplace application' {
@@ -234,6 +242,9 @@ model {
   agentstration.server.transport -> agentstration.server.distribution 'Delegates Bootstrap, Pack, and Source distribution use cases'
   agentstration.server.transport -> agentstration.server.scheduling 'Delegates Trigger administration and run-now commands'
   agentstration.server.transport -> agentstration.server.resources 'Delegates resource use cases'
+  agentstration.server.transport -> agentstration.server.coding 'Delegates repository and PR use cases'
+  agentstration.server.coding -> agentstration.server.work 'Checks private Project and task association'
+  agentstration.server.coding -> agentstration.server.tools 'Invokes authorized protected connections'
   agentstration.server.transport -> agentstration.server.work 'Delegates Work and interaction use cases'
   agentstration.server.transport -> agentstration.server.flow 'Delegates Flow use cases'
   agentstration.server.transport -> agentstration.server.runtime 'Delegates Runtime use cases'
@@ -258,6 +269,7 @@ model {
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.sourcesApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.toolsApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.platformApis.triggersApi 'Composes'
+  agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.codingApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.workApi 'Composes'
   agentstration.server.transport.apiAggregator -> agentstration.server.transport.executionApis.workplaceApi 'Composes'
   agentstration.server.distribution -> agentstration.server.resources 'Applies manifests through owning services'

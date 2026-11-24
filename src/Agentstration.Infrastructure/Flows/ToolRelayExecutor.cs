@@ -93,7 +93,8 @@ public sealed class ToolRelayExecutor(
             var execution = invocation.ExecutionContext;
             var context = new ToolExecutionContext
             {
-                OwnerKind = invocation.CallerKind == ToolDefinitionCallerKind.Console ? ToolExecutionOwnerKind.Console
+                OwnerKind = invocation.CallerKind == ToolDefinitionCallerKind.WorkOperation ? ToolExecutionOwnerKind.WorkOperation
+                    : invocation.CallerKind == ToolDefinitionCallerKind.Console ? ToolExecutionOwnerKind.Console
                     : invocation.CallerKind == ToolDefinitionCallerKind.Mcp ? ToolExecutionOwnerKind.Mcp
                     : invocation.CallerKind == ToolDefinitionCallerKind.Flow ? ToolExecutionOwnerKind.FlowRun : ToolExecutionOwnerKind.RuntimeRun,
                 ToolCallId = $"{invocation.CallId}:relay:{publication.Value.Uid:N}",

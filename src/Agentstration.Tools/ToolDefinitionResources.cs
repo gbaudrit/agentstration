@@ -85,6 +85,7 @@ public abstract record ToolDefinitionProperties
     public int InvocationTimeoutSeconds { get; init; } = 90;
     public string Version { get; init; } = "1.0.0";
     public bool Publish { get; init; }
+    public IReadOnlyDictionary<string, JsonElement> Metadata { get; init; } = new Dictionary<string, JsonElement>();
     public IReadOnlyList<ToolArgumentBinding> Bindings { get; init; } = [];
 }
 
@@ -210,7 +211,7 @@ public interface IToolDefinitionFlowResolver
         CancellationToken cancellationToken);
 }
 
-public enum ToolDefinitionCallerKind { Mcp, Agent, Flow, Console }
+public enum ToolDefinitionCallerKind { Mcp, Agent, Flow, Console, WorkOperation }
 
 public sealed record ToolDefinitionInvocationContext(
     string? AgentId = null,

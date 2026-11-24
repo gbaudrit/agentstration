@@ -107,7 +107,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
         if (project?.Definition.Bindings.Contains(operation.Route.Binding) != true) return Failure("task_provider_binding_changed");
         var route = await provider.ResolveAsync(operation.WorkspaceId, context.PrincipalId, operation.Route.Binding, operation.Input.Operation, token);
         if (!route.IsSuccess) return Failure(route.ErrorCode!);
-        if (route.Value!.Tool != operation.Route.Tool) return Failure("task_provider_route_changed");
+        if (route.Value!.Tool != operation.Route.Tool || route.Value.Provider != operation.Route.Provider) return Failure("task_provider_route_changed");
         ExternalTaskProviderResponse response;
         try
         {

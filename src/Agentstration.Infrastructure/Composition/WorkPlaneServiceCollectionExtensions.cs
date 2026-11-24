@@ -1,4 +1,5 @@
 using Agentstration.Application.Work;
+using Agentstration.Coding;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Flows;
 using Agentstration.Infrastructure.Work;
@@ -22,6 +23,8 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkPlanService>();
         services.AddSingleton<WorkProjectService>();
         services.AddSingleton<WorkTaskProviderService>();
+        services.AddSingleton<CodingRepositoryService>();
+        services.AddSingleton<ICodingProviderGateway, McpCodingProviderGateway>();
         services.AddSingleton<IWorkTaskProviderGateway, McpWorkTaskProviderGateway>();
         services.AddSingleton<WorkProjectContextService>();
         services.AddSingleton<IWorkProjectBindingResolver, WorkProjectBindingResolver>();

@@ -64,6 +64,24 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void CodingAndGitHubRemainOutsideGenericWorkAndFlowAndTheExtensionIsAutonomous()
+    {
+        var core = new[] { typeof(WorkItem).Assembly, typeof(Agentstration.Flows.FlowDefinition).Assembly };
+        foreach (var assembly in core)
+            Assert.IsFalse(assembly.GetReferencedAssemblies().Any(reference => reference.Name!.Contains("Coding", StringComparison.Ordinal)
+                || reference.Name.Contains("GitHub", StringComparison.Ordinal)));
+        var coding = typeof(Agentstration.Coding.CodingRepositoryService).Assembly.GetReferencedAssemblies();
+        Assert.IsFalse(coding.Any(reference => reference.Name!.Contains("Extensions.GitHub", StringComparison.Ordinal)
+            || reference.Name.Contains("Storage.Sqlite", StringComparison.Ordinal) || reference.Name.Contains("EntityFrameworkCore", StringComparison.Ordinal)));
+        var root = FindRepositoryRoot();
+        var project = File.ReadAllText(Path.Combine(root, "src/extensions/Agentstration.Extensions.GitHub/Agentstration.Extensions.GitHub.csproj"));
+        Assert.DoesNotContain("Agentstration.Work", project); Assert.DoesNotContain("Agentstration.Coding", project); Assert.DoesNotContain("Agentstration.Application", project);
+        var sourceProjects = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.GitHub.csproj", StringComparison.Ordinal)).ToArray();
+        Assert.HasCount(0, sourceProjects, "The optional GitHub executable must not be linked into the authoritative server.");
+    }
+
+    [TestMethod]
     public void PostgreSqlDocumentImplementationRemainsOutsideProductFamilies()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");

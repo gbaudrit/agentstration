@@ -247,6 +247,13 @@ public sealed partial class ToolDefinitionService(
             throw new ToolDefinitionValidationException("tool_definition_invalid", "A ToolDefinition requires a typed definition.");
         if (resource.Definition.Bindings is null || resource.Definition is RelayToolDefinitionProperties { Target: null })
             throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "A relay requires its target and binding collection.");
+        if (resource.Definition.Metadata is null || resource.Definition.Metadata.Count > 32
+            || resource.Definition.Metadata.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Key.Length > 128
+                || pair.Key.StartsWith("agentstration.toolDefinition", StringComparison.Ordinal)
+                || pair.Key is "agentstration.toolPublicationUid" or "agentstration.relayDepth"
+                || pair.Value.ValueKind == JsonValueKind.Undefined)
+            || JsonSerializer.SerializeToUtf8Bytes(resource.Definition.Metadata).Length > 16 * 1024)
+            throw new ToolDefinitionValidationException("tool_definition_metadata_invalid", "Tool declaration metadata must be bounded and cannot override platform identity.");
         if (resource.Kind != ToolResourceKinds.ToolDefinition || resource.ApiVersion != ResourceApiVersions.CoreV1)
             throw new ToolDefinitionValidationException("tool_definition_identity_invalid", "ToolDefinition kind and apiVersion are required.");
         if (resource.ScopeRef is null)
@@ -397,7 +404,7 @@ public sealed partial class ToolDefinitionService(
                 ExternalId = definition.Name,
                 Discovery = new ToolDiscoveryState { Available = true, FirstSeenAt = firstSeen, LastSeenAt = now },
                 Schema = new ToolSchema { Input = definition.Definition.InputSchema.Clone(), Output = definition.Definition.OutputSchema?.Clone() },
-                Metadata = new Dictionary<string, JsonElement>
+                Metadata = new Dictionary<string, JsonElement>(definition.Definition.Metadata, StringComparer.Ordinal)
                 {
                     ["agentstration.toolDefinitionUid"] = JsonSerializer.SerializeToElement(definitionUid ?? definition.Uid),
                     ["agentstration.toolPublicationUid"] = JsonSerializer.SerializeToElement(definition.Uid),

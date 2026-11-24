@@ -42,7 +42,10 @@ public sealed record ExternalTaskSnapshot(string Repository, string TaskId, stri
 public sealed record WorkTaskProviderCapabilities(string Version, IReadOnlyList<ExternalTaskOperationKind> Operations,
     bool IdempotentOperations, bool OperationRecovery);
 public sealed record WorkTaskProviderRoute(WorkProjectContextBinding Binding, WorkProjectResourceReference Tool,
-    WorkTaskProviderCapabilities Capabilities);
+    WorkTaskProviderCapabilities Capabilities)
+{
+    public WorkProjectResourceReference? Provider { get; init; }
+}
 public sealed record ExternalTaskProviderRequest(string Mode, string OperationKey, string IntentDigest, ExternalTaskOperationInput Input);
 public sealed record ExternalTaskProviderResponse(string OperationKey, string IntentDigest, ExternalTaskProviderStatus Status,
     ExternalTaskSnapshot? Task = null, string? ErrorCode = null);

@@ -50,6 +50,11 @@
     <Project Path="src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <Project Path="src/Agentstration.Bootstrap.Api/Agentstration.Bootstrap.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Coding/">
+    <Project Path="src/Agentstration.Coding/Agentstration.Coding.csproj" />
+    <Project Path="src/Agentstration.Coding.Contracts/Agentstration.Coding.Contracts.csproj" />
+    <Project Path="src/Agentstration.Coding.Api/Agentstration.Coding.Api.csproj" />
+  </Folder>
   <Folder Name="/src/ConnectedServices/">
     <Project Path="src/Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <Project Path="src/Agentstration.ConnectedServices.Api/Agentstration.ConnectedServices.Api.csproj" />
@@ -80,6 +85,7 @@
     <Project Path="src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <Project Path="src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <Project Path="src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.GitHub/Agentstration.Extensions.GitHub.csproj" />
     <Project Path="src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
     <Project Path="src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
     <Project Path="src/extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />

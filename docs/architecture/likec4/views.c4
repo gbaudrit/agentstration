@@ -28,6 +28,7 @@ views {
     include agentstration.server.scheduling
     include agentstration.server.resources
     include agentstration.server.work
+    include agentstration.server.coding
     include agentstration.server.flow
     include agentstration.server.runtime
     include agentstration.server.tools
@@ -39,6 +40,9 @@ views {
     include agentstration.server.transport -> agentstration.server.scheduling
     include agentstration.server.transport -> agentstration.server.resources
     include agentstration.server.transport -> agentstration.server.work
+    include agentstration.server.transport -> agentstration.server.coding
+    include agentstration.server.coding -> agentstration.server.work
+    include agentstration.server.coding -> agentstration.server.tools
     include agentstration.server.transport -> agentstration.server.flow
     include agentstration.server.transport -> agentstration.server.runtime
     include agentstration.server.transport -> agentstration.server.tools

@@ -20,6 +20,7 @@ src/
   Agentstration.Workplace.Client/ typed HTTP and reconnecting SignalR client
   Agentstration.Workplace.Components/ reusable Workplace business components
   Agentstration.Workplace.Web/    standalone end-user Blazor host
+  Agentstration.Coding*/          repository/PR contracts, application service and family API
   Agentstration.Application/      use cases and module contracts
   Agentstration.Flows/             provider-neutral Flow definitions and references
   Agentstration.Flows.Application/ Flow CRUD, publication, activation, resolution
@@ -664,3 +665,14 @@ A successful startup restores ordinary admission and redirects to the validated
 local destination. A terminal failure retains correction/restart guidance. This
 increment does not add a durable startup journal or change readiness's worker
 barrier. See [ADR-0244](../../decisions/0244-authenticated-startup-progress-and-admission.md).
+
+## Coding repository boundary
+
+Coding resolves private Project/task repository selections and native pull requests
+through an authorized published Tool relay. Generic Work retains provider-neutral task
+operation intents and receipts. The optional GitHub AEP/MCP executable has no host
+business references; per-consumer credentials use existing Secret relay bindings. Its
+persistent provider journal recovers uncertain native creates without blind resubmission.
+Git acquisition, issue coordination and local harness execution remain separate increments.
+See [Coding GitHub](../../reference/coding-github.md) and
+[ADR-0264](../../decisions/0264-coding-github-operations-use-protected-relays-and-native-recovery.md).

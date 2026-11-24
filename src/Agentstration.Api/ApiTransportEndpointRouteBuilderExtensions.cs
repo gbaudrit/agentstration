@@ -1,4 +1,5 @@
 using Agentstration.Agents.Api;
+using Agentstration.Coding.Api;
 using Agentstration.Artifacts.Api;
 using Agentstration.Bootstrap.Api;
 using Agentstration.ConnectedServices.Api;
@@ -60,6 +61,7 @@ public static class ApiTransportEndpointRouteBuilderExtensions
         app.MapResourcePlanningApi();
         app.MapExtensionsApi();
         app.MapWorkApi();
+        app.MapCodingApi();
         app.MapWorkplaceApi();
         app.MapFlowsApi();
         app.MapRuntimeApi();

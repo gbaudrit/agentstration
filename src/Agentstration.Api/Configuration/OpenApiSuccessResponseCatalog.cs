@@ -1,4 +1,5 @@
 using Agentstration.Agents;
+using Agentstration.Coding.Contracts;
 using Agentstration.Agents.Contracts;
 using Agentstration.Api.Contracts;
 using Agentstration.DataSources.Contracts;
@@ -169,6 +170,8 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/management/workspaces/", StringComparison.OrdinalIgnoreCase)) return DashboardAdministration(method, path);
         if (!path.StartsWith("/api/workspaces/{workspaceName}", StringComparison.OrdinalIgnoreCase)) return null;
 
+        if (method == "POST" && path.EndsWith("/coding/repositories/resolve", StringComparison.OrdinalIgnoreCase)) return Json<CodingRepositorySelection>(200, "Resolve authorized Coding repositories");
+        if (method == "POST" && path.EndsWith("/coding/pull-requests", StringComparison.OrdinalIgnoreCase)) return Json<CodingPullRequestResponse>(202, "Invoke or recover a Coding pull request operation");
         if (path == "/api/workspaces/{workspaceName}") return Json<WorkplaceWorkspaceResponse>(200, "Get a Workplace workspace");
         if (method == "GET" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectPageResponse>(200, "List private Workspace Projects");
         if (method == "POST" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(201, "Create a private Workspace Project");

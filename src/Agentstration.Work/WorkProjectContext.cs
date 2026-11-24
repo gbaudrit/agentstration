@@ -22,9 +22,10 @@ public static class WorkProjectContextRules
         && bindings.All(binding => binding is not null && WorkProjectDefinition.ValidName(binding.Name) && Enum.IsDefined(binding.Purpose)
             && binding.Target is { Uid: var uid, Generation: >= 1 } target && uid != Guid.Empty
             && target.Address.ScopeRef != default && target.Address.Name is { Length: > 0 and <= 512 }
-            && target.Address.Kind is "ToolProvider" or "ConnectedService" or "SourceVersion"
+            && target.Address.Kind is "ToolProvider" or "ConnectedService" or "SourceVersion" or "Tool"
+            && (target.Address.Kind != "Tool" || binding.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Repository)
             && target.Version?.Length is not > 128
-            && (binding.Purpose != WorkProjectBindingPurpose.TaskOperations || target.Address.Kind == "ToolProvider")
+            && (binding.Purpose != WorkProjectBindingPurpose.TaskOperations || target.Address.Kind is "ToolProvider" or "Tool")
             && (binding.Purpose != WorkProjectBindingPurpose.Sharing || target.Address.Kind == "ToolProvider")
-            && (binding.Purpose != WorkProjectBindingPurpose.Repository || target.Address.Kind is "ToolProvider" or "ConnectedService"));
+            && (binding.Purpose != WorkProjectBindingPurpose.Repository || target.Address.Kind is "ToolProvider" or "ConnectedService" or "Tool"));
 }

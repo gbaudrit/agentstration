@@ -606,6 +606,7 @@ public sealed class McpToolInvoker(
     {
         ToolExecutionOwnerKind.Console => ToolDefinitionCallerKind.Console,
         ToolExecutionOwnerKind.Mcp => ToolDefinitionCallerKind.Mcp,
+        ToolExecutionOwnerKind.WorkOperation => ToolDefinitionCallerKind.WorkOperation,
         ToolExecutionOwnerKind.FlowRun => ToolDefinitionCallerKind.Flow,
         _ when context.AgentId is not null => ToolDefinitionCallerKind.Agent,
         _ => ToolDefinitionCallerKind.Agent

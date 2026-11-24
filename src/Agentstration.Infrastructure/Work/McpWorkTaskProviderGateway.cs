@@ -26,19 +26,39 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
     {
         if (current.Current.WorkspaceId != workspaceId.Value || current.Current.PrincipalId != principalId
             || !await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, token)) return Failure("task_provider_denied");
-        if (binding.Purpose != WorkProjectBindingPurpose.TaskOperations || binding.Target.Address.Kind != ToolResourceKinds.ToolProvider
+        if (binding.Purpose != WorkProjectBindingPurpose.TaskOperations || binding.Target.Address.Kind is not (ToolResourceKinds.ToolProvider or ToolResourceKinds.Tool)
             || !Enum.IsDefined(operation)) return Failure("task_provider_binding_invalid");
         var allowed = await bindings.ResolveAsync(workspaceId, principalId, binding, token);
         if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
-        var provider = await resources.GetExactAsync<ToolProviderResource>(binding.Target.Address, token);
-        if (provider is null || !provider.Value.Definition.Enabled || provider.Value.Definition.Mcp?.Internal == true) return Failure("task_provider_unavailable");
-        var consumer = ResourceScopeRef.Workspace(workspaceId.Value);
-        var tools = await resources.ListVisibleAsync<ToolResource>(consumer, ToolResourceKinds.Tool, 0, 1_000, token);
-        if (tools.Count == 1_000) return Failure("task_provider_discovery_limit");
-        var candidates = new List<(ToolResource Tool, WorkTaskProviderCapabilities Capabilities)>();
-        foreach (var stored in tools)
+        ToolResource? exactTool = null;
+        var providerAddress = binding.Target.Address;
+        if (binding.Target.Address.Kind == ToolResourceKinds.Tool)
         {
-            var tool = stored.Value;
+            exactTool = (await resources.GetExactAsync<ToolResource>(binding.Target.Address, token))?.Value;
+            if (exactTool?.Definition.Provider is not { } reference || (reference.ScopeRef ?? exactTool.ScopeRef) is not { } providerScope)
+                return Failure("task_provider_tool_unavailable");
+            providerAddress = ScopedResourceAddress.Create(providerScope, reference.Namespace ?? exactTool.Namespace, ToolResourceKinds.ToolProvider, reference.Name);
+        }
+        var provider = await resources.GetExactAsync<ToolProviderResource>(providerAddress, token);
+        if (provider is null || !provider.Value.Definition.Enabled) return Failure("task_provider_unavailable");
+        var providerReference = new WorkProjectResourceReference(providerAddress, provider.Value.Uid, provider.Value.Generation);
+        if (exactTool is not null)
+        {
+            var providerAccess = await bindings.ResolveAsync(workspaceId, principalId, binding with { Target = providerReference }, token);
+            if (!providerAccess.IsSuccess) return Failure(providerAccess.ErrorCode!);
+        }
+        var consumer = ResourceScopeRef.Workspace(workspaceId.Value);
+        IReadOnlyList<ToolResource> tools;
+        if (exactTool is not null) tools = [exactTool];
+        else
+        {
+            var page = await resources.ListVisibleAsync<ToolResource>(consumer, ToolResourceKinds.Tool, 0, 1_000, token);
+            if (page.Count == 1_000) return Failure("task_provider_discovery_limit");
+            tools = page.Select(value => value.Value).ToArray();
+        }
+        var candidates = new List<(ToolResource Tool, WorkTaskProviderCapabilities Capabilities)>();
+        foreach (var tool in tools)
+        {
             if (tool.Definition.Provider is not { } reference || reference.Name != provider.Value.Name
                 || (reference.ScopeRef ?? tool.ScopeRef) != provider.Value.ScopeRef
                 || (reference.Namespace ?? tool.Namespace) != provider.Value.Namespace
@@ -58,11 +78,14 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         if (!selected.Tool.Definition.Enabled || selected.Tool.Definition.Discovery?.Available != true) return Failure("task_provider_tool_unavailable");
         if (selected.Tool.Definition.RequiresApproval) return Failure("task_provider_approval_required");
         if (selected.Tool.ScopeRef is not { } owner) return Failure("task_provider_tool_unavailable");
+        if (provider.Value.Definition.Mcp?.Internal == true && !await IsPublishedRelayAsync(selected.Tool, selected.Capabilities, token))
+            return Failure("task_provider_bound_relay_required");
         var identity = new ResourceAccessIdentity(selected.Tool.Uid, owner, selected.Tool.Namespace, selected.Tool.Kind, selected.Tool.Generation);
         if (!(await access.EvaluateAsync(identity, consumer, ResourceAccessAction.Discover, token)).Allowed) return Failure("task_provider_tool_unavailable");
         if (!(await access.EvaluateAsync(identity, consumer, ResourceAccessAction.Use, token)).Allowed) return Failure("task_provider_denied");
         return Result<WorkTaskProviderRoute>.Success(new(binding, new(ScopedResourceAddress.Create(owner, selected.Tool.Namespace,
-            selected.Tool.Kind, selected.Tool.Name), selected.Tool.Uid, selected.Tool.Generation), selected.Capabilities));
+            selected.Tool.Kind, selected.Tool.Name), selected.Tool.Uid, selected.Tool.Generation), selected.Capabilities)
+            { Provider = exactTool is null ? null : providerReference });
     }
 
     public async Task<ExternalTaskProviderResponse> InvokeAsync(WorkTaskOperation operation, bool recover, CancellationToken token)
@@ -72,9 +95,10 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
             || current.Current.PrincipalId != operation.OwnerPrincipalId) return Unknown("task_provider_denied");
         var selected = await ResolveAsync(operation.WorkspaceId, operation.OwnerPrincipalId, operation.Route.Binding, operation.Input.Operation, token);
         if (!selected.IsSuccess) return Unknown(selected.ErrorCode!);
-        if (selected.Value!.Tool != operation.Route.Tool) return Unknown("task_provider_route_changed");
+        if (selected.Value!.Tool != operation.Route.Tool || selected.Value.Provider != operation.Route.Provider) return Unknown("task_provider_route_changed");
         var tool = (await resources.GetExactAsync<ToolResource>(operation.Route.Tool.Address, token))?.Value;
         if (tool is null || tool.Uid != operation.Route.Tool.Uid || tool.Generation != operation.Route.Tool.Generation) return Unknown("task_provider_route_changed");
+        var providerReference = operation.Route.Provider ?? operation.Route.Binding.Target;
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), clock);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
         try
@@ -86,9 +110,9 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
                 InvocationId = $"work-operation:{operation.Id}:{(recover ? "recover" : "execute")}",
                 ToolId = tool.Name, ToolName = tool.Definition.ExternalId ?? tool.Name,
                 ToolNamespace = tool.Namespace, ToolScopeRef = tool.ScopeRef, ToolUid = tool.Uid, ToolGeneration = tool.Generation,
-                ToolProviderId = operation.Route.Binding.Target.Address.Name, ToolProviderNamespace = operation.Route.Binding.Target.Address.Namespace,
-                ToolProviderScopeRef = operation.Route.Binding.Target.Address.ScopeRef, ToolProviderUid = operation.Route.Binding.Target.Uid,
-                ToolProviderGeneration = operation.Route.Binding.Target.Generation, ExternalToolId = tool.Definition.ExternalId,
+                ToolProviderId = providerReference.Address.Name, ToolProviderNamespace = providerReference.Address.Namespace,
+                ToolProviderScopeRef = providerReference.Address.ScopeRef, ToolProviderUid = providerReference.Uid,
+                ToolProviderGeneration = providerReference.Generation, ExternalToolId = tool.Definition.ExternalId,
                 TenantId = operation.TenantId, WorkspaceId = operation.WorkspaceId, PrincipalId = operation.OwnerPrincipalId,
                 CorrelationId = $"work-operation:{operation.Id}", PersistArguments = false,
                 Arguments = JsonSerializer.SerializeToElement(new ExternalTaskProviderRequest(recover ? "recover" : "execute",
@@ -106,7 +130,26 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         catch (JsonException) { return Unknown("task_provider_response_invalid"); }
         catch (HttpRequestException) { return Unknown("task_provider_unavailable"); }
         catch (McpException) { return Unknown("task_provider_outcome_uncertain"); }
+        catch (ToolDefinitionInvocationException) { return Unknown("task_provider_bound_source_unavailable"); }
         catch (ToolResolutionException) { return Unknown("task_provider_outcome_uncertain"); }
+    }
+
+    private async Task<bool> IsPublishedRelayAsync(ToolResource tool, WorkTaskProviderCapabilities capabilities, CancellationToken token)
+    {
+        if (tool.ScopeRef is not { } scope || tool.Definition.ExternalId is not { } name
+            || !tool.Definition.Metadata.TryGetValue("agentstration.toolPublicationUid", out var identity)
+            || identity.ValueKind != JsonValueKind.String || !identity.TryGetGuid(out var uid)) return false;
+        var publication = await resources.GetExactAsync<ToolDefinitionVersionResource>(ScopedResourceAddress.Create(scope,
+            tool.Namespace, ToolResourceKinds.ToolDefinitionVersion, name), token);
+        if (publication?.Value.Uid != uid || publication.Value.Definition is not RelayToolDefinitionProperties || publication.Value.Source is not { } source
+            || !source.Tool.Definition.Metadata.TryGetValue(WorkTaskProviderProtocol.MetadataKey, out var metadata)) return false;
+        try
+        {
+            var declared = metadata.Deserialize<WorkTaskProviderCapabilities>(Json);
+            return declared is not null && declared.Version == capabilities.Version && declared.Operations is { Count: >= 1 and <= 3 } && declared.IdempotentOperations && declared.OperationRecovery
+                && capabilities.Operations.All(operation => declared.Operations.Contains(operation));
+        }
+        catch (JsonException) { return false; }
     }
 
     private static Result<WorkTaskProviderRoute> Failure(string code) => Result<WorkTaskProviderRoute>.Failure(code);
