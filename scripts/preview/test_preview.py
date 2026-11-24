@@ -11,6 +11,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import preview
+import preview_smoke
 from images import catalogue
 
 
@@ -191,6 +192,27 @@ class PreviewContracts(unittest.TestCase):
         invalid["worker"]["Config"]["Env"] = ["ConnectionStrings__Agentstration=forbidden"]
         with self.assertRaises(ValueError):
             evaluate(invalid)
+
+    def test_failure_evidence_keeps_technical_codes_and_redacts_credentials(self):
+        credential = "private-credential-must-not-appear"
+        opaque_token = "x" * 48
+        logs = "System.InvalidOperationException: bootstrap_profile_failed " + credential + " " + opaque_token
+        with patch.object(preview, "compose", return_value=logs):
+            diagnostics = preview_smoke.failure_diagnostics(self.directory, [credential])
+        encoded = json.dumps(diagnostics)
+        self.assertNotIn(credential, encoded)
+        self.assertNotIn(opaque_token, encoded)
+        self.assertIn("bootstrap_profile_failed", diagnostics["codes"])
+        self.assertIn("InvalidOperationException", encoded)
+
+    def test_smoke_password_always_satisfies_the_non_development_character_policy(self):
+        with patch.object(preview_smoke.secrets, "token_urlsafe", return_value="x" * 54):
+            password = preview_smoke.bootstrap_password()
+        self.assertGreaterEqual(len(password), 12)
+        self.assertTrue(any(value.islower() for value in password))
+        self.assertTrue(any(value.isupper() for value in password))
+        self.assertTrue(any(value.isdigit() for value in password))
+        self.assertTrue(any(not value.isalnum() for value in password))
 
 
 if __name__ == "__main__":
