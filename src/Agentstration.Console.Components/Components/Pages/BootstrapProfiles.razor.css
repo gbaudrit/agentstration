@@ -1,8 +1,5 @@
-.bootstrap-metrics { margin-bottom: 1rem; }
 .bootstrap-config { margin-bottom: 1rem; }
-.bootstrap-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: .75rem; }
-.bootstrap-profile-card { display: flex; gap: .75rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: .75rem; cursor: pointer; }
-.bootstrap-profile-card.selected { border-color: var(--accent-color); background: var(--surface-accent); }
+.bootstrap-profile-card { display: flex; gap: .75rem; align-items: start; cursor: pointer; }
 .bootstrap-profile-card.invalid { cursor: not-allowed; opacity: .75; }
 .bootstrap-profile-card > span { display: grid; gap: .25rem; }
 .bootstrap-profile-card small { display: block; }
@@ -10,12 +7,47 @@
 .bootstrap-order li { display: flex; justify-content: space-between; align-items: center; }
 .bootstrap-target { display: grid; gap: .4rem; max-width: 42rem; }
 .bootstrap-binding-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: .75rem; }
-.bootstrap-binding { display: grid; gap: .6rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: .75rem; }
+.bootstrap-binding { display: grid; gap: .6rem; padding: 1rem; border: 1px solid var(--border); border-radius: .75rem; }
 .bootstrap-binding legend { padding: 0 .25rem; font-weight: 600; }
 .bootstrap-binding p { margin: 0; }
 .bootstrap-binding label { display: grid; gap: .3rem; }
 .bootstrap-preview-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: .75rem 0; }
+.bootstrap-preview-identity { overflow-wrap: anywhere; }
 .bootstrap-detail-list { display: grid; gap: .25rem; margin: .25rem 0 0; padding: 0; list-style: none; }
 .bootstrap-detail-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .bootstrap-apply { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1rem; }
 @media (max-width: 700px) { .bootstrap-apply { align-items: stretch; flex-direction: column; } }
+
+
+.bootstrap-workflow { display: grid; gap: var(--space-4); margin-top: var(--space-4); min-width: 0; }
+.bootstrap-workflow > details { margin: 0; }
+.bootstrap-config > summary, .bootstrap-application-audit > summary { cursor: pointer; font-weight: 600; }
+
+.bootstrap-profile-card > input { flex: 0 0 auto; margin-top: .2rem; }
+.bootstrap-profile-card > span { min-width: 0; overflow-wrap: anywhere; }
+.bootstrap-application-audit { margin-top: var(--space-4); }
+
+.bootstrap-catalog ::deep .data-grid th:nth-child(2) { width: 8rem; }
+.bootstrap-catalog ::deep .data-grid th:nth-child(3) { width: 7rem; }
+.bootstrap-catalog ::deep .data-grid th:last-child { width: 40%; }
+
+.bootstrap-management-page { min-width: 0; }
+.bootstrap-order { padding-inline-start: 1.5rem; }
+.bootstrap-order li { gap: var(--space-4); padding-block: var(--space-3); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.bootstrap-order li > div:first-child { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.bootstrap-order li small { display: block; margin-block-start: var(--space-1); color: var(--muted); }
+.bootstrap-order ::deep .bootstrap-target { flex: 2 1 20rem; min-width: 0; }
+.bootstrap-order-actions { display: flex; gap: var(--space-2); }
+.bootstrap-profile-source { flex: 1 1 100%; min-width: 0; }
+.bootstrap-preview-targets { display: grid; gap: var(--space-3); margin: 0; padding-inline-start: 1.5rem; }
+.bootstrap-preview-targets li { overflow-wrap: anywhere; }
+.bootstrap-preview-target-label { display: block; margin-block-start: var(--space-1); color: var(--muted); }
+
+.bootstrap-preparation-content { display: grid; gap: var(--space-4); }
+.bootstrap-preparation-content > p { margin: 0; color: var(--muted); font-size: var(--font-size-sm); }
+.bootstrap-scope-group { min-width: 0; }
+.bootstrap-scope-group h3 { margin: 0 0 var(--space-2); font-size: var(--font-size-md); }
+.bootstrap-scope-group .bootstrap-order { margin: 0; padding: 0; gap: 0; list-style: none; }
+.bootstrap-scope-group .bootstrap-order li { padding: var(--space-3); gap: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
+.bootstrap-scope-group .bootstrap-order li + li { margin-top: var(--space-2); }
+.bootstrap-scope-group .bootstrap-order ::deep .bootstrap-target { max-width: none; }

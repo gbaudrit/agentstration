@@ -25,7 +25,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Ollama.dll
     depends_on:
       aep-key-provisioner:
@@ -36,21 +36,31 @@ services:
       Ollama__Endpoint: http://ollama:11434
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
+      Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080
+      Aep__SharedKeyFile__PublicEndpoint: http://ollama-extension:8080
+      Aep__SharedKeyFile__StateFile: /var/lib/aep/instance
+      Aep__SharedKeyFile__AllowInsecureHttp: "true"
     volumes:
       - aep-ollama-key:/run/aep-key:ro
+      - aep-ollama-state:/var/lib/aep
 
   utilities-extension:
     build:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll
     environment:
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
+      Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080
+      Aep__SharedKeyFile__PublicEndpoint: http://utilities-extension:8080
+      Aep__SharedKeyFile__StateFile: /var/lib/aep/instance
+      Aep__SharedKeyFile__AllowInsecureHttp: "true"
     volumes:
       - aep-utilities-key:/run/aep-key:ro
+      - aep-utilities-state:/var/lib/aep
     depends_on:
       aep-key-provisioner:
         condition: service_completed_successfully
@@ -69,6 +79,7 @@ services:
       - "127.0.0.1:${AGENTSTRATION_HTTP_PORT:-5100}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      AllowedHosts: localhost;127.0.0.1;[::1];agentstration
       AI__Provider: ${AI_PROVIDER:-Managed}
       Data__Directory: /data
       Data__ControlPlanePath: /data/control-plane.db
@@ -100,3 +111,5 @@ volumes:
   ollama-data:
   aep-ollama-key:
   aep-utilities-key:
+  aep-ollama-state:
+  aep-utilities-state:

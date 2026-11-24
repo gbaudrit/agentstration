@@ -1,0 +1,116 @@
+@using Agentstration.Web.Components.Pages
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.ResourceManagement.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Startup
+
+<StepProgress @key="Application.Metadata.Name" Steps="@Steps" ActiveStepId="@ActiveStep" AutoCollapseCompletedGroups="true" FitToViewport="true" ProgressKey="@ProgressKey" @bind-FollowActiveStep="following" TestId="bootstrap-manual-step-progress">
+    <HeaderContent>
+        @if (Application.Definition.Status is BootstrapApplicationStatus.Failed or BootstrapApplicationStatus.PartiallyApplied)
+        {
+            <BootstrapFailureView Failure="@(Application.Definition.Failure ?? Application.Definition.Resources.LastOrDefault(row => row.Failure is not null)?.Failure)" />
+        }
+        <div class="bootstrap-application-metrics">
+            <MetricCard Label="@Startup["Created"]" Value="@Count(BootstrapResourceDisposition.Create).ToString()" Status="UiStatus.Success" />
+            <MetricCard Label="@Startup["Skipped"]" Value="@Count(BootstrapResourceDisposition.Skip).ToString()" />
+            <MetricCard Label="@Startup["Conflicts"]" Value="@Count(BootstrapResourceDisposition.Conflict).ToString()" Status="@(Count(BootstrapResourceDisposition.Conflict) > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
+            <MetricCard Label="@Startup["ResourceFailures"]" Value="@Count(BootstrapResourceDisposition.Failed).ToString()" Status="@(Count(BootstrapResourceDisposition.Failed) > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
+        </div>
+        <div class="bootstrap-application-summary" role="status">
+            <strong>@Localizer["ApplicationStatus." + Application.Definition.Status]</strong>
+            @if (Application.Definition.TotalResources > 0)
+            {
+                <span>@Localizer["ProcessedCount", Application.Definition.Resources.Count, Application.Definition.TotalResources]</span>
+                <progress max="@Application.Definition.TotalResources" value="@Application.Definition.Resources.Count" aria-label="@Localizer["ProgressLabel"]"></progress>
+            }
+            else if (Application.Definition.Status == BootstrapApplicationStatus.Running && Application.Definition.Resources.Count == 0) { <span>@Localizer["PreparingApplication"]</span> }
+            else { <span>@Localizer["ProcessedResources", Application.Definition.Resources.Count]</span> }
+        </div>
+        @if (Application.Definition.CurrentResource is { } current) { <p>@Localizer["CurrentResource", Application.Definition.Resources.Count + 1] <code>@current.Kind/@current.Name</code></p> }
+        @if (Application.Definition.Operation is { } operation && Application.Definition.Status == BootstrapApplicationStatus.Running)
+        {
+            <div role="status" data-testid="bootstrap-operation-stage">
+                <p>@Localizer["OperationStage." + operation.Stage] · @Localizer["OperationElapsed", Math.Max(0, (Time.GetUtcNow() - operation.StartedAt).TotalSeconds).ToString("F0", System.Globalization.CultureInfo.CurrentCulture)]</p>
+                @if (operation.FlowRunId is { } run) { <a href="@("/flow-runs/" + Uri.EscapeDataString(run) + "?context=" + Uri.EscapeDataString(FlowRunContext.Value))">@Localizer["DiscoveryFlowRun"]</a> }
+                <p>@Localizer["ConsumersPending"]</p>
+            </div>
+        }
+        @if (Application.Definition.ResourcePlan.Count == 0 && Application.Definition.TotalResources > 0) { <p>@Localizer["ObservedResourcesOnly"]</p> }
+    </HeaderContent>
+</StepProgress>
+
+@code {
+    [Parameter] public TimeProvider Time { get; set; } = TimeProvider.System;
+    [Parameter] public string? TargetLabel { get; set; }
+    [Parameter, EditorRequired] public BootstrapApplicationResource Application { get; set; } = default!;
+    private bool following = true;
+    private Agentstration.Resources.ResourceScopeRef FlowRunContext
+    {
+        get
+        {
+            var current = Application.Definition.Applications.FirstOrDefault(item => item.Profile == Application.Definition.CurrentResource?.Profile);
+            var target = current?.ResolvedTarget ?? Application.Definition.Target;
+            return target?.WorkspaceId is { } workspace ? Agentstration.Resources.ResourceScopeRef.Workspace(workspace)
+                : target?.TenantId is { } tenant ? Agentstration.Resources.ResourceScopeRef.Tenant(tenant) : Agentstration.Resources.ResourceScopeRef.Instance;
+        }
+    }
+    private string? observedApplication;
+    private string ProgressKey => Application.Definition.Resources.Count + ":" + Application.Definition.CurrentResource?.Location + ":" + Application.Definition.Status;
+    private Task FollowChanged(bool value) { following = value; return Task.CompletedTask; }
+    private IReadOnlyList<BootstrapApplicationProgressGroup> groups = [];
+    private bool Prepared => !(Application.Definition.Error == "bootstrap_application_invalid" && Application.Definition.Resources.Count == 0)
+        && (Application.Definition.TotalResources > 0 || Application.Definition.Resources.Count > 0 || Application.Definition.Status == BootstrapApplicationStatus.Succeeded);
+    private ProgressStepStatus ApplicationStatus => Application.Definition.Status switch
+    {
+        BootstrapApplicationStatus.Running => ProgressStepStatus.Running,
+        BootstrapApplicationStatus.Succeeded => ProgressStepStatus.Succeeded,
+        BootstrapApplicationStatus.Cancelled => ProgressStepStatus.Cancelled,
+        BootstrapApplicationStatus.Interrupted => ProgressStepStatus.Interrupted,
+        _ => ProgressStepStatus.Failed
+    };
+    private string ActiveStep => !Prepared ? "prepare" : groups.FirstOrDefault(group => group.Rows.Any(row => row.IsCurrent)) is { } current ? "resources:" + current.Id : groups.FirstOrDefault(group => group.Rows.Any(row => row.Status == ProgressStepStatus.Failed)) is { } failed ? "resources:" + failed.Id : "resources";
+    private int Count(BootstrapResourceDisposition disposition) => Application.Definition.Resources.Count(row => row.Disposition == disposition);
+    protected override void OnParametersSet()
+    {
+        if (observedApplication != Application.Metadata.Name) following = true;
+        observedApplication = Application.Metadata.Name;
+        groups = BootstrapApplicationProgressModel.Groups(Application);
+    }
+    private string Family(string kind)
+    {
+        var value = Startup["Family_" + kind];
+        return value.ResourceNotFound ? kind : value.Value;
+    }
+    private IReadOnlyList<ProgressStep> Steps
+    {
+        get
+        {
+            var steps = new List<ProgressStep>
+            {
+                new("prepare", Localizer["Preparation"], Prepared ? ProgressStepStatus.Succeeded : ApplicationStatus, Preparation),
+                new("resources", Startup["Stage_resources"], Prepared ? ApplicationStatus : Application.Definition.Status == BootstrapApplicationStatus.Running ? ProgressStepStatus.Pending : ProgressStepStatus.Interrupted, Panel(groups.SelectMany(group => group.Rows).ToArray(), Startup["Stage_resources"]))
+            };
+            var counts = groups.GroupBy(group => group.Kind).ToDictionary(group => group.Key, group => group.Count());
+            var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var group in groups)
+            {
+                var ordinal = seen.GetValueOrDefault(group.Kind) + 1;
+                seen[group.Kind] = ordinal;
+                var title = counts[group.Kind] > 1 ? Startup["FamilyOccurrence", Family(group.Kind), ordinal].Value : Family(group.Kind);
+                steps.Add(new("resources:" + group.Id, title, BootstrapApplicationProgressModel.Status(group.Rows), Panel(group.Rows, title))
+                {
+                    ParentId = "resources",
+                    Summary = Startup["ResourceCount", group.Rows.Count(row => row.Result is not null), group.Rows.Count] + " · " + group.Rows[0].Resource.Profile
+                });
+            }
+            return steps;
+        }
+    }
+    private RenderFragment Preparation => @<section><h2>@Localizer["Preparation"]</h2><p>@Localizer["PreparationDescription"]</p><p>@string.Join(" → ", Application.Definition.Profiles)</p>
+        @foreach (var profile in Application.Definition.Profiles)
+        {
+            <div><strong>@profile</strong><BootstrapProfileSourceViewer @key="profile" Profile="@profile" Source="@Application.Definition.Selection?.Source" /></div>
+        }
+    </section>;
+    private RenderFragment Panel(IReadOnlyList<BootstrapApplicationProgressRow> rows, string title) => @<BootstrapApplicationResources Rows="rows" Title="@title" TargetLabel="@TargetLabel" FollowCurrent="@following" FollowCurrentChanged="FollowChanged" />;
+}

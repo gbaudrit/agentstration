@@ -6,16 +6,24 @@ namespace Agentstration.Web.Console;
 
 public interface IBootstrapProfilesApiClient
 {
+    Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, CancellationToken cancellationToken);
     Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken);
     Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, CancellationToken cancellationToken);
     Task<IReadOnlyList<BootstrapBindingTargetOption>> GetBindingTargetsAsync(BootstrapBindingTargetsRequest request, CancellationToken cancellationToken);
     Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, CancellationToken cancellationToken);
-    Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, CancellationToken cancellationToken);
+    Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, CancellationToken cancellationToken, Guid? requestId = null);
+    Task<BootstrapApplicationResource> CancelAsync(string applicationId, CancellationToken cancellationToken);
     Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, CancellationToken cancellationToken);
 }
 
 public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstrapProfilesApiClient
 {
+    public async Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/bootstrap/profiles/files", request, cancellationToken);
+        return await ReadAsync<BootstrapProfileFiles>(response, "Bootstrap profile files", cancellationToken);
+    }
+
     public Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<BootstrapManagementView>(httpClient, "api/bootstrap/profiles", cancellationToken);
 
@@ -35,17 +43,23 @@ public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstr
     {
         using var response = await httpClient.PostAsJsonAsync(
             "api/bootstrap/profiles/preview",
-            new BootstrapProfilePreviewRequest(selection.Profiles, selection.Target, selection.Bindings, selection.Source),
+            new BootstrapProfilePreviewRequest(selection.Profiles, selection.Target, selection.Bindings, selection.Source, selection.Applications, selection.Inputs),
             cancellationToken);
         return await ReadAsync<BootstrapCompositionPreview>(response, "Bootstrap preview", cancellationToken);
     }
 
-    public async Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, CancellationToken cancellationToken)
+    public async Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, CancellationToken cancellationToken, Guid? requestId = null)
     {
         using var response = await httpClient.PostAsJsonAsync(
             "api/bootstrap/applications",
-            new ApplyBootstrapProfilesRequest(selection.Profiles, expectedDigest, selection.Target, selection.Bindings, selection.Source),
+            new ApplyBootstrapProfilesRequest(selection.Profiles, expectedDigest, selection.Target, selection.Bindings, selection.Source, requestId, selection.Applications, selection.Inputs),
             cancellationToken);
+        return await ReadAsync<BootstrapApplicationResource>(response, "Bootstrap application", cancellationToken);
+    }
+
+    public async Task<BootstrapApplicationResource> CancelAsync(string applicationId, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync($"api/bootstrap/applications/{Uri.EscapeDataString(applicationId)}/cancel", null, cancellationToken);
         return await ReadAsync<BootstrapApplicationResource>(response, "Bootstrap application", cancellationToken);
     }
 

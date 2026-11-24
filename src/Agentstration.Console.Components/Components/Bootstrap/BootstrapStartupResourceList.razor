@@ -1,0 +1,170 @@
+@using Agentstration.Bootstrap.Contracts
+@implements IDisposable
+@inject IBootstrapStartupApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<StepProgressStrings> StepStrings
+
+<section class="startup-resource-list" data-testid="startup-resource-list" aria-busy="@loading.ToString().ToLowerInvariant()">
+    <ResourceToolbar Label="@Localizer["ResourceFilters"]">
+        <SearchBox Value="@search" ValueChanged="SearchAsync" UpdateOnInput="false" Label="@Localizer["SearchResources"]" Placeholder="@Localizer["SearchResources"]" />
+        <FormField Label="@Localizer["ResourceState"]">
+            <ClearableSelect TValue="string" Value="@state" ValueChanged="FilterAsync" AllowClear="false" data-testid="startup-resource-state">
+                <option value="">@Localizer["AllStates"]</option>
+                @foreach (var value in States) { <option value="@value">@Localizer["State_" + value]</option> }
+            </ClearableSelect>
+        </FormField>
+    </ResourceToolbar>
+    @if (readError) { <p role="status">@Localizer[search.Length > 128 ? "SearchLimit" : "ResourceReadFailed"]</p> }
+    @if (resourcePage is null)
+    {
+        <LoadingState Message="@Localizer["LoadingResources"]" />
+    }
+    else
+    {
+        <p class="startup-resource-count">@Localizer["MatchingResources", resourcePage.Total]</p>
+        @if (resourcePage.Items.Count == 0)
+        {
+            <EmptyState Title="@Localizer["NoResources"]" />
+        }
+        else
+        {
+            <CollectionView TItem="BootstrapStartupResource" Items="@resourcePage.Items" RowTestId="startup-resource-row"
+                            IdentityLabel="@Localizer["Resource"]" ScopeLabel="@Localizer["Target"]" StateLabel="@Localizer["ResourceState"]"
+                            InformationLabels="@(new[] { Localizer["Profile"].Value })" IsExpanded="@(item => item.Id == expanded)" Compact="true" ItemAttributes="@(item => new Dictionary<string, object> { ["data-progress-resource"] = item.Id, ["data-progress-current"] = (item.Id == Snapshot.Activity?.ResourceId).ToString().ToLowerInvariant() })">
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Name="@item.Name" Namespace="@item.Namespace" OnOpen="() => ToggleDetails(item.Id)" /></Identity>
+                <Scope Context="item"><code>@item.TargetLevel</code></Scope>
+                <State Context="item"><StatusBadge Text="@(item.State == "waiting" ? StepStrings["Waiting"].Value : Localizer["State_" + item.State].Value)" Status="@Tone(item.State)" /></State>
+                <Information Context="item"><CollectionValue Label="@Localizer["Profile"]">@item.Profile</CollectionValue></Information>
+                <Actions Context="item"><button type="button" class="button-secondary" aria-expanded="@((item.Id == expanded).ToString().ToLowerInvariant())" @onclick="() => ToggleDetails(item.Id)">@Localizer["ResourceDetails"]</button></Actions>
+                <Details Context="item">
+                    <div class="startup-resource-operations" data-testid="startup-resource-operations">
+                        <h3>@Localizer["ResourceDetails"] — @item.Name</h3>
+                        <p><code>@item.Kind</code> · @item.Profile · <code>@item.Location</code></p>
+                        @if (item.State == "blocked")
+                        {
+                            <div data-testid="startup-resource-blocker">
+                                <p>@Localizer["BlockedByBootstrapFailure"]</p>
+                                <BootstrapFailureView Failure="@(item.Failure ?? Snapshot.Failure)" ResourceTitle="@BlockingResourceTitle" />
+                            </div>
+                        }
+                        else if (item.State == "failed")
+                        {
+                            <BootstrapFailureView Failure="@(item.Failure ?? (Snapshot.Activity?.ResourceId == item.Id ? Snapshot.Failure : null))" />
+                        }
+                        @if (item.Dependency is { } dependency)
+                        {
+                            <BootstrapDependencyDetails Dependency="@dependency" Reason="@item.WaitReason" Failed="@(item.State == "failed")" />
+                        }
+                        else if (Snapshot.Activity is { WaitReason: not null } activity && activity.ResourceId == item.Id)
+                        {
+                            <BootstrapStartupActivityDetails Activity="@activity" AttemptId="@Snapshot.AttemptId" Failed="@(item.State == "failed")" ShowIdentity="false" />
+                        }
+                        <BootstrapProfileSourceViewer @key="item.Profile" Profile="@item.Profile" />
+                        @if (item.Substitution is { } correction)
+                        {
+                            <p>@Localizer["SubstitutionApplied"]</p>
+                            <dl>
+                                <dt>@Localizer["PreviousSelection"]</dt><dd><code>@correction.PreviousProvider.Name / @correction.PreviousModel</code></dd>
+                                <dt>@Localizer["NewSelection"]</dt><dd><code>@correction.Provider.Namespace/@correction.Provider.Name / @correction.Model</code></dd>
+                            </dl>
+                        }
+                        @if (item.Operations.Count == 0 && item.State != "blocked") { <p>@Localizer["NotStarted"]</p> }
+                        else if (item.Operations.Count > 0)
+                        {
+                            <ol>
+                                @foreach (var operation in item.Operations)
+                                {
+                                    <li><span>@Localizer["Operation_" + operation.Code]</span> <StatusBadge Text="@Localizer["State_" + operation.State]" Status="@Tone(operation.State)" /> <time datetime="@operation.ObservedAt.ToString("O")">@operation.ObservedAt.ToString("u")</time></li>
+                                }
+                            </ol>
+                        }
+                    </div>
+                </Details>
+            </CollectionView>
+        }
+        <CollectionPager Page="@pageNumber" Total="@resourcePage.Total" HasMore="@(resourcePage.Offset + resourcePage.Items.Count < resourcePage.Total)"
+                         PageSize="25" SupportsDirectNavigation="true" Busy="@loading" PageChanged="PageAsync" />
+    }
+</section>
+
+@code {
+    [Parameter] public bool FollowCurrent { get; set; }
+    [Parameter] public EventCallback<bool> FollowCurrentChanged { get; set; }
+    [Parameter, EditorRequired] public BootstrapStartupSnapshot Snapshot { get; set; } = default!;
+    [Parameter, EditorRequired] public string StepId { get; set; } = string.Empty;
+    [Parameter] public string? Kind { get; set; }
+    [Parameter] public string? GroupId { get; set; }
+    private static readonly string[] States = ["pending", "running", "waiting", "created", "skipped", "succeeded", "conflict", "failed", "blocked"];
+    private readonly CancellationTokenSource stopping = new();
+    private BootstrapStartupResourcePage? resourcePage;
+    private (Guid Attempt, string Step, string? Kind, string? Group)? identity;
+    private string search = string.Empty, state = string.Empty;
+    private string? expanded;
+    private int pageNumber = 1, request;
+    private long loadedRevision = -1;
+    private bool loading, readError, previouslyFollowing;
+    private string? BlockingResourceTitle
+    {
+        get
+        {
+            if (Snapshot.Activity is not { ResourceId: not null, ResourceKind: not null, ResourceName: not null } activity) return null;
+            var profile = activity.GroupId is null ? null : Snapshot.Families.FirstOrDefault(family => family.GroupId == activity.GroupId)?.Profile;
+            return (profile is null ? string.Empty : profile + "/") + activity.ResourceKind + "/" + activity.ResourceName;
+        }
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        var next = (Snapshot.AttemptId, StepId, Kind, GroupId);
+        if (identity != next)
+        {
+            identity = next; pageNumber = 1; search = state = string.Empty; expanded = null; resourcePage = null; loadedRevision = -1;
+        }
+        if (FollowCurrent && !previouslyFollowing) { search = state = string.Empty; pageNumber = 1; loadedRevision = -1; }
+        previouslyFollowing = FollowCurrent;
+        return loadedRevision != Snapshot.Revision ? LoadAsync() : Task.CompletedTask;
+    }
+    private async Task SearchAsync(string value) { await FollowCurrentChanged.InvokeAsync(false); search = value; pageNumber = 1; await LoadAsync(); }
+    private async Task FilterAsync(string value) { await FollowCurrentChanged.InvokeAsync(false); state = value; pageNumber = 1; await LoadAsync(); }
+    private async Task PageAsync(int value) { await FollowCurrentChanged.InvokeAsync(false); pageNumber = value; await LoadAsync(); }
+    private async Task ToggleDetails(string id)
+    {
+        await FollowCurrentChanged.InvokeAsync(false);
+        expanded = expanded == id ? null : id;
+    }
+    private async Task LoadAsync()
+    {
+        if (search.Length > 128) { readError = true; return; }
+        var current = ++request;
+        loading = true;
+        try
+        {
+            var result = await Client.GetResourcesAsync(new(Snapshot.AttemptId, StepId, Kind,
+                string.IsNullOrEmpty(state) ? null : state, string.IsNullOrWhiteSpace(search) ? null : search,
+                (pageNumber - 1) * 25, 25, GroupId, FollowCurrent && string.IsNullOrEmpty(state) && string.IsNullOrWhiteSpace(search) ? Snapshot.Activity?.ResourceId : null), stopping.Token);
+            if (current != request || stopping.IsCancellationRequested || result.AttemptId != Snapshot.AttemptId) return;
+            if (FollowCurrent || resourcePage is null)
+            {
+                var focus = result.Items.FirstOrDefault(item => item.State == "failed")
+                    ?? result.Items.FirstOrDefault(item => item.State == "waiting")
+                    ?? result.Items.FirstOrDefault(item => item.State == "blocked")
+                    ?? result.Items.FirstOrDefault(item => item.Id == Snapshot.Activity?.ResourceId && item.State == "running");
+                expanded = focus?.Id;
+            }
+            resourcePage = result; pageNumber = result.Offset / 25 + 1; readError = false; loadedRevision = result.Revision;
+            if (pageNumber > 1 && resourcePage.Items.Count == 0) { pageNumber = Math.Max(1, (int)Math.Ceiling(resourcePage.Total / 25d)); await LoadAsync(); }
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException) { if (current == request) readError = true; }
+        finally { if (current == request) loading = false; }
+    }
+    private static UiStatus Tone(string value) => value switch
+    {
+        "created" or "succeeded" => UiStatus.Success,
+        "waiting" or "conflict" => UiStatus.Warning,
+        "failed" => UiStatus.Danger,
+        "running" => UiStatus.Info,
+        _ => UiStatus.Neutral
+    };
+    public void Dispose() { stopping.Cancel(); stopping.Dispose(); }
+}

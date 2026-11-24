@@ -2,7 +2,7 @@ name: OpenDAL native packaging
 on:
   pull_request:
     paths:
-      - 'src/Agentstration.Extensions.OpenDal/**'
+      - 'src/extensions/Agentstration.Extensions.OpenDal/**'
       - 'tests/Agentstration.Extensions.OpenDal.Tests/**'
       - 'samples/OpenDalSmoke/**'
       - 'scripts/opendal/**'
@@ -38,7 +38,7 @@ jobs:
       - name: Verify native backend MCP and provider contracts
         run: dotnet test --project tests/Agentstration.Extensions.OpenDal.Tests --configuration Release --minimum-expected-tests 18
       - name: Publish the standalone extension
-        run: dotnet publish src/Agentstration.Extensions.OpenDal --configuration Release --runtime ${{ matrix.rid }} --self-contained false --output artifacts/opendal/${{ matrix.rid }}
+        run: dotnet publish src/extensions/Agentstration.Extensions.OpenDal --configuration Release --runtime ${{ matrix.rid }} --self-contained false --output artifacts/opendal/${{ matrix.rid }}
       - name: Build the independent MCP consumer
         run: dotnet build samples/OpenDalSmoke --configuration Release
       - name: Verify the published process before and after restart

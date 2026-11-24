@@ -172,6 +172,8 @@ const sidebars = {
         'contributing/overview',
         'contributing/development-slots',
         'contributing/testing',
+        'contributing/image-packaging',
+        'contributing/preview-environments',
         'contributing/documentation',
         'contributing/github-governance',
       ],

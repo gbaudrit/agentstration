@@ -68,6 +68,24 @@ public sealed class MainLayoutPlatformStatusTests
         });
     }
 
+    [TestMethod]
+    public void FeatureStatusReusesTheConsoleFrameWithoutLoadingOperationalSources()
+    {
+        using var culture = new CultureScope("en-US");
+        using var context = CreateContext(out var provider);
+        var rendered = context.Render<MainLayout>(parameters => parameters
+            .Add(x => x.SectionTitle, "Feature preparation")
+            .Add(x => x.EnableCommandPalette, false)
+            .Add(x => x.StatusContent, builder => builder.AddContent(0, "Feature status"))
+            .Add(x => x.Body, builder => builder.AddContent(0, "Progress body")));
+        Assert.AreEqual(0, provider.Calls);
+        Assert.IsTrue(rendered.Find("[data-testid='console-command-trigger']").HasAttribute("disabled"));
+        Assert.AreEqual(1, rendered.FindAll("[data-testid='console-sidebar']").Count);
+        StringAssert.Contains(rendered.Find("[data-testid='console-breadcrumb']").TextContent, "Feature preparation");
+        StringAssert.Contains(rendered.Find(".sidebar-footer").TextContent, "Feature status");
+        StringAssert.Contains(rendered.Find("main").TextContent, "Progress body");
+    }
+
     private static BunitContext CreateContext(out ControlledPlatformStatusProvider provider)
     {
         var context = new BunitContext();
@@ -89,8 +107,12 @@ public sealed class MainLayoutPlatformStatusTests
         private readonly TaskCompletionSource<PlatformStatusResult> completion =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public Task<PlatformStatusResult> GetStatusAsync(CancellationToken cancellationToken) =>
-            completion.Task.WaitAsync(cancellationToken);
+        public int Calls { get; private set; }
+        public Task<PlatformStatusResult> GetStatusAsync(CancellationToken cancellationToken)
+        {
+            Calls++;
+            return completion.Task.WaitAsync(cancellationToken);
+        }
 
         public void Complete(PlatformStatusResult result) => completion.SetResult(result);
         public void Fail(Exception exception) => completion.SetException(exception);

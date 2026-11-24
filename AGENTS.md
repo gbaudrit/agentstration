@@ -43,6 +43,7 @@ src/
   Agentstration.ResourceManagement.Contracts/ Generic resource and Bootstrap handler contracts
   Agentstration.Extensions/      Extension registration and inventory use cases
   Agentstration.Extensions.Aep/  AEP enrollment use cases
+  extensions/                   Autonomous AEP extension executables (Foundry, OpenAPI, OpenDAL, Crawl4AI, PostgreSQL, Ollama, llama.cpp, LocalAI, Git and Utilities)
   Agentstration.Identity.Contracts/ Identity, authorization and PAT contracts
   Agentstration.Identity/        Identity, authorization, scope and audit use cases
   Agentstration.Security.Contracts/ Provider-neutral security audit contracts
@@ -165,7 +166,7 @@ In Visual Studio, select the profile on the configured startup project. When `Ag
 
 Build configuration and host environment are independent. `--configuration Release` still uses the selected Development launch profile and does not disable bootstrap. Use a `NoBootstrap` profile or `--no-launch-profile` when initial bootstrap must be omitted intentionally. `NoBootstrap` controls `Agentstration:Bootstrap:InitialBootstrapEnabled`; it does not hide the catalog or erase `InitialProfiles`.
 
-Catalog profiles may include a reserved `profile.yaml` with kind `BootstrapProfile` and `targetScope` `instance`, `tenant`, or `workspace`. Profiles applied together must use the same scope. Manual application is available to Platform administrators under **System > Bootstrap profiles** and requires an explicit Tenant or Workspace target for scoped profiles. Workspace profiles may directly create editable `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` resources; order dependencies before consumers. Keep Pack archives inside their profile and reference them with a relative `PackInstallation` path when Pack ownership and immutability are required; bootstrap installs a missing Pack but never replaces an installed version.
+Catalog profiles may include a reserved `profile.yaml` with kind `BootstrapProfile` and `targetScope` `instance`, `tenant`, or `workspace`. Legacy flat compositions share one scope and target. Console plans select a target per profile and execute Instance, then Tenant, then Workspace profiles; profiles retain their order within a level. Manual application is available to Platform administrators under **System > Bootstrap profiles** and requires an explicit Tenant or Workspace target for scoped profiles. Workspace profiles may directly create editable `ModelProvider`, `RuntimeProfile`, `ModelProfile`, `Agent`, `Flow`, and `Entry` resources; order dependencies before consumers. Keep Pack archives inside their profile and reference them with a relative `PackInstallation` path when Pack ownership and immutability are required; bootstrap installs a missing Pack but never replaces an installed version.
 
 ## C# Conventions
 

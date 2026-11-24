@@ -1,0 +1,4 @@
+.bootstrap-source-viewer { min-width: 0; margin-block: .5rem; }
+.bootstrap-source-viewer p { overflow-wrap: anywhere; }
+.bootstrap-source-viewer ::deep .resource-yaml-editor, .bootstrap-source-viewer ::deep .form-field { min-width: 0; }
+.bootstrap-source-viewer ::deep textarea { box-sizing: border-box; max-width: 100%; white-space: pre; overflow: auto; }

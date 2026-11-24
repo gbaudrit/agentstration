@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using Agentstration.Bootstrap.Contracts;
 using Agentstration.Console.Web;
 using Agentstration.Console.Web.Security;
 using Agentstration.Identity.Contracts;
@@ -217,7 +218,51 @@ public sealed class ConsoleHostTests
         Assert.AreEqual(HttpStatusCode.Redirect, replayed.StatusCode);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(IBffSessionAuthorityClient? authority = null) =>
+    [TestMethod]
+    public async Task PendingAuthorityRoutesAuthenticatedConsoleToDedicatedProgress()
+    {
+        var identity = new BffSessionIdentityResponse(
+            Guid.NewGuid(), "Startup administrator", BffSessionAuthenticationMethods.Local, "local", Guid.NewGuid(), Guid.NewGuid());
+        var startup = new StubStartupClient { Ready = false };
+        await using var factory = CreateFactory(new StubSessionAuthorityClient(identity), startup);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            BaseAddress = new Uri("https://localhost")
+        });
+        var loginHtml = await client.GetStringAsync("/login");
+        using var login = await client.PostAsync("/login", Form(Token(loginHtml),
+            ("Input.UserName", "startup-admin"), ("Input.Password", "fixture-password")));
+        Assert.AreEqual(HttpStatusCode.Redirect, login.StatusCode);
+        using var pending = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.Redirect, pending.StatusCode);
+        StringAssert.Contains(pending.Headers.Location!.OriginalString, "/startup/progress?ReturnUrl=%2F");
+        var progress = await client.GetStringAsync("/startup/progress?ReturnUrl=%2F");
+        StringAssert.Contains(progress, "bootstrap-startup-progress");
+        StringAssert.Contains(progress, "Bootstrap in progress");
+        StringAssert.Contains(progress, "console-shell");
+        Assert.IsFalse(progress.Contains("bootstrap-startup-notice", StringComparison.Ordinal));
+        StringAssert.Contains(progress, "console-sidebar");
+        Assert.IsFalse(progress.Contains("bootstrap-startup-header", StringComparison.Ordinal));
+        StringAssert.Contains(progress, "console-command-trigger");
+        Assert.IsFalse(progress.Contains("bootstrap-startup-header", StringComparison.Ordinal));
+        startup.Ready = true;
+        using var completed = await client.GetAsync("/startup/progress?ReturnUrl=%2F");
+        Assert.AreEqual(HttpStatusCode.OK, completed.StatusCode);
+        var completedHtml = await completed.Content.ReadAsStringAsync();
+        StringAssert.Contains(completedHtml, "bootstrap-startup-progress");
+        StringAssert.Contains(completedHtml, "Bootstrap completed");
+        StringAssert.Contains(completedHtml, "Open Console");
+        Assert.IsFalse(completed.Headers.Contains("Location"));
+        using var ready = await client.GetAsync("/");
+        Assert.AreEqual(HttpStatusCode.OK, ready.StatusCode);
+        var console = await ready.Content.ReadAsStringAsync();
+        StringAssert.Contains(console, "console-sidebar");
+        StringAssert.Contains(console, "console-command-trigger");
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(IBffSessionAuthorityClient? authority = null,
+        IBootstrapStartupApiClient? startup = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Agentstration:ManagementApi:BaseAddress", "http://127.0.0.1:5101/");
@@ -228,6 +273,8 @@ public sealed class ConsoleHostTests
             builder.UseSetting("Agentstration:FlowApi:TimeoutSeconds", "1");
             builder.UseSetting("Agentstration:RuntimeApi:BaseAddress", "http://127.0.0.1:5104/");
             builder.UseSetting("Agentstration:RuntimeApi:TimeoutSeconds", "1");
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<IBootstrapStartupApiClient>(startup ?? new StubStartupClient()));
             if (authority is not null)
                 builder.ConfigureTestServices(services =>
                     services.AddSingleton<IBffSessionAuthorityClient>(authority));
@@ -248,6 +295,18 @@ public sealed class ConsoleHostTests
             RegexOptions.CultureInvariant);
         Assert.IsTrue(match.Success, "The antiforgery token was not rendered.");
         return WebUtility.HtmlDecode(match.Groups[1].Value);
+    }
+
+    private sealed class StubStartupClient : IBootstrapStartupApiClient
+    {
+        public bool Ready { get; set; } = true;
+        private readonly Guid attemptId = Guid.NewGuid();
+        public Task<BootstrapStartupAdmission> GetAdmissionAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapStartupAdmission(Ready));
+        public Task<BootstrapStartupSnapshot> GetAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(new BootstrapStartupSnapshot(attemptId, 1, Ready, true, Ready ? "ready" : "running",
+                [new("topology", "succeeded"), new("extensions", "waiting"), new("resources", "pending"), new("finalization", "pending")],
+                "extensions", null, 0, 0, 0, 0));
     }
 
     private sealed class StubSessionAuthorityClient(BffSessionIdentityResponse identity) : IBffSessionAuthorityClient

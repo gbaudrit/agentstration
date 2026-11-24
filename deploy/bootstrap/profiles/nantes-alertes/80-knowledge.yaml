@@ -1,0 +1,43 @@
+apiVersion: agentstration.io/v1
+kind: KnowledgeSource
+metadata:
+  name: nantes-alertes
+  namespace: default
+definition:
+  displayName: Nantes - Alertes
+  output:
+    rule:
+      read: true
+      prefix: ""
+      write: true
+      list: true
+      stat: true
+    storage:
+      resourceRef:
+        name: nantes-alertes-content
+  projectionFlow:
+    scopeRef: /instance
+    name: knowledge-projection-builtin
+    version: 1.0.0
+    useActiveVersion: false
+  dataSources:
+  - name: alertes
+    refreshIfNecessary: true
+    maximumAge: 01:00:00
+    dataSource:
+      name: nantes-alertes
+      scopeRef: /instance
+    required: true
+  - name: actualites
+    refreshIfNecessary: true
+    maximumAge: 01:00:00
+    dataSource:
+      name: nantes-actualites
+      scopeRef: /instance
+    required: true
+  description: Alertes Nantes Métropole et actualités Google News, conservées sans transformation.
+  retrievalFlow:
+    scopeRef: /instance
+    name: knowledge-retrieval-builtin
+    version: 1.0.0
+    useActiveVersion: false

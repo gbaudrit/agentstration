@@ -1,0 +1,34 @@
+@using Agentstration.Bootstrap.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+<div class="bootstrap-failure" role="alert" data-testid="bootstrap-failure">
+    <UiIcon Name="alert-triangle" />
+    <div>
+        <strong>@Localizer["FailureTitle"]@if (!string.IsNullOrWhiteSpace(ResourceTitle)) { <span> — @ResourceTitle</span> }</strong>
+        <p>@Localizer[Failure is null ? "FailureLegacy" : DescriptionKey]</p>
+        @if (Failure is not null)
+        {
+            <dl><dt>@Localizer["FailureCode"]</dt><dd><code>@Failure.Code</code></dd><dt>@Localizer["DiagnosticId"]</dt><dd><code>@Failure.DiagnosticId</code></dd></dl>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? ResourceTitle { get; set; }
+    [Parameter] public BootstrapFailure? Failure { get; set; }
+    private string DescriptionKey => Failure?.Code switch
+    {
+        "bootstrap_discovery_actor_required" => "FailureDiscoveryActorRequired",
+        "bootstrap_discovery_timeout" => "FailureDiscoveryTimeout",
+        "bootstrap_discovery_requires_manual_application" => "FailureDiscoveryRequiresManualApplication",
+        "data_source_acquisition_flow_unavailable" or "data_source_discovery_flow_unavailable" or "flow_composition_child_unavailable" => "FailureFlowUnavailable",
+        "data_source_profile_not_published" => "FailureProfileUnpublished",
+        "data_source_dependency_access_denied" => "Failure_access",
+        { } code when code.StartsWith("data_source_acquisition_tool_", StringComparison.Ordinal)
+            || code.StartsWith("data_source_discovery_tool_", StringComparison.Ordinal)
+            || code.StartsWith("data_source_acquisition_provider_", StringComparison.Ordinal)
+            || code.StartsWith("data_source_discovery_provider_", StringComparison.Ordinal) => "FailureToolUnavailable",
+        _ => "Failure_" + Category
+    };
+    private string Category => Failure?.Category is "validation" or "access" or "dependency" or "timeout" or "storage" or "provider" or "configuration" ? Failure.Category : "unexpected";
+}

@@ -1,3 +1,4 @@
+import { waitForModelDiscovery } from './model-discovery.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { LoginPage } from './login.page.js';
@@ -115,7 +116,10 @@ export class RuntimeWorkerObservabilityPage {
     const link = row.locator(`a.worker-run-link[href^="/runs/${runId}"], a.worker-run-link[href^="/flow-runs/${runId}"]`);
     const href = await link.getAttribute('href');
     await link.click();
-    await selectResourceSection(this.page, href?.startsWith('/flow-runs/') ? 'worker' : 'execution/worker');
+    const isFlow = href?.startsWith('/flow-runs/') === true;
+    await expect(this.page).toHaveURL(url => url.pathname === `${isFlow ? '/flow-runs' : '/runs'}/${runId}`);
+    await expect(this.page.getByTestId(isFlow ? TestIds.flowObservability.runDetails : TestIds.flowObservability.agentRunner)).toBeVisible();
+    await selectResourceSection(this.page, isFlow ? 'worker' : 'execution/worker');
     await expect(this.page.getByTestId(TestIds.runtimeWorkerObservability.placement)).toHaveAttribute('data-assignment-id', assignmentId);
   }
 
@@ -388,7 +392,8 @@ export class RuntimeWorkerObservabilityPage {
       `${consoleUrl}/api/modelproviders/${observabilityProviderName}/models/refresh`,
       { headers: instanceHeaders },
     );
-    expect(refreshed.status(), await refreshed.text()).toBe(200);
+    expect(refreshed.status(), await refreshed.text()).toBe(202);
+    await waitForModelDiscovery(this.page, consoleUrl, observabilityProviderName, instanceHeaders);
     const created = await this.page.request.post(`${consoleUrl}/api/modelprofiles`, {
       headers: workspaceHeaders,
       data: {

@@ -1,0 +1,59 @@
+apiVersion: agentstration.io/v1
+kind: Storage
+metadata:
+  name: nantes-alertes-jsonb
+  namespace: default
+definition:
+  displayName: Nantes - Alertes JSONB
+  configuration: {}
+  bindings:
+  - requirementId: host
+    exportName: host
+  - requirementId: port
+    exportName: port
+  - requirementId: database
+    exportName: database
+  - requirementId: username
+    exportName: username
+  - requirementId: password
+    exportName: password
+  envelope:
+    maximumDocumentBytes: 65536
+    maximumPageSize: 50
+    delete: false
+    maximumResultBytes: 196608
+    get: true
+    publish: true
+    query: true
+    put: true
+    queryProfiles:
+    - odata/4.01
+  collections:
+  - name: alertes
+    policy:
+      maximumDocumentBytes: 65536
+      maximumPageSize: 50
+      delete: false
+      maximumResultBytes: 196608
+      get: true
+      publish: true
+      query: true
+      put: true
+      queryProfiles:
+      - odata/4.01
+    schemaBinding:
+      reference:
+        scopeRef: /instance
+        name: nantes-alertes-response
+        namespace: default
+        version: 1.0.0
+    displayName: Réponses Alertes Nantes Métropole
+  type:
+    extensionContribution:
+      extensionId: agentstration.extensions.postgresql
+      contributionId: postgresql.jsonb
+      version: 1.0.0
+      kind: StorageType
+  connectedService:
+    resourceRef:
+      name: nantes-alertes-postgresql

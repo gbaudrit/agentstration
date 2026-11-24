@@ -5,7 +5,7 @@
     <ProjectReference Include="../../aep/src/Agentstration.Aep.Client/Agentstration.Aep.Client.csproj" />
     <ProjectReference Include="../../src/Agentstration.Api/Agentstration.Api.csproj" />
     <ProjectReference Include="../../src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
-    <ProjectReference Include="../../src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" Aliases="UtilitiesExtension" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" Aliases="UtilitiesExtension" />
     <ProjectReference Include="../../src/Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
     <ProjectReference Include="../../src/Agentstration.Resources/Agentstration.Resources.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />

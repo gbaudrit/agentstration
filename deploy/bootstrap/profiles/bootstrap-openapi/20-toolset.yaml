@@ -1,0 +1,12 @@
+apiVersion: agentstration.io/v1
+kind: ToolSet
+metadata:
+  name: bootstrap-openapi-tools
+definition:
+  displayName: Bootstrap OpenAPI discovery
+  version: 1.0.0
+  publish: true
+  members:
+    - tool: { binding: discover-tool }
+      capability: openapi.discover
+      route: default

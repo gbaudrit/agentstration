@@ -71,6 +71,8 @@ Each JSON report records total/passed/failed test counts, TRX availability, proc
 
 The [CI memory investigation for PR #1181](ci-memory-1181.md) retains the evidence and its limits. All three resource-family modules enforce the original 2432 MiB failure ceiling. The split bounds the workload retained in each process; it does not establish or repair a product memory leak.
 
+Bootstrap retains its original 500/700 MiB warning/failure limits in both the framework and scenario processes. The [PR #1224 investigation](ci-memory-1224.md) records the cumulative working-set breach and the unchanged 60-case inventory. Both modules remain in Integration and coverage shard A; module concurrency is unchanged.
+
 The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET 10.0.10/10.0.11, collected during #298. `Agentstration.Management.Api.Tests` was recalibrated during #745 from 108-test Release runs: 1784.1 MiB peak working set on Ubuntu 24.04.5 with .NET 10.0.12 and 1757.6 MiB on Windows 11 10.0.26200 with .NET 10.0.11. `Agentstration.Management.Security.Tests` was recalibrated from 59-test runs in the same change: 1193.7 MiB on Ubuntu and 1127.6 MiB on Windows. The consolidated `Agentstration.Api.Tests` baseline was collected on the same Windows build with .NET 10.0.11 during #142: 191 tests in 200 seconds, 1503.7 MiB peak working set, 1176.6 MiB peak private memory, and 1621.2 MiB aggregate `dotnet` working set. A warning is evidence to review the Linux and Windows trend; a failure caps regression relative to the retained baseline. Adjust these values only after retaining representative artifacts from both runner families.
 
 | Module | Baseline peak (MiB) | Warning (MiB) | Failure (MiB) | Minimum tests |
@@ -83,6 +85,8 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 | `Agentstration.Api.Artifacts.Tests` | Pending after resource-family split | 2048 | 2432 | 39 |
 | `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2560 | 112 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 31 |
+| `Agentstration.Management.Bootstrap.Scenarios.Tests` | Pending CI baseline after split | 500 | 700 | 10 |
+| `Agentstration.Management.Bootstrap.Plans.Tests` | Pending CI baseline after split | 500 | 700 | 6 |
 | `Agentstration.Management.Security.Tests` | 1193.7 | 1280 | 1664 | 64 |
 | `Agentstration.Management.Aep.Tests` | 763.4 | 832 | 1024 | 29 |
 
@@ -117,7 +121,9 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Api.DataSources.Tests` | Integration | Data Source acquisition, Knowledge Snapshots and structured Storage |
 | `Agentstration.Api.Artifacts.Tests` | Integration | Artifact APIs, processing and storage-backed content |
 | `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
-| `Agentstration.Management.Bootstrap.Tests` | Integration | Declarative bootstrap catalog, application, and hosted startup scenarios using the API-only test profile |
+| `Agentstration.Management.Bootstrap.Tests` | Integration | Bootstrap framework, catalog, enrollment and startup contracts using the API-only test profile |
+| `Agentstration.Management.Bootstrap.Scenarios.Tests` | Integration | Durable profile application/progress and versioned Assistant/documentation profile scenarios |
+| `Agentstration.Management.Bootstrap.Plans.Tests` | Integration | Ordered multi-target plans, future targets, producer bindings, cancellation and deferred validation |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
@@ -134,9 +140,32 @@ The autonomous AEP SDK keeps its own `aep/Aep.slnx` validation because it can be
 
 Run `./scripts/ci/test-ci-contracts.ps1` to check coverage partition completeness and path-selection regressions. The classifier also runs these checks before selecting jobs. Rename detection is disabled when gathering changed paths so both the removed and added paths contribute to validation selection. Storage/application families, including Resource Planning and Security, and every PostgreSQL project select PostgreSQL checks; Console Web, Client and Components select Browser UX on pull requests and main pushes. The required `build-and-test` check keeps its existing name and documentation-only success path.
 
+Foundry is the first independently validated extension. Changes confined to
+`src/extensions/Agentstration.Extensions.Foundry/`, its two Foundry-specific
+Model Providers test files, its image catalogue entry or shared image tooling
+select the reusable OCI validation instead of the product build, Windows lifecycle,
+server container, hosted diagnostics and functional/coverage lanes. Documentation
+may accompany those changes. The OCI workflow runs the existing offline Foundry
+tests, exports the image with attestations, stages the exact digest and checks
+protected discovery and restart. It does not publish images from CI.
+
+The required `build-and-test` check waits for the selected OCI job and rejects a
+failed, cancelled or unexpectedly skipped result. Local regression checks exercise
+both selection and the same result-gate script used by Actions. Shared test
+fixtures, the Model Providers test project, AEP, build/package settings and mixed
+product changes retain transverse validation. Image inputs also select OCI
+validation. Other extensions and unknown paths keep their existing checks until
+their packaging vertical explicitly supplies equivalent validation. Manual CI
+runs select everything. CodeQL and dependency review remain independent.
+
+Resource Plan UX excludes isolated Foundry source changes from its `src/**`
+trigger. A simultaneous product-source change still triggers it. No new live
+model or Azure dependency is introduced; full coverage inventories and collectors
+remain unchanged when transverse validation is selected.
+
 Coverage emits one assembly-named TRX per module. Collection and publication check each required module's TRX coverage attachment against its actual Cobertura file; missing, reused, malformed or unexpected reports fail publication; byte-identical TRX attachment copies are consolidated once. Fast and Integration remain authoritative inventories; Coverage A/B must partition Integration exactly. Performance and live-provider execution remain optional.
 
-Linux validation compiles `Agentstration.slnx` once in `build-linux`, plus the autonomous AEP solution when selected. Fast and Integration then run in parallel on separate runners; AEP, both coverage shards, both hosted diagnostic groups and selected PostgreSQL checks also consume that build with `--no-build`. Consumers wait for compilation and artifact publication, not for another test job. Windows lifecycle and container builds remain independent. The required `build-and-test` check aggregates the build and selected functional/AEP results, fails on failed or unexpectedly skipped dependencies, and retains documentation-only success.
+Linux validation compiles `Agentstration.slnx` once in `build-linux`, plus the autonomous AEP solution when selected. Fast and Integration then run in parallel on separate runners; AEP, both coverage shards, both hosted diagnostic groups and selected PostgreSQL checks also consume that build with `--no-build`. Consumers wait for compilation and artifact publication, not for another test job. Windows lifecycle and container builds remain independent. The required `build-and-test` check aggregates the build and selected functional/AEP and extension-image results, fails on failed or unexpectedly skipped dependencies, and retains documentation-only success.
 
 The run-scoped Linux artifact contains tracked projects' `bin` and `obj` directories in a Zstandard-compressed tar archive, preserving executable modes, hidden generated files and timestamps. Its context manifest binds it to the checkout revision, exact SDK, OS, architecture, checkout path and NuGet package path; consumers reject mismatches before extraction. GitHub-hosted Linux runners must use matching checkout/package paths because generated static-web-asset files can contain absolute paths. Each consumer still restores and audits packages so a partial NuGet cache cannot silently omit dependencies. The build archive is retained for three days; rerun the producer too if it expires. Archive size and packaging duration appear in the build job summary. Compare artifact transfer costs, total runner minutes and complete elapsed time before claiming a speedup.
 

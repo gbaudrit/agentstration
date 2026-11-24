@@ -24,7 +24,7 @@ internal sealed class AwpRuntimeWorkerService(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var configured = options.Value;
-        using var credential = await credentials.LoadAsync(stoppingToken);
+        using var credential = await LoadCredentialAsync(stoppingToken);
         var sessionId = new AwpWorkerSessionId(Guid.NewGuid());
         using var client = new AwpClient(new Uri(configured.AuthorityUrl, UriKind.Absolute), credential, sessionId,
             timeProvider, configured.TransientRetryCount, httpClientFactory.CreateClient("agentstration-awp"));
@@ -59,6 +59,20 @@ internal sealed class AwpRuntimeWorkerService(
 
         readiness.MarkNotReady();
         await Task.WhenAll(active.Values);
+    }
+
+    private async Task<AwpClientCredential> LoadCredentialAsync(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            try { return await credentials.LoadAsync(cancellationToken); }
+            catch (HttpRequestException exception) when (exception.StatusCode is null or HttpStatusCode.ServiceUnavailable
+                or HttpStatusCode.BadGateway or HttpStatusCode.GatewayTimeout or HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests)
+            {
+                logger.LogWarning("AWP Worker enrollment is waiting for the authority (HTTP {StatusCode}).", exception.StatusCode);
+                await Task.Delay(TimeSpan.FromSeconds(2), timeProvider, cancellationToken);
+            }
+        }
     }
 
     private async Task ClaimLoopAsync(AwpClient client, RuntimeWorkerOptions configured,

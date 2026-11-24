@@ -76,7 +76,7 @@ new acquisition sees current Parameter values. Secrets remain symbolic in accept
 acquisition/Flow inputs and resolve only at the server's operation boundary. Rotation
 is observed on the next attempt. The wizard review and YAML retain references only;
 protected output echoes are redacted and request/response body diagnostics are
-suppressed for protected calls. See [ADR-0241](../../decisions/0241-dataset-operation-inputs-use-exact-value-bindings.md).
+suppressed for protected calls. See [ADR-0256](../../decisions/0256-dataset-operation-inputs-use-exact-value-bindings.md).
 
 When transformations are configured, the governed acquisition boundary uses the
 selected Operation's validated output schema if its adapter Flow has no declared

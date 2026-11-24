@@ -33,7 +33,7 @@ public enum BootstrapResourceDisposition
 }
 
 public sealed record BootstrapApplicationTarget(Guid? TenantId = null, Guid? WorkspaceId = null);
-public sealed record BootstrapBindingSelection(string Profile, string Name, ResourceReference Target);
+public sealed record BootstrapBindingSelection(string Profile, string Name, ResourceReference Target, JsonElement? TargetValue = null, string? TargetProfile = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<BootstrapBindingTargetKind>))]
 public enum BootstrapBindingTargetKind
@@ -44,10 +44,23 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("extensionRegistration")] ExtensionRegistration,
     [JsonStringEnumMemberName("tool")] Tool,
     [JsonStringEnumMemberName("parameter")] Parameter,
-    [JsonStringEnumMemberName("secret")] Secret
+    [JsonStringEnumMemberName("secret")] Secret,
+    [JsonStringEnumMemberName("connectedServiceType")] ConnectedServiceType,
+    [JsonStringEnumMemberName("storageType")] StorageType,
+    [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile
 }
 
-public sealed record BootstrapResourceOperationContext(string ProfileName, string ProfilePath, BootstrapProfileScope ProfileScope, BootstrapApplicationTarget? Target = null);
+public sealed record BootstrapResourceOperationContext(string ProfileName, string ProfilePath, BootstrapProfileScope ProfileScope, BootstrapApplicationTarget? Target = null, bool WaitForDependencies = false)
+{
+    [JsonIgnore] public IReadOnlyList<BootstrapInputSelection> Inputs { get; init; } = [];
+    [JsonIgnore] public Guid? ActorPrincipalId { get; init; }
+    [JsonIgnore] public Func<string, string?, CancellationToken, Task>? ReportStage { get; init; }
+    [JsonIgnore] public Action<string, string>? ObserveOperation { get; init; }
+    [JsonIgnore] public string? StartupResourceId { get; init; }
+    [JsonIgnore] public string? StartupProfileDigest { get; init; }
+}
+public sealed record BootstrapInputSelection(string Profile, string Configuration, string Kind,
+    JsonElement? Literal = null, ScopedResourceAddress? Resource = null);
 public sealed record BootstrapResourcePlanDetail(string Kind, string Name, BootstrapResourceDisposition Disposition, string? Description = null);
 public sealed record BootstrapResourcePlanResult(BootstrapResourceDisposition Disposition, IReadOnlyList<BootstrapResourcePlanDetail>? Details = null);
 
@@ -71,6 +84,7 @@ public sealed class BootstrapPlanningContext
 
 public interface IBootstrapResourceHandler
 {
+    IReadOnlyList<string> ExtensionReferencePaths => [];
     string Kind { get; }
     BootstrapProfileScope Scope { get; }
     bool SupportsProfileScope(BootstrapProfileScope profileScope) =>

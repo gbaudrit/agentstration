@@ -130,27 +130,27 @@ async function startProductHostsOnPorts(
 
   const fakeOllama = await startFakeOllama();
   await extensionPort.release();
-  const modelExtension = runDotnet('src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj', path.join(workDirectory, 'model-extension.log'), {
+  const modelExtension = runDotnet('src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj', path.join(workDirectory, 'model-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: extensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
     Ollama__Endpoint: fakeOllama.url,
   });
   await gitExtensionPort.release();
-  const gitExtension = runDotnet('src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj', path.join(workDirectory, 'git-extension.log'), {
+  const gitExtension = runDotnet('src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj', path.join(workDirectory, 'git-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: gitExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
     GitSourceProvider__AllowLocalRepositories: 'true',
   });
   await foundryExtensionPort.release();
-  const foundryExtension = runDotnet('src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj', path.join(workDirectory, 'foundry-extension.log'), {
+  const foundryExtension = runDotnet('src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj', path.join(workDirectory, 'foundry-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: foundryExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',
   });
   await utilitiesExtensionPort.release();
-  const utilitiesExtension = runDotnet('src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj', path.join(workDirectory, 'utilities-extension.log'), {
+  const utilitiesExtension = runDotnet('src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj', path.join(workDirectory, 'utilities-extension.log'), {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ASPNETCORE_URLS: utilitiesExtensionUrl,
     Logging__EventLog__LogLevel__Default: 'None',

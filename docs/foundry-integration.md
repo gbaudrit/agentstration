@@ -8,7 +8,7 @@ Foundry is never required by the deterministic SQLite default.
 
 - Aspire: set only `Foundry:Enabled=true` on AppHost. The extension starts with the normal development AEP enrollment path.
 - Compose: start `base.yml` with the `foundry.yml` overlay. The overlay creates a separate AEP shared key and registers the extension.
-- Standalone extension: start `src/Agentstration.Extensions.Foundry` and configure its AEP enrollment as for any autonomous extension.
+- Standalone extension: start `src/extensions/Agentstration.Extensions.Foundry` and configure its AEP enrollment as for any autonomous extension.
 
 Project endpoints, authentication mode and credentials are not extension startup settings. Do not put them in AppHost User Secrets, Compose environment files, extension `appsettings`, or process environment variables.
 

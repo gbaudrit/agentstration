@@ -25,4 +25,5 @@
   <data name="Status.Failed"><value>Failed</value></data>
   <data name="Status.Unknown"><value>Unknown</value></data>
   <data name="Scope"><value>Scope</value></data>
+  <data name="NotDiscovered" xml:space="preserve"><value>Not yet discovered</value></data>
 </root>

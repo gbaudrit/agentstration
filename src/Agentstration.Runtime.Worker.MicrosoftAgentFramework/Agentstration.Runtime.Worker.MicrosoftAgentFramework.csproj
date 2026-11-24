@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/version.txt').Trim())</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
@@ -20,6 +21,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Runtime.Tests" />
     <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Scenarios.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Execution.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Resources.Tests" />

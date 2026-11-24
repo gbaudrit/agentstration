@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "server",
+  "kind": "server",
+  "project": "src/Agentstration.Web/Agentstration.Web.csproj",
+  "entrypoint": "Agentstration.Web.dll",
+  "dockerfile": "Dockerfile",
+  "versionFile": "Directory.Build.props",
+  "testProject": "tests/Agentstration.Api.Tests/Agentstration.Api.Tests.csproj",
+  "testFilter": "FullyQualifiedName~OpenApiTests",
+  "imageName": "server",
+  "platform": "linux/amd64"
+}

@@ -76,16 +76,16 @@
     <Project Path="src/Agentstration.Extensions.Api/Agentstration.Extensions.Api.csproj" />
     <Project Path="src/Agentstration.Extensions.Contracts/Agentstration.Extensions.Contracts.csproj" />
     <Project Path="src/Agentstration.Extensions.Aep/Agentstration.Extensions.Aep.csproj" />
-    <Project Path="src/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
-    <Project Path="src/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
-    <Project Path="src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
-    <Project Path="src/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
-    <Project Path="src/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
-    <Project Path="src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
-    <Project Path="src/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
-    <Project Path="src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
-    <Project Path="src/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
-    <Project Path="src/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
+    <Project Path="src/extensions/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj" />
   </Folder>
   <Folder Name="/src/Flows/">
     <Project Path="src/Agentstration.Flows/Agentstration.Flows.csproj" />
@@ -256,6 +256,8 @@
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Api.Tests/Agentstration.Management.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Tests/Agentstration.Management.Bootstrap.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Bootstrap.Scenarios.Tests/Agentstration.Management.Bootstrap.Scenarios.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Bootstrap.Plans.Tests/Agentstration.Management.Bootstrap.Plans.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Runtime/">
@@ -267,6 +269,7 @@
     <Project Path="tests/Agentstration.Tools.SourceRegistry.Tests/Agentstration.Tools.SourceRegistry.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Web/">
+    <Project Path="tests/Agentstration.AppHost.Tests/Agentstration.AppHost.Tests.csproj" />
     <Project Path="tests/Agentstration.Http.Diagnostics.Tests/Agentstration.Http.Diagnostics.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Tests/Agentstration.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Web.Components.Tests/Agentstration.Web.Components.Tests.csproj" />

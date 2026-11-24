@@ -1,0 +1,187 @@
+@page "/startup/progress"
+@layout Agentstration.Web.Components.Bootstrap.BootstrapStartupLayout
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.Web.Components.Bootstrap
+@implements IAsyncDisposable
+@inject IBootstrapStartupApiClient Client
+@inject NavigationManager Navigation
+@inject TimeProvider Clock
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapStartupStrings> Localizer
+
+<div class="bootstrap-startup-page">
+<PageTitle>@Localizer["Title"]</PageTitle>
+<PageHeader Title="@Localizer["Title"]" Eyebrow="@Localizer["Startup"]" Description="@Localizer[snapshot?.Ready == true ? "CompletedDescription" : "Description"]">
+    <Actions>
+        @if (snapshot?.Ready == true)
+        {
+            <button type="button" class="button-primary" @onclick="OpenConsole">@Localizer["OpenConsole"]</button>
+        }
+    </Actions>
+</PageHeader>
+
+@if (denied)
+{
+    <ErrorState Title="@Localizer["AccessUnavailable"]" Message="@Localizer["AccessUnavailableDescription"]" />
+}
+else if (snapshot is null)
+{
+    <LoadingState Message="@(disconnected ? Localizer["ConnectionLostDescription"] : Localizer["Checking"])" />
+}
+else
+{
+    @if (disconnected) { <p class="startup-progress-notice" role="status">@Localizer["ConnectionLostDescription"]</p> }
+    <StepProgress @key="snapshot.AttemptId" AutoCollapseCompletedGroups="true" FitToViewport="true" ProgressKey="@snapshot.Revision.ToString()" Steps="@Steps" ActiveStepId="@ActiveNavigationId" @bind-SelectedStepId="selected" @bind-FollowActiveStep="following" TestId="bootstrap-startup-progress">
+        <HeaderContent>
+            @if (snapshot.State == "failed")
+            {
+                <BootstrapFailureView Failure="@snapshot.Failure" ResourceTitle="@(snapshot.Activity is { ResourceName: not null } activity ? activity.ResourceKind + " / " + activity.ResourceName : null)" />
+                <details class="startup-recovery"><summary>@Localizer["RecoveryAction"]</summary><p>@Localizer["Recovery"]</p></details>
+            }
+            <div class="startup-progress-header">
+            <div class="startup-progress-summary" role="status">
+                <div class="startup-progress-summary-heading">
+                    <span class="startup-progress-summary-icon" aria-hidden="true"><UiIcon Name="@(snapshot.Ready ? "check" : snapshot.State == "failed" ? "alert-triangle" : "cloud-upload")" /></span>
+                    <div><strong>@Localizer[snapshot.Ready ? "Completed" : snapshot.State == "failed" ? "Failed" : "Running"]</strong>@if (!snapshot.Ready) { <p>@Localizer["CurrentStage", Localizer["Stage_" + snapshot.ActiveStepId].Value]</p> }</div>
+                </div>
+                <div class="startup-progress-completion">
+                    <span>@Localizer["StepCount", CompletedSteps, snapshot.Steps.Count]</span>
+                    <progress value="@CompletedSteps" max="@snapshot.Steps.Count" aria-label="@Localizer["StepCount", CompletedSteps, snapshot.Steps.Count]"></progress>
+                </div>
+            </div>
+            <div class="startup-progress-metrics">
+                <MetricCard Label="@Localizer["Created"]" Value="@snapshot.Created.ToString()" Status="UiStatus.Success" />
+                <MetricCard Label="@Localizer["Skipped"]" Value="@snapshot.Skipped.ToString()" />
+                <MetricCard Label="@Localizer["Conflicts"]" Value="@snapshot.Conflicts.ToString()" Status="@(snapshot.Conflicts > 0 ? UiStatus.Warning : UiStatus.Neutral)" />
+                <MetricCard Label="@Localizer["ResourceFailures"]" Value="@snapshot.Failed.ToString()" Status="@(snapshot.Failed > 0 ? UiStatus.Danger : UiStatus.Neutral)" />
+            </div></div>
+        </HeaderContent>
+    </StepProgress>
+
+}
+
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "ReturnUrl")] public string? ReturnUrl { get; set; }
+    private readonly CancellationTokenSource stopping = new();
+    private BootstrapStartupSnapshot? snapshot;
+    private string? selected;
+    private bool following = true, denied, disconnected;
+    private Task? polling;
+
+    private int CompletedSteps => snapshot?.Steps.Count(step => step.State is "succeeded" or "skipped") ?? 0;
+    private string? ActiveNavigationId => (snapshot?.Families.FirstOrDefault(family => family.StepId == snapshot.ActiveStepId
+        && (snapshot.Activity?.GroupId is { } groupId ? family.GroupId == groupId : family.Kind == snapshot.Activity?.ResourceKind))
+        ?? snapshot?.Families.FirstOrDefault(family => family.StepId == snapshot.ActiveStepId && family.State is "running" or "waiting")) is { } active
+        ? FamilyId(active) : snapshot?.ActiveStepId;
+    private static string FamilyId(BootstrapStartupFamily family) => family.StepId + ":" + family.Kind + (family.GroupId is null ? string.Empty : ":" + family.GroupId);
+    private string FamilyLabel(string kind)
+    {
+        var label = Localizer["Family_" + kind];
+        return label.ResourceNotFound ? kind : label.Value;
+    }
+    private static ProgressStepStatus StepStatus(string state) => state switch
+    {
+        "succeeded" => ProgressStepStatus.Succeeded,
+        "running" => ProgressStepStatus.Running,
+        "waiting" => ProgressStepStatus.Waiting,
+        "failed" => ProgressStepStatus.Failed,
+        "skipped" => ProgressStepStatus.Skipped,
+        "blocked" => ProgressStepStatus.Interrupted,
+        _ => ProgressStepStatus.Pending
+    };
+    private IReadOnlyList<ProgressStep> Steps
+    {
+        get
+        {
+            var items = new List<ProgressStep>();
+            foreach (var step in snapshot!.Steps)
+            {
+                items.Add(new(step.Id, Localizer["Stage_" + step.Id], StepStatus(step.State), Panel(step.Id, null, null)));
+                var families = snapshot.Families.Where(family => family.StepId == step.Id).ToArray();
+                var counts = families.GroupBy(family => family.Kind).ToDictionary(group => group.Key, group => group.Count());
+                var seen = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (var family in families)
+                {
+                    var ordinal = seen.GetValueOrDefault(family.Kind) + 1;
+                    seen[family.Kind] = ordinal;
+                    var title = counts[family.Kind] > 1 ? Localizer["FamilyOccurrence", FamilyLabel(family.Kind), ordinal].Value : FamilyLabel(family.Kind);
+                    items.Add(new(FamilyId(family), title, StepStatus(family.State), Panel(step.Id, family.Kind, family.GroupId, title))
+                    {
+                        ParentId = step.Id,
+                        Summary = Localizer["ResourceCount", family.Processed, family.Total] + (counts[family.Kind] > 1 && family.Profile is not null ? " · " + family.Profile : string.Empty)
+                    });
+                }
+            }
+            return items;
+        }
+    }
+    private RenderFragment Panel(string step, string? kind, string? groupId, string? title = null) => builder =>
+    {
+        builder.OpenComponent<BootstrapStartupStepPanel>(0);
+        builder.AddAttribute(1, nameof(BootstrapStartupStepPanel.Snapshot), snapshot);
+        builder.AddAttribute(2, nameof(BootstrapStartupStepPanel.StepId), step);
+        builder.AddAttribute(3, nameof(BootstrapStartupStepPanel.Kind), kind);
+        builder.AddAttribute(4, nameof(BootstrapStartupStepPanel.GroupId), groupId);
+        builder.AddAttribute(5, nameof(BootstrapStartupStepPanel.GroupTitle), title);
+        builder.AddAttribute(6, nameof(BootstrapStartupStepPanel.FollowCurrent), following);
+        builder.AddAttribute(7, nameof(BootstrapStartupStepPanel.FollowCurrentChanged), EventCallback.Factory.Create<bool>(this, value => following = value));
+        builder.CloseComponent();
+    };
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && snapshot?.Ready != true) polling = PollAsync();
+        return Task.CompletedTask;
+    }
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2), Clock);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stopping.Token))
+            {
+                await InvokeAsync(LoadAsync);
+                if (snapshot?.Ready == true) break;
+            }
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+    }
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var current = await Client.GetAsync(stopping.Token);
+            if (snapshot is not null && (snapshot.AttemptId != current.AttemptId
+                || IsWaiting(snapshot) && !IsWaiting(current) && current.State != "failed"))
+            {
+                selected = null;
+                following = true;
+            }
+            snapshot = current; disconnected = denied = false;
+        }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Forbidden) { snapshot = null; denied = true; }
+        catch (AgentstrationApiException exception) when (exception.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        { Navigation.NavigateTo("login?ReturnUrl=" + Uri.EscapeDataString(BootstrapStartupNavigation.ProgressUrl(ReturnUrl)), forceLoad: true); }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or InvalidOperationException or OperationCanceledException) { disconnected = true; }
+        if (!stopping.IsCancellationRequested) StateHasChanged();
+    }
+    private static bool IsWaiting(BootstrapStartupSnapshot value) =>
+        value.Activity?.WaitReason is { } reason && reason is not ("discovery_running" or "discovery_validation")
+        || value.Steps.Any(step => step.State == "waiting");
+
+    private void OpenConsole()
+    {
+        if (snapshot?.Ready != true) return;
+        var destination = BootstrapStartupNavigation.LocalReturnUrl(ReturnUrl);
+        Navigation.NavigateTo(destination == "/" ? Navigation.BaseUri : destination.TrimStart('/'), replace: true);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        stopping.Cancel();
+        if (polling is not null) await polling;
+        stopping.Dispose();
+    }
+}

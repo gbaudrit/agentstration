@@ -36,6 +36,15 @@ public abstract class ModelManagementApiTestBase
             services.AddSingleton(discovery);
         }));
 
+    protected static async Task ProcessDiscoveryAsync(WebApplicationFactory<Program> factory, string name)
+    {
+        using var system = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushSystem();
+        var provider = await factory.Services.GetRequiredService<ModelProviderManagementService>()
+            .GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, name, default);
+        Assert.IsNotNull(provider);
+        await factory.Services.GetRequiredService<ModelProviderDiscoveryLifecycle>().ProcessAsync(provider.Value, default);
+    }
+
     protected static Task<RequestContext> GetBootstrapContextAsync(WebApplicationFactory<Program> factory) =>
         factory.Services
             .GetRequiredService<ILocalEnvironmentBootstrapper>()

@@ -7,7 +7,7 @@ on:
       - 'src/Agentstration.Storage*/**'
       - 'src/Agentstration.Knowledge*/**'
       - 'src/Agentstration.Infrastructure/**'
-      - 'src/Agentstration.Extensions.PostgreSql/**'
+      - 'src/extensions/Agentstration.Extensions.PostgreSql/**'
       - 'tests/Agentstration.Extensions.PostgreSql.Tests/**'
       - 'tests/Agentstration.Api.Resources.Tests/**'
       - 'tests/Agentstration.Api.DataSources.Tests/**'
@@ -48,7 +48,7 @@ jobs:
       - name: V2 and V3 through product AEP, MCP, Tools and Snapshots
         run: dotnet test --project tests/Agentstration.Api.DataSources.Tests --configuration Release --filter 'FullyQualifiedName~TwoAgentRelaysUseLateBoundExports|FullyQualifiedName~AcquiredJsonProjectsToImmutableStructuredKnowledge|FullyQualifiedName~PostgreSqlJsonExplodePublishesIndependentRecords' --minimum-expected-tests 6
       - name: Publish independent provider
-        run: dotnet publish src/Agentstration.Extensions.PostgreSql --configuration Release --output artifacts/postgresql-documents
+        run: dotnet publish src/extensions/Agentstration.Extensions.PostgreSql --configuration Release --output artifacts/postgresql-documents
       - uses: actions/upload-artifact@v7
         with:
           name: postgresql-documents-linux

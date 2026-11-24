@@ -21,4 +21,86 @@
   <data name="SourceSelection" xml:space="preserve"><value>Source {0}/{1} · content locale {2}</value></data><data name="SourceVersion" xml:space="preserve"><value>Source version</value></data><data name="ContentLocale" xml:space="preserve"><value>Content locale</value></data><data name="ContentPath" xml:space="preserve"><value>Content path</value></data>
 <data name="BindingTargetKind.Parameter"><value>Parameter</value></data><data name="InheritedScope"><value>visible scope</value></data>
   <data name="BindingTargetKind.Tool" xml:space="preserve"><value>Tool</value></data>
+  <data name="BindingTargetKind.ConnectedServiceType" xml:space="preserve"><value>Connected service type</value></data>
+  <data name="BindingTargetKind.StorageType" xml:space="preserve"><value>Storage type</value></data>
+  <data name="BindingTargetKind.DataSourceProfile" xml:space="preserve"><value>Data source profile</value></data>
+
+  <data name="ProcessedCount" xml:space="preserve"><value>Processed {0} of {1} resources</value></data>
+  <data name="ProgressLabel" xml:space="preserve"><value>Bootstrap application progress</value></data>
+  <data name="PreparingApplication" xml:space="preserve"><value>Preparing the application…</value></data>
+  <data name="CurrentResource" xml:space="preserve"><value>Resource {0}:</value></data>
+  <data name="ObservationInterrupted" xml:space="preserve"><value>Progress updates are temporarily unavailable. Reconnecting to the same application…</value></data>
+  <data name="ApplicationStatus.Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="CancelApplication" xml:space="preserve"><value>Cancel application</value></data>
+  <data name="CancellationRequested" xml:space="preserve"><value>Cancellation requested. The current resource may finish first.</value></data>
+<data name="ApplicationCancelled" xml:space="preserve"><value>The application was cancelled. Already created resources are retained.</value></data>
+<data name="ApplicationInterrupted" xml:space="preserve"><value>The application was interrupted. Preview the profiles before starting a new application.</value></data>
+<data name="ApplicationFailed" xml:space="preserve"><value>The application could not complete. Preview the profiles before retrying.</value></data>
+<data name="ApplicationInvalid" xml:space="preserve"><value>The profiles or target changed, or validation failed. Preview the application again.</value></data>
+<data name="ProcessedResources" xml:space="preserve"><value>Processed {0} resources</value></data>
+<data name="RequestIdentityConflict" xml:space="preserve"><value>This request identity already belongs to a different application. Preview the profiles again.</value></data>
+<data name="ApplicationQueueFull" xml:space="preserve"><value>Follow the current applications before submitting another application.</value></data>
+  <data name="SearchProfiles" xml:space="preserve"><value>Search profiles</value></data>
+  <data name="SearchResources" xml:space="preserve"><value>Search resources</value></data>
+  <data name="Resources" xml:space="preserve"><value>Resources</value></data>
+  <data name="Preparation" xml:space="preserve"><value>Preparation</value></data>
+  <data name="PreparationDescription" xml:space="preserve"><value>Validate the selected profiles and their exact source before applying resources.</value></data>
+  <data name="ObservedResourcesOnly" xml:space="preserve"><value>This older application retains only observed resources; unobserved resource groups are not reconstructed.</value></data>
+  <data name="CatalogConfiguration" xml:space="preserve"><value>Catalog configuration</value></data>
+  <data name="CloseConfiguration" xml:space="preserve"><value>Close</value></data>
+  <data name="BackToSelection" xml:space="preserve"><value>Back to preparation</value></data>
+  <data name="PlanOrderHelp" xml:space="preserve"><value>Each profile has its own target. Instance profiles run first, then Tenant profiles, then Workspace profiles. You can reorder profiles within the same level.</value></data>
+  <data name="PlanTargets" xml:space="preserve"><value>Profiles and targets</value></data>
+  <data name="ValidationDeferred" xml:space="preserve"><value>Validation of this profile will complete after the preceding resources and target are available. Execution stops at the first failure; resources already created are retained.</value></data>
+  <data name="PlanTargetInvalid" xml:space="preserve"><value>Choose a valid target for every selected profile. Planned targets must be created by an earlier profile.</value></data>
+  <data name="PlanBindingsInvalid" xml:space="preserve"><value>Check required bindings and their producer profiles.</value></data>
+  <data name="MultipleTargets" xml:space="preserve"><value>Multiple targets</value></data>
+  <data name="TargetForProfile" xml:space="preserve"><value>Target for {0}</value></data>
+  <data name="ValidationDeferredLabel" xml:space="preserve"><value>Validation deferred</value></data>
+  <data name="ApplicationTitle" xml:space="preserve"><value>Bootstrap application</value></data>
+  <data name="ConfigurationInputs" xml:space="preserve"><value>Configuration inputs</value></data>
+  <data name="ConfigurationInputsHelp" xml:space="preserve"><value>Supply missing values for this application. Secured inputs use an existing Secret or the shared masked Secret creator. A configured Vault is required for creation. Review again after changing a value.</value></data>
+  <data name="InputOptionsUnavailable" xml:space="preserve"><value>Some value references could not be loaded. Check permissions and retry the preview.</value></data>
+  <data name="InputConfigured" xml:space="preserve"><value>Configured</value></data>
+  <data name="InputMissing" xml:space="preserve"><value>Required value missing</value></data>
+  <data name="ReviewInputs" xml:space="preserve"><value>Review supplied values</value></data>
+  <data name="OperationStage.waiting_worker" xml:space="preserve"><value>Waiting for a Worker</value></data>
+  <data name="OperationStage.discovery_running" xml:space="preserve"><value>Discovering Connected Service operations</value></data>
+  <data name="OperationStage.discovery_validation" xml:space="preserve"><value>Selecting operations and validating dependencies</value></data>
+  <data name="OperationElapsed" xml:space="preserve"><value>{0} s elapsed</value></data>
+  <data name="DiscoveryFlowRun" xml:space="preserve"><value>View discovery Flow Run</value></data>
+  <data name="ConsumersPending" xml:space="preserve"><value>Dependent resources remain pending until discovery and validation finish.</value></data>
+  <data name="Diagnostic.bootstrap_input_selection_invalid" xml:space="preserve"><value>Choose a valid value or authorized reference, then review the application again.</value></data>
+  <data name="Diagnostic.bootstrap_configuration_key_invalid" xml:space="preserve"><value>Use a Bootstrap Parameters or Secrets configuration key for the expected input protection.</value></data>
+  <data name="Diagnostic.bootstrap_configuration_type_invalid" xml:space="preserve"><value>The configured value does not match the declared input type.</value></data>
+  <data name="Diagnostic.bootstrap_configuration_required" xml:space="preserve"><value>A required configuration value is missing or empty.</value></data>
+  <data name="Diagnostic.bootstrap_secured_input_requires_secret" xml:space="preserve"><value>Select or create a configured Secret for this protected input.</value></data>
+  <data name="Diagnostic.bootstrap_parameter_unavailable" xml:space="preserve"><value>The selected Parameter is unavailable or unauthorized.</value></data>
+  <data name="Diagnostic.bootstrap_reference_invalid" xml:space="preserve"><value>Check the typed resource reference and required name/version/output.</value></data>
+  <data name="Diagnostic.bootstrap_reference_kind_invalid" xml:space="preserve"><value>The referenced resource kind is incompatible with this field.</value></data>
+  <data name="Diagnostic.bootstrap_reference_not_available" xml:space="preserve"><value>This exact dependency is unavailable or was not declared earlier.</value></data>
+  <data name="Diagnostic.bootstrap_collection_not_unique" xml:space="preserve"><value>Select exactly one declared collection in the chosen Storage.</value></data>
+  <data name="Diagnostic.bootstrap_collection_invalid" xml:space="preserve"><value>A collection name is required.</value></data>
+  <data name="Diagnostic.bootstrap_dataset_invalid" xml:space="preserve"><value>The dataset requires a Storage, operation and structured acquisition parameters.</value></data>
+  <data name="Diagnostic.bootstrap_storage_invalid" xml:space="preserve"><value>Storage configuration and envelope must be objects.</value></data>
+  <data name="Diagnostic.bootstrap_export_not_found" xml:space="preserve"><value>The selected Connected Service export is unavailable.</value></data>
+  <data name="Diagnostic.bootstrap_discovery_output_unknown" xml:space="preserve"><value>The selected discovery output alias is not declared.</value></data>
+  <data name="Diagnostic.bootstrap_discovery_output_ambiguous" xml:space="preserve"><value>Several operations match this selector. Specify an exact response or operation.</value></data>
+  <data name="Diagnostic.bootstrap_discovery_service_not_planned" xml:space="preserve"><value>Declare the Connected Service before its discovery instruction.</value></data>
+  <data name="Diagnostic.bootstrap_discovery_invalid" xml:space="preserve"><value>Check the discovery service, unique output names and exact selectors.</value></data>
+  <data name="Diagnostic.bootstrap_operation_disabled_by_operator" xml:space="preserve"><value>An operator disabled this operation. Review it explicitly before applying.</value></data>
+  <data name="Diagnostic.bootstrap_vault_not_planned" xml:space="preserve"><value>Declare an authorized Vault before the Secret.</value></data>
+  <data name="Diagnostic.bootstrap_secret_initializer_required" xml:space="preserve"><value>Provide a configuration initializer for the unconfigured Secret.</value></data>
+  <data name="Diagnostic.bootstrap_secret_namespace_unsupported" xml:space="preserve"><value>Vaults and Secrets in this workflow require the default namespace.</value></data>
+  <data name="Diagnostic.bootstrap_resource_metadata_invalid" xml:space="preserve"><value>Check the display name, description bounds and boolean enabled state.</value></data>
+  <data name="Diagnostic.bootstrap_discovery_contract_pending" xml:space="preserve"><value>Operation contract, saved parameters and output validation will be checked after this discovery completes.</value></data>
+  <data name="Diagnostic.bootstrap_resource_dependency_pending" xml:space="preserve"><value>The exact revision will be resolved after this prerequisite exists.</value></data>
+  <data name="Diagnostic.bootstrap_dependency_revision_changed" xml:space="preserve"><value>An existing resource pins different dependencies. Review and reconcile it explicitly; Bootstrap will not repin it.</value></data>
+  <data name="Diagnostic.bootstrap_secret_unavailable" xml:space="preserve"><value>The existing Secret or its Vault is unavailable. Restore its access or key before initializing; Bootstrap will not replace an unreadable value.</value></data>
+  <data name="ViewSourceFiles" xml:space="preserve"><value>View YAML files</value></data>
+  <data name="SourceFilesHelp" xml:space="preserve"><value>Original profile files, read-only. Configuration inputs and secrets are not resolved in this view.</value></data>
+  <data name="SourceFilesUnavailable" xml:space="preserve"><value>The profile files could not be read. The profile may have changed or access may no longer be available. Reload the files and review the current profile.</value></data>
+  <data name="ReloadSourceFiles" xml:space="preserve"><value>Reload files</value></data>
+  <data name="LoadingSourceFiles" xml:space="preserve"><value>Loading profile files…</value></data>
+  <data name="SourceFile" xml:space="preserve"><value>Profile file</value></data>
 </root>

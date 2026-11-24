@@ -92,13 +92,13 @@ public sealed class DependencyTests
     public void OpenApiDependenciesStayInsideTheAutonomousExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
-        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.OpenApi", "Agentstration.Extensions.OpenApi.csproj");
+        var extensionProject = Path.Combine(sourceRoot, "extensions", "Agentstration.Extensions.OpenApi", "Agentstration.Extensions.OpenApi.csproj");
         var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
         Assert.IsTrue(File.Exists(extensionProject));
         var project = File.ReadAllText(extensionProject);
         Assert.Contains("<PackageReference Include=\"Microsoft.OpenApi\"", project);
         Assert.Contains("<PackageReference Include=\"YamlDotNet\"", project);
-        Assert.Contains("../Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj", File.ReadAllText(appHostProject));
+        Assert.Contains("../extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj", File.ReadAllText(appHostProject));
         CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
             .Select(value => value.Name).ToArray(), "Agentstration.DataSources.Contracts");
         CollectionAssert.DoesNotContain(typeof(OpenApiContractParser).Assembly.GetReferencedAssemblies()
@@ -135,10 +135,10 @@ public sealed class DependencyTests
     public void Crawl4AiDependenciesStayInsideTheAutonomousExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
-        var extensionProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Crawl4AI", "Agentstration.Extensions.Crawl4AI.csproj");
+        var extensionProject = Path.Combine(sourceRoot, "extensions", "Agentstration.Extensions.Crawl4AI", "Agentstration.Extensions.Crawl4AI.csproj");
         var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
         Assert.IsTrue(File.Exists(extensionProject));
-        Assert.Contains("../Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj", File.ReadAllText(appHostProject));
+        Assert.Contains("../extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj", File.ReadAllText(appHostProject));
         Assert.IsFalse(typeof(Crawl4AiClient).Assembly.GetReferencedAssemblies().Any(reference =>
             reference.Name is "Agentstration.Knowledge" or "Agentstration.Knowledge.Contracts"));
 
@@ -182,11 +182,11 @@ public sealed class DependencyTests
     public void FoundryDependenciesStayInsideTheAutonomousExtension()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
-        var foundryProject = Path.Combine(sourceRoot, "Agentstration.Extensions.Foundry", "Agentstration.Extensions.Foundry.csproj");
+        var foundryProject = Path.Combine(sourceRoot, "extensions", "Agentstration.Extensions.Foundry", "Agentstration.Extensions.Foundry.csproj");
         var appHostProject = Path.Combine(sourceRoot, "Agentstration.AppHost", "Agentstration.AppHost.csproj");
         Assert.IsTrue(File.Exists(foundryProject));
         Assert.Contains("<PackageReference Include=\"Azure.Identity\"", File.ReadAllText(foundryProject));
-        Assert.Contains("../Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj", File.ReadAllText(appHostProject));
+        Assert.Contains("../extensions/Agentstration.Extensions.Foundry/Agentstration.Extensions.Foundry.csproj", File.ReadAllText(appHostProject));
 
         var violations = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
             .Where(path => !string.Equals(path, foundryProject, StringComparison.OrdinalIgnoreCase))
@@ -1519,6 +1519,17 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
+                // This fixture belongs to the test root and is compiled into
+                // independently bounded Bootstrap test processes.
+                if (include.Replace('\\', '/') == "../BootstrapApiOnlyWebApplicationFactory.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
+                        or "Agentstration.Management.Bootstrap.Scenarios.Tests"
+                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+
+                if (include.Replace('\\', '/') == "../BootstrapApplicationTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Scenarios.Tests"
+                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.
                 if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"
@@ -1689,7 +1700,7 @@ public sealed class DependencyTests
             var enabled = variables.TryGetProperty("Agentstration__Lan__Enabled", out var lan)
                 && bool.Parse(lan.GetString()!);
             Assert.AreEqual(profile.Name is "https-LAN" or "https-LAN-NoBootstrap", enabled);
-            Assert.AreEqual(profile.Name is "https" or "https-LAN",
+            Assert.AreEqual(profile.Name is "https" or "https-LAN" or "https-BootstrapExtensions" or "https-BootstrapOllama",
                 bool.Parse(variables.GetProperty("Agentstration__Bootstrap__InitialBootstrapEnabled").GetString()!));
 
             foreach (var key in new[] { "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL", "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL" })

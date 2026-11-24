@@ -44,6 +44,31 @@ public sealed class ModelProviderCollectionTests
     }
 
     [TestMethod]
+    public async Task UndiscoveredModelCountsAreNotFilteredAsKnownZero()
+    {
+        using var culture = new TestCultureScope("en-US");
+        using var handler = new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = JsonContent.Create(new
+            {
+                Value = new[]
+            {
+                new ModelProviderResponse("pending", "pending", new("Pending", "aep", "chat", "extension", "default", "manual", "unknown", null, 0, Discovery: new() { State = "never" }), ScopeRef: ResourceScopeRef.Instance),
+                new ModelProviderResponse("known-empty", "known-empty", new("Known empty", "aep", "chat", "extension", "default", "manual", "available", null, 0, Discovery: new() { State = "succeeded", LastSuccessAt = DateTimeOffset.UnixEpoch }), ScopeRef: ResourceScopeRef.Instance)
+            }
+            })
+        }));
+        using var context = Context(handler);
+        var cut = context.Render<ModelProviders>();
+        cut.WaitForAssertion(() => Assert.HasCount(2, cut.FindAll("tbody tr")));
+        StringAssert.Contains(cut.Find("tbody").TextContent, "Not yet discovered");
+        await cut.Find(".resource-toolbar button[aria-controls]").ClickAsync(new());
+        await cut.Find("[data-filter-key=models] input").ChangeAsync(new() { Value = "0" });
+        Assert.HasCount(1, cut.FindAll("tbody tr"));
+        StringAssert.Contains(cut.Find("tbody .resource-name-link").GetAttribute("href"), "/modelproviders/known-empty");
+    }
+
+    [TestMethod]
     public async Task RefreshFailureKeepsRowsAndShrinkClampsTheSuccessfulPage()
     {
         using var handler = new Handler(call => call == 2 ? throw new HttpRequestException("Offline") : Task.FromResult(Response(call == 1 ? 45 : 3)));

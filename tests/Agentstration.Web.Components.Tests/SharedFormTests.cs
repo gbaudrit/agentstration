@@ -27,6 +27,7 @@ public sealed class SharedFormTests
                     .Add(value => value.ValueChanged, value => model.Choice = value).Add(value => value.ValueExpression, () => model.Choice)
                     .AddChildContent("<option value='Sunday'>Sunday</option><option value='Friday'>Friday</option>"))));
         var buttons = cut.FindAll("button");
+        Assert.IsTrue(buttons.All(button => button.GetAttribute("tabindex") == "-1"));
         await buttons[0].ClickAsync(new());
         await buttons[1].ClickAsync(new());
         Assert.AreEqual(7, model.Number, "Invalid input must not silently become zero.");
@@ -54,6 +55,7 @@ public sealed class SharedFormTests
                 .Add(value => value.ValueExpression, () => model.Name)));
 
         Assert.AreEqual("button", cut.Find("button").GetAttribute("type"));
+        Assert.AreEqual("-1", cut.Find("button").GetAttribute("tabindex"));
         await cut.Find("button").ClickAsync(new());
 
         Assert.AreEqual(string.Empty, model.Name);

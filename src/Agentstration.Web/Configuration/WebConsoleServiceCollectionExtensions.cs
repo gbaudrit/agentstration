@@ -78,6 +78,7 @@ public static class WebConsoleServiceCollectionExtensions
         AddClient<RuntimeProfilesApiClient, IRuntimeProfilesClient>(services, configured.ManagementApi);
         AddClient<PacksApiClient, IPacksClient>(services, configured.ManagementApi);
         AddSensitiveClient<BootstrapProfilesApiClient, IBootstrapProfilesApiClient>(services, configured.ManagementApi);
+        AddSensitiveClient<BootstrapStartupApiClient, IBootstrapStartupApiClient>(services, configured.ManagementApi);
         AddClient<TriggerApiClient, ITriggerApiClient>(services, configured.ManagementApi);
         AddClient<ResourcePlansApiClient, IResourcePlansApiClient>(services, configured.ManagementApi);
         AddClient<ToolsApiClient, IToolsClient>(services, configured.ManagementApi);

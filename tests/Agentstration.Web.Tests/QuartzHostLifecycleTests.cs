@@ -1,4 +1,5 @@
 using System.Net;
+using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +26,7 @@ public sealed class QuartzHostLifecycleTests
         }
 
         var hostedServiceNames = factory.Services.GetServices<IHostedService>()
+            .SelectMany(ApplicationServices)
             .Select(service => service.GetType().Name)
             .ToArray();
         AssertApplicationWorkers(hostedServiceNames, enabled: false);
@@ -58,6 +60,7 @@ public sealed class QuartzHostLifecycleTests
                     Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
                     Assert.IsTrue(File.Exists(Path.Combine(directory, "scheduler.db")));
                     AssertApplicationWorkers(factory.Services.GetServices<IHostedService>()
+                        .SelectMany(ApplicationServices)
                         .Select(service => service.GetType().Name).ToArray(), enabled: true);
                 }
 
@@ -81,11 +84,15 @@ public sealed class QuartzHostLifecycleTests
         });
 
         var hostedServiceNames = factory.Services.GetServices<IHostedService>()
+            .SelectMany(ApplicationServices)
             .Select(service => service.GetType().Name)
             .ToArray();
 
         Assert.IsTrue(hostedServiceNames.Contains("TelemetryHostedService", StringComparer.Ordinal));
     }
+
+    private static IEnumerable<IHostedService> ApplicationServices(IHostedService service) =>
+        service is BootstrapDeferredHostedServices deferred ? deferred.Workers : [service];
 
     private static void AssertApplicationWorkers(string[] hostedServices, bool enabled)
     {

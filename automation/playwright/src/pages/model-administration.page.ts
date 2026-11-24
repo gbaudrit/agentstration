@@ -1,3 +1,4 @@
+import { waitForModelDiscovery } from './model-discovery.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { selectResourceSection } from './resource-sections.js';
@@ -59,6 +60,7 @@ export class ModelAdministrationPage {
     if (!response.ok()) {
       throw new Error(`Model discovery refresh returned HTTP ${response.status()}.`);
     }
+    await waitForModelDiscovery(this.page, consoleUrl, providerName, scopeRef ? { 'X-Agentstration-Context': scopeRef } : undefined);
   }
 
   public async overrideFirstModelContextLimit(consoleUrl: string, providerName: string, contextTokens: number): Promise<void> {

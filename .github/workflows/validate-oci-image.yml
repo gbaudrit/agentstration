@@ -1,0 +1,189 @@
+name: Validate OCI image
+
+on:
+  workflow_call:
+    inputs:
+      extension:
+        description: Implemented image catalogue ID
+        type: string
+        required: true
+      release-tag:
+        description: Optional image release tag to validate before delivery
+        type: string
+        default: ''
+    outputs:
+      image:
+        description: Validated catalogue image ID
+        value: ${{ jobs.validate-and-build.outputs.extension }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      extension: ${{ steps.select.outputs.extension }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate catalogue and release version
+        id: select
+        env:
+          REQUESTED_EXTENSION: ${{ inputs.extension }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          extension = os.environ.get('REQUESTED_EXTENSION', '')
+          arguments = []
+          tag = os.environ.get('RELEASE_TAG')
+          if tag:
+              match = re.fullmatch(r'(?:extension|worker)/([a-z][a-z0-9-]*)/v(.+)', tag)
+              if not match:
+                  raise ValueError('Expected an extension/<id>/v<version> or worker/<id>/v<version> tag.')
+              extension = match[1]
+              arguments = ['--release-tag', tag]
+              subprocess.run(['git', 'fetch', 'origin', 'main'], check=True)
+              subprocess.run(['git', 'merge-base', '--is-ancestor', 'HEAD', 'origin/main'], check=True)
+          entry = json.loads(subprocess.check_output(['python3', 'scripts/packaging/images.py', 'describe', '--extension', extension, *arguments], text=True))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"extension={entry['id']}\nkind={entry.get('kind', 'aep-extension')}\n")
+          PY
+      - name: Offline packaging contracts
+        run: |
+          python3 -m unittest discover -s scripts/packaging -p 'test_*.py' -v
+          python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Image offline MSTest contracts
+        env:
+          EXTENSION_ID: ${{ steps.select.outputs.extension }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          entry = json.loads(subprocess.check_output(['python3', 'scripts/packaging/images.py', 'describe', '--extension', os.environ['EXTENSION_ID']], text=True))
+          subprocess.run(['dotnet', 'test', '--project', entry['testProject'], '--configuration', 'Release', '--filter', entry['testFilter'], '--minimum-expected-tests', '1'], check=True)
+          PY
+      - uses: docker/setup-buildx-action@v4
+      - name: Build once to an OCI archive with provenance and SBOM
+        env:
+          EXTENSION_ID: ${{ steps.select.outputs.extension }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: >-
+          python3 scripts/packaging/images.py build --extension "$EXTENSION_ID"
+          --repository "$SOURCE_REPOSITORY" --directory artifacts/extension
+      - name: Install OCI copy tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Start a disposable loopback registry
+        run: |
+          docker run --detach --name packaging-registry --publish 127.0.0.1:5000:5000 registry:3
+      - name: Stage the exact component archive
+        if: steps.select.outputs.kind != 'server'
+        run: |
+          skopeo copy --all --preserve-digests --retry-times 5 --dest-tls-verify=false oci-archive:artifacts/extension/image.oci.tar docker://localhost:5000/extension:smoke
+      - name: Verify AEP image health, discovery and restart
+        if: steps.select.outputs.kind == 'aep-extension'
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+          delivery = json.load(open('artifacts/extension/delivery.json'))
+          subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', 'artifacts/extension/delivery.json', '--image', 'localhost:5000/extension@' + delivery['digest']], check=True)
+          PY
+      - name: Build the SQLite authority fixture from the same source and pinned bases
+        if: steps.select.outputs.kind != 'server'
+        run: |
+          python3 - <<'PYBUILD'
+          import json, subprocess, sys
+          sys.path.insert(0, 'scripts/packaging')
+          from images import delivery_entry
+          delivery = json.load(open('artifacts/extension/delivery.json'))
+          subprocess.run(['docker', 'buildx', 'build', '--load', '--file', 'Dockerfile.extension',
+                          '--platform', delivery_entry(delivery)['platform'],
+                          '--build-arg', 'SDK_IMAGE=' + delivery['buildImages']['sdk'],
+                          '--build-arg', 'RUNTIME_IMAGE=' + delivery['buildImages']['runtime'],
+                          '--build-arg', 'PROJECT=src/Agentstration.Web/Agentstration.Web.csproj',
+                          '--build-arg', 'ENTRYPOINT_DLL=Agentstration.Web.dll',
+                          '--label', 'org.opencontainers.image.revision=' + delivery['sourceSha'],
+                          '--tag', 'agentstration-packaging-smoke-authority:local', '.'], check=True)
+          PYBUILD
+      - name: Build the Worker companion from the same source and pinned bases
+        if: steps.select.outputs.kind == 'server'
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/packaging')
+          from images import build
+          delivery = json.load(open('artifacts/extension/delivery.json'))
+          build('maf-worker', Path('artifacts/preview-worker'), os.environ['SOURCE_REPOSITORY'], bases=delivery['buildImages'])
+          PY
+      - name: Verify digest-pinned database previews and persisted execution
+        if: steps.select.outputs.kind == 'server'
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          from preview import image_record
+          for path, kind in [('artifacts/extension/delivery.json', 'server'), ('artifacts/preview-worker/delivery.json', 'awp-worker')]:
+              delivery = json.load(open(path))
+              reference = image_record(delivery, kind, 'localhost:5000')['reference'].split('@')[0] + ':smoke'
+              subprocess.run(['skopeo', 'copy', '--all', '--preserve-digests', '--dest-tls-verify=false',
+                              'oci-archive:' + str(Path(path).parent / delivery['archive']), 'docker://' + reference], check=True)
+          for database in ('sqlite', 'postgresql'):
+              subprocess.run(['python3', 'scripts/preview/preview_smoke.py', '--server-delivery', 'artifacts/extension/delivery.json',
+                              '--worker-delivery', 'artifacts/preview-worker/delivery.json', '--registry', 'localhost:5000',
+                              '--database', database, '--output', f'artifacts/extension/preview-{database}-smoke.json'], check=True)
+          PY
+      - name: Verify AEP enrollment and persisted identity against the SQLite authority
+        if: steps.select.outputs.kind == 'aep-extension'
+        run: |
+          python3 - <<'PYSMOKE'
+          import json, subprocess
+          delivery = json.load(open('artifacts/extension/delivery.json'))
+          subprocess.run(['python3', 'scripts/packaging/enrollment_smoke.py',
+                          '--delivery', 'artifacts/extension/delivery.json',
+                          '--image', 'localhost:5000/extension@' + delivery['digest'],
+                          '--authority-image', 'agentstration-packaging-smoke-authority:local',
+                          '--output', 'artifacts/extension/enrollment-smoke.json'], check=True)
+          PYSMOKE
+      - name: Verify real AWP registration, execution and Worker recreation
+        if: steps.select.outputs.kind == 'awp-worker'
+        run: |
+          python3 - <<'PYWORKER'
+          import json, subprocess
+          delivery = json.load(open('artifacts/extension/delivery.json'))
+          subprocess.run(['python3', 'scripts/packaging/worker_smoke.py',
+                          '--delivery', 'artifacts/extension/delivery.json',
+                          '--image', 'localhost:5000/extension@' + delivery['digest'],
+                          '--authority-image', 'agentstration-packaging-smoke-authority:local',
+                          '--output', 'artifacts/extension/worker-smoke.json'], check=True)
+          PYWORKER
+      - name: Retain small validation evidence separately from the OCI archive
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oci-evidence-${{ steps.select.outputs.extension }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/extension/delivery.json
+            artifacts/extension/*-smoke.json
+          if-no-files-found: warn
+          retention-days: 30
+      - uses: actions/upload-artifact@v7
+        with:
+          name: oci-image-${{ steps.select.outputs.extension }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/extension/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove disposable registry
+        if: always()
+        run: docker rm --force packaging-registry || true

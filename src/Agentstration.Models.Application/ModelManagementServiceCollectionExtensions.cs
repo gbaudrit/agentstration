@@ -14,6 +14,8 @@ public static class ModelManagementServiceCollectionExtensions
 
         services.AddSingleton<ModelProviderManagementService>();
         services.AddSingleton<ModelDiscoveryService>();
+        services.AddSingleton<ModelProviderDiscoveryState>();
+        services.AddSingleton<ModelProviderDiscoveryLifecycle>();
         services.AddSingleton<IParameterUsageProvider, ModelProviderParameterUsageProvider>();
         services.AddSingleton<IModelProviderConfigurationStore>(provider => provider.GetRequiredService<ModelProviderManagementService>());
         services.AddSingleton<ModelProfileManagementService>();

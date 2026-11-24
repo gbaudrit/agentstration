@@ -5,6 +5,7 @@ namespace Agentstration.Bootstrap.Contracts;
 
 public interface IBootstrapProfileApiService
 {
+    Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapManagementView> GetAsync(Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapCompositionPreview> PreviewAsync(BootstrapProfileSelection selection, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, Guid actorPrincipalId, CancellationToken cancellationToken);
@@ -15,6 +16,9 @@ public interface IBootstrapProfileApiService
         Guid actorPrincipalId,
         CancellationToken cancellationToken,
         BootstrapSourceProfileSelection? source = null);
+    Task<IReadOnlyList<BootstrapBindingTargetOption>> GetPlanBindingTargetsAsync(BootstrapBindingTargetsRequest request, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapApplicationResource?> GetApplicationAsync(string applicationId, Guid actorPrincipalId, CancellationToken cancellationToken);
+    Task<BootstrapApplicationResource?> CancelAsync(string applicationId, Guid actorPrincipalId, CancellationToken cancellationToken);
+    Task<BootstrapApplicationResource> StartAsync(ApplyBootstrapProfilesRequest request, Guid actorPrincipalId, CancellationToken cancellationToken);
     Task<BootstrapApplicationResource> ApplyAsync(BootstrapProfileSelection selection, string expectedDigest, Guid actorPrincipalId, CancellationToken cancellationToken);
 }

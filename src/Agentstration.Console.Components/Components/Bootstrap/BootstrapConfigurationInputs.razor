@@ -1,0 +1,92 @@
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.ResourceManagement.Contracts
+@using Agentstration.Parameters
+@using Agentstration.Web.Components.Values
+@using Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject IParametersClient Parameters
+@inject ISecretsClient Secrets
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+<FormSection Title="@Localizer["ConfigurationInputs"]" TestId="bootstrap-configuration-inputs"><ChildContent>
+    <p>@Localizer["ConfigurationInputsHelp"]</p>
+    @if (error) { <p class="inline-warning" role="alert">@Localizer["InputOptionsUnavailable"]</p> }
+    <div class="bootstrap-input-list">
+    @foreach (var input in Inputs.DistinctBy(item => (item.Profile, item.Configuration)))
+    {
+        <div @key="Key(input)" class="bootstrap-configuration-input">
+            <p><strong>@input.Profile/@input.Resource</strong> · <code>@input.Configuration</code>
+                <StatusBadge Text="@Localizer[input.Configured ? "InputConfigured" : "InputMissing"]" Status="@(input.Configured ? UiStatus.Success : UiStatus.Warning)" /></p>
+            @if (!input.Configured || Selections.Any(item => item.Profile == input.Profile && item.Configuration == input.Configuration))
+            {
+                <ValueBindingRequirementEditor Requirement="@Requirement(input)" AllowedSources="@Sources(input)" Options="@Options(input)"
+                    Selection="@Selection(input)" SelectionChanged="value => ChangedAsync(input, value)"
+                    CreationContext="@Creation(input)" ResourceCreated="_ => ReloadAsync()" Disabled="@Disabled" TestIdPrefix="bootstrap-input" />
+            }
+        </div>
+    }
+    </div>
+</ChildContent></FormSection>
+
+@code {
+    [Parameter] public IReadOnlyList<BootstrapConfigurationInput> Inputs { get; set; } = [];
+    [Parameter] public IReadOnlyList<BootstrapInputSelection> Selections { get; set; } = [];
+    [Parameter] public EventCallback<BootstrapInputSelection> SelectionChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly Dictionary<string, IReadOnlyList<ValueBindingOption>> options = [];
+    private string? loaded;
+    private bool error;
+    private static string Key(BootstrapConfigurationInput input) => input.Profile + ":" + input.Configuration;
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = string.Join('|', Inputs.Select(input => input.ScopeRef.Value).Distinct());
+        if (key == loaded) return;
+        loaded = key;
+        await ReloadAsync();
+    }
+    private async Task ReloadAsync()
+    {
+        error = false;
+        foreach (var scope in Inputs.Select(input => input.ScopeRef).Distinct())
+        {
+            try
+            {
+                var result = new List<ValueBindingOption>();
+                var secretValues = await Secrets.GetSecretsAsync(scope, lifetime.Token);
+                result.AddRange(secretValues.Where(item => item.ValueConfigured && item.Resource.ScopeRef is not null).Select(item =>
+                    new ValueBindingOption(ValueBindingSourceKind.Secret, new(item.Resource.ScopeRef!.Value, item.Resource.Namespace,
+                        item.Resource.Kind, item.Resource.Name), item.Resource.Definition.DisplayName)));
+                if (Inputs.Any(input => input.ScopeRef == scope && input.AllowsParameter))
+                {
+                    var values = await Parameters.GetParametersAsync(scope, lifetime.Token);
+                    result.AddRange(values.Where(item => item.ScopeRef is not null).Select(item => new ValueBindingOption(
+                        ValueBindingSourceKind.Parameter, new(item.ScopeRef!.Value, item.Namespace, item.Kind, item.Name), item.Definition.DisplayName)));
+                }
+                options[scope.Value] = result;
+            }
+            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { return; }
+            catch (AgentstrationApiException) { error = true; options[scope.Value] = []; }
+        }
+    }
+    private IReadOnlyList<ValueBindingOption> Options(BootstrapConfigurationInput input) => options.GetValueOrDefault(input.ScopeRef.Value, []);
+    private static IReadOnlyList<ValueBindingSourceKind> Sources(BootstrapConfigurationInput input) => input.Secured
+        ? [ValueBindingSourceKind.Secret] : input.AllowsParameter
+        ? [ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter] : [ValueBindingSourceKind.Literal];
+    private static ValueBindingRequirement Requirement(BootstrapConfigurationInput input) =>
+        new(input.Configuration, true, input.ValueType, input.Secured);
+    private ContextualValueCreationContext Creation(BootstrapConfigurationInput input) =>
+        new(Selection(input).Kind == ValueBindingSourceKind.Parameter ? input.ParameterCreationScope ?? input.ScopeRef : input.ScopeRef,
+            input.Resource, input.Resource, Namespace: input.Namespace, ValueType: input.ValueType switch
+        { "integer" => ParameterValueType.WholeNumber, "number" => ParameterValueType.DecimalNumber, "boolean" => ParameterValueType.Logical, _ => ParameterValueType.Text });
+    private ValueBindingSelection Selection(BootstrapConfigurationInput input)
+    {
+        var selected = Selections.SingleOrDefault(item => item.Profile == input.Profile && item.Configuration == input.Configuration);
+        return selected is null ? new(input.Secured ? ValueBindingSourceKind.Secret : ValueBindingSourceKind.Literal)
+            : new(selected.Kind switch { "secret" => ValueBindingSourceKind.Secret, "parameter" => ValueBindingSourceKind.Parameter, _ => ValueBindingSourceKind.Literal },
+                selected.Resource, selected.Literal);
+    }
+    private Task ChangedAsync(BootstrapConfigurationInput input, ValueBindingSelection value) => SelectionChanged.InvokeAsync(new(input.Profile,
+        input.Configuration, value.Kind.ToString().ToLowerInvariant(), value.Literal, value.Resource));
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

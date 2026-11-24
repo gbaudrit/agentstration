@@ -1,0 +1,59 @@
+name: agentstration
+
+# Opt-in deterministic Bootstrap example. Start with an existing base/provider
+# topology; Compose owns the external extension process and its isolated files.
+services:
+  bootstrap-openapi-key-provisioner:
+    image: alpine:3.22
+    command: >-
+      sh -ec 'target=/keys/token; if [ ! -f "$$target" ]; then temporary="$$target.tmp"; head -c 32 /dev/urandom | base64 | tr -d "\r\n" > "$$temporary"; chmod 600 "$$temporary"; mv "$$temporary" "$$target"; fi; test "$$(wc -c < "$$target")" -ge 32'
+    volumes:
+      - aep-bootstrap-openapi-key:/keys
+    restart: "no"
+
+  bootstrap-openapi-extension:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.extension
+      args:
+        PROJECT: src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj
+        ENTRYPOINT_DLL: Agentstration.Extensions.OpenApi.dll
+    environment:
+      OpenApi__AllowedDomains__0: example.invalid
+      Aep__EnrollmentMode: SharedKeyFile
+      Aep__SharedKeyFile__Path: /run/aep-key/token
+      Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080
+      Aep__SharedKeyFile__PublicEndpoint: http://bootstrap-openapi-extension:8080
+      Aep__SharedKeyFile__StateFile: /var/lib/aep/instance
+      Aep__SharedKeyFile__AllowInsecureHttp: "true"
+    volumes:
+      - aep-bootstrap-openapi-key:/run/aep-key:ro
+      - aep-bootstrap-openapi-state:/var/lib/aep
+    depends_on:
+      bootstrap-openapi-key-provisioner:
+        condition: service_completed_successfully
+
+  agentstration:
+    environment:
+      AI__Provider: Deterministic
+      Agentstration__Bootstrap__Path: /app/bootstrap/profiles
+      Agentstration__Bootstrap__InitialBootstrapEnabled: "true"
+      Agentstration__Bootstrap__ExtensionDependencyTimeout: "00:10:00"
+      Agentstration__Bootstrap__InitialProfiles__0: development
+      Agentstration__Bootstrap__InitialProfiles__1: bootstrap-openapi
+      Agentstration__Bootstrap__InitialApplications__0__Profiles__0: bootstrap-workspace-example
+      Agentstration__Bootstrap__InitialApplications__0__TargetLevel: /tenants/dev/workspaces/default
+      Agentstration__Aep__Enrollment__AutoEnrollmentLevel: /instance
+      Agentstration__Extensions__Agentstration.Extensions.OpenApi__EnrollmentMode: SharedKeyFile
+      Agentstration__Extensions__Agentstration.Extensions.OpenApi__SharedKeyFile__Path: /run/aep-keys/bootstrap-openapi/token
+      Agentstration__Aep__Transport__AllowedHttpHosts__5: bootstrap-openapi-extension
+      Agentstration__Aep__Transport__AllowedPrivateNetworkHosts__5: bootstrap-openapi-extension
+    volumes:
+      - aep-bootstrap-openapi-key:/run/aep-keys/bootstrap-openapi:ro
+    depends_on:
+      bootstrap-openapi-key-provisioner:
+        condition: service_completed_successfully
+
+volumes:
+  aep-bootstrap-openapi-key:
+  aep-bootstrap-openapi-state:

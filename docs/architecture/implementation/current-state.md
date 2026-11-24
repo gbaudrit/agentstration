@@ -48,12 +48,17 @@ src/
   Agentstration.ResourcePlanning*/ Resource Plan contracts, lifecycle, API and relational storage
   ../aep/                            autonomous AEP SDK, CLI, Inspector, samples and tests
   ../awp/src/Agentstration.Awp.Abstractions/ provider-neutral AWP v1 wire contracts
-  Agentstration.Extensions.Ollama/   autonomous AEP-to-Ollama service
-  Agentstration.Extensions.LlamaCpp/ autonomous AEP-to-llama.cpp service
-  Agentstration.Extensions.LocalAI/  autonomous AEP-to-LocalAI service
-  Agentstration.Extensions.Git/      bounded AEP Git Source Provider service
-  Agentstration.Extensions.Crawl4AI/ optional bounded AEP web-acquisition Tool Provider service
-  Agentstration.Extensions.OpenApi/ optional bounded AEP OpenAPI schema-format and acquisition service
+  extensions/                      autonomous AEP extension executables
+    Agentstration.Extensions.Foundry/ optional Microsoft Foundry model provider
+    Agentstration.Extensions.Ollama/   AEP-to-Ollama service
+    Agentstration.Extensions.LlamaCpp/ AEP-to-llama.cpp service
+    Agentstration.Extensions.LocalAI/  AEP-to-LocalAI service
+    Agentstration.Extensions.Git/      bounded Git Source Provider service
+    Agentstration.Extensions.Crawl4AI/ bounded web-acquisition Tool Provider service
+    Agentstration.Extensions.OpenApi/ bounded OpenAPI schema-format and acquisition service
+    Agentstration.Extensions.OpenDal/ native OpenDAL storage service
+    Agentstration.Extensions.PostgreSql/ PostgreSQL document storage service
+    Agentstration.Extensions.Utilities/ deterministic utility Tool Provider service
   Agentstration.ModelProviders/      provider-neutral model-provider resolution through AEP
   Agentstration.Tools.Mcp/           Tool catalog, AEP-to-MCP resolution, official MCP client
   Agentstration.Runtime.Abstractions/
@@ -144,7 +149,7 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Control storage | SQLite by default or optional PostgreSQL in seven module-owned schemas, with optimistic concurrency and versioned migrations | richer relational projections and supported export/import |
 | Resource Planning | durable Workspace-scoped Resource Plans, deterministic materialization with explicit per-Agent Model and Runtime Profile bindings, reviewable ChangeSets, validation, governed application through canonical services, planning Tools, specialist Flows, and Console review UX | an official installable Pack |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, durable Worker assignments with renewable leases and fencing, authenticated AWP registration and governed operations, independent MAF Worker processes, bounded pull-based claim/heartbeat transport, governed AWP model streaming over typed SSE events, Aspire/Compose/manual hosting, registry, reconciliation, and provider-neutral AWP v1 wire contracts | additional Runtime implementations, Kubernetes integration, and automatic checkpoint-based recovery after Worker loss |
-| Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, dynamic AEP health/model discovery, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions, cached discovery |
+| Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, durable asynchronous AEP health/model discovery with bounded retries and cached status reads, exact-model staged Bootstrap dependencies, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions |
 | Storages | Governed immutable types, independent StorageType and Storage Console administration, explicit version publication, discoverable references, scoped generic Discover/Use grant administration/evaluation, manual Connected Service export mappings, JSON Schema validation, ETag lifecycle/reconciliation, Bootstrap, protected neutral resolution | ASP/AEP/Artifact adapters (#1040), dataset/Snapshot consumers (#1041/#1042), new user-permission work (#1077), UsePolicy administration (#1078), gated administration scenario (#1065) |
 | Connected Services | Governed service and operation types (Core-, user-, Bootstrap- or extension-owned), exact type/Flow pins, Instance-/Tenant-/Workspace-owned remote-service definitions, durable Flow-backed operation discovery, schema-validated read-only operation materialization, typed Literal and late-bound Parameter/Secret inputs, scoped CRUD and reconciliation | invocation dispatch and explicit consumer export bindings, including Storage/OpenDAL adapters |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API | durable dispatch, retry/recovery, requester authorization, artifact storage |
@@ -642,3 +647,20 @@ access uses its own publication TTL and explicit expired-serving option. Bounded
 history reconciliation preserves active work, read leases and immutable provenance;
 provider-qualified retirement can remain pending. See
 [ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).
+
+Standalone startup always opens the listener after storage initialization and before
+phased Bootstrap. Readiness and execution remain fenced until initialization
+completes; `InitialBootstrapEnabled` controls only initial profile application.
+See [ADR-0243](../../decisions/0243-standalone-startup-always-runs-in-phases.md).
+
+During pending or failed startup, global Platform administrators alone can sign in
+or use retained Console/API sessions. Browser entry opens the dedicated
+`/startup/progress` view through the shared StepProgress component. A process-local
+Bootstrap observation port projects four actual coordinator stages and safe
+resource/dependency activity; authenticated admission and PlatformAdmin progress
+reads are non-cacheable and do not call providers or provision defaults. The same
+typed Console client supports embedded and independently hosted Console routing.
+A successful startup restores ordinary admission and redirects to the validated
+local destination. A terminal failure retains correction/restart guidance. This
+increment does not add a durable startup journal or change readiness's worker
+barrier. See [ADR-0244](../../decisions/0244-authenticated-startup-progress-and-admission.md).

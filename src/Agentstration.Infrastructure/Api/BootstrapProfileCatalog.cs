@@ -26,6 +26,7 @@ internal sealed record BootstrapProfileBindingDefinition
     public string? Description { get; init; }
     public bool Required { get; init; } = true;
     public ResourceReference? DefaultTarget { get; init; }
+    public BootstrapContributionSelector? ExtensionTarget { get; init; }
 }
 
 internal sealed record BootstrapProfileDefinition
@@ -53,6 +54,30 @@ public sealed class BootstrapProfileCatalog(
     private const long MaximumProfileBytes = 32L * 1024 * 1024;
 
     public int MaximumSelectedProfiles => MaximumProfilesPerApplication;
+
+    internal static async Task<BootstrapProfileFiles> ReadFilesAsync(LoadedBootstrapProfile profile, string? file,
+        CancellationToken cancellationToken)
+    {
+        // Only the manifests belonging to the already validated profile are exposed.
+        var files = Directory.EnumerateFiles(profile.DirectoryPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(IsManifest).Select(Path.GetFileName).OfType<string>()
+            .Order(StringComparer.Ordinal).ToArray();
+        string? yaml = null;
+        if (file is not null)
+        {
+            if (!files.Contains(file, StringComparer.Ordinal))
+                throw new DeclarativeBootstrapException("bootstrap_profile_file_invalid");
+            var path = Path.Combine(profile.DirectoryPath, file);
+            var info = new FileInfo(path);
+            RejectReparsePoint(info, "Bootstrap profile source");
+            if (info.Length > MaximumManifestBytes)
+                throw new DeclarativeBootstrapException("bootstrap_profile_file_invalid");
+            yaml = await File.ReadAllTextAsync(path, cancellationToken);
+            if (Encoding.UTF8.GetByteCount(yaml) > MaximumManifestBytes)
+                throw new DeclarativeBootstrapException("bootstrap_profile_file_invalid");
+        }
+        return new(profile.Summary.Name, profile.Summary.Digest, files, file, yaml);
+    }
 
     public async Task<BootstrapCatalogSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
     {
@@ -199,7 +224,12 @@ public sealed class BootstrapProfileCatalog(
 
         var hash = Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant();
         return new(
-            new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings),
+            new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings)
+            {
+                Topology = resources.Where(item => item.Resource.Kind is "Tenant" or "Workspace")
+                    .Select(item => new BootstrapTopologyResource(item.Resource.Kind, item.Resource.Metadata.Name,
+                        item.Resource.Definition.TryGetProperty("tenantRef", out var tenant) && tenant.TryGetProperty("name", out var name) ? name.GetString() : null)).ToArray()
+            },
             profilePath,
             resources);
     }
@@ -270,7 +300,7 @@ public sealed class BootstrapProfileCatalog(
         IReadOnlyList<BootstrapProfileBindingDefinition> definitions)
     {
         if (definitions.Count == 0) return [];
-        if (scope != BootstrapProfileScope.Workspace)
+        if (scope != BootstrapProfileScope.Workspace && definitions.Any(binding => binding.ExtensionTarget is null))
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' can declare bindings only with Workspace scope.");
         if (definitions.Count > MaximumBindingsPerProfile)
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares more than {MaximumBindingsPerProfile} bindings.");
@@ -284,13 +314,22 @@ public sealed class BootstrapProfileCatalog(
                 throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' declares binding '{binding.Name}' more than once.");
             if (binding.TargetKind is null)
                 throw new DeclarativeBootstrapException($"Bootstrap profile binding '{profile}/{binding.Name}' requires targetKind.");
+            if (binding.ExtensionTarget is not null && binding.DefaultTarget is not null)
+                throw new DeclarativeBootstrapException($"Bootstrap binding '{profile}/{binding.Name}' cannot declare both defaultTarget and extensionTarget.");
+            if (binding.ExtensionTarget is { } extensionTarget)
+            {
+                BootstrapExtensionReferencePreparation.Validate(extensionTarget);
+                if (BootstrapExtensionReferencePreparation.BindingKind(binding.TargetKind.Value) != extensionTarget.Kind)
+                    throw new DeclarativeBootstrapException($"Bootstrap binding '{profile}/{binding.Name}' has a contribution kind incompatible with targetKind.");
+            }
             result.Add(new(
                 binding.Name,
                 binding.TargetKind.Value,
                 string.IsNullOrWhiteSpace(binding.DisplayName) ? binding.Name : binding.DisplayName.Trim(),
                 string.IsNullOrWhiteSpace(binding.Description) ? null : binding.Description.Trim(),
                 binding.Required,
-                binding.DefaultTarget));
+                binding.DefaultTarget,
+                binding.ExtensionTarget));
         }
         return result;
     }
