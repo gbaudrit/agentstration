@@ -11,7 +11,8 @@ public static partial class WorkplaceEndpoints
     {
         var result = await service.StartAsync(WorkspaceId(workspaceName), new(planId), new(request.CommandId, request.ExpectedVersion,
             request.Revision, request.RevisionDigest, request.Targets?.Select(target => target is null ? null!
-                : new WorkPlanTaskTarget(new(target.TaskId), target.Flow, target.Input)).ToArray()!), token);
+                : new WorkPlanTaskTarget(new(target.TaskId), target.Flow, target.Input)).ToArray()!)
+            { ProjectId = request.ProjectId is { } id ? new WorkProjectId(id) : null }, token);
         return result.IsSuccess ? Results.Accepted(PlanUrl(workspaceName, planId), ToPlanResponse(result.Value!)) : WorkPlanProblem(result.ErrorCode!);
     }
 

@@ -39,6 +39,13 @@ public sealed partial class WorkPlanExecutionService
                 return Failure("work_plan_conflict");
             var task = members.Single(item => WorkTaskId.FromWorkItem(item.Value.Id) == target.TaskId).Value;
             if (view.Plan.Attempts.Any(attempt => attempt.TaskId == target.TaskId && IsOpen(attempt))) continue;
+            WorkProjectContextSnapshot? projectContext = null;
+            if (view.Plan.Execution.ProjectId is { } projectId)
+            {
+                var captured = await projectContexts.CaptureAsync(workspaceId, projectId, id, token);
+                if (!captured.IsSuccess) return Failure(captured.ErrorCode!);
+                projectContext = captured.Value!;
+            }
             var evidence = new List<WorkPlanAdmissionEvidence>();
             foreach (var gate in gates)
             {
@@ -61,17 +68,34 @@ public sealed partial class WorkPlanExecutionService
                 .Select(edge => observations.Single(item => item.TaskId == edge.DependsOnTaskId)).ToArray();
             var attempt = new WorkPlanAttempt(attemptId, target.TaskId, view.Revision.Number, view.Revision.Digest,
                 task.Version, task.TaskHierarchy!.CreationDigest, workId, $"flowrun-root-{workId.Value:N}", target.Flow,
-                target.Input, dependencies, WorkPlanAttemptStatus.Admitted, false, now, now) { AdmissionEvidence = evidence };
+                target.Input, dependencies, WorkPlanAttemptStatus.Admitted, false, now, now) { AdmissionEvidence = evidence, ProjectContext = projectContext };
             var version = task.Version;
             task.AdmitPlanAttempt(id, attemptId, new(attemptId), now);
             var admitted = await SaveObservedAsync(view, view.Plan with { Attempts = [.. view.Plan.Attempts, attempt] }, attemptId,
-                WorkPlanAction.AdvanceExecution, WorkPlanDefinition.Digest(attempt), observations, [new(task, version)], token);
+                WorkPlanAction.AdvanceExecution, WorkPlanDefinition.Digest(attempt), observations, [new(task, version)], token,
+                projectContext is null ? null : new(projectContext.ProjectId, projectContext.ProjectVersion));
             if (!admitted.IsSuccess) return admitted;
             var progressed = await ProgressAttemptAsync(admitted.Value!, attempt, token);
             if (!progressed.IsSuccess) return progressed;
             view = progressed.Value!;
         }
         return await planService.GetAsync(workspaceId, id, token);
+    }
+
+    private static IReadOnlyDictionary<string, string> AttemptMetadata(WorkPlanSnapshot plan, WorkPlanAttempt attempt)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["workPlan.id"] = plan.Id.ToString(), ["workPlan.revision"] = attempt.PlanRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["workPlan.attemptId"] = attempt.Id.ToString("D"), ["workplace.taskId"] = attempt.TaskId.ToString()
+        };
+        if (attempt.ProjectContext is { } context)
+        {
+            metadata["workProject.id"] = context.ProjectId.ToString();
+            metadata["workProject.version"] = context.ProjectVersion.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            metadata["workProject.contextDigest"] = context.Digest;
+        }
+        return metadata;
     }
 
     private async Task<Result<WorkPlanView>> ProgressAttemptAsync(WorkPlanView view, WorkPlanAttempt attempt, CancellationToken token)
@@ -88,11 +112,7 @@ public sealed partial class WorkPlanExecutionService
                 IdempotencyKey: attempt.Id.ToString("D"), CausationId: view.Plan.Id.ToString(),
                 CorrelationId: $"plan:{view.Plan.Id.Value:N}:attempt:{attempt.Id:N}", Type: "flow",
                 Instruction: task.Instruction, Title: task.Title, WorkTaskId: attempt.TaskId.ToString(), WorkItemId: attempt.WorkItemId,
-                Metadata: new Dictionary<string, string>
-                {
-                    ["workPlan.id"] = view.Plan.Id.ToString(), ["workPlan.revision"] = attempt.PlanRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    ["workPlan.attemptId"] = attempt.Id.ToString("D"), ["workplace.taskId"] = attempt.TaskId.ToString()
-                }), execution.Scope.PrincipalId, token);
+                Metadata: AttemptMetadata(view.Plan, attempt)), execution.Scope.PrincipalId, token);
         }
         if (cancelling) await flows.CancelAsync(execution.Scope, attempt.FlowRunId, token);
         var run = await flows.GetAsync(execution.Scope, attempt.FlowRunId, token);

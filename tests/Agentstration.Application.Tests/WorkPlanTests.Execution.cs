@@ -342,6 +342,8 @@ public sealed partial class WorkPlanTests
         private readonly SemaphoreSlim runLock = new(1);
         public bool FailAfterRoot { get; set; }
         public IReadOnlyList<IWorkPlanAdmissionGate> Gates { get; init; } = [];
+        public IWorkProjectBindingResolver? Bindings { get; init; }
+        public IWorkPlanRepository? PlanStore { get; init; }
         public PlanExecutionGateway Execution { get; } = new();
         private IFlowRepository FlowStore => fixture.FlowStore;
         private FlowRunScope Scope => new(fixture.Principal, fixture.Workspace, fixture.Principal);
@@ -352,7 +354,7 @@ public sealed partial class WorkPlanTests
             var work = new WorkItemService(fixture.Tasks, Execution, new Clock(Now), NullLogger<WorkItemService>.Instance, [], scopes);
             var target = new ExecutionTargetResolver(); var authorizer = new ExecutionAuthorizer();
             var root = new RootFlowSubmissionService(work, fixture.Tasks, target, this, authorizer, scopes);
-            return new(fixture.Store, fixture.Tasks, fixture.Plans(owner: owner), work, root, target, authorizer, this,
+            return new(PlanStore ?? fixture.Store, fixture.Tasks, fixture.Plans(owner: owner, store: PlanStore), ProjectContexts(fixture, Bindings, owner), work, root, target, authorizer, this,
                 new Context(fixture.Workspace, owner ?? fixture.Principal), scopes, Gates, new Clock(Now), NullLogger<WorkPlanExecutionService>.Instance);
         }
         public Task<Result<WorkPlanView>> AdvanceAsync(WorkPlanView view) => Service().AdvanceAsync(fixture.Workspace, view.Plan.Id, default);

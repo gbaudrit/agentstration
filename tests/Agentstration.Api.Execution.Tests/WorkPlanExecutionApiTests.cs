@@ -23,6 +23,7 @@ public sealed class WorkPlanExecutionApiTests
     {
         var directory = Path.Combine(Path.GetTempPath(), "work-plan-execution-" + Guid.NewGuid().ToString("N"));
         var root = Guid.NewGuid(); var first = Guid.NewGuid(); var second = Guid.NewGuid(); var planId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
         var prefix = $"/api/workspaces/default/work-plans/{planId}";
         try
         {
@@ -56,13 +57,21 @@ public sealed class WorkPlanExecutionApiTests
                 plan = (await validated.Content.ReadFromJsonAsync<WorkPlanResponse>())!;
                 using var activated = await client.PostAsJsonAsync(prefix + "/activate", Transition(plan));
                 plan = (await activated.Content.ReadFromJsonAsync<WorkPlanResponse>())!;
+                using var project = await client.PostAsJsonAsync("/api/workspaces/default/projects", new CreateWorkProjectRequest(projectId, Guid.NewGuid(), "plan-context",
+                    new("Plan context", null, [planId], [])));
+                Assert.AreEqual(HttpStatusCode.Created, project.StatusCode);
                 using var started = await client.PostAsJsonAsync(prefix + "/execution", new StartWorkPlanExecutionRequest(Guid.NewGuid(), plan.Version,
-                    plan.CurrentRevision, plan.Revision.Digest, [Target(first), Target(second)]));
+                    plan.CurrentRevision, plan.Revision.Digest, [Target(first), Target(second)]) { ProjectId = projectId });
                 Assert.AreEqual(HttpStatusCode.Accepted, started.StatusCode, await started.Content.ReadAsStringAsync());
                 plan = await WaitAsync(client, prefix, plan => plan.Attempts.Count == 1
                     && plan.Attempts[0].Status == (fail ? WorkPlanAttemptStatus.Failed : WorkPlanAttemptStatus.Completed));
                 Assert.AreEqual(WorkTaskOutcome.Pending, plan.Tasks.Single(task => task.TaskId == first).Outcome);
                 Assert.AreEqual(WorkPlanTaskReadiness.Blocked, plan.Tasks.Single(task => task.TaskId == second).Readiness);
+                Assert.AreEqual(projectId, plan.Attempts[0].ProjectContext!.ProjectId);
+                Assert.AreEqual(1, plan.Attempts[0].ProjectContext!.ProjectVersion);
+                using var edit = await client.PutAsJsonAsync($"/api/workspaces/default/projects/{projectId}", new UpdateWorkProjectRequest(Guid.NewGuid(), 1,
+                    new("Explicit Project v2", null, [planId], [])));
+                Assert.AreEqual(HttpStatusCode.OK, edit.StatusCode);
                 using var foreign = await client.PostAsync($"/api/workspaces/{Guid.NewGuid()}/work-plans/{planId}/execution/advance", null);
                 Assert.AreEqual(HttpStatusCode.Forbidden, foreign.StatusCode);
             }
@@ -73,6 +82,7 @@ public sealed class WorkPlanExecutionApiTests
                 await using var worker = await AwpTestWorker.StartAsync(restarted);
                 var plan = (await client.GetFromJsonAsync<WorkPlanResponse>(prefix))!;
                 Assert.HasCount(1, plan.Attempts);
+                Assert.AreEqual(1, plan.Attempts[0].ProjectContext!.ProjectVersion);
                 var node = plan.Tasks.Single(task => task.TaskId == first);
                 using var reviewed = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{first}/outcome",
                     new RecordWorkTaskOutcomeRequest(Guid.NewGuid(), node.Version, fail ? WorkTaskOutcome.Failed : WorkTaskOutcome.Accepted, "Reviewed deterministic evidence"));
@@ -80,6 +90,7 @@ public sealed class WorkPlanExecutionApiTests
                 if (!fail)
                 {
                     plan = await WaitAsync(client, prefix, plan => plan.Attempts.Count == 2 && plan.Attempts[1].Status == WorkPlanAttemptStatus.Completed);
+                    Assert.AreEqual(2, plan.Attempts[1].ProjectContext!.ProjectVersion);
                     using var accepted = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{second}/outcome", new RecordWorkTaskOutcomeRequest(Guid.NewGuid(),
                         plan.Tasks.Single(task => task.TaskId == second).Version, WorkTaskOutcome.Accepted, "Summary reviewed"));
                     Assert.AreEqual(HttpStatusCode.OK, accepted.StatusCode);

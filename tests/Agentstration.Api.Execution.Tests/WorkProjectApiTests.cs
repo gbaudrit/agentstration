@@ -21,6 +21,8 @@ public sealed class WorkProjectApiTests
         Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
         var project = (await created.Content.ReadFromJsonAsync<WorkProjectResponse>())!;
         Assert.HasCount(0, project.PlanIds);
+        var context = (await client.GetFromJsonAsync<WorkProjectContextResponse>($"/api/workspaces/default/projects/{id}/context"))!;
+        Assert.AreEqual(project.Version, context.ProjectVersion); Assert.HasCount(0, context.Bindings);
         var root = Guid.NewGuid(); var task = Guid.NewGuid();
         using var tree = await client.PostAsJsonAsync("/api/workspaces/default/tasks/tree", new CreateWorkTaskTreeRequest(root,
             [new(root, WorkTaskKind.Composite, "Objective", "Deliver objective"), new(task, WorkTaskKind.Atomic, "Child", "Do local work", root)]));
@@ -55,5 +57,14 @@ public sealed class WorkProjectApiTests
         Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
         using var invalidPage = await client.GetAsync("/api/workspaces/default/projects?take=101");
         Assert.AreEqual(HttpStatusCode.BadRequest, invalidPage.StatusCode);
+        using var unavailable = await client.PostAsJsonAsync("/api/workspaces/default/projects", create with
+        {
+            Id = Guid.NewGuid(), Name = "missing-binding", Definition = create.Definition! with
+            {
+                Bindings = [new("sharing", WorkProjectBindingPurpose.Sharing, new(new(
+                    Agentstration.Resources.ResourceScopeRef.Workspace(project.WorkspaceId), default, "ToolProvider", "missing-provider"), Guid.NewGuid(), 1))]
+            }
+        });
+        Assert.AreEqual(HttpStatusCode.NotFound, unavailable.StatusCode, await unavailable.Content.ReadAsStringAsync());
     }
 }

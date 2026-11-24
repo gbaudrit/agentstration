@@ -176,8 +176,21 @@ public sealed partial class WorkPlanTests
     }
 
     private static WorkProjectSnapshot ProjectSuccess(Result<WorkProjectSnapshot> result) { Assert.IsTrue(result.IsSuccess, result.ErrorCode); return result.Value!; }
-    private static WorkProjectService ProjectService(Fixture fixture, Guid? owner = null, IWorkProjectRepository? store = null) =>
-        new(store ?? fixture.Projects, fixture.Store, fixture.Tasks, new Context(fixture.Workspace, owner ?? fixture.Principal), new Clock(Now), NullLogger<WorkProjectService>.Instance);
+    private static WorkProjectService ProjectService(Fixture fixture, Guid? owner = null, IWorkProjectRepository? store = null, IWorkProjectBindingResolver? bindings = null) =>
+        new(store ?? fixture.Projects, fixture.Store, fixture.Tasks, ProjectContexts(fixture, bindings, owner), new Context(fixture.Workspace, owner ?? fixture.Principal), new Clock(Now), NullLogger<WorkProjectService>.Instance);
+    private static WorkProjectContextService ProjectContexts(Fixture fixture, IWorkProjectBindingResolver? bindings = null, Guid? owner = null) =>
+        new(fixture.Projects, bindings ?? new ProjectBindings(), new Context(fixture.Workspace, owner ?? fixture.Principal), new Clock(Now));
+    private sealed class ProjectBindings : IWorkProjectBindingResolver
+    {
+        public string? Failure { get; set; }
+        public long? RequiredGeneration { get; set; }
+        public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspace, Guid owner, WorkProjectContextBinding binding, CancellationToken token)
+        {
+            var failure = Failure ?? (RequiredGeneration is { } generation && binding.Target.Generation != generation ? "work_project_binding_stale" : null);
+            return Task.FromResult(failure is null ? Result<WorkProjectResolvedBinding>.Success(new(binding, "\"binding-" + binding.Target.Generation + "\"", "same_scope", "same_scope"))
+                : Result<WorkProjectResolvedBinding>.Failure(failure));
+        }
+    }
     private sealed class HookedProjects(IWorkProjectRepository inner, Func<WorkProjectChange, Task> beforeSave) : IWorkProjectRepository
     {
         public Task InitializeAsync(CancellationToken token) => inner.InitializeAsync(token);

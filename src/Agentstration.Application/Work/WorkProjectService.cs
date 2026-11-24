@@ -8,7 +8,7 @@ namespace Agentstration.Application.Work;
 public sealed record SaveWorkProjectCommand(Guid CommandId, long ExpectedVersion, WorkProjectDefinition Definition);
 
 public sealed class WorkProjectService(IWorkProjectRepository projects, IWorkPlanRepository plans,
-    IWorkItemRepository tasks, IWorkplaceContext context, TimeProvider clock, ILogger<WorkProjectService> logger)
+    IWorkItemRepository tasks, WorkProjectContextService bindings, IWorkplaceContext context, TimeProvider clock, ILogger<WorkProjectService> logger)
 {
     public Task InitializeAsync(CancellationToken cancellationToken) => projects.InitializeAsync(cancellationToken);
 
@@ -33,11 +33,16 @@ public sealed class WorkProjectService(IWorkProjectRepository projects, IWorkPla
         if (!create && current is null) return Failure("work_project_not_found");
         name = create ? name! : current!.Name;
         resourceNamespace = create ? resourceNamespace : current!.Namespace;
-        var intent = WorkPlanDefinition.Digest(new { Action = create ? "create" : "update", Name = name, Namespace = resourceNamespace, Definition = definition });
+        // Preserve receipt digests for pre-binding Projects whose original definition had these four fields only.
+        object intentDefinition = definition.Bindings.Count == 0
+            ? new { definition.DisplayName, definition.Description, definition.PlanIds, definition.TaskIds } : definition;
+        var intent = WorkPlanDefinition.Digest(new { Action = create ? "create" : "update", Name = name, Namespace = resourceNamespace, Definition = intentDefinition });
         var replay = current?.Commands.SingleOrDefault(receipt => receipt.CommandId == command.CommandId);
         if (replay is not null) return replay.IntentDigest == intent ? Result<WorkProjectSnapshot>.Success(current!) : Failure("work_project_command_conflict");
         if (create ? current is not null : current!.Version != command.ExpectedVersion) return Failure("work_project_conflict");
         if (current?.Version >= WorkProjectDefinition.MaximumCommands) return Failure("work_project_history_limit");
+        var resolved = await bindings.ValidateAsync(workspaceId, definition, token);
+        if (!resolved.IsSuccess) return Failure(resolved.ErrorCode!);
         var work = await ObserveWorkAsync(workspaceId, definition, token);
         if (!work.IsSuccess) return Failure(work.ErrorCode!);
         var now = clock.GetUtcNow();
@@ -84,6 +89,8 @@ public sealed class WorkProjectService(IWorkProjectRepository projects, IWorkPla
         if (!Owns(workspaceId)) return Result<WorkProjectDefinition>.Failure("work_project_not_found");
         var valid = definition.Validate();
         if (!valid.IsSuccess) return valid;
+        var resolved = await bindings.ValidateAsync(workspaceId, valid.Value!, token);
+        if (!resolved.IsSuccess) return Result<WorkProjectDefinition>.Failure(resolved.ErrorCode!);
         var work = await ObserveWorkAsync(workspaceId, valid.Value!, token);
         return work.IsSuccess ? valid : Result<WorkProjectDefinition>.Failure(work.ErrorCode!);
     }

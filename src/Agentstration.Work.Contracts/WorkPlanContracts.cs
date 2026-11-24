@@ -22,13 +22,22 @@ public sealed record WorkPlanResponse(Guid Id, Guid WorkspaceId, WorkPlanStatus 
 
 public sealed record WorkPlanExecutionTargetRequest(Guid TaskId, Agentstration.Flows.FlowReference Flow, System.Text.Json.JsonElement Input);
 public sealed record StartWorkPlanExecutionRequest(Guid CommandId, long ExpectedVersion, long Revision, string RevisionDigest,
-    IReadOnlyList<WorkPlanExecutionTargetRequest> Targets);
+    IReadOnlyList<WorkPlanExecutionTargetRequest> Targets)
+{
+    public Guid? ProjectId { get; init; }
+}
 public sealed record ControlWorkPlanExecutionRequest(Guid CommandId, long ExpectedVersion, Guid? TaskId = null);
-public sealed record WorkPlanExecutionResponse(long Revision, string RevisionDigest, bool Enabled);
+public sealed record WorkPlanExecutionResponse(long Revision, string RevisionDigest, bool Enabled)
+{
+    public Guid? ProjectId { get; init; }
+}
 public sealed record WorkPlanAttemptResponse(Guid Id, Guid TaskId, long PlanRevision, string PlanDigest, long TaskVersion, string TaskDigest,
     Guid WorkItemId, string FlowRunId, Agentstration.Flows.FlowReference Flow, IReadOnlyList<WorkPlanTaskObservationResponse> Dependencies,
     WorkPlanAttemptStatus Status, bool CancellationRequested, DateTimeOffset AdmittedAt, DateTimeOffset UpdatedAt, string? Diagnostic,
-    IReadOnlyList<WorkPlanAdmissionEvidence> AdmissionEvidence);
+    IReadOnlyList<WorkPlanAdmissionEvidence> AdmissionEvidence)
+{
+    public WorkProjectContextSnapshotResponse? ProjectContext { get; init; }
+}
 public sealed record WorkPlanTaskObservationResponse(Guid TaskId, long Version);
 public sealed record WorkPlanCommandResponse(Guid PlanId, Guid CommandId, long PlanVersion, WorkPlanAction Action, string IntentDigest, long Revision,
     string RevisionDigest, DateTimeOffset AppliedAt, IReadOnlyList<WorkPlanTaskObservationResponse> ObservedTasks);

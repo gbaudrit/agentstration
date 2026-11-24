@@ -66,7 +66,8 @@ public static partial class WorkplaceEndpoints
         : new(request.Intent, request.TaskIds?.Select(id => new WorkTaskId(id)).ToArray() ?? [],
             request.Dependencies?.Select(edge => edge is null ? null! : new WorkTaskDependency(new(edge.TaskId), new(edge.DependsOnTaskId))).ToArray() ?? []);
 
-    private static IResult WorkPlanProblem(string code) => Results.Problem(title: code, statusCode: code switch
+    private static IResult WorkPlanProblem(string code) => code.StartsWith("work_project_", StringComparison.Ordinal) ? WorkProjectProblem(code)
+        : Results.Problem(title: code, statusCode: code switch
     {
         "work_plan_not_found" or "work_plan_revision_not_found" or "work_plan_command_not_found" or "work_plan_task_not_found" => StatusCodes.Status404NotFound,
         "work_plan_conflict" or "work_plan_command_conflict" or "work_plan_active" or "work_plan_tasks_active"
@@ -86,10 +87,13 @@ public static partial class WorkplaceEndpoints
         ToPlanRevisionResponse(view.Revision), view.Tasks.Select(task => new WorkPlanTaskStateResponse(task.TaskId.Value, task.Version, task.Outcome,
             task.Readiness, task.Reasons, task.UnmetDependencies.Select(id => id.Value).ToArray())).ToArray())
         {
-            Execution = view.Plan.Execution is { } execution ? new(execution.Revision, execution.RevisionDigest, execution.Enabled) : null,
+            Execution = view.Plan.Execution is { } execution ? new(execution.Revision, execution.RevisionDigest, execution.Enabled) { ProjectId = execution.ProjectId?.Value } : null,
             Attempts = view.Plan.Attempts.Select(attempt => new WorkPlanAttemptResponse(attempt.Id, attempt.TaskId.Value, attempt.PlanRevision,
                 attempt.PlanDigest, attempt.TaskVersion, attempt.TaskDigest, attempt.WorkItemId.Value, attempt.FlowRunId, attempt.Flow,
                 attempt.Dependencies.Select(item => new WorkPlanTaskObservationResponse(item.TaskId.Value, item.Version)).ToArray(),
-                attempt.Status, attempt.CancellationRequested, attempt.AdmittedAt, attempt.UpdatedAt, attempt.Diagnostic, attempt.AdmissionEvidence)).ToArray()
+                attempt.Status, attempt.CancellationRequested, attempt.AdmittedAt, attempt.UpdatedAt, attempt.Diagnostic, attempt.AdmissionEvidence)
+            {
+                ProjectContext = attempt.ProjectContext is { } context ? new(context.ProjectId.Value, context.ProjectVersion, context.Digest, context.Bindings, context.CapturedAt) : null
+            }).ToArray()
         };
 }

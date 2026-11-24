@@ -3,11 +3,13 @@ using Agentstration.Work;
 
 namespace Agentstration.Work.Storage.Abstractions;
 
-public enum WorkPlanSaveStatus { Saved, Replayed, Conflict, TasksActive, TaskChanged }
+public enum WorkPlanSaveStatus { Saved, Replayed, Conflict, TasksActive, TaskChanged, ProjectChanged }
+public sealed record WorkPlanProjectObservation(WorkProjectId ProjectId, long Version);
 public sealed record WorkPlanChange(WorkPlanSnapshot Plan, long ExpectedVersion, WorkPlanRevision? NewRevision,
     WorkPlanCommandReceipt Receipt, bool RequireInactiveTasks)
 {
     public IReadOnlyList<WorkTaskTreeUpdate> TaskUpdates { get; init; } = [];
+    public WorkPlanProjectObservation? Project { get; init; }
 }
 
 public interface IWorkPlanRepository

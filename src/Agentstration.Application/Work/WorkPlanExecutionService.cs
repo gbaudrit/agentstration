@@ -7,7 +7,10 @@ using Microsoft.Extensions.Logging;
 namespace Agentstration.Application.Work;
 
 public sealed record StartWorkPlanExecution(Guid CommandId, long ExpectedVersion, long Revision, string RevisionDigest,
-    IReadOnlyList<WorkPlanTaskTarget> Targets);
+    IReadOnlyList<WorkPlanTaskTarget> Targets)
+{
+    public WorkProjectId? ProjectId { get; init; }
+}
 public sealed record ControlWorkPlanExecution(Guid CommandId, long ExpectedVersion, WorkTaskId? TaskId = null);
 
 public interface IWorkPlanFlowObserver
@@ -23,7 +26,7 @@ public interface IWorkPlanAdmissionGate
 }
 
 public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, IWorkItemRepository tasks,
-    WorkPlanService planService, WorkItemService workItems, RootFlowSubmissionService submissions, IRootFlowTargetResolver targets,
+    WorkPlanService planService, WorkProjectContextService projectContexts, WorkItemService workItems, RootFlowSubmissionService submissions, IRootFlowTargetResolver targets,
     IRootFlowSubmissionAuthorizer authorizer, IWorkPlanFlowObserver flows, IWorkplaceContext context,
     IEnumerable<IWorkExecutionScopeAccessor> scopes, IEnumerable<IWorkPlanAdmissionGate> gates,
     TimeProvider clock, ILogger<WorkPlanExecutionService> logger)
@@ -43,8 +46,9 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
             || command.Targets.Select(target => target.TaskId).Distinct().Count() != command.Targets.Count
             || command.Targets.Sum(target => target.Input.GetRawText().Length) > 256 * 1024)
             return Result<WorkPlanView>.Failure("work_plan_execution_invalid");
-        var intent = WorkPlanDefinition.Digest(new { command.Revision, command.RevisionDigest,
-            Targets = command.Targets.OrderBy(target => target.TaskId.Value).ToArray() });
+        var sorted = command.Targets.OrderBy(target => target.TaskId.Value).ToArray();
+        var intent = command.ProjectId is null ? WorkPlanDefinition.Digest(new { command.Revision, command.RevisionDigest, Targets = sorted })
+            : WorkPlanDefinition.Digest(new { command.Revision, command.RevisionDigest, Targets = sorted, command.ProjectId });
         var replay = await ReplayAsync(view.Plan, command.CommandId, intent, token);
         if (replay is not null) return replay;
         if (view.Plan.Version != command.ExpectedVersion) return Failure("work_plan_conflict");
@@ -57,13 +61,18 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
             return Failure("work_plan_execution_targets_invalid");
         var scope = Scope(workspaceId);
         await authorizer.AuthorizeAsync(scope, token);
+        if (command.ProjectId is { } projectId)
+        {
+            var project = await projectContexts.CaptureAsync(workspaceId, projectId, id, token);
+            if (!project.IsSuccess) return Failure(project.ErrorCode!);
+        }
         var resolved = new List<WorkPlanTaskTarget>();
         foreach (var target in command.Targets.OrderBy(target => target.TaskId.Value))
         {
             var exact = await targets.ResolveAsync(scope, target.Flow, target.Input, token);
             resolved.Add(target with { Flow = exact.Reference, Input = target.Input.Clone() });
         }
-        var plan = view.Plan with { Execution = new(scope, command.Revision, command.RevisionDigest, true, resolved) };
+        var plan = view.Plan with { Execution = new(scope, command.Revision, command.RevisionDigest, true, resolved) { ProjectId = command.ProjectId } };
         return await SaveAsync(view, plan, command.CommandId, WorkPlanAction.StartExecution, intent, members, [], token);
     }
 
@@ -134,7 +143,8 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
         SaveObservedAsync(before, plan, commandId, action, intent, Observe(members), updates, token);
 
     private async Task<Result<WorkPlanView>> SaveObservedAsync(WorkPlanView before, WorkPlanSnapshot plan, Guid commandId, WorkPlanAction action,
-        string intent, IReadOnlyList<WorkPlanTaskObservation> observations, IReadOnlyList<WorkTaskTreeUpdate> updates, CancellationToken token)
+        string intent, IReadOnlyList<WorkPlanTaskObservation> observations, IReadOnlyList<WorkTaskTreeUpdate> updates, CancellationToken token,
+        WorkPlanProjectObservation? project = null)
     {
         // Always reserve progress/cancellation for already admitted work, including at the authoring history limit.
         if (before.Plan.Version >= WorkPlanDefinition.MaximumCommands && action is not (WorkPlanAction.AdvanceExecution or WorkPlanAction.CancelExecution)
@@ -143,12 +153,13 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
         var now = clock.GetUtcNow();
         plan = plan with { Version = before.Plan.Version + 1, UpdatedAt = now };
         var receipt = new WorkPlanCommandReceipt(commandId, plan.Version, action, intent, before.Revision.Number, before.Revision.Digest, now, observations);
-        var saved = await plans.TrySaveAsync(new(plan, before.Plan.Version, null, receipt, false) { TaskUpdates = updates }, token);
+        var saved = await plans.TrySaveAsync(new(plan, before.Plan.Version, null, receipt, false) { TaskUpdates = updates, Project = project }, token);
+        if (saved == WorkPlanSaveStatus.ProjectChanged) return Failure("work_project_context_changed");
         if (saved is not (WorkPlanSaveStatus.Saved or WorkPlanSaveStatus.Replayed))
             return await ReplayAsync(plan, commandId, intent, token) ?? Failure("work_plan_conflict");
         if (logger.IsEnabled(LogLevel.Information))
-            logger.LogInformation("Applied WorkPlan execution action {Action} to {PlanId} in Workspace {WorkspaceId}; command {CommandId}",
-                action, plan.Id.Value, plan.WorkspaceId.Value, commandId);
+            logger.LogInformation("Applied WorkPlan execution action {Action} to {PlanId} in Workspace {WorkspaceId}; Project {ProjectId}, context version {ProjectVersion}; command {CommandId}",
+                action, plan.Id.Value, plan.WorkspaceId.Value, plan.Execution?.ProjectId?.Value, project?.Version, commandId);
         return await planService.GetAsync(plan.WorkspaceId, plan.Id, token);
     }
 

@@ -62,4 +62,48 @@ definition:
 
 Optional `definition.id` supplies a portable Project UUID; `planIds` and `taskIds` associate existing work. Otherwise Bootstrap derives a stable local ID. Reapplication skips an existing private name, preserving edits. An explicit ID different from that existing Project conflicts. Instance/Tenant profiles and foreign targets are rejected. Planning and application both use the Project service, and ordinary Bootstrap planning references can resolve the namespaced Project.
 
-This is #950. Context binding resolution, connector configuration and snapshots at execution admission belong to #951. Project sharing and Workspace seed ingestion remain #1345/#1347. See [ADR-0260](../decisions/0260-projects-group-private-work-without-changing-workspace-ownership.md).
+Grouping and Bootstrap creation are #950; context references and admission snapshots are #951. Project sharing and Workspace seed ingestion remain #1345/#1347. See [ADR-0260](../decisions/0260-projects-group-private-work-without-changing-workspace-ownership.md) and [ADR-0261](../decisions/0261-project-context-is-authorized-and-captured-at-task-admission.md).
+
+## Bind exact context references
+
+Create/update definitions can include `bindings`. Every reference is explicit and pins an existing resource; this example assumes the selected ToolProvider has already been installed and authorized:
+
+```json
+{
+  "displayName": "Operations",
+  "planIds": ["30000000-0000-0000-0000-000000000001"],
+  "taskIds": [],
+  "bindings": [
+    {
+      "name": "sharing",
+      "purpose": 1,
+      "target": {
+        "address": {
+          "scopeRef": "/instance",
+          "namespace": "default",
+          "kind": "ToolProvider",
+          "name": "git-operations"
+        },
+        "uid": "80000000-0000-0000-0000-000000000001",
+        "generation": 1
+      }
+    }
+  ]
+}
+```
+
+Purpose values are `Context = 0`, `Sharing = 1`, `Repository = 2`. Up to 32 unique names are supported. Sharing has at most one binding and selects a ToolProvider; Repository has at most one and selects a ToolProvider or ConnectedService. Context may also select an immutable SourceVersion. Supply the exact UID/generation and `version` when the resource identity has one. No credentials, arbitrary provider options or Secret targets are accepted. Ordinary Bootstrap Project manifests accept the same bindings, with camel-case purpose names such as `sharing` in YAML.
+
+Create/update validates the selected ownership tree, current resource identity, Discover permission and Use permission. Missing or undiscoverable references return `work_project_binding_unavailable` (`404`); denied Use is `403`, and an accessible stale identity is `409`. Invalid reference shape/purpose is `400`. Removing or explicitly replacing a broken binding remains possible through the usual version-checked edit; no template or automatic retargeting updates it.
+
+`GET .../projects/{projectId}/context` returns the current Project version and per-binding `available`/`code` diagnostics. A resolved reference has code `resolved`. Availability describes current identity/access metadata, not remote connectivity, health or supported operations. Actual consumers retain their normal capability, health and authorization checks. Resource bodies and protected values are never included.
+
+## Capture context for execution
+
+Include `projectId` in the [WorkPlan execution configuration](work-plans.md#execute-an-active-plan). The Project must belong to the caller and explicitly reference the plan. The scheduler uses the same admission path for Project and standalone work.
+
+Every admitted attempt exposes `projectContext`: Project ID, version, digest, captured exact bindings, ETags, Discover/Use decision reasons and capture time. A concurrent Project edit rejects the task claim with `work_project_context_changed` (`409`); after rereading, admission can observe the newer version. A missing association returns `work_project_plan_not_associated` (`409`). Current inaccessible/stale bindings block new admission with the same bounded diagnostics as authoring.
+
+Changing Project v1 to v2 does not alter an existing attempt. Later admissions and explicit retries capture v2. Submission recovery and server restart keep the admitted v1 evidence. Revoking access changes current diagnostics and blocks new admission; earlier evidence remains available. A resource consumer must reauthorize its captured reference and fail explicitly if it is no longer usable, without selecting a replacement. References are not automatically interpolated into Flow input or prompts.
+
+Old Projects with no bindings and standalone plans with no Project remain valid and replay their existing commands. These optional JSON fields require no new SQLite or PostgreSQL migration.

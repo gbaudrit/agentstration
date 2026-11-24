@@ -9,7 +9,10 @@ using Agentstration.Work;
 namespace Agentstration.Infrastructure.Bootstrap;
 
 public sealed record DeclarativeProjectDefinition(Guid? Id = null, string? DisplayName = null, string? Description = null,
-    IReadOnlyList<Guid>? PlanIds = null, IReadOnlyList<Guid>? TaskIds = null);
+    IReadOnlyList<Guid>? PlanIds = null, IReadOnlyList<Guid>? TaskIds = null)
+{
+    public IReadOnlyList<WorkProjectContextBinding>? Bindings { get; init; }
+}
 
 public sealed class ProjectBootstrapResourceHandler(WorkProjectService projects, IWorkplaceContext context) : IBootstrapResourceHandler
 {
@@ -61,6 +64,7 @@ public sealed class ProjectBootstrapResourceHandler(WorkProjectService projects,
 
     private static WorkProjectDefinition Definition(DeclarativeResourceEnvelope<DeclarativeProjectDefinition> value) => new(
         value.Definition.DisplayName ?? value.Metadata.Name, value.Definition.Description,
-        value.Definition.PlanIds?.Select(id => new WorkPlanId(id)).ToArray() ?? [], value.Definition.TaskIds?.Select(id => new WorkTaskId(id)).ToArray() ?? []);
+        value.Definition.PlanIds?.Select(id => new WorkPlanId(id)).ToArray() ?? [], value.Definition.TaskIds?.Select(id => new WorkTaskId(id)).ToArray() ?? [])
+        { Bindings = value.Definition.Bindings?.ToArray() ?? [] };
     private static WorkValidationException Invalid(string code) => new(code, "The Workspace Project could not be planned or applied.");
 }

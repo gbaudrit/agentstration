@@ -101,6 +101,19 @@ public sealed class PostgreSqlWorkPlanRepository(IDbContextFactory<WorkDbContext
                         ? WorkPlanSaveStatus.TasksActive : WorkPlanSaveStatus.TaskChanged;
                 }
             }
+            // All Work mutations acquire task rows, then plan rows, then Project rows.
+            if (change.Project is { } projectObservation)
+            {
+                var planMatched = await context.WorkPlans.Where(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner
+                    && value.Id == key && value.Version == change.ExpectedVersion)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.Version, value => value.Version), cancellationToken);
+                if (planMatched != 1) return WorkPlanSaveStatus.Conflict;
+                var projectKey = projectObservation.ProjectId.ToString();
+                var projectMatched = await context.WorkProjects.Where(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner
+                    && value.Id == projectKey && value.Version == projectObservation.Version)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(value => value.Version, value => value.Version), cancellationToken);
+                if (projectMatched != 1) return WorkPlanSaveStatus.ProjectChanged;
+            }
             foreach (var update in change.TaskUpdates)
             {
                 var taskKey = update.Value.Id.ToString();

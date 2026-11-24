@@ -66,6 +66,7 @@ public static partial class WorkplaceEndpoints
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(256 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapGet("/projects", ListWorkProjectsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapGet("/projects/{projectId:guid}", GetWorkProjectAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/projects/{projectId:guid}/context", GetWorkProjectContextAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/projects", CreateWorkProjectAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(64 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapPut("/projects/{projectId:guid}", UpdateWorkProjectAsync)
