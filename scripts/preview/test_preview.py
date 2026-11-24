@@ -156,6 +156,7 @@ class PreviewContracts(unittest.TestCase):
         self.assertTrue(all(port["host_ip"] == "127.0.0.1" for port in server["ports"]))
         self.assertNotIn("ports", worker)
         self.assertNotIn("volumes", worker)
+        self.assertEqual("service_started", worker["depends_on"]["server"]["condition"])
         self.assertEqual(["awp_key"], [value["source"] for value in worker["secrets"]])
         self.assertTrue(all("ConnectionStrings" not in key for key in worker["environment"]))
 
@@ -284,6 +285,7 @@ class PreviewContracts(unittest.TestCase):
         server, worker = model["services"]["server"], model["services"]["worker"]
         self.assertEqual("PostgreSql", server["environment"]["Agentstration__Storage__Provider"])
         self.assertEqual("service_healthy", server["depends_on"]["postgres"]["condition"])
+        self.assertEqual("service_started", worker["depends_on"]["server"]["condition"])
         self.assertNotIn("ConnectionStrings__Agentstration", server["environment"])
         self.assertNotIn("volumes", worker)
         self.assertEqual(["awp_key"], [item["source"] for item in worker["secrets"]])

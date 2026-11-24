@@ -39,6 +39,12 @@ port; port `0` allocates a temporary port for isolated smoke tests. The Worker h
 no host-published port. Only loopback HTTP is supported in this increment;
 external routing, TLS and protected URLs belong to #1283–#1285.
 
+The Worker starts after the authority process starts and retries through early
+initialization. It does not wait for full server readiness: Bootstrap discovery
+can itself require a Worker before finalization (ADR-0253). `up --wait` still
+waits for every selected service to become healthy before returning. PostgreSQL,
+when selected, must be healthy before the server process starts.
+
 `deployment.json` records environment ID, database selection, stable instance/Worker/
 credential IDs, the server source SHA and each image's own source/version/digest.
 The Compose project is `preview-<environment-id>`; use a distinct ID and state
