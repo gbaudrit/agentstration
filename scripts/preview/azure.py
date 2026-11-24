@@ -28,7 +28,15 @@ TRANSPORT = preview.ROOT / 'deploy/preview/azure/transport.json'
 def command(arguments, *, timeout=180):
     completed = subprocess.run(arguments, text=True, capture_output=True, timeout=timeout)
     if completed.returncode:
-        raise RuntimeError('Azure preview command failed (' + arguments[0] + ' ' + arguments[1] + '); provider output is withheld to protect credentials.')
+        context = []
+        for argument in arguments[:4]:
+            if argument.startswith('-'):
+                break
+            context.append(argument)
+        code = re.search(r'ERROR:\s*\(([A-Za-z][A-Za-z0-9_.]{0,79})\)', completed.stderr)
+        reason = ' [' + code[1] + ']' if code else ''
+        raise RuntimeError('Azure preview command failed (' + ' '.join(context) + ')' + reason
+                           + '; provider output is withheld to protect credentials.')
     return completed.stdout.strip()
 
 
@@ -138,7 +146,8 @@ class Azure:
         return json.loads(raw) if raw else None
 
     def storage(self, *args, **kwargs):
-        return self.az('storage', *args, '--account-name', self.account, '--container-name', self.container, '--auth-mode', 'login', **kwargs)
+        container_option = '--name' if args[0] == 'container' else '--container-name'
+        return self.az('storage', *args, '--account-name', self.account, container_option, self.container, '--auth-mode', 'login', **kwargs)
 
     def read(self):
         if not self.storage('blob', 'exists', '--name', self.blob)['exists']:
