@@ -1,7 +1,7 @@
 {
   "Name": "Agentstration Preview VM Operator",
   "IsCustom": true,
-  "Description": "Operate tagged preview VMs in one dedicated resource group, without role assignment, identity or storage-key privileges.",
+  "Description": "Operate tagged preview VMs in one dedicated resource group, without role assignment, user-assigned identity assignment or storage-key privileges.",
   "Actions": [
     "*/read",
     "Microsoft.Resources/deployments/*",

@@ -100,6 +100,8 @@ def execute(action, request, state_root, bootstrap=None, now=None):
     if action == "validate":
         return result(request, "validated")
     if request["provider"] == "azure-vm":
+        preview.require(state_root is None and bootstrap is None,
+                        "Azure uses its private blob/disk state; Docker host state and Bootstrap files are not transferred.")
         import azure
         return azure.execute(action, request)
     preview.require(state_root is not None, "Docker operations require a protected persistent state root.")

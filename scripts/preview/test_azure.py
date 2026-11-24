@@ -104,6 +104,11 @@ class AzureTests(unittest.TestCase):
         self.assertEqual('validated', result['state'])
         self.assertEqual({}, result['providerResourceIds'])
 
+    def test_azure_never_silently_ignores_docker_host_state_or_bootstrap_flags(self):
+        for state_root, bootstrap in ((Path('/tmp/private-host-state'), None), (None, {'InitialBootstrapEnabled': True})):
+            with self.subTest(state_root=state_root), self.assertRaises(ValueError):
+                lifecycle.execute('deploy', self.value, state_root, bootstrap)
+
     def test_absent_status_and_destroy_have_no_mutating_effects(self):
         self.assertEqual('absent', self.execute('status')['state'])
         self.assertEqual('destroyed', self.execute('destroy')['state'])
@@ -212,6 +217,21 @@ class AzureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.execute('destroy')
         self.assertEqual(count, len(self.cloud.effects))
+
+    def test_observed_vm_must_have_no_managed_identity_and_match_selected_infrastructure(self):
+        instance = {'location': 'westeurope', 'hardwareProfile': {'vmSize': 'Standard_B2ms'},
+                    'storageProfile': {'imageReference': {'version': self.value['target']['imageVersion']}}}
+        azure.verify_vm(self.value, instance)
+        for path, value in ((('identity',), {'type': 'SystemAssigned'}), (('identity',), {'type': 'UserAssigned'}),
+                            (('hardwareProfile', 'vmSize'), 'Standard_B4ms'), (('location',), 'eastus'),
+                            (('storageProfile', 'imageReference', 'version'), 'latest')):
+            changed = copy.deepcopy(instance)
+            selected = changed
+            for key in path[:-1]:
+                selected = selected[key]
+            selected[path[-1]] = value
+            with self.subTest(path=path, value=value), self.assertRaises(ValueError):
+                azure.verify_vm(self.value, changed)
 
     def test_guest_request_uses_same_digests_without_cloud_credentials(self):
         with patch.object(lifecycle, 'docker', return_value='actual-daemon'):

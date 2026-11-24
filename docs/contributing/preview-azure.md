@@ -79,7 +79,10 @@ Storage providers and check regional B-family vCPU quota before provisioning.
    to the exact resource group ID and create that custom role. Assign it to
    the federated principal **at the resource group only**. Its actions allow
    the required VM/disk/network operations and deployments, not role assignment,
-   VM identity assignment or storage-key access.
+   user-assigned identity assignment or storage-key access. VM write permission
+   inherently allows system-assigned identity configuration: the template sets
+   identity to None and the adapter rejects an observed managed identity before
+   transferring workloads.
 5. Assign **Storage Blob Data Contributor** to that principal **at the staging
    storage account only**. Account scope is necessary for user-delegation key
    generation; the dedicated account limits its data-plane reach. Allow time

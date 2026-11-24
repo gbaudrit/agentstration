@@ -48,6 +48,15 @@ def resource_ids(request):
         ('virtualNetwork', 'Microsoft.Network/virtualNetworks', '-vnet'), ('networkSecurityGroup', 'Microsoft.Network/networkSecurityGroups', '-nsg'))}
 
 
+def verify_vm(request, instance):
+    target = request['target']
+    preview.require((instance.get('identity') or {}).get('type') in (None, 'None'),
+                    'Preview VMs must not expose an Azure managed identity to workloads.')
+    preview.require(instance['location'] == target['region'] and instance['hardwareProfile']['vmSize'] == target['vmSize']
+                    and instance['storageProfile']['imageReference']['version'] == target['imageVersion'],
+                    'Observed Azure VM location, size or OS version differs from the request.')
+
+
 def tags(request, metadata):
     pr = re.match(r'pr-([0-9]+)(?:-|$)', request['environmentId'])
     return {OWNER: metadata['ownerId'], ENVIRONMENT: request['environmentId'],
@@ -184,6 +193,8 @@ class Azure:
         preview.private_write(path, json.dumps({'parameters': {k: {'value': v} for k, v in parameters.items()}}))
         self.az('deployment', 'group', 'create', '--name', prefix(self.request), '--resource-group', target['resourceGroup'],
                 '--template-file', str(preview.ROOT / 'deploy/preview/azure/main.bicep'), '--parameters', '@' + str(path), timeout=1800)
+        instance = self.az('vm', 'show', '--ids', resource_ids(self.request)['virtualMachine'])
+        verify_vm(self.request, instance)
         self.az('vm', 'start', '--ids', resource_ids(self.request)['virtualMachine'], timeout=600)
 
     def power(self):

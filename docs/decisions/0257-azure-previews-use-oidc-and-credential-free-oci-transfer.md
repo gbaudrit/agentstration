@@ -22,8 +22,9 @@ host state. SQLite remains the default; PostgreSQL reuses the existing overlay.
 Use GitHub OIDC for a protected main workflow and a group-scoped custom VM
 operator role. Grant Blob Data Contributor only on a dedicated staging account;
 disable shared-key authentication and anonymous blob access. The operator cannot
-create role assignments, VM identities or unrelated resource kinds. Do not attach
-an Azure identity to the VM. Deny all inbound ports; a public IP provides explicit
+create role assignments, assign user-assigned identities or operate unrelated
+resource kinds. The template sets VM identity to None; the adapter checks the
+observed identity, VM size, location and OS version before transferring workloads. Deny all inbound ports; a public IP provides explicit
 outbound connectivity without adding a NAT gateway or Bastion.
 
 CI exports the selected GHCR indexes with `skopeo --all --preserve-digests`.
