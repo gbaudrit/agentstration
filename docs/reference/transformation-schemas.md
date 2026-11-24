@@ -227,7 +227,11 @@ Malformed XML, DTDs/external entities and operator quota violations still fail.
 
 The generic mapping and output contract remain separate validation stages.
 Opaque GUIDs stay strings; missing GUIDs/titles are permitted when an item has
-a description. `guidIsPermaLink` is emitted only for an explicit attribute;
+a description. The JSON item projection uses the flat object contract supported
+by the ASP document profile: its individual fields are optional, and the input
+XSD enforces the title-or-description requirement. It does not use `anyOf`/`oneOf`
+combinators that would prevent admitting the item contract as a document collection.
+`guidIsPermaLink` is emitted only for an explicit attribute;
 RSS defines the omitted attribute as true. Item links, source titles and
 `dc:creator` are optional output fields. Explicit boolean/date conversions can
 still fail on unconvertible values after structural validation, with no partial
