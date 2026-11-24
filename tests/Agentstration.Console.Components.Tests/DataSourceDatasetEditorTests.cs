@@ -32,6 +32,10 @@ public sealed partial class DataSourceDatasetEditorTests
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         await SelectAsync(rendered, handler);
 
+        var binding = rendered.Find("[data-testid='dataset-parameter-query-value-requirement']");
+        Assert.IsTrue(binding.ClassList.Contains("binding-requirement-compact"));
+        Assert.IsFalse(binding.ClassList.Contains("panel"));
+        Assert.IsEmpty(binding.QuerySelectorAll(".panel-header"));
         var input = rendered.Find("[data-testid='dataset-parameter-query-binding-literal'] input");
         Assert.AreEqual("2048", input.GetAttribute("maxlength"));
         Assert.HasCount(0, rendered.FindAll("[data-testid='dataset-parameter-query-binding-literal'] textarea"));

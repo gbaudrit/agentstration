@@ -14,7 +14,7 @@
             {
                 var name = property.Name; var schema = property.Value;
                 <div class="operation-parameter" data-schema-path="@($"$.{name}")" @key="name">
-                    <ValueBindingRequirementEditor Requirement="@Requirement(name, schema)" AllowedSources="@Sources(schema)"
+                    <ValueBindingRequirementEditor Compact="true" Requirement="@Requirement(name, schema)" AllowedSources="@Sources(schema)"
                         Selection="@Selection(name)" SelectionChanged="value => ChangeAsync(name, value)" Options="@Options(schema)"
                         CreationContext="@CreationContext(schema)" ResourceCreated="address => ReloadOptionsAsync(address)" Disabled="Disabled"
                         ValidationField="ValidationField" TestIdPrefix="@($"dataset-parameter-{name}")" />

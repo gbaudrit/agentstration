@@ -4,3 +4,30 @@
 .binding-requirement > .form-grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
 .binding-source { max-width: 28rem; }
 .binding-value-editor { min-width: 0; }
+
+.binding-requirement-compact { display: grid; grid-template-columns: minmax(8rem, .45fr) minmax(0, 2fr); gap: .5rem 1.5rem; align-items: start; }
+.binding-identity { min-width: 0; padding-top: 1.5rem; overflow-wrap: anywhere; }
+.binding-identity > div { display: flex; align-items: center; gap: .35rem; }
+.binding-type { display: block; margin-top: .25rem; color: var(--muted); font-size: var(--font-size-sm); }
+.binding-requirement-compact ::deep .form-grid { grid-template-columns: minmax(12rem, .8fr) minmax(0, 2fr); gap: 1rem; margin: 0; }
+.binding-requirement-compact ::deep .form-field { min-width: 0; }
+.binding-requirement-compact ::deep .schema-input-editor { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .5rem; }
+.binding-requirement-compact ::deep .schema-input-editor > .form-field,
+.binding-requirement-compact ::deep .schema-input-toolbar,
+.binding-requirement-compact ::deep .schema-input-editor > .field-validation-error { grid-column: 1 / -1; }
+.binding-requirement-compact ::deep .schema-value-toolbar { padding-top: 1.5rem; }
+.binding-requirement-compact ::deep .schema-presence-action { justify-self: start; width: auto; min-height: 0; padding: .15rem 0; border: 0; background: transparent; color: var(--primary); font-size: var(--font-size-sm); }
+.binding-requirement-compact .contextual-binding-target { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.binding-requirement-compact .contextual-binding-target > button { margin-top: 1.5rem; }
+.binding-requirement-compact > p { grid-column: 2; margin: 0; }
+
+@media (max-width: 900px) {
+    .binding-requirement-compact { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+    .binding-identity { padding-top: 0; }
+    .binding-requirement-compact > p { grid-column: 1; }
+}
+@media (max-width: 600px) {
+    .binding-requirement-compact ::deep .form-grid { grid-template-columns: minmax(0, 1fr); }
+    .binding-requirement-compact .contextual-binding-target { grid-template-columns: minmax(0, 1fr); }
+    .binding-requirement-compact .contextual-binding-target > button { margin-top: 0; }
+}

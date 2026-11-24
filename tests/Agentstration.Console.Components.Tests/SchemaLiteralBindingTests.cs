@@ -53,6 +53,7 @@ public sealed partial class ModelProviderNavigationTests
             new("message", true, "string", Description: "Notification body", LiteralSchema: schema)));
 
         var input = rendered.Find("textarea.schema-long-text");
+        Assert.IsTrue(rendered.Find("[data-requirement-id='message']").ClassList.Contains("panel"));
         Assert.AreEqual("3", input.GetAttribute("rows"));
         StringAssert.Contains(rendered.Find($"label[for='{input.GetAttribute("id")}']").TextContent, label);
         Assert.AreEqual(1, rendered.Markup.Split("Notification body", StringSplitOptions.None).Length - 1);
