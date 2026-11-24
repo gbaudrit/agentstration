@@ -25,6 +25,26 @@ API = '2024-07-01'
 TRANSPORT = preview.ROOT / 'deploy/preview/azure/transport.json'
 
 
+def recorded_request(environment_id, subscription, resource_group, repository, client_factory=None):
+    """Read only public selection metadata; the executor rechecks ownership under its lease."""
+    preview.require(isinstance(environment_id, str) and preview.ENVIRONMENT_ID.fullmatch(environment_id), 'Invalid preview environment ID.')
+    # A scope-only lookup must not resolve current image tags or apply new VM defaults.
+    uuid.UUID(subscription)
+    preview.require(isinstance(resource_group, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,79}', resource_group), 'Invalid dedicated Azure resource group.')
+    lookup = {'environmentId': environment_id, 'target': {'subscriptionId': subscription, 'resourceGroup': resource_group}}
+    with tempfile.TemporaryDirectory(prefix='agentstration-azure-lookup-') as temporary:
+        client = (client_factory or Azure)(lookup, temporary)
+        record = client.read()
+        preview.require(record is not None, 'No recorded preview found. Check its environment ID and configured storage scope; no resources were changed.')
+        request = contract.loads(json.dumps(record['request']))
+        preview.require(request['provider'] == 'azure-vm' and request['environmentId'] == environment_id
+                        and request['target']['subscriptionId'] == subscription and request['target']['resourceGroup'] == resource_group
+                        and all(receipt['repository'].lower() == repository.lower() for receipt in request['deliveries'].values()),
+                        'Recorded preview does not belong to this repository and configured Azure scope.')
+        validate_record(request, record, 'status')
+        return request
+
+
 def error_codes(stderr):
     """Retain bounded Azure codes, never nested messages, targets or parameter values."""
     codes = []
@@ -304,6 +324,11 @@ class Azure:
             if any(r['id'].lower() == identifier.lower() for r in resources):
                 api = API if kind == 'virtualMachine' else '2024-03-02' if kind == 'dataDisk' else '2024-05-01'
                 self.az('resource', 'delete', '--ids', identifier, '--api-version', api, timeout=900)
+        # ARM may briefly list the last deleted disk. Do not report completion until inventory converges.
+        deadline = time.monotonic() + 120
+        while self.resources(record):
+            preview.require(time.monotonic() < deadline, 'Reset deletions submitted but Azure inventory has not converged; run status, then retry explicit reset if needed.')
+            time.sleep(5)
 
 
 def bundle_images(request, directory):

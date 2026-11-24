@@ -16,9 +16,62 @@ on:
         description: Azure region for the optional public price snapshot
         type: string
         default: westeurope
+      published_revision:
+        description: Optional read-only GHCR selection check (server revision; empty disables)
+        type: string
+        default: ''
+      worker_revision:
+        description: Worker revision for the optional registry check
+        type: string
+        default: published
 permissions:
   contents: read
 jobs:
+  published-selection:
+    if: github.event_name == 'workflow_dispatch' && inputs.published_revision != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install OCI metadata reader without cloud credentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Verify published revision selection without deploying
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVER_REVISION: ${{ inputs.published_revision }}
+          WORKER_REVISION: ${{ inputs.worker_revision }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import contract, manual, preview
+          selector = manual.PublishedImages(os.environ['GITHUB_REPOSITORY'])
+          server = selector.select('server', os.environ['SERVER_REVISION'])
+          worker = selector.select('maf-worker', os.environ['WORKER_REVISION'])
+          target = preview.read_json('deploy/preview/targets/azure-vm.example.json')
+          request = contract.plan(server, worker, 'selection-validation-only', provider='azure-vm', target=target)
+          preview.private_write(Path(os.environ['RUNNER_TEMP']) / 'published-selection.json', json.dumps(request) + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-published-selection
+          path: ${{ runner.temp }}/published-selection.json
+          retention-days: 30
+          if-no-files-found: error
+
   retail-prices:
     if: github.event_name == 'workflow_dispatch' && inputs.retail_prices
     runs-on: ubuntu-24.04

@@ -44,6 +44,25 @@ def images(request):
     return selected
 
 
+def validate_azure_target(target):
+    expected_target = {"subscriptionId", "resourceGroup", "region", "vmSize", "imageVersion"}
+    if "osProfile" in target:
+        expected_target.add("osProfile")
+    fields(target, expected_target)
+    preview.require(target.get("osProfile", AZURE_OS_PROFILE) == AZURE_OS_PROFILE,
+                    "Only the qualified ubuntu-24.04 OS profile is supported.")
+    try:
+        uuid.UUID(target["subscriptionId"])
+    except (ValueError, TypeError, AttributeError) as error:
+        raise ValueError("Invalid Azure subscription identity.") from error
+    preview.require(isinstance(target["region"], str) and re.fullmatch(r"[a-z][a-z0-9]{1,31}", target["region"])
+                    and target["vmSize"] in ("Standard_B2ms", "Standard_B4ms"), "Invalid Azure region or VM size.")
+    preview.require(isinstance(target["resourceGroup"], str)
+                    and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", target["resourceGroup"]), "Invalid dedicated Azure resource group.")
+    preview.require(isinstance(target["imageVersion"], str) and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", target["imageVersion"]),
+                    "Azure requires an exact Ubuntu image version, never latest.")
+
+
 def _validate(request):
     preview.require(isinstance(request, dict), "Expected a deployment request object.")
     expected = {"schemaVersion", "environmentId", "provider", "sourceSha", "database", "registry", "deliveries",
@@ -83,22 +102,7 @@ def _validate(request):
         preview.require(isinstance(target["daemonId"], str) and re.fullmatch(r"[a-zA-Z0-9:_-]{1,128}", target["daemonId"]),
                         "An exact trusted Docker daemon identity is required.")
     elif request["provider"] == "azure-vm":
-        expected_target = {"subscriptionId", "resourceGroup", "region", "vmSize", "imageVersion"}
-        if "osProfile" in target:
-            expected_target.add("osProfile")
-        fields(target, expected_target)
-        preview.require(target.get("osProfile", AZURE_OS_PROFILE) == AZURE_OS_PROFILE,
-                        "Only the qualified ubuntu-24.04 OS profile is supported.")
-        try:
-            uuid.UUID(target["subscriptionId"])
-        except (ValueError, TypeError, AttributeError) as error:
-            raise ValueError("Invalid Azure subscription identity.") from error
-        preview.require(isinstance(target["region"], str) and re.fullmatch(r"[a-z][a-z0-9]{1,31}", target["region"])
-                        and target["vmSize"] in ("Standard_B2ms", "Standard_B4ms"), "Invalid Azure region or VM size.")
-        preview.require(isinstance(target["resourceGroup"], str)
-                        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", target["resourceGroup"]), "Invalid dedicated Azure resource group.")
-        preview.require(isinstance(target["imageVersion"], str) and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", target["imageVersion"]),
-                        "Azure requires an exact Ubuntu image version, never latest.")
+        validate_azure_target(target)
     else:
         fields(target, ("host", "sshPort", "user", "hostKeyFingerprint", "port"))
         preview.require(isinstance(target["host"], str) and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}", target["host"])
