@@ -106,7 +106,9 @@ public sealed class GenAiHttpPayloadCaptureHandlerTests
     }
 
     [TestMethod]
-    public async Task GeneralHttpDiagnosticsOwnsCaptureWhenBothFeaturesAreEnabled()
+    [DataRow("Agentstration.Http.Diagnostics.Active")]
+    [DataRow("Agentstration.Http.Diagnostics.SensitivePayload")]
+    public async Task GeneralDiagnosticsOrProtectedPayloadSuppressesLegacyCapture(string option)
     {
         var logger = new RecordingLogger();
         using var handler = new GenAiHttpPayloadCaptureHandler(new GenAiObservabilityOptions
@@ -124,7 +126,7 @@ public sealed class GenAiHttpPayloadCaptureHandlerTests
         {
             Content = JsonContent.Create(new { content = "request" })
         };
-        request.Options.Set(new HttpRequestOptionsKey<bool>("Agentstration.Http.Diagnostics.Active"), true);
+        request.Options.Set(new HttpRequestOptionsKey<bool>(option), true);
 
         using var response = await client.SendAsync(request);
 

@@ -280,6 +280,30 @@ public sealed class HttpDiagnosticsTests
     }
 
     [TestMethod]
+    public async Task ProtectedOperationPayloadDisablesBothBodyCapturesWithoutChangingTransport()
+    {
+        using var traces = new Traces();
+        var logs = new Logs();
+        var builder = Builder(logs);
+        builder.Services.AddHttpClient("protected-probe").ConfigurePrimaryHttpMessageHandler(() => new Stub(async (request, ct) =>
+        {
+            Assert.AreEqual(RequestJson, await request.Content!.ReadAsStringAsync(ct));
+            return new(HttpStatusCode.OK) { Content = Json(ResponseJson) };
+        }));
+        await using var app = builder.Build();
+        using var client = app.Services.GetRequiredService<IHttpClientFactory>().CreateClient("protected-probe");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://localhost/operation?value=private-query") { Content = Json(RequestJson) };
+        request.Options.Set(new HttpRequestOptionsKey<bool>(HttpDiagnosticsExtensions.SensitivePayloadKey), true);
+        using var response = await client.SendAsync(request);
+        Assert.AreEqual(ResponseJson, await response.Content.ReadAsStringAsync());
+        var captured = logs.Text + traces.Text;
+        Assert.DoesNotContain("diagnostic-request", captured);
+        Assert.DoesNotContain("diagnostic-response", captured);
+        Assert.DoesNotContain("private-query", captured);
+        Assert.Contains("[sensitive route]", captured);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task MasterSwitchControlsBothBodies(bool enabled)

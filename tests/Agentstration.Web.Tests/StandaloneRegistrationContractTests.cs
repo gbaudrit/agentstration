@@ -117,7 +117,8 @@ public sealed class StandaloneRegistrationContractTests
     {
         var contributions = new Dictionary<Type, int>
         {
-            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
+            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 4,
+            [typeof(Agentstration.Secrets.ISecretUsageProvider)] = 2,
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = 2,

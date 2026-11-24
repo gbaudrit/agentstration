@@ -15,7 +15,7 @@
 .form-grid input:not([type="checkbox"]):not([type="radio"]):disabled,.form-grid select:disabled,.form-grid textarea:disabled,.form-grid input:not([type="checkbox"]):not([type="radio"])[readonly],.form-grid textarea[readonly]{border-color:var(--border);background:color-mix(in srgb,var(--surface-2) 72%,var(--bg));color:var(--muted);box-shadow:none;opacity:1;cursor:not-allowed}
 .form-grid textarea{resize:vertical}
 .form-grid .checkbox-field{display:flex;align-items:center;align-self:end;gap:10px;min-height:42px;margin:0 0 1px;cursor:pointer}
-.form-grid .checkbox-field input[type="checkbox"]{flex:0 0 auto;width:17px;height:17px;min-height:17px;margin:0;padding:0;border-radius:4px;accent-color:var(--primary)}
+.form-grid .checkbox-field input[type="checkbox"]:not([role="switch"]){flex:0 0 auto;width:17px;height:17px;min-height:17px;margin:0;padding:0;border-radius:4px;accent-color:var(--primary)}
 .form-grid .checkbox-field span{line-height:1.25}
 .form-grid .form-code-editor{width:100%;min-height:170px;max-height:none;line-height:1.5}
 .form-grid small,.resource-hint{margin:0;color:var(--muted);font-size:.72rem;font-weight:400}

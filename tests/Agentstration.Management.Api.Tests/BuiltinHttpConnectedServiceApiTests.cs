@@ -15,6 +15,9 @@ using Agentstration.Infrastructure.Storage;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Parameters;
+using Agentstration.Secrets;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Storage.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -60,10 +63,11 @@ public sealed partial class ConnectedServiceApiTests
     }
 
     [TestMethod]
-    [DataRow("instance")]
-    [DataRow("workspace")]
-    [DataRow("instance-shared")]
-    public async Task BuiltinHttpDiscoveryAndAcquisitionUseOnlyIndependentDatasetParameters(string ownerKind)
+    [DataRow("instance", false)]
+    [DataRow("workspace", false)]
+    [DataRow("instance-shared", false)]
+    [DataRow("instance", true)]
+    public async Task BuiltinHttpDiscoveryAndAcquisitionUseOnlyIndependentDatasetParameters(string ownerKind, bool boundInputs)
     {
         var requests = new ConcurrentQueue<Uri>();
         await using var factory = Factory().WithWebHostBuilder(builder =>
@@ -214,6 +218,30 @@ public sealed partial class ConnectedServiceApiTests
             new() { DisplayName = "Invalid", Dataset = new(storagePin, new(Write: true), new(pin, JsonSerializer.SerializeToElement(new { q = 42 }))) }, ScopeRef: consumer));
         Assert.AreEqual(HttpStatusCode.UnprocessableEntity, invalid.StatusCode);
         var results = new List<DataSourceAcquisitionResource>();
+        IReadOnlyList<DataSourceParameterBinding> parameterBindings = [], secretBindings = [];
+        if (boundInputs)
+        {
+            using var request = scopes.PushInstance(context);
+            var parameter = await factory.Services.GetRequiredService<ParameterManagementService>().CreateAsync(new()
+            {
+                ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter,
+                Metadata = new() { Name = "acquisition-query" }, ScopeRef = consumer,
+                Definition = new() { DisplayName = "Query", ValueType = ParameterValueType.Text,
+                    Value = JsonSerializer.SerializeToElement("Rennes when:1d & été+news") }
+            }, timeout.Token);
+            parameterBindings = [new("q", Parameter: new(parameter.Value.Address, consumer))];
+            var secrets = factory.Services.GetRequiredService<SecretManagementService>();
+            await secrets.CreateVaultAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault,
+                Metadata = new() { Name = "acquisition-vault" }, ScopeRef = consumer,
+                Definition = new() { DisplayName = "Acquisition vault", ProviderType = "local" } }, timeout.Token);
+            await secrets.InitializeVaultExactAsync(consumer, "acquisition-vault", timeout.Token);
+            var secret = await secrets.CreateSecretAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
+                Metadata = new() { Name = "acquisition-secret" }, ScopeRef = consumer,
+                Definition = new() { DisplayName = "Query", Vault = new("acquisition-vault", consumer), Key = "query" } }, timeout.Token);
+            using var value = new SecretValue(Encoding.UTF8.GetBytes("Brest"));
+            await secrets.SetValueExactAsync(consumer, secret.Value.Name, value, timeout.Token);
+            secretBindings = [new("q", Secret: new(secret.Value.Address, consumer))];
+        }
         foreach (var (name, parameters) in new[]
         {
             ("rennes", JsonSerializer.SerializeToElement(new { q = "Rennes when:1d & été+news", hl = "fr", gl = "FR", ceid = "FR:fr" })),
@@ -221,8 +249,11 @@ public sealed partial class ConnectedServiceApiTests
             ("empty", JsonSerializer.SerializeToElement(new { }))
         })
         {
+            var bindings = !boundInputs ? [] : name == "rennes" ? parameterBindings : name == "brest" ? secretBindings : [];
+            var literals = bindings.Count == 0 ? parameters : JsonSerializer.SerializeToElement(parameters.EnumerateObject()
+                .Where(property => property.Name != "q").ToDictionary(property => property.Name, property => property.Value));
             using var saved = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest("http-" + name,
-                new() { DisplayName = name, Dataset = new(storagePin, new(Write: true), new(pin, parameters)) }, ScopeRef: consumer), timeout.Token);
+                new() { DisplayName = name, Dataset = new(storagePin, new(Write: true), new(pin, literals) { ParameterBindings = bindings }) }, ScopeRef: consumer), timeout.Token);
             Assert.AreEqual(HttpStatusCode.Created, saved.StatusCode, await saved.Content.ReadAsStringAsync(timeout.Token));
             Assert.DoesNotContain("Nantes", await saved.Content.ReadAsStringAsync(timeout.Token), StringComparison.Ordinal);
             using var start = await client.PostAsJsonAsync($"/api/datasources/http-{name}/acquisitions?scopeRef={Uri.EscapeDataString(consumer.Value)}",
@@ -235,7 +266,13 @@ public sealed partial class ConnectedServiceApiTests
                 acquisition = (await client.GetFromJsonAsync<DataSourceAcquisitionResource>($"/api/datasourceacquisitions/{acquisition.Name}", timeout.Token))!;
             } while (acquisition.CompletedAt is null);
             Assert.AreEqual(DataSourceAcquisitionState.Succeeded, acquisition.State, $"{acquisition.ErrorCode}: {acquisition.ErrorMessage}");
-            Assert.IsTrue(JsonElement.DeepEquals(parameters, acquisition.Parameters));
+            if (boundInputs && name == "brest")
+            {
+                Assert.IsTrue(SecretInputs.IsReference(acquisition.Parameters.GetProperty("q"), acquisition.Dataset!.SecretInputs));
+                Assert.DoesNotContain("Brest", JsonSerializer.Serialize(acquisition));
+                Assert.DoesNotContain("Brest", await saved.Content.ReadAsStringAsync(timeout.Token));
+            }
+            else Assert.IsTrue(JsonElement.DeepEquals(parameters, acquisition.Parameters));
             using var content = await client.GetAsync($"/api/datasourceacquisitions/{acquisition.Name}/content", timeout.Token);
             Assert.AreEqual(HttpStatusCode.OK, content.StatusCode, await content.Content.ReadAsStringAsync(timeout.Token));
             var storedContent = (await content.Content.ReadFromJsonAsync<StorageObjectContent>(timeout.Token))!;
@@ -248,6 +285,18 @@ public sealed partial class ConnectedServiceApiTests
         }
         Assert.HasCount(3, requests);
         var urls = requests.ToArray();
+        if (boundInputs)
+        {
+            using var request = scopes.PushInstance(context);
+            Assert.IsTrue((await factory.Services.GetRequiredService<ParameterManagementService>()
+                .GetUsagesAsync(consumer, "acquisition-query", timeout.Token)).Any(usage => usage.Name == "http-rennes"));
+            Assert.IsTrue((await factory.Services.GetRequiredService<SecretManagementService>()
+                .GetSecretUsagesAsync(consumer, "acquisition-secret", timeout.Token)).Any(usage => usage.Name == "http-brest"));
+            var usages = await client.GetFromJsonAsync<Agentstration.Secrets.Contracts.SecretUsagesResponse>(
+                "/api/secrets/acquisition-secret/usages?scopeRef=/instance", timeout.Token);
+            Assert.Contains("/data-sources/http-brest?", usages!.Value.Single(usage => usage.Name == "http-brest").Url);
+            Assert.Contains("context=%2Finstance", usages.Value.Single(usage => usage.Name == "http-brest").Url);
+        }
         Assert.AreEqual("?ceid=FR%3Afr&gl=FR&hl=fr&q=Rennes%20when%3A1d%20%26%20%C3%A9t%C3%A9%2Bnews", urls[0].Query);
         Assert.AreEqual("?q=Brest", urls[1].Query);
         Assert.AreEqual("", urls[2].Query);

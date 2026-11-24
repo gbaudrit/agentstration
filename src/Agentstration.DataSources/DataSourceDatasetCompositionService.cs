@@ -15,7 +15,8 @@ public sealed class DataSourceDatasetCompositionService(
     IStorageResolver storage,
     IDataSourceAcquisitionCompositionResolver flows, IFlowCompositionResolver? sequences = null,
     DataSourceDocumentStorage? documentStorage = null, ISchemaBindingResolver? schemaBindings = null,
-    IStoragePublicationGateway? publications = null, DataSourceContentOptions? options = null)
+    IStoragePublicationGateway? publications = null, DataSourceContentOptions? options = null,
+    DataSourceAcquisitionValues? values = null)
 {
     public const string FlowContract = "connected-service-operation-acquisition/v1";
     public int MaximumValueBytes { get; } = (options ?? new()).MaximumValueBytes;
@@ -41,7 +42,12 @@ public sealed class DataSourceDatasetCompositionService(
         var finalSnapshot = definition.OutputSchemaSnapshot;
         var output = finalSnapshot is null ? rawOutput : JsonSchemaSelection.Select(finalSnapshot.Content);
         ValidateSchema(output);
-        ValidateValue(input, definition.Acquisition.Parameters, MaximumValueBytes);
+        var prepared = values is null
+            ? (Parameters: definition.Acquisition.Parameters.Clone(), Secrets: (IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference>)[])
+            : await values.PrepareAsync(source, input, cancellationToken, accepted?.InvocationParameters);
+        if (values is null && definition.Acquisition.ParameterBindings.Count > 0)
+            throw Invalid("data_source_parameter_binding_invalid", "Operation input bindings are unavailable.");
+        ValidateValue(input, prepared.Parameters, MaximumValueBytes, prepared.Secrets);
         var partition = Partition(source);
         if (definition.Storage is { } inputStorage)
         {
@@ -65,7 +71,9 @@ public sealed class DataSourceDatasetCompositionService(
         var flow = await flows.ResolveOperationAsync(operation.ScopeRef!.Value, adapter.Flow, cancellationToken);
         if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
             return new(definition, operation, type, input, output, partition, flow)
-            { OperationOutputSchema = rawOutput, OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot };
+            { OperationOutputSchema = rawOutput, OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot,
+                InvocationParameters = accepted?.InvocationParameters is { ValueKind: not JsonValueKind.Undefined } pinnedParameters ? pinnedParameters : prepared.Parameters,
+                SecretInputs = prepared.Secrets };
         if (sequences is null || definition.Compositions.ContainsKey("acquisition"))
             throw Invalid("data_source_composition_invalid", "The acquisition point is owned by the Data Source.");
         var bindings = definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
@@ -90,6 +98,8 @@ public sealed class DataSourceDatasetCompositionService(
             { ScopeRef = composed.Orchestration.ScopeRef };
             return new(definition, operation, type, input, finalSnapshot is not null ? output : composed.OutputSchema ?? output, partition, targetFlow)
             {
+                InvocationParameters = accepted?.InvocationParameters is { ValueKind: not JsonValueKind.Undefined } pinnedParameters ? pinnedParameters : prepared.Parameters,
+                SecretInputs = prepared.Secrets,
                 OperationFlow = flow,
                 Composition = composed,
                 OperationOutputSchema = rawOutput,
@@ -108,6 +118,11 @@ public sealed class DataSourceDatasetCompositionService(
     public async Task<DataSourceResource> AdoptSchemasAsync(DataSourceResource resource, CancellationToken token, DataSourceResource? previous = null)
     {
         if (resource.Definition.Dataset is not { } dataset) return resource;
+        if (dataset.Acquisition.ParameterBindings.Count > 0)
+        {
+            if (values is null) throw Invalid("data_source_parameter_binding_invalid", "Operation input bindings are unavailable.");
+            dataset = dataset with { Acquisition = dataset.Acquisition with { ParameterBindings = await values.PinAsync(resource, token) } };
+        }
         var prior = previous?.Definition.Dataset;
         var raw = await ResolveBindingAsync(dataset.Acquisition.OutputSchemaBinding, "$.dataset.acquisition.outputSchema", resource,
             prior?.Acquisition.OutputSchemaBinding, prior?.Acquisition.OutputSchemaSnapshot, token);
@@ -206,12 +221,13 @@ public sealed class DataSourceDatasetCompositionService(
         { DocumentCollectionUid = dataset.Definition.DocumentCollectionUid };
     }
 
-    public static void ValidateValue(JsonElement schema, JsonElement value, int maximumBytes = DataSourceContentOptions.DefaultMaximumValueBytes)
+    public static void ValidateValue(JsonElement schema, JsonElement value, int maximumBytes = DataSourceContentOptions.DefaultMaximumValueBytes,
+        IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference>? secretInputs = null)
     {
         ValidateSchema(schema);
         if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumBytes)
             throw Invalid("data_source_parameters_invalid", "Operation values must be bounded JSON.");
-        try { ToolInputSchemaValidator.Validate(schema, value); }
+        try { ToolInputSchemaValidator.Validate(schema, value, secretInputs); }
         catch (ToolInputValidationException)
         { throw Invalid("data_source_parameters_invalid", "The value does not satisfy the effective operation schema."); }
     }

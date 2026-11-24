@@ -8,6 +8,7 @@ namespace Agentstration.Http.Diagnostics;
 public static class HttpDiagnosticsExtensions
 {
     public const string ActivitySourceName = "Agentstration.Http.Diagnostics";
+    public const string SensitivePayloadKey = "Agentstration.Http.Diagnostics.SensitivePayload";
     // Shared by name with the legacy GenAI handler to keep host diagnostics provider-neutral.
     internal const string CaptureOwnerKey = "Agentstration.Http.Diagnostics.Active";
 

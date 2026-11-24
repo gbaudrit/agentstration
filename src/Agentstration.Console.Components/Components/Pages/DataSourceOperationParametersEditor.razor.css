@@ -1,0 +1,7 @@
+.operation-parameters-editor, .operation-parameter-fields, .operation-parameter { display: grid; min-width: 0; gap: var(--space-4); }
+.operation-parameter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.operation-parameter ::deep .binding-requirement { margin: 0; box-shadow: none; background: var(--surface-2); }
+.operation-parameter ::deep .panel-header strong { font-size: var(--font-size-sm); }
+.operation-parameters-advanced { min-width: 0; padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--font-size-sm); }
+.operation-parameters-advanced summary { color: var(--primary); cursor: pointer; margin-bottom: var(--space-3); }
+@media (max-width: 900px) { .operation-parameter-fields { grid-template-columns: minmax(0, 1fr); } }

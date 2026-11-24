@@ -5,6 +5,9 @@ using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Parameters;
+using Agentstration.Secrets;
+using Agentstration.Secrets.Contracts;
 using Agentstration.Storage.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
@@ -19,6 +22,51 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed partial class DataSourceDatasetEditorTests
 {
+    [TestMethod]
+    public async Task InvalidNamespaceKeepsTheValueEditorMountedAndDisablesContextualCreation()
+    {
+        using var handler = new DatasetHandler(withParameters: true);
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+        await rendered.Find("[data-testid='dataset-parameter-query-binding-kind']").ChangeAsync("Parameter");
+        await rendered.Find("[data-testid='dataset-namespace']").ChangeAsync("invalid namespace");
+        Assert.IsTrue(rendered.Find("[data-testid='dataset-parameter-query-binding-create']").HasAttribute("disabled"));
+        Assert.IsNotNull(rendered.FindComponent<DataSourceOperationParametersEditor>());
+        await rendered.Find("[data-testid='dataset-namespace']").ChangeAsync("valid");
+        Assert.IsFalse(rendered.Find("[data-testid='dataset-parameter-query-binding-create']").HasAttribute("disabled"));
+        Assert.IsNull(handler.Created);
+    }
+
+    [TestMethod]
+    [DataRow("Parameter")]
+    [DataRow("Secret")]
+    public async Task SharedValueEditorSavesAnExactReferenceWithoutCopyingItsValue(string kind)
+    {
+        using var handler = new DatasetHandler(withParameters: true);
+        using var http = new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") };
+        using var context = await SetupAsync(http);
+        DataSourceScreenTestSupport.Configure(context);
+        var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
+        await SelectAsync(rendered, handler);
+        await rendered.Find("[data-testid='dataset-parameter-query-binding-kind']").ChangeAsync(kind);
+        rendered.WaitForAssertion(() => Assert.IsFalse(ConfigurationComplete(rendered)));
+        var resource = rendered.WaitForElement("[data-testid='dataset-parameter-query-binding-target'] option:not([value=''])");
+        await rendered.Find("[data-testid='dataset-parameter-query-binding-target']").ChangeAsync(resource.GetAttribute("value"));
+        rendered.WaitForAssertion(() => Assert.IsTrue(ConfigurationComplete(rendered)));
+        await CompleteCreationAsync(rendered);
+        rendered.WaitForAssertion(() => Assert.IsNotNull(handler.Created));
+        var saved = handler.Created!.Properties.Dataset!.Acquisition;
+        Assert.IsFalse(saved.Parameters.TryGetProperty("query", out _));
+        var binding = saved.ParameterBindings.Single();
+        Assert.AreEqual("query", binding.Name);
+        Assert.AreEqual(ResourceScopeRef.Instance, binding.Parameter?.ScopeRef ?? binding.Secret?.ScopeRef);
+        Assert.AreEqual("query-value", binding.Parameter?.Address.Name ?? binding.Secret?.Address.Name);
+        Assert.DoesNotContain("synthetic-parameter-value", JsonSerializer.Serialize(saved));
+    }
+
     [TestMethod]
     public async Task AuthorizedOperationContractCanBeSavedWithoutTypeCatalogueAccess()
     {
@@ -128,8 +176,10 @@ public sealed partial class DataSourceDatasetEditorTests
         var rendered = context.Render<DataSourceDatasetEditor>(p => p.Add(c => c.ScopeRef, "/instance"));
         rendered.WaitForElement("[data-testid='dataset-service']");
         Assert.IsTrue(rendered.Find("[data-testid='dataset-operation']").HasAttribute("disabled"));
+        Assert.IsEmpty(rendered.FindAll("[data-testid='dataset-parameters']"));
         Assert.IsEmpty(rendered.FindAll("[data-testid='dataset-parameters'] textarea"));
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.Service.Uid.ToString());
+        Assert.IsEmpty(rendered.FindAll("[data-testid='dataset-parameters']"));
         var operationKey = $"{handler.Operation.Uid}:{handler.Operation.Generation}:{handler.Operation.Definition.DefinitionDigest}";
         var otherKey = $"{handler.OtherOperation.Uid}:{handler.OtherOperation.Generation}:{handler.OtherOperation.Definition.DefinitionDigest}";
         rendered.WaitForAssertion(() =>
@@ -138,8 +188,11 @@ public sealed partial class DataSourceDatasetEditorTests
             Assert.IsEmpty(rendered.FindAll($"[data-testid='dataset-operation'] option[value='{otherKey}']"));
         });
         await rendered.Find("[data-testid='dataset-operation']").ChangeAsync(operationKey);
+        Assert.HasCount(1, rendered.FindComponents<Agentstration.Web.Components.Values.ValueBindingRequirementEditor>());
+        Assert.HasCount(3, rendered.FindAll("[data-testid='dataset-parameter-query-binding-kind'] option"));
         await rendered.Find("[data-testid='dataset-parameters'] [data-schema-path='$.query'] input").InputAsync("first-service-query");
         await rendered.Find("[data-testid='dataset-service']").ChangeAsync(handler.OtherService.Uid.ToString());
+        Assert.IsEmpty(rendered.FindAll("[data-testid='dataset-parameters']"));
         Assert.AreEqual("", rendered.Find("[data-testid='dataset-operation']").GetAttribute("value"));
         Assert.IsFalse(ConfigurationComplete(rendered));
         Assert.IsEmpty(rendered.FindAll($"[data-testid='dataset-operation'] option[value='{operationKey}']"));
@@ -466,6 +519,8 @@ public sealed partial class DataSourceDatasetEditorTests
         var state = new ConsoleContextState(new ContextProvider());
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
+        context.Services.AddSingleton<IParametersClient>(new ParametersApiClient(http));
+        context.Services.AddSingleton<ISecretsClient>(new SecretsApiClient(http));
         context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         context.Services.AddSingleton<IDataSourcesClient>(new DataSourcesApiClient(http));
         context.Services.AddSingleton<IStoragesClient>(new StoragesApiClient(http));
@@ -640,6 +695,12 @@ public sealed partial class DataSourceDatasetEditorTests
         {
             var path = request.RequestUri!.AbsolutePath;
             if (path == "/api/schemas") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { value = Array.Empty<object>() }) };
+            if (path == "/api/parameters") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { new ParameterResource
+                { ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter, Metadata = new() { Name = "query-value" }, ScopeRef = ResourceScopeRef.Instance,
+                    Definition = new() { DisplayName = "Query", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("synthetic-parameter-value") } } }) };
+            if (path == "/api/secrets") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { new SecretResponse(new SecretResource
+                { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret, Metadata = new() { Name = "query-value" }, ScopeRef = ResourceScopeRef.Instance,
+                    Definition = new() { DisplayName = "Query", Vault = new("fixture", ResourceScopeRef.Instance), Key = "query" } }, "configured", true) }) };
             object body;
             if (request.Method == HttpMethod.Post && path == "/api/datasources")
             {

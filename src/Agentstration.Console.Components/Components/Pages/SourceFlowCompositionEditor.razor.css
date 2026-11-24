@@ -2,3 +2,8 @@
 label { min-width: 0; }
 select { width: 100%; min-width: 0; max-width: 100%; }
 h2, p, small { overflow-wrap: anywhere; }
+.source-composition-editor { gap: var(--space-5); }
+.source-composition-heading { display: flex; gap: var(--space-3); align-items: center; }
+.source-composition-heading h2 { margin: 0; font-size: 1.1rem; }
+.source-composition-icon { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius-md); background: var(--primary-soft); color: var(--primary); flex: 0 0 auto; }
+.source-composition-icon ::deep svg { width: 1.2rem; height: 1.2rem; }

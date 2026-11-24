@@ -4,6 +4,7 @@ using Agentstration.Aep.Client;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources;
+using Agentstration.DataSources.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
@@ -19,7 +20,7 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
     ConnectedServiceManagementService services, ConnectedServiceOperationTypeManagementService operationTypes,
     ConnectedServiceBoundValues boundValues, ISecretResolver secrets, ICurrentRequestContext current,
     IHttpClientFactory clients,
-    BuiltinHttpOperationExecutor httpOperations, IRequestContextScopeFactory requestScopes)
+    BuiltinHttpOperationExecutor httpOperations, IRequestContextScopeFactory requestScopes, ISecretInputResolver inputSecrets)
 {
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -47,6 +48,23 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
         };
         var acquisition = await acquisitions.GetExecutionAsync(invocation.Arguments.GetProperty("acquisitionId").GetString()!,
             invocation.RunId, cancellationToken);
+        using var resolvedInputs = await inputSecrets.ResolveAsync(acquisition.Parameters, acquisition.Dataset!.SecretInputs, cancellationToken);
+        try
+        {
+            DataSourceDatasetCompositionService.ValidateValue(acquisition.Dataset.InputSchema, resolvedInputs.Value);
+            var protectedOutput = resolvedInputs.Protect(await ExecuteOperationAsync(acquisition, invocation, consumer, resolvedInputs.Value, cancellationToken));
+            var output = protectedOutput is null ? (JsonElement?)null : SecretInputs.Rewrite(protectedOutput.Value,
+                value => SecretInputs.IsReference(value, acquisition.Dataset.SecretInputs) ? JsonSerializer.SerializeToElement("[REDACTED]") : null);
+            if (output is { } result) DataSourceDatasetCompositionService.ValidateOperationOutput(acquisition.Dataset, result, invocation.RunId);
+            return output;
+        }
+        catch (Exception exception) when (resolvedInputs.IsSensitive && exception is not OperationCanceledException)
+        { throw Error("data_source_protected_acquisition_failed"); }
+    }
+
+    private async Task<JsonElement?> ExecuteOperationAsync(DataSourceAcquisitionResource acquisition, InternalMcpToolInvocation invocation,
+        ResourceScopeRef consumer, JsonElement parameters, CancellationToken cancellationToken)
+    {
         var operation = acquisition.Dataset!.Operation;
         var service = await services.AuthorizeAsync(operation.Definition.Service.Service,
             new(consumer, operation.Address), cancellationToken) ?? throw Error("connected_service_unavailable");
@@ -68,8 +86,8 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
             && operationVersion.Version == BuiltinHttpOperation.Version
             && operationVersion.Invocation.ProviderOperationId == BuiltinHttpOperation.ProviderOperationId)
         {
-            var result = await httpOperations.AcquireAsync(service, operation, acquisition.Parameters,
-                new(consumer, operation.Address), cancellationToken);
+            var result = await httpOperations.AcquireAsync(service, operation, parameters,
+                new(consumer, operation.Address), cancellationToken, acquisition.Dataset.SecretInputs.Count > 0);
             DataSourceDatasetCompositionService.ValidateOperationOutput(acquisition.Dataset, result, invocation.RunId);
             return result;
         }
@@ -87,7 +105,9 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
             throw Error("connected_service_acquisition_provider_unavailable");
         using var http = clients.CreateClient("agentstration-aep");
         http.BaseAddress = registration.Definition.Endpoint;
-        var client = new AepClient(http, AepExtensionCredentials.Create(registration, secrets),
+        using var protectedHttp = acquisition.Dataset.SecretInputs.Count > 0
+            ? new HttpClient(new ProtectedRequestHandler(http)) { BaseAddress = http.BaseAddress, Timeout = http.Timeout } : null;
+        var client = new AepClient(protectedHttp ?? http, AepExtensionCredentials.Create(registration, secrets),
             expectedExtensionId: registration.Definition.ExpectedExtensionId);
         var manifest = await client.DiscoverAsync(cancellationToken);
         if (!manifest.Capabilities.TryGetValue(AepConnectedServiceAcquisitionProtocol.Capability, out var capability)
@@ -111,7 +131,7 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
         {
             var result = await client.AcquireConnectedServiceOperationAsync(new(type.Name, version.Version,
                 service.Definition.Options, values, operationType.Name, operationVersion.Version,
-                operation.Definition.Definition, acquisition.Parameters, acquisition.CorrelationId), cancellationToken);
+                operation.Definition.Definition, parameters, acquisition.CorrelationId), cancellationToken);
             if (operation.Definition.Definition.TryGetProperty(adapter.OutputSchemaProperty, out var declaredOutput))
                 DataSourceDatasetCompositionService.ValidateValue(declaredOutput, result.Result);
             DataSourceDatasetCompositionService.ValidateOperationOutput(acquisition.Dataset, result.Result, invocation.RunId);
@@ -119,6 +139,20 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
         }, cancellationToken);
     }
     private static DataSourceAcquisitionException Error(string code) => new(code, "Connected Service acquisition could not be completed.");
+
+    internal sealed class ProtectedRequestHandler(HttpClient client) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            // HttpClient marks a message sent before invoking its handler; forwarding needs a fresh envelope.
+            using var forwarded = new HttpRequestMessage(request.Method, request.RequestUri)
+            { Content = request.Content, Version = request.Version, VersionPolicy = request.VersionPolicy };
+            foreach (var header in request.Headers) forwarded.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            foreach (var option in request.Options) forwarded.Options.Set(new HttpRequestOptionsKey<object?>(option.Key), option.Value);
+            forwarded.Options.Set(new HttpRequestOptionsKey<bool>(Agentstration.Http.Diagnostics.HttpDiagnosticsExtensions.SensitivePayloadKey), true);
+            return await client.SendAsync(forwarded, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+    }
 }
 
 internal sealed class ConnectedServiceAcquisitionMcpTool(ConnectedServiceAcquisitionExecutor execution) : IInternalMcpToolHandler

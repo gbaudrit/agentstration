@@ -287,4 +287,14 @@
   <data name="SourceDiscard" xml:space="preserve"><value>Discard</value></data>
   <data name="SourceSettingValue" xml:space="preserve"><value>Value</value></data>
   <data name="SourceNamespaceInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
+  <data name="DatasetParametersTitle" xml:space="preserve"><value>Operation parameters</value></data>
+  <data name="DatasetBoundParametersHelp" xml:space="preserve"><value>Enter a value or select a Parameter or Secret. References are checked at execution; Secret values stay hidden.</value></data>
+  <data name="DatasetValueReferencesUnavailable" xml:space="preserve"><value>Some value references could not be loaded. You can still enter a literal value.</value></data>
+  <data name="DatasetParameterBindingInvalid" xml:space="preserve"><value>An operation parameter reference is invalid, unavailable or no longer authorized. Review the selected Parameter or Secret.</value></data>
+  <data name="DatasetParameterReference" xml:space="preserve"><value>Parameter reference</value></data>
+  <data name="DatasetSecretReference" xml:space="preserve"><value>Secret reference · value hidden</value></data>
+  <data name="SequenceTransformationsTitle" xml:space="preserve"><value>Processing steps</value></data>
+  <data name="SequenceEmptyTitle" xml:space="preserve"><value>No processing steps</value></data>
+  <data name="WizardHistoryLabel" xml:space="preserve"><value>Acquisition history</value></data>
+  <data name="DatasetLiteralJson" xml:space="preserve"><value>Literal values (JSON)</value></data>
 </root>

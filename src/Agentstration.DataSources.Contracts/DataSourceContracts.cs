@@ -100,11 +100,18 @@ public sealed record DataSourceProperties
 public sealed record DataSourceOperationAcquisitionBinding(
     ConnectedServiceOperationRevisionReference Operation, JsonElement Parameters)
 {
+    public IReadOnlyList<DataSourceParameterBinding> ParameterBindings { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SchemaBinding? OutputSchemaBinding { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
 }
+
+/// <summary>An exact reference for one declared operation input; literal inputs remain in Parameters.</summary>
+public sealed record DataSourceParameterBinding(string Name,
+    Agentstration.Parameters.ParameterReference? Parameter = null,
+    Agentstration.Secrets.Abstractions.SecretReference? Secret = null,
+    Guid? ResourceUid = null);
 
 /// <summary>A logical dataset rule. Its effective UID partition is assigned by the server, never by a caller.</summary>
 public sealed record DataSourceDatasetProperties(
@@ -131,6 +138,9 @@ public sealed record ResolvedDataSourceDataset(
     JsonElement InputSchema, JsonElement OutputSchema, string Partition,
     ResolvedDataSourceFlowBinding Flow)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public JsonElement InvocationParameters { get; init; }
+    public IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference> SecretInputs { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? OperationOutputSchema { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

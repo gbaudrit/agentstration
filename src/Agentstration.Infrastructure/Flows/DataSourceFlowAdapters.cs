@@ -332,6 +332,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
                 DefinitionUseScopeRef = request.Flow.DefinitionUseScopeRef,
                 Compositions = request.Compositions,
                 AcceptedCompositionSchemas = true,
+                SecretInputs = request.SecretInputs,
                 TransientPayloads = request.TransientPayloads
             }, cancellationToken);
             return Snapshot(stored.Value);

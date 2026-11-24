@@ -1,0 +1,169 @@
+@using Agentstration.Parameters
+@using Agentstration.Secrets
+@using Agentstration.Secrets.Contracts
+@implements IDisposable
+@inject IParametersClient ParametersClient
+@inject ISecretsClient SecretsClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+<div class="operation-parameters-editor">
+    @if (Properties is { } properties)
+    {
+        <div class="operation-parameter-fields">
+            @foreach (var property in properties.EnumerateObject())
+            {
+                var name = property.Name; var schema = property.Value;
+                <div class="operation-parameter" data-schema-path="@($"$.{name}")" @key="name">
+                    <ValueBindingRequirementEditor Requirement="@Requirement(name, schema)" AllowedSources="@Sources(schema)"
+                        Selection="@Selection(name)" SelectionChanged="value => ChangeAsync(name, value)" Options="@Options(schema)"
+                        CreationContext="@CreationContext(schema)" ResourceCreated="address => ReloadOptionsAsync(address)" Disabled="Disabled"
+                        ValidationField="ValidationField" TestIdPrefix="@($"dataset-parameter-{name}")" />
+                </div>
+            }
+        </div>
+        <details class="operation-parameters-advanced"><summary>@Localizer["DatasetLiteralJson"]</summary>
+            <JsonSchemaInputEditor Schema="@LiteralSchema" Value="Value" ValueChanged="RawChangedAsync" ValidationChanged="RawValidated" Disabled="Disabled" AllowAnyRoot="true" />
+        </details>
+    }
+    else
+    {
+        <JsonSchemaInputEditor Schema="Schema" Value="Value" ValueChanged="ValueChanged" ValidationChanged="RawValidated"
+            Disabled="Disabled" AllowAnyRoot="true" Compact="true" />
+    }
+    @if (optionsUnavailable) { <p class="muted" role="status">@Localizer["DatasetValueReferencesUnavailable"]</p> }
+</div>
+
+@code {
+    [Parameter] public JsonElement? Schema { get; set; }
+    [Parameter] public JsonElement Value { get; set; }
+    [Parameter] public EventCallback<JsonElement> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<DataSourceParameterBinding> Bindings { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<DataSourceParameterBinding>> BindingsChanged { get; set; }
+    [Parameter] public EventCallback<bool> ValidityChanged { get; set; }
+    [Parameter] public FieldIdentifier ValidationField { get; set; }
+    [Parameter] public ResourceScopeRef? Scope { get; set; }
+    [Parameter] public ResourceNamespace? Namespace { get; set; } = ResourceNamespace.Default;
+    [Parameter] public bool Disabled { get; set; }
+    [CascadingParameter] private EditContext? EditContext { get; set; }
+    private readonly CancellationTokenSource cancellation = new();
+    private IReadOnlyList<ParameterResource> parameters = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private readonly Dictionary<string, ValueBindingSelection> selections = new(StringComparer.Ordinal);
+    private ResourceScopeRef? loadedScope;
+    private string externalKey = "";
+    private EditContext? attached;
+    private bool optionsUnavailable, lastValidity = true, rawValid = true;
+    private long optionsVersion;
+    private JsonElement? Properties => Schema is { } schema && schema.TryGetProperty("type", out var type)
+        && type.ValueKind == JsonValueKind.String && type.GetString() == "object"
+        && schema.TryGetProperty("properties", out var properties) && properties.ValueKind == JsonValueKind.Object ? properties : null;
+    private JsonElement? LiteralSchema
+    {
+        get
+        {
+            if (Schema is not { } schema) return null;
+            var node = System.Text.Json.Nodes.JsonNode.Parse(schema.GetRawText())!;
+            if (node["required"] is System.Text.Json.Nodes.JsonArray required)
+                node["required"] = new System.Text.Json.Nodes.JsonArray(required.Where(v => !Bindings.Any(b => b.Name == v?.GetValue<string>())).Select(v => v?.DeepClone()).ToArray());
+            return JsonSerializer.SerializeToElement(node);
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = JsonSerializer.Serialize(new { Value, Bindings });
+        if (externalKey != key) { externalKey = key; selections.Clear(); }
+        if (attached != EditContext)
+        {
+            if (attached is not null) attached.OnValidationStateChanged -= ValidationChanged;
+            attached = EditContext;
+            if (attached is not null) attached.OnValidationStateChanged += ValidationChanged;
+        }
+        if (Scope != loadedScope) { loadedScope = Scope; await ReloadOptionsAsync(); }
+    }
+
+    private ValueBindingSelection Selection(string name)
+    {
+        if (selections.TryGetValue(name, out var selection)) return selection;
+        var binding = Bindings.FirstOrDefault(b => b.Name == name);
+        if (binding?.Parameter is { } parameter) return new(ValueBindingSourceKind.Parameter,
+            new(parameter.ScopeRef, parameter.Address.Namespace, parameter.Address.Kind, parameter.Address.Name));
+        if (binding?.Secret is { ScopeRef: { } owner } secret) return new(ValueBindingSourceKind.Secret,
+            new(owner, secret.Address.Namespace, secret.Address.Kind, secret.Address.Name));
+        return new(ValueBindingSourceKind.Literal, Literal: Value.ValueKind == JsonValueKind.Object
+            && Value.TryGetProperty(name, out var literal) ? literal.Clone() : null);
+    }
+    private ValueBindingRequirement Requirement(string name, JsonElement schema) => new(name,
+        Schema is { } root && root.TryGetProperty("required", out var required) && required.EnumerateArray().Any(v => v.GetString() == name),
+        Type(schema) ?? "any", Description: Text(schema, "description"), Format: Text(schema, "format"), LiteralSchema: schema);
+    private static string? Type(JsonElement schema) => Text(schema, "type");
+    private static string? Text(JsonElement schema, string key) => schema.TryGetProperty(key, out var value)
+        && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    private static ParameterValueType? ParameterType(JsonElement schema) => Type(schema) switch
+    { "string" => ParameterValueType.Text, "integer" => ParameterValueType.WholeNumber, "number" => ParameterValueType.DecimalNumber,
+        "boolean" => ParameterValueType.Logical, _ => null };
+    private static IReadOnlyList<ValueBindingSourceKind> Sources(JsonElement schema) => Type(schema) == "string"
+        ? [ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter, ValueBindingSourceKind.Secret]
+        : ParameterType(schema) is not null ? [ValueBindingSourceKind.Literal, ValueBindingSourceKind.Parameter]
+        : [ValueBindingSourceKind.Literal];
+    private IReadOnlyList<ValueBindingOption> Options(JsonElement schema) => parameters
+        .Where(p => p.Definition.ValueType == ParameterType(schema) && p.ScopeRef is not null)
+        .Select(p => new ValueBindingOption(ValueBindingSourceKind.Parameter, new(p.ScopeRef!.Value, p.Namespace, p.Kind, p.Name), p.Definition.DisplayName))
+        .Concat(Type(schema) == "string" ? secrets.Where(s => s.ValueConfigured && s.Resource.ScopeRef is not null)
+            .Select(s => new ValueBindingOption(ValueBindingSourceKind.Secret,
+                new(s.Resource.ScopeRef!.Value, s.Resource.Namespace, s.Resource.Kind, s.Resource.Name), s.Resource.Definition.DisplayName)) : []).ToArray();
+    private ContextualValueCreationContext? CreationContext(JsonElement schema) => Scope is { } scope && Namespace is { } ns
+        ? new(scope, "", "", Namespace: ns, ValueType: ParameterType(schema)) : null;
+
+    private async Task ReloadOptionsAsync(ScopedResourceAddress? _ = null)
+    {
+        if (Scope is not { } scope) return;
+        var version = ++optionsVersion;
+        parameters = []; secrets = []; optionsUnavailable = false;
+        try
+        {
+            var foundParameters = await ParametersClient.GetParametersAsync(scope, cancellation.Token);
+            var foundSecrets = await SecretsClient.GetSecretsInContextAsync(scope, cancellation.Token);
+            if (version != optionsVersion || scope != Scope) return;
+            parameters = foundParameters; secrets = foundSecrets;
+        }
+        catch (Exception exception) when (exception is AgentstrationApiException or HttpRequestException)
+        { if (version == optionsVersion) optionsUnavailable = true; }
+    }
+
+    private async Task ChangeAsync(string name, ValueBindingSelection selection)
+    {
+        if (Disabled) return;
+        var values = Value.ValueKind == JsonValueKind.Object ? Value.EnumerateObject()
+            .Where(p => p.Name != name).ToDictionary(p => p.Name, p => p.Value.Clone(), StringComparer.Ordinal) : new Dictionary<string, JsonElement>();
+        var bindings = Bindings.Where(b => b.Name != name).ToList();
+        if (selection.Kind == ValueBindingSourceKind.Literal && selection.Literal is { } literal) values[name] = literal.Clone();
+        else if (selection.Resource is { } address)
+        {
+            var previous = Bindings.FirstOrDefault(b => b.Name == name);
+            var next = selection.Kind == ValueBindingSourceKind.Parameter
+                ? new DataSourceParameterBinding(name, Parameter: new(address.Address, address.ScopeRef))
+                : new DataSourceParameterBinding(name, Secret: new(address.Address, address.ScopeRef));
+            if (next.Parameter == previous?.Parameter && next.Secret == previous?.Secret) next = next with { ResourceUid = previous?.ResourceUid };
+            bindings.Add(next);
+        }
+        Value = JsonSerializer.SerializeToElement(values); Bindings = bindings;
+        externalKey = JsonSerializer.Serialize(new { Value, Bindings }); selections[name] = selection;
+        await ValueChanged.InvokeAsync(Value); await BindingsChanged.InvokeAsync(Bindings);
+        await ReportValidityAsync();
+    }
+    private void ValidationChanged(object? sender, ValidationStateChangedEventArgs args) => _ = InvokeAsync(ReportValidityAsync);
+    private async Task RawChangedAsync(JsonElement value)
+    { if (Disabled) return; Value = value; externalKey = ""; selections.Clear(); await ValueChanged.InvokeAsync(value); await ReportValidityAsync(); }
+    private Task RawValidated(JsonSchemaInputValidationState state) { rawValid = state.IsValid; return ReportValidityAsync(); }
+    private async Task ReportValidityAsync()
+    {
+        var valid = rawValid && attached?.GetValidationMessages(ValidationField).Any() != true
+            && (Value.ValueKind != JsonValueKind.Object || !Bindings.Any(b => Value.TryGetProperty(b.Name, out _)))
+            && selections.Values.All(s => s.Kind == ValueBindingSourceKind.Literal || s.IsConfigured);
+        if (valid == lastValidity) return;
+        lastValidity = valid; await ValidityChanged.InvokeAsync(valid);
+    }
+    public void Dispose()
+    { ++optionsVersion; if (attached is not null) attached.OnValidationStateChanged -= ValidationChanged; cancellation.Cancel(); cancellation.Dispose(); }
+}

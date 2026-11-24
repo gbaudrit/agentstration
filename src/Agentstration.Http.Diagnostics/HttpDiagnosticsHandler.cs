@@ -18,7 +18,8 @@ internal sealed class HttpDiagnosticsHandler(HttpDiagnosticsOptions options, ILo
         var category = policy.Category.ToString();
         activity?.SetTag("agentstration.http.category", category);
         var parentContext = activity?.Context ?? Activity.Current?.Context ?? default;
-        var sensitive = BodyCapture.IsSensitivePath(uri.AbsolutePath);
+        var sensitive = BodyCapture.IsSensitivePath(uri.AbsolutePath)
+            || request.Options.TryGetValue(new HttpRequestOptionsKey<bool>(HttpDiagnosticsExtensions.SensitivePayloadKey), out var protectedPayload) && protectedPayload;
         var target = uri.GetComponents(UriComponents.SchemeAndServer, UriFormat.UriEscaped) + (sensitive ? "/[sensitive route]" : uri.AbsolutePath);
         activity?.SetTag("http.request.method", request.Method.Method);
         activity?.SetTag("url.full", target);

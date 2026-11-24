@@ -4,11 +4,12 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Secrets;
 using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Flows;
 
-public sealed class ToolSecretInputResolver(ToolDefinitionService definitions, ISecretResolver secrets,
+public sealed class ToolSecretInputResolver(IResourceStore store, ISecretResolver secrets,
     ICurrentRequestContext current, IResourceScopeResolver scopes) : ISecretInputResolver
 {
     public async Task<ResolvedSecretInputs> ResolveAsync(JsonElement input,
@@ -41,7 +42,8 @@ public sealed class ToolSecretInputResolver(ToolDefinitionService definitions, I
                 if (reference.Secret.ScopeRef is not { } owner) throw Error();
                 var address = ScopedResourceAddress.Create(owner, reference.Secret.Address.Namespace,
                     reference.Secret.Address.Kind, reference.Secret.Address.Name);
-                if (await definitions.BindingIdentityAsync(address, cancellationToken) != reference.Uid) throw Error();
+                var resource = await store.GetExactAsync<SecretResource>(address, cancellationToken);
+                if (resource?.Value.Uid != reference.Uid) throw Error();
                 using var secret = await secrets.ResolveAsync(reference.Secret, reference.Consumer, cancellationToken) ?? throw Error();
                 values.Add(id, new UTF8Encoding(false, true).GetString(secret.Value.AccessValue().Span));
             }
