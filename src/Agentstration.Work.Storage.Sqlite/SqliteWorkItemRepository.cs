@@ -17,6 +17,57 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         await context.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureWorkplaceTaskProjectionAsync(context, cancellationToken);
+        await EnsureTaskTreeProjectionAsync(context, cancellationToken);
+    }
+
+    private static async Task EnsureTaskTreeProjectionAsync(WorkDbContext context, CancellationToken cancellationToken)
+    {
+        var connection = context.Database.GetDbConnection();
+        var closeConnection = connection.State != ConnectionState.Open;
+        if (closeConnection) await connection.OpenAsync(cancellationToken);
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT COUNT(*) FROM pragma_table_info('WorkItems') WHERE name = 'TaskTreeId';";
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture) == 0)
+            {
+                command.CommandText = "ALTER TABLE WorkItems ADD COLUMN TaskTreeId TEXT NULL;";
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+            command.CommandText = "CREATE INDEX IF NOT EXISTS IX_WorkItems_WorkspaceId_OwnerPrincipalId_TaskTreeId ON WorkItems (WorkspaceId, OwnerPrincipalId, TaskTreeId);";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        finally
+        {
+            if (closeConnection) await connection.CloseAsync();
+        }
+    }
+
+    public async Task<bool> TryCreateTaskTreeAsync(IReadOnlyList<WorkItem> items, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.WorkItems.AddRange(items.Select(ToDocument));
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (exception.InnerException is Microsoft.Data.Sqlite.SqliteException
+        { SqliteErrorCode: 19, SqliteExtendedErrorCode: 1555 or 2067 })
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public async Task<IReadOnlyList<StoredWorkItem>> ListTaskTreeAsync(WorkspaceId workspaceId, Guid ownerPrincipalId,
+        WorkTaskId treeId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
+        var treeKey = treeId.ToString();
+        var documents = await context.WorkItems.AsNoTracking()
+            .Where(item => item.WorkspaceId == workspaceKey && item.OwnerPrincipalId == ownerKey && item.TaskTreeId == treeKey)
+            .OrderBy(item => item.Id).Take(WorkTaskTreeDefinition.MaximumTasks + 1).ToArrayAsync(cancellationToken);
+        return documents.Select(FromDocument).ToArray();
     }
 
     private static async Task EnsureWorkplaceTaskProjectionAsync(WorkDbContext context, CancellationToken cancellationToken)
@@ -196,6 +247,8 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         var anchor = workItems.SingleOrDefault(value => value.Id == taskKey && value.AnchorTaskId == null)
             ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         var latest = workItems.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.Id, StringComparer.Ordinal).First();
+        if (anchor.TaskTreeId is not null)
+            throw new WorkTransitionException("task_tree_delete_not_supported", "Task tree membership must be preserved.");
         if (!string.Equals(ETag(latest.Version), expectedETag, StringComparison.Ordinal))
             throw new WorkItemConcurrencyException("The supplied ETag does not match the current Task version.");
         if (latest.Status is not (WorkItemStatus.Completed or WorkItemStatus.Failed or WorkItemStatus.Cancelled))
@@ -276,6 +329,7 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
         InteractionId = Metadata(item, "workplace.interactionId"),
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
+        TaskTreeId = item.TaskHierarchy?.TreeId.ToString(),
         FlowRunId = Metadata(item, "flowRunId"),
         IsWorkplaceTask = WorkplaceTaskIdentity.IsTask(item),
         CreatedAt = item.CreatedAt,
@@ -286,6 +340,9 @@ public sealed class SqliteWorkItemRepository(IDbContextFactory<WorkDbContext> co
 
     private static void Apply(WorkItemDocument document, WorkItem item)
     {
+        if ((document.TaskTreeId is not null || item.TaskHierarchy is not null)
+            && FromDocument(document).Value.TaskHierarchy != item.TaskHierarchy)
+            throw new WorkItemConcurrencyException("Task tree membership and kind are immutable.");
         var updated = ToDocument(item);
         document.Type = updated.Type;
         if (!string.Equals(document.ScopeRef, updated.ScopeRef, StringComparison.Ordinal))

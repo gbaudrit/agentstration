@@ -43,6 +43,9 @@ public interface IWorkItemRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<StoredWorkItem> CreateAsync(WorkItem workItem, CancellationToken cancellationToken);
+    Task<bool> TryCreateTaskTreeAsync(IReadOnlyList<WorkItem> items, CancellationToken cancellationToken);
+    Task<IReadOnlyList<StoredWorkItem>> ListTaskTreeAsync(WorkspaceId workspaceId, Guid ownerPrincipalId,
+        WorkTaskId treeId, CancellationToken cancellationToken);
     Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken);
     Task<StoredWorkItem?> GetExactAsync(ResourceScopeRef scopeRef, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken) =>
         GetAsync(RequiredWorkspace(scopeRef), ownerPrincipalId, id, cancellationToken);

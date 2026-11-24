@@ -35,6 +35,7 @@ public sealed class WorkItem
         Result = snapshot.Result;
         Error = snapshot.Error;
         Version = snapshot.Version;
+        TaskHierarchy = snapshot.TaskHierarchy;
         _inputs = [.. snapshot.Inputs];
         _attachments = [.. snapshot.Attachments];
         _messages = [.. snapshot.Messages];
@@ -69,6 +70,19 @@ public sealed class WorkItem
     public WorkResult? Result { get; private set; }
     public WorkError? Error { get; private set; }
     public long Version { get; private set; }
+    public WorkTaskHierarchy? TaskHierarchy { get; }
+
+    public static WorkItem CreateTask(WorkTaskDefinition definition, WorkspaceId workspaceId, Guid ownerPrincipalId,
+        WorkTaskId treeId, string creationDigest, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        var item = Create(definition.Id.ToWorkItemId(), workspaceId, ownerPrincipalId, "task", definition.Instruction,
+            now, definition.Title, definition.Description);
+        return Restore(item.ToSnapshot() with
+        {
+            TaskHierarchy = new(treeId, definition.Kind, definition.ParentTaskId, creationDigest)
+        });
+    }
 
     public static WorkItem Create(
         WorkItemId id,
@@ -169,7 +183,7 @@ public sealed class WorkItem
     public WorkItemSnapshot ToSnapshot() => new(
         Id, WorkspaceId, OwnerPrincipalId, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
         Metadata, RequestedAgentId, Flow, SelectedAgentId, CurrentExecutionId, [.. _inputs], [.. _attachments], [.. _messages],
-        [.. _interactions], [.. _history], Result, Error, Version, ExecutionScopeRef);
+        [.. _interactions], [.. _history], Result, Error, Version, ExecutionScopeRef, TaskHierarchy);
 
     public bool ApplyRuntimeEvent(WorkExecutionEvent executionEvent)
     {

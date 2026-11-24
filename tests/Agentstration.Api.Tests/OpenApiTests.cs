@@ -276,6 +276,22 @@ public sealed class OpenApiTests
     }
 
     [TestMethod]
+    public async Task TaskTreeOperationsDescribeTheirTypedCreationAndReadContracts()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync(OpenApiConfiguration.DocumentPath));
+        var paths = document.RootElement.GetProperty("paths");
+        var create = paths.GetProperty("/api/workspaces/{workspaceName}/tasks/tree").GetProperty("post");
+        Assert.AreEqual("Create a functional task tree", create.GetProperty("summary").GetString());
+        AssertSchemaHasProperty(create, "201", "rootTaskId");
+        AssertSchemaHasProperty(create, "201", "tasks");
+        var read = paths.GetProperty("/api/workspaces/{workspaceName}/tasks/{taskId}/tree").GetProperty("get");
+        AssertSchemaHasProperty(read, "200", "workspaceId");
+        AssertSchemaHasProperty(read, "200", "tasks");
+    }
+
+    [TestMethod]
     public async Task EveryApiOperationHasADocumentedSuccessOutcome()
     {
         await using var factory = CreateFactory();

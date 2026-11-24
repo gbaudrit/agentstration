@@ -178,6 +178,8 @@ internal static class OpenApiSuccessResponseCatalog
             return method == "POST" ? Json<AddConversationMessageResponse>(202, "Add a conversation message") : Json<IReadOnlyList<ConversationMessage>>(200, "List conversation messages");
         if (path.EndsWith("/pending-actions/{pendingActionId}/responses", StringComparison.OrdinalIgnoreCase)) return Json<PendingActionResolutionResponse>(200, "Respond to a pending action");
         if (path.EndsWith("/pending-actions", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<PendingActionContract>>(200, "List pending actions");
+        if (method == "POST" && path.EndsWith("/tasks/tree", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskTreeResponse>(201, "Create a functional task tree");
+        if (method == "GET" && path.EndsWith("/tasks/{taskId}/tree", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskTreeResponse>(200, "Get a functional task subtree");
         if (path.EndsWith("/tasks", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskPageResponse>(200, "List Workplace Tasks");
         if (path.EndsWith("/tasks/{taskId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskResponse>(200, "Get a Workplace Task");
         if (path.EndsWith("/tasks/{taskId}/pause", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskResponse>(200, "Pause a Workplace Task");

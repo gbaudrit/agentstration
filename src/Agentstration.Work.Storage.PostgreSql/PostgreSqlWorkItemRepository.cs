@@ -41,6 +41,8 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         item.Property(value => value.InteractionId).HasMaxLength(36);
         item.Property(value => value.EntryId).HasMaxLength(512);
         item.Property(value => value.AnchorTaskId).HasMaxLength(36);
+        item.Property(value => value.TaskTreeId).HasMaxLength(36);
+        item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.TaskTreeId });
         item.Property(value => value.FlowRunId).HasMaxLength(128);
         item.HasIndex(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.IsWorkplaceTask, value.UpdatedAt });
         item.Property(value => value.CreatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
@@ -255,6 +257,7 @@ internal sealed class WorkItemDocument
     public string? InteractionId { get; set; }
     public string? EntryId { get; set; }
     public string? AnchorTaskId { get; set; }
+    public string? TaskTreeId { get; set; }
     public string? FlowRunId { get; set; }
     public bool IsWorkplaceTask { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -266,6 +269,33 @@ internal sealed class WorkItemDocument
 public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkItemRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public async Task<bool> TryCreateTaskTreeAsync(IReadOnlyList<WorkItem> items, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        context.WorkItems.AddRange(items.Select(ToDocument));
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException exception) when (exception.InnerException is Npgsql.PostgresException
+        { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation })
+        {
+            return false;
+        }
+        return true;
+    }
+
+    public async Task<IReadOnlyList<StoredWorkItem>> ListTaskTreeAsync(WorkspaceId workspaceId, Guid ownerPrincipalId,
+        WorkTaskId treeId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
+        var treeKey = treeId.ToString();
+        var documents = await context.WorkItems.AsNoTracking()
+            .Where(item => item.WorkspaceId == workspaceKey && item.OwnerPrincipalId == ownerKey && item.TaskTreeId == treeKey)
+            .OrderBy(item => item.Id).Take(WorkTaskTreeDefinition.MaximumTasks + 1).ToArrayAsync(cancellationToken);
+        return documents.Select(FromDocument).ToArray();
+    }
 
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -420,6 +450,8 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         var anchor = workItems.SingleOrDefault(value => value.Id == taskKey && value.AnchorTaskId == null)
             ?? throw new KeyNotFoundException($"Task '{taskId}' was not found.");
         var latest = workItems.OrderByDescending(value => value.CreatedAt).ThenBy(value => value.Id, StringComparer.Ordinal).First();
+        if (anchor.TaskTreeId is not null)
+            throw new WorkTransitionException("task_tree_delete_not_supported", "Task tree membership must be preserved.");
         if (!string.Equals(ETag(latest.Version), expectedETag, StringComparison.Ordinal))
             throw new WorkItemConcurrencyException("The supplied ETag does not match the current Task version.");
         if (latest.Status is not (WorkItemStatus.Completed or WorkItemStatus.Failed or WorkItemStatus.Cancelled))
@@ -500,6 +532,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         InteractionId = Metadata(item, "workplace.interactionId"),
         EntryId = Metadata(item, "workplace.entryId"),
         AnchorTaskId = Metadata(item, "workplace.taskId"),
+        TaskTreeId = item.TaskHierarchy?.TreeId.ToString(),
         FlowRunId = Metadata(item, "flowRunId"),
         IsWorkplaceTask = WorkplaceTaskIdentity.IsTask(item),
         CreatedAt = item.CreatedAt,
@@ -510,6 +543,9 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
 
     private static void Apply(WorkItemDocument document, WorkItem item)
     {
+        if ((document.TaskTreeId is not null || item.TaskHierarchy is not null)
+            && FromDocument(document).Value.TaskHierarchy != item.TaskHierarchy)
+            throw new WorkItemConcurrencyException("Task tree membership and kind are immutable.");
         var updated = ToDocument(item);
         document.Type = updated.Type;
         if (!string.Equals(document.ScopeRef, updated.ScopeRef, StringComparison.Ordinal))

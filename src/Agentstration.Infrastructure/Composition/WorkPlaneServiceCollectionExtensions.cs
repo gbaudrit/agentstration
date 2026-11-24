@@ -18,6 +18,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<IWorkExecutionGateway>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<ILocalWorkExecutionQueue>(provider => provider.GetRequiredService<LocalWorkExecutionGateway>());
         services.AddSingleton<WorkItemService>();
+        services.AddSingleton<WorkTaskTreeService>();
         services.AddSingleton<WorkplaceService>();
         services.AddSingleton<IEntryDiscoveryAuthorization, EntryDiscoveryAuthorization>();
         services.AddSingleton<EntryDiscoveryService>();
