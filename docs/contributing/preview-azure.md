@@ -149,7 +149,9 @@ registry image digests stay immutable.
 
 ## Failure recovery and costs
 
-Inspect the safe result and ARM provisioning state first. Raw command output,
+Inspect the safe result and ARM provisioning state first. CLI failures identify
+the operation and a bounded Azure error code when present; parameter values and
+raw provider output remain withheld. Raw command output,
 cloud-init logs, agent settings, guest credential files and private archives are
 not uploaded as workflow artifacts. A failed transfer can be retried using the
 same request; an owned leftover loopback registry is replaced safely. Reset also
@@ -182,7 +184,10 @@ claim is made before that run.
 ## Offline and CI validation
 
 `Preview Azure contracts` compiles Bicep and runs offline ownership/transport
-contracts without OIDC or Azure provisioning. For trusted repository branches,
+contracts without OIDC or Azure provisioning. When Azure CLI is installed, an
+offline boundary check compares generated storage options with its built-in help
+using an empty CLI configuration and disabled telemetry; it never authenticates
+or accesses Azure resources. For trusted repository branches,
 it also calls the reusable entrypoint for all three provider contracts; the
 execution jobs remain skipped. Request/result artifacts include the environment
 ID so multiple calls in one run do not collide. Server image validation additionally
