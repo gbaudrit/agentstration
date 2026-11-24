@@ -17,6 +17,7 @@ def smoke(server_path, worker_path, database, output):
     receipts = [preview.read_json(path) for path in (server_path, worker_path)]
     value = contract.plan(*receipts, 'guest-' + uuid.uuid4().hex[:12], provider='azure-vm', database=database,
                           target=preview.read_json(preview.ROOT / 'deploy/preview/targets/azure-vm.example.json'))
+    value['target'].pop('osProfile', None)
     image = preview.read_json(preview.ROOT / 'deploy/preview/azure/transport.json')['registryImage']
     with tempfile.TemporaryDirectory(prefix='agentstration-azure-guest-') as temporary:
         root = Path(temporary)

@@ -239,8 +239,89 @@ initially be `pending`/`unavailable`; that is not evidence of zero use. Verify t
 chosen Ubuntu image, quota, successful preserve/recreate and full reset, and
 confirm no owned resources remain. Price the selected regional B2ms/B4ms PAYG
 SKU, both disks, public IP and staging/egress using current Azure pricing; record
-actual duration and estimated cost with the trial evidence. No capacity or cost
-claim is made before that run.
+actual duration and estimated cost with the trial evidence. The functional baseline
+and its cost assumptions are recorded below; they do not establish a load SLA.
+
+### West Europe PAYG cost baseline
+
+The [public rate snapshot](https://github.com/gbaudrit/agentstration/actions/runs/45445309638)
+retrieved on **2026-11-24 at 17:09 UTC** reports these EUR list prices, before tax,
+discounts or reservations:
+
+| Component | Price | Unit |
+| --- | ---: | --- |
+| Linux B2ms | 0.0862 | EUR/hour |
+| Linux B4ms | 0.1724 | EUR/hour |
+| Standard IPv4 static public IP | 0.0045 | EUR/hour |
+| Standard SSD LRS E4 OS disk, up to 32 GiB | 2.1545 | EUR/month |
+| Standard SSD LRS E6 data disk, 64 GiB | 4.3090 | EUR/month |
+
+Using a 730-hour month for disk prorating, the fixed baseline is approximately
+**EUR 0.099554/hour for B2ms**, or **EUR 0.185754/hour for B4ms**. A two-hour
+preview is approximately EUR 0.20 / EUR 0.37 respectively. Keeping everything
+running for 730 hours is approximately EUR 72.67 / EUR 135.60. Verify the selected
+image's OS disk tier when changing image versions; this estimate assumes E4.
+
+These figures exclude disk transactions, shared staging Blob capacity/operations
+and outbound transfer. They are estimates, not subscription invoices. Preserve-
+destroy removes compute billing after deallocation but retains approximately
+**EUR 9.75/month** of disks and IPv4 at these rates; reset is needed to remove that
+per-preview baseline. The shared storage account and small ownership records remain.
+
+Image delivery has no expected bandwidth charge when staging and VM share a
+region: GitHub currently makes [GHCR storage/bandwidth free](https://docs.github.com/en/billing/concepts/product-billing/github-packages),
+Azure ingress is free, and [same-region Azure transfer is free](https://azure.microsoft.com/en-us/pricing/details/bandwidth/).
+Confirm the storage account's region. Cross-region staging or application Internet
+egress has separate rates. Blob requests and temporary capacity remain billable;
+seven-day soft delete can retain deleted image bundles for seven days. Do not
+mistake deletion from the active blob list for immediate capacity reclamation.
+
+Budget alerts do not stop resources. The maintainer verified **10 regional vCPUs
+and 10 BS-family vCPUs available** before these trials; B2ms uses two and B4ms four.
+SKU restrictions were empty for B2ms in West Europe. Recheck quota/SKU availability
+when changing region or adding parallel previews. TTL enforcement remains #1286.
+
+## Live qualification — 2026-11-24
+
+Both database profiles completed the trusted-main lifecycle on **B2ms in West
+Europe**, using exact private server/Worker digests and the Ubuntu x64 image
+`Canonical:ubuntu-24_04-lts:server:24.04.202611170`. PostgreSQL also retained its
+checked-in public image digest. No local model or live model endpoint was required.
+
+| Profile | Initial provision/deploy | Preserve/redeploy | Initial available memory | Latest observed CPU average / credits remaining |
+| --- | ---: | ---: | ---: | --- |
+| SQLite | 262.3 s | 216.9 s | 6,986,480 KiB | 5.34% / 60.72 |
+| PostgreSQL | 239.4 s | 208.2 s | 6,971,688 KiB | 12.44% / 64.93 |
+
+These are point-in-time readiness/startup measurements, not sustained-load,
+peak-memory or inference benchmarks. CPU/credit samples can lag the guest.
+The tested configuration supports B2ms as the configurable default for this
+lightweight preview baseline; assess actual workloads/extensions before sizing
+them. B4ms remains an available configuration, not a separately measured trial.
+
+| Profile | Deploy | Preserve | Redeploy | Reset | Independent final status |
+| --- | --- | --- | --- | --- | --- |
+| SQLite | [45436683907](https://github.com/gbaudrit/agentstration/actions/runs/45436683907) | [45438377903](https://github.com/gbaudrit/agentstration/actions/runs/45438377903) | [45439039818](https://github.com/gbaudrit/agentstration/actions/runs/45439039818) | [45440036663](https://github.com/gbaudrit/agentstration/actions/runs/45440036663) | [45440743417](https://github.com/gbaudrit/agentstration/actions/runs/45440743417) |
+| PostgreSQL | [45443076440](https://github.com/gbaudrit/agentstration/actions/runs/45443076440) | [45444252247](https://github.com/gbaudrit/agentstration/actions/runs/45444252247) | [45445033172](https://github.com/gbaudrit/agentstration/actions/runs/45445033172) | [45446112201](https://github.com/gbaudrit/agentstration/actions/runs/45446112201) | [45446742151](https://github.com/gbaudrit/agentstration/actions/runs/45446742151) |
+
+Recreation found the required initialized host state and retained the exact
+digests, principal resource IDs and original expiry. Both independent final
+results report `state: absent` and `resources: []`. The immediate reset snapshots
+still listed the final data disk: ARM list convergence is delayed after successful
+deletion. Shared bootstrap storage/role assignments and ownership blobs remain.
+
+The earlier invalid-image attempt also exercised safe partial-failure recovery:
+the [refusal](https://github.com/gbaudrit/agentstration/actions/runs/45433631082)
+was followed by an [explicit empty-resource reset](https://github.com/gbaudrit/agentstration/actions/runs/45434039133)
+before deploying the corrected exact image. No foreign resources were adopted.
+
+The metadata-creation-to-reset-completion windows were 1,087.2 seconds for SQLite
+and 1,040.5 seconds for PostgreSQL. Applying the full fixed hourly baseline to
+those entire windows gives approximately EUR 0.0301 and EUR 0.0288 respectively;
+this deliberately includes provisioning and preserved/deallocated intervals.
+A conservative whole-hour fixed-resource allowance is about EUR 0.10 per trial.
+Actual invoice rounding and the excluded storage/transaction/transfer charges
+remain separate; these estimates are not measured Azure invoices.
 
 ## Offline and CI validation
 
