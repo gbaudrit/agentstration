@@ -67,10 +67,14 @@ Storage providers and check regional B-family vCPU quota before provisioning.
 2. Create a dedicated `StorageV2` account in that group, Standard LRS, TLS 1.2
    minimum, with `allowBlobPublicAccess: false` and `allowSharedKeyAccess: false`.
    Create a private `previews` container using Entra authentication (`--auth-mode login`).
+   With shared keys disabled, the bootstrap maintainer also needs Blob Data
+   Contributor to create the container; grant it temporarily if necessary.
    Its HTTPS data endpoint must be reachable from the hosted runner and VM;
    anonymous access remains disabled. Add a storage lifecycle rule expiring
-   `*/transfer-*` blobs after one day as a fallback for terminated runners;
-   **exclude `*/lifecycle.json` ownership records** from expiration.
+   `previews/transfer/` blobs after one day as a fallback for terminated runners
+   (replace `previews` if using another container name). Azure lifecycle prefix
+   matching is literal, not a wildcard. **Do not expire ownership records**
+   under `<resource-prefix>/lifecycle.json`.
 3. Create an Entra application/service principal with GitHub federation:
    issuer `https://token.actions.githubusercontent.com`, audience
    `api://AzureADTokenExchange`, subject

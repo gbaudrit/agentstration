@@ -219,7 +219,7 @@ class Azure:
 
     def transfer(self, expect_existing=False):
         bundle, checksum = bundle_images(self.request, self.directory)
-        name = prefix(self.request) + '/transfer-' + uuid.uuid4().hex + '.tar.gz'
+        name = 'transfer/' + prefix(self.request) + '/' + uuid.uuid4().hex + '.tar.gz'
         try:
             self.storage('blob', 'upload', '--name', name, '--file', str(bundle), '--overwrite', 'false', '--no-progress')
             expires = (datetime.now(timezone.utc) + timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%MZ')

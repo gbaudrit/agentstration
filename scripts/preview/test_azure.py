@@ -268,6 +268,29 @@ class AzureTests(unittest.TestCase):
             self.assertFalse((client.directory / 'run-command.json').exists())
             self.assertEqual(('rest', '--method', 'delete'), calls[-1][:3])
 
+    def test_staged_blob_is_removed_when_the_guest_command_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            client = object.__new__(azure.Azure)
+            client.request, client.directory = self.value, Path(temporary)
+            blobs = set()
+            def storage(*args, **kwargs):
+                name = args[args.index('--name') + 1]
+                if args[:2] == ('blob', 'upload'):
+                    blobs.add(name)
+                if args[:2] == ('blob', 'generate-sas'):
+                    self.assertEqual('r', args[args.index('--permissions') + 1])
+                    self.assertIn('--https-only', args)
+                    self.assertIn('--as-user', args)
+                    return 'https://private.example.test/read-only-fixture'
+                if args[:2] == ('blob', 'delete'):
+                    blobs.remove(name)
+            client.storage = storage
+            client.run_guest = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError('Guest interrupted'))
+            with patch.object(azure, 'bundle_images', return_value=(Path(temporary) / 'bundle.tar.gz', 'a' * 64)):
+                with self.assertRaises(RuntimeError):
+                    client.transfer()
+            self.assertEqual(set(), blobs)
+
     def test_provider_command_failure_never_echoes_credentials_or_raw_logs(self):
         secret = 'public-disposable-secret-fixture'
         with patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], 1, secret, secret)):
