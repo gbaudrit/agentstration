@@ -64,6 +64,16 @@ namespace Agentstration.ArchitectureTests;
 public sealed class DependencyTests
 {
     [TestMethod]
+    public void GenericGitOperationsStayInsideTheAutonomousExtensionWithoutHostBusinessDependencies()
+    {
+        var references = typeof(GitRepositoryOperations).Assembly.GetReferencedAssemblies().Select(reference => reference.Name!).ToArray();
+        Assert.IsFalse(references.Any(name => name.StartsWith("Agentstration.Work", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Coding", StringComparison.Ordinal) || name.StartsWith("Agentstration.Application", StringComparison.Ordinal)
+            || name.StartsWith("Agentstration.Sources", StringComparison.Ordinal) || name.Contains("Storage.Sqlite", StringComparison.Ordinal)));
+        Assert.AreEqual(typeof(GitSourceProvider).Assembly, typeof(GitRepositoryOperations).Assembly);
+    }
+
+    [TestMethod]
     public void CodingAndGitHubRemainOutsideGenericWorkAndFlowAndTheExtensionIsAutonomous()
     {
         var core = new[] { typeof(WorkItem).Assembly, typeof(Agentstration.Flows.FlowDefinition).Assembly };
@@ -1547,6 +1557,11 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') == "../BootstrapApplicationTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Scenarios.Tests"
                         or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+
+                // The native Git HTTP fixture is owned by the test root and reused
+                // only by its provider and governed transport integration modules.
+                if (include.Replace('\\', '/') == "../fixtures/Git/AuthenticatedGitFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.SourceProviders.Git.Tests") continue;
 
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.

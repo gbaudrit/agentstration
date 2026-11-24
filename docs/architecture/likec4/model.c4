@@ -204,7 +204,7 @@ model {
   }
 
   aepExtensions = softwareSystem 'AEP extensions' {
-    description 'Independently deployable provider and utility adapters enrolled with Agentstration, including optional PostgreSQL JSONB ASP document/query storage'
+    description 'Independently deployable provider and utility adapters enrolled with Agentstration, including optional PostgreSQL JSONB ASP storage and generic authenticated Git reads/CAS publication'
   }
 
   providerServices = softwareSystem 'Optional provider services' {

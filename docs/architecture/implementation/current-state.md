@@ -676,3 +676,14 @@ persistent provider journal recovers uncertain native creates without blind resu
 Git acquisition, issue coordination and local harness execution remain separate increments.
 See [Coding GitHub](../../reference/coding-github.md) and
 [ADR-0264](../../decisions/0264-coding-github-operations-use-protected-relays-and-native-recovery.md).
+
+## Generic Git operations
+
+The existing autonomous Git extension retains its public Source acquisition contract
+and adds an optional authenticated AEP/MCP Tool for exact reads, bounded diffs and
+expected-ref publication. Protected published relays bind credentials and allowed
+repository/ref/path policies; provider-owned prepared/sent journals recover the
+original native commit without blind resubmission. It has no Work, Coding, Bootstrap
+or usage semantics and introduces no host storage dependency. See
+[Git operations](../../reference/git-operations.md) and
+[ADR-0265](../../decisions/0265-generic-git-publication-uses-protected-connections-and-native-cas.md).

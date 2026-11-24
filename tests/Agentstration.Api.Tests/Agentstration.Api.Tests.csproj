@@ -1,5 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <Compile Include="../fixtures/Git/AuthenticatedGitFixture.cs" Link="Fixtures/AuthenticatedGitFixture.cs" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" Aliases="GitExtension" />
     <ProjectReference Include="../../src/extensions/Agentstration.Extensions.GitHub/Agentstration.Extensions.GitHub.csproj" Aliases="GitHubExtension" />
     <Compile Include="../TestHostMetrics.cs" Link="TestHostMetrics.cs" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />

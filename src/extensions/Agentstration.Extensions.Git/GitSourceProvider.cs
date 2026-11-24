@@ -1,7 +1,5 @@
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Agentstration.Aep.Abstractions;
@@ -13,7 +11,6 @@ namespace Agentstration.Extensions.Git;
 public sealed partial class GitSourceProvider(IOptions<GitSourceProviderOptions> configuredOptions) : IAepSourceProvider
 {
     public const string ContributionId = "git";
-    private const int MaximumDiagnosticCharacters = 16 * 1024;
     private readonly GitSourceProviderOptions options = configuredOptions.Value;
 
     public AepSourceProviderDescriptor Descriptor { get; } = new(
@@ -189,86 +186,15 @@ public sealed partial class GitSourceProvider(IOptions<GitSourceProviderOptions>
         long maximumFileBytes = long.MaxValue)
     {
         ValidateProviderOptions();
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = options.GitExecutable,
-            WorkingDirectory = repositoryPath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        startInfo.Environment["GIT_TERMINAL_PROMPT"] = "0";
-        startInfo.Environment["GCM_INTERACTIVE"] = "Never";
-        var hooksPath = Path.Combine(repositoryPath, ".disabled-hooks");
-        var globalConfigPath = Path.Combine(repositoryPath, ".empty-gitconfig");
-        Directory.CreateDirectory(hooksPath);
-        File.WriteAllText(globalConfigPath, string.Empty);
-        startInfo.Environment["GIT_CONFIG_NOSYSTEM"] = "1";
-        startInfo.Environment["GIT_CONFIG_GLOBAL"] = globalConfigPath;
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("credential.helper=");
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add($"core.hooksPath={hooksPath}");
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add(options.AllowLocalRepositories ? "protocol.file.allow=always" : "protocol.file.allow=never");
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("protocol.ext.allow=never");
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("submodule.recurse=false");
-        foreach (var argument in arguments) startInfo.ArgumentList.Add(argument);
-
-        using var process = new Process { StartInfo = startInfo };
         try
         {
-            if (!process.Start()) throw new InvalidOperationException("The Git process could not be started.");
+            return (await new GitCommandRunner(options).RunAsync(repositoryPath, arguments, maximumRepositoryBytes,
+                cancellationToken, boundedFile, maximumFileBytes, truncateOutput: true)).Text;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (GitOperationException error)
         {
-            throw new AepServerException("git_unavailable", "The configured Git executable is unavailable.", 502, exception);
-        }
-
-        var standardOutput = ReadBoundedAsync(process.StandardOutput, cancellationToken);
-        var standardError = ReadBoundedAsync(process.StandardError, cancellationToken);
-        try
-        {
-            while (!process.HasExited)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (DirectorySize(repositoryPath) > maximumRepositoryBytes)
-                    throw TooLarge("git_repository_too_large", "The fetched Git repository exceeds the configured size limit.");
-                if (boundedFile is not null && File.Exists(boundedFile) && new FileInfo(boundedFile).Length > maximumFileBytes)
-                    throw TooLarge("git_archive_too_large", "The Git archive exceeds the negotiated compressed size limit.");
-                await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
-            }
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch
-        {
-            TryKill(process);
-            throw;
-        }
-
-        var output = await standardOutput;
-        var error = await standardError;
-        if (process.ExitCode != 0)
-            throw new AepServerException("git_command_failed", "Git could not resolve or materialize the requested content.", 422,
-                new InvalidOperationException(TrimDiagnostic(error)));
-        if (DirectorySize(repositoryPath) > maximumRepositoryBytes)
-            throw TooLarge("git_repository_too_large", "The fetched Git repository exceeds the configured size limit.");
-        return output;
-    }
-
-    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken)
-    {
-        var buffer = new char[2048];
-        var result = new StringBuilder();
-        while (true)
-        {
-            var read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
-            if (read == 0) return result.ToString();
-            if (result.Length < MaximumDiagnosticCharacters)
-                result.Append(buffer, 0, Math.Min(read, MaximumDiagnosticCharacters - result.Length));
+            throw new AepServerException(error.Code, "Git could not produce the requested bounded content.",
+                error.Code is "git_repository_too_large" or "git_archive_too_large" ? 413 : 422);
         }
     }
 
@@ -317,14 +243,6 @@ public sealed partial class GitSourceProvider(IOptions<GitSourceProviderOptions>
             throw new InvalidOperationException("Git Source Provider options are invalid.");
     }
 
-    private static long DirectorySize(string path)
-    {
-        if (!Directory.Exists(path)) return 0;
-        try { return Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length); }
-        catch (DirectoryNotFoundException) { return 0; }
-        catch (FileNotFoundException) { return 0; }
-    }
-
     private static string RequiredString(JsonElement values, string name) =>
         OptionalString(values, name) ?? throw Invalid("git_configuration_invalid", $"Git option '{name}' is required.");
 
@@ -335,9 +253,6 @@ public sealed partial class GitSourceProvider(IOptions<GitSourceProviderOptions>
             throw Invalid("git_configuration_invalid", $"Git option '{name}' must be a non-empty string.");
         return property.GetString()!.Trim();
     }
-
-    private static string TrimDiagnostic(string value) =>
-        value.Length <= MaximumDiagnosticCharacters ? value : value[..MaximumDiagnosticCharacters];
 
     private static AepServerException Invalid(string code, string message) => new(code, message, 422);
     private static AepServerException TooLarge(string code, string message) => new(code, message, 413);
@@ -355,12 +270,6 @@ public sealed partial class GitSourceProvider(IOptions<GitSourceProviderOptions>
             && !(bytes[0] == 192 && bytes[1] == 168)
             && !(bytes[0] == 100 && bytes[1] is >= 64 and <= 127)
             && bytes[0] < 224;
-    }
-
-    private static void TryKill(Process process)
-    {
-        try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-        catch (InvalidOperationException) { }
     }
 
     [GeneratedRegex("^[0-9a-fA-F]{40}$", RegexOptions.CultureInvariant)]
