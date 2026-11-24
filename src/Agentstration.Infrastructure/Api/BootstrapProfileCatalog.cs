@@ -55,6 +55,30 @@ public sealed class BootstrapProfileCatalog(
 
     public int MaximumSelectedProfiles => MaximumProfilesPerApplication;
 
+    internal static async Task<BootstrapProfileFiles> ReadFilesAsync(LoadedBootstrapProfile profile, string? file,
+        CancellationToken cancellationToken)
+    {
+        // Only the manifests belonging to the already validated profile are exposed.
+        var files = Directory.EnumerateFiles(profile.DirectoryPath, "*", SearchOption.TopDirectoryOnly)
+            .Where(IsManifest).Select(Path.GetFileName).OfType<string>()
+            .Order(StringComparer.Ordinal).ToArray();
+        string? yaml = null;
+        if (file is not null)
+        {
+            if (!files.Contains(file, StringComparer.Ordinal))
+                throw new DeclarativeBootstrapException("bootstrap_profile_file_invalid");
+            var path = Path.Combine(profile.DirectoryPath, file);
+            var info = new FileInfo(path);
+            RejectReparsePoint(info, "Bootstrap profile source");
+            if (info.Length > MaximumManifestBytes)
+                throw new DeclarativeBootstrapException("bootstrap_profile_file_invalid");
+            yaml = await File.ReadAllTextAsync(path, cancellationToken);
+            if (Encoding.UTF8.GetByteCount(yaml) > MaximumManifestBytes)
+                throw new DeclarativeBootstrapException("bootstrap_profile_file_invalid");
+        }
+        return new(profile.Summary.Name, profile.Summary.Digest, files, file, yaml);
+    }
+
     public async Task<BootstrapCatalogSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
     {
         var options = configuration.GetSection(ConfigurationSection).Get<DeclarativeBootstrapOptions>() ?? new();

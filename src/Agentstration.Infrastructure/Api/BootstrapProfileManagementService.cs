@@ -39,6 +39,20 @@ public sealed partial class BootstrapProfileManagementService(
     BootstrapApplicationLock applicationLock,
     ILogger<BootstrapProfileManagementService>? logger = null) : IBootstrapProfileApiService
 {
+    public async Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request,
+        Guid actorPrincipalId, CancellationToken cancellationToken)
+    {
+        await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
+        await using var loaded = request.Source is null
+            ? new LoadedBootstrapSelection(await catalog.LoadAsync([request.Profile], cancellationToken))
+            : await sourceProfiles.LoadAsync(request.Source, cancellationToken);
+        var profile = loaded.Profiles.Single();
+        if (profile.Summary.Name != request.Profile
+            || request.ExpectedDigest is not null && request.ExpectedDigest != profile.Summary.Digest)
+            throw new DeclarativeBootstrapException("bootstrap_profile_source_changed");
+        return await BootstrapProfileCatalog.ReadFilesAsync(profile, request.File, cancellationToken);
+    }
+
     public async Task<BootstrapManagementView> GetAsync(Guid actorPrincipalId, CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
@@ -215,7 +229,16 @@ public sealed partial class BootstrapProfileManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.ExpectedDigest) || request.RequestId == Guid.Empty)
             throw new DeclarativeBootstrapException("bootstrap_request_identity_required");
-        var selection = new BootstrapProfileSelection(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications);
+        var selection = new BootstrapProfileSelection(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications, request.Inputs);
+        BootstrapInputSelectionValidation.Validate(selection.Inputs);
+        // Validate authored input declarations before persisting any application-local selections.
+        if (selection.Inputs is { Count: > 0 })
+        {
+            var inputPreview = await PreviewAsync(selection, actorPrincipalId, cancellationToken);
+            if (!inputPreview.CanApply || selection.Inputs.Any(input => !inputPreview.Inputs.Any(declaration =>
+                    declaration.Profile == input.Profile && declaration.Configuration == input.Configuration)))
+                throw new DeclarativeBootstrapException("bootstrap_input_selection_invalid");
+        }
         if (selection.Applications is { Count: > 0 })
         {
             ValidatePlanRequest(selection);
@@ -371,7 +394,8 @@ public sealed partial class BootstrapProfileManagementService(
                                 Bindings = progress.Preview.Bindings,
                                 SourceProvenance = progress.Preview.SourceProvenance,
                                 Resources = progress.Resources,
-                                CurrentResource = progress.CurrentResource
+                                CurrentResource = progress.CurrentResource,
+                                Operation = progress.Operation
                             }
                         }, application.ETag, token);
                         if (application.Definition.CancellationRequested) throw new OperationCanceledException();
@@ -380,7 +404,8 @@ public sealed partial class BootstrapProfileManagementService(
                 };
             var execution = selection.Applications is { Count: > 0 }
                 ? await ExecutePlanAsync(selection, application.Definition.ActorPrincipalId.Value, application.Definition.Digest, report, cancellationToken)
-                : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report);
+                : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report,
+                    actorPrincipalId: application.Definition.ActorPrincipalId);
             await applicationLock.State.WaitAsync(CancellationToken.None);
             try
             {

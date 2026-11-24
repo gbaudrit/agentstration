@@ -11,7 +11,11 @@ internal sealed class BootstrapStartupAdmissionMiddleware(RequestDelegate next)
     public async Task InvokeAsync(HttpContext context, BootstrapStartupState startup, IAuthenticationAdmissionPolicy admission)
     {
         if (startup.IsReady || !startup.AdministrationReady || context.User.Identity?.IsAuthenticated != true
-            || context.User.Identity.AuthenticationType == AgentstrationAuthenticationDefaults.BffWorkloadScheme)
+            || context.User.Identity.AuthenticationType == AgentstrationAuthenticationDefaults.AwpWorkerScheme)
+        {
+            await next(context); return;
+        }
+        if (context.User.Identity.AuthenticationType == AgentstrationAuthenticationDefaults.BffWorkloadScheme)
         {
             await next(context); return;
         }

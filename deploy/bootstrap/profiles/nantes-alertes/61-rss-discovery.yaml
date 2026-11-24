@@ -1,0 +1,15 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceOperationDiscovery
+metadata:
+  name: nantes-news-operations
+  namespace: default
+definition:
+  connectedService:
+    resourceRef:
+      name: nantes-actualites-rss
+  operations:
+  - name: rss
+    selector:
+      method: GET
+      endpoint: https://news.google.com/rss/search
+    enabled: true

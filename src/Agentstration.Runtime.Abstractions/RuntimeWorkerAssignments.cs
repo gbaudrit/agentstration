@@ -74,6 +74,8 @@ public sealed record RuntimeWorkerAssignmentQuery
 
 public sealed record RuntimeWorkerClaimRequest
 {
+    // Null admits all assignments; an empty set admits none. Supplied by the server only.
+    public IReadOnlySet<RuntimeAssignmentId>? AllowedAssignmentIds { get; init; }
     public required RuntimeAssignmentAttemptId AttemptId { get; init; }
     public required RuntimeWorkerId WorkerId { get; init; }
     public required RuntimeWorkerSessionId WorkerSessionId { get; init; }
@@ -81,6 +83,12 @@ public sealed record RuntimeWorkerClaimRequest
     public required IReadOnlySet<string> RuntimeCapabilityVersions { get; init; }
     public required IReadOnlySet<string> ExecutionMaterialVersions { get; init; }
     public required int MaximumConcurrentAssignments { get; init; }
+}
+
+/// <summary>Host-controlled admission of durable assignments, independent of Worker capabilities.</summary>
+public interface IRuntimeAssignmentAdmission
+{
+    IReadOnlySet<RuntimeAssignmentId>? ClaimableAssignmentIds { get; }
 }
 
 public sealed record RuntimeAssignmentOwnershipProof
@@ -177,6 +185,7 @@ public sealed record RuntimeAssignmentTerminalCommand(
 
 public static class RuntimeAssignmentErrorCodes
 {
+    public const string ExecutionSuspended = "assignment_execution_suspended";
     public const string NotOwned = "assignment_not_owned";
     public const string LeaseExpired = "assignment_lease_expired";
     public const string FencingRejected = "assignment_fencing_rejected";

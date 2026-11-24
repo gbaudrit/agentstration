@@ -190,7 +190,9 @@ internal static class StandaloneHostCompositionExtensions
             var startup = context.RequestServices.GetRequiredService<BootstrapStartupState>();
             var announcement = HttpMethods.IsPost(context.Request.Method)
                 && string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/api/aep/enrollments/announce", StringComparison.OrdinalIgnoreCase);
-            if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement
+            var workerProtocol = startup.WorkerCommunicationOpen
+                && BootstrapAdministrationAccess.IsWorkerCommunicationEndpoint(context.GetEndpoint());
+            if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement && !workerProtocol
                 && !(startup.AdministrationReady && (BootstrapAdministrationAccess.IsAdministrationPath(context.Request.Path)
                     || BootstrapAdministrationAccess.IsInspectionRead(context.Request)
                     || BootstrapAdministrationAccess.IsLoginOrAsset(context.Request.Path)
@@ -259,7 +261,8 @@ internal static class StandaloneHostCompositionExtensions
             }
             // Do not let the startup System execution context flow into the HTTP
             // listener or background service execution contexts.
-            hostStart = app.StartAsync(app.Lifetime.ApplicationStopping);
+            using (ExecutionContext.SuppressFlow())
+                hostStart = Task.Run(() => app.StartAsync(app.Lifetime.ApplicationStopping), CancellationToken.None);
             var listenerStarted = app.Services.GetRequiredService<BootstrapStartupLifecycle>().ListenerStarted;
             await await Task.WhenAny(hostStart, listenerStarted);
             using (startupScopes.PushSystem())
@@ -270,9 +273,8 @@ internal static class StandaloneHostCompositionExtensions
                     if (string.Equals(composition.Authentication.Mode, ApiAuthenticationOptions.Development, StringComparison.OrdinalIgnoreCase))
                         bootstrapContext = await app.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(token);
                     await app.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(token);
-                    await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
-                    if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
-                        await app.Services.GetRequiredService<ExtensionSourceDiscoveryService>().DiscoverForActiveWorkspacesAsync(token);
+                    if (!app.Configuration.GetValue<bool>("Agentstration:Bootstrap:InitialBootstrapEnabled"))
+                        await app.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(token);
                     await BootstrapStartupRetry.ExecuteAsync(app.Services, token);
                     await app.Services.GetRequiredService<IOperationalTopologyProvisioner>().EnsureAllAsync(token);
                     if (app.Configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))

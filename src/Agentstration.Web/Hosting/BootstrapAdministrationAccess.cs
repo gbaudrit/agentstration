@@ -1,10 +1,30 @@
+using Agentstration.Aep.Abstractions;
+using Agentstration.Web.Security;
+using Microsoft.AspNetCore.Authorization;
+
 namespace Agentstration.Web.Hosting;
 
 internal static class BootstrapAdministrationAccess
 {
+    // Read only server-owned endpoint metadata. A request path or verb alone
+    // cannot grant early admission, and endpoint authorization still runs.
+    internal static bool IsWorkerCommunicationEndpoint(Endpoint? endpoint)
+    {
+        if (endpoint is null) return false;
+        if (endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null
+            && endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
+                .Any(value => value.Policy == AgentstrationPolicies.AwpWorker))
+            return true;
+
+        return endpoint is RouteEndpoint route
+            && endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods is ["POST"]
+            && route.RoutePattern.RawText is "/api/awp/enrollment/announce"
+                or "/api/awp/enrollment/claim" or AepProtocol.SecretAccessPath;
+    }
+
     internal static bool IsInspectionRead(HttpRequest request) =>
         (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
-        && new[] { "/api/agents", "/api/deployments", "/api/flows", "/api/schemas", "/api/runtimeprofiles", "/api/tools", "/api/data-sources",
+        && new[] { "/api/agents", "/api/deployments", "/api/flows", "/api/flowRuns", "/api/schemas", "/api/runtimeprofiles", "/api/tools", "/api/data-sources",
             "/api/data-source-profiles", "/api/knowledge-sources", "/api/storages", "/api/storage-types", "/api/connected-services",
             "/api/packs", "/api/resource-plans", "/api/entries", "/api/transformation-functions" }
             .Any(prefix => request.Path.StartsWithSegments(prefix));
@@ -16,7 +36,7 @@ internal static class BootstrapAdministrationAccess
             "/api/parameters", "/api/secrets",
             "/api/auth", "/api/resource-scopes", "/api/resource-access-policies",
             "/api/identity", "/api/authorization", "/api/tenants", "/api/workspaces", "/api/principals",
-            "/api/bootstrap", "/api/internal/bff", "/api/notifications", "/api/navigation", "/api/console", "/_blazor" }
+            "/api/bootstrap", "/api/internal/bff", "/api/notifications", "/api/navigation", "/api/console", "/_blazor", "/hubs/flow-runs" }
             .Any(prefix => path.StartsWithSegments(prefix));
 
     // Let document navigations reach authentication and the post-authentication

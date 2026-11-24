@@ -6,7 +6,9 @@ public sealed record BootstrapStartupActivity(
     string? ResourceKind = null, string? ResourceName = null,
     string? ProviderName = null, string? ModelName = null, string? WaitReason = null, string? ProviderNamespace = null,
     string? ExtensionId = null, string? ContributionId = null, string? ProviderScopeRef = null,
-    string? ResourceId = null, bool CanChangeModel = false, string? TargetLevel = null, string? GroupId = null);
+    string? ResourceId = null, bool CanChangeModel = false, string? TargetLevel = null, string? GroupId = null,
+    string? FlowRunId = null, string? FlowRunContext = null, DateTimeOffset? StageStartedAt = null,
+    string? RuntimeCapability = null, DateTimeOffset? Deadline = null);
 
 public sealed record BootstrapStartupSnapshot(
     Guid AttemptId, long Revision, bool Ready, bool AdministrationReady, string State,

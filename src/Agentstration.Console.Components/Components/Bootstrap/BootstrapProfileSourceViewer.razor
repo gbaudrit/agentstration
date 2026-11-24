@@ -1,0 +1,88 @@
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.Sources.Contracts
+@using Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject IBootstrapProfilesApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+<section class="bootstrap-source-viewer" data-testid="bootstrap-source-viewer" aria-busy="@loading.ToString().ToLowerInvariant()">
+    <button type="button" class="text-button" aria-expanded="@opened.ToString().ToLowerInvariant()" @onclick="ToggleAsync">@Localizer["ViewSourceFiles"]</button>
+    @if (opened)
+    {
+        <p>@Localizer["SourceFilesHelp"]</p>
+        @if (failed)
+        {
+            <p role="alert">@Localizer["SourceFilesUnavailable"]</p>
+            <button type="button" class="button-secondary" disabled="@loading" @onclick="LoadAsync">@Localizer["ReloadSourceFiles"]</button>
+        }
+        @if (loading) { <LoadingState Message="@Localizer["LoadingSourceFiles"]" /> }
+        @if (files is not null)
+        {
+            <FormField Label="@Localizer["SourceFile"]">
+                <ClearableSelect TValue="string" Value="@selected" ValueChanged="SelectAsync" AllowClear="false" disabled="@loading" data-testid="bootstrap-source-file">
+                    @foreach (var file in files.Files) { <option value="@file">@file</option> }
+                </ClearableSelect>
+            </FormField>
+            @if (files.Yaml is { } yaml)
+            {
+                <ResourceYamlEditor Value="@yaml" ReadOnly="true" Label="@(Profile + "/" + files.File)" InputTestId="bootstrap-source-yaml" />
+            }
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Profile { get; set; } = string.Empty;
+    [Parameter] public BootstrapSourceProfileSelection? Source { get; set; }
+    [Parameter] public string? ExpectedDigest { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private (string, BootstrapSourceProfileSelection?, string?) identity;
+    private BootstrapProfileFiles? files;
+    private string selected = string.Empty;
+    private bool opened, loading, failed;
+    private int revision;
+
+    protected override void OnParametersSet()
+    {
+        var next = (Profile, Source, ExpectedDigest);
+        if (identity == next) return;
+        identity = next; revision++; opened = loading = failed = false; files = null; selected = string.Empty;
+    }
+    private async Task ToggleAsync()
+    {
+        opened = !opened;
+        if (opened && files is null && !loading) await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        var current = ++revision;
+        loading = true; failed = false; files = null;
+        try
+        {
+            var result = await Client.GetFilesAsync(new(Profile, Source: Source, ExpectedDigest: ExpectedDigest), lifetime.Token);
+            if (current != revision || lifetime.IsCancellationRequested) return;
+            files = result;
+            selected = result.Files.Contains(selected, StringComparer.Ordinal) ? selected : result.Files.FirstOrDefault() ?? string.Empty;
+            if (selected.Length > 0) await SelectAsync(selected);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException)
+        { if (current == revision && !lifetime.IsCancellationRequested) failed = true; }
+        finally { if (current == revision) loading = false; }
+    }
+    private async Task SelectAsync(string file)
+    {
+        if (files is null) return;
+        var digest = files.Digest;
+        var current = ++revision;
+        selected = file; files = files with { File = null, Yaml = null }; loading = true; failed = false;
+        try
+        {
+            var result = await Client.GetFilesAsync(new(Profile, file, Source, digest), lifetime.Token);
+            if (current == revision && !lifetime.IsCancellationRequested) files = result;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException)
+        { if (current == revision && !lifetime.IsCancellationRequested) failed = true; }
+        finally { if (current == revision) loading = false; }
+    }
+    public void Dispose() { revision++; lifetime.Cancel(); lifetime.Dispose(); }
+}

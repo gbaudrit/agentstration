@@ -28,7 +28,7 @@ public sealed class BootstrapStartupCoordinator(
     private sealed record InitialApplication(
         IReadOnlyList<string> Profiles, string TargetLevel, IReadOnlyList<LoadedBootstrapProfile> Snapshot);
 
-    public async Task ExecuteAsync(CancellationToken cancellationToken)
+    public async Task ExecuteAsync(Func<CancellationToken, Task> discoverConfiguredExtensions, CancellationToken cancellationToken)
     {
         using var system = scopes.PushSystem();
         var options = configuration.GetSection("Agentstration:Bootstrap").Get<DeclarativeBootstrapOptions>() ?? new();
@@ -60,13 +60,18 @@ public sealed class BootstrapStartupCoordinator(
         foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
             await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Topology, application.Snapshot, application.TargetLevel, cancellationToken);
         await operationalTopology.EnsureAllAsync(cancellationToken);
+        startup.MoveTo("workers");
+        startup.OpenWorkerCommunication();
+        startup.MoveTo("builtins");
         await platformResources.EnsureAllAsync(cancellationToken);
+        startup.MoveTo("extensions");
+        if (configuration.GetValue("Agentstration:Extensions:DiscoverOnStartup", false))
+            await discoverConfiguredExtensions(cancellationToken);
         foreach (var application in applications.Where(value => value.Snapshot[0].Summary.Scope == BootstrapProfileScope.Instance))
             await ApplyPhaseAsync(new(application.Profiles), BootstrapStartupPhase.Policies, application.Snapshot, application.TargetLevel, cancellationToken);
         await automaticEnrollment.ActivateAsync(cancellationToken);
-
         startup.EnableAdministration();
-        startup.MoveTo("extensions");
+
         var selections = new List<BootstrapProfileSelection>();
         foreach (var application in applications)
             selections.Add(await SelectAsync(application, cancellationToken));
@@ -92,7 +97,11 @@ public sealed class BootstrapStartupCoordinator(
             using var operation = context is null ? scopes.PushSystem()
                 : selection.Target!.WorkspaceId is not null ? scopes.Push(context)
                 : scopes.PushTenant(context.PrincipalId, context.TenantId);
-            await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index].Snapshot, applications[index].TargetLevel, cancellationToken);
+            var actor = context?.PrincipalId;
+            if (actor is null && applications[index].Snapshot.Any(profile => profile.Resources.Any(resource => resource.Resource.Kind == "ConnectedServiceOperationDiscovery")))
+                actor = (await identities.ListPlatformAdministratorsAsync(cancellationToken)).OrderBy(value => value.PrincipalId).FirstOrDefault()?.PrincipalId
+                    ?? throw new DeclarativeBootstrapException("bootstrap_discovery_actor_required");
+            await ApplyPhaseAsync(selection, BootstrapStartupPhase.Resources, applications[index].Snapshot, applications[index].TargetLevel, cancellationToken, actor);
         }
         startup.MoveTo("finalization");
     }
@@ -134,11 +143,11 @@ public sealed class BootstrapStartupCoordinator(
     }
 
     private async Task ApplyPhaseAsync(BootstrapProfileSelection selection, BootstrapStartupPhase phase,
-        IReadOnlyList<LoadedBootstrapProfile> expected, string targetLevel, CancellationToken cancellationToken)
+        IReadOnlyList<LoadedBootstrapProfile> expected, string targetLevel, CancellationToken cancellationToken, Guid? actorPrincipalId = null)
     {
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("Applying Bootstrap phase {Phase} for profiles {Profiles}.", phase, string.Join(",", selection.Profiles));
-        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: targetLevel);
+        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: targetLevel, actorPrincipalId: actorPrincipalId);
         if (result.Error is not null) throw new DeclarativeBootstrapException(result.Error);
     }
 
@@ -149,7 +158,9 @@ public sealed class BootstrapStartupCoordinator(
         requirements = requirements.DistinctBy(requirement => (requirement.ConsumerScope, requirement.Selector)).ToArray();
         var observations = requirements.Select(requirement => startup.RegisterResource(
             requirement.ConsumerScope.Value, requirement.Profile, "contribution:" + requirement.Location + ":" + requirement.Selector.ExtensionId + ":" + requirement.Selector.InstanceId + ":" + requirement.Selector.Kind + ":" + requirement.Selector.ContributionId,
-            "extensions", "ExtensionContribution", requirement.Selector.ExtensionId + "/" + requirement.Selector.ContributionId)).ToArray();
+            "extensions", "ExtensionContribution", requirement.Selector.ExtensionId + "/" + requirement.Selector.ContributionId,
+            dependency: new(requirement.Selector.ExtensionId, requirement.Selector.Kind, requirement.Selector.ContributionId,
+                requirement.Selector.Version, requirement.Selector.InstanceId, requirement.ResourceKind, requirement.ResourceName))).ToArray();
         var requiredIds = requirements.Select(value => value.Selector.ExtensionId).ToHashSet(StringComparer.Ordinal);
         using var deadline = new CancellationTokenSource(timeout, timeProvider);
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
@@ -181,7 +192,8 @@ public sealed class BootstrapStartupCoordinator(
                     catch (BootstrapDependencyException exception)
                     {
                         startup.ObserveContributionWait(requirement.ResourceKind, requirement.ResourceName,
-                            requirement.Selector.ExtensionId, requirement.Selector.ContributionId);
+                            requirement.Selector.ExtensionId, requirement.Selector.ContributionId, observations[index], exception.Code,
+                            makeCurrent: !missing);
                         startup.ObserveOperation(observations[index], "contribution_availability", "waiting");
                         lastDiagnostic = $"{requirement.Profile}/{requirement.Location}: {requirement.ResourceKind}/{requirement.ResourceName} requires extension '{requirement.Selector.ExtensionId}' installation '{requirement.Selector.InstanceId}', {requirement.Selector.Kind}/{requirement.Selector.ContributionId} [{exception.Code}]: {exception.Message}";
                         if (exception.Code is not ("extension_unavailable" or "contribution_unavailable"))

@@ -15,7 +15,7 @@ public sealed partial class BootstrapStartupState
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
     public string RegisterResource(string targetLevel, string profile, string location, string stepId,
-        string kind, string name, string resourceNamespace = "default")
+        string kind, string name, string resourceNamespace = "default", BootstrapStartupDependency? dependency = null)
     {
         lock (sync)
         {
@@ -28,7 +28,8 @@ public sealed partial class BootstrapStartupState
             resourceRows.Add(id, new(id, stepId, profile, location, kind, name,
                 resourceNamespace, targetLevel, "pending", [])
             {
-                GroupId = groupId
+                GroupId = groupId,
+                Dependency = dependency
             });
             revision++;
             return id;
@@ -37,6 +38,30 @@ public sealed partial class BootstrapStartupState
 
     internal static string ResourceId(string targetLevel, string profile, string location) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{targetLevel}\n{profile}\n{location}")));
+
+    public void ConfigureDiscovery(string id, string runtimeCapability, DateTimeOffset deadline)
+    {
+        lock (sync)
+        {
+            if (resourceRows.TryGetValue(id, out var row))
+                activity = new(row.Kind, row.Name, ResourceId: id, GroupId: row.GroupId, TargetLevel: row.TargetLevel,
+                    RuntimeCapability: runtimeCapability, Deadline: deadline);
+        }
+    }
+
+    public void ObserveDiscovery(string id, string stage, string? runId, DateTimeOffset startedAt, string context)
+    {
+        lock (sync)
+        {
+            if (failure is not null || !resourceRows.TryGetValue(id, out var row)) return;
+            activity = new(row.Kind, row.Name, WaitReason: stage, ResourceId: id, GroupId: row.GroupId, TargetLevel: row.TargetLevel,
+                FlowRunId: runId, FlowRunContext: context, StageStartedAt: startedAt,
+                RuntimeCapability: activity?.ResourceId == id ? activity.RuntimeCapability : null,
+                Deadline: activity?.ResourceId == id ? activity.Deadline : null);
+            resourceRows[id] = row with { State = stage == "waiting_worker" ? "waiting" : "running" };
+            revision++;
+        }
+    }
 
     internal BootstrapStartupResource? FindResource(Guid attempt, string id)
     {
@@ -95,7 +120,12 @@ public sealed partial class BootstrapStartupState
             ObserveOperationCore(id, "resource_apply", outcome);
             if (resourceRows.TryGetValue(id, out var row))
             {
-                resourceRows[id] = row with { State = outcome, Failure = diagnostic };
+                resourceRows[id] = row with
+                {
+                    State = outcome,
+                    Failure = diagnostic,
+                    WaitReason = outcome is "succeeded" or "created" or "skipped" ? null : row.WaitReason
+                };
                 if (outcome == "failed" && activity?.ResourceId != id)
                     activity = new(row.Kind, row.Name, ResourceId: id, TargetLevel: row.TargetLevel, GroupId: row.GroupId);
             }
