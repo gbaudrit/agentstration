@@ -1,5 +1,11 @@
 namespace Agentstration.Work;
 
+public readonly record struct WorkPlanId(Guid Value)
+{
+    public static WorkPlanId New() => new(Guid.NewGuid());
+    public override string ToString() => Value.ToString();
+}
+
 public readonly record struct WorkItemId(Guid Value)
 {
     public static WorkItemId New() => new(Guid.NewGuid());

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Work.Storage.PostgreSql;
 
-public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbContext(options)
+public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbContext(options)
 {
     internal DbSet<WorkItemDocument> WorkItems => Set<WorkItemDocument>();
     internal DbSet<WorkplaceDashboardDocument> Dashboards => Set<WorkplaceDashboardDocument>();
@@ -100,6 +100,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskActivityDocument>(), "WorkTaskActivities");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskResultDocument>(), "WorkTaskResults");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
+        ConfigureWorkPlans(modelBuilder);
     }
 
     private static void ConfigureConversationMessage(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<ConversationMessageDocument> entity)
@@ -1033,6 +1034,7 @@ public static class PostgreSqlWorkServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.AddDbContextFactory<WorkDbContext>(options => options.UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", "work").EnableRetryOnFailure()).AddInterceptors(new UtcDateTimeOffsetInterceptor()));
         services.AddSingleton<IWorkItemRepository, PostgreSqlWorkItemRepository>();
+        services.AddSingleton<IWorkPlanRepository, PostgreSqlWorkPlanRepository>();
         services.AddSingleton<IWorkplaceRepository, PostgreSqlWorkplaceRepository>();
         return services;
     }

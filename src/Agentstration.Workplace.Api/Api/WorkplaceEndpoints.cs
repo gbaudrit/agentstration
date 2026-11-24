@@ -62,6 +62,19 @@ public static partial class WorkplaceEndpoints
         workspaces.MapGet("/interactions/{interactionId:guid}/pending-actions", GetPendingActionsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/interactions/{interactionId:guid}/pending-actions/{pendingActionId:guid}/responses", RespondPendingActionAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapGet("/tasks", ListTasksAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapPost("/work-plans", CreateWorkPlanAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(256 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
+        workspaces.MapGet("/work-plans/{planId:guid}", GetWorkPlanAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/work-plans/{planId:guid}/revisions/{revision:long}", GetWorkPlanRevisionAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapGet("/work-plans/{planId:guid}/commands/{commandId:guid}", GetWorkPlanCommandAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/revisions", ReviseWorkPlanAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(256 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/validate", ValidateWorkPlanAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(4 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/activate", ActivateWorkPlanAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(4 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/deactivate", DeactivateWorkPlanAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(4 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         workspaces.MapPost("/tasks/tree", CreateTaskTreeAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(8 * 1024 * 1024))
             .RequireAuthorization(AgentstrationPolicies.CanRunFlows);

@@ -42,6 +42,7 @@ public static class SqliteWorkServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
         services.AddDbContextFactory<WorkDbContext>(options => options.UseSqlite(connectionString));
         services.AddSingleton<IWorkItemRepository, SqliteWorkItemRepository>();
+        services.AddSingleton<IWorkPlanRepository, SqliteWorkPlanRepository>();
         services.AddSingleton<IWorkplaceRepository, SqliteWorkplaceRepository>();
         return services;
     }

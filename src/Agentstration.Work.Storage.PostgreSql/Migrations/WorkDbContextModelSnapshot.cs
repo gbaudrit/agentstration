@@ -95,6 +95,7 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .HasColumnType("character varying(128)");
 
                     b.Property<string>("Payload")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -208,13 +209,8 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkItemDocument", b =>
                 {
                     b.Property<string>("ScopeRef")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
-
-                    b.Property<string>("WorkspaceId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)");
 
                     b.Property<string>("Id")
                         .HasMaxLength(36)
@@ -245,10 +241,6 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.Property<bool>("IsWorkplaceTask")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("TaskTreeId")
-                        .HasMaxLength(36)
-                        .HasColumnType("character varying(36)");
-
                     b.Property<string>("OwnerPrincipalId")
                         .IsRequired()
                         .HasMaxLength(36)
@@ -275,6 +267,10 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<string>("TaskTreeId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
                     b.Property<string>("Title")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
@@ -290,6 +286,10 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.Property<long>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("bigint");
+
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
 
                     b.HasKey("ScopeRef", "Id");
 
@@ -309,13 +309,13 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
 
                     b.HasIndex("WorkspaceId", "InteractionId", "UpdatedAt");
 
-                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "UpdatedAt");
-
-                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "IsWorkplaceTask", "UpdatedAt");
-
                     b.HasIndex("WorkspaceId", "OwnerPrincipalId", "TaskTreeId");
 
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "UpdatedAt");
+
                     b.HasIndex("WorkspaceId", "Status", "UpdatedAt");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "IsWorkplaceTask", "UpdatedAt");
 
                     b.ToTable("WorkItems", "work");
                 });
@@ -356,6 +356,91 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.HasIndex("WorkspaceId", "ReadAt");
 
                     b.ToTable("WorkNotifications", "work");
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkPlanCommandDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("PlanId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("CommandId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("WorkspaceId", "PlanId", "CommandId");
+
+                    b.ToTable("WorkPlanCommands", "work");
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkPlanDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("WorkspaceId", "Id");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId");
+
+                    b.ToTable("WorkPlans", "work");
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkPlanRevisionDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("PlanId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("WorkspaceId", "PlanId", "Number");
+
+                    b.ToTable("WorkPlanRevisions", "work");
                 });
 
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkTaskActivityDocument", b =>
@@ -499,6 +584,24 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .IsUnique();
 
                     b.ToTable("WorkplaceDashboardDrafts", "work");
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkPlanCommandDocument", b =>
+                {
+                    b.HasOne("Agentstration.Work.Storage.PostgreSql.WorkPlanDocument", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkPlanRevisionDocument", b =>
+                {
+                    b.HasOne("Agentstration.Work.Storage.PostgreSql.WorkPlanDocument", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

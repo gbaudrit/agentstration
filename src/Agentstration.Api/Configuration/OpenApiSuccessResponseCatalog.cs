@@ -169,6 +169,14 @@ internal static class OpenApiSuccessResponseCatalog
         if (!path.StartsWith("/api/workspaces/{workspaceName}", StringComparison.OrdinalIgnoreCase)) return null;
 
         if (path == "/api/workspaces/{workspaceName}") return Json<WorkplaceWorkspaceResponse>(200, "Get a Workplace workspace");
+        if (method == "POST" && path.EndsWith("/work-plans", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(201, "Create a WorkPlan");
+        if (method == "POST" && path.EndsWith("/work-plans/{planId}/revisions", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(201, "Revise an inactive WorkPlan");
+        if (method == "GET" && path.EndsWith("/work-plans/{planId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(200, "Get a WorkPlan and task readiness");
+        if (method == "GET" && path.EndsWith("/work-plans/{planId}/revisions/{revision}", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanRevisionResponse>(200, "Get an immutable WorkPlan revision");
+        if (method == "GET" && path.EndsWith("/work-plans/{planId}/commands/{commandId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanCommandResponse>(200, "Get a WorkPlan command receipt");
+        if (method == "POST" && path.EndsWith("/work-plans/{planId}/validate", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(200, "Validate a WorkPlan revision");
+        if (method == "POST" && path.EndsWith("/work-plans/{planId}/activate", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(200, "Activate a validated WorkPlan");
+        if (method == "POST" && path.EndsWith("/work-plans/{planId}/deactivate", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(200, "Deactivate an idle WorkPlan");
         if (path.EndsWith("/dashboards", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<WorkplaceDashboardResponse>>(200, "List Workplace dashboards");
         if (path.EndsWith("/dashboard", StringComparison.OrdinalIgnoreCase)
             || path.Contains("/dashboards/", StringComparison.OrdinalIgnoreCase)) return Json<WorkplaceDashboardResponse>(200, "Get a Workplace dashboard");

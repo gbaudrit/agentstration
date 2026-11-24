@@ -296,6 +296,27 @@ public sealed class OpenApiTests
     }
 
     [TestMethod]
+    public async Task WorkPlanOperationsDescribeTypedRevisionsReadinessAndReceipts()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient();
+        using var document = JsonDocument.Parse(await client.GetStringAsync(OpenApiConfiguration.DocumentPath));
+        var paths = document.RootElement.GetProperty("paths");
+        var create = paths.GetProperty("/api/workspaces/{workspaceName}/work-plans").GetProperty("post");
+        Assert.AreEqual("Create a WorkPlan", create.GetProperty("summary").GetString());
+        AssertSchemaHasProperty(create, "201", "revision");
+        AssertSchemaHasProperty(create, "201", "tasks");
+        var revise = paths.GetProperty("/api/workspaces/{workspaceName}/work-plans/{planId}/revisions").GetProperty("post");
+        AssertSchemaHasProperty(revise, "201", "currentRevision");
+        var revision = paths.GetProperty("/api/workspaces/{workspaceName}/work-plans/{planId}/revisions/{revision}").GetProperty("get");
+        AssertSchemaHasProperty(revision, "200", "digest");
+        var receipt = paths.GetProperty("/api/workspaces/{workspaceName}/work-plans/{planId}/commands/{commandId}").GetProperty("get");
+        AssertSchemaHasProperty(receipt, "200", "observedTasks");
+        foreach (var action in new[] { "validate", "activate", "deactivate" })
+            AssertSchemaHasProperty(paths.GetProperty($"/api/workspaces/{{workspaceName}}/work-plans/{{planId}}/{action}").GetProperty("post"), "200", "status");
+    }
+
+    [TestMethod]
     public async Task EveryApiOperationHasADocumentedSuccessOutcome()
     {
         await using var factory = CreateFactory();

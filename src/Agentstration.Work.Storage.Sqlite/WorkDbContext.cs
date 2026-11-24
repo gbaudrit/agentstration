@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Work.Storage.Sqlite;
 
-public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbContext(options)
+public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbContext(options)
 {
     internal DbSet<WorkItemDocument> WorkItems => Set<WorkItemDocument>();
     internal DbSet<WorkplaceDashboardDocument> Dashboards => Set<WorkplaceDashboardDocument>();
@@ -99,6 +99,7 @@ public sealed class WorkDbContext(DbContextOptions<WorkDbContext> options) : DbC
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskActivityDocument>(), "WorkTaskActivities");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskResultDocument>(), "WorkTaskResults");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
+        ConfigureWorkPlans(modelBuilder);
     }
 
     private static void ConfigureConversationMessage(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<ConversationMessageDocument> entity)

@@ -1,0 +1,19 @@
+using Agentstration.Resources;
+using Agentstration.Work;
+
+namespace Agentstration.Work.Storage.Abstractions;
+
+public enum WorkPlanSaveStatus { Saved, Replayed, Conflict, TasksActive, TaskChanged }
+public sealed record WorkPlanChange(WorkPlanSnapshot Plan, long ExpectedVersion, WorkPlanRevision? NewRevision,
+    WorkPlanCommandReceipt Receipt, bool RequireInactiveTasks);
+
+public interface IWorkPlanRepository
+{
+    Task InitializeAsync(CancellationToken cancellationToken);
+    Task<WorkPlanSnapshot?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkPlanId id, CancellationToken cancellationToken);
+    Task<WorkPlanRevision?> GetRevisionAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkPlanId id, long revision,
+        CancellationToken cancellationToken);
+    Task<WorkPlanCommandReceipt?> GetReceiptAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkPlanId id, Guid commandId,
+        CancellationToken cancellationToken);
+    Task<WorkPlanSaveStatus> TrySaveAsync(WorkPlanChange change, CancellationToken cancellationToken);
+}
