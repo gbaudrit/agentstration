@@ -1,55 +1,20 @@
-name: OCI images
-
+name: Verify private Azure OCI transport
 on:
-  push:
-    tags: ['extension/**', 'worker/**']
   workflow_dispatch:
-    inputs:
-      extension:
-        description: Catalogue image ID (server, AEP extension or AWP Worker)
-        type: choice
-        options: [server, foundry, maf-worker]
-        default: foundry
-        required: true
-      publish_preview:
-        description: Publish the validated archive to private GHCR (no Docker Hub release)
-        type: boolean
-        default: false
-
 permissions:
   contents: read
-
-concurrency:
-  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
-  cancel-in-progress: false
-
+  packages: read
 jobs:
-  validate-and-build:
-    uses: ./.github/workflows/validate-oci-image.yml
-    with:
-      extension: ${{ inputs.extension || 'foundry' }}
-      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
-
-  publish:
-    needs: validate-and-build
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
-    runs-on: ubuntu-latest
+  transport:
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: write
     env:
-      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+      DOCKER_CONFIG: /tmp/agentstration-transport-auth-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v8
-        with:
-          name: oci-image-${{ needs.validate-and-build.outputs.image }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: delivery
-      - name: Install OCI copy tooling
-        run: |
+      - run: |
           sudo apt-get update
           sudo apt-get install -y skopeo
       - uses: docker/login-action@v3
@@ -57,34 +22,56 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Publish the validated archive to private GHCR without rebuilding
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Export private GHCR digests and execute the Azure guest transport
         run: |
-          release_arguments=()
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
-      - name: Log in to Docker Hub for an official image release
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish the same archive to official Docker Hub
-        if: github.event_name == 'push' && github.ref_type == 'tag'
-        env:
-          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
-        run: >-
-          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
-          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
-          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
-      - name: Retain immutable publication references
+          python3 - <<'PY'
+          import json, tarfile, tempfile, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import azure, azure_host, contract, lifecycle, preview
+          from images import catalogue
+          def receipt(name, sha, digest):
+              return {'schemaVersion': 1, 'component': catalogue(name), 'repository': 'gbaudrit/agentstration',
+                      'sourceSha': sha, 'digest': digest}
+          server = receipt('server', '28e38606cb1a236886c4996d4d6791aa4fc24aaf', 'sha256:e573710f4de9f25a33f51cfcda026f83844238e3f8d87d17cc7a78856e388e89')
+          worker = receipt('maf-worker', 'b9d6e97e076229ec6b258327dabfb29f0a17e21d', 'sha256:2f85c63e1d55ebe6cdad21acc045e735aec2370b1f4cd2eec2f062ca9549663a')
+          Path('evidence').mkdir()
+          registry_image = preview.read_json(azure.TRANSPORT)['registryImage']
+          with tempfile.TemporaryDirectory(prefix='private-azure-transport-') as temporary:
+              for database in ('sqlite', 'postgresql'):
+                  directory = Path(temporary) / database
+                  directory.mkdir(mode=0o700)
+                  request = contract.plan(server, worker, 'ghcr-azure-' + database, provider='azure-vm', database=database,
+                                          target=preview.read_json('deploy/preview/targets/azure-vm.example.json'))
+                  bundle, checksum = azure.bundle_images(request, directory)
+                  guest = directory / 'guest'
+                  guest.mkdir(mode=0o700)
+                  with tarfile.open(bundle) as archive:
+                      archive.extractall(guest, filter='data')
+                  try:
+                      first = azure_host.run('deploy', request, registry_image, guest)
+                      assert first['state'] == 'running'
+                      assert azure_host.run('status', request, root=guest)['state'] == 'running'
+                      azure_host.run('destroy', request, root=guest)
+                      again = azure_host.run('deploy', request, registry_image, guest)
+                      assert again['expiresAt'] == first['expiresAt']
+                      for name in ('server', 'worker'):
+                          assert again['observedImages'][name].endswith('@' + request['deliveries'][name]['digest'])
+                      preview.private_write(Path('evidence') / (database + '.json'), json.dumps({
+                          'database': database, 'privateGhcrExport': True, 'sameDigests': True,
+                          'preserveRecreate': True, 'expiryPreserved': True,
+                          'sourceSha': request['sourceSha'], 'workerSourceSha': worker['sourceSha'],
+                          'observedImages': again['observedImages'], 'bundleSha256': checksum
+                      }, indent=2))
+                  finally:
+                      selected = azure_host.local_request(request)
+                      selected['dataMode'] = 'reset'
+                      lifecycle.execute('destroy', selected, guest / 'state')
+          PY
+      - uses: actions/upload-artifact@v7
         if: always()
-        uses: actions/upload-artifact@v7
         with:
-          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            delivery/delivery.json
-            delivery/publication-*.json
-          if-no-files-found: warn
+          name: private-azure-transport-evidence
+          path: evidence/
           retention-days: 30
+          if-no-files-found: error
