@@ -16,7 +16,8 @@ public sealed partial class ApiClientTests
             Assert.AreEqual("/api/bootstrap/profiles/files", request.RequestUri!.AbsolutePath);
             captured = request.Content!.ReadFromJsonAsync<BootstrapProfileFilesRequest>().GetAwaiter().GetResult();
             return new(HttpStatusCode.OK) { Content = JsonContent.Create(new BootstrapProfileFiles("nantes-alertes", "digest", ["20-secret.yaml"], "20-secret.yaml", "valueFrom: {configuration: fixture}")) };
-        })) { BaseAddress = new("http://localhost/") };
+        }))
+        { BaseAddress = new("http://localhost/") };
         var selection = new BootstrapProfileFilesRequest("nantes-alertes", "20-secret.yaml", ExpectedDigest: "digest");
         var result = await new BootstrapProfilesApiClient(http).GetFilesAsync(selection, default);
         Assert.AreEqual(selection, captured);

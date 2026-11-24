@@ -1,7 +1,27 @@
+using Agentstration.Aep.Abstractions;
+using Agentstration.Web.Security;
+using Microsoft.AspNetCore.Authorization;
+
 namespace Agentstration.Web.Hosting;
 
 internal static class BootstrapAdministrationAccess
 {
+    // Read only server-owned endpoint metadata. A request path or verb alone
+    // cannot grant early admission, and endpoint authorization still runs.
+    internal static bool IsWorkerCommunicationEndpoint(Endpoint? endpoint)
+    {
+        if (endpoint is null) return false;
+        if (endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null
+            && endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
+                .Any(value => value.Policy == AgentstrationPolicies.AwpWorker))
+            return true;
+
+        return endpoint is RouteEndpoint route
+            && endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods is ["POST"]
+            && route.RoutePattern.RawText is "/api/awp/enrollment/announce"
+                or "/api/awp/enrollment/claim" or AepProtocol.SecretAccessPath;
+    }
+
     internal static bool IsInspectionRead(HttpRequest request) =>
         (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
         && new[] { "/api/agents", "/api/deployments", "/api/flows", "/api/flowRuns", "/api/schemas", "/api/runtimeprofiles", "/api/tools", "/api/data-sources",

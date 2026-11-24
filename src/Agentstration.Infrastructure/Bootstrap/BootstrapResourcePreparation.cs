@@ -74,7 +74,10 @@ public sealed class BootstrapResourcePreparation(
                     root["type"] = Node(new StorageTypeReference
                     {
                         Type = new(type.Name, type.ScopeRef, type.Namespace),
-                        TypeUid = type.Uid, Version = version.Version, SchemaDigest = version.SchemaDigest, ContractDigest = version.ContractDigest
+                        TypeUid = type.Uid,
+                        Version = version.Version,
+                        SchemaDigest = version.SchemaDigest,
+                        ContractDigest = version.ContractDigest
                     });
                 }
                 else
@@ -86,7 +89,9 @@ public sealed class BootstrapResourcePreparation(
                     root["type"] = Node(new ConnectedServiceTypeReference
                     {
                         Type = new(type.Name, type.ScopeRef, type.Namespace),
-                        TypeUid = type.Uid, Version = version.Version, SchemaDigest = version.SchemaDigest
+                        TypeUid = type.Uid,
+                        Version = version.Version,
+                        SchemaDigest = version.SchemaDigest
                     });
                 }
                 fingerprints.Add(root["type"]!.ToJsonString());
@@ -145,12 +150,16 @@ public sealed class BootstrapResourcePreparation(
             {
                 root["connectedService"] = Node(new ConnectedServiceRevisionReference
                 {
-                    Service = new(service.Address, address.ScopeRef), ServiceUid = service.Uid, Generation = service.Generation
+                    Service = new(service.Address, address.ScopeRef),
+                    ServiceUid = service.Uid,
+                    Generation = service.Generation
                 });
                 root["connectedServiceType"] = Node(service.Definition.Type);
                 var exports = await services.InspectAsync(new()
                 {
-                    Service = new(service.Address, address.ScopeRef), ServiceUid = service.Uid, Generation = service.Generation
+                    Service = new(service.Address, address.ScopeRef),
+                    ServiceUid = service.Uid,
+                    Generation = service.Generation
                 }, new(scope, new(resource.Metadata.Namespace, resource.Kind, resource.Metadata.Name)), cancellationToken);
                 selectedExports = exports.Exports;
                 ResolveExports(selectedExports);

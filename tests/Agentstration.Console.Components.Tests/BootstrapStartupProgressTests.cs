@@ -81,7 +81,8 @@ public sealed class BootstrapStartupProgressTests
         var api = new StartupClient();
         api.Snapshot = api.Snapshot with
         {
-            State = "failed", Failure = new("configuration", "bootstrap_discovery_requires_manual_application", "startup-reference"),
+            State = "failed",
+            Failure = new("configuration", "bootstrap_discovery_requires_manual_application", "startup-reference"),
             Activity = new("ConnectedServiceOperationDiscovery", "nantes-operations", ResourceId: "discovery"),
             Families = [new("resources", "ConnectedServiceOperationDiscovery", "failed", 1, 1, 0, 0, 1, 0, 0)]
         };

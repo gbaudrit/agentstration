@@ -1,5 +1,4 @@
 extern alias awpworker;
-
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.Aep.Abstractions;
@@ -9,8 +8,8 @@ using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
-using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Secrets;
+using Agentstration.Security.AspNetCoreIdentity;
 using Agentstration.Web.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
@@ -104,6 +103,10 @@ public sealed partial class AgentstrationDocumentationEndToEndTests
         Assert.IsNotNull(activity.FlowRunId);
         using var denied = await client.GetAsync("/api/work-items", cancellation.Token);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, denied.StatusCode);
+        using var unknownProtocol = await client.PostAsJsonAsync("/api/awp/v1/unknown", new { }, cancellation.Token);
+        Assert.AreEqual(HttpStatusCode.ServiceUnavailable, unknownProtocol.StatusCode, "A protocol-looking URL is not a registered startup endpoint.");
+        using var unsignedWorker = await client.PostAsJsonAsync("/api/awp/v1/workers/register", new { }, cancellation.Token);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, unsignedWorker.StatusCode, "Admitting the endpoint must not bypass Worker authentication.");
         using var capabilityDenied = await client.PostAsJsonAsync(AepProtocol.SecretAccessPath,
             new { version = AepProtocol.SecretAccessVersion, secretCapability = "invalid", extensionId = "fixture", requirementId = "password", executionId = "fixture" }, cancellation.Token);
         Assert.AreEqual(HttpStatusCode.Forbidden, capabilityDenied.StatusCode, "Startup admits only the callback transport; capability validation remains authoritative.");

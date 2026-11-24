@@ -204,7 +204,8 @@ public sealed partial class BootstrapProfileManagementService
                     expectedDigest: preview.Applications.Single(item => item.Profile == profile.Name).Digest,
                     reportProgress: (progress, cancellation) => report(new(preview,
                         completed.Concat(progress.Resources).ToArray(), progress.CurrentResource is { } current
-                            ? current with { TargetLabel = first?.TargetLabel } : null) { Operation = progress.Operation }, cancellation), waitForDependencies: true, actorPrincipalId: actor);
+                            ? current with { TargetLabel = first?.TargetLabel } : null)
+                    { Operation = progress.Operation }, cancellation), waitForDependencies: true, actorPrincipalId: actor);
                 resources.AddRange(execution.Resources);
                 if (execution.Error is not null)
                 {

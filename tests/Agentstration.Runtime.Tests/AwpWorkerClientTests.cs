@@ -21,7 +21,8 @@ public sealed class AwpWorkerClientTests
     {
         var configured = Microsoft.Extensions.Options.Options.Create(new RuntimeWorkerOptions
         {
-            WorkerId = Guid.NewGuid(), AuthorityUrl = "https://authority.invalid",
+            WorkerId = Guid.NewGuid(),
+            AuthorityUrl = "https://authority.invalid",
             CredentialStateFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "credential.json")
         });
         using var handler = new UnavailableEnrollmentHandler();

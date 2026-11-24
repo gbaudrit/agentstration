@@ -190,10 +190,8 @@ internal static class StandaloneHostCompositionExtensions
             var startup = context.RequestServices.GetRequiredService<BootstrapStartupState>();
             var announcement = HttpMethods.IsPost(context.Request.Method)
                 && string.Equals(context.Request.Path.Value?.TrimEnd('/'), "/api/aep/enrollments/announce", StringComparison.OrdinalIgnoreCase);
-            var workerProtocol = startup.WorkerCommunicationOpen && (context.Request.Path.StartsWithSegments("/api/awp/v1")
-                || HttpMethods.IsPost(context.Request.Method) && (context.Request.Path == "/api/awp/enrollment/announce"
-                    || context.Request.Path == "/api/awp/enrollment/claim"
-                    || context.Request.Path == Agentstration.Aep.Abstractions.AepProtocol.SecretAccessPath));
+            var workerProtocol = startup.WorkerCommunicationOpen
+                && BootstrapAdministrationAccess.IsWorkerCommunicationEndpoint(context.GetEndpoint());
             if (!startup.IsReady && !context.Request.Path.StartsWithSegments("/health") && !announcement && !workerProtocol
                 && !(startup.AdministrationReady && (BootstrapAdministrationAccess.IsAdministrationPath(context.Request.Path)
                     || BootstrapAdministrationAccess.IsInspectionRead(context.Request)

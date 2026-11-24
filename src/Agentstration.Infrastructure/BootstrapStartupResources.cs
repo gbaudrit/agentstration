@@ -120,8 +120,12 @@ public sealed partial class BootstrapStartupState
             ObserveOperationCore(id, "resource_apply", outcome);
             if (resourceRows.TryGetValue(id, out var row))
             {
-                resourceRows[id] = row with { State = outcome, Failure = diagnostic,
-                    WaitReason = outcome is "succeeded" or "created" or "skipped" ? null : row.WaitReason };
+                resourceRows[id] = row with
+                {
+                    State = outcome,
+                    Failure = diagnostic,
+                    WaitReason = outcome is "succeeded" or "created" or "skipped" ? null : row.WaitReason
+                };
                 if (outcome == "failed" && activity?.ResourceId != id)
                     activity = new(row.Kind, row.Name, ResourceId: id, TargetLevel: row.TargetLevel, GroupId: row.GroupId);
             }

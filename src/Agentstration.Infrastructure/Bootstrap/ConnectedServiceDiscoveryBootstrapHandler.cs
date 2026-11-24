@@ -6,9 +6,9 @@ using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement.Contracts;
+using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Core;
-using Agentstration.Resources;
 using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.Infrastructure.Bootstrap;

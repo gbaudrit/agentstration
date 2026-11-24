@@ -311,7 +311,9 @@ public sealed partial class DeclarativeBootstrapTests
             var version = original.Definition.Versions.Single();
             _ = await types.CreateAsync(new ConnectedServiceTypeResource
             {
-                ApiVersion = original.ApiVersion, Kind = original.Kind, ScopeRef = ResourceScopeRef.Instance,
+                ApiVersion = original.ApiVersion,
+                Kind = original.Kind,
+                ScopeRef = ResourceScopeRef.Instance,
                 Metadata = new() { Name = "fixture-protected" },
                 Definition = original.Definition with
                 {

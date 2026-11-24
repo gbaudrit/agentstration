@@ -140,7 +140,8 @@ public sealed partial class DeclarativeBootstrapService(
             bindings,
             ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints),
             resources,
-            loadedSelection.SourceProvenance) { Inputs = inputs.Distinct().ToArray() };
+            loadedSelection.SourceProvenance)
+        { Inputs = inputs.Distinct().ToArray() };
     }
 
     public Task<BootstrapExecutionResult> ExecuteAsync(
