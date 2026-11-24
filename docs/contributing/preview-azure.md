@@ -4,6 +4,8 @@ The external adapter for [#1283](https://github.com/gbaudrit/agentstration/issue
 reuses the [portable lifecycle](preview-lifecycle.md) and the existing SQLite or
 PostgreSQL Compose profile. No deployment service is added to Agentstration.
 See [ADR-0257](../decisions/0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md).
+For the maintainer form selecting a published revision without composing JSON,
+see [manual previews from GitHub Actions](preview-on-demand.md).
 
 ## Execution and ownership
 
@@ -51,7 +53,7 @@ have been reset; deleting it loses their ownership records.
 
 Retries preserve the original expiry. Reset allows a new data lifecycle, including
 a database change, with a new owner/expiry. Database conversion, automatic TTL
-cleanup (#1286), revision selection UI (#1284), public URL/access policy (#1285)
+cleanup (#1286), public URL/access policy (#1285)
 and optional extension selection remain separate work. A reset removes the
 environment's server and Worker identities; preserve-destroy retains them.
 
