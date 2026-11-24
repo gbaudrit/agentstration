@@ -51,7 +51,7 @@ Send it to `POST .../work-plans/{planId}/validate` with execution permission. Su
 
 Activation returns Active, pins the validated revision and exposes Ready/Blocked states. It does not dispatch work. A stale version, unvalidated revision or different revision pin returns `409`. Activation is rejected while any member has active local execution.
 
-The invariant status values are `Draft = 0`, `Validated = 1`, `Active = 2`, `Inactive = 3`. A plan whose tasks are accepted remains Active until explicitly deactivated; automatic execution/lifecycle advancement belongs to #949.
+The invariant status values are `Draft = 0`, `Validated = 1`, `Active = 2`, `Inactive = 3`. A plan whose tasks are accepted remains Active until explicitly deactivated. Explicit execution configuration enables the durable scheduler described below.
 
 ## Readiness and dependency satisfaction
 
@@ -109,6 +109,39 @@ The caller-supplied plan ID and `(revision number, digest)` retain a portable in
 
 ## Bounds and current scope
 
-Plans are limited to 100 tasks, 1,000 explicit edges, 8,000 intent characters, 100 revisions and 256 commands. Existing receipts remain replayable at the history limit. Definition HTTP bodies are limited to 256 KiB and lifecycle bodies to 4 KiB. Invalid graph/input failures use Problem Details `400`; inaccessible records use `404` after authorization; concurrency, active-work, history-limit and lifecycle conflicts use `409`.
+Plans are limited to 100 tasks, 1,000 explicit edges, 8,000 intent characters, 100 revisions and 1,024 authoring/control versions. Existing receipts remain replayable at the history limit. Already admitted completion and cancellation can still progress at that limit. Execution retains at most 200 attempts. Definition HTTP bodies are limited to 256 KiB and lifecycle bodies to 4 KiB. Invalid graph/input failures use Problem Details `400`; inaccessible records use `404` after authorization; concurrency, active-work, history-limit and lifecycle conflicts use `409`.
 
-This is #948. Automatic dispatch and execution admission are #949; Project sharing is #1345. In issue-realization mode, #1346 owns the one-issue/one-plan association and repository-owned issue acknowledgement, hierarchy and dependencies. Those external relationships are not copied into this internal dependency graph. See [ADR-0258](../decisions/0258-workplans-pin-revisions-and-coordinate-readiness.md).
+Revisions/readiness are #948 and durable execution is #949; Project sharing remains #1345. In issue-realization mode, #1346 owns the one-issue/one-plan association and repository-owned issue acknowledgement, hierarchy and dependencies. Those external relationships are not copied into this internal dependency graph. See [ADR-0258](../decisions/0258-workplans-pin-revisions-and-coordinate-readiness.md) and [ADR-0259](../decisions/0259-workplan-dispatch-persists-admission-before-root-flow-submission.md).
+
+## Execute an active plan
+
+Send `POST .../work-plans/{planId}/execution` with execution permission, the current plan version and validated revision, and one Flow target for every atomic member:
+
+```json
+{
+  "commandId": "50000000-0000-0000-0000-000000000001",
+  "expectedVersion": 3,
+  "revision": 1,
+  "revisionDigest": "<digest returned by the plan>",
+  "targets": [
+    {
+      "taskId": "10000000-0000-0000-0000-000000000002",
+      "flow": { "flowId": { "value": "collect" }, "useActiveVersion": true },
+      "input": { "instruction": "Collect evidence" }
+    },
+    {
+      "taskId": "10000000-0000-0000-0000-000000000003",
+      "flow": { "flowId": { "value": "summarize" }, "useActiveVersion": true },
+      "input": { "instruction": "Summarize reviewed evidence" }
+    }
+  ]
+}
+```
+
+The response is `202 Accepted` with a plan `Location`. Targets resolve to exact published versions and are checked again at admission. Inputs must be JSON objects, at most 64 KiB each and 256 KiB combined; request bodies are limited to 1 MiB. Inputs are explicit: prerequisite outputs are retained as evidence and are not implicitly interpolated into another task's input.
+
+The hosted control-plane scheduler checks configured plans every two seconds in bounded pages. `POST .../execution/advance` also runs the same service for deterministic administration. Every attempt exposes its immutable plan/task pins, dependency versions, admission evidence, execution WorkItem ID, root Flow Run ID, lifecycle status and bounded diagnostic code. Admission and its task claim commit before submission; a failed/uncertain handoff reuses these exact identities on restart. Completed/failed/cancelled Flow state is projected durably into the attempt and task. It never substitutes for reviewed functional acceptance.
+
+Use `POST .../execution/cancel` with `{ "commandId": "<uuid>", "expectedVersion": 6 }` to stop future admissions and persist cancellation of open attempts. Flow cancellation is asynchronous; a completion committed before cancellation stays completed. Use `POST .../execution/retry` with the same fields plus `taskId` to explicitly retry a failed/cancelled technical execution whose functional outcome is still Pending. Retry creates a new attempt and keeps earlier evidence. Replaying an identical command is safe; changing its intent conflicts. A final reviewed Accepted/Failed/Cancelled outcome is not reopened by technical retry.
+
+Execution commands, observations and recovery are private to the original Workspace/Principal and revalidate current execution access. Worker loss produces a failed task attempt and leaves successors blocked until an explicit retry and acceptance. No automatic AWP recovery is added. Deactivate and revise only after active tasks settle; a new revision clears execution configuration and retains past attempts.

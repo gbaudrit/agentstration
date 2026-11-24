@@ -75,6 +75,14 @@ public static partial class WorkplaceEndpoints
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(4 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         workspaces.MapPost("/work-plans/{planId:guid}/deactivate", DeactivateWorkPlanAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(4 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/execution", StartWorkPlanExecutionAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1024 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/execution/advance", AdvanceWorkPlanExecutionAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1024 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/execution/cancel", CancelWorkPlanExecutionAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1024 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+        workspaces.MapPost("/work-plans/{planId:guid}/execution/retry", RetryWorkPlanTaskAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1024 * 1024)).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         workspaces.MapPost("/tasks/tree", CreateTaskTreeAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(8 * 1024 * 1024))
             .RequireAuthorization(AgentstrationPolicies.CanRunFlows);

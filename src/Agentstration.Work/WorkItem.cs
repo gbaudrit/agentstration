@@ -3,7 +3,7 @@ using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
-public sealed class WorkItem
+public sealed partial class WorkItem
 {
     private readonly List<WorkInput> _inputs;
     private readonly List<WorkAttachment> _attachments;

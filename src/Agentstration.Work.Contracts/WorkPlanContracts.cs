@@ -14,7 +14,21 @@ public sealed record WorkPlanTaskStateResponse(Guid TaskId, long Version, WorkTa
     IReadOnlyList<string> Reasons, IReadOnlyList<Guid> UnmetDependencies);
 public sealed record WorkPlanResponse(Guid Id, Guid WorkspaceId, WorkPlanStatus Status, long Version, long CurrentRevision,
     long? ValidatedRevision, string? ValidatedDigest, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
-    WorkPlanRevisionResponse Revision, IReadOnlyList<WorkPlanTaskStateResponse> Tasks);
+    WorkPlanRevisionResponse Revision, IReadOnlyList<WorkPlanTaskStateResponse> Tasks)
+{
+    public WorkPlanExecutionResponse? Execution { get; init; }
+    public IReadOnlyList<WorkPlanAttemptResponse> Attempts { get; init; } = [];
+}
+
+public sealed record WorkPlanExecutionTargetRequest(Guid TaskId, Agentstration.Flows.FlowReference Flow, System.Text.Json.JsonElement Input);
+public sealed record StartWorkPlanExecutionRequest(Guid CommandId, long ExpectedVersion, long Revision, string RevisionDigest,
+    IReadOnlyList<WorkPlanExecutionTargetRequest> Targets);
+public sealed record ControlWorkPlanExecutionRequest(Guid CommandId, long ExpectedVersion, Guid? TaskId = null);
+public sealed record WorkPlanExecutionResponse(long Revision, string RevisionDigest, bool Enabled);
+public sealed record WorkPlanAttemptResponse(Guid Id, Guid TaskId, long PlanRevision, string PlanDigest, long TaskVersion, string TaskDigest,
+    Guid WorkItemId, string FlowRunId, Agentstration.Flows.FlowReference Flow, IReadOnlyList<WorkPlanTaskObservationResponse> Dependencies,
+    WorkPlanAttemptStatus Status, bool CancellationRequested, DateTimeOffset AdmittedAt, DateTimeOffset UpdatedAt, string? Diagnostic,
+    IReadOnlyList<WorkPlanAdmissionEvidence> AdmissionEvidence);
 public sealed record WorkPlanTaskObservationResponse(Guid TaskId, long Version);
 public sealed record WorkPlanCommandResponse(Guid PlanId, Guid CommandId, long PlanVersion, WorkPlanAction Action, string IntentDigest, long Revision,
     string RevisionDigest, DateTimeOffset AppliedAt, IReadOnlyList<WorkPlanTaskObservationResponse> ObservedTasks);

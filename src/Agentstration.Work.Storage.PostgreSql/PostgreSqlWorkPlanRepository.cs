@@ -45,6 +45,14 @@ public sealed class PostgreSqlWorkPlanRepository(IDbContextFactory<WorkDbContext
         return row is null ? null : Deserialize<WorkPlanCommandReceipt>(row.Payload);
     }
 
+    public async Task<IReadOnlyList<WorkPlanSnapshot>> ListExecutionsAsync(int skip, int take, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var payloads = await context.WorkPlans.AsNoTracking().OrderBy(row => row.WorkspaceId).ThenBy(row => row.Id)
+            .Skip(Math.Max(0, skip)).Take(Math.Clamp(take, 1, 100)).Select(row => row.Payload).ToArrayAsync(cancellationToken);
+        return payloads.Select(Deserialize<WorkPlanSnapshot>).ToArray();
+    }
+
     public async Task<WorkPlanSaveStatus> TrySaveAsync(WorkPlanChange change, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(change);
@@ -92,6 +100,16 @@ public sealed class PostgreSqlWorkPlanRepository(IDbContextFactory<WorkDbContext
                     return change.RequireInactiveTasks && current is not null && IsActive(current.Status)
                         ? WorkPlanSaveStatus.TasksActive : WorkPlanSaveStatus.TaskChanged;
                 }
+            }
+            foreach (var update in change.TaskUpdates)
+            {
+                var taskKey = update.Value.Id.ToString();
+                if (update.Value.WorkspaceId != change.Plan.WorkspaceId || update.Value.OwnerPrincipalId != change.Plan.OwnerPrincipalId
+                    || update.Value.Version != update.ExpectedVersion + 1
+                    || !change.Receipt.ObservedTasks.Any(observed => observed.TaskId.ToWorkItemId() == update.Value.Id && observed.Version == update.ExpectedVersion))
+                    throw new ArgumentException("Plan task updates must match the observed owned task version.", nameof(change));
+                var document = await context.WorkItems.SingleAsync(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner && value.Id == taskKey, cancellationToken);
+                PostgreSqlWorkItemRepository.Apply(document, update.Value);
             }
             if (row is null)
             {

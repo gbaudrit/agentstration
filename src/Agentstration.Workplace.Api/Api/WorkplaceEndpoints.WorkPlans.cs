@@ -71,6 +71,7 @@ public static partial class WorkplaceEndpoints
         "work_plan_not_found" or "work_plan_revision_not_found" or "work_plan_command_not_found" or "work_plan_task_not_found" => StatusCodes.Status404NotFound,
         "work_plan_conflict" or "work_plan_command_conflict" or "work_plan_active" or "work_plan_tasks_active"
             or "work_plan_history_limit" or "work_plan_task_changed" or "work_plan_revision_conflict"
+            or "work_plan_execution_transition_invalid" or "work_plan_retry_not_allowed" or "work_plan_execution_target_changed" or "work_plan_execution_run_mismatch" or "work_plan_execution_run_unavailable"
             or "work_plan_transition_invalid" or "work_plan_not_validated" or "work_plan_task_intent_changed" => StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest
     });
@@ -83,5 +84,12 @@ public static partial class WorkplaceEndpoints
     private static WorkPlanResponse ToPlanResponse(WorkPlanView view) => new(view.Plan.Id.Value, view.Plan.WorkspaceId.Value, view.Plan.Status,
         view.Plan.Version, view.Plan.CurrentRevision, view.Plan.ValidatedRevision, view.Plan.ValidatedDigest, view.Plan.CreatedAt, view.Plan.UpdatedAt,
         ToPlanRevisionResponse(view.Revision), view.Tasks.Select(task => new WorkPlanTaskStateResponse(task.TaskId.Value, task.Version, task.Outcome,
-            task.Readiness, task.Reasons, task.UnmetDependencies.Select(id => id.Value).ToArray())).ToArray());
+            task.Readiness, task.Reasons, task.UnmetDependencies.Select(id => id.Value).ToArray())).ToArray())
+        {
+            Execution = view.Plan.Execution is { } execution ? new(execution.Revision, execution.RevisionDigest, execution.Enabled) : null,
+            Attempts = view.Plan.Attempts.Select(attempt => new WorkPlanAttemptResponse(attempt.Id, attempt.TaskId.Value, attempt.PlanRevision,
+                attempt.PlanDigest, attempt.TaskVersion, attempt.TaskDigest, attempt.WorkItemId.Value, attempt.FlowRunId, attempt.Flow,
+                attempt.Dependencies.Select(item => new WorkPlanTaskObservationResponse(item.TaskId.Value, item.Version)).ToArray(),
+                attempt.Status, attempt.CancellationRequested, attempt.AdmittedAt, attempt.UpdatedAt, attempt.Diagnostic, attempt.AdmissionEvidence)).ToArray()
+        };
 }

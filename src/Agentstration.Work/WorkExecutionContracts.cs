@@ -14,7 +14,10 @@ public sealed record WorkExecutionRequest(
     IReadOnlyList<WorkAttachment> Attachments,
     IReadOnlyDictionary<string, string> Metadata,
     FlowReference? Flow = null,
-    FlowRunScope? ExecutionScope = null);
+    FlowRunScope? ExecutionScope = null)
+{
+    public WorkExecutionId? RequestedExecutionId { get; init; }
+}
 
 public interface IWorkExecutionScopeAccessor
 {

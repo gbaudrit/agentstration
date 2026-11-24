@@ -317,3 +317,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 256. [ADR-0256 — Functional task trees extend existing Work Items](0256-functional-task-trees-extend-work-items.md)
 257. [ADR-0257 — Functional acceptance consolidates independently of runtime completion](0257-functional-acceptance-is-independent-of-runtime-completion.md)
 258. [ADR-0258 — WorkPlans pin revisions and coordinate readiness](0258-workplans-pin-revisions-and-coordinate-readiness.md)
+259. [ADR-0259 — WorkPlan dispatch persists admission before root Flow submission](0259-workplan-dispatch-persists-admission-before-root-flow-submission.md)

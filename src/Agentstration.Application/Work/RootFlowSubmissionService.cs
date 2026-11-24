@@ -153,6 +153,7 @@ public sealed class RootFlowSubmissionService(
         if (existing is not null)
         {
             ValidateExisting(existing.Value, command, runId, inputHash);
+            existing = await workItems.EnsureRootFlowQueuedAsync(existing, cancellationToken);
             var recoveredRun = await EnsureRunAsync(existing.Value, command, scope, runId, command.Target.UseActiveVersion, cancellationToken);
             return new(existing, recoveredRun, true);
         }

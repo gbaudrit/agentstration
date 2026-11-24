@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Security.Cryptography;
+using System.Text;
 using Agentstration.Flows;
 using Agentstration.Resources;
 using Agentstration.Work;
@@ -81,7 +83,8 @@ public sealed class WorkItemService(
 
         var accepted = await executionGateway.RequestExecutionAsync(new WorkExecutionRequest(
             item.Id, item.WorkspaceId, item.CorrelationId, item.Type, item.Instruction, item.RequestedAgentId, item.Inputs, item.Attachments, item.Metadata, item.Flow,
-            executionScope), cancellationToken);
+            executionScope)
+        { RequestedExecutionId = command.Metadata?.ContainsKey(RootFlowSubmissionService.RootRunIdMetadata) == true ? RootFlowExecutionId(executionScope, item.Id) : null }, cancellationToken);
         var expectedVersion = item.Version;
         item.MarkQueued(accepted.ExecutionId, accepted.SelectedAgentId, accepted.EventId, accepted.AcceptedAt);
         var stored = await repository.SaveAsync(item, expectedVersion, cancellationToken);
@@ -95,6 +98,47 @@ public sealed class WorkItemService(
 
     public Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, WorkItemId id, CancellationToken cancellationToken) =>
         repository.GetAsync(workspaceId, CurrentExecutionScope().PrincipalId, id, cancellationToken);
+
+    internal async Task<StoredWorkItem> EnsureRootFlowQueuedAsync(StoredWorkItem stored, CancellationToken token)
+    {
+        var item = stored.Value;
+        if (item.Flow is null || item.Status is not (WorkItemStatus.Pending or WorkItemStatus.Queued)) return stored;
+        var scope = CurrentExecutionScope();
+        var accepted = await executionGateway.RequestExecutionAsync(new(item.Id, item.WorkspaceId, item.CorrelationId, item.Type,
+            item.Instruction, item.RequestedAgentId, item.Inputs, item.Attachments, item.Metadata, item.Flow, scope)
+        { RequestedExecutionId = RootFlowExecutionId(scope, item.Id) }, token);
+        if (item.Status == WorkItemStatus.Pending)
+        {
+            var version = item.Version;
+            item.MarkQueued(accepted.ExecutionId, accepted.SelectedAgentId, accepted.EventId, accepted.AcceptedAt);
+            try { stored = await repository.SaveAsync(item, version, token); }
+            catch (WorkItemConcurrencyException)
+            { stored = await GetRequiredExactAsync(scope.ScopeRef, item.Id, token); }
+        }
+        await executionGateway.ConfirmQueuedAsync(accepted, token);
+        return stored;
+    }
+
+    internal async Task ObservePlanFlowOutcomeAsync(WorkItemId id, FlowRun run, WorkResult? result, WorkError? error, CancellationToken token)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var stored = await GetRequiredExactAsync(run.Scope.ScopeRef, id, token);
+            var item = stored.Value;
+            if (run.WorkItemResourceId != id.ToString() || item.Metadata.GetValueOrDefault(RootFlowSubmissionService.RootRunIdMetadata) != run.Id)
+                throw new WorkTransitionException("flow_invocation_idempotency_conflict", "The observed Flow does not belong to this WorkItem.");
+            if (item.CurrentExecutionId is not { } executionId || item.Status is WorkItemStatus.Completed or WorkItemStatus.Failed or WorkItemStatus.Cancelled) return;
+            var version = item.Version;
+            item.ObservePlanAttempt(Guid.NewGuid(), executionId, run.Status switch
+            {
+                FlowRunStatus.Succeeded => WorkItemStatus.Completed,
+                FlowRunStatus.Cancelled => WorkItemStatus.Cancelled,
+                _ => WorkItemStatus.Failed
+            }, result, error is null ? null : error with { ExecutionId = executionId }, timeProvider.GetUtcNow());
+            try { await repository.SaveAsync(item, version, token); return; }
+            catch (WorkItemConcurrencyException) when (attempt < 2) { }
+        }
+    }
 
     public Task<StoredWorkItem?> GetExactAsync(ResourceScopeRef scopeRef, WorkItemId id, CancellationToken cancellationToken)
     {
@@ -243,6 +287,9 @@ public sealed class WorkItemService(
 
     private async Task<StoredWorkItem> GetRequiredForExecutionExactAsync(ResourceScopeRef scopeRef, WorkItemId id, CancellationToken cancellationToken) =>
         await repository.GetForExecutionExactAsync(scopeRef, id, cancellationToken) ?? throw new KeyNotFoundException($"Work item '{id}' was not found in execution scope '{scopeRef}'.");
+
+    private static WorkExecutionId RootFlowExecutionId(FlowRunScope scope, WorkItemId id) =>
+        new(new Guid(SHA256.HashData(Encoding.UTF8.GetBytes($"{scope.ScopeRef.Value}\n{scope.PrincipalId:D}\n{id.Value:D}")).AsSpan(0, 16)));
 
     private FlowRunScope CurrentExecutionScope() =>
         WorkExecutionScopeSelection.Select(executionScopeAccessors)

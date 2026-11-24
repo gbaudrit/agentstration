@@ -49,6 +49,8 @@ public sealed partial class WorkPlanService(IWorkPlanRepository plans, IWorkItem
         var observed = members.Values.ToDictionary(item => WorkTaskId.FromWorkItem(item.Value.Id));
         if (current is not null)
         {
+            if (current.Attempts.Any(attempt => attempt.Status is WorkPlanAttemptStatus.Admitted or WorkPlanAttemptStatus.Submitted))
+                return Result<WorkPlanView>.Failure("work_plan_tasks_active");
             var previous = await RequiredRevisionAsync(workspaceId, id, current.CurrentRevision, cancellationToken);
             foreach (var removed in previous.Definition.TaskIds.Except(definition.TaskIds))
             {
@@ -62,7 +64,8 @@ public sealed partial class WorkPlanService(IWorkPlanRepository plans, IWorkItem
         var revision = new WorkPlanRevision(id, (current?.CurrentRevision ?? 0) + 1, definition, references,
             definition.ContentDigest(references), now);
         var plan = new WorkPlanSnapshot(id, workspaceId, context.PrincipalId, WorkPlanStatus.Draft,
-            command.ExpectedVersion + 1, revision.Number, null, null, current?.CreatedAt ?? now, now);
+            command.ExpectedVersion + 1, revision.Number, null, null, current?.CreatedAt ?? now, now)
+        { Attempts = current?.Attempts ?? [] };
         var receipt = new WorkPlanCommandReceipt(command.CommandId, plan.Version, action, intent, revision.Number, revision.Digest, now,
             Observe(observed.Values));
         return await SaveAsync(new(plan, command.ExpectedVersion, revision, receipt, !create), cancellationToken);
@@ -101,7 +104,8 @@ public sealed partial class WorkPlanService(IWorkPlanRepository plans, IWorkItem
         var graphError = await ValidateHierarchyAsync(workspaceId, revision.Definition, members, cancellationToken);
         if (graphError is not null) return Result<WorkPlanView>.Failure(graphError);
         var requireInactive = command.Action != WorkPlanAction.Validate;
-        if (requireInactive && members.Values.Any(item => IsActive(item.Value.Status)))
+        if (requireInactive && (members.Values.Any(item => IsActive(item.Value.Status))
+            || plan.Attempts.Any(attempt => attempt.Status is WorkPlanAttemptStatus.Admitted or WorkPlanAttemptStatus.Submitted)))
             return Result<WorkPlanView>.Failure("work_plan_tasks_active");
         var now = timeProvider.GetUtcNow();
         var changed = plan with

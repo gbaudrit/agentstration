@@ -19,6 +19,25 @@ public sealed class RootFlowSubmissionTests
         Guid.Parse("33333333-3333-3333-3333-333333333333"));
 
     [TestMethod]
+    public async Task CanonicalQueueRecoveryIdentityIsStableAndScopedToWorkspaceAndPrincipal()
+    {
+        var id = WorkItemId.New();
+        var command = Command("scoped-queue", JsonSerializer.SerializeToElement(new { })) with { WorkItemId = id };
+        await using var first = await Fixture.CreateAsync();
+        await first.Submissions.SubmitAsync(command, default);
+        var original = first.Execution.LastRequest!.RequestedExecutionId;
+        await first.Submissions.SubmitAsync(command, default);
+        Assert.AreEqual(original, first.Execution.LastRequest!.RequestedExecutionId);
+        Assert.IsNotNull(original);
+        foreach (var otherScope in new[] { Scope with { WorkspaceId = WorkspaceId.New() }, Scope with { PrincipalId = Guid.NewGuid() } })
+        {
+            await using var other = await Fixture.CreateAsync([new ScopeAccessor(otherScope)]);
+            await other.Submissions.SubmitAsync(command with { WorkspaceId = otherScope.WorkspaceId }, default);
+            Assert.AreNotEqual(original, other.Execution.LastRequest!.RequestedExecutionId);
+        }
+    }
+
+    [TestMethod]
     public async Task RepeatedSubmissionRecoversOneWorkItemAndOneRootRun()
     {
         await using var fixture = await Fixture.CreateAsync();

@@ -1,3 +1,4 @@
+using Agentstration.Flows.Storage.Sqlite;
 using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Resources;
@@ -12,7 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Agentstration.Application.Tests;
 
 [TestClass]
-public sealed class WorkPlanTests
+public sealed partial class WorkPlanTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 24, 16, 0, 0, TimeSpan.Zero);
 
@@ -417,6 +418,7 @@ public sealed class WorkPlanTests
     private sealed class HookedPlans(IWorkPlanRepository inner, Func<WorkPlanChange, Task> beforeSave) : IWorkPlanRepository
     {
         public Task InitializeAsync(CancellationToken token) => inner.InitializeAsync(token);
+        public Task<IReadOnlyList<WorkPlanSnapshot>> ListExecutionsAsync(int skip, int take, CancellationToken token) => inner.ListExecutionsAsync(skip, take, token);
         public Task<WorkPlanSnapshot?> GetAsync(WorkspaceId workspace, Guid owner, WorkPlanId id, CancellationToken token) => inner.GetAsync(workspace, owner, id, token);
         public Task<WorkPlanRevision?> GetRevisionAsync(WorkspaceId workspace, Guid owner, WorkPlanId id, long revision, CancellationToken token) => inner.GetRevisionAsync(workspace, owner, id, revision, token);
         public Task<WorkPlanCommandReceipt?> GetReceiptAsync(WorkspaceId workspace, Guid owner, WorkPlanId id, Guid command, CancellationToken token) => inner.GetReceiptAsync(workspace, owner, id, command, token);
@@ -433,6 +435,7 @@ public sealed class WorkPlanTests
         public string ConnectionString => $"Data Source={Path.Combine(directory, "work.db")};Pooling=False";
         public IWorkItemRepository Tasks => provider!.GetRequiredService<IWorkItemRepository>();
         public IWorkPlanRepository Store => provider!.GetRequiredService<IWorkPlanRepository>();
+        public Agentstration.Flows.Storage.Abstractions.IFlowRepository FlowStore => provider!.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>();
         public static async Task<Fixture> CreateAsync()
         {
             var fixture = new Fixture(); Directory.CreateDirectory(fixture.directory); await fixture.ReopenAsync(); return fixture;
@@ -455,7 +458,7 @@ public sealed class WorkPlanTests
         public async Task ReopenAsync()
         {
             if (provider is not null) await provider.DisposeAsync();
-            var services = new ServiceCollection(); services.AddSqliteWorkPlane(ConnectionString); provider = services.BuildServiceProvider();
+            var services = new ServiceCollection(); services.AddSingleton<TimeProvider>(new Clock(Now)); services.AddSqliteWorkPlane(ConnectionString); services.AddSqliteFlowStorage($"Data Source={Path.Combine(directory, "flow.db")};Pooling=False"); provider = services.BuildServiceProvider();
             await Tasks.InitializeAsync(default); await Store.InitializeAsync(default);
         }
         public async Task SqlAsync(string sql)

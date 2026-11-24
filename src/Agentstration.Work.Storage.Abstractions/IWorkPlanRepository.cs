@@ -5,7 +5,10 @@ namespace Agentstration.Work.Storage.Abstractions;
 
 public enum WorkPlanSaveStatus { Saved, Replayed, Conflict, TasksActive, TaskChanged }
 public sealed record WorkPlanChange(WorkPlanSnapshot Plan, long ExpectedVersion, WorkPlanRevision? NewRevision,
-    WorkPlanCommandReceipt Receipt, bool RequireInactiveTasks);
+    WorkPlanCommandReceipt Receipt, bool RequireInactiveTasks)
+{
+    public IReadOnlyList<WorkTaskTreeUpdate> TaskUpdates { get; init; } = [];
+}
 
 public interface IWorkPlanRepository
 {
@@ -16,4 +19,6 @@ public interface IWorkPlanRepository
     Task<WorkPlanCommandReceipt?> GetReceiptAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkPlanId id, Guid commandId,
         CancellationToken cancellationToken);
     Task<WorkPlanSaveStatus> TrySaveAsync(WorkPlanChange change, CancellationToken cancellationToken);
+    // Trusted scheduler enumeration. User-facing access always requires Workspace and Principal.
+    Task<IReadOnlyList<WorkPlanSnapshot>> ListExecutionsAsync(int skip, int take, CancellationToken cancellationToken);
 }

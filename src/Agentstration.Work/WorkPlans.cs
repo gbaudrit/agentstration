@@ -5,7 +5,7 @@ using Agentstration.Resources;
 namespace Agentstration.Work;
 
 public enum WorkPlanStatus { Draft, Validated, Active, Inactive }
-public enum WorkPlanAction { Create, Revise, Validate, Activate, Deactivate }
+public enum WorkPlanAction { Create, Revise, Validate, Activate, Deactivate, StartExecution, AdvanceExecution, CancelExecution, RetryTask }
 public enum WorkPlanTaskReadiness { Ready, Blocked, Accepted }
 public sealed record WorkTaskDependency(WorkTaskId TaskId, WorkTaskId DependsOnTaskId);
 public sealed record WorkPlanTaskReference(WorkTaskId TaskId, string CreationDigest);
@@ -18,7 +18,7 @@ public sealed record WorkPlanDefinition(string Intent, IReadOnlyList<WorkTaskId>
     public const int MaximumDependencies = 1_000;
     public const int MaximumIntentLength = 8_000;
     public const int MaximumRevisions = 100;
-    public const int MaximumCommands = 256;
+    public const int MaximumCommands = 1_024;
 
     public Result<WorkPlanDefinition> Validate()
     {
@@ -60,7 +60,11 @@ public sealed record WorkPlanDefinition(string Intent, IReadOnlyList<WorkTaskId>
 
 public sealed record WorkPlanSnapshot(WorkPlanId Id, WorkspaceId WorkspaceId, Guid OwnerPrincipalId, WorkPlanStatus Status,
     long Version, long CurrentRevision, long? ValidatedRevision, string? ValidatedDigest,
-    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+{
+    public WorkPlanExecution? Execution { get; init; }
+    public IReadOnlyList<WorkPlanAttempt> Attempts { get; init; } = [];
+}
 public sealed record WorkPlanRevision(WorkPlanId PlanId, long Number, WorkPlanDefinition Definition,
     IReadOnlyList<WorkPlanTaskReference> Tasks, string Digest, DateTimeOffset CreatedAt);
 public sealed record WorkPlanCommandReceipt(Guid CommandId, long PlanVersion, WorkPlanAction Action, string IntentDigest, long Revision,

@@ -570,7 +570,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         Payload = JsonSerializer.Serialize(item.ToSnapshot(), JsonOptions)
     };
 
-    private static void Apply(WorkItemDocument document, WorkItem item)
+    internal static void Apply(WorkItemDocument document, WorkItem item)
     {
         if ((document.TaskTreeId is not null || item.TaskHierarchy is not null)
             && FromDocument(document).Value.TaskHierarchy != item.TaskHierarchy)

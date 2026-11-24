@@ -101,6 +101,7 @@ internal static class StandaloneHostServiceCollectionExtensions
         services.AddHostedService<ModelProviderDiscoveryWorker>();
         services.AddHostedService<AepAutomaticEnrollmentWorker>();
         services.AddHostedService<LocalWorkExecutionWorker>();
+        services.AddHostedService<WorkPlanExecutionWorker>();
         services.AddHostedService<RuntimeAssignmentLeaseReaper>();
         services.AddHostedService<FlowRunRecoveryWorker>();
         services.AddHostedService<SourceRefreshWorker>();

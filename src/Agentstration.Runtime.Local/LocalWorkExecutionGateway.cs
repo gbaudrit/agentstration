@@ -15,6 +15,7 @@ public interface ILocalWorkExecutionQueue
 public sealed class LocalWorkExecutionGateway(TimeProvider timeProvider) : IWorkExecutionGateway, ILocalWorkExecutionQueue
 {
     private readonly ConcurrentDictionary<WorkExecutionId, LocalWorkExecution> _pending = new();
+    private readonly ConcurrentDictionary<WorkExecutionId, byte> _queued = new();
     private readonly Channel<LocalWorkExecution> _queue = Channel.CreateBounded<LocalWorkExecution>(new BoundedChannelOptions(256)
     {
         FullMode = BoundedChannelFullMode.Wait,
@@ -25,20 +26,27 @@ public sealed class LocalWorkExecutionGateway(TimeProvider timeProvider) : IWork
     public async Task<WorkExecutionAccepted> RequestExecutionAsync(WorkExecutionRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var accepted = new WorkExecutionAccepted(WorkExecutionId.New(), request.RequestedAgentId, timeProvider.GetUtcNow(), Guid.NewGuid());
-        if (!_pending.TryAdd(accepted.ExecutionId, new LocalWorkExecution(request, accepted))) throw new InvalidOperationException("The local execution identifier already exists.");
+        var id = request.RequestedExecutionId ?? WorkExecutionId.New();
+        var accepted = new WorkExecutionAccepted(id, request.RequestedAgentId, timeProvider.GetUtcNow(), id.Value);
+        accepted = _pending.GetOrAdd(id, new LocalWorkExecution(request, accepted)).Accepted;
         await Task.CompletedTask;
         return accepted;
     }
 
     public async Task ConfirmQueuedAsync(WorkExecutionAccepted accepted, CancellationToken cancellationToken)
     {
-        if (!_pending.TryRemove(accepted.ExecutionId, out var execution)) throw new InvalidOperationException($"Execution '{accepted.ExecutionId}' is not awaiting queue confirmation.");
-        await _queue.Writer.WriteAsync(execution, cancellationToken);
+        if (!_pending.TryGetValue(accepted.ExecutionId, out var execution) || !_queued.TryAdd(accepted.ExecutionId, 0)) return;
+        try { await _queue.Writer.WriteAsync(execution, cancellationToken); }
+        catch { _queued.TryRemove(accepted.ExecutionId, out _); throw; }
     }
 
     public async IAsyncEnumerable<LocalWorkExecution> ReadAllAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var execution in _queue.Reader.ReadAllAsync(cancellationToken)) yield return execution;
+        await foreach (var execution in _queue.Reader.ReadAllAsync(cancellationToken))
+        {
+            yield return execution;
+            _pending.TryRemove(execution.Accepted.ExecutionId, out _);
+            _queued.TryRemove(execution.Accepted.ExecutionId, out _);
+        }
     }
 }
