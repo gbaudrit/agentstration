@@ -2,10 +2,10 @@
   "apiVersion": "agentstration.io/v1",
   "kind": "Schema",
   "metadata": {
-    "name": "rss-json"
+    "name": "rss-2-0-json"
   },
   "definition": {
-    "displayName": "rss-json",
+    "displayName": "RSS 2.0 feed JSON",
     "format": "json-schema",
     "dialect": "https://json-schema.org/draft/2020-12/schema",
     "content": {
@@ -21,11 +21,13 @@
           "type": "string"
         },
         "version": {
-          "type": "string"
+          "type": "string",
+          "enum": [
+            "2.0"
+          ]
         },
         "items": {
           "type": "array",
-          "maxItems": 100,
           "items": {
             "type": "object",
             "properties": {
@@ -45,21 +47,45 @@
               "sourceUrl": {
                 "type": "string"
               },
-              "rating": {
-                "type": "integer"
+              "link": {
+                "type": "string"
+              },
+              "sourceTitle": {
+                "type": "string"
+              },
+              "creator": {
+                "type": "string"
+              },
+              "guidIsPermaLink": {
+                "type": "boolean"
               }
             },
-            "required": [
-              "guid",
-              "title"
-            ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "title"
+                ]
+              },
+              {
+                "required": [
+                  "description"
+                ]
+              }
+            ]
           }
+        },
+        "generator": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
         }
       },
       "required": [
         "title",
         "link",
+        "description",
         "version",
         "items"
       ],

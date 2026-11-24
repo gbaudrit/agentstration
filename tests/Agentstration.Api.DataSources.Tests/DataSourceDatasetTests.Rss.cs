@@ -63,7 +63,7 @@ public sealed partial class DataSourceDatasetTests
         var itemSchema = RssTransformationTestData.Declarations[1].Definition.GetProperty("content").GetProperty("properties").GetProperty("items").GetProperty("items");
         await using var structured = documentStorage ? await StructuredStorageFixture.StartAsync(services, client, Owner, false, itemSchema) : null;
         var storage = structured?.Reference ?? fixture.Storage;
-        var convert = new FlowCompositionCall { Function = new("rss-xml-to-json", "1.0.0", Owner) };
+        var convert = new FlowCompositionCall { Function = new("rss-2-0-xml-to-json", "1.0.0", Owner) };
         var split = new FlowCompositionCall
         {
             Function = new("json-explode-builtin", "1.0.0", Owner),
@@ -71,7 +71,7 @@ public sealed partial class DataSourceDatasetTests
             {
                 path = "/items",
                 itemSchema = new SchemaBinding
-                { Reference = new() { Name = "rss-json", Version = "1.0.0", ScopeRef = Owner, SchemaPath = "/properties/items/items" } }
+                { Reference = new() { Name = "rss-2-0-json", Version = "1.0.0", ScopeRef = Owner, SchemaPath = "/properties/items/items" } }
             }, JsonSerializerOptions.Web)
         };
         var sourceDefinition = Source("rss-input-" + suffix, fixture, JsonSerializer.SerializeToElement(new { dataset = "rss" }));
@@ -105,7 +105,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.HasCount(point == "data-source" && explode ? 2 : 1, acquired.Publication!.Records!.Members);
         if (point == "data-source")
         {
-            var receipt = acquired.Dataset!.Composition!.Receipt!.Bindings["transformations"].Single(c => c.Function?.Name == "rss-xml-to-json");
+            var receipt = acquired.Dataset!.Composition!.Receipt!.Bindings["transformations"].Single(c => c.Function?.Name == "rss-2-0-xml-to-json");
             Assert.AreEqual(FlowCompositionFunctionInputSource.AcquisitionContent, receipt.FunctionInputSource);
             Assert.HasCount(explode ? 2 : 1, acquired.Dataset.Composition.Receipt.Bindings["transformations"]);
             Assert.IsNotNull(receipt.Function!.Uid);
@@ -191,7 +191,7 @@ public sealed partial class DataSourceDatasetTests
                 {
                     SnapshotId = snapshot.Name,
                     Profile = description.QueryProfiles.Single(),
-                    Query = RssTransformationTestData.Json("""{"$filter":"rating eq 1"}"""),
+                    Query = RssTransformationTestData.Json("""{"$filter":"creator eq 'Author 1'"}"""),
                     PageSize = 1
                 }, default);
                 Assert.HasCount(1, page.DocumentPage!.Documents);

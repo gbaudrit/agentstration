@@ -25,7 +25,7 @@ public sealed class XmlTransformationContentTests : ResourceManagementApiTestBas
             : factory.Services.GetRequiredService<XmlContentOptions>().MaximumDocumentBytes);
         await RssTransformationTestData.CreateAsync(factory.Services, owner);
         var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
-        var function = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
+        var function = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "1.0.0", owner), owner, default);
         var document = XDocument.Parse(RssTransformationTestData.Feed(1));
         document.Root!.Element("channel")!.Element("item")!.Element("title")!.Value = new string('é', 1000);
         var xml = document.ToString();
@@ -49,7 +49,7 @@ public sealed class XmlTransformationContentTests : ResourceManagementApiTestBas
         var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
         await RssTransformationTestData.CreateAsync(factory.Services, owner);
         var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
-        var function = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
+        var function = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "1.0.0", owner), owner, default);
         var xml = "<rss version='2.0'>\n<channel><unexpected>private-value</unexpected></channel></rss>";
         var error = await Assert.ThrowsExactlyAsync<DataContractException>(() => functions.InvokeAsync(function, owner,
             JsonSerializer.SerializeToElement(new { value = xml }), default));
@@ -57,7 +57,7 @@ public sealed class XmlTransformationContentTests : ResourceManagementApiTestBas
         var diagnostic = error.Failure.Xml!;
         Assert.AreEqual("contract", diagnostic.Kind);
         Assert.Contains("unexpected", diagnostic.NodePath!);
-        Assert.AreEqual("rss-xml", diagnostic.Schema!.Name);
+        Assert.AreEqual("rss-2-0-xml", diagnostic.Schema!.Name);
         Assert.AreEqual("1.0.0", diagnostic.Schema.Version);
         Assert.AreEqual(function.Transformation!.Input.DefinitionHash, diagnostic.Schema.DefinitionHash);
         var details = JsonSerializer.Serialize(new { contractFailure = error.Failure });

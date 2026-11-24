@@ -11,7 +11,7 @@ It requires no extension, external endpoint, PostgreSQL or LLM.
 
 ## Bootstrap example
 
-The same `rss-schemas` and `rss-functions` manifests can be installed at
+The same `rss-2-0-schemas` and `rss-2-0-functions` manifests can be installed at
 Instance, Tenant or Workspace scope. The catalog ships them with
 `targetScope: instance`. Before previewing an installation, set the existing
 `definition.targetScope` field in **both** `profile.yaml` descriptors to the
@@ -35,14 +35,14 @@ plan can combine per-profile targets ([ADR-0248](../decisions/0248-manual-bootst
 keep these two sample profiles at the same target so their relative references
 resolve. Changing `targetScope` does not move an existing installation to another owner.
 
-Apply `rss-schemas` through **System > Bootstrap profiles**. This synthetic
-example creates and publishes `rss-xml`, `rss-json` and `rss-mapping` at
-`1.0.0`; it creates no `rss-xml-to-json` function. `definition.publishVersion` is
+Apply `rss-2-0-schemas` through **System > Bootstrap profiles**. This RSS 2.0
+profile creates and publishes `rss-2-0-xml`, `rss-2-0-json` and `rss-2-0-mapping` at
+`1.0.0`; it creates no `rss-2-0-xml-to-json` function. `definition.publishVersion` is
 an optional Bootstrap instruction. Reapplying equivalent declarations preserves
 their identities and versions. Changed definitions at the same identity produce
 a conflict instead of replacing the operator's draft.
 
-Then either apply `rss-functions` to the same target, or open `rss-mapping`
+Then either apply `rss-2-0-functions` to the same target, or open `rss-2-0-mapping`
 under **Schemas > Versions**, select `1.0.0`, and use **Expose as function**.
 The two profiles may also be composed in declaration-first order in one explicit
 application. Tenant and Workspace applications require their explicit target. Reapplying either
@@ -67,12 +67,12 @@ Content-Type: application/json
 
 ```json
 {
-  "name": "rss-xml-to-json",
-  "displayName": "RSS XML to JSON",
+  "name": "rss-2-0-xml-to-json",
+  "displayName": "RSS 2.0 XML to JSON",
   "version": "1.0.0",
   "scopeRef": "/instance",
   "namespace": "default",
-  "schema": { "name": "rss-mapping", "version": "1.0.0" }
+  "schema": { "name": "rss-2-0-mapping", "version": "1.0.0" }
 }
 ```
 
@@ -154,7 +154,7 @@ The raw response is still validated against the acquisition contract first, and
 the function validates its text content against the native XML contract.
 
 Optionally follow the conversion with `json-explode-builtin@1.0.0`, `path: /items`,
-and `itemSchema.reference` selecting `rss-json@1.0.0` at
+and `itemSchema.reference` selecting `rss-2-0-json@1.0.0` at
 `/properties/items/items`. This uses one logical Artifact for the resulting records.
 
 Object-valued functions receive the complete response. Later functions receive the
@@ -191,6 +191,50 @@ Historic publications retain their original evidence and content.
 The separate reusable UX scenario [#1215](https://github.com/gbaudrit/agentstration/issues/1215)
 remains blocked until maintainer UX validation and implementation merge.
 
+## RSS 2.0 structural validation profile
+
+The catalog names include the feed format version: `rss-2-0-xml`,
+`rss-2-0-json`, `rss-2-0-mapping` and `rss-2-0-xml-to-json`. Their Agentstration
+resource versions are all `1.0.0`; that version is independent of RSS `2.0`.
+This is an unreleased replacement of the former synthetic `rss-*` examples.
+Reseed/rebootstrap the instance explicitly; existing immutable versions and
+consumer snapshots are not silently replaced or rebound.
+
+The shipped XSD is an Agentstration-authored, permissive structural contract
+based on the [RSS 2.0 specification](https://www.rssboard.org/rss-specification)
+and [RSS Best Practices Profile](https://www.rssboard.org/rss-profile). It is not
+an official RSS XSD or a copy of a third-party validator. Passing this contract
+does not certify full RSS 2.0 conformance.
+
+The contract requires one `rss` root with `version="2.0"`, one `channel`, its
+`title`, `link` and `description`, and at least a `title` or `description` per
+item. Standard channel/item metadata may appear in different orders; scalar
+duplicates are rejected. Required attributes on `source`, `enclosure` and
+`cloud`, and required children of `image` and `textInput`, remain structural
+requirements. Undeclared no-namespace elements are rejected. Namespace-qualified
+extensions are accepted without resolving or validating their contents. There
+is no schema ceiling of 100 items; operator array quotas remain independent.
+The XSD does not enforce a single occurrence of empty `skipHours`/`skipDays`
+containers. Their child counts remain bounded at 24 and 7 respectively.
+
+Publisher values are text at this validation stage. Image size limits, numeric
+ranges, date/email/URL syntax, GUID permalink semantics, protocol vocabularies
+and duplicate hour/day values do not block structural validation. In particular,
+an image width of `256`, as observed in Google News, is accepted even though the
+RSS specification limits it to `144`. These deviations are not emitted as
+warnings or silently corrected; this profile deliberately does not assess them.
+Malformed XML, DTDs/external entities and operator quota violations still fail.
+
+The generic mapping and output contract remain separate validation stages.
+Opaque GUIDs stay strings; missing GUIDs/titles are permitted when an item has
+a description. `guidIsPermaLink` is emitted only for an explicit attribute;
+RSS defines the omitted attribute as true. Item links, source titles and
+`dc:creator` are optional output fields. Explicit boolean/date conversions can
+still fail on unconvertible values after structural validation, with no partial
+output. The mapping supports the documented date formats above rather than
+every possible RSS date spelling. The generic engine contains no RSS-specific
+code and the deterministic tests use synthetic documents, not live news content.
+
 ## XML processing settings and limit diagnostics
 
 The unreleased installation is reseeded for this change. Engine/provider/function
@@ -225,8 +269,8 @@ Storage and remote protocol limits remain independent and still apply.
 All operator values must be positive. Restart the authority after changing them;
 for example `Agentstration__XmlContent__MaximumDocumentBytes` overrides document
 bytes through an environment variable. Raising an array-item quota does not widen
-the input XSD or the output JSON Schema. The sample profile still declares at most
-100 input items, independently of engine quotas.
+the input XSD or the output JSON Schema. The RSS 2.0 profile itself has no item
+count ceiling; the default engine quota remains 100 array items.
 
 A limit error shows the measured quantity, permitted bound, unit, causal function
 step and exact server setting when applicable. XML UTF-8 bytes, serialized JSON

@@ -21,7 +21,7 @@ public sealed class TransformationSchemaBootstrapScopeTests : ResourceManagement
         Directory.CreateDirectory(root);
         try
         {
-            foreach (var name in new[] { "rss-schemas", "rss-functions" })
+            foreach (var name in new[] { "rss-2-0-schemas", "rss-2-0-functions" })
             {
                 var destination = Directory.CreateDirectory(Path.Combine(root, name)).FullName;
                 foreach (var file in Directory.GetFiles(Path.Combine(RssTransformationTestData.ProfilesPath, name), "*.yaml"))
@@ -52,26 +52,26 @@ public sealed class TransformationSchemaBootstrapScopeTests : ResourceManagement
                     _ => new(TenantId: context.TenantId, WorkspaceId: context.WorkspaceId)
                 };
                 // Only the existing descriptor setting changes; resource files are reused unchanged.
-                foreach (var name in new[] { "rss-schemas", "rss-functions" })
+                foreach (var name in new[] { "rss-2-0-schemas", "rss-2-0-functions" })
                 {
                     var descriptor = Path.Combine(root, name, "profile.yaml");
                     File.WriteAllText(descriptor, Regex.Replace(File.ReadAllText(descriptor),
                         @"(?m)^  targetScope: \w+", "  targetScope: " + scope.ToString().ToLowerInvariant()));
                 }
-                var declarations = new BootstrapProfileSelection(["rss-schemas"], target);
-                var combined = new BootstrapProfileSelection(["rss-schemas", "rss-functions"], target);
+                var declarations = new BootstrapProfileSelection(["rss-2-0-schemas"], target);
+                var combined = new BootstrapProfileSelection(["rss-2-0-schemas", "rss-2-0-functions"], target);
                 var preview = await bootstrap.PreviewAsync(combined, context.PrincipalId, default);
                 Assert.AreEqual(scope, preview.Scope);
                 Assert.HasCount(4, preview.Resources);
                 Assert.IsTrue(preview.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Create),
                     JsonSerializer.Serialize(preview.Resources));
-                Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default));
+                Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default));
 
                 var declarationsPreview = await bootstrap.PreviewAsync(declarations, context.PrincipalId, default);
                 var installed = await bootstrap.ApplyAsync(declarations, declarationsPreview.Digest, context.PrincipalId, default);
                 Assert.AreEqual(BootstrapApplicationStatus.Succeeded, installed.Definition.Status, installed.Definition.Error);
-                Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default));
-                foreach (var name in new[] { "rss-xml", "rss-json", "rss-mapping" })
+                Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default));
+                foreach (var name in new[] { "rss-2-0-xml", "rss-2-0-json", "rss-2-0-mapping" })
                 {
                     var schema = (await schemas.GetExactAsync(owner, ResourceNamespace.Default, name, default))!.Value;
                     Assert.AreEqual(owner, schema.ScopeRef);
@@ -81,9 +81,9 @@ public sealed class TransformationSchemaBootstrapScopeTests : ResourceManagement
                 Assert.AreEqual(3, exposurePreview.Resources.Count(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
                 var exposed = await bootstrap.ApplyAsync(combined, exposurePreview.Digest, context.PrincipalId, default);
                 Assert.AreEqual(BootstrapApplicationStatus.Succeeded, exposed.Definition.Status, exposed.Definition.Error);
-                var first = (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default))!;
+                var first = (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default))!;
                 Assert.IsTrue(functionUids.Add(first.Value.Uid), "Different owners retain distinct resource identities.");
-                var accepted = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
+                var accepted = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "1.0.0", owner), owner, default);
                 Assert.AreEqual(owner, accepted.Transformation!.Declaration.Source!.ScopeRef);
                 Assert.AreEqual(owner, accepted.Transformation.Input.Source!.ScopeRef);
                 Assert.AreEqual(owner, accepted.Transformation.Output.Source!.ScopeRef);
@@ -96,7 +96,7 @@ public sealed class TransformationSchemaBootstrapScopeTests : ResourceManagement
                 Assert.IsTrue(replay.Resources.All(resource => resource.Disposition == BootstrapResourceDisposition.Skip));
                 var reapplied = await bootstrap.ApplyAsync(combined, replay.Digest, context.PrincipalId, default);
                 Assert.AreEqual(BootstrapApplicationStatus.Succeeded, reapplied.Definition.Status, reapplied.Definition.Error);
-                Assert.AreEqual(first.ETag, (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default))!.ETag);
+                Assert.AreEqual(first.ETag, (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default))!.ETag);
                 if (scope != BootstrapProfileScope.Instance)
                     await Assert.ThrowsAsync<BootstrapRequestException>(() => bootstrap.PreviewAsync(
                         combined with { Target = null }, context.PrincipalId, default));

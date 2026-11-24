@@ -11,15 +11,15 @@ namespace Agentstration.Management.Tests;
 internal static class RssTransformationTestData
 {
     public static JsonElement Json(string value) => JsonSerializer.Deserialize<JsonElement>(value);
-    public static IReadOnlyList<BootstrapResourceDocument> Declarations => Read("rss-schemas");
-    public static BootstrapResourceDocument Exposure => Read("rss-functions").Single();
-    public static ExposeTransformationSchemaRequest Request(ResourceScopeRef owner) => new("rss-xml-to-json", "RSS XML to JSON", "1.0.0",
-        new() { Name = "rss-mapping", Version = "1.0.0" }, owner, ResourceNamespace.Default);
+    public static IReadOnlyList<BootstrapResourceDocument> Declarations => Read("rss-2-0-schemas");
+    public static BootstrapResourceDocument Exposure => Read("rss-2-0-functions").Single();
+    public static ExposeTransformationSchemaRequest Request(ResourceScopeRef owner) => new("rss-2-0-xml-to-json", "RSS 2.0 XML to JSON", "1.0.0",
+        new() { Name = "rss-2-0-mapping", Version = "1.0.0" }, owner, ResourceNamespace.Default);
 
     public static string Feed(int count) => """
-        <rss version="2.0" xmlns:ext="urn:agentstration:rss:example"><channel><title>Synthetic feed</title><link>https://example.test/news</link>
+        <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><generator>Fixture generator</generator><description>Deterministic RSS 2.0 fixture</description><title>Synthetic feed</title><link>https://example.test/news</link>
         """ + string.Concat(Enumerable.Range(0, count).Select(index => $"""
-        <item><guid>opaque:{index}:not-a-uuid</guid><title>Item {index}</title><description><![CDATA[<p>HTML stays data</p>]]></description><pubDate>Tue, 17 Nov 2026 11:30:00 +0100</pubDate><source url="https://example.test/source">Source</source><ext:rating>{index}</ext:rating></item>
+        <item><link>https://example.test/news/{index}</link><guid isPermaLink="false">opaque:{index}:not-a-uuid</guid><title>Item {index}</title><description><![CDATA[<p>HTML stays data</p>]]></description><pubDate>Tue, 17 Nov 2026 11:30:00 +0100</pubDate><source url="https://example.test/source">Source</source><dc:creator>Author {index}</dc:creator></item>
         """)) + "</channel></rss>";
 
     public static async Task<TransformationFunctionResource> CreateAsync(IServiceProvider services, ResourceScopeRef owner)

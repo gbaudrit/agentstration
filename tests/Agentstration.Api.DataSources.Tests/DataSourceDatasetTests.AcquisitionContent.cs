@@ -19,7 +19,7 @@ public sealed partial class DataSourceDatasetTests
         var response = JsonSerializer.Deserialize<JsonElement>("""
             {"type":"object","properties":{"mediaType":{"type":"string"},"content":{"type":"string"}},"required":["mediaType","content"],"additionalProperties":false}
             """);
-        var convert = new FlowCompositionCall { Function = new("rss-xml-to-json", "1.0.0", Owner) };
+        var convert = new FlowCompositionCall { Function = new("rss-2-0-xml-to-json", "1.0.0", Owner) };
         Dictionary<string, IReadOnlyList<FlowCompositionCall>> Bindings(JsonElement schema, params FlowCompositionCall[] calls) => new()
         {
             ["acquisition"] = [new() { Flow = new("fixture-acquire", ScopeRef: Owner) { OutputSchema = schema }, PassInputDirectly = true }],

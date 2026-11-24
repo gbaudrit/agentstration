@@ -2,13 +2,13 @@
   "apiVersion": "agentstration.io/v1",
   "kind": "TransformationFunctionExposure",
   "metadata": {
-    "name": "rss-xml-to-json"
+    "name": "rss-2-0-xml-to-json"
   },
   "definition": {
-    "displayName": "RSS XML to JSON",
+    "displayName": "RSS 2.0 XML to JSON",
     "version": "1.0.0",
     "schema": {
-      "name": "rss-mapping",
+      "name": "rss-2-0-mapping",
       "version": "1.0.0"
     }
   }

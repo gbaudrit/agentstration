@@ -35,7 +35,7 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
         foreach (var document in RssTransformationTestData.Declarations)
             Assert.AreEqual(BootstrapResourceDisposition.Create, (await declarationHandler.PlanAsync(document, operation, planning, default)).Disposition);
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await exposureHandler.PlanAsync(RssTransformationTestData.Exposure, operation, planning, default)).Disposition);
-        Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default));
+        Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default));
         foreach (var document in RssTransformationTestData.Declarations)
         {
             Assert.AreEqual(BootstrapResourceApplyResult.Created, await declarationHandler.ApplyAsync(document, operation, default));
@@ -44,19 +44,19 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
             Assert.AreEqual(first.ETag, (await schemas.GetExactAsync(owner, ResourceNamespace.Default, document.Metadata.Name, default))!.ETag);
             Assert.HasCount(1, await schemas.ListVersionsAsync(owner, ResourceNamespace.Default, document.Metadata.Name, default));
         }
-        Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default));
+        Assert.IsNull(await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default));
         using var client = factory.CreateClient();
         SelectConsoleContext(client, owner);
         using var response = await client.PostAsJsonAsync("/api/transformation-functions/expose-schema", RssTransformationTestData.Request(owner));
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
-        var firstFunction = (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default))!;
+        var firstFunction = (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default))!;
         Assert.AreEqual(BootstrapResourceApplyResult.Skipped, await exposureHandler.ApplyAsync(RssTransformationTestData.Exposure, operation, default));
-        Assert.AreEqual(firstFunction.ETag, (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-xml-to-json", default))!.ETag);
+        Assert.AreEqual(firstFunction.ETag, (await functions.GetAsync(owner, ResourceNamespace.Default, "rss-2-0-xml-to-json", default))!.ETag);
         Assert.AreEqual(BootstrapResourceDisposition.Skip, (await exposureHandler.PlanAsync(RssTransformationTestData.Exposure, operation, planning, default)).Disposition);
         foreach (var invalidName in new[] { "", " ", "Bad Name", "../escape" })
             Assert.AreEqual("function_definition_invalid", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.ExposeAsync(
                 RssTransformationTestData.Request(owner) with { Name = invalidName }, default))).Code);
-        var accepted = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
+        var accepted = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "1.0.0", owner), owner, default);
         Assert.IsNotNull(accepted.Transformation!.Declaration.SchemaUid);
         Assert.IsNotNull(accepted.Transformation.Input.SchemaUid);
         Assert.IsNotNull(accepted.Transformation.Output.SchemaUid);
@@ -71,28 +71,60 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
             var result = await functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(count) }), default);
             Assert.AreEqual(count, result.GetProperty("items").GetArrayLength());
             Assert.AreEqual("2.0", result.GetProperty("version").GetString());
-            Assert.IsFalse(result.TryGetProperty("description", out _));
+            Assert.AreEqual("Deterministic RSS 2.0 fixture", result.GetProperty("description").GetString());
+            Assert.AreEqual("Fixture generator", result.GetProperty("generator").GetString());
             if (count == 0) continue;
             var item = result.GetProperty("items")[0];
             Assert.AreEqual("opaque:0:not-a-uuid", item.GetProperty("guid").GetString());
             Assert.AreEqual("<p>HTML stays data</p>", item.GetProperty("description").GetString());
             Assert.AreEqual("2026-11-17T10:30:00Z", item.GetProperty("publishedAt").GetString());
             Assert.AreEqual("https://example.test/source", item.GetProperty("sourceUrl").GetString());
-            Assert.AreEqual(0, item.GetProperty("rating").GetInt32());
+            Assert.AreEqual("Author 0", item.GetProperty("creator").GetString());
+            Assert.IsFalse(item.GetProperty("guidIsPermaLink").GetBoolean());
+            Assert.AreEqual("https://example.test/news/0", item.GetProperty("link").GetString());
         }
-        var draft = (await schemas.GetExactAsync(owner, ResourceNamespace.Default, "rss-mapping", default))!;
+        var draft = (await schemas.GetExactAsync(owner, ResourceNamespace.Default, "rss-2-0-mapping", default))!;
         var changed = JsonNode.Parse(draft.Value.Definition.Content.GetRawText())!;
         changed["rules"]!["root"]!["fields"]!["title"]!["path"] = "channel/link";
-        await schemas.PutAsync(owner, ResourceNamespace.Default, "rss-mapping", draft.Value.Definition with { Content = JsonSerializer.SerializeToElement(changed) }, draft.ETag, default);
-        await schemas.PublishAsync(owner, ResourceNamespace.Default, "rss-mapping", "2.0.0", default);
+        await schemas.PutAsync(owner, ResourceNamespace.Default, "rss-2-0-mapping", draft.Value.Definition with { Content = JsonSerializer.SerializeToElement(changed) }, draft.ETag, default);
+        await schemas.PublishAsync(owner, ResourceNamespace.Default, "rss-2-0-mapping", "2.0.0", default);
         Assert.AreEqual("Synthetic feed", (await functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(0) }), default)).GetProperty("title").GetString());
-        var adopt = RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-mapping", Version = "2.0.0" } };
+        var adopt = RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-2-0-mapping", Version = "2.0.0" } };
         Assert.AreEqual("transformation_exposure_conflict", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.ExposeAsync(adopt, default))).Code);
         await functions.ExposeAsync(adopt with { Version = "2.0.0" }, default);
-        var newer = await functions.ResolveAsync(new("rss-xml-to-json", "2.0.0", owner), owner, default);
+        var newer = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "2.0.0", owner), owner, default);
         Assert.AreEqual("https://example.test/news", (await functions.InvokeAsync(newer, owner, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(0) }), default)).GetProperty("title").GetString());
         Assert.AreEqual("function_contract_changed", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.InvokeAsync(accepted with { Transformation = newer.Transformation }, owner, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(0) }), default))).Code);
         Assert.AreEqual("function_use_denied", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.ResolveAsync(accepted.Reference, ResourceScopeRef.Workspace(Guid.NewGuid()), default))).Code);
+    }
+
+    [TestMethod]
+    public async Task PermissiveRssProfileTransformsLargeImagesAndItemsWithoutGuidsOrTitles()
+    {
+        await using var factory = Factory();
+        var context = await GetBootstrapContextAsync(factory);
+        using var caller = factory.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
+        var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
+        await RssTransformationTestData.CreateAsync(factory.Services, owner);
+        var functions = factory.Services.GetRequiredService<TransformationFunctionService>();
+        var function = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "1.0.0", owner), owner, default);
+        const string xml = """
+            <rss version="2.0"><channel>
+              <generator>Fixture</generator><title>Feed</title><link>https://example.test/</link><description>Feed description</description>
+              <image><url>https://example.test/logo.png</url><title>Logo</title><link>https://example.test/</link><width>256</width><height>256</height></image>
+              <item><description>Body without title or GUID</description></item>
+              <item><title>Headline without description or GUID</title></item>
+            </channel></rss>
+            """;
+        var result = await functions.InvokeAsync(function, owner, JsonSerializer.SerializeToElement(new { value = xml }), default);
+        var items = result.GetProperty("items");
+        Assert.AreEqual(2, items.GetArrayLength());
+        Assert.AreEqual("Body without title or GUID", items[0].GetProperty("description").GetString());
+        Assert.IsFalse(items[0].TryGetProperty("title", out _));
+        Assert.IsFalse(items[0].TryGetProperty("guid", out _));
+        Assert.AreEqual("Headline without description or GUID", items[1].GetProperty("title").GetString());
+        Assert.IsFalse(items[1].TryGetProperty("description", out _));
+        Assert.IsFalse(items[1].TryGetProperty("guid", out _));
     }
 
     [TestMethod]
@@ -107,30 +139,30 @@ public sealed class TransformationSchemaTests : ResourceManagementApiTestBase
         var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
         // Every schema dependency needs its own descendant Use grant.
         Assert.AreEqual("schema_reference_forbidden", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.ExposeAsync(
-            RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-mapping", Version = "1.0.0", ScopeRef = ResourceScopeRef.Instance } }, default))).Code);
-        foreach (var name in new[] { "rss-xml", "rss-json", "rss-mapping" })
+            RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-2-0-mapping", Version = "1.0.0", ScopeRef = ResourceScopeRef.Instance } }, default))).Code);
+        foreach (var name in new[] { "rss-2-0-xml", "rss-2-0-json", "rss-2-0-mapping" })
         {
             var schema = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, name, default))!;
             await schemas.PutAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, name,
                 schema.Value.Definition with { UsePolicy = new() { Grants = [new(owner)] } }, schema.ETag, default);
         }
-        await functions.ExposeAsync(RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-mapping", Version = "1.0.0", ScopeRef = ResourceScopeRef.Instance } }, default);
-        var accepted = await functions.ResolveAsync(new("rss-xml-to-json", "1.0.0", owner), owner, default);
-        foreach (var xml in new[] { "<rss>", "<wrong />", "<!DOCTYPE rss [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><rss>&x;</rss>", RssTransformationTestData.Feed(1).Replace("<guid>", "<wrong>", StringComparison.Ordinal) })
+        await functions.ExposeAsync(RssTransformationTestData.Request(owner) with { Schema = new() { Name = "rss-2-0-mapping", Version = "1.0.0", ScopeRef = ResourceScopeRef.Instance } }, default);
+        var accepted = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "1.0.0", owner), owner, default);
+        foreach (var xml in new[] { "<rss>", "<wrong />", "<!DOCTYPE rss [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><rss>&x;</rss>", RssTransformationTestData.Feed(1).Replace("<item>", "<item><unsupported />", StringComparison.Ordinal) })
             Assert.AreEqual("transformation_input_invalid", (await Assert.ThrowsExactlyAsync<DataContractException>(() => functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = xml }), default))).Code);
-        var target = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-json", default))!;
+        var target = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-2-0-json", default))!;
         await schemas.PutAsync(ResourceScopeRef.Instance, target.Value.Namespace, target.Value.Name,
             target.Value.Definition with { Content = RssTransformationTestData.Json("""{"type":"object","required":["missing"]}""") }, target.ETag, default);
         await schemas.PublishAsync(ResourceScopeRef.Instance, target.Value.Namespace, target.Value.Name, "2.0.0", default);
-        var mapping = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-mapping", default))!;
+        var mapping = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-2-0-mapping", default))!;
         var changed = JsonNode.Parse(mapping.Value.Definition.Content.GetRawText())!;
         changed["output"]!["version"] = "2.0.0";
         await schemas.PutAsync(ResourceScopeRef.Instance, mapping.Value.Namespace, mapping.Value.Name, mapping.Value.Definition with { Content = JsonSerializer.SerializeToElement(changed) }, mapping.ETag, default);
         await schemas.PublishAsync(ResourceScopeRef.Instance, mapping.Value.Namespace, mapping.Value.Name, "2.0.0", default);
-        await functions.ExposeAsync(RssTransformationTestData.Request(ResourceScopeRef.Instance) with { Version = "bad-output", Schema = new() { Name = "rss-mapping", Version = "2.0.0" } }, default);
-        var badOutput = await functions.ResolveAsync(new("rss-xml-to-json", "bad-output", ResourceScopeRef.Instance), ResourceScopeRef.Instance, default);
+        await functions.ExposeAsync(RssTransformationTestData.Request(ResourceScopeRef.Instance) with { Version = "bad-output", Schema = new() { Name = "rss-2-0-mapping", Version = "2.0.0" } }, default);
+        var badOutput = await functions.ResolveAsync(new("rss-2-0-xml-to-json", "bad-output", ResourceScopeRef.Instance), ResourceScopeRef.Instance, default);
         await Assert.ThrowsExactlyAsync<DataContractException>(() => functions.InvokeAsync(badOutput, ResourceScopeRef.Instance, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(1) }), default));
-        var input = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-xml", default))!;
+        var input = (await schemas.GetExactAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "rss-2-0-xml", default))!;
         await schemas.PutAsync(ResourceScopeRef.Instance, input.Value.Namespace, input.Value.Name, input.Value.Definition with { UsePolicy = new() }, input.ETag, default);
         Assert.AreEqual("schema_reference_forbidden", (await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => functions.InvokeAsync(accepted, owner, JsonSerializer.SerializeToElement(new { value = RssTransformationTestData.Feed(1) }), default))).Code);
     }
