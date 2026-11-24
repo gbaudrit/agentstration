@@ -1,8 +1,8 @@
-# Local SQLite preview
+# Local database previews
 
-This is the first executable increment of [#1281](https://github.com/gbaudrit/agentstration/issues/1281):
+This implements the local database profiles of [#1281](https://github.com/gbaudrit/agentstration/issues/1281):
 the authoritative server with its embedded Console, one independent MAF Worker,
-SQLite and no inference service. PostgreSQL, selectable AEP extensions, the
+SQLite by default, PostgreSQL as an explicit option, and no inference service. Selectable AEP extensions, the
 separate Workplace shell and cloud provisioning remain subsequent increments.
 The existing source-built Development topologies remain under `deploy/compose`.
 
@@ -39,7 +39,13 @@ port; port `0` allocates a temporary port for isolated smoke tests. The Worker h
 no host-published port. Only loopback HTTP is supported in this increment;
 external routing, TLS and protected URLs belong to #1283–#1285.
 
-`deployment.json` records environment ID, SQLite selection, stable instance/Worker/
+The Worker starts after the authority process starts and retries through early
+initialization. It does not wait for full server readiness: Bootstrap discovery
+can itself require a Worker before finalization (ADR-0253). `up --wait` still
+waits for every selected service to become healthy before returning. PostgreSQL,
+when selected, must be healthy before the server process starts.
+
+`deployment.json` records environment ID, database selection, stable instance/Worker/
 credential IDs, the server source SHA and each image's own source/version/digest.
 The Compose project is `preview-<environment-id>`; use a distinct ID and state
 directory for each preview. Repeating `prepare` for the same directory preserves
@@ -54,6 +60,49 @@ There are no Compose `build` directives. `check` validates container image
 references, OCI source/version labels, server readiness, authenticated Worker
 readiness and absence of Worker database mounts/settings. Its JSON contains
 technical metadata, not credentials.
+
+## Optional PostgreSQL profile
+
+Select the database when preparing a **new** preview:
+
+```sh
+python3 scripts/preview/preview.py prepare \
+  --environment-id example-pg \
+  --directory .agentstration-preview/example-pg \
+  --database postgresql \
+  --server-delivery /path/to/server/delivery.json \
+  --worker-delivery /path/to/worker/delivery.json
+```
+
+Use the same `compose ... -- pull`, `compose ... -- up` and `check` commands with
+that directory. The helper adds `deploy/preview/postgresql.yml` to the base
+composition; the application image digests do not change with the database choice.
+The official third-party PostgreSQL 17 image is pinned by digest in
+`deploy/preview/postgresql.json`, runs as `linux/amd64`, and is recorded in the
+deployment alongside the private GHCR application images. Consuming this image
+from Docker Hub does not publish any Agentstration image there.
+
+The database has no host-published port. Its random password is persisted in the
+protected `postgres.password` file and mounted through `POSTGRES_PASSWORD_FILE`.
+Only the server's private JSON contains the corresponding connection string;
+neither the deployment record nor the Compose environment/model contains its
+value. The Worker still receives only its AWP credential and no database access.
+Each preview owns a separate PostgreSQL volume **and** the existing server data
+volume, which retains file-backed keys, archives and artifacts in both profiles.
+This reuses [ADR-0078](../decisions/0078-postgresql-is-an-optional-server-storage-profile.md).
+
+Repeating `prepare` without `--database` preserves an existing profile. Changing
+the database for existing state is rejected: create another preview with a distinct
+environment ID and state directory. No SQLite/PostgreSQL data conversion is
+performed. A missing or symlinked PostgreSQL password file is rejected and is
+never silently regenerated. Restore the matching original state and volumes.
+
+To select another approved PostgreSQL 17 build, supply `--postgres-image` with
+`docker.io/library/postgres:17@sha256:<digest>`. Floating tags, other image
+repositories and major-version changes are rejected. Omitting the option on
+repeat keeps the recorded image, even when the repository default changes. Test
+and back up before changing any image; major upgrades require their own explicit
+migration procedure and are outside this helper.
 
 ## Credentials and initialization
 
@@ -89,7 +138,7 @@ python3 scripts/preview/preview.py compose \
   --directory .agentstration-preview/example -- down
 ```
 
-This preserves the project's named SQLite/data volume and host-side credentials.
+This preserves the project's named data volumes and host-side credentials.
 Retain the matching state directory. An intentional reset uses `down --volumes`
 for this exact project before removing its host state. No host-wide prune is part
 of preview cleanup. No automatic rollback after schema migration is promised.
@@ -109,18 +158,24 @@ python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
 The server's OCI validation builds one disposable Worker companion with the same
 source and pinned SDK/runtime bases, stages both exact archives in a loopback
 registry, and runs `scripts/preview/preview_smoke.py` against this composition.
-The test first boots the non-Development default without Bootstrap and rejects
+Both SQLite and PostgreSQL must pass using those **same application archives**
+before the server can be promoted. The test first boots the non-Development default without Bootstrap and rejects
 the public fixture credential. It then explicitly selects the existing test
 profiles with a newly generated password, authenticates a Worker, executes a
-deterministic Flow, recreates both containers while retaining SQLite state and
+deterministic Flow, recreates all selected containers while retaining data and
 proves the previous result is retained and a second execution succeeds.
+It also checks server file-volume persistence; for PostgreSQL it verifies tables
+exist in all seven module-owned schemas. Only the disposable test project's own
+containers and volumes are removed, on success or failure.
 
 The companion is a CI fixture and is not automatically published as a Worker
-release. Its exact tested identity/digest is recorded in `preview-smoke.json`.
+release. Each profile's exact tested images are recorded in
+`preview-sqlite-smoke.json` and `preview-postgresql-smoke.json`.
 Real deployments select published receipts independently; the tested pair is
 not a promise of compatibility with every historical Worker version. To exercise
 a particular published pair, run the same disposable smoke after authenticating
-the Docker client, using its two receipts and `--registry ghcr.io`.
+the Docker client, using its two receipts, `--registry ghcr.io` and
+`--database sqlite` or `--database postgresql`.
 
 The server archive is promoted through the existing private GHCR publisher,
 without rebuilding. Its package `agentstration-server` must already be private
