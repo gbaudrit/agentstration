@@ -77,13 +77,17 @@ def _validate(request):
         preview.require(isinstance(target["daemonId"], str) and re.fullmatch(r"[a-zA-Z0-9:_-]{1,128}", target["daemonId"]),
                         "An exact trusted Docker daemon identity is required.")
     elif request["provider"] == "azure-vm":
-        fields(target, ("subscriptionId", "region", "vmSize"))
+        fields(target, ("subscriptionId", "resourceGroup", "region", "vmSize", "imageVersion"))
         try:
             uuid.UUID(target["subscriptionId"])
         except (ValueError, TypeError, AttributeError) as error:
             raise ValueError("Invalid Azure subscription identity.") from error
         preview.require(isinstance(target["region"], str) and re.fullmatch(r"[a-z][a-z0-9]{1,31}", target["region"])
                         and target["vmSize"] in ("Standard_B2ms", "Standard_B4ms"), "Invalid Azure region or VM size.")
+        preview.require(isinstance(target["resourceGroup"], str)
+                        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", target["resourceGroup"]), "Invalid dedicated Azure resource group.")
+        preview.require(isinstance(target["imageVersion"], str) and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", target["imageVersion"]),
+                        "Azure requires an exact Ubuntu image version, never latest.")
     else:
         fields(target, ("host", "sshPort", "user", "hostKeyFingerprint", "port"))
         preview.require(isinstance(target["host"], str) and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}", target["host"])
@@ -120,8 +124,8 @@ def operation(action, request):
     preview.require(action in OPERATIONS, "Unsupported lifecycle operation.")
     validate(request)
     preview.require(action != "deploy" or request["dataMode"] == "preserve", "Reset is explicit destroy only; destroy with reset before redeploying.")
-    preview.require(action == "validate" or request["provider"] == "docker",
-                    "This provider is contract-only: Azure execution is #1283; SSH execution is #1288.")
+    preview.require(action == "validate" or request["provider"] in ("docker", "azure-vm"),
+                    "SSH execution remains #1288; it never falls back to another provider.")
 
 
 def loads(text):

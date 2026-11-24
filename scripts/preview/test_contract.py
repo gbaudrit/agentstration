@@ -66,14 +66,17 @@ class ContractTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 contract.validate(value)
 
-    def test_provider_fields_are_isolated_and_remote_execution_is_explicitly_unavailable(self):
-        azure = request(provider="azure-vm", target={"subscriptionId": str(uuid.uuid4()), "region": "westeurope", "vmSize": "Standard_B2ms"})
+    def test_provider_fields_are_isolated_and_only_ssh_execution_is_unavailable(self):
+        azure = request(provider="azure-vm", target={"subscriptionId": str(uuid.uuid4()), "resourceGroup": "previews", "imageVersion": "24.04.202511120", "region": "westeurope", "vmSize": "Standard_B2ms"})
         ssh = request(provider="ssh-docker", target={"host": "preview.example.test", "sshPort": 22, "user": "deploy",
                                                    "port": 5080, "hostKeyFingerprint": "SHA256:" + "a" * 43})
         for value in (azure, ssh):
             contract.operation("validate", value)
             for operation in ("deploy", "status", "destroy"):
-                with self.subTest(provider=value["provider"], operation=operation), self.assertRaises(ValueError):
+                if value["provider"] == "ssh-docker":
+                    with self.subTest(operation=operation), self.assertRaises(ValueError):
+                        contract.operation(operation, value)
+                else:
                     contract.operation(operation, value)
             wrong = copy.deepcopy(value)
             wrong["provider"] = "docker"

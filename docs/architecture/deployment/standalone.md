@@ -35,3 +35,10 @@ It uses the existing Runtime and Bootstrap boundaries, keeps initial
 Bootstrap disabled unless explicitly configured, and requires no local inference
 or cloud account. This external packaging increment does not add a Runtime deployment
 orchestrator; see [ADR-0255](../../decisions/0255-sqlite-previews-consume-private-oci-deliveries.md).
+
+The optional [Azure preview adapter](../../contributing/preview-azure.md) wraps this
+same Compose lifecycle with external Bicep, OIDC and private OCI archive transfer.
+It creates no Azure dependency in the standalone product or its image packages.
+Its closed-ingress VM has no managed identity; public access remains a separate
+protected-access increment. See [ADR-0257](../../decisions/0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
+for the proposed transport and ownership decision and required live validation.

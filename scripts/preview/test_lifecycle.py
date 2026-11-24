@@ -86,7 +86,7 @@ class LifecycleTests(unittest.TestCase):
         return lifecycle.execute(action, value or request(), self.root, **kwargs)
 
     def test_validation_has_no_provider_or_filesystem_side_effect(self):
-        value = request(provider="azure-vm", target={"subscriptionId": "a" * 32, "region": "westeurope", "vmSize": "Standard_B2ms"})
+        value = request(provider="azure-vm", target={"subscriptionId": "a" * 32, "resourceGroup": "previews", "imageVersion": "24.04.202511120", "region": "westeurope", "vmSize": "Standard_B2ms"})
         result = self.execute("validate", value)
         self.assertEqual("validated", result["state"])
         self.assertEqual({}, result["providerResourceIds"])
