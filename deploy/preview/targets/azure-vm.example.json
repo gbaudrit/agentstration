@@ -3,5 +3,6 @@
   "resourceGroup": "agentstration-previews",
   "region": "westeurope",
   "vmSize": "Standard_B2ms",
-  "imageVersion": "24.04.202511120"
+  "osProfile": "ubuntu-24.04",
+  "imageVersion": "24.04.202611170"
 }

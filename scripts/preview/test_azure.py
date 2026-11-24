@@ -117,6 +117,14 @@ class AzureTests(unittest.TestCase):
         self.assertIsNone(self.cloud.record)
         self.assertEqual([], self.cloud.effects)
 
+    def test_explicit_ubuntu_profile_can_inspect_and_remove_legacy_owned_requests(self):
+        self.execute('deploy')
+        explicit = copy.deepcopy(self.value)
+        explicit['target']['osProfile'] = contract.AZURE_OS_PROFILE
+        self.assertEqual('running', self.execute('status', explicit)['state'])
+        explicit['dataMode'] = 'reset'
+        self.assertEqual('destroyed', self.execute('destroy', explicit)['state'])
+
     def test_deploy_preserve_redeploy_keeps_ownership_expiry_and_private_ingress(self):
         first = self.execute('deploy', now=datetime(2026, 11, 24, tzinfo=timezone.utc))
         record = copy.deepcopy(self.cloud.record)

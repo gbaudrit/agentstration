@@ -1,6 +1,6 @@
 # ADR-0257: Azure previews use OIDC and credential-free OCI transfer
 
-Status: Proposed — 2026-11-24
+Status: Accepted — 2026-11-24
 
 ## Context
 
@@ -14,9 +14,9 @@ and subscription-wide deployment privileges are unnecessary.
 
 Keep the portable request and existing Docker lifecycle. Add an external Bicep
 VM adapter in a pre-created, dedicated preview resource group. Pin the Ubuntu
-platform image version explicitly. Use Standard_B2ms as the initial candidate
-and allow Standard_B4ms; capacity acceptance requires measurement, not an assumed
-memory fit. Attach one managed data disk containing Docker volumes and private
+platform image version explicitly. Use Standard_B2ms as the configurable default
+for the qualified lightweight preview baseline and allow Standard_B4ms; larger
+workloads still require their own measurements. Attach one managed data disk containing Docker volumes and private
 host state. SQLite remains the default; PostgreSQL reuses the existing overlay.
 
 Use GitHub OIDC for a protected main workflow and a group-scoped custom VM
@@ -49,7 +49,10 @@ identity files and networking. Explicit reset deletes inspected owned ARM resour
 Azure deletes the VM's OS disk with its parent. Shared bootstrap infrastructure
 is retained. Do not return a public application URL before #1285 verifies Access.
 TTL enforcement remains #1286. The adapter records measured startup duration,
-available guest memory and Azure CPU/credit metrics when available.
+available guest memory and Azure CPU/credit metrics when available. Resolve public
+GitHub protected-environment OS/image/size defaults once into the canonical request; later status/destroy
+operations use the recorded selection. The only qualified OS profile is Ubuntu
+24.04; legacy v1 requests without an explicit profile retain that meaning.
 
 ## Consequences
 
@@ -57,6 +60,12 @@ Azure is an optional deployment transport, with no Runtime or image-package
 references to Azure. Shared bootstrap resources and scoped role assignments are
 one-time prerequisites. Preserved disks and the public IP remain billable; reset
 is required for complete per-preview teardown. Local contract/IaC checks and a
-real Docker guest smoke run without Azure credentials, but they do not replace
-an actual Azure provisioning, capacity and cost validation. This decision remains
-proposed until that validation and maintainer review.
+real Docker guest smoke run without Azure credentials. The
+[live qualification and public-rate assumptions](../contributing/preview-azure.md#live-qualification--2026-11-24)
+record successful SQLite/PostgreSQL deploy, preserve/recreate and full reset on
+B2ms, with exact digests and unchanged expiry. Point-in-time memory/CPU-credit
+measurements qualify the functional preview baseline; they are not a sustained-load
+SLA or a promise that B2ms fits arbitrary extensions or local inference. Public
+PAYG estimates are not subscription invoices. Independent status checks account
+for delayed ARM inventory convergence after deletion. Automatic TTL enforcement
+and protected public access remain their owning follow-ups.

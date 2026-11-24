@@ -31,7 +31,9 @@ def run(action, request, registry_image=None, root=GUEST_ROOT):
     saved = root / 'azure-request.json'
     if saved.exists():
         previous = contract.loads(saved.read_text())
-        preview.require(previous['environmentId'] == request['environmentId'] and {k: v for k, v in previous['target'].items() if k != 'vmSize'} == {k: v for k, v in request['target'].items() if k != 'vmSize'},
+        preview.require(previous['environmentId'] == request['environmentId']
+                        and {k: v for k, v in contract.azure_target(previous).items() if k != 'vmSize'}
+                        == {k: v for k, v in contract.azure_target(request).items() if k != 'vmSize'},
                         'The guest belongs to another Azure target.')
         if action != 'deploy':
             preview.require(contract.images(previous) == contract.images(request), 'Stale guest image selection.')
