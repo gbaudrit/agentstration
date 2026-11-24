@@ -217,13 +217,13 @@ jobs:
         run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
 
   extension-images:
-    name: extension-images
+    name: oci-images
     needs: changes
     if: needs.changes.outputs.extension-images == 'true'
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.image-matrix) }}
-    uses: ./.github/workflows/validate-extension-image.yml
+    uses: ./.github/workflows/validate-oci-image.yml
     with:
       extension: ${{ matrix.image }}
 

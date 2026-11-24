@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from enrollment_smoke import announce, enrollment_snapshot, request
+from enrollment_smoke import announce, authority_environment, enrollment_snapshot, request
 
 
 class EnrollmentEvidenceTests(unittest.TestCase):
@@ -22,11 +22,11 @@ class EnrollmentEvidenceTests(unittest.TestCase):
         self.enrollment = {"uid": "enrollment-uid", "generation": 3, "definition": {
             "instanceId": self.instance, "extensionId": "Agentstration.Extensions.Foundry", "extensionVersion": "0.1.0",
             "state": "available", "targetScopeRef": "/instance", "enrollmentMode": "sharedKeyFile",
-            "registrationName": "foundry", "endpoint": "http://foundry:8080/"}}
+            "registrationName": "foundry", "endpoint": "http://extension:8080/"}}
         self.registration = {"uid": "registration-uid", "generation": 1, "metadata": {"name": "foundry"},
                              "scopeRef": "/instance", "definition": {"enabled": True,
                              "expectedExtensionId": "Agentstration.Extensions.Foundry", "enrollmentMode": "sharedKeyFile",
-                             "authenticationMode": "staticBearer", "endpoint": "http://foundry:8080/"}}
+                             "authenticationMode": "staticBearer", "endpoint": "http://extension:8080/"}}
         with sqlite3.connect(self.database) as connection:
             connection.execute("CREATE TABLE ControlPlaneResources (Kind TEXT, Payload TEXT)")
 
@@ -58,6 +58,36 @@ class EnrollmentEvidenceTests(unittest.TestCase):
                 self.store(enrollment, self.registration)
                 with self.assertRaises(ValueError):
                     enrollment_snapshot(self.database, self.delivery, self.instance)
+
+    def test_trust_and_persisted_evidence_use_the_selected_extension_identity(self):
+        for extension_id in ("Agentstration.Extensions.OpenApi", "Agentstration.Extensions.OpenDal",
+                             "Agentstration.Extensions.Crawl4Ai"):
+            with self.subTest(extension_id=extension_id):
+                delivery = copy.deepcopy(self.delivery)
+                delivery["extension"]["extensionId"] = extension_id
+                enrollment, registration = copy.deepcopy(self.enrollment), copy.deepcopy(self.registration)
+                enrollment["definition"]["extensionId"] = extension_id
+                registration["definition"]["expectedExtensionId"] = extension_id
+                self.store(enrollment, registration)
+                self.assertEqual(self.instance, enrollment_snapshot(self.database, delivery, self.instance)["instanceId"])
+                self.assertEqual({"Agentstration__Extensions__" + extension_id + "__EnrollmentMode": "SharedKeyFile",
+                                  "Agentstration__Extensions__" + extension_id + "__SharedKeyFile__Path": "/run/secrets/aep-key"},
+                                 authority_environment(delivery))
+
+    def test_trust_configuration_rejects_worker_or_ambiguous_environment_keys(self):
+        entries = [{"kind": "awp-worker"}, *({"extensionId": value} for value in
+                   ("", "Injected\nOTHER=value", "Injected:Other", "Injected__Other"))]
+        for entry in entries:
+            with self.subTest(entry=entry), self.assertRaises(ValueError):
+                authority_environment({"component": entry})
+
+    def test_reannouncement_uses_the_manifest_identity_and_generic_endpoint(self):
+        manifest = {"extension": {"id": "Agentstration.Extensions.OpenApi", "version": "0.1.0"}}
+        with patch("enrollment_smoke.request") as send:
+            announce("http://authority:8080", manifest, self.instance, "disposable-protocol-fixture")
+        announcement = send.call_args.args[2]
+        self.assertEqual(manifest["extension"]["id"], announcement["extension"]["id"])
+        self.assertEqual("http://extension:8080/", announcement["endpoint"])
 
     def test_disabled_wrong_endpoint_or_unauthenticated_registration_cannot_pass(self):
         for key, value in (("enabled", False), ("endpoint", "http://other:8080/"),
@@ -99,7 +129,8 @@ class EnrollmentEvidenceTests(unittest.TestCase):
         manifest = {"extension": {"id": "Agentstration.Extensions.Foundry", "name": "Microsoft Foundry",
                     "version": "0.1.0", "description": "Optional Microsoft Foundry model-deployment discovery for Agentstration."}}
         with patch("enrollment_smoke.time.time", return_value=1), patch("enrollment_smoke.request") as request:
-            announce("http://authority:8080", manifest, self.instance, "public-disposable-protocol-test-fixture")
+            announce("http://authority:8080", manifest, self.instance, "public-disposable-protocol-test-fixture",
+                     endpoint="http://foundry:8080/")
         self.assertEqual("sharedKeyFile", request.call_args.args[2]["method"])
         self.assertEqual("vdwgwdeVSHD7A7ekwfOkpgp6QA73Y5U68cfXyot9Zqo=",
                          request.call_args.args[3]["X-AEP-Enrollment-Signature"])
