@@ -25,6 +25,34 @@ API = '2024-07-01'
 TRANSPORT = preview.ROOT / 'deploy/preview/azure/transport.json'
 
 
+def error_codes(stderr):
+    """Retain bounded Azure codes, never nested messages, targets or parameter values."""
+    codes = []
+
+    def collect(value, depth=0):
+        if not isinstance(value, dict) or depth > 4 or len(codes) >= 6:
+            return
+        code = value.get('code')
+        if isinstance(code, str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_.]{0,79}', code) and code not in codes:
+            codes.append(code)
+        for child in ('error', 'innererror'):
+            collect(value.get(child), depth + 1)
+        details = value.get('details', [])
+        if isinstance(details, list):
+            for detail in details[:10]:
+                collect(detail, depth + 1)
+
+    match = re.search(r'ERROR:\s*\(([A-Za-z][A-Za-z0-9_.]{0,79})\)', stderr)
+    if match:
+        codes.append(match[1])
+    try:
+        value, _ = json.JSONDecoder().raw_decode(stderr.partition('ERROR:')[2].lstrip())
+        collect(value)
+    except ValueError:
+        pass
+    return codes
+
+
 def command(arguments, *, timeout=180):
     completed = subprocess.run(arguments, text=True, capture_output=True, timeout=timeout)
     if completed.returncode:
@@ -33,8 +61,8 @@ def command(arguments, *, timeout=180):
             if argument.startswith('-'):
                 break
             context.append(argument)
-        code = re.search(r'ERROR:\s*\(([A-Za-z][A-Za-z0-9_.]{0,79})\)', completed.stderr)
-        reason = ' [' + code[1] + ']' if code else ''
+        codes = error_codes(completed.stderr)
+        reason = ' [' + ', '.join(codes) + ']' if codes else ''
         raise RuntimeError('Azure preview command failed (' + ' '.join(context) + ')' + reason
                            + '; provider output is withheld to protect credentials.')
     return completed.stdout.strip()

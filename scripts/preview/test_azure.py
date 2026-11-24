@@ -311,6 +311,37 @@ class AzureTests(unittest.TestCase):
         self.assertNotIn(secret, str(error.exception))
         self.assertNotIn('--connection-string', str(error.exception))
 
+    def test_arm_json_errors_report_nested_codes_without_messages_or_targets(self):
+        secret = 'https://private.example.test/bundle?sig=disposable-fixture'
+        payload = {'error': {'code': 'InvalidTemplateDeployment', 'message': secret,
+                             'details': [{'code': 'InvalidParameter', 'target': secret, 'message': secret},
+                                         {'code': 'InvalidTemplateDeployment', 'message': secret}]}}
+        failure = subprocess.CompletedProcess([], 1, secret, 'ERROR: ' + json.dumps(payload))
+        with patch.object(subprocess, 'run', return_value=failure):
+            with self.assertRaises(RuntimeError) as error:
+                azure.command(['az', 'deployment', 'group', 'create', '--parameters', secret])
+        self.assertIn('az deployment group create', str(error.exception))
+        self.assertIn('[InvalidTemplateDeployment, InvalidParameter]', str(error.exception))
+        self.assertNotIn(secret, str(error.exception))
+
+    def test_error_codes_ignore_message_contents_invalid_values_and_malformed_json(self):
+        for code in ('secret/value', 'x' * 81, ['AuthorizationFailed'], None):
+            with self.subTest(code=code):
+                payload = {'code': code, 'message': '{"code":"SensitiveMessageContent"}',
+                           'target': {'code': 'SensitiveTargetContent'}, 'details': 'not a detail list'}
+                self.assertEqual([], azure.error_codes('ERROR: ' + json.dumps(payload)))
+        self.assertEqual([], azure.error_codes('ERROR: {not-json; disposable fixture'))
+        self.assertEqual([], azure.error_codes('WARNING: {"code":"SensitiveWarningContent"}\nERROR: plain failure'))
+        self.assertEqual([], azure.error_codes('ERROR: plain message containing {"code":"SensitiveMessageContent"}'))
+        self.assertEqual(['AuthorizationFailed'], azure.error_codes('ERROR: (AuthorizationFailed) {not-json'))
+
+    def test_error_code_output_is_bounded_for_large_arm_detail_lists(self):
+        payload = {'code': 'InvalidTemplateDeployment',
+                   'details': [{'code': 'Failure' + str(i)} for i in range(100)]}
+        codes = azure.error_codes('ERROR: ' + json.dumps(payload))
+        self.assertLessEqual(len(codes), 6)
+        self.assertIn('InvalidTemplateDeployment', codes)
+
     @unittest.skipUnless(shutil.which('az'), 'Azure CLI is needed for the offline command-line boundary check.')
     def test_storage_arguments_match_the_installed_azure_cli_without_authentication(self):
         client = object.__new__(azure.Azure)
