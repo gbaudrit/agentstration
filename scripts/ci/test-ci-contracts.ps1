@@ -32,10 +32,14 @@ foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs'
 }
 foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Program.cs', 'Dockerfile.worker', 'deploy/images/workers/maf-worker.json', 'scripts/packaging/worker_smoke.py', 'awp/src/Agentstration.Awp.Abstractions/AwpProtocol.cs')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
-    Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker') "Worker-only inputs must select the Worker image: $path"
+    Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker,server') "Worker inputs must validate the Worker and its real preview composition: $path"
 }
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
-Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker') 'Shared packaging tooling must validate both image families.'
+Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
+foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'scripts/preview/preview.py')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
+}
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.OpenApi/Program.cs')
 Require ($selection.dotnet -and $selection.container -and -not $selection.extensionImages) 'Unimplemented packaging verticals must retain current validation.'
 foreach ($project in Get-ChildItem (Join-Path $root 'src') -Directory -Filter '*PostgreSql*') {
@@ -94,6 +98,8 @@ $validation = Get-Content (Join-Path $root '.github/workflows/validate-oci-image
 Require (-not ($validation.Contains('packages: write') -or $validation.Contains('secrets.') -or $validation.Contains('  publish:'))) 'Reusable PR validation must not include registry publication credentials.'
 $enrollmentSteps = @($validation -split '(?m)^      - name: ' | Where-Object { $_.Contains('scripts/packaging/enrollment_smoke.py') })
 Require ($enrollmentSteps.Count -eq 1 -and $enrollmentSteps[0].Contains("if: steps.select.outputs.kind == 'aep-extension'")) 'The enrollment smoke must run for every selected AEP image, not a provider ID.'
+$previewSteps = @($validation -split '(?m)^      - name: ' | Where-Object { $_.Contains('scripts/preview/preview_smoke.py') })
+Require ($previewSteps.Count -eq 1 -and $previewSteps[0].Contains("if: steps.select.outputs.kind == 'server'")) 'Server delivery must execute the actual digest-pinned preview before publication.'
 $resourceUx = Get-Content (Join-Path $root '.github/workflows/resource-plan-ux.yml') -Raw
 Require ($resourceUx.Contains("      - 'src/**'") -and $resourceUx.Contains("      - '!src/extensions/Agentstration.Extensions.Foundry/**'")) 'Resource Plan UX must exclude Foundry-only source edits while retaining mixed product edits.'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
