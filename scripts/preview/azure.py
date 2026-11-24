@@ -45,13 +45,11 @@ def error_codes(stderr):
     match = re.search(r'ERROR:\s*\(([A-Za-z][A-Za-z0-9_.]{0,79})\)', stderr)
     if match:
         codes.append(match[1])
-    start = stderr.find('{')
-    if start >= 0:
-        try:
-            value, _ = json.JSONDecoder().raw_decode(stderr[start:])
-            collect(value)
-        except ValueError:
-            pass
+    try:
+        value, _ = json.JSONDecoder().raw_decode(stderr.partition('ERROR:')[2].lstrip())
+        collect(value)
+    except ValueError:
+        pass
     return codes
 
 

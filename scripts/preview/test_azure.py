@@ -331,6 +331,8 @@ class AzureTests(unittest.TestCase):
                            'target': {'code': 'SensitiveTargetContent'}, 'details': 'not a detail list'}
                 self.assertEqual([], azure.error_codes('ERROR: ' + json.dumps(payload)))
         self.assertEqual([], azure.error_codes('ERROR: {not-json; disposable fixture'))
+        self.assertEqual([], azure.error_codes('WARNING: {"code":"SensitiveWarningContent"}\nERROR: plain failure'))
+        self.assertEqual([], azure.error_codes('ERROR: plain message containing {"code":"SensitiveMessageContent"}'))
         self.assertEqual(['AuthorizationFailed'], azure.error_codes('ERROR: (AuthorizationFailed) {not-json'))
 
     def test_error_code_output_is_bounded_for_large_arm_detail_lists(self):
