@@ -61,15 +61,23 @@ def inspect_owned(request, metadata, resources):
     ids = {value.lower() for value in resource_ids(request).values()}
     vm = resource_ids(request)['virtualMachine'].lower()
     relevant = []
+    expected = tags(request, metadata) if metadata else {}
+    parent_owned = any(item['id'].lower() == vm and metadata
+                       and all((item.get('tags') or {}).get(key) == expected[key] for key in (OWNER, ENVIRONMENT, REPOSITORY))
+                       for item in resources)
     for item in resources:
         identifier = item['id'].lower()
         if item['name'].lower().startswith(prefix(request)):
             # Azure creates the OS disk on behalf of the VM; verify its attachment separately.
             if item['name'].lower() == prefix(request) + '-os' and item['type'].lower() == 'microsoft.compute/disks':
                 continue
-            preview.require(identifier in ids or identifier.startswith(vm + '/runcommands/'),
+            # Platform-installed Run Command extensions are children of the owned VM.
+            if identifier.startswith((vm + '/extensions/', vm + '/runcommands/')):
+                preview.require(parent_owned, 'An Azure child resource has no verified owned VM.')
+                relevant.append(item)
+                continue
+            preview.require(identifier in ids,
                             'Unexpected resources occupy this preview namespace; refusing mutation.')
-            expected = tags(request, metadata) if metadata else {}
             preview.require(metadata and all((item.get('tags') or {}).get(key) == expected[key]
                                              for key in (OWNER, ENVIRONMENT, REPOSITORY)),
                             'Foreign or unmanaged Azure resources exist; refusing adoption or deletion.')
@@ -78,8 +86,8 @@ def inspect_owned(request, metadata, resources):
 
 
 def validate_record(request, record, action):
-    contract.fields(record, ('schemaVersion', 'ownerId', 'createdAt', 'expiresAt', 'request', 'destroyed'))
-    preview.require(record['schemaVersion'] == 1 and type(record['destroyed']) is bool, 'Invalid Azure ownership metadata.')
+    contract.fields(record, ('schemaVersion', 'ownerId', 'createdAt', 'expiresAt', 'request', 'destroyed', 'initialized'))
+    preview.require(record['schemaVersion'] == 1 and type(record['destroyed']) is bool and type(record['initialized']) is bool, 'Invalid Azure ownership metadata.')
     uuid.UUID(record['ownerId'])
     datetime.fromisoformat(record['createdAt'])
     datetime.fromisoformat(record['expiresAt'])
@@ -87,9 +95,9 @@ def validate_record(request, record, action):
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
     preview.require(previous['deliveries']['server']['repository'].lower() == request['deliveries']['server']['repository'].lower(),
                     'Azure ownership metadata belongs to another repository.')
-    old_target = {k: v for k, v in previous['target'].items() if k != 'vmSize'}
-    new_target = {k: v for k, v in request['target'].items() if k != 'vmSize'}
-    preview.require(old_target == new_target, 'Existing Azure previews cannot change location, OS image or ownership scope.')
+    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion')
+    preview.require(all(previous['target'][key] == request['target'][key] for key in fixed),
+                    'Existing Azure previews cannot change location, OS image or ownership scope; reset before changing location/OS.')
     if not record['destroyed']:
         preview.require(previous['database'] == request['database'], 'Reset the Azure preview explicitly before changing databases.')
     if action != 'deploy':
@@ -198,7 +206,7 @@ class Azure:
             # Azure Monitor can lag a newly provisioned VM; never fabricate a capacity result.
             return {'azureMetricsState': 'unavailable'}
 
-    def transfer(self):
+    def transfer(self, expect_existing=False):
         bundle, checksum = bundle_images(self.request, self.directory)
         name = prefix(self.request) + '/transfer-' + uuid.uuid4().hex + '.tar.gz'
         try:
@@ -206,13 +214,13 @@ class Azure:
             expires = (datetime.now(timezone.utc) + timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%MZ')
             url = self.storage('blob', 'generate-sas', '--name', name, '--permissions', 'r', '--expiry', expires,
                                '--https-only', '--as-user', '--full-uri')
-            return self.run_guest('deploy', url=url, checksum=checksum)
+            return self.run_guest('deploy', url=url, checksum=checksum, expect_existing=expect_existing)
         finally:
             # Staged application bytes are private, temporary, and never become Actions artifacts.
             self.storage('blob', 'delete', '--name', name, '--delete-snapshots', 'include')
 
-    def run_guest(self, action, *, url=None, checksum=None):
-        properties = {'source': {'script': guest_script(action, self.request, checksum)}, 'timeoutInSeconds': 1800, 'asyncExecution': False,
+    def run_guest(self, action, *, url=None, checksum=None, expect_existing=False):
+        properties = {'source': {'script': guest_script(action, self.request, checksum, expect_existing)}, 'timeoutInSeconds': 1800, 'asyncExecution': False,
                       'parameters': [], 'protectedParameters': [{'name': 'BUNDLE_URL', 'value': url}] if url else []}
         path = self.directory / 'run-command.json'
         preview.private_write(path, json.dumps({'location': self.request['target']['region'],
@@ -274,35 +282,39 @@ def bundle_images(request, directory):
     return bundle, checksum
 
 
-def guest_script(action, request, checksum=None):
+def guest_script(action, request, checksum=None, expect_existing=False):
     preview.require(action in ('deploy', 'status', 'destroy'), 'Unsupported guest operation.')
     encoded = base64.b64encode(json.dumps(request).encode()).decode()
     script = '#!/bin/bash\nset -euo pipefail\numask 077\n'
     if action == 'deploy':
         preview.require(isinstance(checksum, str) and re.fullmatch('[0-9a-f]{64}', checksum), 'Invalid bundle checksum.')
         script += '''cloud-init status --wait >/dev/null 2>&1
-+test -d /srv/agentstration-preview
-+mountpoint -q /srv/agentstration-preview
-+python3 - <<'DOWNLOAD'
-+import hashlib, os, pathlib, tarfile, urllib.request
-+root = pathlib.Path('/srv/agentstration-preview')
-+path = root / 'transfer.tar.gz'
-+try:
-+    with urllib.request.urlopen(os.environ.pop('BUNDLE_URL'), timeout=120) as response, path.open('wb') as output:
-+        while block := response.read(1024 * 1024):
-+            output.write(block)
-+    with path.open('rb') as stream:
-+        assert hashlib.file_digest(stream, 'sha256').hexdigest() == 'CHECKSUM'
-+    with tarfile.open(path) as archive:
-+        archive.extractall(root, filter='data')
-+except Exception:
-+    print('Private image transfer failed; no provider URL is logged.')
-+    raise SystemExit(1)
-+finally:
-+    path.unlink(missing_ok=True)
-+DOWNLOAD
-+unset BUNDLE_URL
-+'''.replace('\n+', '\n').replace('CHECKSUM', checksum)
+test -d /srv/agentstration-preview
+mountpoint -q /srv/agentstration-preview
+python3 - <<'DOWNLOAD'
+import hashlib, os, pathlib, tarfile, urllib.request
+root = pathlib.Path('/srv/agentstration-preview')
+path = root / 'transfer.tar.gz'
+try:
+    with urllib.request.urlopen(os.environ.pop('BUNDLE_URL'), timeout=120) as response, path.open('wb') as output:
+        while block := response.read(1024 * 1024):
+            output.write(block)
+    with path.open('rb') as stream:
+        if hashlib.file_digest(stream, 'sha256').hexdigest() != 'CHECKSUM':
+            raise ValueError('Bundle checksum mismatch')
+    with tarfile.open(path) as archive:
+        archive.extractall(root, filter='data')
+except Exception:
+    print('Private image transfer failed; no provider URL is logged.')
+    raise SystemExit(1)
+finally:
+    path.unlink(missing_ok=True)
+DOWNLOAD
+unset BUNDLE_URL
+'''.replace('CHECKSUM', checksum)
+    if expect_existing:
+        script += 'test -f /srv/agentstration-preview/azure-request.json\n'
+        script += 'test -f /srv/agentstration-preview/state/' + request['environmentId'] + '/lifecycle.json\n'
     script += "printf '%s' '" + encoded + "' | base64 --decode > /srv/agentstration-preview/request.json\n"
     script += 'python3 /srv/agentstration-preview/tooling/scripts/preview/azure_host.py ' + action + ' --request /srv/agentstration-preview/request.json'
     if action == 'deploy':
@@ -331,7 +343,7 @@ def execute(action, request, client_factory=Azure, now=None):
                 return azure_result(request, 'destroyed' if action == 'destroy' else 'absent', [])
             created = now or datetime.now(timezone.utc)
             record = {'schemaVersion': 1, 'ownerId': str(uuid.uuid4()), 'createdAt': created.isoformat(),
-                      'expiresAt': (created + timedelta(hours=request['ttlHours'])).isoformat(), 'request': request, 'destroyed': False}
+                      'expiresAt': (created + timedelta(hours=request['ttlHours'])).isoformat(), 'request': request, 'destroyed': False, 'initialized': False}
             client.write(record, initial=True)
         with client.lock():
             record = client.read()
@@ -341,13 +353,15 @@ def execute(action, request, client_factory=Azure, now=None):
                 if record['destroyed']:
                     preview.require(not resources, 'A reset preview still has resources; finish reset before deploying.')
                     created = now or datetime.now(timezone.utc)
-                    record.update(ownerId=str(uuid.uuid4()), createdAt=created.isoformat(), destroyed=False)
+                    record.update(ownerId=str(uuid.uuid4()), createdAt=created.isoformat(), destroyed=False, initialized=False)
                 record['request'] = request
                 record['expiresAt'] = (datetime.fromisoformat(record['createdAt']) + timedelta(hours=request['ttlHours'])).isoformat()
                 client.write(record)
                 client.provision(record)
-                guest = client.transfer()
+                guest = client.transfer(expect_existing=record['initialized'])
                 preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
+                record['initialized'] = True
+                client.write(record)
                 value = azure_result(request, 'running', client.resources(record), record, guest)
                 value['metrics'].update(client.metrics())
                 value['metrics']['provisionAndDeploySeconds'] = round(time.monotonic() - started, 1)
@@ -355,6 +369,7 @@ def execute(action, request, client_factory=Azure, now=None):
             if action == 'destroy' and request['dataMode'] == 'reset':
                 client.reset(record)
                 record['destroyed'] = True
+                record['initialized'] = False
                 client.write(record)
                 return azure_result(request, 'destroyed', client.resources(record), record)
             vm = resource_ids(request)['virtualMachine']

@@ -23,3 +23,49 @@ jobs:
         run: |
           az bicep install --version v0.44.1
           az bicep build --file deploy/preview/azure/main.bicep --outfile "$RUNNER_TEMP/preview-azure.json"
+
+  requests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    outputs:
+      docker: ${{ steps.requests.outputs.docker }}
+      azure-vm: ${{ steps.requests.outputs.azure-vm }}
+      ssh-docker: ${{ steps.requests.outputs.ssh-docker }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Prepare public provider fixtures without accessing images or infrastructure
+        id: requests
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, 'scripts/preview')
+          import contract, preview
+          from test_contract import receipts
+          server, worker = receipts()
+          for receipt in (server, worker):
+              receipt['repository'] = os.environ['GITHUB_REPOSITORY']
+          targets = {'docker': {'port': 5080, 'daemonId': 'contract-validation-only'},
+                     'azure-vm': preview.read_json('deploy/preview/targets/azure-vm.example.json'),
+                     'ssh-docker': preview.read_json('deploy/preview/targets/ssh-docker.example.json')}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for provider, target in targets.items():
+                  request = contract.plan(server, worker, 'ci-' + provider, provider=provider, target=target)
+                  output.write(provider + '=' + json.dumps(request) + '\n')
+          PY
+
+  portable-call:
+    needs: requests
+    strategy:
+      matrix:
+        provider: [docker, azure-vm, ssh-docker]
+    # GitHub checks all conditional callee jobs. Validation itself receives no OIDC token.
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    uses: ./.github/workflows/preview-environment.yml
+    with:
+      operation: validate
+      request: ${{ needs.requests.outputs[matrix.provider] }}

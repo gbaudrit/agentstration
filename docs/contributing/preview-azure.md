@@ -8,8 +8,8 @@ See [ADR-0257](../decisions/0257-azure-previews-use-oidc-and-credential-free-oci
 ## Execution and ownership
 
 An Azure target now requires `subscriptionId`, `resourceGroup`, `region`, `vmSize`
-and `imageVersion`. Update old contract-only Azure requests with the last two
-new fields (`resourceGroup` and `imageVersion`); Docker/SSH requests are unchanged.
+and `imageVersion`. Update old contract-only Azure requests with the
+new fields `resourceGroup` and `imageVersion`; Docker/SSH requests are unchanged.
 Use [the target example](https://github.com/gbaudrit/agentstration/blob/main/deploy/preview/targets/azure-vm.example.json)
 only as a shape: select an available **exact** Canonical `ubuntu-24_04-lts:server`
 version in the target region. `latest` is rejected.
@@ -31,7 +31,10 @@ existing Docker lifecycle. `images` identifies the original GHCR deliveries;
 registry container is removed after each transfer. No GHCR credential reaches
 the VM. No workload mounts host tooling, Azure agent state or a Docker socket.
 
-A state blob records ownership and the canonical request **without secrets**.
+A state blob records ownership, successful guest initialization and the canonical
+request **without secrets**. Once initialized, deployment refuses a guest whose
+protected host state has disappeared; restore it or explicitly reset instead of
+silently generating new identities.
 Every ARM mutation checks the random owner, repository and environment tags.
 An infinite blob lease and Actions concurrency serialize operations. Two previews
 use distinct ARM names and state namespaces. Lost ownership metadata never
@@ -160,7 +163,10 @@ claim is made before that run.
 ## Offline and CI validation
 
 `Preview Azure contracts` compiles Bicep and runs offline ownership/transport
-contracts without OIDC or Azure provisioning. Server image validation additionally
+contracts without OIDC or Azure provisioning. For trusted repository branches,
+it also calls the reusable entrypoint for all three provider contracts; the
+execution jobs remain skipped. Request/result artifacts include the environment
+ID so multiple calls in one run do not collide. Server image validation additionally
 runs `azure_guest_smoke.py` against the exact built OCI archives for SQLite and
 PostgreSQL, covering mirroring, health and preserve/recreate with no registry
 credential in the guest. The existing authenticated AWP execution smoke remains

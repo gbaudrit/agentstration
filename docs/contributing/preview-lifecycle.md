@@ -115,7 +115,7 @@ Changing TTL recalculates from that anchor. Automatic expiration/cleanup is #128
 `.github/workflows/preview-environment.yml` supports `workflow_dispatch` and
 `workflow_call`, with the same `operation` and public request JSON inputs. Static
 `validate` runs on a GitHub-hosted runner. Host operations require trusted `main`
-invocation, the `preview-deployment` environment, and operator-configured
+invocation and the `preview-deployment` environment. Docker execution uses operator-configured
 `PREVIEW_RUNNER_LABELS` (JSON array including `self-hosted` and `linux`, pinned to
 the intended persistent host) plus absolute `PREVIEW_STATE_ROOT`. Optionally set
 `PREVIEW_BOOTSTRAP_CONFIG` to an existing protected host file. Configure environment
@@ -127,11 +127,14 @@ serialized by environment ID without cancellation. GHCR login uses only the job'
 read-only `GITHUB_TOKEN`, with a temporary Docker auth directory; no bootstrap PAT
 or cloud credential is required. Only validated public requests and safe results
 are uploaded; host keys/configuration/logs are excluded. URLs are host-local in
-this first provider. Azure provisioning and accessible URLs remain #1283–#1285.
+the Docker provider. Azure uses the [VM adapter](preview-azure.md) on a hosted
+runner with its own scoped OIDC configuration; accessible URLs remain #1285.
 
 The reusable outputs expose result JSON, environment ID, state, URL and provider
-resource IDs. Calling workflows grant `contents: read` and `packages: read` so
-the called workflow's package-read job has permission. Pass request JSON as a string to `request` and
+resource IDs. Calling workflows grant `contents: read`, `packages: read` and
+`id-token: write`: GitHub validates the complete conditional call graph. Only the
+Azure execution job actually receives OIDC permission; pure validation and
+Docker execution do not. Pass request JSON as a string to `request` and
 one of `validate`, `deploy`, `status`, `destroy` to `operation`.
 
 OCI validation exercises this same lifecycle against both database profiles,

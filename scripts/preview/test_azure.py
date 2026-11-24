@@ -65,8 +65,8 @@ class Cloud:
     def metrics(self):
         return {}
 
-    def transfer(self):
-        self.effects.append('transfer')
+    def transfer(self, expect_existing=False):
+        self.effects.append(('transfer', expect_existing))
         if self.fail_transfer:
             raise RuntimeError('Interrupted transfer')
         return {'state': 'running', 'observedImages': {n: v['reference'] for n, v in contract.images(self.request).items()},
@@ -126,6 +126,7 @@ class AzureTests(unittest.TestCase):
         self.assertEqual(12, again['metrics']['guestOperationSeconds'])
         self.assertGreaterEqual(again['metrics']['provisionAndDeploySeconds'], 0)
         self.assertFalse(self.cloud.leased)
+        self.assertIn(('transfer', True), self.cloud.effects)
 
     def test_reset_removes_only_owned_resources_and_can_change_database_afterwards(self):
         self.execute('deploy')
@@ -139,6 +140,16 @@ class AzureTests(unittest.TestCase):
         self.assertTrue(self.cloud.record['destroyed'])
         self.assertEqual('running', self.execute('deploy', azure_request(database='postgresql'))['state'])
 
+    def test_reset_allows_a_corrected_os_image_and_keeps_scope_isolation(self):
+        self.execute('deploy')
+        reset = copy.deepcopy(self.value)
+        reset['dataMode'] = 'reset'
+        self.execute('destroy', reset)
+        changed = copy.deepcopy(self.value)
+        changed['target']['imageVersion'] = '24.04.202611120'
+        self.assertEqual('running', self.execute('deploy', changed)['state'])
+        self.assertTrue(self.cloud.record['initialized'])
+
     def test_foreign_or_unmanaged_resources_are_never_adopted_or_deleted(self):
         for action in ('deploy', 'status', 'destroy'):
             for owner in (None, 'another-owner'):
@@ -148,6 +159,16 @@ class AzureTests(unittest.TestCase):
                     self.execute(action)
         self.assertIsNone(self.cloud.record)
         self.assertEqual([], self.cloud.effects)
+
+    def test_platform_agent_children_require_an_owned_parent_vm(self):
+        self.execute('deploy')
+        child = {'id': azure.resource_ids(self.value)['virtualMachine'] + '/extensions/RunCommandLinux',
+                 'name': azure.prefix(self.value) + '-vm/RunCommandLinux', 'tags': {}}
+        self.cloud.items.append(child)
+        self.assertEqual('running', self.execute('status')['state'])
+        self.cloud.items = [child]
+        with self.assertRaises(ValueError):
+            self.execute('destroy')
 
     def test_partial_transfer_is_recoverable_without_new_owner_or_expiry(self):
         self.cloud.fail_transfer = True
