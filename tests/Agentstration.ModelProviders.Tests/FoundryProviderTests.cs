@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -20,6 +21,10 @@ public sealed class FoundryProviderTests
         var manifest = await client.GetFromJsonAsync<AepManifest>(AepProtocol.DiscoveryPath, AepProtocol.JsonOptions);
 
         Assert.IsNotNull(manifest);
+        Assert.AreEqual("Agentstration.Extensions.Foundry", manifest.Extension.Id);
+        Assert.AreEqual(typeof(FoundryAepModelProvider).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0],
+            manifest.Extension.Version);
         Assert.IsTrue(manifest.Capabilities.ContainsKey(AepCapabilityNames.ValueRequirements));
         Assert.IsTrue(manifest.Capabilities.ContainsKey(AepCapabilityNames.BoundValues));
         Assert.AreEqual(AepProtocol.SecretAccessVersion,

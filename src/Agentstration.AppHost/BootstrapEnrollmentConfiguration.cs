@@ -9,15 +9,14 @@ public static class BootstrapEnrollmentConfiguration
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var root in new[]
         {
-            "Agentstration:Bootstrap:ExtensionDependencyTimeout",
-            "Agentstration:Bootstrap:ModelDependencyTimeout",
-            "Agentstration:Bootstrap:InitialApplications",
+            "Agentstration:Bootstrap",
             "Agentstration:Aep:Enrollment:PairingCodeAllowed",
             "Agentstration:Aep:Enrollment:SharedKeyFileAllowed",
             "Agentstration:Aep:Enrollment:AutoEnrollmentLevel"
         })
             foreach (var value in configuration.GetSection(root).AsEnumerable())
-                if (value.Value is not null) result[value.Key.Replace(":", "__", StringComparison.Ordinal)] = value.Value;
+                if (value.Value is not null && !value.Key.StartsWith("Agentstration:Bootstrap:Secrets:", StringComparison.OrdinalIgnoreCase))
+                    result[value.Key.Replace(":", "__", StringComparison.Ordinal)] = value.Value;
 
         // Only trust metadata and references to orchestrator-owned files are
         // forwarded. Paths and activation of the initial catalog remain resolved
@@ -33,4 +32,9 @@ public static class BootstrapEnrollmentConfiguration
         }
         return result;
     }
+
+    public static IReadOnlyDictionary<string, string> SecretEnvironment(IConfiguration configuration) =>
+        configuration.GetSection("Agentstration:Bootstrap:Secrets").AsEnumerable()
+            .Where(value => value.Value is not null)
+            .ToDictionary(value => value.Key.Replace(":", "__", StringComparison.Ordinal), value => value.Value!, StringComparer.Ordinal);
 }

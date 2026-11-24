@@ -1,0 +1,90 @@
+name: OCI images
+
+on:
+  push:
+    tags: ['extension/**', 'worker/**']
+  workflow_dispatch:
+    inputs:
+      extension:
+        description: Catalogue image ID (AEP extension or AWP Worker)
+        type: choice
+        options: [foundry, maf-worker]
+        default: foundry
+        required: true
+      publish_preview:
+        description: Publish the validated archive to private GHCR (no Docker Hub release)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-build:
+    uses: ./.github/workflows/validate-oci-image.yml
+    with:
+      extension: ${{ inputs.extension || 'foundry' }}
+      release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+
+  publish:
+    needs: validate-and-build
+    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    env:
+      DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: oci-image-${{ needs.validate-and-build.outputs.image }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: delivery
+      - name: Install OCI copy tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish the validated archive to private GHCR without rebuilding
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_arguments=()
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
+          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
+      - name: Log in to Docker Hub for an official image release
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish the same archive to official Docker Hub
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || 'agentstration' }}
+        run: >-
+          python3 scripts/packaging/images.py publish --delivery delivery/delivery.json
+          --registry dockerhub --namespace "$DOCKERHUB_NAMESPACE"
+          --release-tag "$GITHUB_REF_NAME" --authfile "$DOCKER_CONFIG/config.json"
+      - name: Retain immutable publication references
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            delivery/delivery.json
+            delivery/publication-*.json
+          if-no-files-found: warn
+          retention-days: 30

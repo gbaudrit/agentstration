@@ -306,8 +306,16 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 250. [ADR-0250 — Initial Bootstrap waits for required extension contributions](0250-initial-bootstrap-waits-for-required-extension-contributions.md)
 
-251. [ADR-0251 — Transformation Schemas have explicit function exposure](0251-transformation-schemas-have-explicit-function-exposure.md)
+251. [ADR-0251 — Bootstrap configures resource graphs and discovers operations](0251-bootstrap-configures-resource-graphs-and-discovers-operations.md)
 
-252. [ADR-0252 — Acquisition text content is selected at admission](0252-acquisition-text-content-is-selected-at-admission.md)
+252. [ADR-0252 — Extension images have independent OCI releases](0252-extension-images-have-independent-oci-releases.md)
 
-253. [ADR-0253 — XML processing uses operator content settings](0253-xml-processing-uses-operator-content-settings.md)
+253. [ADR-0253 — Initial Bootstrap admits its own Worker assignments](0253-initial-bootstrap-admits-its-own-worker-assignments.md)
+
+254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
+
+255. [ADR-0255 — Transformation Schemas have explicit function exposure](0255-transformation-schemas-have-explicit-function-exposure.md)
+
+256. [ADR-0256 — Acquisition text content is selected at admission](0256-acquisition-text-content-is-selected-at-admission.md)
+
+257. [ADR-0257 — XML processing uses operator content settings](0257-xml-processing-uses-operator-content-settings.md)

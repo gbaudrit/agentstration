@@ -8,51 +8,6 @@ using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Infrastructure.Bootstrap;
 
-/// <summary>publishVersion is a Bootstrap instruction, not part of the persisted Schema definition.</summary>
-public sealed class SchemaBootstrapResourceHandler(SchemaManagementService schemas) : IBootstrapResourceHandler
-{
-    public string Kind => SchemaResourceKinds.Schema;
-    public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
-    public bool SupportsProfileScope(BootstrapProfileScope scope) => true;
-    internal static SchemaResource Parse(BootstrapResourceDocument document, BootstrapResourceOperationContext operation)
-    {
-        var resource = WorkspaceBootstrapResource.Parse<SchemaResource>(document);
-        return resource with { ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation) };
-    }
-    internal static string? Publication(BootstrapResourceDocument document) => document.Definition.TryGetProperty("publishVersion", out var value) ? value.GetString() : null;
-
-    public async Task<BootstrapResourcePlanResult> PlanAsync(BootstrapResourceDocument document, BootstrapResourceOperationContext operation, BootstrapPlanningContext planning, CancellationToken ct)
-    {
-        var desired = Parse(document, operation);
-        await schemas.ValidateAsync(desired, ct);
-        var existing = await schemas.GetExactAsync(desired.ScopeRef!.Value, desired.Namespace, desired.Name, ct);
-        if (existing is not null && FunctionDigests.Compute(existing.Value.Definition) != FunctionDigests.Compute(desired.Definition)) return new(BootstrapResourceDisposition.Conflict);
-        if (Publication(document) is { } version)
-        {
-            if (string.IsNullOrWhiteSpace(version) || version.Length > 64 || version.Any(c => !char.IsLetterOrDigit(c) && c is not ('.' or '-')))
-                throw new SchemaValidationException("schema_version_invalid", "An exact bounded publication version is required.");
-            if (await schemas.GetVersionAsync(desired.ScopeRef.Value, desired.Namespace, desired.Name, version, ct) is { } published
-                && published.Value.DefinitionHash != JsonSchemaSelection.DefinitionHash(desired.Definition.Format, desired.Definition.Dialect, desired.Definition.Content, published: true))
-                return new(BootstrapResourceDisposition.Conflict);
-            planning.Register(Kind, desired.Name, WorkspaceBootstrapResource.PlanningParent(desired.Namespace), document);
-            if (existing is not null && await schemas.GetVersionAsync(desired.ScopeRef.Value, desired.Namespace, desired.Name, version, ct) is not null) return new(BootstrapResourceDisposition.Skip);
-        }
-        else if (existing is not null) return new(BootstrapResourceDisposition.Skip);
-        return WorkspaceBootstrapResource.Created(planning, Kind, desired.Name, desired.Namespace, document);
-    }
-
-    public async Task<BootstrapResourceApplyResult> ApplyAsync(BootstrapResourceDocument document, BootstrapResourceOperationContext operation, CancellationToken ct)
-    {
-        var plan = await PlanAsync(document, operation, new(), ct);
-        if (plan.Disposition == BootstrapResourceDisposition.Conflict) return BootstrapResourceApplyResult.Conflict;
-        if (plan.Disposition == BootstrapResourceDisposition.Skip) return BootstrapResourceApplyResult.Skipped;
-        var desired = Parse(document, operation);
-        if (await schemas.GetExactAsync(desired.ScopeRef!.Value, desired.Namespace, desired.Name, ct) is null) await schemas.CreateAsync(desired, ct);
-        if (Publication(document) is { } version) await schemas.PublishAsync(desired.ScopeRef.Value, desired.Namespace, desired.Name, version, ct);
-        return BootstrapResourceApplyResult.Created;
-    }
-}
-
 public sealed class TransformationSchemaExposureBootstrapResourceHandler(
     TransformationFunctionService functions, ISchemaBindingResolver bindings) : IBootstrapResourceHandler
 {

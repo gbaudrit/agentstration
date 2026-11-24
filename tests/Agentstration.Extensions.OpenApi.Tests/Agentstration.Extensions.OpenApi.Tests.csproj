@@ -10,7 +10,7 @@
     <PackageReference Include="Agentstration.Aep.Client" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
+    <ProjectReference Include="../../src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" />
     <ProjectReference Include="../../src/Agentstration.Schemas/Agentstration.Schemas.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>

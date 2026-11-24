@@ -23,7 +23,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.LocalAI.dll
     depends_on:
       aep-key-provisioner:
@@ -48,7 +48,7 @@ services:
       context: ../..
       dockerfile: Dockerfile.extension
       args:
-        PROJECT: src/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
+        PROJECT: src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.Utilities.dll
     environment:
       Aep__EnrollmentMode: SharedKeyFile

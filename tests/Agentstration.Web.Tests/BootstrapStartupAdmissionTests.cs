@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure;
 using Agentstration.Web.Hosting;
@@ -6,6 +7,8 @@ using Agentstration.Web.Pages;
 using Agentstration.Web.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 
@@ -14,6 +17,44 @@ namespace Agentstration.Web.Tests;
 [TestClass]
 public sealed class BootstrapStartupAdmissionTests
 {
+    [TestMethod]
+    public void WorkerRequestPathWithoutARegisteredEndpointCannotGrantStartupAdmission()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/api/awp/v1/workers/register";
+        Assert.IsFalse(BootstrapAdministrationAccess.IsWorkerCommunicationEndpoint(context.GetEndpoint()));
+    }
+
+    [TestMethod]
+    [DataRow(AgentstrationPolicies.AwpWorker, false, true)]
+    [DataRow(AgentstrationPolicies.AwpWorker, true, false)]
+    [DataRow(AgentstrationPolicies.PlatformAdmin, false, false)]
+    [DataRow(AgentstrationPolicies.Authenticated, false, false)]
+    public void WorkerStartupAdmissionRequiresTheWorkerPolicyWithoutAnonymousOverride(string policy, bool anonymous, bool expected)
+    {
+        List<object> metadata = [new AuthorizeAttribute { Policy = policy }];
+        if (anonymous) metadata.Add(new AllowAnonymousAttribute());
+        var endpoint = new Endpoint(_ => Task.CompletedTask, new EndpointMetadataCollection(metadata), "Fixture");
+        Assert.AreEqual(expected, BootstrapAdministrationAccess.IsWorkerCommunicationEndpoint(endpoint));
+    }
+
+    [TestMethod]
+    [DataRow("/api/awp/enrollment/announce", "POST", true)]
+    [DataRow("/api/awp/enrollment/claim", "POST", true)]
+    [DataRow(AepProtocol.SecretAccessPath, "POST", true)]
+    [DataRow("/api/awp/enrollment/announce", "GET", false)]
+    [DataRow("/api/awp/enrollment/claim", "GET", false)]
+    [DataRow(AepProtocol.SecretAccessPath, "GET", false)]
+    [DataRow("/api/awp/v1/unknown", "POST", false)]
+    [DataRow("/api/work-items", "POST", false)]
+    public void AnonymousStartupProtocolExceptionsRequireTheDeclaredRouteAndMethod(string pattern, string method, bool expected)
+    {
+        var endpoint = new RouteEndpoint(_ => Task.CompletedTask, RoutePatternFactory.Parse(pattern), 0,
+            new EndpointMetadataCollection(new HttpMethodMetadata([method]), new AllowAnonymousAttribute()), "Fixture");
+        Assert.AreEqual(expected, BootstrapAdministrationAccess.IsWorkerCommunicationEndpoint(endpoint));
+    }
+
     [TestMethod]
     [DataRow("/_blazor/negotiate")]
     [DataRow("/api/auth/protected")]

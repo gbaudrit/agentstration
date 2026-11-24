@@ -1,0 +1,27 @@
+apiVersion: agentstration.io/v1
+kind: DataSource
+metadata:
+  name: nantes-actualites
+  namespace: default
+definition:
+  displayName: Nantes - Actualités des dernières 24 heures
+  dataset:
+    storage:
+      resourceRef:
+        name: nantes-alertes-content
+    rule:
+      read: true
+      prefix: ""
+      write: true
+      list: true
+      stat: true
+    acquisition:
+      parameters:
+        ceid: FR:fr
+        q: Nantes when:1d
+        hl: fr
+        gl: FR
+      operation:
+        resourceRef:
+          name: nantes-news-operations
+          output: rss

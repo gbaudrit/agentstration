@@ -43,7 +43,8 @@ public sealed class StorageManagementService(
     public async Task ValidateForCreateAsync(StorageResource resource, CancellationToken token)
     {
         var scope = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(StorageResourceKinds.Storage);
-        await ValidateAsync(resource with { ScopeRef = scope }, token);
+        var desired = await AdoptSchemasAsync(resource with { ScopeRef = scope }, token);
+        await ValidateAsync(desired, token);
     }
 
     public async Task<StoredResource<StorageResource>> CreateAsync(StorageResource resource, CancellationToken token)
@@ -205,11 +206,20 @@ public sealed class StorageManagementService(
         var scope = resource.ScopeRef!.Value;
         ResourceScopePolicy.EnsureAllowed(resource, scope);
         await useAuthorizer.ValidateAsync(scope, definition.UsePolicy, token);
-        var reference = definition.Type;
-        var typeScope = reference.Type.ScopeRef!.Value;
-        var address = reference.Type.Resolve(resource.Namespace, StorageResourceKinds.StorageType);
-        var type = (await store.GetExactAsync<StorageTypeResource>(new(typeScope, address.Namespace, address.Kind, address.Name), token))?.Value
-            ?? throw new StorageException("storage_type_unavailable", "The pinned Storage type is missing or inaccessible.", 409);
+        var version = await ValidateConfigurationAsync(scope, resource.Namespace, definition.Type, definition.Configuration, definition.Envelope, token);
+        await ValidateCollectionsAsync(version, definition.Collections, token);
+        foreach (var validator in definitionValidators ?? []) validator.Validate(await RequireTypeAsync(definition.Type, resource.Namespace, token), version, definition);
+        await ValidateMappingAsync(resource, version, token);
+        return version;
+    }
+
+    public async Task<StorageTypeVersionDescriptor> ValidateConfigurationAsync(ResourceScopeRef scope, ResourceNamespace ns,
+        StorageTypeReference reference, JsonElement configuration, JsonElement envelope, CancellationToken token)
+    {
+        if (reference.Type?.ScopeRef is null || reference.TypeUid == Guid.Empty || string.IsNullOrWhiteSpace(reference.Version)
+            || string.IsNullOrWhiteSpace(reference.SchemaDigest) || string.IsNullOrWhiteSpace(reference.ContractDigest))
+            throw new StorageException("storage_type_reference_invalid", "An exact type UID, scope, version and digests are required.");
+        var type = await RequireTypeAsync(reference, ns, token);
         await EnsureUseAsync(type, scope, token);
         if (type.Uid != reference.TypeUid)
             throw new StorageException("storage_type_stale", "The pinned Storage type identity is stale.", 409);
@@ -222,17 +232,32 @@ public sealed class StorageManagementService(
             throw new StorageException("storage_type_stale", "The pinned type contract has changed.", 409);
         if (!await availability.IsAvailableAsync(type, version, token))
             throw new StorageException("storage_provider_unavailable", "The exact Storage provider is unavailable.", 409);
-        await StorageValidation.InstanceAsync(version.ConfigurationSchema, definition.Configuration, token);
-        await StorageValidation.InstanceAsync(version.EnvelopeSchema, definition.Envelope, token);
-        if (definition.Collections.Count > 32 || definition.Collections.Select(c => c.Name).Distinct(StringComparer.Ordinal).Count() != definition.Collections.Count
-            || definition.Collections.Where(c => c.Uid != Guid.Empty).Select(c => c.Uid).Distinct().Count() != definition.Collections.Count(c => c.Uid != Guid.Empty)
-            || definition.Collections.Count > 0 && version.Documents is null)
+        await StorageValidation.InstanceAsync(version.ConfigurationSchema, configuration, token);
+        await StorageValidation.InstanceAsync(version.EnvelopeSchema, envelope, token);
+        return version;
+    }
+
+    private async Task<StorageTypeResource> RequireTypeAsync(StorageTypeReference reference, ResourceNamespace ns, CancellationToken token)
+    {
+        var typeScope = reference.Type.ScopeRef!.Value;
+        var address = reference.Type.Resolve(ns, StorageResourceKinds.StorageType);
+        var type = (await store.GetExactAsync<StorageTypeResource>(new(typeScope, address.Namespace, address.Kind, address.Name), token))?.Value
+            ?? throw new StorageException("storage_type_unavailable", "The pinned Storage type is missing or inaccessible.", 409);
+        return type;
+    }
+
+    public async Task ValidateCollectionsAsync(StorageTypeVersionDescriptor version, IReadOnlyList<StorageDocumentCollection> collections,
+        CancellationToken token, bool allowUnresolvedSchemaBindings = false)
+    {
+        if (collections.Count > 32 || collections.Select(c => c.Name).Distinct(StringComparer.Ordinal).Count() != collections.Count
+            || collections.Where(c => c.Uid != Guid.Empty).Select(c => c.Uid).Distinct().Count() != collections.Count(c => c.Uid != Guid.Empty)
+            || collections.Count > 0 && version.Documents is null)
             throw new StorageException("storage_collections_invalid", "Collections require a document-capable Storage and unique bounded identities.");
-        foreach (var collection in definition.Collections)
+        foreach (var collection in collections)
         {
             StorageValidation.Name(collection.Name); StorageValidation.Display(collection.DisplayName, null);
             StorageValidation.Json(collection.Schema);
-            if (!(definitionValidators ?? []).Any(v => v.ValidatesDocumentSchemas(version)))
+            if ((!allowUnresolvedSchemaBindings || collection.SchemaBinding is null) && !(definitionValidators ?? []).Any(v => v.ValidatesDocumentSchemas(version)))
                 await StorageValidation.SchemaAsync(collection.Schema, token);
             var policy = collection.Policy;
             if (policy.MaximumPageSize is < 1 or > 100 || policy.MaximumDocumentBytes is < 1 or > 65536
@@ -240,9 +265,6 @@ public sealed class StorageManagementService(
                 || policy.QueryProfiles.Any(id => !version.Documents!.QueryProfiles.Any(p => p.Id == id)))
                 throw new StorageException("storage_collection_policy_invalid", "The collection requests unsupported query profiles or limits.");
         }
-        foreach (var validator in definitionValidators ?? []) validator.Validate(type, version, definition);
-        await ValidateMappingAsync(resource, version, token);
-        return version;
     }
 
     private async Task ValidateMappingAsync(StorageResource resource, StorageTypeVersionDescriptor version, CancellationToken token)
@@ -273,13 +295,19 @@ public sealed class StorageManagementService(
         }
         if (definition.ConnectedServiceType is null || metadata.Type != definition.ConnectedServiceType)
             throw new StorageException("storage_exports_stale", "The pinned Connected Service type is stale.", 409);
+        ValidateExportBindings(version, definition.Bindings, metadata.Exports);
+    }
+
+    public static void ValidateExportBindings(StorageTypeVersionDescriptor version, IReadOnlyList<StorageExportBinding> bindings,
+        IReadOnlyList<ConnectedServiceExportDescriptor> exports)
+    {
         var requirements = version.Requirements.ToDictionary(r => r.Id, StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var binding in definition.Bindings)
+        foreach (var binding in bindings)
         {
             if (!seen.Add(binding.RequirementId) || !requirements.TryGetValue(binding.RequirementId, out var requirement))
                 throw new StorageException("storage_mapping_invalid", "Bindings must name unique declared requirements.");
-            var export = metadata.Exports.SingleOrDefault(e => e.Id == binding.Export.Id);
+            var export = exports.SingleOrDefault(e => e.Id == binding.Export.Id);
             if (export is null || export != binding.Export)
                 throw new StorageException("storage_export_stale", "A selected export is missing or its exact descriptor is stale.", 409);
             if (export.Type != requirement.Type || export.Protection != requirement.Protection

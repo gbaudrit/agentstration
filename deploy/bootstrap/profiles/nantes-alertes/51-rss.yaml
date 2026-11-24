@@ -1,0 +1,20 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedService
+metadata:
+  name: nantes-actualites-rss
+  namespace: default
+definition:
+  options: {}
+  type:
+    resourceRef:
+      name: http-endpoint
+      version: 1.0.0
+  bindings:
+  - inputId: baseUrl
+    literal:
+      valueFrom:
+        configuration: Agentstration:Bootstrap:Parameters:NantesNewsUrl
+        type: string
+        default: https://news.google.com/rss/search?q=Nantes+when:1d&hl=fr&gl=FR&ceid=FR:fr
+    kind: literal
+  displayName: Nantes - Google News RSS

@@ -86,6 +86,7 @@ public sealed record BootstrapApplicationProperties
     public IReadOnlyList<BootstrapPlannedResource> ResourcePlan { get; init; } = [];
     public IReadOnlyList<BootstrapProfileApplicationPreview> Applications { get; init; } = [];
     public BootstrapResourcePreview? CurrentResource { get; init; }
+    public BootstrapOperationProgress? Operation { get; init; }
     public string? ExecutionOwner { get; init; }
     public BootstrapProfileSelection? Selection { get; init; }
     public string? RequestFingerprint { get; init; }

@@ -9,6 +9,33 @@ namespace Agentstration.Runtime.Tests;
 [TestClass]
 public sealed class RuntimeWorkerAssignmentTests
 {
+    [TestMethod]
+    public async Task HostAdmissionSkipsOlderOrdinaryWorkAndAnEmptySetClaimsNothing()
+    {
+        var admission = new ControlledAdmission();
+        await using var fixture = await AssignmentFixture.CreateAsync(admission: admission);
+        await fixture.CreateAssignmentAsync("ordinary");
+        var ordinary = fixture.AssignmentId;
+        await fixture.CreateAssignmentAsync("bootstrap");
+        var bootstrap = fixture.AssignmentId;
+        Assert.IsNull(await fixture.ClaimAsync(Guid.NewGuid(), Guid.NewGuid()));
+        admission.ClaimableAssignmentIds = new HashSet<RuntimeAssignmentId> { bootstrap };
+        var selected = await fixture.ClaimRequiredAsync();
+        Assert.AreEqual(bootstrap, selected.Assignment.Id);
+        Assert.AreEqual(RuntimeAssignmentState.Pending, (await fixture.Assignments.GetAsync(Workspace, ordinary, default))!.Value.State);
+        admission.ClaimableAssignmentIds = new HashSet<RuntimeAssignmentId>();
+        var suspended = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() => fixture.Service.AuthorizeAsync(selected.Ownership, default));
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.ExecutionSuspended, suspended.Code);
+        suspended = await Assert.ThrowsExactlyAsync<RuntimeAssignmentException>(() => fixture.Service.HeartbeatAsync(selected.Ownership, default));
+        Assert.AreEqual(RuntimeAssignmentErrorCodes.ExecutionSuspended, suspended.Code);
+        admission.ClaimableAssignmentIds = null;
+        Assert.AreEqual(ordinary, (await fixture.ClaimRequiredAsync()).Assignment.Id);
+    }
+
+    private sealed class ControlledAdmission : IRuntimeAssignmentAdmission
+    {
+        public IReadOnlySet<RuntimeAssignmentId>? ClaimableAssignmentIds { get; set; } = new HashSet<RuntimeAssignmentId>();
+    }
     private static readonly WorkspaceId Workspace = new(Guid.Parse("9bc73ec9-83b2-44ef-96e4-971d2d2eb85e"));
 
     [TestMethod]
@@ -655,12 +682,13 @@ public sealed class RuntimeWorkerAssignmentTests
         public string RunId { get; } = $"run-{Guid.NewGuid():N}";
         public RuntimeAssignmentId AssignmentId { get; private set; }
 
-        public static async Task<AssignmentFixture> CreateAsync(string? databasePath = null)
+        public static async Task<AssignmentFixture> CreateAsync(string? databasePath = null, IRuntimeAssignmentAdmission? admission = null)
         {
             var ownsDatabase = databasePath is null;
             databasePath ??= Path.Combine(Path.GetTempPath(), $"agentstration-runtime-assignment-{Guid.NewGuid():N}.db");
             var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-10-03T08:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
             var services = new ServiceCollection();
+            if (admission is not null) services.AddSingleton(admission);
             services.AddSingleton<TimeProvider>(clock);
             services.AddSingleton(new RuntimeWorkerLeaseOptions());
             services.AddSingleton(new RuntimeWorkerDispatchOptions());

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "maf-worker",
+  "kind": "awp-worker",
+  "project": "src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj",
+  "entrypoint": "Agentstration.Runtime.Worker.MicrosoftAgentFramework.dll",
+  "dockerfile": "Dockerfile.worker",
+  "versionFile": "src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/version.txt",
+  "testProject": "tests/Agentstration.Runtime.Tests/Agentstration.Runtime.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Awp|FullyQualifiedName~RuntimeWorker",
+  "imageName": "worker-maf",
+  "platform": "linux/amd64",
+  "awpVersion": "1.0",
+  "runtimeKind": "microsoft-agent-framework",
+  "capabilityVersion": "1.0",
+  "executionMaterialVersions": ["1.0", "1.1"]
+}

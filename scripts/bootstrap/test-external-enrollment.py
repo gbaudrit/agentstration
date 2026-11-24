@@ -131,11 +131,15 @@ def main():
     processes = []
 
     def start(project, settings, log_name):
-        dll = repo / "src" / project / "bin/Release/net10.0" / (project + ".dll")
+        project_directory = repo / "src"
+        if project.startswith("Agentstration.Extensions."):
+            project_directory /= "extensions"
+        project_directory /= project
+        dll = project_directory / "bin/Release/net10.0" / (project + ".dll")
         if not dll.is_file():
             raise RuntimeError(f"Build Release before running this smoke check: missing {dll}")
         with (root / (log_name + ".log")).open("w") as log:
-            processes.append(subprocess.Popen([args.dotnet, str(dll)], cwd=repo / "src" / project,
+            processes.append(subprocess.Popen([args.dotnet, str(dll)], cwd=project_directory,
                                               env=settings, stdout=log, stderr=subprocess.STDOUT))
 
     def status(path):

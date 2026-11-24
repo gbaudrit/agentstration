@@ -1,0 +1,48 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedService
+metadata:
+  name: nantes-alertes-postgresql
+  namespace: default
+definition:
+  options: {}
+  type:
+    extensionContribution:
+      extensionId: agentstration.extensions.postgresql
+      contributionId: postgresql
+      version: 1.0.0
+      kind: ConnectedServiceType
+  bindings:
+  - inputId: host
+    literal:
+      valueFrom:
+        configuration: Agentstration:Bootstrap:Parameters:NantesPostgreSqlHost
+        type: string
+        default: localhost
+    kind: literal
+  - inputId: port
+    literal:
+      valueFrom:
+        configuration: Agentstration:Bootstrap:Parameters:NantesPostgreSqlPort
+        type: integer
+        default: 5432
+    kind: literal
+  - inputId: database
+    literal:
+      valueFrom:
+        configuration: Agentstration:Bootstrap:Parameters:NantesPostgreSqlDatabase
+        type: string
+        default: agentstration_documents
+    kind: literal
+  - inputId: username
+    literal:
+      valueFrom:
+        configuration: Agentstration:Bootstrap:Parameters:NantesPostgreSqlUser
+        type: string
+        default: agentstration
+    kind: literal
+  - secret:
+      resourceRef:
+        name: nantes-alertes-postgresql-password
+    inputId: password
+    kind: secret
+  displayName: Nantes - PostgreSQL documents

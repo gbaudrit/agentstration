@@ -1,0 +1,16 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedServiceOperationDiscovery
+metadata:
+  name: nantes-operations
+  namespace: default
+definition:
+  connectedService:
+    resourceRef:
+      name: nantes-alertes-openapi
+  operations:
+  - name: alertes
+    selector:
+      method: GET
+      path: /catalog/datasets/{dataset_id}/records
+      operationId: getRecords
+    enabled: true

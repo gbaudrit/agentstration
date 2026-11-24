@@ -18876,6 +18876,16 @@
       "reason": "Provider/model options are bounded form choices, not a resource collection."
     },
     {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapConfigurationInputs.razor",
+      "classification": "non-collection-control",
+      "reason": "Bootstrap application configuration requirements render repeated form fields through the shared value-binding editor."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapProfileSourceViewer.razor",
+      "classification": "non-collection-control",
+      "reason": "Native selection options choose the Bootstrap YAML document displayed by the source viewer."
+    },
+    {
       "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationProgress.razor",
       "classification": "non-collection-control",
       "reason": "Configured process-step navigation delegates resource rows to BootstrapApplicationResources."

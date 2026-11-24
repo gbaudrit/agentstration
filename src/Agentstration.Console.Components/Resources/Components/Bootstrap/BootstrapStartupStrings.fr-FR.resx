@@ -218,4 +218,30 @@
   <data name="Completed" xml:space="preserve"><value>Bootstrap terminé</value></data>
   <data name="CompletedDescription" xml:space="preserve"><value>La préparation est terminée. Consultez le résultat, puis ouvrez la console quand vous le souhaitez.</value></data>
   <data name="OpenConsole" xml:space="preserve"><value>Ouvrir la console</value></data>
+  <data name="RequiredExtensionUnavailable" xml:space="preserve"><value>L’extension requise n’est pas disponible dans le périmètre cible. Démarrez ou enrôlez cette extension.</value></data>
+  <data name="RequiredContributionUnavailable" xml:space="preserve"><value>La contribution sélectionnée n’est pas disponible auprès de cette extension. Vérifiez son enrôlement, les contributions publiées et la version attendue.</value></data>
+  <data name="ContributionType" xml:space="preserve"><value>Type de contribution</value></data>
+  <data name="RequiredVersion" xml:space="preserve"><value>Version attendue</value></data>
+  <data name="RequiredInstallation" xml:space="preserve"><value>Installation attendue</value></data>
+  <data name="RequiredByResource" xml:space="preserve"><value>Requise par la ressource</value></data>
+  <data name="RequiredDependency" xml:space="preserve"><value>Dépendance requise</value></data>
+  <data name="BlockedByBootstrapFailure" xml:space="preserve"><value>Cette ressource n’a pas été appliquée car le bootstrap s’est arrêté sur l’erreur ci-dessous.</value></data>
+  <data name="FailureDiscoveryRequiresManualApplication" xml:space="preserve"><value>Un des profils sélectionnés demande une découverte d’opérations de Connected Service. Cette découverte utilise des Flows et des Workers disponibles seulement après la fin du bootstrap initial ; elle ne peut donc pas s’exécuter pendant le bootstrap initial. Retirez ce profil de la sélection initiale, redémarrez, puis appliquez-le depuis Système &gt; Profils Bootstrap.</value></data>
+  <data name="Family_ConnectedServiceOperationDiscovery" xml:space="preserve"><value>Découverte des opérations</value></data>
+  <data name="Stage_workers" xml:space="preserve"><value>Communication avec les Workers</value></data>
+  <data name="Explanation_workers" xml:space="preserve"><value>Permettre la connexion des Workers authentifiés. Un Worker compatible est requis seulement lorsqu’une opération du bootstrap nécessite une exécution. Les travaux ordinaires restent suspendus jusqu’à la fin de l’initialisation.</value></data>
+  <data name="Stage_builtins" xml:space="preserve"><value>Ressources builtin</value></data>
+  <data name="Explanation_builtins" xml:space="preserve"><value>Matérialiser et publier les Tools, Flows et contrats de la plateforme dans leurs périmètres administratifs avant d’appliquer les ressources des profils qui en dépendent.</value></data>
+  <data name="WaitingForWorker" xml:space="preserve"><value>Attente d’un Worker compatible</value></data>
+  <data name="WorkerWaitDescription" xml:space="preserve"><value>La découverte est en attente d’exécution. Connectez un Worker prenant en charge la capacité Runtime attendue avant l’échéance.</value></data>
+  <data name="DiscoveryInProgress" xml:space="preserve"><value>Découverte des opérations</value></data>
+  <data name="DiscoveryRunningDescription" xml:space="preserve"><value>Le Flow de découverte est en cours d’exécution. Les ressources dépendantes seront appliquées après validation de ses résultats.</value></data>
+  <data name="DiscoveryValidationDescription" xml:space="preserve"><value>Valider les opérations découvertes selon les sélecteurs du profil.</value></data>
+  <data name="RuntimeCapability" xml:space="preserve"><value>Capacité Runtime attendue</value></data>
+  <data name="Elapsed" xml:space="preserve"><value>Durée écoulée</value></data>
+  <data name="ElapsedSeconds" xml:space="preserve"><value>{0} s</value></data>
+  <data name="DiscoveryDeadline" xml:space="preserve"><value>Échéance de la découverte</value></data>
+  <data name="DiscoveryFlowRun" xml:space="preserve"><value>Ouvrir le Flow Run de découverte</value></data>
+  <data name="FailureDiscoveryActorRequired" xml:space="preserve"><value>La découverte d’opérations nécessite une identité d’exécution autorisée. Le bootstrap initial doit créer ou conserver un administrateur de plateforme dans sa phase de structure.</value></data>
+  <data name="FailureDiscoveryTimeout" xml:space="preserve"><value>Le délai de découverte est dépassé. Vérifiez qu’un Worker compatible est connecté et que le fournisseur de découverte est accessible, puis relancez le bootstrap. Les ressources dépendantes n’ont pas été appliquées.</value></data>
 </root>
