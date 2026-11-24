@@ -1,4 +1,4 @@
-# Local SQLite preview: exact image references and host-side credentials only.
+# Default SQLite preview: exact images and host-side credentials; optional PostgreSQL overlay.
 x-ready: &ready
   test:
     - CMD

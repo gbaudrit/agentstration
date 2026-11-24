@@ -27,9 +27,11 @@ Console and Workplace shells consume the authoritative APIs and own no business
 state. Deterministic AI remains the offline validation and fallback path; provider
 integrations are optional.
 
-The [local SQLite preview](../../contributing/preview-environments.md) consumes
+The [local database preview](../../contributing/preview-environments.md) consumes
 independently versioned server and Worker OCI deliveries by digest. Its two-container
-composition uses the existing Runtime and Bootstrap boundaries, keeps initial
+SQLite composition optionally adds a digest-pinned PostgreSQL container, following
+[ADR-0078](../../decisions/0078-postgresql-is-an-optional-server-storage-profile.md).
+It uses the existing Runtime and Bootstrap boundaries, keeps initial
 Bootstrap disabled unless explicitly configured, and requires no local inference
 or cloud account. This external packaging increment does not add a Runtime deployment
 orchestrator; see [ADR-0255](../../decisions/0255-sqlite-previews-consume-private-oci-deliveries.md).

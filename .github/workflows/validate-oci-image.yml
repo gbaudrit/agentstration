@@ -126,7 +126,7 @@ jobs:
           delivery = json.load(open('artifacts/extension/delivery.json'))
           build('maf-worker', Path('artifacts/preview-worker'), os.environ['SOURCE_REPOSITORY'], bases=delivery['buildImages'])
           PY
-      - name: Verify the digest-pinned SQLite preview and persisted execution
+      - name: Verify digest-pinned database previews and persisted execution
         if: steps.select.outputs.kind == 'server'
         run: |
           python3 - <<'PY'
@@ -139,9 +139,10 @@ jobs:
               reference = image_record(delivery, kind, 'localhost:5000')['reference'].split('@')[0] + ':smoke'
               subprocess.run(['skopeo', 'copy', '--all', '--preserve-digests', '--dest-tls-verify=false',
                               'oci-archive:' + str(Path(path).parent / delivery['archive']), 'docker://' + reference], check=True)
-          subprocess.run(['python3', 'scripts/preview/preview_smoke.py', '--server-delivery', 'artifacts/extension/delivery.json',
-                          '--worker-delivery', 'artifacts/preview-worker/delivery.json', '--registry', 'localhost:5000',
-                          '--output', 'artifacts/extension/preview-smoke.json'], check=True)
+          for database in ('sqlite', 'postgresql'):
+              subprocess.run(['python3', 'scripts/preview/preview_smoke.py', '--server-delivery', 'artifacts/extension/delivery.json',
+                              '--worker-delivery', 'artifacts/preview-worker/delivery.json', '--registry', 'localhost:5000',
+                              '--database', database, '--output', f'artifacts/extension/preview-{database}-smoke.json'], check=True)
           PY
       - name: Verify AEP enrollment and persisted identity against the SQLite authority
         if: steps.select.outputs.kind == 'aep-extension'

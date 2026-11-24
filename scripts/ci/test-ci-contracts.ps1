@@ -36,7 +36,7 @@ foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Pr
 }
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
 Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
-foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'scripts/preview/preview.py')) {
+foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
 }
@@ -100,6 +100,7 @@ $enrollmentSteps = @($validation -split '(?m)^      - name: ' | Where-Object { $
 Require ($enrollmentSteps.Count -eq 1 -and $enrollmentSteps[0].Contains("if: steps.select.outputs.kind == 'aep-extension'")) 'The enrollment smoke must run for every selected AEP image, not a provider ID.'
 $previewSteps = @($validation -split '(?m)^      - name: ' | Where-Object { $_.Contains('scripts/preview/preview_smoke.py') })
 Require ($previewSteps.Count -eq 1 -and $previewSteps[0].Contains("if: steps.select.outputs.kind == 'server'")) 'Server delivery must execute the actual digest-pinned preview before publication.'
+Require ($previewSteps[0].Contains("for database in ('sqlite', 'postgresql'):") -and $previewSteps[0].Contains("'--database', database")) 'The same server archive must pass both database previews before publication.'
 $resourceUx = Get-Content (Join-Path $root '.github/workflows/resource-plan-ux.yml') -Raw
 Require ($resourceUx.Contains("      - 'src/**'") -and $resourceUx.Contains("      - '!src/extensions/Agentstration.Extensions.Foundry/**'")) 'Resource Plan UX must exclude Foundry-only source edits while retaining mixed product edits.'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
