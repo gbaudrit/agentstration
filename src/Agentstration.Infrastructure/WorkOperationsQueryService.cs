@@ -63,6 +63,17 @@ public sealed class WorkOperationsQueryService(
         return await RunsForAsync(operational.Task.Id, FlowScope(scope), results, artifacts, cancellationToken);
     }
 
+    public async Task<WorkTaskFlowRunPageResponse> ListFlowRunPageAsync(WorkOperationsQueryScope scope, Guid taskId, int skip, int take, CancellationToken cancellationToken)
+    {
+        if (skip < 0 || take is < 1 or > 200) throw new WorkValidationException("invalid_pagination", "Skip must be non-negative and take must be between 1 and 200.");
+        var operational = await workplace.GetOperationalTaskAsync(new WorkspaceId(scope.WorkspaceId), new(taskId), cancellationToken);
+        var results = await workplace.ListResultsAsync(operational.WorkspaceId, operational.Task.Id, cancellationToken);
+        var artifacts = await workplace.ListArtifactsAsync(operational.WorkspaceId, operational.Task.Id, cancellationToken);
+        var page = await flowRuns.ListTaskRunsAsync(operational.Task.Id.ToString(), skip, take, FlowScope(scope), cancellationToken);
+        var count = await flowRuns.CountTaskRunsAsync(operational.Task.Id.ToString(), FlowScope(scope), cancellationToken);
+        return new(page.Items.Select(value => ToRunResponse(value.Value, results, artifacts)).ToArray(), skip, take, page.HasMore, count);
+    }
+
     public async Task<object> GetFlowRunAsync(WorkOperationsQueryScope scope, Guid taskId, string runId, CancellationToken cancellationToken)
     {
         var operational = await workplace.GetOperationalTaskAsync(new WorkspaceId(scope.WorkspaceId), new(taskId), cancellationToken);
@@ -78,24 +89,32 @@ public sealed class WorkOperationsQueryService(
         var results = await workplace.ListResultsAsync(task.WorkspaceId, task.Id, token);
         var artifacts = await workplace.ListArtifactsAsync(task.WorkspaceId, task.Id, token);
         var pending = (await workplace.ListPendingActionsForTaskAsync(task.WorkspaceId, task.Id, token)).Count(value => value.Status == PendingActionStatus.Pending);
-        var runs = await RunsForAsync(task.Id, scope, results, artifacts, token);
+        var runCount = await flowRuns.CountTaskRunsAsync(task.Id.ToString(), scope, token);
         var started = activities.FirstOrDefault(value => value.Type == WorkTaskActivityType.TaskStarted)?.CreatedAt;
         var completed = activities.LastOrDefault(value => value.Type is WorkTaskActivityType.TaskCompleted or WorkTaskActivityType.TaskFailed or WorkTaskActivityType.TaskCancelled)?.CreatedAt;
         var error = task.Error is null ? null : new WorkTaskErrorResponse(task.Error.Code, "Task failed", task.Error.Message, task.Error.OccurredAt, task.FlowRunId, task.Error.IsRecoverable);
         return new(task.Id.Value, task.WorkspaceId.ToString(), task.EntryId?.Value, task.InteractionId?.Value, task.Title, task.Description, task.Status,
-            task.CreatedAt, started, task.UpdatedAt, completed, task.FlowRunId, results.LastOrDefault()?.Id.Value, pending, results.Count, artifacts.Count, runs.Count,
+            task.CreatedAt, started, task.UpdatedAt, completed, task.FlowRunId, results.LastOrDefault()?.Id.Value, pending, results.Count, artifacts.Count, runCount,
             activities.LastOrDefault()?.Title, error);
     }
 
     private async Task<IReadOnlyList<WorkTaskFlowRunResponse>> RunsForAsync(WorkTaskId taskId, FlowRunScope scope, IReadOnlyList<WorkTaskResult> results, IReadOnlyList<WorkTaskArtifact> artifacts, CancellationToken token)
     {
-        var page = await flowRuns.ListAsync(null, null, 0, 200, scope, token);
-        return page.Items.Select(value => value.Value).Where(value => value.WorkTaskId == taskId.ToString()).OrderBy(value => value.CreatedAt)
-            .Select(value => new WorkTaskFlowRunResponse(value.Id, value.FlowId.Value, value.Status.ToString(), value.CreatedAt, value.StartedAt, value.CompletedAt,
+        var runs = new List<FlowRun>();
+        for (var skip = 0; ; skip += 200)
+        {
+            var page = await flowRuns.ListTaskRunsAsync(taskId.ToString(), skip, 200, scope, token);
+            runs.AddRange(page.Items.Select(value => value.Value));
+            if (!page.HasMore) break;
+        }
+        return runs.Select(value => ToRunResponse(value, results, artifacts)).ToArray();
+    }
+
+    private static WorkTaskFlowRunResponse ToRunResponse(FlowRun value, IReadOnlyList<WorkTaskResult> results, IReadOnlyList<WorkTaskArtifact> artifacts) =>
+        new WorkTaskFlowRunResponse(value.Id, value.FlowId.Value, value.Status.ToString(), value.CreatedAt, value.StartedAt, value.CompletedAt,
                 value.ParentFlowRunId is null ? "Initial request" : "Conversation continuation", value.ParentFlowRunId,
                 Guid.TryParse(value.TriggerMessageId, out var triggerId) ? triggerId : null,
-                results.Count(result => result.FlowRunId == value.Id), artifacts.Count(artifact => artifact.FlowRunId == value.Id))).ToArray();
-    }
+                results.Count(result => result.FlowRunId == value.Id), artifacts.Count(artifact => artifact.FlowRunId == value.Id));
 
     private static WorkTaskResultResponse ToResult(WorkTaskResult value) => new(value.Id.Value, value.FlowRunId, value.Kind, value.Title, value.Content, value.CreatedAt, value.Sequence);
     private static WorkTaskArtifactResponse ToArtifact(WorkTaskArtifact value, WorkspaceId workspaceId) => new(value.Id.Value, value.FlowRunId, value.Name, value.ContentType, value.Length, value.CreatedAt, value.Sequence,

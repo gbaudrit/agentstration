@@ -4,6 +4,7 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Storage.Abstractions;
 using Agentstration.Resources;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Agentstration.Application.Tests;
@@ -174,6 +175,68 @@ public sealed partial class FlowTests
                 if (!page.HasMore) return items;
             }
         }
+    }
+
+    [TestMethod]
+    public async Task TaskRunPagesFilterBeforePagingAndRemainStableWhenRunsAreUpdated()
+    {
+        var commands = new FlowCommandInterceptor();
+        await using var fixture = await FlowFixture.CreateAsync(commands);
+        const string taskId = "task-history";
+        for (var index = 420; index >= 0; index--)
+        {
+            var run = CreateStoredRun($"task-run-{index:D4}", new("history"), FlowRunStatus.Succeeded) with
+            {
+                WorkTaskId = index < 205 ? taskId : "another-task",
+                CreatedAt = Now.AddMinutes(index / 2)
+            };
+            await fixture.Repository.CreateRunAsync(run, default);
+        }
+        foreach (var scope in new[] { TestScope with { PrincipalId = Guid.NewGuid() }, TestScope with { TenantId = Guid.NewGuid() }, TestScope with { WorkspaceId = new WorkspaceId(Guid.NewGuid()) } })
+            await fixture.Repository.CreateRunAsync(CreateStoredRun($"foreign-run-{Guid.NewGuid():N}", new("history"), FlowRunStatus.Succeeded) with { Scope = scope, WorkspaceId = scope.WorkspaceId, WorkTaskId = taskId }, default);
+        commands.Reset();
+        Assert.AreEqual(205, await fixture.Repository.CountTaskRunsAsync(TestScope, taskId, default));
+        Assert.IsFalse(commands.CommandTexts[0].Contains("\"Payload\"", StringComparison.Ordinal));
+        var actual = new List<string>();
+        for (var skip = 0; ; skip += 37)
+        {
+            commands.Reset();
+            var page = await fixture.Repository.ListTaskRunsAsync(TestScope, taskId, skip, 37, default);
+            Assert.HasCount(1, commands.CommandTexts);
+            StringAssert.Contains(commands.CommandTexts[0], "\"WorkTaskId\" =");
+            StringAssert.Contains(commands.CommandTexts[0], "LIMIT");
+            actual.AddRange(page.Items.Select(value => value.Value.Id));
+            foreach (var run in page.Items)
+                await fixture.Repository.UpdateRunAsync(run.Value with { Status = FlowRunStatus.Failed }, run.ETag, default);
+            if (!page.HasMore) break;
+        }
+        CollectionAssert.AreEqual(Enumerable.Range(0, 205).Select(index => $"task-run-{index:D4}").ToArray(), actual.ToArray());
+        var empty = await fixture.Repository.ListTaskRunsAsync(TestScope, taskId, 205, 20, default);
+        Assert.HasCount(0, empty.Items);
+        Assert.IsFalse(empty.HasMore);
+    }
+
+    [TestMethod]
+    public async Task SqliteTaskRunProjectionUpgradesExistingHistoryWithoutChangingRunReceipts()
+    {
+        await using var fixture = await FlowFixture.CreateAsync();
+        var run = CreateStoredRun("legacy-task-run", new("history"), FlowRunStatus.Succeeded) with { WorkTaskId = "legacy-task" };
+        var stored = await fixture.Repository.CreateRunAsync(run, default);
+        await using (var context = await fixture.ContextFactory.CreateDbContextAsync())
+        {
+            await context.Database.ExecuteSqlRawAsync("DROP INDEX IX_FlowResources_TaskHistory;");
+            await context.Database.ExecuteSqlRawAsync("ALTER TABLE FlowResources DROP COLUMN WorkTaskId;");
+            await context.Database.ExecuteSqlRawAsync("ALTER TABLE FlowResources DROP COLUMN RunCreatedAtTicks;");
+        }
+        await fixture.Repository.InitializeAsync(default);
+        await fixture.Repository.InitializeAsync(default);
+        var page = await fixture.Repository.ListTaskRunsAsync(TestScope, "legacy-task", 0, 20, default);
+        Assert.HasCount(1, page.Items);
+        Assert.AreEqual(run.Id, page.Items[0].Value.Id);
+        Assert.AreEqual(run.CreatedAt, page.Items[0].Value.CreatedAt);
+        Assert.AreEqual(stored.ETag, page.Items[0].ETag);
+        Assert.AreEqual(stored.UpdatedAt, page.Items[0].UpdatedAt);
+        Assert.AreEqual(1, await fixture.Repository.CountTaskRunsAsync(TestScope, "legacy-task", default));
     }
 
     private static FlowRun CreateStoredRun(string id, FlowId flowId, FlowRunStatus status)

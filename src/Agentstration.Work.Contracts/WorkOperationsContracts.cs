@@ -45,6 +45,8 @@ public sealed record WorkTaskErrorResponse(
     string? FlowRunId,
     bool IsRetryable);
 
+public sealed record WorkTaskFlowRunPageResponse(IReadOnlyList<WorkTaskFlowRunResponse> Items, int Skip, int Take, bool HasMore, int TotalCount);
+
 public sealed record WorkTaskFlowRunResponse(
     string Id,
     string FlowId,
@@ -98,5 +100,6 @@ public interface IWorkOperationsQueryService
     Task<WorkTaskOperationsCountersResponse> GetCountersAsync(WorkOperationsQueryScope scope, CancellationToken cancellationToken);
     Task<WorkTaskOperationsDetailProjection> GetDetailAsync(WorkOperationsQueryScope scope, Guid taskId, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkTaskFlowRunResponse>> ListFlowRunsAsync(WorkOperationsQueryScope scope, Guid taskId, CancellationToken cancellationToken);
+    Task<WorkTaskFlowRunPageResponse> ListFlowRunPageAsync(WorkOperationsQueryScope scope, Guid taskId, int skip, int take, CancellationToken cancellationToken);
     Task<object> GetFlowRunAsync(WorkOperationsQueryScope scope, Guid taskId, string runId, CancellationToken cancellationToken);
 }

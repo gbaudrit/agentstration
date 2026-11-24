@@ -26,6 +26,12 @@ public sealed partial class FlowRunService
     public Task<FlowRunPage> ListAsync(FlowId? flowId, FlowRunStatus? status, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken) =>
         repository.ListRunsAsync(scope, flowId, status, skip, take, cancellationToken);
 
+    public Task<FlowRunPage> ListTaskRunsAsync(string workTaskId, int skip, int take, FlowRunScope scope, CancellationToken cancellationToken) =>
+        repository.ListTaskRunsAsync(scope, workTaskId, skip, take, cancellationToken);
+
+    public Task<int> CountTaskRunsAsync(string workTaskId, FlowRunScope scope, CancellationToken cancellationToken) =>
+        repository.CountTaskRunsAsync(scope, workTaskId, cancellationToken);
+
     public async Task DeleteAsync(string runId, string expectedETag, FlowRunScope scope, CancellationToken cancellationToken)
     {
         var stored = await RequiredAsync(runId, scope, cancellationToken);

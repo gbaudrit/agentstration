@@ -146,6 +146,7 @@ internal static class OpenApiSuccessResponseCatalog
         if (path == "/api/tasks") return Json<WorkTaskOperationsPageResponse>(200, "List operational Tasks");
         if (path == "/api/tasks/summary") return Json<WorkTaskOperationsCountersResponse>(200, "Get operational Task counters");
         if (path.EndsWith("/activities", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<WorkTaskActivity>>(200, "List Task activities");
+        if (path.EndsWith("/flow-runs/page", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskFlowRunPageResponse>(200, "List a page of Task Flow Runs");
         if (path.EndsWith("/flow-runs/{runId}", StringComparison.OrdinalIgnoreCase)) return Json<FlowRun>(200, "Get a Task Flow Run");
         if (path.EndsWith("/flow-runs", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<WorkTaskFlowRunResponse>>(200, "List Task Flow Runs");
         if (path.EndsWith("/pending-actions/{actionId}/respond", StringComparison.OrdinalIgnoreCase)) return Json<PendingActionContract>(200, "Respond to a Task pending action");

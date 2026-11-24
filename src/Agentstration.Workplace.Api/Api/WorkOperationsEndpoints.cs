@@ -17,6 +17,7 @@ public static class WorkOperationsEndpoints
         tasks.MapGet("/{taskId:guid}", DetailAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         tasks.MapGet("/{taskId:guid}/activities", ActivitiesAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         tasks.MapGet("/{taskId:guid}/flow-runs", FlowRunsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
+        tasks.MapGet("/{taskId:guid}/flow-runs/page", FlowRunPageAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         tasks.MapGet("/{taskId:guid}/flow-runs/{runId}", FlowRunAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         tasks.MapGet("/{taskId:guid}/pending-actions", PendingActionsAsync).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanReadRuns);
         tasks.MapPost("/{taskId:guid}/pending-actions/{actionId:guid}/respond", RespondPendingActionAsync)
@@ -59,6 +60,8 @@ public static class WorkOperationsEndpoints
     private static Task<IResult> ArtifactsAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok((await service.ListArtifactsAsync(value.WorkspaceId, value.Task.Id, token)).Select(artifact => ToArtifact(artifact, value.WorkspaceId))), token);
     private static Task<IResult> FlowRunsAsync(Guid taskId, IWorkOperationsQueryService queries, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () => Results.Ok(await queries.ListFlowRunsAsync(CurrentScope(requestContext), taskId, token)));
+    private static Task<IResult> FlowRunPageAsync(Guid taskId, int? skip, int? take, IWorkOperationsQueryService queries, ICurrentRequestContext requestContext, CancellationToken token) =>
+        ExecuteAsync(async () => Results.Ok(await queries.ListFlowRunPageAsync(CurrentScope(requestContext), taskId, skip ?? 0, take ?? 25, token)));
     private static Task<IResult> FlowRunAsync(Guid taskId, string runId, IWorkOperationsQueryService queries, ICurrentRequestContext requestContext, CancellationToken token) =>
         ExecuteAsync(async () => Results.Ok(await queries.GetFlowRunAsync(CurrentScope(requestContext), taskId, runId, token)));
     private static Task<IResult> PauseAsync(Guid taskId, WorkplaceService service, ICurrentRequestContext requestContext, CancellationToken token) => WithTaskAsync(taskId, service, requestContext, async value => Results.Ok(await service.PauseTaskAsync(value.WorkspaceId, value.Task.Id, token)), token);

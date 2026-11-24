@@ -25,6 +25,8 @@ public sealed class FlowDbContext(DbContextOptions<FlowDbContext> options) : DbC
         document.Property(value => value.Namespace).HasMaxLength(128);
         document.Property(value => value.Version).HasMaxLength(128);
         document.Property(value => value.Status);
+        document.Property(value => value.WorkTaskId).HasMaxLength(128);
+        document.HasIndex(value => new { value.ScopeRef, value.Kind, value.TenantId, value.PrincipalId, value.WorkTaskId, value.RunCreatedAtTicks, value.Key }).HasDatabaseName("IX_FlowResources_TaskHistory");
         document.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         document.Property(value => value.UpdatedAt).HasConversion(value => value.UtcTicks, value => new DateTimeOffset(value, TimeSpan.Zero));
         document.HasIndex(value => new { value.ScopeRef, value.Namespace, value.Kind, value.FlowId, value.Version });
@@ -47,6 +49,8 @@ internal sealed class FlowDocument
     public Guid TenantId { get; set; }
     public Guid PrincipalId { get; set; }
     public FlowRunStatus? Status { get; set; }
+    public string? WorkTaskId { get; set; }
+    public long RunCreatedAtTicks { get; set; }
     public required string Payload { get; set; }
     public required string ETag { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
@@ -189,6 +193,8 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         document.TenantId = run.Scope.TenantId;
         document.PrincipalId = run.Scope.PrincipalId;
         document.Status = run.Status;
+        document.WorkTaskId = run.WorkTaskId;
+        document.RunCreatedAtTicks = run.CreatedAt.UtcTicks;
         context.Documents.Add(document);
         await SaveCreateAsync(context, cancellationToken);
         return new StoredFlowRun(run, document.ETag, now);
@@ -253,6 +259,29 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         return new FlowRunPage(items, documents.Length > take);
     }
 
+    public async Task<FlowRunPage> ListTaskRunsAsync(FlowRunScope scope, string workTaskId, int skip, int take, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
+        take = Math.Min(take, 200);
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var documents = await TaskRuns(context, scope, workTaskId)
+            .OrderBy(value => value.RunCreatedAtTicks).ThenBy(value => value.Key)
+            .Skip(skip).Take(take + 1).ToArrayAsync(cancellationToken);
+        return new FlowRunPage(documents.Take(take).Select(ToRun).ToArray(), documents.Length > take);
+    }
+
+    public async Task<int> CountTaskRunsAsync(FlowRunScope scope, string workTaskId, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await TaskRuns(context, scope, workTaskId).CountAsync(cancellationToken);
+    }
+
+    private static IQueryable<FlowDocument> TaskRuns(FlowDbContext context, FlowRunScope scope, string workTaskId) =>
+        context.Documents.AsNoTracking().Where(value => value.ScopeRef == scope.ScopeRef.Value
+            && value.Kind == RunKind && value.TenantId == scope.TenantId && value.PrincipalId == scope.PrincipalId
+            && value.WorkTaskId == workTaskId);
+
     public async Task<IReadOnlyList<FlowRunKey>> ListRecoverableRunsAsync(FlowRunKey? after, int take, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
@@ -294,6 +323,8 @@ public sealed class PostgreSqlFlowRepository(IDbContextFactory<FlowDbContext> co
         var now = timeProvider.GetUtcNow();
         document.Payload = Serialize(run);
         document.Status = run.Status;
+        document.WorkTaskId = run.WorkTaskId;
+        document.RunCreatedAtTicks = run.CreatedAt.UtcTicks;
         document.ETag = NewETag();
         document.UpdatedAt = now;
         await SaveUpdateAsync(context, cancellationToken);

@@ -75,3 +75,20 @@ An atomic outcome is final in this increment. A second event cannot replace the 
 Work-owned SQLite stores the hierarchy in the WorkItem snapshot and indexes the tree identity by Workspace and principal. Initialization adds the nullable projection/index to existing stores. PostgreSQL has the equivalent migration and adapter behavior; live PostgreSQL validation is opt-in.
 
 Creation and reading are the #946 slice; evidence-based functional consolidation is #947. [WorkPlan revisions, dependency readiness and durable execution](work-plans.md) are #948–#949. Shared-project synchronization and the Workplace authoring journey are subsequent capabilities. PostgreSQL adapter compilation is verified; live PostgreSQL execution remains opt-in. See [ADR-0256](../decisions/0256-functional-task-trees-extend-work-items.md) and [ADR-0257](../decisions/0257-functional-acceptance-is-independent-of-runtime-completion.md).
+
+## Task FlowRun history
+
+Operational Task histories query the exact Tenant, execution Workspace, Principal and
+`WorkTaskId` before paging. `GET /api/tasks/{taskId}/flow-runs/page?skip=0&take=25`
+returns `items`, `skip`, `take`, `hasMore` and `totalCount`; `take` must be 1–200 and
+`skip` non-negative. Pages sort by immutable run creation time, then run identity.
+Updating an execution status cannot move a run across page boundaries. As with
+offset-based collections, concurrent insertions or deletions require callers to
+refresh the traversal; the count describes the current query, not a frozen snapshot.
+
+The existing complete history and Task detail responses retain their shapes and
+read all Task-specific pages. Summary counts use a scoped database count without
+loading FlowRun payloads. Unrelated Tasks cannot truncate either result. Existing
+SQLite databases are upgraded idempotently at initialization; the optional
+PostgreSQL store includes an equivalent migration and index. Both preserve run
+payloads, ETags and update timestamps.

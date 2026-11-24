@@ -47,6 +47,8 @@ public interface IFlowRepository
         GetRunExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), runId, cancellationToken);
     Task<StoredFlowRun?> GetRunAsync(FlowRunScope scope, string runId, CancellationToken cancellationToken);
     Task<FlowRunPage> ListRunsAsync(FlowRunScope scope, FlowId? flowId, FlowRunStatus? status, int skip, int take, CancellationToken cancellationToken);
+    Task<FlowRunPage> ListTaskRunsAsync(FlowRunScope scope, string workTaskId, int skip, int take, CancellationToken cancellationToken);
+    Task<int> CountTaskRunsAsync(FlowRunScope scope, string workTaskId, CancellationToken cancellationToken);
     Task<IReadOnlyList<FlowRunKey>> ListRunKeysAsync(int skip, int take, CancellationToken cancellationToken);
     /// <summary>
     /// Lists recoverable runs after an exclusive, immutable run key in storage order. Pass null for

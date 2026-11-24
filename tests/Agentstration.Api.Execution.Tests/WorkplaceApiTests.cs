@@ -492,8 +492,7 @@ public sealed class WorkplaceApiTests
                     TimeProvider.System.GetUtcNow(),
                     metadata: new Dictionary<string, string>
                     {
-                        ["workplace.entryId"] = "isolation-test",
-                        ["workplace.interactionId"] = Guid.NewGuid().ToString("D")
+                        [WorkplaceTaskIdentity.OriginMetadata] = WorkplaceTaskIdentity.TriggerOrigin
                     });
                 await workItems.CreateAsync(item, default);
                 var taskId = WorkTaskId.FromWorkItem(item.Id);
@@ -529,6 +528,38 @@ public sealed class WorkplaceApiTests
                 var otherWorkspace = NewRun("other-workspace-run", otherWorkspaceScope, "other-workspace-secret");
                 foreach (var run in new[] { own, otherPrincipal, otherTenant, otherWorkspace })
                     await runs.CreateRunAsync(run, default);
+
+                // Bury this Task behind more than a global page of unrelated runs, and
+                // make its own history larger than a page as well.
+                for (var index = 0; index < 204; index++)
+                    await runs.CreateRunAsync(NewRun($"owned-{index:D4}", ownerScope, "owned-content") with { CreatedAt = own.CreatedAt.AddSeconds(index + 1) }, default);
+                for (var index = 0; index < 210; index++)
+                    await runs.CreateRunAsync(NewRun($"unrelated-{index:D4}", ownerScope, "unrelated-content") with { WorkTaskId = Guid.NewGuid().ToString("D") }, default);
+
+                var history = await client.GetFromJsonAsync<WorkTaskFlowRunResponse[]>($"/api/tasks/{taskId}/flow-runs");
+                Assert.HasCount(205, history!);
+                Assert.AreEqual(own.Id, history![0].Id);
+                var detail = await client.GetFromJsonAsync<WorkTaskOperationsDetailResponse>($"/api/tasks/{taskId}");
+                Assert.AreEqual(205, detail!.Task.FlowRunCount);
+                Assert.HasCount(205, detail.FlowRuns);
+                var pagedIds = new List<string>();
+                for (var skip = 0; ; skip += 37)
+                {
+                    var page = await client.GetFromJsonAsync<WorkTaskFlowRunPageResponse>($"/api/tasks/{taskId}/flow-runs/page?skip={skip}&take=37");
+                    Assert.AreEqual(205, page!.TotalCount);
+                    Assert.AreEqual(skip, page.Skip);
+                    Assert.AreEqual(37, page.Take);
+                    pagedIds.AddRange(page.Items.Select(value => value.Id));
+                    if (!page.HasMore) break;
+                }
+                CollectionAssert.AreEqual(history.Select(value => value.Id).ToArray(), pagedIds.ToArray());
+                foreach (var query in new[] { "skip=-1", "take=0", "take=201" })
+                {
+                    using var invalid = await client.GetAsync($"/api/tasks/{taskId}/flow-runs/page?{query}");
+                    Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+                }
+                using var missingPage = await client.GetAsync($"/api/tasks/{Guid.NewGuid()}/flow-runs/page");
+                Assert.AreEqual(HttpStatusCode.NotFound, missingPage.StatusCode);
 
                 using var ownerResponse = await client.GetAsync($"/api/tasks/{taskId}/flow-runs/{own.Id}");
                 Assert.AreEqual(HttpStatusCode.OK, ownerResponse.StatusCode);
