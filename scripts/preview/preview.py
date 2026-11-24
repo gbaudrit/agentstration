@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare and run a local, digest-pinned SQLite preview outside the product Runtime."""
+"""Prepare and run a local, digest-pinned preview outside the product Runtime."""
 import argparse
 import json
 import os
@@ -18,6 +18,7 @@ from images import DIGEST, delivery_entry, valid_version
 SHA = re.compile(r"[0-9a-f]{40}")
 ENVIRONMENT_ID = re.compile(r"[a-z][a-z0-9-]{0,39}")
 REGISTRY = re.compile(r"ghcr\.io|localhost:[0-9]{1,5}")
+POSTGRES_IMAGE = re.compile(r"docker\.io/library/postgres:17@sha256:[0-9a-f]{64}")
 
 
 def require(condition, message):
@@ -58,13 +59,20 @@ def private_write(path, value):
 
 
 def validate_state(state):
-    require(state.get("schemaVersion") == 1 and state.get("database") == "sqlite"
-            and ENVIRONMENT_ID.fullmatch(state.get("environmentId", "")), "Invalid SQLite preview state.")
+    require(state.get("schemaVersion") == 1 and state.get("database") in ("sqlite", "postgresql")
+            and ENVIRONMENT_ID.fullmatch(state.get("environmentId", "")), "Invalid preview state.")
     require(type(state.get("port")) is int and (state["port"] == 0 or 1024 <= state["port"] <= 65535),
             "Choose port 0 for a disposable test or a port between 1024 and 65535.")
     for name in ("instanceId", "workerId", "credentialId"):
         uuid.UUID(state[name])
-    require(set(state["images"]) == {"server", "worker"}, "This preview requires exactly the server and Worker images.")
+    if "deploymentOwnerId" in state:
+        uuid.UUID(state["deploymentOwnerId"])
+    expected = {"server", "worker", "postgres"} if state["database"] == "postgresql" else {"server", "worker"}
+    require(set(state["images"]) == expected, "Preview images must match its selected database.")
+    if state["database"] == "postgresql":
+        postgres = state["images"]["postgres"]
+        require(POSTGRES_IMAGE.fullmatch(postgres["reference"]) and postgres["platform"] == "linux/amd64",
+                "PostgreSQL requires an official version 17 image pinned by digest.")
     for name in ("server", "worker"):
         image = state["images"][name]
         require(re.fullmatch(r"(?:ghcr\.io|localhost:[0-9]{1,5})/[a-z0-9_.-]+/[a-z0-9_.-]+@sha256:[0-9a-f]{64}", image["reference"])
@@ -73,7 +81,8 @@ def validate_state(state):
     return state
 
 
-def prepare(directory, server_delivery, worker_delivery, environment_id, port=5080, registry="ghcr.io", bootstrap=None):
+def prepare(directory, server_delivery, worker_delivery, environment_id, port=5080, registry="ghcr.io", bootstrap=None,
+            database=None, postgres_image=None):
     require(ENVIRONMENT_ID.fullmatch(environment_id), "Environment ID must use 1–40 lowercase letters, digits or hyphens, starting with a letter.")
     require(bootstrap is None or isinstance(bootstrap, dict), "Bootstrap configuration must be a JSON object.")
     images = {"server": image_record(server_delivery, "server", registry),
@@ -86,15 +95,25 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
     if state_path.exists():
         state = validate_state(read_json(state_path))
         require(state["environmentId"] == environment_id, "Existing state belongs to another preview; use another directory.")
-        require(all((directory / name).is_file() and not (directory / name).is_symlink()
-                    for name in ("worker.key", "server-configuration.json", "deployment.json")),
+        require(database is None or database == state["database"],
+                "An existing preview cannot switch databases; use a new environment and state directory.")
+        files = ["worker.key", "server-configuration.json", "deployment.json"]
+        if state["database"] == "postgresql":
+            files.append("postgres.password")
+        require(all((directory / name).is_file() and not (directory / name).is_symlink() for name in files),
                 "Restore the existing preview state; credentials must not be silently regenerated.")
         configuration = read_json(directory / "server-configuration.json")
     else:
         require(not directory.exists() or not any(directory.iterdir()), "Refusing to overwrite an unrelated nonempty directory.")
-        state = {"schemaVersion": 1, "environmentId": environment_id, "database": "sqlite",
+        state = {"schemaVersion": 1, "environmentId": environment_id, "database": database or "sqlite",
                  **{name: str(uuid.uuid4()) for name in ("instanceId", "workerId", "credentialId")}}
         configuration = {"Agentstration": {"Bootstrap": {"InitialBootstrapEnabled": False, "Path": "/app/bootstrap/profiles"}}}
+    if state["database"] == "postgresql":
+        previous = state.get("images", {}).get("postgres")
+        images["postgres"] = {"reference": postgres_image or (previous or read_json(ROOT / "deploy/preview/postgresql.json"))["reference"],
+                              "platform": "linux/amd64"}
+    else:
+        require(postgres_image is None, "A PostgreSQL image can only be selected for the PostgreSQL profile.")
     state.update(port=port, images=images, sourceSha=images["server"]["sourceSha"])
     validate_state(state)
     if bootstrap is not None:
@@ -106,6 +125,14 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
     directory.chmod(0o700)
     if not state_path.exists():
         private_write(directory / "worker.key", secrets.token_urlsafe(48))
+        if state["database"] == "postgresql":
+            private_write(directory / "postgres.password", secrets.token_urlsafe(48))
+    if state["database"] == "postgresql":
+        password = (directory / "postgres.password").read_text()
+        require(re.fullmatch(r"[A-Za-z0-9_-]{64}", password), "Restore the original generated PostgreSQL password file.")
+        (directory / "postgres.password").chmod(0o600)
+        configuration["ConnectionStrings"] = {"Agentstration":
+            "Host=postgres;Port=5432;Database=agentstration;Username=agentstration;Password=" + password}
     private_write(directory / "server-configuration.json", json.dumps(configuration, indent=2) + "\n")
     private_write(state_path, json.dumps(state, indent=2) + "\n")
     return state
@@ -118,11 +145,16 @@ def compose_command(directory):
     environment.update(PREVIEW_STATE_DIRECTORY=str(directory), PREVIEW_ENVIRONMENT_ID=state["environmentId"],
         PREVIEW_PORT=str(state["port"]), PREVIEW_INSTANCE_ID=state["instanceId"],
         PREVIEW_WORKER_ID=state["workerId"], PREVIEW_CREDENTIAL_ID=state["credentialId"])
+    environment["PREVIEW_OWNER_ID"] = state.get("deploymentOwnerId", "unmanaged")
     for name, image in state["images"].items():
         environment["PREVIEW_" + name.upper() + "_IMAGE"] = image["reference"]
-        environment["PREVIEW_" + name.upper() + "_SHA"] = image["sourceSha"]
-    return ["docker", "compose", "--project-name", "preview-" + state["environmentId"], "--env-file", "/dev/null",
-            "--file", str(ROOT / "deploy/preview/compose.yml")], environment
+        if name != "postgres":
+            environment["PREVIEW_" + name.upper() + "_SHA"] = image["sourceSha"]
+    command = ["docker", "compose", "--project-name", "preview-" + state["environmentId"], "--env-file", "/dev/null",
+               "--file", str(ROOT / "deploy/preview/compose.yml")]
+    if state["database"] == "postgresql":
+        command += ["--file", str(ROOT / "deploy/preview/postgresql.yml")]
+    return command, environment
 
 
 def compose(directory, *arguments, capture=False):
@@ -138,17 +170,21 @@ def server_address(directory):
 
 def verify(directory):
     state = validate_state(read_json(Path(directory) / "deployment.json"))
-    for service in ("server", "worker"):
+    for service, expected in state["images"].items():
         container_id = compose(directory, "ps", "--quiet", service, capture=True).strip()
         require(container_id and "\n" not in container_id, "Expected one preview container per service.")
         container = json.loads(subprocess.check_output(["docker", "inspect", container_id], text=True))[0]
-        expected = state["images"][service]
         require(container["Config"]["Image"] == expected["reference"] and container["State"].get("Health", {}).get("Status") == "healthy",
                 "Preview container is unready or differs from its recorded digest.")
-        image = json.loads(subprocess.check_output(["docker", "image", "inspect", container["Image"]], text=True))[0]
-        labels = image["Config"]["Labels"]
-        require(labels.get("org.opencontainers.image.revision") == expected["sourceSha"]
-                and labels.get("org.opencontainers.image.version") == expected["version"], "Preview OCI source/version mismatch.")
+        if service != "postgres":
+            image = json.loads(subprocess.check_output(["docker", "image", "inspect", container["Image"]], text=True))[0]
+            labels = image["Config"]["Labels"]
+            require(labels.get("org.opencontainers.image.revision") == expected["sourceSha"]
+                    and labels.get("org.opencontainers.image.version") == expected["version"], "Preview OCI source/version mismatch.")
+        else:
+            require(not any((container["HostConfig"].get("PortBindings") or {}).values())
+                    and not any(value.startswith("POSTGRES_PASSWORD=") for value in container["Config"]["Env"]),
+                    "PostgreSQL must not publish a host port or receive a plaintext password environment variable.")
         if service == "worker":
             require({mount["Destination"] for mount in container["Mounts"]} == {"/run/secrets/awp_key"}
                     and all(not mount["RW"] for mount in container["Mounts"])
@@ -171,13 +207,16 @@ def main():
     initialize.add_argument("--port", type=int, default=5080)
     initialize.add_argument("--registry", default="ghcr.io")
     initialize.add_argument("--bootstrap-config", type=Path)
+    initialize.add_argument("--database", choices=("sqlite", "postgresql"))
+    initialize.add_argument("--postgres-image", help="Official PostgreSQL 17 image reference pinned by digest")
     for command in (initialize, sub.add_parser("compose"), sub.add_parser("check")):
         command.add_argument("--directory", required=True, type=Path)
     sub.choices["compose"].add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.action == "prepare":
         prepare(args.directory, read_json(args.server_delivery), read_json(args.worker_delivery), args.environment_id,
-                args.port, args.registry, read_json(args.bootstrap_config) if args.bootstrap_config else None)
+                args.port, args.registry, read_json(args.bootstrap_config) if args.bootstrap_config else None,
+                args.database, args.postgres_image)
     elif args.action == "compose":
         arguments = args.arguments[1:] if args.arguments[:1] == ["--"] else args.arguments
         compose(args.directory, *arguments)

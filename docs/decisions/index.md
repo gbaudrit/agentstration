@@ -316,8 +316,10 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)
 
-256. [ADR-0256 — Transformation Schemas have explicit function exposure](0256-transformation-schemas-have-explicit-function-exposure.md)
+256. [ADR-0256 — Preview lifecycle binds provider-neutral requests to owned resources](0256-preview-lifecycle-binds-provider-neutral-requests-to-owned-resources.md)
 
-257. [ADR-0257 — Acquisition text content is selected at admission](0257-acquisition-text-content-is-selected-at-admission.md)
+257. [ADR-0257 — Transformation Schemas have explicit function exposure](0257-transformation-schemas-have-explicit-function-exposure.md)
 
-258. [ADR-0258 — XML processing uses operator content settings](0258-xml-processing-uses-operator-content-settings.md)
+258. [ADR-0258 — Acquisition text content is selected at admission](0258-acquisition-text-content-is-selected-at-admission.md)
+
+259. [ADR-0259 — XML processing uses operator content settings](0259-xml-processing-uses-operator-content-settings.md)

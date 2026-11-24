@@ -1,0 +1,4 @@
+{
+  "reference": "docker.io/library/postgres:17@sha256:cdbfb3de010ef603c29f10a5dfc79e023f66ad662ec6fddcda7130afe5d65e7b",
+  "platform": "linux/amd64"
+}
