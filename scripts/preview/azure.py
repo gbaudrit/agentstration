@@ -137,16 +137,17 @@ def validate_record(request, record, action):
     datetime.fromisoformat(record['createdAt'])
     datetime.fromisoformat(record['expiresAt'])
     previous = contract.validate(record['request'])
+    previous_target, target = contract.azure_target(previous), contract.azure_target(request)
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
     preview.require(previous['deliveries']['server']['repository'].lower() == request['deliveries']['server']['repository'].lower(),
                     'Azure ownership metadata belongs to another repository.')
-    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion')
-    preview.require(all(previous['target'][key] == request['target'][key] for key in fixed),
+    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion', 'osProfile')
+    preview.require(all(previous_target[key] == target[key] for key in fixed),
                     'Existing Azure previews cannot change location, OS image or ownership scope; reset before changing location/OS.')
     if not record['destroyed']:
         preview.require(previous['database'] == request['database'], 'Reset the Azure preview explicitly before changing databases.')
     if action != 'deploy':
-        preview.require(contract.images(previous) == contract.images(request) and previous['target'] == request['target'],
+        preview.require(contract.images(previous) == contract.images(request) and previous_target == target,
                         'Status/destroy requires the recorded Azure image and target selection.')
 
 

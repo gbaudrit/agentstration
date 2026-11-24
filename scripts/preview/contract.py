@@ -8,6 +8,12 @@ from images import delivery_entry
 
 PROVIDERS = {"docker", "azure-vm", "ssh-docker"}
 OPERATIONS = {"deploy", "status", "destroy", "validate"}
+AZURE_OS_PROFILE = "ubuntu-24.04"
+
+
+def azure_target(request):
+    # Legacy v1 Azure requests already meant this fixed Ubuntu profile.
+    return {"osProfile": AZURE_OS_PROFILE, **request["target"]}
 
 
 def fields(value, expected):
@@ -77,7 +83,12 @@ def _validate(request):
         preview.require(isinstance(target["daemonId"], str) and re.fullmatch(r"[a-zA-Z0-9:_-]{1,128}", target["daemonId"]),
                         "An exact trusted Docker daemon identity is required.")
     elif request["provider"] == "azure-vm":
-        fields(target, ("subscriptionId", "resourceGroup", "region", "vmSize", "imageVersion"))
+        expected_target = {"subscriptionId", "resourceGroup", "region", "vmSize", "imageVersion"}
+        if "osProfile" in target:
+            expected_target.add("osProfile")
+        fields(target, expected_target)
+        preview.require(target.get("osProfile", AZURE_OS_PROFILE) == AZURE_OS_PROFILE,
+                        "Only the qualified ubuntu-24.04 OS profile is supported.")
         try:
             uuid.UUID(target["subscriptionId"])
         except (ValueError, TypeError, AttributeError) as error:
@@ -128,11 +139,15 @@ def operation(action, request):
                     "SSH execution remains #1288; it never falls back to another provider.")
 
 
-def loads(text):
+def parse(text):
     preview.require(len(text.encode("utf-8")) <= 65536, "Deployment requests are limited to 64 KiB.")
 
     def unique(pairs):
         preview.require(len(pairs) == len(dict(pairs)), "Duplicate JSON contract fields are not accepted.")
         return dict(pairs)
 
-    return validate(json.loads(text, object_pairs_hook=unique))
+    return json.loads(text, object_pairs_hook=unique)
+
+
+def loads(text):
+    return validate(parse(text))

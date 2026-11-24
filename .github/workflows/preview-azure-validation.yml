@@ -10,6 +10,23 @@ on:
 permissions:
   contents: read
 jobs:
+  retail-prices:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Snapshot public Azure PAYG rates without cloud credentials
+        run: python3 scripts/preview/azure_prices.py --output "$RUNNER_TEMP/azure-prices.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: azure-public-retail-prices
+          path: ${{ runner.temp }}/azure-prices*.json
+          retention-days: 30
+          if-no-files-found: warn
   offline:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
