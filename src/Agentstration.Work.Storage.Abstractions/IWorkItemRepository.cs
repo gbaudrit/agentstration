@@ -38,6 +38,7 @@ public sealed record WorkItemQuery(
 public sealed record StoredWorkItem(WorkItem Value, string ETag, DateTimeOffset UpdatedAt);
 public sealed record WorkItemPage(IReadOnlyList<StoredWorkItem> Items, bool HasMore, int TotalCount = -1);
 public sealed record DeletedWorkTask(IReadOnlyList<ArtifactReference> Artifacts);
+public sealed record WorkTaskTreeUpdate(WorkItem Value, long ExpectedVersion);
 
 public interface IWorkItemRepository
 {
@@ -46,6 +47,8 @@ public interface IWorkItemRepository
     Task<bool> TryCreateTaskTreeAsync(IReadOnlyList<WorkItem> items, CancellationToken cancellationToken);
     Task<IReadOnlyList<StoredWorkItem>> ListTaskTreeAsync(WorkspaceId workspaceId, Guid ownerPrincipalId,
         WorkTaskId treeId, CancellationToken cancellationToken);
+    Task SaveTaskTreeOutcomeAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkTaskId treeId,
+        IReadOnlyList<WorkTaskTreeUpdate> updates, CancellationToken cancellationToken);
     Task<StoredWorkItem?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken);
     Task<StoredWorkItem?> GetExactAsync(ResourceScopeRef scopeRef, Guid ownerPrincipalId, WorkItemId id, CancellationToken cancellationToken) =>
         GetAsync(RequiredWorkspace(scopeRef), ownerPrincipalId, id, cancellationToken);

@@ -289,6 +289,10 @@ public sealed class OpenApiTests
         var read = paths.GetProperty("/api/workspaces/{workspaceName}/tasks/{taskId}/tree").GetProperty("get");
         AssertSchemaHasProperty(read, "200", "workspaceId");
         AssertSchemaHasProperty(read, "200", "tasks");
+        var outcome = paths.GetProperty("/api/workspaces/{workspaceName}/tasks/{taskId}/outcome").GetProperty("post");
+        Assert.AreEqual("Record a functional task outcome", outcome.GetProperty("summary").GetString());
+        AssertSchemaHasProperty(outcome, "200", "rootTaskId");
+        AssertSchemaHasProperty(outcome, "200", "tasks");
     }
 
     [TestMethod]

@@ -74,4 +74,5 @@ public sealed record WorkItemSnapshot(
     WorkError? Error,
     long Version,
     ResourceScopeRef? ScopeRef = null,
-    WorkTaskHierarchy? TaskHierarchy = null);
+    WorkTaskHierarchy? TaskHierarchy = null,
+    WorkTaskAcceptance? TaskAcceptance = null);

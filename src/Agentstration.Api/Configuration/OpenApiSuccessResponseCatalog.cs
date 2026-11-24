@@ -179,6 +179,7 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.EndsWith("/pending-actions/{pendingActionId}/responses", StringComparison.OrdinalIgnoreCase)) return Json<PendingActionResolutionResponse>(200, "Respond to a pending action");
         if (path.EndsWith("/pending-actions", StringComparison.OrdinalIgnoreCase)) return Json<IReadOnlyList<PendingActionContract>>(200, "List pending actions");
         if (method == "POST" && path.EndsWith("/tasks/tree", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskTreeResponse>(201, "Create a functional task tree");
+        if (method == "POST" && path.EndsWith("/tasks/{taskId}/outcome", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskTreeResponse>(200, "Record a functional task outcome");
         if (method == "GET" && path.EndsWith("/tasks/{taskId}/tree", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskTreeResponse>(200, "Get a functional task subtree");
         if (path.EndsWith("/tasks", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskPageResponse>(200, "List Workplace Tasks");
         if (path.EndsWith("/tasks/{taskId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskResponse>(200, "Get a Workplace Task");

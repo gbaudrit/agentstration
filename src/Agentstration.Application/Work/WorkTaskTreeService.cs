@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Agentstration.Application.Work;
 
-public sealed class WorkTaskTreeService(
+public sealed partial class WorkTaskTreeService(
     IWorkItemRepository repository, IWorkplaceContext context, TimeProvider timeProvider, ILogger<WorkTaskTreeService> logger)
 {
     public async Task<Result<WorkTaskTree>> CreateAsync(WorkspaceId workspaceId, WorkTaskTreeDefinition definition,
@@ -77,6 +77,7 @@ public sealed class WorkTaskTreeService(
 
     private static WorkTaskTreeNode ToNode(WorkItem item) => new(
         new(WorkTaskId.FromWorkItem(item.Id), item.TaskHierarchy?.Kind ?? WorkTaskKind.Atomic,
-            item.Title ?? item.Instruction, item.Instruction, item.TaskHierarchy?.ParentTaskId, item.Description),
-        item.Status, item.Version, item.CreatedAt, item.UpdatedAt);
+            item.Title ?? item.Instruction, item.Instruction, item.TaskHierarchy?.ParentTaskId, item.Description,
+            item.TaskHierarchy?.IsOptional ?? false),
+        item.Status, item.Version, item.CreatedAt, item.UpdatedAt, item.TaskAcceptance);
 }

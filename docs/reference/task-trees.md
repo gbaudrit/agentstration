@@ -27,7 +27,7 @@ Send `POST /api/workspaces/{workspaceName}/tasks/tree` with the run-submission p
 }
 ```
 
-`kind` is the invariant enum `Atomic = 0`, `Composite = 1`. Only composites can have children. Empty composites remain Pending; creation does not imply successful completion. Titles, instructions and descriptions are user-authored content.
+`kind` is the invariant enum `Atomic = 0`, `Composite = 1`. Only composites can have children. Children are required by default; set `isOptional: true` when a child's outcome must not condition its parent. This flag is immutable. Empty composites remain Pending; creation does not imply successful completion. Titles, instructions and descriptions are user-authored content.
 
 Successful creation returns `201 Created`, a `Location` for the tree and the stored nodes with kind, parent, status, version and timestamps. Replaying the same tree identifiers and normalized content also returns `201` with the existing state, without resetting timestamps, creating duplicate tasks or requesting execution. Task order in the request does not affect replay. Changing the original intent under the same identity returns `409 task_tree_conflict`.
 
@@ -38,6 +38,29 @@ Creation is atomic: a collision on any task rolls back the whole new family. The
 Use `GET /api/workspaces/{workspaceName}/tasks/{taskId}/tree` with run-read permission. A root returns its family; a descendant returns only itself and its descendants. Reads are restricted to the current Workspace and principal. Missing or inaccessible roots return `404 work_task_not_found`.
 
 Existing Entry/Trigger tasks can be read as atomic single-node trees. New task nodes also participate in existing task supervision; technical Flow-only WorkItems remain excluded from Workplace task classification.
+
+## Record and consolidate functional outcomes
+
+Send `POST /api/workspaces/{workspaceName}/tasks/{taskId}/outcome` with execution permission, using the current `version` of an atomic node in a created tree. Legacy Entry/Trigger projections retain their existing lifecycle:
+
+```json
+{
+  "eventId": "20000000-0000-0000-0000-000000000001",
+  "expectedVersion": 1,
+  "outcome": 1,
+  "evidence": "Reviewed the result against the task's acceptance criteria."
+}
+```
+
+`outcome` is the invariant enum `Pending = 0`, `Accepted = 1`, `Failed = 2`, `Cancelled = 3`. Only terminal outcomes may be submitted. Evidence is required and bounded to 8,000 characters. The authenticated user makes an explicit functional judgment; a completed Runtime or Flow execution alone never supplies acceptance. Conversely, a task can be accepted from reviewed evidence without a local execution. Recording acceptance preserves execution `status` and runtime results.
+
+Success returns `200 OK` with the current complete tree. Each node exposes `isOptional` and nullable `acceptance`; absent acceptance means Pending. Atomic acceptance contains the stable event identifier, outcome, normalized evidence and server timestamp. Composite acceptance contains direct required-child IDs, functional outcomes and observed versions, allowing evidence to be traced back through the tree.
+
+Consolidation proceeds from the changed node to the root. A required Failed child makes its parent Failed; otherwise a required Cancelled child makes it Cancelled. A nonempty set of all Accepted required children makes the parent Accepted. Otherwise the parent remains Pending. Optional children do not affect that decision. Empty and optional-only composites remain Pending. Composite outcomes are derived, so posting directly to a composite returns `409 task_outcome_derived`.
+
+All changed nodes are saved atomically with optimistic concurrency and a root version guard. A stale target version returns `409 task_tree_conflict`; retry after rereading the task. Concurrent updates to different children are reloaded and retried up to three attempts. Replaying the same event, outcome and trimmed evidence returns current state without changing versions or history, even when its original expected version is now stale. Reusing an event within the same tree for another task or another intent returns `409 task_outcome_conflict`.
+
+An atomic outcome is final in this increment. A second event cannot replace the existing evidence or reopen a failed/cancelled task. Reopening requires a future explicit lifecycle command. The event and evidence receipt survive restart, independently of execution history. HTTP outcome bodies are limited to 64 KiB.
 
 ## Bounds and failures
 
@@ -51,4 +74,4 @@ Existing Entry/Trigger tasks can be read as atomic single-node trees. New task n
 
 Work-owned SQLite stores the hierarchy in the WorkItem snapshot and indexes the tree identity by Workspace and principal. Initialization adds the nullable projection/index to existing stores. PostgreSQL has the equivalent migration and adapter behavior; live PostgreSQL validation is opt-in.
 
-Creation and reading are the #946 slice. Composite outcome consolidation (#947), WorkPlan dependencies/execution (#948/#949), shared-project synchronization and the Workplace authoring journey are subsequent capabilities. See [ADR-0256](../decisions/0256-functional-task-trees-extend-work-items.md).
+Creation and reading are the #946 slice; evidence-based functional consolidation is #947. WorkPlan dependencies/execution (#948/#949), shared-project synchronization and the Workplace authoring journey are subsequent capabilities. PostgreSQL adapter compilation is verified; live PostgreSQL execution remains opt-in. See [ADR-0256](../decisions/0256-functional-task-trees-extend-work-items.md) and [ADR-0257](../decisions/0257-functional-acceptance-is-independent-of-runtime-completion.md).

@@ -66,6 +66,9 @@ public static partial class WorkplaceEndpoints
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(8 * 1024 * 1024))
             .RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapGet("/tasks/{taskId:guid}/tree", GetTaskTreeAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        workspaces.MapPost("/tasks/{taskId:guid}/outcome", RecordTaskOutcomeAsync)
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(64 * 1024))
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         workspaces.MapGet("/tasks/{taskId:guid}", GetTaskAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/tasks/{taskId:guid}/pause", PauseTaskAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         workspaces.MapPost("/tasks/{taskId:guid}/resume", ResumeTaskAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);

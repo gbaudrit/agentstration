@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Agentstration.Work;
 
 public enum WorkTaskKind { Atomic, Composite }
@@ -15,9 +17,11 @@ public sealed record WorkTaskDefinition(
     string Title,
     string Instruction,
     WorkTaskId? ParentTaskId = null,
-    string? Description = null);
+    string? Description = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsOptional = false);
 
-public sealed record WorkTaskHierarchy(WorkTaskId TreeId, WorkTaskKind Kind, WorkTaskId? ParentTaskId, string CreationDigest);
+public sealed record WorkTaskHierarchy(WorkTaskId TreeId, WorkTaskKind Kind, WorkTaskId? ParentTaskId, string CreationDigest,
+    bool IsOptional = false);
 
 public sealed record WorkTaskTreeDefinition(WorkTaskId RootTaskId, IReadOnlyList<WorkTaskDefinition> Tasks)
 {
@@ -79,4 +83,5 @@ public sealed record WorkTaskTreeDefinition(WorkTaskId RootTaskId, IReadOnlyList
 
 public sealed record WorkTaskTree(WorkTaskId RootTaskId, IReadOnlyList<WorkTaskTreeNode> Tasks);
 public sealed record WorkTaskTreeNode(
-    WorkTaskDefinition Definition, WorkItemStatus Status, long Version, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    WorkTaskDefinition Definition, WorkItemStatus Status, long Version, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    WorkTaskAcceptance? Acceptance = null);

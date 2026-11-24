@@ -31,7 +31,7 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 ### Work Plane and Workplace
 
 - durable Work Items, interactions, Tasks, Pending Actions, results, artifacts and notifications;
-- atomic creation and bounded retrieval of durable functional task trees through the [Work API](docs/reference/task-trees.md), with retry-safe identities and Workspace/principal isolation;
+- atomic creation and bounded retrieval of durable functional task trees through the [Work API](docs/reference/task-trees.md), with retry-safe identities, Workspace/principal isolation and evidence-based consolidation of required children;
 - Entries as governed user-facing access points to immutable Flow versions;
 - workspace Dashboards that organize published Entries without exposing runtime details;
 - a responsive, conversation-first Workplace that projects agent turns, progress, human input and outcomes;

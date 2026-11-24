@@ -6,13 +6,15 @@ using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
 using Agentstration.Work.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Agentstration.Application.Tests;
 
 [TestClass]
-public sealed class WorkTaskTreeTests
+public sealed partial class WorkTaskTreeTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 24, 12, 0, 0, TimeSpan.Zero);
 
@@ -274,14 +276,15 @@ public sealed class WorkTaskTreeTests
     {
         private readonly string directory = Path.Combine(Path.GetTempPath(), "agentstration-task-tree-" + Guid.NewGuid().ToString("N"));
         private ServiceProvider? provider;
+        private IInterceptor? interceptor;
         public WorkspaceId Workspace { get; } = new(Guid.NewGuid());
         public Guid Principal { get; } = Guid.NewGuid();
         public string ConnectionString => $"Data Source={Path.Combine(directory, "work.db")};Pooling=False";
         public IWorkItemRepository Repository => provider!.GetRequiredService<IWorkItemRepository>();
 
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(IInterceptor? interceptor = null)
         {
-            var fixture = new Fixture();
+            var fixture = new Fixture { interceptor = interceptor };
             Directory.CreateDirectory(fixture.directory);
             await fixture.ReopenAsync();
             return fixture;
@@ -295,6 +298,9 @@ public sealed class WorkTaskTreeTests
             if (provider is not null) await provider.DisposeAsync();
             var services = new ServiceCollection();
             services.AddSqliteWorkPlane(ConnectionString);
+            if (interceptor is not null)
+                services.AddSingleton<IDbContextFactory<WorkDbContext>>(new TestContextFactory(
+                    new DbContextOptionsBuilder<WorkDbContext>().UseSqlite(ConnectionString).AddInterceptors(interceptor).Options));
             provider = services.BuildServiceProvider();
             await Repository.InitializeAsync(default);
         }
@@ -304,5 +310,10 @@ public sealed class WorkTaskTreeTests
             if (provider is not null) await provider.DisposeAsync();
             if (Directory.Exists(directory)) Directory.Delete(directory, true);
         }
+    }
+
+    private sealed class TestContextFactory(DbContextOptions<WorkDbContext> options) : IDbContextFactory<WorkDbContext>
+    {
+        public WorkDbContext CreateDbContext() => new(options);
     }
 }

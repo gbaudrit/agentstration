@@ -336,6 +336,34 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
         return document is null ? null : FromDocument(document);
     }
 
+    public async Task SaveTaskTreeOutcomeAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkTaskId treeId,
+            IReadOnlyList<WorkTaskTreeUpdate> updates, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(updates);
+        if (updates.Count is < 1 or > WorkTaskTreeDefinition.MaximumDepth + 1
+            || !updates.Any(update => update.Value.Id == treeId.ToWorkItemId())
+            || updates.Select(update => update.Value.Id).Distinct().Count() != updates.Count
+            || updates.Any(update => update.Value.WorkspaceId != workspaceId
+                || update.Value.OwnerPrincipalId != ownerPrincipalId || update.Value.TaskHierarchy?.TreeId != treeId
+                || update.Value.Version <= update.ExpectedVersion))
+            throw new WorkItemConcurrencyException("A bounded task-family update with its root version is required.");
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var workspaceKey = workspaceId.ToString();
+        var ownerKey = ownerPrincipalId.ToString("D");
+        var treeKey = treeId.ToString();
+        var documents = await context.WorkItems
+            .Where(item => item.WorkspaceId == workspaceKey && item.OwnerPrincipalId == ownerKey && item.TaskTreeId == treeKey)
+            .OrderBy(item => item.Id).Take(WorkTaskTreeDefinition.MaximumTasks + 1).ToDictionaryAsync(item => item.Id, cancellationToken);
+        foreach (var update in updates)
+        {
+            if (!documents.TryGetValue(update.Value.Id.ToString(), out var document) || document.Version != update.ExpectedVersion)
+                throw new WorkItemConcurrencyException("The task family changed before its outcome was saved.");
+            Apply(document, update.Value);
+        }
+        try { await context.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateConcurrencyException exception) { throw new WorkItemConcurrencyException(exception.Message); }
+    }
+
     public async Task<StoredWorkItem> SaveAsync(WorkItem workItem, long expectedVersion, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workItem);

@@ -36,6 +36,7 @@ public sealed class WorkItem
         Error = snapshot.Error;
         Version = snapshot.Version;
         TaskHierarchy = snapshot.TaskHierarchy;
+        TaskAcceptance = snapshot.TaskAcceptance;
         _inputs = [.. snapshot.Inputs];
         _attachments = [.. snapshot.Attachments];
         _messages = [.. snapshot.Messages];
@@ -71,6 +72,7 @@ public sealed class WorkItem
     public WorkError? Error { get; private set; }
     public long Version { get; private set; }
     public WorkTaskHierarchy? TaskHierarchy { get; }
+    public WorkTaskAcceptance? TaskAcceptance { get; private set; }
 
     public static WorkItem CreateTask(WorkTaskDefinition definition, WorkspaceId workspaceId, Guid ownerPrincipalId,
         WorkTaskId treeId, string creationDigest, DateTimeOffset now)
@@ -80,7 +82,7 @@ public sealed class WorkItem
             now, definition.Title, definition.Description);
         return Restore(item.ToSnapshot() with
         {
-            TaskHierarchy = new(treeId, definition.Kind, definition.ParentTaskId, creationDigest)
+            TaskHierarchy = new(treeId, definition.Kind, definition.ParentTaskId, creationDigest, definition.IsOptional)
         });
     }
 
@@ -183,7 +185,31 @@ public sealed class WorkItem
     public WorkItemSnapshot ToSnapshot() => new(
         Id, WorkspaceId, OwnerPrincipalId, Type, Title, Instruction, Description, Status, CreatedAt, UpdatedAt, RequesterIdentity, CorrelationId,
         Metadata, RequestedAgentId, Flow, SelectedAgentId, CurrentExecutionId, [.. _inputs], [.. _attachments], [.. _messages],
-        [.. _interactions], [.. _history], Result, Error, Version, ExecutionScopeRef, TaskHierarchy);
+        [.. _interactions], [.. _history], Result, Error, Version, ExecutionScopeRef, TaskHierarchy, TaskAcceptance);
+
+    public void RecordTaskOutcome(WorkTaskEvidence evidence)
+    {
+        ArgumentNullException.ThrowIfNull(evidence);
+        if (TaskHierarchy?.Kind != WorkTaskKind.Atomic || TaskAcceptance?.Evidence is not null)
+            throw new WorkTransitionException("task_outcome_conflict", "Only an undecided atomic task accepts outcome evidence.");
+        if (evidence.EventId == Guid.Empty || !Enum.IsDefined(evidence.Outcome) || evidence.Outcome == WorkTaskOutcome.Pending
+            || string.IsNullOrWhiteSpace(evidence.Evidence) || evidence.Evidence.Length > WorkTaskAcceptanceRules.MaximumEvidenceLength)
+            throw new WorkValidationException("task_outcome_invalid", "A terminal outcome and bounded evidence are required.");
+        TaskAcceptance = new(evidence.Outcome, evidence, [], evidence.RecordedAt);
+        Touch("task.outcome.recorded", Guid.NewGuid(), WorkInteractionOrigin.Requester, evidence.RecordedAt);
+    }
+
+    public void ConsolidateTaskOutcome(IReadOnlyList<WorkItem> children, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(children);
+        if (TaskHierarchy?.Kind != WorkTaskKind.Composite || children.Count > WorkTaskTreeDefinition.MaximumTasks
+            || children.Any(child => child.WorkspaceId != WorkspaceId || child.OwnerPrincipalId != OwnerPrincipalId
+                || child.TaskHierarchy?.TreeId != TaskHierarchy.TreeId
+                || child.TaskHierarchy.ParentTaskId != WorkTaskId.FromWorkItem(Id)))
+            throw new WorkValidationException("task_children_invalid", "Consolidation requires children from the same functional family.");
+        TaskAcceptance = WorkTaskAcceptanceRules.Consolidate(children, now);
+        Touch("task.outcome.consolidated", Guid.NewGuid(), WorkInteractionOrigin.System, now);
+    }
 
     public bool ApplyRuntimeEvent(WorkExecutionEvent executionEvent)
     {

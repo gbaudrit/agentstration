@@ -76,6 +76,72 @@ public sealed class WorkTaskTreeApiTests
             using var foreign = await client.PostAsJsonAsync($"/api/workspaces/{Guid.NewGuid()}/tasks/tree",
                 new CreateWorkTaskTreeRequest(root, [new(root, WorkTaskKind.Atomic, "Task", "Work")]));
             Assert.AreEqual(HttpStatusCode.Forbidden, foreign.StatusCode);
+            var outcome = new RecordWorkTaskOutcomeRequest(Guid.NewGuid(), 1, WorkTaskOutcome.Accepted, "Reviewed evidence");
+            using var missingOutcome = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{root}/outcome", outcome);
+            Assert.AreEqual(HttpStatusCode.NotFound, missingOutcome.StatusCode);
+            using var invalidOutcome = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{root}/outcome", outcome with { Evidence = " " });
+            Assert.AreEqual(HttpStatusCode.BadRequest, invalidOutcome.StatusCode);
+            using var foreignOutcome = await client.PostAsJsonAsync($"/api/workspaces/{Guid.NewGuid()}/tasks/{root}/outcome", outcome);
+            Assert.AreEqual(HttpStatusCode.Forbidden, foreignOutcome.StatusCode);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [TestMethod]
+    public async Task OutcomeApiConsolidatesEvidenceAndReplaysWithoutChangingExecutionState()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "agentstration-task-outcome-api-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await using var factory = Factory(directory);
+            using var client = factory.CreateClient();
+            var root = Guid.NewGuid();
+            var first = Guid.NewGuid();
+            var second = Guid.NewGuid();
+            var optional = Guid.NewGuid();
+            using var created = await client.PostAsJsonAsync("/api/workspaces/default/tasks/tree", new CreateWorkTaskTreeRequest(root,
+                [new(root, WorkTaskKind.Composite, "Review", "Review results"),
+                 new(first, WorkTaskKind.Atomic, "First", "First result", root),
+                 new(second, WorkTaskKind.Atomic, "Second", "Second result", root),
+                 new(optional, WorkTaskKind.Atomic, "Optional", "Additional result", root, IsOptional: true)]));
+            Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+            var command = new RecordWorkTaskOutcomeRequest(Guid.NewGuid(), 1, WorkTaskOutcome.Accepted, "Reviewed first evidence");
+            using var recorded = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{first}/outcome", command);
+            Assert.AreEqual(HttpStatusCode.OK, recorded.StatusCode, await recorded.Content.ReadAsStringAsync());
+            var partial = (await recorded.Content.ReadFromJsonAsync<WorkTaskTreeResponse>())!;
+            Assert.AreEqual(WorkTaskOutcome.Pending, partial.Tasks.Single(task => task.Id == root).Acceptance!.Outcome);
+            using var replay = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{first}/outcome", command);
+            Assert.AreEqual(HttpStatusCode.OK, replay.StatusCode);
+            var replayed = (await replay.Content.ReadFromJsonAsync<WorkTaskTreeResponse>())!;
+            Assert.AreEqual(partial.Tasks.Single(task => task.Id == root).Version, replayed.Tasks.Single(task => task.Id == root).Version);
+            using var derived = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{root}/outcome", command);
+            Assert.AreEqual(HttpStatusCode.Conflict, derived.StatusCode);
+            using var reused = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{second}/outcome", command);
+            Assert.AreEqual(HttpStatusCode.Conflict, reused.StatusCode);
+            using var stale = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{second}/outcome",
+                command with { EventId = Guid.NewGuid(), ExpectedVersion = 999 });
+            Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode);
+            using var completed = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{second}/outcome",
+                command with { EventId = Guid.NewGuid(), Evidence = "Reviewed second evidence" });
+            Assert.AreEqual(HttpStatusCode.OK, completed.StatusCode);
+            var accepted = (await completed.Content.ReadFromJsonAsync<WorkTaskTreeResponse>())!;
+            var consolidated = accepted.Tasks.Single(task => task.Id == root);
+            Assert.AreEqual(WorkTaskOutcome.Accepted, consolidated.Acceptance!.Outcome);
+            Assert.HasCount(2, consolidated.Acceptance.RequiredChildren);
+            CollectionAssert.AreEquivalent(new[] { first, second }, consolidated.Acceptance.RequiredChildren.Select(child => child.TaskId).ToArray());
+            Assert.IsTrue(accepted.Tasks.All(task => task.Status == WorkItemStatus.Pending));
+            using var optionalFailure = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{optional}/outcome",
+                new RecordWorkTaskOutcomeRequest(Guid.NewGuid(), 1, WorkTaskOutcome.Failed, "Optional evidence rejected"));
+            Assert.AreEqual(HttpStatusCode.OK, optionalFailure.StatusCode);
+            var loaded = (await client.GetFromJsonAsync<WorkTaskTreeResponse>($"/api/workspaces/default/tasks/{root}/tree"))!;
+            Assert.AreEqual(WorkTaskOutcome.Accepted, loaded.Tasks.Single(task => task.Id == root).Acceptance!.Outcome);
+            Assert.IsTrue(loaded.Tasks.Single(task => task.Id == optional).IsOptional);
+            Assert.AreEqual("Reviewed first evidence", loaded.Tasks.Single(task => task.Id == first).Acceptance!.Evidence!.Evidence);
         }
         finally
         {
