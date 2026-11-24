@@ -7,6 +7,7 @@ using Agentstration.Infrastructure.Notifications;
 using Agentstration.Infrastructure.ResourcePlanning;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.Infrastructure.Tools;
+using Agentstration.Infrastructure.Work;
 using Agentstration.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,6 +34,17 @@ internal static class InternalToolsServiceCollectionExtensions
         services.AddSingleton<BuiltinHttpOperationExecutor>();
         AddInternalTool<ConnectedServiceAcquisitionMcpTool>(services);
         services.AddSingleton<ConnectedServiceAcquisitionExecutor>();
+        foreach (var operation in Enum.GetValues<WorkPlanningOperation>())
+        {
+            services.AddSingleton<IInternalMcpToolHandler>(provider => new WorkPlanningMcpTool(operation,
+                provider.GetRequiredService<Agentstration.Application.Work.WorkProjectService>(),
+                provider.GetRequiredService<Agentstration.Application.Work.WorkTaskTreeService>(),
+                provider.GetRequiredService<Agentstration.Application.Work.WorkPlanService>(),
+                provider.GetRequiredService<Agentstration.Application.Work.WorkPlanExecutionService>(),
+                provider.GetRequiredService<Agentstration.Identity.Contracts.ICurrentRequestContext>(),
+                provider.GetRequiredService<Agentstration.Identity.Contracts.IAuthorizationService>()));
+            services.AddSingleton<IInternalMcpToolDefinitionProvider>(_ => new WorkPlanningToolDefinition(operation));
+        }
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

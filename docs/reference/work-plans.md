@@ -147,3 +147,32 @@ The hosted control-plane scheduler checks configured plans every two seconds in 
 Use `POST .../execution/cancel` with `{ "commandId": "<uuid>", "expectedVersion": 6 }` to stop future admissions and persist cancellation of open attempts. Flow cancellation is asynchronous; a completion committed before cancellation stays completed. Use `POST .../execution/retry` with the same fields plus `taskId` to explicitly retry a failed/cancelled technical execution whose functional outcome is still Pending. Retry creates a new attempt and keeps earlier evidence. Replaying an identical command is safe; changing its intent conflicts. A final reviewed Accepted/Failed/Cancelled outcome is not reopened by technical retry.
 
 Execution commands, observations and recovery are private to the original Workspace/Principal and revalidate current execution access. Worker loss produces a failed task attempt and leaves successors blocked until an explicit retry and acceptance. No automatic AWP recovery is added. Deactivate and revise only after active tasks settle; a new revision clears execution configuration and retains past attempts.
+
+## Governed MCP planning
+
+The internal MCP broker publishes these Workspace operations:
+
+| Tool | Operation |
+| --- | --- |
+| `work.project.list` / `work.project.get` | Private Project pages (up to 100) or exact lookup |
+| `work.task.get` / `work.task.create-tree` | Read or idempotently create a functional task tree |
+| `work.task.record-outcome` | Explicitly review a task with evidence and expected version |
+| `work.plan.get` / `work.plan.propose` | Read or create a Draft plan |
+| `work.plan.revise` | Revise an inactive plan using its expected version |
+| `work.plan.validate` / `work.plan.activate` | Transition an exact revision number and digest |
+| `work.plan.start` / `work.plan.advance` | Configure and advance the durable execution path |
+
+Schemas expose the same definition and execution-target shapes as the REST contracts.
+MCP WorkPlan results contain `commandId` and `value`, where `value` is the same
+`WorkPlanResponse` as REST. Model input contains no Workspace, Principal, command ID or
+causal coordinates. A stable MCP `agentstration/idempotencyKey` in request metadata
+identifies retries; retain the same target plan or task IDs. Different intent under
+an existing resource command receipt fails with the canonical conflict code.
+
+Assign the Workspace Tool resource to an Agent using the existing Tool assignment
+path. Disabled/unavailable Tools and managed deny hooks fail before effects. A Tool
+requiring approval cannot be called through raw MCP; use the existing approved Agent
+invocation. Functional acceptance remains an explicit review with evidence, independent
+of technical Flow completion. No task tracker, template or model is needed for the
+local deterministic execution path. `dryRun` validates declared structure without
+writes and reports that canonical execution validation is still required.

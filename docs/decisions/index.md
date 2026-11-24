@@ -320,3 +320,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 259. [ADR-0259 — WorkPlan dispatch persists admission before root Flow submission](0259-workplan-dispatch-persists-admission-before-root-flow-submission.md)
 260. [ADR-0260 — Projects group private work without changing Workspace ownership](0260-projects-group-private-work-without-changing-workspace-ownership.md)
 261. [ADR-0261 — Project context is authorized and captured at task admission](0261-project-context-is-authorized-and-captured-at-task-admission.md)
+262. [ADR-0262 — Governed Work planning Tools reuse Work services](0262-governed-work-planning-tools-reuse-work-services.md)

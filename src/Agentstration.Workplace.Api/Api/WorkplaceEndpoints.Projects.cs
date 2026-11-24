@@ -1,3 +1,4 @@
+using static Agentstration.Work.Contracts.WorkProjectContractMapping;
 using Agentstration.Application.Work;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -41,9 +42,6 @@ public static partial class WorkplaceEndpoints
     private static WorkProjectDefinition ToProjectDefinition(WorkProjectDefinitionRequest? request) => request is null ? null!
         : new(request.DisplayName, request.Description, request.PlanIds?.Select(id => new WorkPlanId(id)).ToArray() ?? [], request.TaskIds?.Select(id => new WorkTaskId(id)).ToArray() ?? [])
         { Bindings = request.Bindings?.ToArray() ?? [] };
-    private static WorkProjectResponse ToProjectResponse(WorkProjectSnapshot project) => new(project.Id.Value, project.WorkspaceId.Value, project.Name, project.Namespace,
-        project.Definition.DisplayName, project.Definition.Description, project.Definition.PlanIds.Select(id => id.Value).ToArray(), project.Definition.TaskIds.Select(id => id.Value).ToArray(),
-        project.Version, project.CreatedAt, project.UpdatedAt) { Bindings = project.Definition.Bindings };
     private static IResult WorkProjectProblem(string code) => Results.Problem(title: code, statusCode: code switch
     {
         "work_project_not_found" or "work_project_work_not_found" => StatusCodes.Status404NotFound,

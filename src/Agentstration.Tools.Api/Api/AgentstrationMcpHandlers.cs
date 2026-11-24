@@ -94,8 +94,14 @@ internal static class AgentstrationMcpHandlers
                     throw new ToolDefinitionInvocationException("tool_not_exposed", $"Tool '{parameters.Name}' is an internal implementation Tool and is not exposed by the MCP broker.");
                 var callId = IdempotencyKey(parameters.Meta) ?? request.JsonRpcRequest.Id.ToString();
                 var resourceName = AgentstrationToolProvider.ToolResourceName(builtIn.Definition.Name);
+                var projection = await services.GetRequiredService<IResourceStore>().GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                    workspaceScope, ResourceNamespace.Default, ToolResourceKinds.Tool, resourceName), cancellationToken)
+                    ?? throw new ToolDefinitionInvocationException("tool_not_found", "The internal Tool projection is unavailable.");
+                if (projection.Value.Definition.RequiresApproval)
+                    throw new ToolDefinitionInvocationException("tool_approval_required", "This Tool requires an approved Agent invocation.");
                 var builtInOutput = await services.GetRequiredService<IToolExecutionPipeline>().ExecuteAsync(new ToolExecutionContext
                 {
+                    OwnerKind = ToolExecutionOwnerKind.Mcp,
                     ToolCallId = callId,
                     InvocationId = $"{callId}:attempt:1",
                     ToolId = resourceName,
@@ -167,6 +173,10 @@ internal static class AgentstrationMcpHandlers
             };
         }
         catch (ToolDefinitionInvocationException exception)
+        {
+            return Error(exception.Code, exception.Message);
+        }
+        catch (ToolInputValidationException exception)
         {
             return Error(exception.Code, exception.Message);
         }
