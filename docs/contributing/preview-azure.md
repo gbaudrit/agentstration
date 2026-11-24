@@ -124,6 +124,35 @@ including conditional jobs. All reusable callers must therefore grant
 job actually receives OIDC permission. Both operations and selected scope are checked before authentication.
 No PAT, `GHCR_BOOTSTRAP_TOKEN`, Azure client secret or account key is required.
 
+### Verify the exact Ubuntu image before deployment
+
+Use a maintainer session such as Azure Cloud Shell to inspect the regional image
+catalog. Azure CLI's publisher, offer and SKU filters accept partial names. A list
+of versions alone can therefore select a version belonging to another SKU or
+architecture. Keep the full URN and apply exact filters:
+
+```bash
+preview_subscription_id='<subscription-id>'
+preview_region='westeurope'
+az vm image list --subscription "$preview_subscription_id" --location "$preview_region" \
+  --publisher Canonical --offer ubuntu-24_04-lts --sku server --architecture x64 --all \
+  --query "[?publisher=='Canonical' && offer=='ubuntu-24_04-lts' && sku=='server'] | [-5:].{urn:urn,version:version}" \
+  --output json
+preview_image_version='<selected-exact-version>'
+az vm image show --subscription "$preview_subscription_id" --location "$preview_region" \
+  --urn "Canonical:ubuntu-24_04-lts:server:$preview_image_version" \
+  --query '{id:id,architecture:architecture,hyperVGeneration:hyperVGeneration}' --output json
+```
+
+Require a successful lookup of the selected x64 Generation 2 image, then put that
+exact version in the target's `imageVersion`. Do not copy the example version
+without checking its regional availability or substitute `latest` in a deployment
+request. The group-scoped deployment identity need not gain subscription-wide
+catalog permissions for this maintainer check. See the
+[Azure CLI image reference](https://learn.microsoft.com/cli/azure/vm/image).
+
+### Run the lifecycle
+
 For a locally authenticated maintainer, plan from the existing delivery receipts,
 then set the two storage environment variables above and use the common CLI:
 

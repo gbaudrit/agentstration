@@ -314,14 +314,14 @@ class AzureTests(unittest.TestCase):
     def test_arm_json_errors_report_nested_codes_without_messages_or_targets(self):
         secret = 'https://private.example.test/bundle?sig=disposable-fixture'
         payload = {'error': {'code': 'InvalidTemplateDeployment', 'message': secret,
-                             'details': [{'code': 'SkuNotAvailable', 'target': secret, 'message': secret},
+                             'details': [{'code': 'InvalidParameter', 'target': secret, 'message': secret},
                                          {'code': 'InvalidTemplateDeployment', 'message': secret}]}}
         failure = subprocess.CompletedProcess([], 1, secret, 'ERROR: ' + json.dumps(payload))
         with patch.object(subprocess, 'run', return_value=failure):
             with self.assertRaises(RuntimeError) as error:
                 azure.command(['az', 'deployment', 'group', 'create', '--parameters', secret])
         self.assertIn('az deployment group create', str(error.exception))
-        self.assertIn('[InvalidTemplateDeployment, SkuNotAvailable]', str(error.exception))
+        self.assertIn('[InvalidTemplateDeployment, InvalidParameter]', str(error.exception))
         self.assertNotIn(secret, str(error.exception))
 
     def test_error_codes_ignore_message_contents_invalid_values_and_malformed_json(self):
