@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 28e38606cb1a236886c4996d4d6791aa4fc24aaf
+          ref: 6b3ebd0a521ad6dac64535cc62b7346fda679d51
           persist-credentials: false
       - name: Download the published server receipt
         uses: actions/download-artifact@v8
