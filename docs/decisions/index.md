@@ -314,8 +314,10 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
 
-255. [ADR-0255 — Transformation Schemas have explicit function exposure](0255-transformation-schemas-have-explicit-function-exposure.md)
+255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)
 
-256. [ADR-0256 — Acquisition text content is selected at admission](0256-acquisition-text-content-is-selected-at-admission.md)
+256. [ADR-0256 — Transformation Schemas have explicit function exposure](0256-transformation-schemas-have-explicit-function-exposure.md)
 
-257. [ADR-0257 — XML processing uses operator content settings](0257-xml-processing-uses-operator-content-settings.md)
+257. [ADR-0257 — Acquisition text content is selected at admission](0257-acquisition-text-content-is-selected-at-admission.md)
+
+258. [ADR-0258 — XML processing uses operator content settings](0258-xml-processing-uses-operator-content-settings.md)

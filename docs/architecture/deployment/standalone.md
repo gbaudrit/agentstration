@@ -26,3 +26,10 @@ startup ordering. There is no in-process execution fallback. Independently hoste
 Console and Workplace shells consume the authoritative APIs and own no business
 state. Deterministic AI remains the offline validation and fallback path; provider
 integrations are optional.
+
+The [local SQLite preview](../../contributing/preview-environments.md) consumes
+independently versioned server and Worker OCI deliveries by digest. Its two-container
+composition uses the existing Runtime and Bootstrap boundaries, keeps initial
+Bootstrap disabled unless explicitly configured, and requires no local inference
+or cloud account. This external packaging increment does not add a Runtime deployment
+orchestrator; see [ADR-0255](../../decisions/0255-sqlite-previews-consume-private-oci-deliveries.md).

@@ -53,6 +53,57 @@ class ImageContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             images.release_tag(self.entry, "worker/foundry/v" + self.entry["version"])
 
+    def test_server_follows_product_properties_without_a_second_version_source(self):
+        entry = json.loads((images.ROOT / "deploy/images/applications/server.json").read_text())
+        root = self.directory / "repository"
+        for name in ("project", "dockerfile", "versionFile", "testProject"):
+            path = root / entry[name]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("fixture")
+        path = root / "deploy/images/applications/server.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(entry))
+        for properties, expected in (("<VersionPrefix>7.4.2</VersionPrefix><VersionSuffix>preview.9</VersionSuffix>", "7.4.2-preview.9"),
+                                     ("<VersionPrefix>8.0.0</VersionPrefix>", "8.0.0")):
+            with self.subTest(expected=expected), patch.object(images, "ROOT", root):
+                (root / entry["versionFile"]).write_text("<Project><PropertyGroup>" + properties + "</PropertyGroup></Project>")
+                server = images.catalogue("server")
+                self.assertEqual(expected, server["version"])
+                self.assertEqual("server", server["kind"])
+                with self.assertRaises(ValueError):
+                    images.release_tag(server, "v" + expected)
+        with patch.object(images, "ROOT", root):
+            (root / entry["versionFile"]).write_text("<Project><PropertyGroup><VersionPrefix>$(Undefined)</VersionPrefix></PropertyGroup></Project>")
+            with self.assertRaises(ValueError):
+                images.catalogue("server")
+
+    def test_server_build_reuses_the_exact_pinned_companion_inputs(self):
+        bases = {"sdk": "sdk@sha256:" + "a" * 64, "runtime": "runtime@sha256:" + "b" * 64}
+        directory = self.directory / "server"
+
+        def build_fixture(command, **_arguments):
+            (directory / "image.oci.tar").write_bytes(b"offline-server-archive")
+            (directory / "build-metadata.json").write_text(json.dumps({"containerimage.digest": "sha256:" + "c" * 64}))
+
+        with patch.object(images, "output", side_effect=["", "d" * 40]), \
+                patch.object(images, "resolve_image") as resolve, \
+                patch.object(images.subprocess, "run", side_effect=build_fixture) as build:
+            delivery = images.build("server", directory, "owner/repo", bases=bases)
+        resolve.assert_not_called()
+        self.assertEqual("server", delivery["component"]["kind"])
+        self.assertEqual(bases, delivery["buildImages"])
+        self.assertIn("SDK_IMAGE=" + bases["sdk"], build.call_args.args[0])
+        self.assertNotIn("extension", delivery)
+
+    def test_unpinned_companion_inputs_fail_before_a_build(self):
+        with patch.object(images, "output", side_effect=["", "d" * 40]), \
+                patch.object(images.subprocess, "run") as build, patch.object(images, "resolve_image") as resolve:
+            with self.assertRaises(ValueError):
+                images.build("server", self.directory / "invalid", "owner/repo",
+                             bases={"sdk": "sdk:latest", "runtime": "runtime@sha256:" + "b" * 64})
+        build.assert_not_called()
+        resolve.assert_not_called()
+
     def test_delivery_accepts_legacy_aep_and_neutral_worker_metadata_without_ambiguity(self):
         worker = images.catalogue("maf-worker")
         self.assertEqual(self.entry, images.delivery_entry({"extension": self.entry}))

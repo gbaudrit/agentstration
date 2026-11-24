@@ -30,6 +30,7 @@ new directory.
 | Git | [#1295](https://github.com/gbaudrit/agentstration/issues/1295) | `extension:git` |
 | Utilities | [#1296](https://github.com/gbaudrit/agentstration/issues/1296) | `extension:utilities` |
 | Independent MAF AWP Worker | [#1300](https://github.com/gbaudrit/agentstration/issues/1300) | — |
+| Authoritative server and local SQLite preview | [#1281](https://github.com/gbaudrit/agentstration/issues/1281) | — |
 
 The PostgreSQL extension provides document storage and is distinct from the
 optional server relational storage profile. The MAF Worker is an AWP executable,
@@ -45,6 +46,14 @@ The AEP catalogue contains `foundry`, under
 below. Foundry’s recipe reuses `Dockerfile.extension`
 for Linux amd64. Future entries are added when their actual build/smoke vertical
 is delivered; tracking an issue does not imply an image is already published.
+
+The catalogue also includes `applications/server.json`, kind `server`. The server
+uses the product's existing version from `Directory.Build.props`, not the independent
+extension/Worker `0.1.0` baseline. The root Dockerfile embeds the Bootstrap catalogue
+and accepts the same pinned SDK/runtime build inputs. This entry supports private
+GHCR previews only; official server tags and Docker Hub releases retain their
+existing product workflow. See [ADR-0255](../decisions/0255-sqlite-previews-consume-private-oci-deliveries.md)
+and the [local SQLite preview instructions](preview-environments.md).
 
 Foundry's `version.txt` is its own version source. The project assembly,
 advertised AEP extension version and image labels use that version. The initial
@@ -66,7 +75,8 @@ dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration R
 
 Product **CI** calls the reusable **Validate OCI image** workflow for the
 implemented image catalogue entries. Foundry-only inputs select Foundry; Worker/AWP
-inputs select the Worker; shared packaging inputs select both. Worker product
+inputs select the Worker and the server/Worker preview validation; server-specific
+inputs select the server. Shared packaging inputs select all three. Worker product
 changes retain conservative product validation. The required `build-and-test` check includes its result;
 Foundry-only changes use this targeted validation while shared or mixed inputs
 retain the transverse checks described in [Testing](testing.md#ci-inventory-and-execution-safeguards).
