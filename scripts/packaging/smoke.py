@@ -12,9 +12,11 @@ import urllib.error
 import urllib.request
 import uuid
 
+from images import delivery_entry
+
 
 def check_manifest(manifest, delivery):
-    entry = delivery["extension"]
+    entry = delivery_entry(delivery)
     if manifest.get("protocolVersion") != entry["aepVersion"]:
         raise ValueError("AEP protocol version does not match the image catalogue.")
     identity = manifest["extension"]
@@ -78,7 +80,7 @@ def main():
                     check_manifest(json.load(response), delivery)
                 image = json.loads(subprocess.check_output(["docker", "image", "inspect", args.image], text=True))[0]
                 labels = image["Config"]["Labels"]
-                if labels.get("org.opencontainers.image.version") != delivery["extension"]["version"] \
+                if labels.get("org.opencontainers.image.version") != delivery_entry(delivery)["version"] \
                         or labels.get("org.opencontainers.image.revision") != delivery["sourceSha"]:
                     raise ValueError("Image version/source labels do not match the delivery.")
                 if iteration == 0:

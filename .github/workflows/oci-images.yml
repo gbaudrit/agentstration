@@ -1,12 +1,14 @@
-name: Extension OCI images
+name: OCI images
 
 on:
   push:
-    tags: ['extension/**']
+    tags: ['extension/**', 'worker/**']
   workflow_dispatch:
     inputs:
       extension:
-        description: Implemented image catalogue ID
+        description: Catalogue image ID (AEP extension or AWP Worker)
+        type: choice
+        options: [foundry, maf-worker]
         default: foundry
         required: true
       publish_preview:
@@ -23,7 +25,7 @@ concurrency:
 
 jobs:
   validate-and-build:
-    uses: ./.github/workflows/validate-extension-image.yml
+    uses: ./.github/workflows/validate-oci-image.yml
     with:
       extension: ${{ inputs.extension || 'foundry' }}
       release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
@@ -44,7 +46,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
-          name: extension-image-${{ github.run_id }}-${{ github.run_attempt }}
+          name: oci-image-${{ needs.validate-and-build.outputs.image }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: delivery
       - name: Install OCI copy tooling
         run: |
@@ -62,7 +64,7 @@ jobs:
           release_arguments=()
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
           python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
-      - name: Log in to Docker Hub for an official extension release
+      - name: Log in to Docker Hub for an official image release
         if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: docker/login-action@v3
         with:

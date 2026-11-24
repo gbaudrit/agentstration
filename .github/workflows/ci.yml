@@ -25,6 +25,7 @@ jobs:
       container: ${{ steps.classify.outputs.container }}
       storage: ${{ steps.classify.outputs.storage }}
       extension-images: ${{ steps.classify.outputs.extensionImages }}
+      image-matrix: ${{ steps.classify.outputs.imageMatrix }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -69,6 +70,9 @@ jobs:
           "container=$($container.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "storage=$($storage.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "extensionImages=$($extensionImages.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          $imageMatrix = @{ image = @($classification.imageIds) } | ConvertTo-Json -Compress
+          "imageMatrix=$imageMatrix" >> $env:GITHUB_OUTPUT
 
           Write-Host "Changed files: $($changedFiles.Count)"
           Write-Host "Run .NET validation: $dotnet"
@@ -213,12 +217,15 @@ jobs:
         run: dotnet test --solution Aep.slnx --configuration Release --no-build --minimum-expected-tests 33 --max-parallel-test-modules 2
 
   extension-images:
-    name: extension-images
+    name: oci-images
     needs: changes
     if: needs.changes.outputs.extension-images == 'true'
-    uses: ./.github/workflows/validate-extension-image.yml
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.image-matrix) }}
+    uses: ./.github/workflows/validate-oci-image.yml
     with:
-      extension: foundry
+      extension: ${{ matrix.image }}
 
   # Keep the required check present for every PR and gate all selected validation.
   build-and-test:
