@@ -180,8 +180,11 @@ class NoProbeRedirect(urllib.request.HTTPRedirectHandler):
 
 def response(url, headers):
     opener = urllib.request.build_opener(NoProbeRedirect())
+    request = urllib.request.Request(url + '/health/ready', headers=headers)
+    # Identify automation honestly; the urllib default can be blocked before Access.
+    request.add_header('User-Agent', 'Agentstration-Preview-Probe/1.0')
     try:
-        result = opener.open(urllib.request.Request(url + '/health/ready', headers=headers), timeout=15)
+        result = opener.open(request, timeout=15)
     except urllib.error.HTTPError as error:
         result = error
     except (urllib.error.URLError, OSError, TimeoutError):

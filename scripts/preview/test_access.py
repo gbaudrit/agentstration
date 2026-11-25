@@ -1,10 +1,12 @@
 """Offline route ownership, interruption recovery and fail-closed publication boundaries."""
 import copy
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -192,6 +194,40 @@ class ProbeTests(unittest.TestCase):
     def setUp(self):
         self.values = cloudflare.configuration(environment())
         self.url = 'https://dev-pr-17.agentstration.cloud'
+
+    def test_real_http_requests_identify_all_probe_phases_before_service_authentication(self):
+        observed = []
+        client_id = self.values['ACCESS_CLIENT_ID']
+        client_secret = self.values['ACCESS_CLIENT_SECRET']
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                identity = (self.headers.get('CF-Access-Client-Id'), self.headers.get('CF-Access-Client-Secret'))
+                observed.append((self.path, self.headers.get('User-Agent'), identity))
+                # Model the observed edge block before Access evaluates credentials.
+                code = 403
+                if self.headers.get('User-Agent') == 'Agentstration-Preview-Probe/1.0':
+                    code = 200 if identity == (client_id, client_secret) else 401
+                self.send_response(code)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        response = access.response
+        with ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            local_url = 'http://127.0.0.1:' + str(server.server_port)
+            try:
+                # Keep production URL validation; redirect only the transport to a local fixture.
+                with patch.object(access, 'response', side_effect=lambda url, headers: response(local_url, headers)):
+                    access.probe(self.url, self.values, attempts=1)
+            finally:
+                server.shutdown()
+                thread.join(timeout=5)
+        self.assertEqual([('/health/ready', 'Agentstration-Preview-Probe/1.0', identity) for identity in
+                          ((None, None), ('invalid.access', 'invalid'), (client_id, client_secret))], observed)
 
     def test_expected_denials_then_service_auth_success_publish_no_response_content(self):
         with patch.object(access, 'response', side_effect=[(302, 'https://agentstration.cloudflareaccess.com/cdn-cgi/access/login/x', False),
