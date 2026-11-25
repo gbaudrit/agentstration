@@ -1,3 +1,4 @@
+using Agentstration.Coding.Bootstrap;
 using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
 using Agentstration.Infrastructure.Bootstrap;
@@ -51,6 +52,8 @@ internal static class BootstrapServiceCollectionExtensions
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ProjectBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ProjectSharingBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, HarnessNativeConfigurationBootstrapHandler>();
+        services.AddScoped<IBootstrapResourceHandler, HarnessProfileBootstrapHandler>();
         return services;
     }
 }

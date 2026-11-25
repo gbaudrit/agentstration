@@ -3,5 +3,9 @@
     <ProjectReference Include="../Agentstration.Coding.Contracts/Agentstration.Coding.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.ResourceManagement/Agentstration.ResourceManagement.csproj" />
+    <ProjectReference Include="../Agentstration.Schemas/Agentstration.Schemas.csproj" />
+    <ProjectReference Include="../Agentstration.Security.Contracts/Agentstration.Security.Contracts.csproj" />
   </ItemGroup>
 </Project>

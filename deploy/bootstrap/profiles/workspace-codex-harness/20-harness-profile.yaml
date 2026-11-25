@@ -1,0 +1,29 @@
+apiVersion: agentstration.io/v1
+kind: HarnessProfile
+metadata:
+  name: coding
+  namespace: default
+definition:
+  version: 1.0.0
+  profile:
+    displayName: Coding
+    instructions: |
+      Implement the requested change in {{project-name}}.
+      Inspect the repository instructions and existing implementation first.
+      Preserve unrelated changes and run the relevant deterministic checks.
+      Report the delivered behavior, evidence and any remaining limitations.
+    instructionsPath: AGENTS.md
+    bindingsSchema:
+      type: object
+      properties:
+        project-name:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+        - project-name
+      additionalProperties: false
+    nativeConfiguration:
+      name: codex-default
+      namespace: default
+      version: 1.0.0

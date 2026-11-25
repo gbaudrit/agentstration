@@ -170,6 +170,20 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/management/workspaces/", StringComparison.OrdinalIgnoreCase)) return DashboardAdministration(method, path);
         if (!path.StartsWith("/api/workspaces/{workspaceName}", StringComparison.OrdinalIgnoreCase)) return null;
 
+        if (path.Contains("/coding/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (method == "POST" && path.EndsWith("/harness-configurations", StringComparison.OrdinalIgnoreCase)) return Json<HarnessNativeConfigurationResource>(201, "Publish an immutable native harness configuration");
+            if (method == "GET" && path.Contains("/harness-configurations/", StringComparison.OrdinalIgnoreCase)) return Json<HarnessNativeConfigurationResource>(200, "Get an exact native harness configuration");
+            if (method == "POST" && path.EndsWith("/harness-profiles", StringComparison.OrdinalIgnoreCase)) return Json<HarnessProfileResource>(201, "Create a Workspace HarnessProfile draft");
+            if (path.Contains("/harness-profiles/", StringComparison.OrdinalIgnoreCase))
+            {
+                if (method == "POST" && path.EndsWith("/versions", StringComparison.OrdinalIgnoreCase)) return Json<HarnessProfileVersionResource>(201, "Publish an immutable HarnessProfile version");
+                if (method == "GET" && path.Contains("/versions/", StringComparison.OrdinalIgnoreCase)) return Json<HarnessProfileVersionResource>(200, "Get an exact HarnessProfile version");
+                return Json<HarnessProfileResource>(200, "Get or update a Workspace HarnessProfile draft");
+            }
+            if (method == "POST" && path.EndsWith("/harness-preview", StringComparison.OrdinalIgnoreCase)) return Json<HarnessExportPreview>(200, "Preview pinned native harness files and ownership");
+            if (method == "POST" && path.EndsWith("/harness-export", StringComparison.OrdinalIgnoreCase)) return new(200, typeof(string), "Export pinned native harness files", "Deterministic native configuration archive.", "application/zip");
+        }
         if (method == "POST" && path.EndsWith("/coding/issues/acknowledge", StringComparison.OrdinalIgnoreCase)) return Json<CodingIssueIntakeResponse>(202, "Acknowledge a uniquely associated repository issue and shared plan");
         if (method == "GET" && path.EndsWith("/issue-readiness", StringComparison.OrdinalIgnoreCase)) return Json<CodingIssueReadiness>(200, "Observe authoritative repository prerequisites before dispatch");
         if (method == "POST" && path.EndsWith("/coding/repositories/resolve", StringComparison.OrdinalIgnoreCase)) return Json<CodingRepositorySelection>(200, "Resolve authorized Coding repositories");

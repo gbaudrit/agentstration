@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: HarnessNativeConfiguration
+metadata:
+  name: codex-default
+  namespace: default
+definition:
+  version: 1.0.0
+  materializer: codex
+  materializerVersion: 1.0.0
+  settings:
+    model: gpt-5.3-codex
+    sandboxMode: workspace-write
+    approvalPolicy: on-request

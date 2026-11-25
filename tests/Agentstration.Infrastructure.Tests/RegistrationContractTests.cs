@@ -41,7 +41,7 @@ public sealed class RegistrationContractTests
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
             [typeof(IBootstrapContributionResourceResolver)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Application.Work.IWorkPlanAdmissionGate)] = (2, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (31, ServiceLifetime.Scoped),
+            [typeof(IBootstrapResourceHandler)] = (33, ServiceLifetime.Scoped),
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = (6, ServiceLifetime.Singleton),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),

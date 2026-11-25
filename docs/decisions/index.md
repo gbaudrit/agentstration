@@ -328,3 +328,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 266. [ADR-0266 — Project sharing preserves portable plans and local execution authority](0266-project-sharing-preserves-portable-plans-and-local-execution-authority.md)
 
 267. [ADR-0267 — Repository issue authority gates shared-plan intake and dispatch](0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md)
+
+268. [ADR-0268 — HarnessProfiles publish pinned standalone native configuration](0268-harness-profiles-publish-pinned-standalone-native-configuration.md)

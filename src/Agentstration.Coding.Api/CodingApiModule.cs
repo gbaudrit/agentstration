@@ -6,7 +6,7 @@ using Agentstration.Work;
 
 namespace Agentstration.Coding.Api;
 
-public static class CodingApiModule
+public static partial class CodingApiModule
 {
     public static IEndpointRouteBuilder MapCodingApi(this IEndpointRouteBuilder endpoints)
     {
@@ -26,6 +26,7 @@ public static class CodingApiModule
         group.MapGet("/plans/{planId:guid}/issue-readiness", async (Guid projectId, Guid planId,
             CodingIssueCoordinationService service, ICurrentRequestContext current, CancellationToken token) =>
                 Response(await service.ReadinessAsync(Workspace(current), new(projectId), new(planId), token)));
+        MapHarnessProfiles(endpoints);
         return endpoints;
     }
 

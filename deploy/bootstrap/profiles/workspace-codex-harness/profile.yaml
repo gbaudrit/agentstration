@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: workspace-codex-harness
+definition:
+  displayName: Workspace Codex harness
+  description: Explicitly publishes a native configuration and a HarnessProfile; does not launch Codex.
+  targetScope: workspace

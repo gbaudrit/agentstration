@@ -26,6 +26,8 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<IWorkPlanAdmissionGate, WorkProjectSharingAdmissionGate>();
         services.AddSingleton<IWorkProjectSharingGateway, GitWorkProjectSharingGateway>();
         services.AddSingleton<WorkTaskProviderService>();
+        services.AddSingleton<CodexHarnessMaterializer>();
+        services.AddSingleton<HarnessProfileService>();
         services.AddSingleton<CodingRepositoryService>();
         services.AddSingleton<CodingIssueCoordinationService>();
         services.AddSingleton<ICodingIssueBindingPolicy, CodingIssueBindingPolicy>();

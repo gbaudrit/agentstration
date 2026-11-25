@@ -146,7 +146,7 @@ model {
       }
 
       work = component 'Work and Workplace application' {
-        description 'Functional Work Item lifecycle, interactions, notifications, projections, portable Project sharing, allocation and native issue prerequisite admission, and execution submission'
+        description 'Functional Work Item lifecycle, interactions, notifications, projections, portable Project sharing, allocation and native issue prerequisite admission, native HarnessProfile publication/export, and execution submission'
       }
 
       flow = component 'Flow engine' {

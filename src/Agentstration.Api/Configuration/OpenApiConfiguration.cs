@@ -189,6 +189,7 @@ public static class OpenApiConfiguration
         }
 
         var schema = await context.GetOrCreateSchemaAsync(contract.BodyType, parameterDescription: null, cancellationToken);
+        if (contract.MediaType == "application/zip") schema = BinarySchema();
         operation.Responses[statusCode] = Response(contract.ResponseDescription, contract.MediaType, schema);
     }
 

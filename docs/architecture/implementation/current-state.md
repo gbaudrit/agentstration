@@ -707,3 +707,12 @@ new attempts; only confirmed completed upstream issues satisfy cross-plan waits.
 does not create a sequencing edge, and active local attempts retain captured authority. See
 [Repository issue coordination](../../reference/repository-issue-coordination.md) and
 [ADR-0267](../../decisions/0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md).
+
+## Native harness publication
+
+Coding owns Workspace HarnessProfile drafts, immutable versions and immutable native configuration.
+The first Codex materializer validates bounded string bindings and emits deterministic standalone
+AGENTS/config/provenance files without resolving Secrets or writing Git. Existing generic resource
+stores/governance retain exact source/native pins; owning Workspace Bootstrap handlers resolve
+semantic version references. See [HarnessProfiles](../../reference/harness-profiles.md) and
+[ADR-0268](../../decisions/0268-harness-profiles-publish-pinned-standalone-native-configuration.md).
