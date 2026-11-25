@@ -322,8 +322,10 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
 
-259. [ADR-0259 — Transformation Schemas have explicit function exposure](0259-transformation-schemas-have-explicit-function-exposure.md)
+259. [ADR-0259 — Preview routes use owned tunnels and an isolated Access proxy](0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)
 
-260. [ADR-0260 — Acquisition text content is selected at admission](0260-acquisition-text-content-is-selected-at-admission.md)
+260. [ADR-0260 — Transformation Schemas have explicit function exposure](0260-transformation-schemas-have-explicit-function-exposure.md)
 
-261. [ADR-0261 — XML processing uses operator content settings](0261-xml-processing-uses-operator-content-settings.md)
+261. [ADR-0261 — Acquisition text content is selected at admission](0261-acquisition-text-content-is-selected-at-admission.md)
+
+262. [ADR-0262 — XML processing uses operator content settings](0262-xml-processing-uses-operator-content-settings.md)

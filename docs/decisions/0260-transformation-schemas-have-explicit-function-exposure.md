@@ -1,4 +1,4 @@
-# ADR-0259: Transformation Schemas have explicit function exposure
+# ADR-0260: Transformation Schemas have explicit function exposure
 
 ## Status
 

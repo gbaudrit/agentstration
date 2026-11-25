@@ -11,6 +11,7 @@ import time
 import contract
 import lifecycle
 import preview
+import access_host
 
 GUEST_ROOT = Path('/srv/agentstration-preview')
 REGISTRY = 'localhost:5001'
@@ -25,7 +26,7 @@ def local_request(request):
     return contract.validate(value)
 
 
-def run(action, request, registry_image=None, root=GUEST_ROOT):
+def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=None, access_owner=None):
     contract.operation(action, request)
     preview.require(request['provider'] == 'azure-vm', 'The guest accepts Azure requests only.')
     saved = root / 'azure-request.json'
@@ -41,6 +42,18 @@ def run(action, request, registry_image=None, root=GUEST_ROOT):
         preview.require(action == 'deploy', 'Guest tooling is not initialized; inspect provisioning before retrying.')
     selected = local_request(request)
     started = time.monotonic()
+    route_file = root / 'access.json'
+    route = preview.read_json(route_file) if route_file.exists() else None
+    if route:
+        preview.require(route['ownerId'] == access_owner, 'Guest access ownership differs from the provider record.')
+    if access_config:
+        preview.require(action == 'deploy' and access_config['ownerId'] == access_owner, 'Invalid guest connector operation.')
+        route = {key: access_config[key] for key in ('ownerId', 'hostname')}
+    if route:
+        os.environ['PREVIEW_ALLOWED_HOSTS'] = 'localhost;127.0.0.1;server;' + route['hostname']
+        os.environ['PREVIEW_FORWARDED_HEADERS'] = 'true'
+        if action in ('deploy', 'destroy'):
+            access_host.stop(root, route['ownerId'])
     if action == 'deploy':
         # Host-only loopback mirror. No registry credential reaches the VM or its containers.
         preview.require(registry_image and '@sha256:' in registry_image, 'Pin the transfer registry image.')
@@ -61,6 +74,9 @@ def run(action, request, registry_image=None, root=GUEST_ROOT):
                                 'docker://' + reference.split('@')[0] + ':delivery'], check=True, capture_output=True, timeout=600)
             preview.private_write(saved, json.dumps(request) + '\n')
             result = lifecycle.execute(action, selected, root / 'state')
+            if access_config:
+                preview.private_write(route_file, json.dumps(route) + '\n')
+                access_host.start(root, access_config)
         finally:
             # Never remove a container selected only by a name after a failed create.
             resources = json.loads(lifecycle.docker('inspect', REGISTRY_NAME))
@@ -69,8 +85,12 @@ def run(action, request, registry_image=None, root=GUEST_ROOT):
             lifecycle.docker('rm', '--force', resources[0]['Id'])
     else:
         result = lifecycle.execute(action, selected, root / 'state')
+    if route and action != 'destroy' and result['state'] == 'running':
+        # Protection checks cannot be disabled through the optional test profile.
+        preview.verify(root / 'state' / request['environmentId'])
     # Keep the Run Command response below its 4 KiB limit and exclude host secrets/configuration.
     return {'state': result['state'], 'observedImages': result['observedImages'], 'expiresAt': result['expiresAt'],
+            'accessReady': bool(route and action != 'destroy' and access_host.ready(route['ownerId'])),
             'guestOperationSeconds': round(time.monotonic() - started, 1),
             'memoryAvailableKiB': int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines()
                                           if line.startswith('MemAvailable:')))}
@@ -81,10 +101,16 @@ def main():
     parser.add_argument('operation', choices=('deploy', 'status', 'destroy'))
     parser.add_argument('--request', type=Path, required=True)
     parser.add_argument('--registry-image')
+    parser.add_argument('--access-owner')
     args = parser.parse_args()
     # A protected download URL is never inherited by the Docker/Compose invocation.
     os.environ.pop('BUNDLE_URL', None)
-    result = run(args.operation, contract.loads(args.request.read_text()), args.registry_image)
+    # Only this per-tunnel token crosses ARM protected parameters. Remove it before
+    # any Docker/Compose subprocess; management and probe credentials never arrive.
+    protected = os.environ.pop('ACCESS_CONNECTOR', None)
+    connector = json.loads(protected) if protected else None
+    result = run(args.operation, contract.loads(args.request.read_text()), args.registry_image,
+                 access_config=connector, access_owner=args.access_owner)
     print('AGENTSTRATION_RESULT=' + json.dumps(result, separators=(',', ':')))
 
 
