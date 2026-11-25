@@ -11,8 +11,10 @@ namespace Agentstration.DataSources;
 
 /// <summary>Projects an authoritative terminal Flow outcome without invoking providers or repairing content.</summary>
 public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestContextScopeFactory scopes,
-    IDataSourceHistoryMaintenance? history = null, DataSourceContentOptions? contentOptions = null)
+    IDataSourceHistoryMaintenance? history = null, DataSourceContentOptions? contentOptions = null, TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
+
     public async Task ApplyAsync(Guid workspaceId, string runId, DataSourceAcquisitionState state,
         DateTimeOffset completedAt, string? code, JsonElement? output, DataSourceAcquisitionProgress progress, DataContractFailure? contractFailure, CancellationToken token)
     {
@@ -43,7 +45,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                         else DataSourceDatasetCompositionService.ValidateOutput(direct.OutputSchema, valueToValidate, (contentOptions ?? new()).MaximumValueBytes);
                         projection ??= JsonRecordProjection.Normalize(directOutput, DataSourceDatasetCompositionService.Contract(direct, value.Name));
                         var bytes = StorageRecordSets.Encode(projection.Value.EnumerateArray().ToArray());
-                        value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), completedAt.AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
+                        value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), value.DirectResult?.ExpiresAt ?? clock.GetUtcNow().AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
                     }
                     catch (Exception exception) when (exception is ArgumentException or DataContractException or DataSourceValidationException or DataSourceAcquisitionException)
                     {

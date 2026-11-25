@@ -51,6 +51,7 @@ internal sealed class PolicyFactory : WebApplicationFactory<Program>
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton<IStoragePublicationGateway, ControlledPublications>();
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, p.GetRequiredService<PolicyClock>()));
+            services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceFlowOutcomeService>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, p.GetRequiredService<PolicyClock>()));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeAccessService>(p, p.GetRequiredService<PolicyClock>()));
