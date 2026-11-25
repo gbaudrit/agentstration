@@ -263,6 +263,18 @@ class AzureAccessTests(unittest.TestCase):
         self.cloud.fail_transfer = False
         self.assertIsNotNone(self.execute('deploy')['url'])
 
+    def test_late_provider_inventory_failure_also_withdraws_a_published_route(self):
+        inspect = self.cloud.resources
+        def resources(record):
+            if record and record.get('access', {}).get('verified'):
+                raise ValueError('Observed provider ownership changed')
+            return inspect(record)
+        self.cloud.resources = resources
+        with self.assertRaisesRegex(ValueError, 'ownership changed'):
+            self.execute('deploy')
+        self.assertEqual([], self.api.dns)
+        self.assertFalse(self.cloud.record['access']['verified'])
+
     def test_no_url_if_guest_connector_or_ingress_check_fails(self):
         for failure in ('connector', 'ingress'):
             self.setUp()

@@ -474,15 +474,15 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                         preview.require(guest.get('accessReady') is True, 'The guest did not confirm its protected connector.')
                         client.closed_ingress()
                         url = routes.publish()
+                    value = azure_result(request, 'running', client.resources(record), record, guest)
+                    value['url'] = url
+                    value['metrics'].update(client.metrics())
+                    value['metrics']['provisionAndDeploySeconds'] = round(time.monotonic() - started, 1)
+                    return value
                 except Exception:
                     if routes:
                         routes.withdraw()
                     raise
-                value = azure_result(request, 'running', client.resources(record), record, guest)
-                value['url'] = url
-                value['metrics'].update(client.metrics())
-                value['metrics']['provisionAndDeploySeconds'] = round(time.monotonic() - started, 1)
-                return value
             routes = route_factory(request, record, client.write, os.environ) if 'access' in record else None
             if action == 'destroy' and routes:
                 routes.withdraw()
