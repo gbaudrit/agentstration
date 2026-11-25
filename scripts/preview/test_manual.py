@@ -209,7 +209,7 @@ class RecordedSelectionTests(unittest.TestCase):
     def setUp(self):
         self.cloud = Cloud()
         self.value = azure_request()
-        azure.execute('deploy', self.value, self.cloud.factory, now=datetime(2026, 11, 24, tzinfo=timezone.utc))
+        azure.execute('deploy', self.value, self.cloud.factory, now=datetime(2026, 11, 24, tzinfo=timezone.utc), route_factory=lambda *args: None)
         self.cloud.effects.clear()
 
     def recorded(self, **changes):

@@ -98,7 +98,7 @@ class AzureTests(unittest.TestCase):
         self.value = azure_request()
 
     def execute(self, action, value=None, now=None):
-        return azure.execute(action, value or self.value, self.cloud.factory, now=now)
+        return azure.execute(action, value or self.value, self.cloud.factory, now=now, route_factory=lambda *args: None)
 
     def test_validation_never_initializes_azure_or_private_state(self):
         with patch.object(azure, 'Azure', side_effect=AssertionError('No cloud access')):

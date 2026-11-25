@@ -39,6 +39,8 @@ orchestrator; see [ADR-0255](../../decisions/0255-sqlite-previews-consume-privat
 The optional [Azure preview adapter](../../contributing/preview-azure.md) wraps this
 same Compose lifecycle with external Bicep, OIDC and private OCI archive transfer.
 It creates no Azure dependency in the standalone product or its image packages.
-Its closed-ingress VM has no managed identity; public access remains a separate
-protected-access increment. See [ADR-0257](../../decisions/0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
-for the proposed transport and ownership decision and required live validation.
+Its closed-ingress VM has no managed identity. Optional public preview access uses
+an owned outbound Cloudflare tunnel and an isolated credential-stripping local
+proxy, external to the Runtime. See [ADR-0257](../../decisions/0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
+for transport/ownership and [ADR-0259](../../decisions/0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)
+for the protected route and remaining live qualification.
