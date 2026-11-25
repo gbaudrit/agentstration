@@ -1,4 +1,4 @@
-# ADR-0256: Dataset operation inputs use exact value bindings
+# ADR-0259: Dataset operation inputs use exact value bindings
 
 ## Status
 

@@ -1,0 +1,245 @@
+name: Preview environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Lifecycle operation (reset is explicit destroy only)
+        type: choice
+        options: [validate, deploy, status, destroy]
+        default: validate
+        required: true
+      request:
+        description: Version 1 deployment request JSON (public metadata only, no credentials)
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      operation:
+        type: string
+        required: true
+      request:
+        type: string
+        required: true
+    outputs:
+      result:
+        description: Versioned safe lifecycle result JSON
+        value: ${{ inputs.operation == 'validate' && jobs.validate.outputs.result || jobs.execute.outputs.result || jobs.azure.outputs.result }}
+      environment-id:
+        value: ${{ jobs.validate.outputs.environment-id }}
+      state:
+        value: ${{ jobs.execute.outputs.state || jobs.azure.outputs.state || (inputs.operation == 'validate' && jobs.validate.outputs.result && 'validated') || 'failed' }}
+      url:
+        value: ${{ jobs.execute.outputs.url || jobs.azure.outputs.url }}
+      resource-ids:
+        value: ${{ jobs.execute.outputs.resource-ids || jobs.azure.outputs.resource-ids || '{}' }}
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      provider: ${{ steps.contract.outputs.provider }}
+      environment-id: ${{ steps.contract.outputs.environment-id }}
+      runner-labels: ${{ steps.contract.outputs.runner-labels }}
+      result: ${{ steps.contract.outputs.result }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate the deployment contract and execution boundary
+        id: contract
+        env:
+          REQUEST_JSON: ${{ inputs.request }}
+          OPERATION: ${{ inputs.operation }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS || '["self-hosted","linux","agentstration-preview"]' }}
+          CONFIGURED_RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS }}
+          STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import contract, lifecycle, preview
+          request = contract.loads(os.environ['REQUEST_JSON'])
+          operation = os.environ['OPERATION']
+          contract.operation(operation, request)
+          preview.require(request['registry'] == 'ghcr.io', 'Actions deployments require private GHCR deliveries.')
+          preview.require(all(item['repository'].lower() == os.environ['SOURCE_REPOSITORY'].lower()
+                              for item in request['deliveries'].values()), 'Actions deliveries must belong to this repository.')
+          labels = json.loads(os.environ['RUNNER_LABELS']) if request['provider'] == 'docker' else ['ubuntu-24.04']
+          preview.require(isinstance(labels, list) and 1 <= len(labels) <= 8
+                          and all(isinstance(label, str) and 1 <= len(label) <= 64 for label in labels), 'Invalid trusted runner labels.')
+          if operation != 'validate':
+              preview.require(os.environ['GITHUB_EVENT_NAME'] in ('workflow_dispatch', 'push')
+                              and os.environ['GITHUB_REF'] == 'refs/heads/main', 'Mutating/host operations require a trusted main workflow.')
+          if operation != 'validate' and request['provider'] == 'docker':
+              preview.require(bool(os.environ['STATE_ROOT']) and Path(os.environ['STATE_ROOT']).is_absolute(),
+                              'Configure an absolute PREVIEW_STATE_ROOT on the trusted persistent host.')
+              preview.require(bool(os.environ['CONFIGURED_RUNNER_LABELS']) and 'self-hosted' in labels and 'linux' in labels,
+                              'Configure persistent self-hosted Linux runner labels pinned to the requested Docker host.')
+          path = Path(os.environ['RUNNER_TEMP']) / 'preview-request.json'
+          preview.private_write(path, json.dumps(request) + '\n')
+          result = lifecycle.execute('validate', request, None)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('provider=' + request['provider'] + '\n')
+              output.write('environment-id=' + request['environmentId'] + '\n')
+              output.write('runner-labels=' + json.dumps(labels) + '\n')
+              output.write('result=' + json.dumps(result) + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Validated preview `' + request['environmentId'] + '` for `' + request['provider'] + '`; operation `' + operation + '`.\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-request-${{ steps.contract.outputs.environment-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-request.json
+          retention-days: 1
+          if-no-files-found: error
+
+  execute:
+    needs: validate
+    if: inputs.operation != 'validate' && needs.validate.outputs.provider == 'docker'
+    runs-on: ${{ fromJSON(needs.validate.outputs.runner-labels) }}
+    timeout-minutes: 15
+    environment: preview-deployment
+    concurrency:
+      group: preview-${{ needs.validate.outputs.environment-id }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DOCKER_CONFIG: /tmp/agentstration-preview-auth-${{ github.run_id }}-${{ github.run_attempt }}
+    outputs:
+      result: ${{ steps.lifecycle.outputs.result }}
+      state: ${{ steps.lifecycle.outputs.state }}
+      url: ${{ steps.lifecycle.outputs.url }}
+      resource-ids: ${{ steps.lifecycle.outputs.resource-ids }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: preview-request-${{ needs.validate.outputs.environment-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-request
+      - uses: docker/login-action@v3
+        if: inputs.operation == 'deploy'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Execute the owned Docker lifecycle operation
+        id: lifecycle
+        env:
+          OPERATION: ${{ inputs.operation }}
+          STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
+          BOOTSTRAP_CONFIG: ${{ vars.PREVIEW_BOOTSTRAP_CONFIG }}
+        run: |
+          arguments=("$OPERATION" --request "$RUNNER_TEMP/preview-request/preview-request.json" --state-root "$STATE_ROOT" --output "$RUNNER_TEMP/preview-result.json")
+          if [[ "$OPERATION" == deploy && -n "$BOOTSTRAP_CONFIG" ]]; then arguments+=(--bootstrap-config "$BOOTSTRAP_CONFIG"); fi
+          python3 scripts/preview/lifecycle.py "${arguments[@]}"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          result = json.loads((Path(os.environ['RUNNER_TEMP']) / 'preview-result.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, value in {'result': json.dumps(result), 'state': result['state'], 'url': result['url'] or '',
+                                  'resource-ids': json.dumps(result['providerResourceIds'])}.items():
+                  output.write(name + '=' + value + '\n')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Preview `' + result['environmentId'] + '`: **' + result['state'] + '**\n\n')
+              summary.write('Host-local URL: ' + (result['url'] or '(none)') + '\n')
+              summary.write('\nExpiry: ' + (result['expiresAt'] or '(none)') + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: preview-result-${{ needs.validate.outputs.environment-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-result.json
+          retention-days: 30
+          if-no-files-found: warn
+
+  azure:
+    needs: validate
+    if: inputs.operation != 'validate' && needs.validate.outputs.provider == 'azure-vm'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    environment: preview-deployment
+    concurrency:
+      group: preview-${{ needs.validate.outputs.environment-id }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    env:
+      DOCKER_CONFIG: /tmp/agentstration-preview-auth-${{ github.run_id }}-${{ github.run_attempt }}
+      AZURE_PREVIEW_STORAGE_ACCOUNT: ${{ vars.AZURE_PREVIEW_STORAGE_ACCOUNT }}
+      AZURE_PREVIEW_STORAGE_CONTAINER: ${{ vars.AZURE_PREVIEW_STORAGE_CONTAINER || 'previews' }}
+    outputs:
+      result: ${{ steps.lifecycle.outputs.result }}
+      state: ${{ steps.lifecycle.outputs.state }}
+      url: ${{ steps.lifecycle.outputs.url }}
+      resource-ids: ${{ steps.lifecycle.outputs.resource-ids }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: preview-request-${{ needs.validate.outputs.environment-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-request
+      - name: Check the protected Azure scope before OIDC login
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_PREVIEW_RESOURCE_GROUP }}
+          AZURE_SUBSCRIPTION: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
+          AZURE_CLIENT: ${{ vars.AZURE_PREVIEW_CLIENT_ID }}
+          AZURE_TENANT: ${{ vars.AZURE_PREVIEW_TENANT_ID }}
+        run: |
+          python3 - <<'PY'
+          import os, sys, uuid
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import contract, preview
+          request = contract.loads((Path(os.environ['RUNNER_TEMP']) / 'preview-request/preview-request.json').read_text())
+          preview.require(request['target']['resourceGroup'] == os.environ['AZURE_RESOURCE_GROUP']
+                          and request['target']['subscriptionId'] == os.environ['AZURE_SUBSCRIPTION'],
+                          'Azure requests must target the configured dedicated preview scope.')
+          for name in ('AZURE_CLIENT', 'AZURE_TENANT'):
+              uuid.UUID(os.environ[name])
+          PY
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PREVIEW_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_PREVIEW_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
+      - name: Install pinned infrastructure compiler and OCI copy tooling
+        run: |
+          az bicep install --version v0.44.1
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        if: inputs.operation == 'deploy'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Execute the owned Azure VM lifecycle operation
+        id: lifecycle
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          python3 scripts/preview/lifecycle.py "$OPERATION" --request "$RUNNER_TEMP/preview-request/preview-request.json" --output "$RUNNER_TEMP/preview-result.json"
+          python3 scripts/preview/workflow_result.py "$RUNNER_TEMP/preview-result.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: preview-result-${{ needs.validate.outputs.environment-id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-result.json
+          retention-days: 30
+          if-no-files-found: warn

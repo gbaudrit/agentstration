@@ -1,0 +1,7 @@
+{
+  "host": "preview.example.test",
+  "sshPort": 22,
+  "user": "deploy",
+  "hostKeyFingerprint": "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "port": 5080
+}

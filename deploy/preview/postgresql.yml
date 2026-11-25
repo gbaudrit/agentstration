@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     labels:
       io.agentstration.preview.environment: ${PREVIEW_ENVIRONMENT_ID:?}
+      io.agentstration.preview.owner: ${PREVIEW_OWNER_ID:-unmanaged}
     environment:
       POSTGRES_DB: agentstration
       POSTGRES_USER: agentstration
@@ -29,6 +30,7 @@ volumes:
   postgres-data:
     labels:
       io.agentstration.preview.environment: ${PREVIEW_ENVIRONMENT_ID}
+      io.agentstration.preview.owner: ${PREVIEW_OWNER_ID:-unmanaged}
 
 secrets:
   postgres_password:

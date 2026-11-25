@@ -144,6 +144,12 @@ jobs:
                               '--worker-delivery', 'artifacts/preview-worker/delivery.json', '--registry', 'localhost:5000',
                               '--database', database, '--output', f'artifacts/extension/preview-{database}-smoke.json'], check=True)
           PY
+      - name: Verify credential-free Azure guest transport for both databases
+        if: steps.select.outputs.kind == 'server'
+        run: |
+          for database in sqlite postgresql; do
+            python3 scripts/preview/azure_guest_smoke.py --server-delivery artifacts/extension/delivery.json --worker-delivery artifacts/preview-worker/delivery.json --database "$database" --output "artifacts/extension/azure-guest-$database-smoke.json"
+          done
       - name: Verify AEP enrollment and persisted identity against the SQLite authority
         if: steps.select.outputs.kind == 'aep-extension'
         run: |

@@ -314,4 +314,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
 255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)
-256. [ADR-0256 — Dataset operation inputs use exact value bindings](0256-dataset-operation-inputs-use-exact-value-bindings.md)
+256. [ADR-0256 — Preview lifecycle binds provider-neutral requests to owned resources](0256-preview-lifecycle-binds-provider-neutral-requests-to-owned-resources.md)
+257. [ADR-0257 — Azure previews use OIDC and credential-free OCI transfer](0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
+258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
+259. [ADR-0259 — Dataset operation inputs use exact value bindings](0259-dataset-operation-inputs-use-exact-value-bindings.md)

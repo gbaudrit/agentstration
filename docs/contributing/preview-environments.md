@@ -1,5 +1,9 @@
 # Local database previews
 
+For managed deploy/status/destroy operations and reusable Actions entrypoints,
+use the [portable lifecycle](preview-lifecycle.md). The helper commands below
+remain available for direct composition and existing helper-only deployments.
+
 This implements the local database profiles of [#1281](https://github.com/gbaudrit/agentstration/issues/1281):
 the authoritative server with its embedded Console, one independent MAF Worker,
 SQLite by default, PostgreSQL as an explicit option, and no inference service. Selectable AEP extensions, the

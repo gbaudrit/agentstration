@@ -1,0 +1,46 @@
+#cloud-config
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - skopeo
+  - python3
+write_files:
+  - path: /etc/docker/daemon.json
+    permissions: '0644'
+    content: |
+      {"data-root":"/srv/agentstration-preview/docker","log-driver":"local","log-opts":{"max-size":"10m","max-file":"3"}}
+  - path: /etc/systemd/system/docker.service.d/preview.conf
+    permissions: '0644'
+    content: |
+      [Unit]
+      RequiresMountsFor=/srv/agentstration-preview
+  - path: /usr/local/sbin/agentstration-preview-disk
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      disk=/dev/disk/azure/scsi1/lun0
+      for attempt in {1..60}; do [[ -b "$disk" ]] && break; sleep 2; done
+      [[ -b "$disk" ]]
+      kind=$(blkid -o value -s TYPE "$disk" || true)
+      if [[ -z "$kind" ]]; then
+        # Refuse partitioned/nonblank media. Only the adapter's new empty disk is formatted.
+        [[ -z "$(wipefs --no-act --noheadings --output TYPE "$disk")" ]]
+        mkfs.ext4 -F "$disk"
+      else
+        [[ "$kind" == ext4 ]]
+      fi
+      mkdir -p /srv/agentstration-preview
+      disk_uuid=$(blkid -o value -s UUID "$disk")
+      if ! findmnt --mountpoint /srv/agentstration-preview >/dev/null; then
+        echo "UUID=$disk_uuid /srv/agentstration-preview ext4 defaults 0 2" >> /etc/fstab
+        mount /srv/agentstration-preview
+      fi
+      chmod 0700 /srv/agentstration-preview
+runcmd:
+  - [systemctl, stop, docker.service, docker.socket]
+  - [/usr/local/sbin/agentstration-preview-disk]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, docker.service]
+  - [systemctl, disable, --now, ssh.service, ssh.socket]
