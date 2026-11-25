@@ -28,8 +28,8 @@ public sealed class ToolProviderCollectionTests
         using var context = Context(handler);
         var cut = context.Render<ToolProviders>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
-        Assert.HasCount(3, cut.FindAll("th"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
+        Assert.HasCount(4, cut.FindAll("th"));
         Assert.IsFalse(cut.FindAll("th").Any(heading => heading.TextContent == (cultureName == "fr-FR" ? "Activé" : "Enabled")));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/tools/providers/provider-0?namespace=team&scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&context=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");

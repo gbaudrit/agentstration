@@ -1,7 +1,6 @@
 @namespace Agentstration.Web.Components
 @using Agentstration.Web.Components.Pages
 @inject IServiceProvider Services
-@inject ConsoleContextState ContextState
 @inject Microsoft.Extensions.Localization.IStringLocalizer<AgentEditorStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
@@ -45,6 +44,7 @@
                 <Information Context="entry"><CollectionValue Label="@T("ConfigurationValue")">@if (entry.Href is { } href) { <a class="resource-name-link configuration-value" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information>
             </CollectionView></div>
     </FormSection>
+    @AdditionalContent
 </div>
 
 @code {
@@ -62,8 +62,12 @@
     [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
     [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
     [Parameter] public EventCallback OnReconcile { get; set; }
-    private bool CanRun => Resource.Namespace.IsDefault && ContextState.HasPermission(AuthorizationPermissions.RunsExecute);
-    private bool CanApply => CanReconcile && ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+    [Parameter] public string? KnownModelProfileHref { get; set; }
+    [Parameter] public string? KnownRuntimeProfileHref { get; set; }
+    private ConsoleContextState? ContextState => Services.GetService(typeof(ConsoleContextState)) as ConsoleContextState;
+    private bool CanRun => Resource.Namespace.IsDefault && ContextState?.HasPermission(AuthorizationPermissions.RunsExecute) == true;
+    private bool CanApply => CanReconcile && ContextState?.HasPermission(AuthorizationPermissions.ResourcesWrite) == true;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private sealed record ConfigurationEntry(string Label, string Value, string? Href = null);
     private IReadOnlyList<ConfigurationEntry> ConfigurationEntries
@@ -78,35 +82,35 @@
             {
                 new(T("Handler"), definition.Handler),
                 new(T("Instructions"), definition.Instructions),
-                new(T("ModelProfile"), $"{modelAddress.Namespace}/{modelAddress.Name}", ResourceOwnershipContext.Resource(Services, "/modelprofiles", modelAddress.Name, modelAddress.Namespace, definition.ModelProfile.ScopeRef)),
-                new(T("RuntimeProfile"), $"{runtimeAddress.Namespace}/{runtimeAddress.Name}", ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", runtimeAddress.Name, runtimeAddress.Namespace, definition.RuntimeProfile.ScopeRef)),
-                new(T("Tools"), definition.Tools.Count == 0 ? Shared["NotProvided"] : string.Join("\n", definition.Tools.Select(value => $"{value.Namespace ?? Resource.Namespace}/{value.Name}"))),
-                new(T("GovernedToolSets"), definition.ToolSets.Count == 0 ? Shared["NotProvided"] : string.Join("\n", definition.ToolSets.Select(value => $"{value.ToolSet.Namespace ?? Resource.Namespace}/{value.ToolSet.Name}@{value.Version}")))
+                new(T("ModelProfile"), $"{modelAddress.Namespace}/{modelAddress.Name}", KnownModelProfileHref ?? (definition.ModelProfile.ScopeRef is { } modelOwner ? ResourceOwnershipContext.Resource(Services, "/modelprofiles", modelAddress.Name, modelAddress.Namespace, modelOwner) : null)),
+                new(T("RuntimeProfile"), $"{runtimeAddress.Namespace}/{runtimeAddress.Name}", KnownRuntimeProfileHref ?? (definition.RuntimeProfile.ScopeRef is { } runtimeOwner ? ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", runtimeAddress.Name, runtimeAddress.Namespace, runtimeOwner) : null)),
+                new(T("Tools"), definition.Tools.Count == 0 ? Shared["NotProvided"] : JsonSerializer.Serialize(definition.Tools)),
+                new(T("GovernedToolSets"), definition.ToolSets.Count == 0 ? Shared["NotProvided"] : JsonSerializer.Serialize(definition.ToolSets))
             };
             if (definition.InputSchemaBinding is not null || definition.InputSchema is not null)
-                rows.Add(new(T("InputContract"), JsonSerializer.Serialize((object?)definition.InputSchemaBinding ?? definition.InputSchema)));
+                rows.Add(new(T("InputContract"), JsonSerializer.Serialize(new { definition.InputSchemaBinding, definition.InputSchema })));
             if (definition.OutputSchemaBinding is not null || definition.OutputSchema is not null || definition.OutputContract is not null)
                 rows.Add(new(T("OutputContract"), JsonSerializer.Serialize((object?)definition.OutputSchemaBinding ?? (object?)definition.OutputContract ?? definition.OutputSchema)));
             if (definition.Behaviors.Count > 0) rows.Add(new(T("Behaviors"), string.Join("\n", definition.Behaviors)));
+            if (definition.Behaviors.Count > 0) rows.Add(new(T("Behaviors"), string.Join("\n", definition.Behaviors)));
             if (definition.Middleware.Count > 0) rows.Add(new(T("Middleware"), string.Join("\n", definition.Middleware)));
             if (definition.ContextProviders.Count > 0) rows.Add(new(T("ContextProviders"), string.Join("\n", definition.ContextProviders)));
-            foreach (var setting in definition.Settings.OrderBy(value => value.Key, StringComparer.Ordinal))
-                rows.Add(new(setting.Key, setting.Value.ToString()));
+            rows.Add(new(T("Settings"), JsonSerializer.Serialize(definition.Settings)));
             return rows;
         }
     }
 
     private string ModelStatusLabel(string? status) => Localizer[$"Status.{status?.ToLowerInvariant() switch { "available" => "Available", "ready" => "Ready", "succeeded" => "Succeeded", "starting" => "Starting", "providerunavailable" => "ProviderUnavailable", "modelunavailable" => "ModelUnavailable", "unavailable" => "Unavailable", "invalidconfiguration" => "InvalidConfiguration", "incompatible" => "Incompatible", "failed" => "Failed", _ => "Unknown" }}"];
-    private static string ProfileUrl(AgentModelResponse value)
+    private string ProfileUrl(AgentModelResponse value)
     {
-        return ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId), value.Declared.ModelProfile.ScopeRef);
+        return ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(value.Declared.ModelProfile.Namespace), ModelResourceKinds.ModelProfile, value.Declared.ModelProfile.ResourceId), value.Declared.ModelProfile.ScopeRef), Services);
     }
 
 
-    private static string ProviderUrl(AgentModelResponse value)
+    private string ProviderUrl(AgentModelResponse value)
     {
         var provider = value.Resolved.Provider!;
-        return $"/modelproviders/{Uri.EscapeDataString(provider.ResourceId)}?namespace={Uri.EscapeDataString(provider.Namespace)}";
+        return ResourceOwnershipContext.PreserveNavigation($"/modelproviders/{Uri.EscapeDataString(provider.ResourceId)}?namespace={Uri.EscapeDataString(provider.Namespace)}", Services);
     }
 
 

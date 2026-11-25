@@ -1517,18 +1517,36 @@ public sealed class DependencyTests
 
                 // This opt-in instrumentation is owned by the test root, not another module.
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests"
+                        or "Agentstration.Management.Models.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+
+                if (include.Replace('\\', '/') == "../AepEnrollmentTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Aep.Tests"
+                        or "Agentstration.Management.Aep.Automatic.Tests") continue;
+
+                // Declarative fixtures are shared only by these bounded Bootstrap modules.
+                if (include.Replace('\\', '/') == "../BootstrapDeclarativeTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
+                        or "Agentstration.Management.Bootstrap.Startup.Tests") continue;
 
                 // This fixture belongs to the test root and is compiled into
                 // independently bounded Bootstrap test processes.
                 if (include.Replace('\\', '/') == "../BootstrapApiOnlyWebApplicationFactory.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
                         or "Agentstration.Management.Bootstrap.Scenarios.Tests"
-                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Plans.Tests"
+                        or "Agentstration.Management.Bootstrap.Startup.Tests"
+                        or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
 
                 if (include.Replace('\\', '/') == "../BootstrapApplicationTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Scenarios.Tests"
-                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Plans.Tests"
+                        or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
+
+                if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/DataSourceDatasetTestFixture.cs"
+                        or "../ApiResourceTestFixtures/StructuredStorageFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.DataSources.Tests"
+                        or "Agentstration.Api.DataSources.Rss.Tests") continue;
 
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.
@@ -1537,7 +1555,15 @@ public sealed class DependencyTests
                         or "../ApiResourceTestFixtures/AwpTestWorker.cs"
                         or "../ApiResourceTestFixtures/RssTransformationTestData.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Resources.Tests"
-                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests") continue;
+                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests"
+                        or "Agentstration.Api.DataSources.Rss.Tests") continue;
+
+                // These test-root fixtures are compiled into the independently
+                // bounded Management API and Model API test processes.
+                if (include.Replace('\\', '/') is "../ManagementApiTestFixtures/ModelManagementApiTestBase.cs"
+                        or "../ManagementApiTestFixtures/AwpTestWorker.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Api.Tests"
+                        or "Agentstration.Management.Models.Api.Tests") continue;
 
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));

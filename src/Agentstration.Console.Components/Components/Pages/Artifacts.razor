@@ -7,6 +7,7 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
+<div class="artifact-catalog @(showDurable ? "artifact-catalog-durable" : null)">
 @if (showDurable)
 {
     <ResourceCollectionTemplate TItem="FlowRunArtifactResource" Title="@T("Title")" Description="@T("Description")" TestId="resource-artifacts" ContextKey="@($"{contextKey}|durable")"
@@ -15,6 +16,10 @@
                                 SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                                 EmptyTitle="@T("NoDurable")" EmptyMessage="@T("NoDurableHelp")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
         <Navigation>@Sections</Navigation><Actions>@RelatedAction</Actions>
+        <ItemActions Context="item"><CollectionActions ResourceName="@DurableName(item)">
+            <a href="@(DurableUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+            <button type="button" data-testid="durable-artifact-preview" disabled="@(item.ScopeRef is null)" @onclick="() => OpenArtifact(ArtifactResourceKinds.FlowRunArtifact, item.ArtifactId.ToString(), item.ScopeRef)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+        </CollectionActions></ItemActions>
     </ResourceCollectionTemplate>
 }
 else
@@ -25,10 +30,28 @@ else
                                 SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                                 EmptyTitle="@T("NoStaged")" EmptyMessage="@T("NoStagedHelp")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
         <Navigation>@Sections</Navigation><Actions>@RelatedAction</Actions>
+        <ItemActions Context="item"><CollectionActions ResourceName="@item.FileName">
+            <a href="@(StagedUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+            <button type="button" data-testid="staged-artifact-preview" disabled="@(StagedOwner is null)" @onclick="() => OpenArtifact(ArtifactResourceKinds.StagedArtifact, item.ArtifactId.ToString(), StagedOwner)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+        </CollectionActions></ItemActions>
     </ResourceCollectionTemplate>
 }
 
+</div>
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="" ResourceKinds="ArtifactKinds" ContextKey="@contextKey" Enabled="@(CanInspect && Context.Error is null)">
+    <ChildContent Context="address">@if (address.Kind == ArtifactResourceKinds.FlowRunArtifact) {
+        <DurableArtifactResourcePreview Address="address" OverviewHref="@ArtifactUrl(address)" />
+    } else { <StagedArtifactResourcePreview Address="address" OverviewHref="@ArtifactUrl(address)" /> }</ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private static readonly IReadOnlySet<string> ArtifactKinds = new HashSet<string> { ArtifactResourceKinds.FlowRunArtifact, ArtifactResourceKinds.StagedArtifact };
+    private ResourceScopeRef? StagedOwner => Context.Current is { WorkspaceId: var id } && id != Guid.Empty ? ResourceScopeRef.Workspace(id) : null;
+    private void OpenArtifact(string kind, string name, ResourceScopeRef? owner) { if (owner is { } scope) preview?.Open(ScopedResourceAddress.Create(scope, ResourceNamespace.Default, kind, name)); }
+    private string ArtifactUrl(ScopedResourceAddress address) => ConsoleResourceUrls.WithOwnerScope(Navigate($"/artifacts/{(address.Kind == ArtifactResourceKinds.FlowRunArtifact ? "durable" : "staged")}/{address.Name}"), address.ScopeRef) + "#overview";
+
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
     private RenderFragment RelatedAction => @<a class="button-secondary" href="@Navigate("/knowledge-sources")">@T("KnowledgeSources")</a>;
@@ -77,8 +100,8 @@ else
         },
         new("expires", T("Expires"), item => @<time datetime="@item.ExpiresAt.ToString("O")">@item.ExpiresAt.ToLocalTime().ToString("g")</time>)
     ];
-    private string StagedUrl(StagedArtifactView artifact) => Navigate($"/artifacts/staged/{artifact.ArtifactId}");
-    private string DurableUrl(FlowRunArtifactResource artifact) => Navigate($"/artifacts/durable/{artifact.ArtifactId}");
+    private string StagedUrl(StagedArtifactView artifact) => StagedOwner is { } owner ? ArtifactUrl(ScopedResourceAddress.Create(owner, ResourceNamespace.Default, ArtifactResourceKinds.StagedArtifact, artifact.ArtifactId.ToString())).Split('#')[0] : Navigate($"/artifacts/staged/{artifact.ArtifactId}");
+    private string DurableUrl(FlowRunArtifactResource artifact) => artifact.ScopeRef is { } owner ? ArtifactUrl(ScopedResourceAddress.Create(owner, artifact.Namespace, ArtifactResourceKinds.FlowRunArtifact, artifact.Name)).Split('#')[0] : Navigate($"/artifacts/durable/{artifact.ArtifactId}");
     private string FlowRunUrl(string id) => Navigate($"/flow-runs/{Uri.EscapeDataString(id)}");
     private string? ProducerUrl(ArtifactProducer producer) => producer.FlowRunId is not null
         ? FlowRunUrl(producer.FlowRunId) : producer.RuntimeRunId is not null ? Navigate($"/runs/{Uri.EscapeDataString(producer.RuntimeRunId)}") : null;

@@ -303,3 +303,8 @@ public sealed class ArtifactValidationException(string code, string message) : E
 {
     public string Code { get; } = code;
 }
+
+// Saved metadata projection deliberately excludes backend references and file content.
+public sealed record StagedArtifactSavedSummary(
+    ResourceMetadata Metadata, Guid Uid, ResourceScopeRef ScopeRef, long Generation,
+    ResourceGovernance Governance, StagedArtifactView Value);

@@ -334,8 +334,8 @@ export const CollectionTextByLocale = {
 } as const;
 
 export const CollectionVersionTextByLocale = {
-  'en-US': { version: 'Version', active: 'Published version', draft: 'Draft version', generation: 'Generation', targetArchive: 'Target archive version', configure: 'Configure' },
-  'fr-FR': { version: 'Version', active: 'Version publiée', draft: 'Version du brouillon', generation: 'Génération', targetArchive: 'Version cible de l’archive', configure: 'Configurer' },
+  'en-US': { version: 'Version', active: 'Published version', draft: 'Draft version', generation: 'Generation', targetArchive: 'Target archive version', open: 'Open', editDefinition: 'Edit definition', configure: 'Configure' },
+  'fr-FR': { version: 'Version', active: 'Version publiée', draft: 'Version du brouillon', generation: 'Génération', targetArchive: 'Version cible de l’archive', open: 'Ouvrir', editDefinition: 'Modifier la définition', configure: 'Configurer' },
 } as const;
 
 /** Independent field expectations; do not import product resource files. */

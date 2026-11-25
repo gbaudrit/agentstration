@@ -18,8 +18,7 @@
     <Actions>@if (CanWrite) { <a class="button-secondary" href="@NewDefinitionUrl">@T("NewDefinition")</a> }</Actions>
     <Feedback>@if (commandError is not null) { <p class="error-panel" role="alert">@commandError</p> }@if (InputContractChanged) { <div class="form-alert form-alert-warning" role="status">@T("InputContractChanged")</div> }</Feedback>
     <OverviewMetrics>@if (tool?.Definition.Discovery is { } observed) { <MetricCard Label="@T("LastSeen")" Value="@observed.LastSeenAt.ToString("g")" /> }</OverviewMetrics>
-    <OverviewConfiguration>@Configuration</OverviewConfiguration>
-    <OverviewContent>@OverviewPanels</OverviewContent>
+    <OverviewSummary Context="identity">@if (tool is not null) { <ToolResourceSummary Resource="tool" Identity="identity" Provider="provider" ManagingExtension="managingExtension" /> }</OverviewSummary>
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="tool-inspection-form" FormName="tool-inspection"
         SectionState="sectionState" Sections="presentations" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
     <AdditionalContent Context="path">@Execution</AdditionalContent>
@@ -29,50 +28,12 @@
     private RenderFragment Identity => @<ResourceIdentityEditor ResourceKind="@ToolResourceKinds.Tool" DisplayName="@model.DisplayName" DisplayNameExpression="@(() => model.DisplayName)"
         TechnicalName="@model.Name" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)" ScopeRef="model.ScopeRef"
         Description="@model.Description" DescriptionExpression="@(() => model.Description)" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)" ReadOnly="true" TestId="tool-identity-editor" />;
-    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-        <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
-    </CollectionView>;
     private RenderFragment DefinitionSection(string path) => path switch
     {
         "definition/identity" => Identity,
-        "definition/configuration" => @<FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@Configuration</FormSection>,
+        "definition/configuration" => @<ToolResourceSummary Resource="tool!" ShowIdentity="false" ShowSpecificContent="false" ConfigurationInitiallyCollapsed="false" />,
         _ => throw new ArgumentOutOfRangeException(nameof(path))
     };
-    private RenderFragment OverviewPanels => @<div>@if (tool is not null) {
-            <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
-                <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
-                <p>@(string.IsNullOrWhiteSpace(tool.Definition.Description) ? T("NoDescription") : tool.Definition.Description)</p>
-            </section>
-
-            <section class="panel tool-contract" aria-labelledby="tool-input-heading">
-                <div class="panel-header"><h2 id="tool-input-heading">@T("InputContract")</h2></div>
-                @SchemaSummary(tool.Definition.Schema?.Input)
-                @RawSchema(tool.Definition.Schema?.Input, "RawInputSchema")
-            </section>
-
-            <section class="panel tool-contract" aria-labelledby="tool-output-heading">
-                <div class="panel-header"><h2 id="tool-output-heading">@T("OutputContract")</h2></div>
-                @SchemaSummary(tool.Definition.Schema?.Output)
-                @RawSchema(tool.Definition.Schema?.Output, "RawOutputSchema")
-            </section>
-
-            <section class="panel" aria-labelledby="tool-governance-heading">
-                <div class="panel-header"><h2 id="tool-governance-heading">@T("GovernanceAndSource")</h2></div>
-                <dl class="resource-details">
-                    @if (managingExtension is not null)
-                    {
-                        <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@managingExtension.DisplayName</a><br /><code>@managingExtension.ExtensionId</code> · @(tool.Governance.Origin.Version ?? managingExtension.Version ?? "—") · <ResourceScopeBadge ScopeRef="managingExtension.RegistrationScopeRef" Compact /></dd>
-                    }
-                    <dt>@T("TechnicalProvider")</dt><dd>@if (provider is not null) { <a href="@ProviderUrl"><code>@tool.Definition.Provider?.ResourceId</code></a> } else { <code>@tool.Definition.Provider?.ResourceId</code> }</dd>
-                    <dt>@T("ExternalName")</dt><dd><code>@tool.Definition.ExternalId</code></dd>
-                    <dt>@T("Enabled")</dt><dd>@BooleanLabel(tool.Definition.Enabled)</dd>
-                    <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(tool.Definition.RequiresApproval)</dd>
-                    <dt>@T("AvailableLabel")</dt><dd>@(tool.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")</dd>
-                    <dt>@T("FirstSeen")</dt><dd>@tool.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>
-                    <dt>@T("LastSeen")</dt><dd>@tool.Definition.Discovery?.LastSeenAt.ToString("g")</dd>
-                </dl>
-            </section>
-    }</div>;
     private RenderFragment Execution => @<div>@if (tool is not null) {
             <section class="panel tool-runner" aria-labelledby="tool-runner-heading" data-testid="tool-runner">
                 <div class="panel-header"><div><h2 id="tool-runner-heading">@T("RunTool")</h2><p class="muted">@T("RunToolHelp")</p></div></div>
@@ -208,8 +169,6 @@
         runInputValid = true; runError = null; runResult = null;
     }
     private RenderFragment ResetInputsAction => @<button type="button" class="button-secondary" disabled="@(submitting || toggling || refreshing)" @onclick="ResetRunInput">@T("ResetRunInput")</button>;
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => tool is null ? [] : [new(T("TechnicalProvider"), tool.Definition.Provider?.ResourceId ?? "—"), new(T("ExternalName"), tool.Definition.ExternalId ?? "—"), new(T("Enabled"), BooleanLabel(tool.Definition.Enabled)), new(T("RequiresApproval"), BooleanLabel(tool.Definition.RequiresApproval)), new(T("AvailableLabel"), tool.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")];
     private ToolResource? tool;
     private ToolProviderResource? provider;
     private ExtensionInventoryItemResponse? managingExtension;
@@ -342,10 +301,6 @@
         System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.Unauthorized => ResourceLoadStatus.Forbidden, _ => ResourceLoadStatus.Failed
     } : ResourceLoadStatus.Failed) { ErrorId = (exception as AgentstrationApiException)?.ErrorId };
 
-    private string ManagingExtensionUrl => managingExtension?.RegistrationName is null ? "/extensions"
-        : ResourceOwnershipContext.Resource(Services, "/extensions", managingExtension.RegistrationName, ResourceNamespace.Parse(managingExtension.RegistrationNamespace), managingExtension.RegistrationScopeRef);
-    private string ProviderUrl => ResourceOwnershipContext.Resource(Services, "/tools/providers", provider!.Name, provider.Namespace, provider.ScopeRef);
-
     private async Task ToggleAsync(bool enabled)
     {
         if (!CanWrite || tool!.Governance.IsManaged || toggling || refreshing) return;
@@ -426,151 +381,4 @@
 
     public void Dispose() { loadVersion++; cancellation.Cancel(); cancellation.Dispose(); }
 
-    private RenderFragment SchemaSummary(JsonElement? schema) => builder =>
-    {
-        if (schema is null || schema.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-        {
-            builder.OpenElement(0, "p");
-            builder.AddAttribute(1, "class", "tool-contract-note");
-            builder.AddContent(2, T("NoSchema"));
-            builder.CloseElement();
-            return;
-        }
-
-        if (schema.Value.ValueKind != JsonValueKind.Object ||
-            !schema.Value.TryGetProperty("properties", out var properties) ||
-            properties.ValueKind != JsonValueKind.Object)
-        {
-            builder.OpenElement(0, "p");
-            builder.AddAttribute(1, "class", "tool-contract-note");
-            builder.AddContent(2, T("UnstructuredSchema"));
-            builder.CloseElement();
-            return;
-        }
-
-        var fields = properties.EnumerateObject().ToArray();
-        if (fields.Length == 0)
-        {
-            builder.OpenElement(0, "p");
-            builder.AddAttribute(1, "class", "tool-contract-note");
-            builder.AddContent(2, T("NoProperties"));
-            builder.CloseElement();
-            return;
-        }
-
-        var required = new HashSet<string>(StringComparer.Ordinal);
-        if (schema.Value.TryGetProperty("required", out var requiredValue) && requiredValue.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var item in requiredValue.EnumerateArray())
-            {
-                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } fieldName)
-                {
-                    required.Add(fieldName);
-                }
-            }
-        }
-
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", "tool-fields");
-        foreach (var field in fields)
-        {
-            builder.OpenElement(2, "article");
-            builder.AddAttribute(3, "class", "tool-field");
-            builder.OpenElement(4, "div");
-            builder.AddAttribute(5, "class", "tool-field-heading");
-            builder.OpenElement(6, "code");
-            builder.AddContent(7, field.Name);
-            builder.CloseElement();
-            builder.OpenElement(8, "span");
-            builder.AddAttribute(9, "class", required.Contains(field.Name) ? "tool-field-required" : "tool-field-optional");
-            builder.AddContent(10, T(required.Contains(field.Name) ? "Required" : "Optional"));
-            builder.CloseElement();
-            builder.CloseElement();
-
-            var type = PropertyText(field.Value, "type");
-            if (type is not null)
-            {
-                builder.OpenElement(11, "p");
-                builder.AddAttribute(12, "class", "tool-field-type");
-                builder.AddContent(13, T("Type", type));
-                builder.CloseElement();
-            }
-
-            var description = PropertyText(field.Value, "description");
-            if (!string.IsNullOrWhiteSpace(description))
-            {
-                builder.OpenElement(14, "p");
-                builder.AddContent(15, description);
-                builder.CloseElement();
-            }
-
-            var constraints = Constraints(field.Value);
-            if (constraints.Count > 0)
-            {
-                builder.OpenElement(16, "ul");
-                builder.AddAttribute(17, "class", "tool-field-constraints");
-                foreach (var constraint in constraints)
-                {
-                    builder.OpenElement(18, "li");
-                    builder.AddContent(19, constraint);
-                    builder.CloseElement();
-                }
-                builder.CloseElement();
-            }
-            builder.CloseElement();
-        }
-        builder.CloseElement();
-    };
-
-    private RenderFragment RawSchema(JsonElement? schema, string titleKey) => builder =>
-    {
-        if (schema is null || schema.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-        {
-            return;
-        }
-
-        builder.OpenElement(0, "details");
-        builder.AddAttribute(1, "class", "tool-raw-schema");
-        builder.OpenElement(2, "summary");
-        builder.AddContent(3, T(titleKey));
-        builder.CloseElement();
-        builder.OpenElement(4, "pre");
-        builder.AddContent(5, JsonSerializer.Serialize(schema.Value, new JsonSerializerOptions { WriteIndented = true }));
-        builder.CloseElement();
-        builder.CloseElement();
-    };
-
-    private static string? PropertyText(JsonElement element, string name) =>
-        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-
-    private List<string> Constraints(JsonElement property)
-    {
-        var result = new List<string>();
-        if (property.ValueKind != JsonValueKind.Object)
-        {
-            return result;
-        }
-
-        AddConstraint("minLength", "MinLength");
-        AddConstraint("maxLength", "MaxLength");
-        AddConstraint("minimum", "Minimum");
-        AddConstraint("maximum", "Maximum");
-        AddConstraint("pattern", "Pattern");
-        AddConstraint("format", "Format");
-        if (property.TryGetProperty("enum", out var allowed) && allowed.ValueKind == JsonValueKind.Array)
-        {
-            result.Add(T("AllowedValues", string.Join(", ", allowed.EnumerateArray().Select(item => item.ToString()))));
-        }
-        return result;
-
-        void AddConstraint(string jsonName, string label)
-        {
-            if (property.TryGetProperty(jsonName, out var value) && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
-            {
-                result.Add(T(label, value.ToString()));
-            }
-        }
-    }
 }

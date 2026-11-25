@@ -74,6 +74,9 @@ public sealed class TriggerManagementService(
         return stored;
     }
 
+    public Task<StoredResource<TriggerResource>?> GetExactAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        owner != operationalContext.Current.WorkspaceScopeRef ? Task.FromResult<StoredResource<TriggerResource>?>(null) : GetAsync(ns, name, token);
+
     public async Task<StoredResource<TriggerResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken)
     {
         var context = operationalContext.Current;

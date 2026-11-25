@@ -13,13 +13,27 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@T("Search")"
                             EmptyTitle="@T("Empty")" EmptyMessage="@T("Empty.Message")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
-                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="connected-service-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ConnectedServiceResourceKinds.ConnectedService" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ConnectedServiceResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(ConnectedServiceResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(ConnectedServiceResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, ConnectedServiceResourceKinds.ConnectedService, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/connected-services", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/connected-services/new", Services)" data-testid="connected-service-create">@T("Create")</a></PermissionGate> : null;
-    private CollectionColumn<ConnectedServiceResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@DetailsUrl(item)" IconName="puzzle" Domain="tools" data-testid="connected-service-name-link">
+    private CollectionColumn<ConnectedServiceResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@(DetailsUrl(item) + "#overview")" IconName="puzzle" Domain="tools" data-testid="connected-service-name-link">
         <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@StatusLabel(Availability(item))" Status="@StatusColor(Availability(item))" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {

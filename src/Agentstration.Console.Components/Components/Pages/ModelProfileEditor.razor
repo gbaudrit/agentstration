@@ -46,7 +46,7 @@ else
         <Actions>@if (CanDelete) { <button class="button-danger" type="button" disabled="@Busy" @onclick="RequestDelete" data-testid="model-profile-delete">@T("Delete")</button> }</Actions>
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics><MetricCard Label="@T("ProfileStatus")" Value="@StatusLabel(resolution?.Status)" Status="@ModelManagementUi.Status(resolution?.Status)" /><MetricCard Label="@T("AgentUsages")" Value="@(usageOverallTotal is { } count ? AgentCount(count) : "—")" Detail="@T("AgentUsagesDescription")" /></OverviewMetrics>
-        <OverviewConfiguration>@SavedConfiguration</OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (resource is not null) { <ModelProfileResourceSummary Resource="resource" Identity="identity" ProviderOwner="@(resource.Definition.Provider.ScopeRef ?? providers.SingleOrDefault(provider => provider.Name == resource.Definition.Provider.Name && provider.Namespace == (resource.Definition.Provider.Namespace ?? resource.Namespace).Value)?.ScopeRef)" /> }</OverviewSummary>
         <DefinitionContent Context="path">@definition</DefinitionContent>
         <AdditionalContent Context="path">@if (path == "usages") { @Usages } else if (path == "resolution") { @Resolution }</AdditionalContent>
         <DraftActions><button class="button-secondary" type="button" disabled="@Busy" @onclick="Discard">@Shared["Discard"]</button><button class="button-primary" type="submit" form="model-profile-resource-form" disabled="@(Busy || !CanManage)" data-testid="model-profile-save">@(saving ? T("Saving") : T("SaveChanges"))</button></DraftActions>
@@ -165,33 +165,6 @@ else
         }
     }
     private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details"><dt>@T("DisplayName")</dt><dd>@model?.DisplayName</dd><dt>@T("Name")</dt><dd><code>@model?.Namespace/@model?.Name</code></dd><dt>@T("Provider")</dt><dd><code>@model?.ProviderNamespace/@model?.ProviderName</code></dd><dt>@T("Model")</dt><dd>@model?.ModelName</dd></dl></FormSection>;
-    private RenderFragment SavedConfiguration => @<CollectionView TItem="ProfileSetting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (entry.Href is { } href) { <a href="@href">@entry.Value</a> } else { @entry.Value }</span></CollectionValue></Information></CollectionView>;
-    private sealed record ProfileSetting(string Label, string Value, string? Href = null);
-    private IEnumerable<ProfileSetting> SavedEntries
-    {
-        get
-        {
-            if (resource is not { } saved) yield break;
-            var definition = saved.Definition;
-            var providerNamespace = definition.Provider.Namespace ?? saved.Namespace;
-            var owner = definition.Provider.ScopeRef ?? providers.SingleOrDefault(provider => provider.Name == definition.Provider.Name && provider.Namespace == providerNamespace.Value)?.ScopeRef;
-            yield return new(T("Provider"), $"{providerNamespace}/{definition.Provider.Name}", owner is { } scope ? ResourceOwnershipContext.Resource(Services, "/modelproviders", definition.Provider.Name, providerNamespace, scope) : null);
-            yield return new(T("Model"), definition.Model.Name);
-            yield return new(T("Temperature"), Number(definition.Generation.Temperature));
-            yield return new(T("TopP"), Number(definition.Generation.TopP));
-            yield return new(T("TopK"), Number(definition.Generation.TopK));
-            yield return new(T("MaximumOutputTokens"), Number(definition.Generation.MaxOutputTokens));
-            yield return new(T("Seed"), Number(definition.Generation.Seed));
-            yield return new(T("StopSequences"), definition.Generation.StopSequences is { Count: > 0 } stops ? string.Join(Environment.NewLine, stops) : "—");
-            yield return new(T("ReasoningMode"), EnumLabel(definition.Reasoning.Mode));
-            yield return new(T("ReasoningEffort"), definition.Reasoning.Effort is { } effort ? EnumLabel(effort) : T("ProviderDefault"));
-            yield return new(T("OutputFormat"), EnumLabel(definition.Output.Format));
-            yield return new(T("StrictStructuredOutput"), T(definition.Output.Strict ? "ReasoningMode.Enabled" : "ReasoningMode.Disabled"));
-            if (definition.Output.JsonSchema is { } schema) yield return new(T("JsonSchema"), schema.GetRawText());
-            yield return new(T("ProviderOptions"), definition.ProviderOptions.Count == 0 ? "—" : JsonSerializer.Serialize(definition.ProviderOptions));
-        }
-    }
-    private static string Number<T>(T? value) where T : struct, IFormattable => value?.ToString(null, System.Globalization.CultureInfo.CurrentCulture) ?? "—";
     private sealed record ProfileBundle(ResourceSnapshot<ModelProfileResource> Snapshot, IReadOnlyList<ModelProviderResponse> Providers, IReadOnlyList<ExtensionResponse> Extensions, IReadOnlyList<AvailableModelResponse> Models, IReadOnlyList<ResourceScopeTargetResponse> Targets, ModelProfileResolutionResponse? Resolution, string? Warning, bool CatalogueDenied = false);
     private bool catalogueDenied;
     protected override Task OnParametersSetAsync()

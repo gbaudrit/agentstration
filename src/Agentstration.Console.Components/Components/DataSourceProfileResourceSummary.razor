@@ -1,0 +1,51 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="data-source-profile-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="data-source-profile-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="data-source-profile-configuration-summary">
+        @Configuration
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public DataSourceProfileResource Resource { get; set; } = null!;
+    [Parameter] public string? PublishedVersion { get; set; }
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration =>
+    [
+        new(T("State"), T(Resource.Definition.Enabled ? "Enabled" : "Disabled")),
+        new(T("PublishedVersion"), Resource.ActiveVersion ?? Resource.PublishedVersion ?? PublishedVersion ?? "—"),
+        new(T("Flow"), FlowLabel(Resource.Definition.AcquisitionFlow)),
+        new(T("DiscoveryFlow"), Resource.Definition.DiscoveryFlow is { } discovery ? FlowLabel(discovery) : T("None")),
+        new(T("Schema"), Json(Resource.Definition.ConfigurationSchema)),
+        new(T("ToolBindings"), Json(Resource.Definition.ToolBindings)),
+        new(T("DiscoveryToolBindings"), Json(Resource.Definition.DiscoveryToolBindings)),
+        new(T("Limits"), Json(Resource.Definition.Limits)),
+        new(T("Policies"), Json(Resource.Definition.Policies))
+    ];
+    private static string Json<T>(T value) => DataSourceProfileEditorModel.Json(value);
+    private string FlowLabel(DataSourceFlowTarget flow) => $"{flow.ScopeRef} · {flow.Namespace ?? Resource.Namespace}/{flow.Name} · {(flow.UseActiveVersion ? T("ActiveVersion") : flow.Version ?? "—")}";
+
+}

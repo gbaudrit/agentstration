@@ -313,6 +313,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
     pageObject: 'src/pages/connected-storage-collection.page.ts', specification: 'tests/connected-storage-collection.spec.ts',
     coverage: 'partial', trackingIssue: 1122,
   },
+  planned('connected-service-operation-details', `${consolePages}/ConnectedServiceOperationDetails.razor`, ['/connected-service-operations/{Name}'], 1258, ['name']),
   partialResourceAdministration('connected-service-details', `${consolePages}/ConnectedServiceDetails.razor`, ['/connected-services/{Name}'], 1048, ['name']),
   {
     id: 'connected-service-editor', host: 'console', source: `${consolePages}/ConnectedServiceEditor.razor`, routes: ['/connected-services/new', '/connected-services/{Name}/edit'], fixtureKeys: ['name'],
@@ -347,6 +348,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
     relatedSpecifications: ['tests/shared-forms.spec.ts'],
   },
   planned('transformation-functions', `${consolePages}/TransformationFunctions.razor`, ['/transformation-functions', '/function-kinds'], 1122),
+  planned('function-kind-details', `${consolePages}/FunctionKindDetails.razor`, ['/function-kinds/{Name}'], 1258, ['name']),
   planned('transformation-function-editor', `${consolePages}/TransformationFunctionEditor.razor`, ['/transformation-functions/{Name}'], 1122, ['name']),
   planned('tool-governance-audit', `${consolePages}/ToolGovernanceAudit.razor`, ['/tool-governance/{Owner}/{RunId}'], 426, ['owner', 'runId']),
   coveredOperationalTriggers('triggers', `${consolePages}/Triggers.razor`, ['/triggers']),
@@ -365,7 +367,8 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('source-provider-details', `${consolePages}/SourceProviderDetails.razor`, ['/sourceproviders/new', '/sourceproviders/{Name}'], ['name']),
   coveredDistribution('source-registries', `${consolePages}/SourceRegistries.razor`, ['/settings/source-registries', '/settings/source-registries/new', '/settings/source-registries/{Name}'], ['name']),
   coveredDistribution('source-registry-discovery', `${consolePages}/SourceRegistryDiscovery.razor`, ['/settings/source-registries/discovery']),
-  coveredDistribution('sources', `${consolePages}/Sources.razor`, ['/settings/sources', '/settings/sources/{Publisher}/{Name}'], ['publisher', 'name'], 'import-source'),
+  coveredDistribution('sources', `${consolePages}/Sources.razor`, ['/settings/sources'], [], 'import-source'),
+  planned('source-details', `${consolePages}/SourceDetails.razor`, ['/settings/sources/{Publisher}/{Name}'], 1258, ['publisher', 'name']),
   lifecycleSurface('knowledge-sources', 'KnowledgeSources', ['/knowledge-sources'], 732),
   lifecycleSurface('knowledge-source-details', 'KnowledgeSourceDetails', ['/knowledge-sources/{Name}'], 732, ['name']),
   lifecycleSurface('knowledge-source-editor', 'KnowledgeSourceEditor', ['/knowledge-sources/new', '/knowledge-sources/{Name}/edit'], 732, ['name']),
@@ -391,6 +394,7 @@ const baseApplicationSurfaces: readonly ApplicationSurface[] = [
   coveredDistribution('bootstrap-profiles', `${consolePages}/BootstrapProfiles.razor`, ['/settings/bootstrap']),
   planned('bootstrap-startup-progress', `${consolePages}/BootstrapStartupProgress.razor`, ['/startup/progress'], 1251),
   coveredDistribution('packs', `${consolePages}/Packs.razor`, ['/packs']),
+  planned('installed-pack-details', `${consolePages}/InstalledPackDetails.razor`, ['/packs/resources/{Name}'], 1258, ['name']),
   coveredDistribution('pack-composer', `${consolePages}/PackComposer.razor`, ['/pack-projects/new'], [], 'create-pack-project'),
   coveredDistribution('pack-project-details', `${consolePages}/PackProjectDetails.razor`, ['/pack-projects/{ProjectId:guid}'], ['projectId'], 'create-pack-project'),
   {

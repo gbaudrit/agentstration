@@ -57,7 +57,7 @@ public sealed partial class ConnectedCollectionPresentationTests
         Assert.AreEqual(inheritedLabel, rows[0].QuerySelector(".managed-resource-badge button")!.GetAttribute("aria-label"));
         Assert.IsNull(rows[1].QuerySelector(".managed-resource-badge"));
         Assert.IsNotNull(rows[2].QuerySelector(".managed-resource-badge"));
-        Assert.HasCount(0, rendered.FindAll(".collection-actions-menu"));
+        Assert.HasCount(3, rendered.FindAll(".collection-actions-menu"));
         Assert.AreEqual(1, handler.Requests);
 
         rendered.Find(".collection-view-switch button[aria-pressed=false]").Click();

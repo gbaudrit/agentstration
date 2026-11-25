@@ -68,6 +68,13 @@ public sealed class AwpWorkerIdentityService(
         return View(resource);
     }
 
+    public async Task<AwpWorkerEnrollmentView?> GetEnrollmentAsync(Guid workerId, CancellationToken token)
+    {
+        using var scope = RequestScopes().PushSystem();
+        var saved = await store.GetExactAsync<AwpWorkerIdentityResource>(Address(workerId), token);
+        return saved is null ? null : View(saved.Value);
+    }
+
     public async Task<IReadOnlyList<AwpWorkerEnrollmentView>> ListAsync(CancellationToken cancellationToken)
     {
         using var scope = RequestScopes().PushSystem();

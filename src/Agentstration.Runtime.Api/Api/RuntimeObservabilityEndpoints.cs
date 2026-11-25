@@ -18,6 +18,11 @@ internal static class RuntimeObservabilityEndpoints
                 Results.Ok(await service.ListWorkersAsync(token)))
             .Produces<RuntimeWorkerSummaryResponse[]>()
             .WithSummary("List enrolled Runtime Workers and their live presence");
+        workers.MapGet("/{workerId:guid}/summary", async (Guid workerId, IRuntimeObservabilityQueryService service, CancellationToken token) =>
+        {
+            var worker = await service.GetWorkerSummaryAsync(workerId, token);
+            return worker is null ? Results.NotFound() : Results.Ok(worker);
+        }).Produces<RuntimeWorkerSummaryResponse>().Produces(StatusCodes.Status404NotFound).WithSummary("Inspect one enrolled Runtime Worker without loading assignment history");
         workers.MapGet("/{workerId:guid}", async (Guid workerId, IRuntimeObservabilityQueryService service,
                 CancellationToken token) =>
             {

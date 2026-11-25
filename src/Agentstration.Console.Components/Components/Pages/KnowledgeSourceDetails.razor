@@ -24,8 +24,7 @@
             <MetricCard Label="@T("ActiveSnapshot")" Value="@(ActiveSnapshot is null ? T("None") : ShortMetricIdentifier(ActiveSnapshot.Snapshot.Name))" Detail="@T("SnapshotCount", snapshots.Count)" HelpText="@ActiveSnapshot?.Snapshot.Name" Status="@(ActiveSnapshot is null ? UiStatus.Warning : UiStatus.Success)" Url="@(ActiveSnapshot is null ? null : SnapshotsUrl)" />
             <MetricCard Label="@T("ToolExposure")" Value="@(exposure is null ? T("NotPublished") : exposure.ToolSetVersion)" Detail="@(exposure is null ? T("ExposureHelp") : $"{exposure.ToolSet.Name} · {exposure.Operations.Count} {T("Operations")}")" Status="@(exposure is null ? UiStatus.Neutral : UiStatus.Success)" />
         </section> }</OverviewMetrics>
-    <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
-    <OverviewContent>@if (source is not null && readiness is not null) {
+    <OverviewSummary Context="identity">@if (source is not null) { <KnowledgeSourceResourceSummary Resource="source" Identity="identity"><AdditionalContent>@if (source is not null && readiness is not null) {
         <section class="panel form-section knowledge-flow-composition">
             <div class="panel-header"><div><p class="eyebrow">@T("FlowBindings")</p><h2>@T("ResolvedFlows")</h2><p>@T("ResolvedFlowsHelp")</p></div></div>
             <div class="knowledge-flow-grid">
@@ -51,7 +50,8 @@
         </Information>
     </CollectionView>
             }
-        </section> }</OverviewContent>
+        </section> }</AdditionalContent></KnowledgeSourceResourceSummary> }</OverviewSummary>
+
     <DefinitionContent Context="path"><KnowledgeSourceEditor @ref="editor" Name="@Name" Namespace="@Namespace" ScopeRef="@ScopeRef" Embedded="true" Snapshot="snapshot" SectionState="sectionState" SectionPresentations="presentations"
         SectionRequested="ShowSection" DraftChanged="value => definitionDirty = value" ReadOnly="@(!CanEdit || resourceRefreshing)" Saved="SourceProjectionSaved" ResourceUnavailable="EditorUnavailable" DiscardRevision="discardRevision" /></DefinitionContent>
     <AdditionalContent Context="path"><div @oninput="() => businessTouched = true" @onchange="() => businessTouched = true">@BusinessContent(path)</div></AdditionalContent>
@@ -161,8 +161,6 @@
     private IReadOnlyList<ResourceNavigationItem> BusinessSections => [new("projections", T("Tab.Projections"), "git-branch"), new("snapshots", T("Tab.Snapshots"), "archive"), new("retrieval", T("Tab.Retrieval"), "search"), new("tools", T("Tab.Tools"), "tool")];
     private string SectionUrl(string path) => Navigation.Uri.Split('#')[0] + "#" + path;
     private void ShowSection(string path) => Navigation.NavigateTo(SectionUrl(path));
-    private IReadOnlyList<KeyValuePair<string,string>> SavedSettings => source is null ? [] : [new(T("Enabled"), T(source.Definition.Enabled ? "Enabled" : "Disabled")), new(T("ProjectionFlow"), FlowLabel(source.Definition.ProjectionFlow)), new(T("NativeLegacyRetrieval"), FlowLabel(source.Definition.RetrievalFlow)), new(T("ProjectionParameters"), source.Definition.ProjectionParameters.GetRawText()), new(T("OutputStorage"), source.Definition.Output is { } output ? $"{output.Storage.Storage.Namespace}/{output.Storage.Storage.Name} · {output.Storage.Storage.ScopeRef} · g{output.Storage.Generation}" : T("ArtifactOutputDefault"))];
-    private string FlowLabel(KnowledgeFlowTarget? target) => target is null ? "—" : $"{target.Namespace ?? source!.Namespace}/{target.Name}:{target.Version ?? "active"} · {target.ScopeRef}";
     protected override async Task OnParametersSetAsync()
     {
         var key = $"{Name}|{Namespace}|{ScopeRef}|{new Uri(Navigation.Uri).Query}";

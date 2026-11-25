@@ -19,6 +19,20 @@ public sealed class EntryAdministrationApiClient(HttpClient httpClient) : IEntry
     public async Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken) =>
         await ApiResponse.ReadAsync<EntryDraftResponse[]>(httpClient, "api/management/entries", cancellationToken);
 
+    public Task<EntrySavedSummaryResponse> GetEntrySummaryAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != EntryResourceKinds.Entry || address.ScopeRef == default || address.ScopeRef.Kind != ResourceScopeKind.Workspace)
+            throw new HttpRequestException("The exact Entry address is unavailable.", null, HttpStatusCode.NotFound);
+        return ApiResponse.ReadAsync<EntrySavedSummaryResponse>(httpClient, $"api/management/entries/{Uri.EscapeDataString(address.Name)}/summary?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}", token);
+    }
+
+    public Task<EntryDraftResponse> GetEntryAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != EntryResourceKinds.Entry || address.ScopeRef == default || address.ScopeRef.Kind != ResourceScopeKind.Workspace)
+            throw new HttpRequestException("The exact Entry address is unavailable.", null, HttpStatusCode.NotFound);
+        return ApiResponse.ReadAsync<EntryDraftResponse>(httpClient, $"{EntryPath(address.Namespace, address.Name)}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}", token);
+    }
+
     public Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken) =>
         GetEntryAsync(ResourceNamespace.Default, name, cancellationToken);
 

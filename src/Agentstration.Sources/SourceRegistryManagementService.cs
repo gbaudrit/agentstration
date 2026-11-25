@@ -100,6 +100,11 @@ public sealed partial class SourceRegistryManagementService(
         return result;
     }
 
+    public Task<StoredResource<SourceRegistryRegistrationResource>?> GetRegistrationExactAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        owner != ResourceScopeRef.Instance || !ns.IsDefault
+            ? Task.FromResult<StoredResource<SourceRegistryRegistrationResource>?>(null)
+            : store.GetExactAsync<SourceRegistryRegistrationResource>(ScopedResourceAddress.Create(owner, ns, SourceRegistryKinds.SourceRegistryRegistration, name), token);
+
     public async Task<SourceRegistryRegistrationView?> GetAsync(string name, CancellationToken cancellationToken)
     {
         var registration = await GetRegistrationStoredAsync(name, cancellationToken);

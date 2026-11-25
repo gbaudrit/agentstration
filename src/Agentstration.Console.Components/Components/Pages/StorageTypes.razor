@@ -3,6 +3,7 @@
 @inject IServiceProvider Services
 @inject IStorageTypesClient Client
 @inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 
 <PageTitle>@T("TypeCatalog") · Agentstration</PageTitle>
@@ -12,13 +13,27 @@
                             PrimaryActions="CreateAction" EmptyActions="CreateAction" EmptyTitle="@T("NoTypes")" EmptyMessage="@T("Type.ListHelp")"
                             OnRefresh="ReloadAsync" OnRetry="RetryAsync">
     <Actions><a class="button-secondary" href="@Navigate("/storages")">@T("Storages")</a></Actions>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="storage-type-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@StorageResourceKinds.StorageType" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><StorageTypeResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(StorageTypeResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(StorageTypeResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, StorageResourceKinds.StorageType, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/storage-types", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
+    private string DetailsUrl(StorageTypeResource item) => Navigate(StorageTypeLinks.Details(item));
     private string T(string key) => Localizer[key].Value;
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/storage-types/new")" data-testid="storage-type-create">@T("Type.Create")</a></PermissionGate> : null;
-    private CollectionColumn<StorageTypeResource> IdentityColumn => new("identity", T("Type"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Navigate(StorageTypeLinks.Details(item))" IconName="database" data-testid="storage-type-name-link">
+    private CollectionColumn<StorageTypeResource> IdentityColumn => new("identity", T("Type"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@(DetailsUrl(item) + "#overview")" IconName="database" data-testid="storage-type-name-link">
         <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@(Availability(item) == StorageAvailability.Ready ? UiStatus.Success : Availability(item) is StorageAvailability.Unavailable or StorageAvailability.Stale ? UiStatus.Warning : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></IconBadges>
         <Versions><CollectionVersion Label="@T("Type.PreferredVersion")" Value="@item.Definition.PreferredVersion" /></Versions>
     </CollectionIdentity>);

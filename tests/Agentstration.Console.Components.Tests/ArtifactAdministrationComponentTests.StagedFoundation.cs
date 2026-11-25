@@ -28,7 +28,7 @@ public sealed partial class ArtifactAdministrationComponentTests
         var client = new ArtifactClient("Retained private staged content");
         var cut = StagedDetails(context, client);
         var template = cut.FindComponent<ResourceDetailsTemplate>().Instance;
-        Assert.HasCount(3, cut.FindAll(".resource-configuration-summary tbody tr"));
+        Assert.HasCount(7, cut.FindAll(".resource-configuration-summary tbody tr"));
         SelectSection(context, "retention");
         var draft = StagedDate(client.Artifact.ExpiresAt.AddHours(2));
         cut.Find("input[type=datetime-local]").Change(draft);

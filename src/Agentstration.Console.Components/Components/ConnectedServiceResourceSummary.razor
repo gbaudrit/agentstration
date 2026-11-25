@@ -1,0 +1,68 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="connected-service-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="connected-service-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="connected-service-configuration-summary">
+        <dl class="resource-details"><dt>@T("ServiceType")</dt><dd><ResourceMetadataBadge Value="@Resource.Definition.Type.Type.Name" /><ResourceMetadataBadge Value="@Resource.Definition.Type.Version" /></dd></dl>
+        @ConfigurationSummary
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ConnectedServiceResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private RenderFragment ConfigurationSummary => @<div>
+        @if (ConfigurationRows.Count == 0) { <p>@T("NoBindings")</p> }
+        else
+        {
+            <CollectionView TItem="ConfigurationRow" Items="ConfigurationRows" IdentityLabel="@T("Input")" InformationLabels="@(new[] { T("ValueOrResource") })" ShowViewSwitch="ShowConfigurationViewSwitch">
+                <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity>
+                <Information Context="row"><CollectionValue Label="@T("ValueOrResource")"><span class="configuration-value"><small>@row.Source</small><br />@row.Value</span></CollectionValue></Information>
+            </CollectionView>
+        }
+    </div>;
+    private IReadOnlyList<ConfigurationRow> ConfigurationRows
+    {
+        get
+        {
+            if (Resource is null) return [];
+            var rows = Resource.Definition.Bindings.Select(binding => new ConfigurationRow(binding.InputId, BindingKindLabel(binding.Kind), BindingValue(binding))).ToList();
+            if (Resource.Definition.Options.ValueKind == JsonValueKind.Object)
+                rows.AddRange(Resource.Definition.Options.EnumerateObject().Select(option => new ConfigurationRow(option.Name, BindingKindLabel(ConnectedServiceBindingKind.Literal), ConfigurationValue(option.Value))));
+            return rows;
+        }
+    }
+    private static string ConfigurationValue(JsonElement value) => value.ValueKind == JsonValueKind.String
+        ? value.GetString() ?? string.Empty : JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
+    private sealed record ConfigurationRow(string Name, string Source, string Value);
+    private string BindingKindLabel(ConnectedServiceBindingKind kind) => T($"BindingKind.{kind}");
+    private static string BindingValue(ConnectedServiceValueBinding binding)
+    {
+        if (binding.Kind == ConnectedServiceBindingKind.Literal && binding.Literal is { } literal)
+            return literal.ValueKind == JsonValueKind.String ? literal.GetString() ?? string.Empty : literal.GetRawText();
+        var address = binding.Parameter?.Address ?? binding.Secret?.Address;
+        var scope = binding.Parameter?.ScopeRef ?? binding.Secret?.ScopeRef;
+        return address is not { } exact ? "—" : $"{scope}/{exact.Namespace}/{exact.Name}";
+    }
+
+}

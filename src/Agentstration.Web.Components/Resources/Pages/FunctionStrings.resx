@@ -46,6 +46,7 @@
   <data name="ScopeRequired" xml:space="preserve"><value>An owner scope is required.</value></data>
   <data name="ResourceIdentityMismatch" xml:space="preserve"><value>The returned function does not match the requested identity.</value></data>
   <data name="SelectionUnavailable" xml:space="preserve"><value>The selected function kind or native implementation is no longer available.</value></data>
+  <data name="KindInspectionOnly" xml:space="preserve"><value>Function Kind definitions are inspected here; activation is managed from the catalog.</value></data>
   <data name="Native.xml.to_json.Description" xml:space="preserve"><value>Convert bounded XML with explicit child/attribute paths, namespace aliases and stable arrays. Expose a transformation Schema to pin and validate the XSD input and JSON output contracts.</value></data>
   <data name="TransformationEvidence" xml:space="preserve"><value>Accepted transformation contracts</value></data>
   <data name="TransformationPinnedHelp" xml:space="preserve"><value>This version exposes an immutable transformation declaration. Adopt a new version from the Schema page; existing versions retain their exact contracts.</value></data>

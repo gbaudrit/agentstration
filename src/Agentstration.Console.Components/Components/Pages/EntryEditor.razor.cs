@@ -16,6 +16,7 @@ public partial class EntryEditor
 {
     [Parameter] public string Name { get; set; } = "new";
     [Parameter] public string? EntryNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedOwner { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private readonly ResourceSectionState sectionState = new();
     private EntryEditorModel model = new();
@@ -44,7 +45,7 @@ public partial class EntryEditor
     private bool IsPackOwned => saved?.ManagedByPack == true;
     private bool CanWrite => !disposed && !IsPackOwned && (contextState is null || contextState.Current is not null && contextState.HasPermission("resources/write"));
     private ResourceReadOnlyReason? ReadOnlyReason => IsPackOwned ? ResourceReadOnlyReason.Managed : !CanWrite ? ResourceReadOnlyReason.InsufficientPermissions : null;
-    private string AddressKey => $"{Name}|{EntryResourceNamespace}|{ResourceOwnershipContext.TryGetCurrent(Services)}|{contextState?.Current?.UserId}|{contextState?.Current?.WorkspaceId}";
+    private string AddressKey => $"{Name}|{RequestedOwner}|{EntryResourceNamespace}|{ResourceOwnershipContext.TryGetCurrent(Services)}|{contextState?.Current?.UserId}|{contextState?.Current?.WorkspaceId}";
     private string Fingerprint => JsonSerializer.Serialize(new { model, bindingEdited, declaredBinding });
     private bool HasModelDraft => baseline.Length > 0 && (baseline != Fingerprint || invalidInput);
     private bool HasRawDraft => rawBaseline != rawYaml;
@@ -129,7 +130,12 @@ public partial class EntryEditor
             EntryDraftResponse? incoming = null;
             if (!IsNew)
             {
-                incoming = await Client.GetEntryAsync(EntryResourceNamespace, Name, cancellation.Token);
+                if (!string.IsNullOrWhiteSpace(RequestedOwner))
+                {
+                    if (!ResourceScopeRef.TryParse(RequestedOwner, out var owner)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
+                    incoming = await Client.GetEntryAtAddressAsync(ScopedResourceAddress.Create(owner, EntryResourceNamespace, EntryResourceKinds.Entry, Name), cancellation.Token);
+                }
+                else incoming = await Client.GetEntryAsync(EntryResourceNamespace, Name, cancellation.Token);
                 if (!Current(version, key)) return;
                 if (!Matches(incoming, saved?.Value.WorkspaceId)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
                 if (incoming.ManagedByPack && !IsPackOwned && HasDraft) { ClearPrivate(); Adopt(incoming); loadState = new(ResourceLoadStatus.Ready) { HasContent = true }; return; }
@@ -162,7 +168,7 @@ public partial class EntryEditor
         finally { if (Current(version, key)) loading = false; }
     }
     private bool Matches(EntryDraftResponse value, WorkspaceId? expected = null) => value.Value.Name == Name && value.Value.Id == new EntryId(Name, EntryResourceNamespace)
-        && value.Value.WorkspaceId.Value != Guid.Empty && (expected is null || value.Value.WorkspaceId == expected)
+        && (string.IsNullOrWhiteSpace(RequestedOwner) || ResourceScopeRef.TryParse(RequestedOwner, out var owner) && owner == ResourceScopeRef.Workspace(value.Value.WorkspaceId.Value)) && value.Value.WorkspaceId.Value != Guid.Empty && (expected is null || value.Value.WorkspaceId == expected)
         && (contextState?.Current is null || value.Value.WorkspaceId.Value == contextState.Current.WorkspaceId)
         && (value.Published is null || value.Published.Id == value.Value.Id && value.Published.WorkspaceId == value.Value.WorkspaceId && value.Published.Name == value.Value.Name);
     private void Adopt(EntryDraftResponse incoming)

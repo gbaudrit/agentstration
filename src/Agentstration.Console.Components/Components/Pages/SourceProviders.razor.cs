@@ -68,7 +68,7 @@ public partial class SourceProviders
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { providers = null; hasCatalogAuthorization = false; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); providers = null; hasCatalogAuthorization = false; query = new(); contextKey = scope; }
         if (Context.Error is not null || Context.Current is null)
         {
             providers = null;

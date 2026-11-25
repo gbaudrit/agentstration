@@ -26,7 +26,7 @@ public sealed class SourcesCollectionTests
         Assert.HasCount(20, cut.FindAll("[data-testid=source-row]"));
         Assert.HasCount(3, cut.FindAll(".metric-card"));
         StringAssert.Contains(cut.FindAll(".metric-card")[0].TextContent, "45");
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());
         Assert.HasCount(5, cut.FindAll("[data-testid=source-row]"));
         await cut.Find("[data-filter-key=health] select").ChangeAsync(new() { Value = "Rejected" });

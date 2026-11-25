@@ -10,7 +10,7 @@
     @if (resource is null) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" RetryTestId="extension-preview-retry" /> }
     else
     {
-        <ExtensionResourceSummary Resource="resource" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false">
+        <ExtensionResourceSummary Resource="resource" ReadOnly="@(!CanEdit)" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false">
             <QuickActions>
                 <a class="button-secondary" href="@OverviewHref" data-testid="extension-preview-open"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
                 @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="extension-preview-edit"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }

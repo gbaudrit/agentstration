@@ -8,6 +8,12 @@ namespace Agentstration.Web.Components.Pages;
 public partial class Extensions
 {
     private ResourceCollectionPreview? preview;
+    private ResourceCollectionPreview? enrollmentPreview;
+    private void OpenEnrollmentPreview(AepEnrollmentRequestResource resource)
+    {
+        if (CanPreview && !loading && !pairingBusy && resource.ScopeRef is { } owner)
+            enrollmentPreview?.Open(ScopedResourceAddress.Create(owner, resource.Namespace, ExtensionKinds.AepEnrollmentRequest, resource.Name));
+    }
     private bool focusEnrollmentAfterPreview;
     private bool CanPreview => catalogContext is { Error: null, Current: not null }
         && catalogContext.HasPermission(AuthorizationPermissions.ResourcesRead) && catalogLoadState.Status != ResourceLoadStatus.Forbidden;

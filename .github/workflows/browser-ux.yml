@@ -141,6 +141,22 @@ jobs:
         env:
           AGENTSTRATION_PLAYWRIGHT_NO_BUILD: true
         run: npm run test:smoke -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/${{ matrix.shards }}
+      - name: Report Console circuit exceptions
+        if: failure()
+        working-directory: automation/playwright
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          for log in sorted(Path('.work').glob('*/console.log')):
+              lines = log.read_text(errors='replace').splitlines()
+              failures = [i for i, line in enumerate(lines) if 'Unhandled exception in circuit' in line]
+              for i in failures[-8:]:
+                  print(f'Console circuit exception in {log}:')
+                  for line in lines[i:i + 40]:
+                      if line and not line[0].isspace():
+                          break
+                      print(line)
+          PYTHON
       - name: Write application coverage report
         if: always()
         working-directory: automation/playwright

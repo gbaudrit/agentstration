@@ -23,6 +23,8 @@ public partial class FlowResourcePreview
     private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
     private bool CanEdit => resource is not null && !resource.Governance.IsManaged && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef
         && Context.HasPermission(AuthorizationPermissions.ResourcesWrite);
+    protected override void OnInitialized() => Context.Changed += ContextChanged;
+    private void ContextChanged() => _ = InvokeAsync(async () => { if (disposed) return; await LoadAsync(); if (!disposed) StateHasChanged(); });
     protected override Task OnParametersSetAsync() => requestedKey == SelectionKey ? Task.CompletedTask : LoadAsync();
     private async Task LoadAsync()
     {
@@ -33,7 +35,7 @@ public partial class FlowResourcePreview
         pending?.Cancel(); pending?.Dispose(); pending = new();
         var token = pending.Token;
         resource = null; loadState = new(ResourceLoadStatus.Loading);
-        if (!Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+        if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
         if (target.Kind != FlowResourceKinds.Flow || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
         try
         {
@@ -57,10 +59,10 @@ public partial class FlowResourcePreview
             { ErrorId = (error as AgentstrationApiException)?.ErrorId };
         }
     }
-    private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
+    private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey && Context.Error is null && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; revision++; pending?.Cancel(); pending?.Dispose(); GC.SuppressFinalize(this);
+        disposed = true; Context.Changed -= ContextChanged; revision++; pending?.Cancel(); pending?.Dispose(); GC.SuppressFinalize(this);
     }
 }

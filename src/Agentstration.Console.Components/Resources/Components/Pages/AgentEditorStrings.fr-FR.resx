@@ -139,4 +139,5 @@
   <data name="DeploymentFailed" xml:space="preserve"><value>En erreur</value></data>
   <data name="RefreshDraftConflict" xml:space="preserve"><value>Une définition plus récente est disponible. Votre brouillon et sa version d’origine sont conservés. Annulez les modifications pour charger cette nouvelle définition.</value></data>
 <data name="QuickActions" xml:space="preserve"><value>Actions rapides</value></data>
+  <data name="Settings" xml:space="preserve"><value>Paramètres</value></data>
 </root>

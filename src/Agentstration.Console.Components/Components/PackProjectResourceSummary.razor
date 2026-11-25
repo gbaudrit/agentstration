@@ -1,0 +1,40 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="pack-project-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@(Resource.Definition.DisplayName ?? Resource.Definition.PackName)" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Version="@Resource.Definition.Version" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="pack-project-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="pack-project-configuration-summary">
+        <CollectionView TItem="Setting" Items="Settings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Project.Value") })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity><Information Context="row"><CollectionValue Label="@T("Project.Value")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+    @Provenance
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public PackProjectResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private sealed record Setting(string Name, string Value);
+    private IReadOnlyList<Setting> Settings => Resource.Definition is not { } definition ? [] : [new(T("Publisher"), definition.Publisher), new(T("TechnicalName"), definition.PackName), new(T("Version"), definition.Version), new(T("Audience"), T($"Audience.{definition.Audience}")), new(T("Purpose"), T($"Purpose.{definition.Purpose}")), new(T("Categories"), string.Join(", ", definition.Categories)), new(T("Tags"), string.Join(", ", definition.Tags)), new(T("Source"), T(definition.SourceKind == PackProjectSourceKind.Fork ? "ForkedFrom" : "WorkspaceResourceSnapshot"))];
+    private RenderFragment Provenance => @<FormSection Title="@T("Source")">@if (Resource.Definition is { } definition) {
+        @if (definition.Origin is { } origin) { <p>@T("ForkedFrom") <code>@origin.Publisher/@origin.Name</code> · @origin.Version</p> }
+        <dl class="resource-details"><dt>@T("SourceHash")</dt><dd><ValueDisclosure Value="@definition.SourceArtifact.Sha256" /></dd><dt>@T("Created")</dt><dd>@definition.CreatedAt.ToLocalTime().ToString("g")</dd><dt>@T("Project.Updated")</dt><dd>@definition.UpdatedAt.ToLocalTime().ToString("g")</dd></dl>
+    }</FormSection>;
+
+}

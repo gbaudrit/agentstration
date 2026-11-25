@@ -56,4 +56,6 @@
 <data name="Project.ReplaceSourceDraftTitle" xml:space="preserve"><value>Use this editor version?</value></data>
 <data name="Project.ReplaceSourceDraftMessage" xml:space="preserve"><value>The pending content in the other editor view will be replaced by this version. A rejected save retains both drafts.</value></data>
 <data name="Project.UseCurrentSource" xml:space="preserve"><value>Use this version</value></data>
+  <data name="PackInspectionOnly" xml:space="preserve"><value>Installed Pack definitions are inspected here. Manage the installation from its catalog.</value></data>
+  <data name="ManageInstallation" xml:space="preserve"><value>Manage installation</value></data>
 </root>

@@ -14,6 +14,8 @@ public sealed record SourceConsoleChannelView(
 
 public sealed record SourceConsoleCatalogFailure(string Code, string Message);
 
+public sealed record SourceSavedSummarySnapshot(SourceResource Resource, SourceConfigurationResource Configuration);
+
 public sealed record SourceConsoleListItem(SourceView Source, SourceVersionResource? LatestVersion);
 
 public sealed record SourceConsoleProviderCandidate(

@@ -16,7 +16,7 @@
 <PageTitle>@(agent?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
 @{ var presentations = Presentations; }
 <div class="namespaced-agent-screen">
-<ConsoleResourceDetailsTemplate CollectionHref="/agents" CollectionLabel="@T("BackToAgents")" Resource="agent" Name="@(agent?.Definition.DisplayName ?? Name)" ResourceType="@T("Agent")" Domain="agent" IconName="agent" Description="@agent?.Definition.Description"
+<ConsoleResourceDetailsTemplate CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/agents", Services)" CollectionLabel="@T("BackToAgents")" Resource="agent" Name="@(agent?.Definition.DisplayName ?? Name)" ResourceType="@T("Agent")" Domain="agent" IconName="agent" Description="@agent?.Definition.Description"
     StatusText="@(agent is null ? null : AgentStatus)" Status="@AgentStatusTone" ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations"
     DefinitionSections="DefinitionSections" NavigationLabel="@T("AgentDetails")" LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="@(loading || deploying)"
     Yaml="@DefinitionYaml" YamlTitle="@(originalSource is null ? Shared["Yaml"] : T("AgentSourceYaml"))" YamlDescription="@T(originalSource is null ? "SavedDefinitionFallback" : "AgentSourceYamlHelp")" YamlLabel="@(originalSource is null ? Shared["Yaml"] : T("OriginalAgentYamlDefinition"))"
@@ -25,8 +25,11 @@
     <Actions>@if (agent is not null && CanPrepareRuntime) { <button class="button-secondary" type="button" @onclick="PrepareRuntimeAsync" disabled="@(deploying || loading)">@DeploymentActionLabel</button> }@if (SafeReturnUrl is { } returnUrl) { <a class="button-secondary" href="@returnUrl" data-testid="namespaced-agent-context-return">@T("ReturnToSource")</a> }</Actions>
     <Feedback>@if (!string.IsNullOrWhiteSpace(deploymentError)) { <div class="form-alert form-alert-danger" role="alert"><strong>@T("DeploymentFailed")</strong><span>@deploymentError</span></div> }@if (!string.IsNullOrWhiteSpace(deploymentMessage)) { <div class="form-alert form-alert-success" role="status"><strong>@T("DeploymentReady")</strong><span>@deploymentMessage</span></div> }</Feedback>
     <OverviewMetrics>@if (agent is not null) { @Metrics }</OverviewMetrics>
-    <OverviewConfiguration>@Configuration</OverviewConfiguration>
-    <OverviewContent><p class="muted">@T("NamespacedProvenance")</p></OverviewContent>
+    <OverviewSummary Context="identity">@if (agent is not null) {
+        <AgentResourceSummary Resource="agent" Identity="identity" RunHref="" ShowModelResolution="false" KnownModelProfileHref="@ModelProfileUrl" KnownRuntimeProfileHref="@RuntimeProfileUrl">
+            <AdditionalContent><p class="muted">@T("NamespacedProvenance")</p></AdditionalContent>
+        </AgentResourceSummary>
+    }</OverviewSummary>
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="inspectionModel" EditContext="FormContext" Id="managed-agent-inspection-form" FormName="managed-agent-inspection"
         Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" Busy="@(loading || deploying)" FieldLabels="FieldLabels" /></DefinitionContent>
 </ConsoleResourceDetailsTemplate>

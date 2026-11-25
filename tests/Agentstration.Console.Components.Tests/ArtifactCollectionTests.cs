@@ -23,7 +23,9 @@ public sealed class ArtifactCollectionTests
         using var context = Context(handler);
         var cut = context.Render<Agentstration.Web.Components.Pages.Artifacts>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("[data-testid=durable-artifact-row]")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll("[data-testid=durable-artifact-preview]"));
+        Assert.AreEqual(2, handler.Requests, "Row actions do not fetch resource details or content.");
         StringAssert.Contains(cut.Find("[data-testid=durable-artifact-row] .collection-identity-cell a").GetAttribute("href")!, "context=%2Finstance");
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());
         Assert.HasCount(5, cut.FindAll("[data-testid=durable-artifact-row]"));

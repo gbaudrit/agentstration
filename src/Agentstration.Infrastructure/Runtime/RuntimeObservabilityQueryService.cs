@@ -34,6 +34,23 @@ public sealed class RuntimeObservabilityQueryService(
         }).OrderBy(value => value.DisplayName, StringComparer.Ordinal).ToArray();
     }
 
+    public async Task<RuntimeWorkerSummaryResponse?> GetWorkerSummaryAsync(Guid workerId, CancellationToken token)
+    {
+        var identity = await identities.GetEnrollmentAsync(workerId, token);
+        if (identity is null) return null;
+        var registration = dispatch.GetRegistration(new RuntimeWorkerId(workerId));
+        var active = await assignments.ListAsync(new RuntimeWorkerAssignmentQuery
+        {
+            WorkerId = new RuntimeWorkerId(workerId),
+            States = new HashSet<RuntimeAssignmentState> { RuntimeAssignmentState.Assigned },
+            Take = 500
+        }, token);
+        var now = timeProvider.GetUtcNow();
+        var count = active.Count(value => value.Value.CurrentAttempt is { State: RuntimeAssignmentAttemptState.Active } attempt
+            && attempt.WorkerId.Value == workerId && attempt.LeaseExpiresAt > now);
+        return Map(identity, registration, count, now);
+    }
+
     public async Task<RuntimeWorkerDetailsResponse?> GetWorkerAsync(Guid workerId, CancellationToken cancellationToken)
     {
         var worker = (await ListWorkersAsync(cancellationToken)).SingleOrDefault(value => value.WorkerId == workerId);

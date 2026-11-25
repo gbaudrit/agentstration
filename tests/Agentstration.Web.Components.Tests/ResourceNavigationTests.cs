@@ -201,6 +201,30 @@ public sealed class ResourceNavigationTests
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
+    [TestMethod]
+    public void DirectPreviewFragmentIsOwnedByTheCollectionWithoutSectionCanonicalization()
+    {
+        const string fragment = "#preview/Tool/%2Finstance/default/example";
+        using var context = Context(fragment);
+        var cut = context.Render<ResourceNavigation>(p => p.Add(c => c.Items, Items()).Add(c => c.DefaultPath, "overview"));
+        Assert.AreEqual("overview", cut.Instance.CurrentPath);
+        Assert.AreEqual(fragment, new Uri(context.Services.GetRequiredService<NavigationManager>().Uri).Fragment);
+        Assert.IsEmpty(context.JSInterop.Invocations.Where(call => call.Identifier == "navigate"));
+        Assert.IsEmpty(cut.FindAll(".resource-navigation-feedback"));
+    }
+    [TestMethod]
+    public async Task EmbeddedPreviewKeepsThePreviouslySelectedNativeSectionMounted()
+    {
+        using var context = Context("#definition/tools");
+        var cut = context.Render<ResourceNavigation>(p => p.Add(c => c.Items, Items()).Add(c => c.DefaultPath, "overview"));
+        var nav = context.Services.GetRequiredService<NavigationManager>();
+        var before = context.JSInterop.Invocations.Count(call => call.Identifier == "navigate");
+        await cut.InvokeAsync(() => nav.NavigateTo(nav.Uri.Split('#')[0] + "#preview/Tool/%2Finstance/default/example"));
+        Assert.AreEqual("definition/tools", cut.Instance.CurrentPath);
+        Assert.AreEqual(before, context.JSInterop.Invocations.Count(call => call.Identifier == "navigate"));
+        Assert.IsEmpty(cut.FindAll(".resource-navigation-feedback"));
+    }
+
     private static ResourceNavigationItem[] Items() =>
     [
         new("overview", "Overview", "home"),

@@ -17,13 +17,26 @@
     <Navigation>
         <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a class="active" href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
     </Navigation>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(CategoryUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(CategoryUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="tool-category-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ToolResourceKinds.ToolCategory" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ToolCategoryResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(ToolCategoryResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(ToolCategoryResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, ToolResourceKinds.ToolCategory, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/tools/categories", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/tools/categories/new")">@T("Create")</a></PermissionGate> : null;
-    private CollectionColumn<ToolCategoryResource> IdentityColumn => new("identity", T("Category"), category => @<CollectionIdentity DisplayName="@category.Definition.DisplayName" Namespace="@category.Namespace.Value" Name="@category.Name" Href="@CategoryUrl(category)" IconName="layers">
+    private CollectionColumn<ToolCategoryResource> IdentityColumn => new("identity", T("Category"), category => @<CollectionIdentity DisplayName="@category.Definition.DisplayName" Namespace="@category.Namespace.Value" Name="@category.Name" Href="@(CategoryUrl(category) + "#overview")" IconName="layers">
         <IconBadges><ResourceScopeBadge ScopeRef="category.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@category.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(category.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>);
     private IReadOnlyList<CollectionColumn<ToolCategoryResource>> Columns =>

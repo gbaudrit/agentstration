@@ -243,6 +243,10 @@ public sealed partial class ModelDetailsTests
         public Task<ResourceSnapshot<ModelResource>>? PendingRead { get; set; }
         public string ReadEtag { get; set; } = "\"model-etag\"";
 
+        public Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+            owner == ResourceScopeRef.Instance ? GetModelAsync(ns, name, token)
+                : Task.FromException<ResourceSnapshot<ModelResource>>(new AgentstrationApiException("Missing exact model", "preview", HttpStatusCode.NotFound));
+
         public Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace @namespace, string modelName, CancellationToken cancellationToken)
         {
             RequestedNamespace = @namespace;

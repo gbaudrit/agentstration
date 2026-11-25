@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using System.Net.Http.Json;
+using Agentstration.Agents;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Web.Components;
@@ -132,6 +134,57 @@ public sealed class CleanupConsoleTests
         Assert.AreEqual(handler.Requests[0].Path, handler.Requests[1].Path);
         StringAssert.EndsWith(handler.Requests[1].Path, "scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         Assert.AreEqual("\"current\"", handler.Requests[1].IfMatch);
+    }
+
+    [TestMethod]
+    public async Task ResourceCandidatePreviewReadsOnlyTheSelectedExactResource()
+    {
+        using var context = CreateContext(AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesDelete, AuthorizationPermissions.RunsDelete);
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        var fixture = Inventory();
+        var candidate = fixture.Agents.Single() with { ScopeRef = ResourceScopeRef.Instance };
+        var cleanup = new FakeCleanupApiClient(fixture with { Agents = [candidate] });
+        context.Services.AddSingleton<ICleanupApiClient>(cleanup);
+        using var handler = new PreviewHandler(candidate);
+        context.Services.AddSingleton<IManagementApiClient>(new ManagementApiClient(Client(handler)));
+        var rendered = context.Render<Cleanup>();
+        Assert.AreEqual(0, handler.Reads);
+        Assert.IsEmpty(rendered.FindComponents<AgentResourcePreview>());
+        await rendered.Find("[data-testid=cleanup-resource-preview]").ClickAsync(new());
+        Assert.AreEqual(1, handler.Reads);
+        Assert.AreEqual("/api/namespaces/team-a/agents/agent-1?scopeRef=%2Finstance", handler.Path);
+        Assert.HasCount(1, rendered.FindComponents<AgentResourceSummary>());
+        Assert.IsEmpty(rendered.FindAll("[data-testid=agent-preview-edit]"));
+        Assert.AreEqual(1, cleanup.LoadCount);
+        Assert.IsEmpty(cleanup.Deleted);
+    }
+    private sealed class PreviewHandler(CleanupCandidate candidate) : HttpMessageHandler
+    {
+        public int Reads { get; private set; }
+        public string? Path { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Reads++; Path = request.RequestUri!.PathAndQuery;
+            Assert.AreEqual(HttpMethod.Get, request.Method);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Headers = { ETag = new("\"preview\"") },
+                Content = JsonContent.Create(new AgentResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = AgentResourceKinds.Agent,
+                    Metadata = new() { Name = candidate.Id, Namespace = candidate.Namespace },
+                    ScopeRef = candidate.ScopeRef,
+                    Uid = Guid.NewGuid(),
+                    Definition = new()
+                    {
+                        DisplayName = candidate.DisplayName,
+                        Instructions = "saved instructions",
+                        ModelProfile = new("profile", ResourceScopeRef.Instance)
+                    }
+                })
+            });
+        }
     }
 
     private static BunitContext CreateContext(params string[] permissions)

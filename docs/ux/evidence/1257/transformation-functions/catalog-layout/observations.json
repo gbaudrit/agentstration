@@ -1,0 +1,6 @@
+{
+  "testedCommit": "1e52fb3e06c303b4ad32e10398edef214c1f780b",
+  "currentObservations": "../observations.json",
+  "historicalObservations": "../history/before-visual-revalidation/catalog-layout/observations.json",
+  "newGridScreenshots": 70
+}

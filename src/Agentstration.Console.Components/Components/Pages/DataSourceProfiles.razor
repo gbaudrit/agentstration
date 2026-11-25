@@ -16,13 +16,26 @@
                             EmptyTitle="@T("Profiles")" EmptyMessage="@T("EmptyProfiles")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
                             OnRefresh="LoadAsync" OnRetry="RetryAsync">
     <Actions><a class="button-secondary" href="@ResourceOwnershipContext.PreserveNavigation("/data-sources", Services)">@T("DataSources")</a></Actions>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(Url(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(Url(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="data-source-profile-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@DataSourceResourceKinds.DataSourceProfile" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><DataSourceProfileResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(DataSourceProfileResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(DataSourceProfileResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, DataSourceResourceKinds.DataSourceProfile, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/data-source-profiles", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key) => Localizer[key];
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/data-source-profiles/new", Services)">@T("Create")</a></PermissionGate> : null;
-    private CollectionColumn<DataSourceProfileResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Url(item)" IconName="database" Domain="data">
+    private CollectionColumn<DataSourceProfileResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@(Url(item) + "#overview")" IconName="database" Domain="data">
         <Versions><CollectionVersion Label="@T("PublishedVersion")" Value="@(item.PublishedVersion ?? item.ActiveVersion)" /></Versions>
         <IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>);
@@ -46,5 +59,5 @@
     private ExtensionManagedResourceOwner? Owner(DataSourceProfileResource item) => item.ScopeRef is { } scope
         ? ExtensionManagedResourceOwner.Find(extensions, item.Governance, scope, item.Namespace, item.Kind, item.Name, item.Uid)
         : null;
-    private static string Url(DataSourceProfileResource item) => $"/data-source-profiles/{Uri.EscapeDataString(item.Name)}?namespace={Uri.EscapeDataString(item.Namespace.Value)}&scopeRef={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(item.ScopeRef!.Value.Value)}";
+    private string Url(DataSourceProfileResource item) => ResourceOwnershipContext.Resource(Services, "/data-source-profiles", item.Name, item.Namespace, item.ScopeRef);
 }

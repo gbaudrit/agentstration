@@ -1,0 +1,28 @@
+.data-source-queries {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.data-source-queries ::deep .collection-identity {
+    align-items: center;
+    width: 100%;
+}
+
+.data-source-queries ::deep .collection-identity-indicators {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.data-source-queries ::deep .data-grid {
+    table-layout: fixed;
+    min-width: 36rem;
+}
+
+.data-source-queries ::deep .data-grid th:first-child {
+    width: auto;
+}
+
+.data-source-queries ::deep .data-grid th:last-child {
+    width: 8rem;
+}

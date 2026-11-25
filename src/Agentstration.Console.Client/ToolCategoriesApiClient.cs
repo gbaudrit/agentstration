@@ -11,6 +11,8 @@ public interface IToolCategoriesClient
 {
     Task<IReadOnlyList<ToolCategoryResource>> GetCategoriesAsync(CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(string name, CancellationToken cancellationToken = default);
+    Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token = default) =>
+        throw new NotSupportedException("This client does not support exact scoped Tool Category reads.");
     Task<IReadOnlyList<ToolCategoryMember>> GetMembersAsync(string name, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<ToolCategoryResource>> CreateCategoryAsync(CreateToolCategoryRequest request, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<ToolCategoryResource>> UpdateCategoryAsync(string name, PutToolCategoryRequest request, string etag, CancellationToken cancellationToken = default);
@@ -33,6 +35,9 @@ public sealed class ToolCategoriesApiClient(HttpClient httpClient) : IToolCatego
 
     public Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(string name, CancellationToken cancellationToken = default) =>
         SendAsync(HttpMethod.Get, Path(name), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token = default) =>
+        SendAsync(HttpMethod.Get, NamespacedPath(Path(name), ns) + (ns.IsDefault ? "?" : "&") + $"scopeRef={Uri.EscapeDataString(owner.Value)}", null, null, token);
 
     public async Task<IReadOnlyList<ToolCategoryMember>> GetMembersAsync(string name, CancellationToken cancellationToken = default) =>
         (await ApiResponse.ReadAsync<ValueResponse<ToolCategoryMember>>(httpClient, $"{Path(name)}/members", cancellationToken)).Value;

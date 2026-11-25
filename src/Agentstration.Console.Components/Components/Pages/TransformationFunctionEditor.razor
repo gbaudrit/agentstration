@@ -35,19 +35,7 @@ else
 
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics>@if (original is not null) { <MetricCard Label="@T("Versions")" Value="@original.Definition.Versions.Count.ToString()" Detail="@T("ImmutableHelp")" /> }</OverviewMetrics>
-        <OverviewConfiguration>@Configuration</OverviewConfiguration>
-        <OverviewContent>@Contracts
-    @if (original?.Definition.Versions.Any(v => v.TransformationSnapshot is not null) == true)
-    {
-        <section class="panel form-section function-transformation-evidence" data-testid="function-transformation-evidence">
-            <h2>@T("TransformationEvidence")</h2><p>@T("TransformationPinnedHelp")</p>
-            @foreach (var item in original.Definition.Versions.Where(v => v.TransformationSnapshot is not null))
-            {
-                <details><summary>@item.Version</summary><pre>@JsonSerializer.Serialize(item.TransformationSnapshot, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })</pre></details>
-            }
-        </section>
-    }
-        </OverviewContent>
+        <OverviewSummary Context="identity">@if (original is not null) { <TransformationFunctionResourceSummary Resource="original" Identity="identity"><AdditionalContent>@Contracts</AdditionalContent></TransformationFunctionResourceSummary> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="transformation-function-form" FormName="transformation-function" data-resource-etag="@etag"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" Disabled="@(!interactive)" ReadOnly="@(!CanEdit)" /></DefinitionContent>
         <DraftActions><button type="button" class="button-secondary" @onclick="Discard" disabled="@(busy || refreshing)">@Shared["Discard"]</button><button type="submit" form="transformation-function-form" class="button-primary" disabled="@(busy || refreshing)" data-testid="function-save">@T("Save")</button></DraftActions>
@@ -77,7 +65,6 @@ else
     </FormGrid><p>@T("ImmutableHelp")</p>@DraftContracts</FormSection>;
     private RenderFragment DraftContracts => @<div>@if (Selected is { } selected) { <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" /><FormSection Title="@T("InputSchema")"><SchemaDocumentEditor Value="selected.InputSchema" ReadOnly="true" /></FormSection><FormSection Title="@T("OutputSchema")"><SchemaDocumentEditor Value="selected.OutputSchema" ReadOnly="true" /></FormSection> }</div>;
     private RenderFragment Contracts => @<div>@if (SavedImplementation is { } selected) { <FunctionDescription ImplementationId="@selected.Id" BuiltIn="true" /><FormSection Title="@T("InputSchema")"><pre class="runner-json">@JsonSerializer.Serialize(selected.InputSchema, new JsonSerializerOptions { WriteIndented = true })</pre></FormSection><FormSection Title="@T("OutputSchema")"><pre class="runner-json">@JsonSerializer.Serialize(selected.OutputSchema, new JsonSerializerOptions { WriteIndented = true })</pre></FormSection> }</div>;
-    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
     private RenderFragment Review => @<FormSection Title="@Shared["Verification"]"><dl class="resource-details"><dt>@Shared["Identity"]</dt><dd>@model.DisplayName <code>@model.Namespace/@model.Name</code></dd><dt>@T("Version")</dt><dd>@model.Version</dd><dt>@T("Kind")</dt><dd>@model.KindKey</dd><dt>@T("Implementation")</dt><dd>@model.ImplementationKey</dd></dl></FormSection>;
     private RenderFragment DefinitionSection(string path) => path switch { "definition/identity" => Identity, "definition/configuration" => Options, _ => throw new ArgumentOutOfRangeException(nameof(path)) };
     [Parameter] public string Name { get; set; } = "new";
@@ -113,10 +100,6 @@ else
         ? descriptor with { InputSchema = FunctionInvocationSchemas.XmlContent, OutputSchema = mapping.Output.Content } : descriptor;
     private IReadOnlyList<ResourceScopeTargetResponse>? ScopeTargets => model.ScopeRef is { } owner ? [new(owner, owner.Kind, owner.Value, CanEdit)] : null;
     private string T(string key) => Localizer[key];
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => original is null ? [] : [
-        new(T("Enabled"), T(original.Definition.Enabled ? "Enabled" : "Disabled")),
-        new(T("Versions"), string.Join("\n", original.Definition.Versions.Select(v => $"{v.Version} · {v.FunctionKind.ScopeRef ?? original.ScopeRef} · {v.FunctionKind.Namespace ?? original.Namespace}/{v.FunctionKind.Name}@{v.FunctionKind.Version} · {v.Configuration.GetRawText()}")))];
     private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
     {
         ["definition/identity"] = new() { ReadOnly = !CanEdit, HasRequiredFields = true, Fields = [nameof(model.Name), nameof(model.DisplayName), nameof(model.Namespace), nameof(model.ScopeRef), nameof(model.Description), nameof(model.Tags)] },

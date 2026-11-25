@@ -71,6 +71,7 @@
             attachedRoot = target;
         }
         catch (JSDisconnectedException) when (disposed) { }
+        catch (OperationCanceledException) when (disposed) { }
     }
 
     public ValueTask DisposeAsync()
@@ -91,5 +92,6 @@
             attachedRoot = null;
         }
         catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) { }
     }
 }

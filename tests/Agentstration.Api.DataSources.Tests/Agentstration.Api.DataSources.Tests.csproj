@@ -48,6 +48,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../ApiResourceTestFixtures/DataSourceDatasetTestFixture.cs" Link="Fixtures/DataSourceDatasetTestFixture.cs" />
+    <Compile Include="../ApiResourceTestFixtures/StructuredStorageFixture.cs" Link="Fixtures/StructuredStorageFixture.cs" />
     <Compile Include="../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs" Link="Fixtures/ResourceManagementApiTestBase.cs" />
     <Compile Include="../ApiResourceTestFixtures/ResourceServiceFixture.cs" Link="Fixtures/ResourceServiceFixture.cs" />
     <Compile Include="../ApiResourceTestFixtures/RssTransformationTestData.cs" Link="Fixtures/RssTransformationTestData.cs" />

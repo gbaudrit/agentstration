@@ -42,9 +42,7 @@ else
         Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
         Yaml="@SavedYaml" Busy="busy" TestId="resource-runtime-profile-editor" SectionTestIdPrefix="runtime-profile">
         <OverviewMetrics><MetricCard Label="@T("Deployments")" Value="@(usageCount?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? Shared["NotProvided"])" /></OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
-        </CollectionView></OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (resource is not null) { <RuntimeProfileResourceSummary Resource="resource" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="runtime-profile-resource-form" FormName="runtime-profile-editor" FieldsTestId="runtime-profile-definition-fields" data-testid="runtime-profile-form" data-resource-etag="@etag"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
             OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
@@ -172,15 +170,6 @@ else
         if (!valid || !optionsValid || !IdentityComplete) { finish.ReturnToStepId = !IdentityComplete ? "identity" : !ExecutionComplete ? "execution" : "options"; definitionForm?.RequestValidationFocus(); return; }
         await SaveAsync();
     }
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => resource is null ? [] :
-    [
-        new(T("RuntimeType"), resource.Definition.RuntimeType),
-        new(T("SessionMode"), SessionLabel(resource.Definition.Execution.SessionMode)),
-        new(T("ToolInvocation"), ToolInvocationLabel(resource.Definition.Execution.ToolInvocation)),
-        new(T("Streaming"), StreamingLabel(resource.Definition.Execution.Streaming)),
-        new(T("RuntimeOptions"), resource.Definition.RuntimeOptions.Count == 0 ? Shared["NotProvided"] : JsonSerializer.Serialize(resource.Definition.RuntimeOptions, new JsonSerializerOptions { WriteIndented = true }))
-    ];
     private void ShowSection(string path) { if (!IsNew) Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path); }
     protected override void OnAfterRender(bool firstRender) { if (returnAfterDelete is { } destination) { returnAfterDelete = null; Navigation.NavigateTo(destination); return; } if (!firstRender) return; interactive = true; StateHasChanged(); }
     private void Apply(RuntimeProfileResource value, string version)
@@ -218,7 +207,9 @@ else
             loadedKey = $"{addressKey}|{NavigationScope}";
             var ns = ResourceNamespace.Parse(Namespace);
             if (IsNew) { model.Namespace = ns.Value; baseline = Fingerprint; loadState = new(ResourceLoadStatus.Ready); return; }
-            var snapshot = await Client.GetRuntimeProfileAsync(ns, Name!, cancellation.Token);
+            var snapshot = string.IsNullOrWhiteSpace(ScopeRefValue)
+                ? await Client.GetRuntimeProfileAsync(ns, Name!, cancellation.Token)
+                : await Client.GetRuntimeProfileAsync(ns, Name!, ResourceScopeRef.Parse(ScopeRefValue), cancellation.Token);
             if (version != loadVersion) return;
             var value = snapshot.Value;
             if (value.Name != Name || value.Namespace != ns || value.ScopeRef is null || !string.IsNullOrWhiteSpace(ScopeRefValue) && value.ScopeRef != ResourceScopeRef.Parse(ScopeRefValue)) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
@@ -238,7 +229,7 @@ else
         var version = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
         try
         {
-            var snapshot = await Client.GetRuntimeProfileAsync(current.Namespace, current.Name, cancellation.Token);
+            var snapshot = await Client.GetRuntimeProfileAsync(current.Namespace, current.Name, owner, cancellation.Token);
             if (version != loadVersion) return;
             var value = snapshot.Value;
             if (value.Uid != current.Uid || value.ScopeRef != owner || value.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }

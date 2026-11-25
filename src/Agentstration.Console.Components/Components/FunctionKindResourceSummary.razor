@@ -1,0 +1,43 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@using Agentstration.Functions.Contracts
+
+<ResourceSummary TestId="function-kind-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (ShowIdentity)
+    {
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="function-kind-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    }
+    @if (ShowConfiguration)
+    {
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="function-kind-configuration-summary">
+        <ul class="collection-specialized">@foreach (var descriptor in Resource.Definition.Versions)
+                { <li><CollectionIdentity DisplayName="@descriptor.Version" Name="@descriptor.Version" IconName="cube"><Badges><code>@descriptor.Executor</code></Badges></CollectionIdentity><SchemaDocumentEditor Value="descriptor.DefinitionSchema" ReadOnly="true" /></li> }</ul>
+    </FormSection>
+    }
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public FunctionKindResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    [Parameter] public bool ShowIdentity { get; set; } = true;
+    [Parameter] public bool ShowConfiguration { get; set; } = true;
+
+}
