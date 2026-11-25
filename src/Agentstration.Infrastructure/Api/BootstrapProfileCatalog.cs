@@ -16,7 +16,10 @@ internal sealed record BootstrapResourceSource(
 internal sealed record LoadedBootstrapProfile(
     BootstrapProfileSummary Summary,
     string DirectoryPath,
-    IReadOnlyList<BootstrapResourceSource> Resources);
+    IReadOnlyList<BootstrapResourceSource> Resources)
+{
+    public IReadOnlyList<string> ManifestFiles { get; init; } = [];
+}
 
 internal sealed record BootstrapProfileBindingDefinition
 {
@@ -35,6 +38,7 @@ internal sealed record BootstrapProfileDefinition
     public string? Description { get; init; }
     public string TargetScope { get; init; } = "workspace";
     public IReadOnlyList<BootstrapProfileBindingDefinition> Bindings { get; init; } = [];
+    public IReadOnlyList<string>? Resources { get; init; }
 }
 
 public sealed class BootstrapProfileCatalog(
@@ -59,9 +63,7 @@ public sealed class BootstrapProfileCatalog(
         CancellationToken cancellationToken)
     {
         // Only the manifests belonging to the already validated profile are exposed.
-        var files = Directory.EnumerateFiles(profile.DirectoryPath, "*", SearchOption.TopDirectoryOnly)
-            .Where(IsManifest).Select(Path.GetFileName).OfType<string>()
-            .Order(StringComparer.Ordinal).ToArray();
+        var files = profile.ManifestFiles;
         string? yaml = null;
         if (file is not null)
         {
@@ -180,6 +182,7 @@ public sealed class BootstrapProfileCatalog(
         string? description = null;
         var scope = BootstrapProfileScope.Workspace;
         IReadOnlyList<BootstrapProfileBinding> bindings = [];
+        IReadOnlyList<string>? selectedFiles = null;
         var descriptorPath = Path.Combine(profilePath, DescriptorFileName);
         if (File.Exists(descriptorPath))
         {
@@ -199,13 +202,18 @@ public sealed class BootstrapProfileCatalog(
             displayName = string.IsNullOrWhiteSpace(definition.DisplayName) ? profile : definition.DisplayName.Trim();
             description = string.IsNullOrWhiteSpace(definition.Description) ? null : definition.Description.Trim();
             bindings = ValidateBindings(profile, scope, definition.Bindings);
+            selectedFiles = definition.Resources;
         }
 
-        var resourceFiles = Directory.EnumerateFiles(profilePath, "*", SearchOption.TopDirectoryOnly)
-            .Where(IsManifest)
-            .Where(path => !string.Equals(Path.GetFileName(path), DescriptorFileName, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(Path.GetFileName, StringComparer.Ordinal)
-            .ToArray();
+        var available = allFiles.Where(IsManifest).Select(path => Path.GetRelativePath(profilePath, path).Replace('\\', '/')).ToHashSet(StringComparer.Ordinal);
+        if (available.Any(path => path.Contains('/') && Path.GetFileName(path).Equals(DescriptorFileName, StringComparison.OrdinalIgnoreCase)))
+            throw new DeclarativeBootstrapException("bootstrap_nested_profile_invalid");
+        var selected = selectedFiles ?? available.Where(path => !path.Contains('/') && path != DescriptorFileName).Order(StringComparer.Ordinal).ToArray();
+        if (selected.Count > MaximumResourceFilesPerProfile || selected.Distinct(StringComparer.Ordinal).Count() != selected.Count
+            || selected.Any(path => string.IsNullOrEmpty(path) || path.Length > 512 || path.Contains('\\') || path.Contains(':') || path.StartsWith('/')
+                || path.Split('/').Any(segment => segment is "" or "." or "..") || path == DescriptorFileName || !available.Contains(path)))
+            throw new DeclarativeBootstrapException("bootstrap_resource_files_invalid");
+        var resourceFiles = selected.Select(path => Path.Combine(profilePath, path)).ToArray();
         if (resourceFiles.Length > MaximumResourceFilesPerProfile)
             throw new DeclarativeBootstrapException($"Bootstrap profile '{profile}' contains more than {MaximumResourceFilesPerProfile} resource files.");
         var resources = new List<BootstrapResourceSource>();
@@ -214,7 +222,7 @@ public sealed class BootstrapProfileCatalog(
             var documents = await ReadDocumentsAsync(file, profile, cancellationToken);
             for (var index = 0; index < documents.Count; index++)
             {
-                var location = $"{profile}/{Path.GetFileName(file)} document {index + 1}";
+                var location = $"{profile}/{Path.GetRelativePath(profilePath, file).Replace('\\', '/')} document {index + 1}";
                 ValidateEnvelope(documents[index], location);
                 resources.Add(new(documents[index], location));
                 if (resources.Count > MaximumDocumentsPerProfile)
@@ -222,6 +230,8 @@ public sealed class BootstrapProfileCatalog(
             }
         }
 
+        if (resources.GroupBy(item => (item.Resource.Kind, item.Resource.Metadata.Namespace, item.Resource.Metadata.Name)).Any(group => group.Count() > 1))
+            throw new DeclarativeBootstrapException("bootstrap_resource_identity_duplicate");
         var hash = Convert.ToHexString(digest.GetHashAndReset()).ToLowerInvariant();
         return new(
             new(profile, displayName, description, scope, resourceFiles.Length, resources.Count, hash, bindings)
@@ -231,7 +241,10 @@ public sealed class BootstrapProfileCatalog(
                         item.Resource.Definition.TryGetProperty("tenantRef", out var tenant) && tenant.TryGetProperty("name", out var name) ? name.GetString() : null)).ToArray()
             },
             profilePath,
-            resources);
+            resources)
+        {
+            ManifestFiles = (File.Exists(descriptorPath) ? new[] { DescriptorFileName }.Concat(selected) : selected).ToArray()
+        };
     }
 
     private async Task<IReadOnlyList<BootstrapResourceDocument>> ReadDocumentsAsync(

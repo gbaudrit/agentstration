@@ -759,7 +759,7 @@ remote fetch is added. See [worker prerequisites and contracts](../../reference/
 
 ### Workspace seed initialization
 
-A bounded ZIP or raw HTTPS JSON pointer is ingested into private Workspace/actor-pinned Source artifact
+A bounded ZIP or raw HTTPS YAML pointer is ingested into private Workspace/actor-pinned Source artifact
 receipts. Existing Bootstrap parsing, materialization, preview/digests, configured inputs, family handlers
 and the durable manual worker perform Workspace-only initialization. Installed extension/model/runtime
 capabilities and current grants are prerequisites. Protected relay publications and Project sharing

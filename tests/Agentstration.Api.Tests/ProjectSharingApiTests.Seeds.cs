@@ -35,14 +35,14 @@ public sealed partial class ProjectSharingApiTests
         var target = new BootstrapApplicationTarget(host.Context.TenantId, host.Context.WorkspaceId);
         var participant = Guid.NewGuid();
         var import = await SeedSharedPlanAsync(native, participant);
-        var bytes = SeedArchive(native, host.Tool, import);
+        var bytes = SeedArchive(native, host.Tool, import, nestedFlow: true);
         using (host.Scope()) await SeedPrerequisitesAsync(host);
         using var ingestion = await host.Http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(), target, Convert.ToBase64String(bytes)));
         Assert.AreEqual(HttpStatusCode.Created, ingestion.StatusCode, await ingestion.Content.ReadAsStringAsync());
         var receipt = (await ingestion.Content.ReadFromJsonAsync<WorkspaceSeedReceipt>())!;
         ((HandlerFactory)host.Host.Services.GetRequiredService<IHttpMessageHandlerFactory>()).SeedContent = bytes;
-        var pointer = new WorkspaceSeedPointer("1.0", new("https://seed.example/content.zip"), receipt.Provenance.ArchiveDigest);
-        using var minimalResponse = await host.Http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(), target, Document: JsonSerializer.Serialize(pointer, Json)));
+        var pointer = new WorkspaceSeedPointer(WorkspaceSeedFormat.Version, new("https://seed.example/content.zip"), receipt.Provenance.ArchiveDigest);
+        using var minimalResponse = await host.Http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(), target, Document: ResourceManifestSerializer.ToYaml(pointer)));
         Assert.AreEqual(HttpStatusCode.Created, minimalResponse.StatusCode, await minimalResponse.Content.ReadAsStringAsync());
         var minimal = (await minimalResponse.Content.ReadFromJsonAsync<WorkspaceSeedReceipt>())!;
         Assert.AreEqual(receipt.Profile.Digest, minimal.Profile.Digest);
@@ -205,9 +205,9 @@ public sealed partial class ProjectSharingApiTests
                 [new(ResourceScopeRef.Workspace(host.Context.WorkspaceId), [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
         await RegisterSeedWorkerAsync(host);
     }
-    private static byte[] SeedArchive(AuthenticatedGitFixture native, ToolResource source, WorkspaceSeedPlanImport import)
+    private static byte[] SeedArchive(AuthenticatedGitFixture native, ToolResource source, WorkspaceSeedPlanImport import, bool nestedFlow = false)
     {
-        var manifest = new WorkspaceSeedManifest("1.0", "1.0.0", "fixture-v1", "seed", "bootstrap", new("seed-project", default),
+        var manifest = new WorkspaceSeedManifest(WorkspaceSeedFormat.Version, "1.0.0", "fixture-v1", "seed", "bootstrap", new("seed-project", default),
             new([new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.Git", ContributionId = "git.repository" }],
                 [new("seed-model", ResourceScopeRef.Instance)], [new("seed-runtime", ResourceScopeRef.Instance)], new("coding-cli", "1.0", "1.0")))
         { ImportPlans = [import] };
@@ -231,8 +231,8 @@ public sealed partial class ProjectSharingApiTests
         using var output = new MemoryStream();
         using (var zip = new ZipArchive(output, ZipArchiveMode.Create, true))
         {
-            WriteSeed(zip, WorkspaceSeedFormat.ManifestPath, JsonSerializer.Serialize(manifest, Json));
-            WriteSeed(zip, "bootstrap/profile.yaml", "apiVersion: agentstration.io/v1\nkind: BootstrapProfile\nmetadata:\n  name: seed\ndefinition:\n  targetScope: workspace\n");
+            WriteSeed(zip, WorkspaceSeedFormat.ManifestPath, ResourceManifestSerializer.ToYaml(manifest));
+            WriteSeed(zip, "bootstrap/profile.yaml", "apiVersion: agentstration.io/v1\nkind: BootstrapProfile\nmetadata:\n  name: seed\ndefinition:\n  targetScope: workspace\n" + (nestedFlow ? "  resources:\n    - 10-relay.yaml\n    - 20-project.yaml\n    - 30-native.yaml\n    - 40-harness.yaml\n    - flows/coding.yaml\n" : ""));
             WriteSeed(zip, "bootstrap/10-relay.yaml", SeedResource("ToolDefinition", "seed-sharing", relay));
             WriteSeed(zip, "bootstrap/20-project.yaml", SeedResource("ProjectSharing", "seed-project", new
             {
@@ -247,7 +247,7 @@ public sealed partial class ProjectSharingApiTests
             { version = "1.0.0", profile = harness }));
             var runtime = new RuntimeFlowDefinition("coding-cli", "1.0", "1.0", JsonSerializer.SerializeToElement(
                 new CodingExecutionConfiguration(new("seed-runtime", default), new("seed-coder", default, "1.0.0", digest), "example/fixture"), Json));
-            WriteSeed(zip, "bootstrap/50-flow.yaml", SeedResource("Flow", "seed-code", new
+            WriteSeed(zip, nestedFlow ? "bootstrap/flows/coding.yaml" : "bootstrap/50-flow.yaml", SeedResource("Flow", "seed-code", new
             { version = "1.0.0", spec = JsonSerializer.SerializeToElement<FlowDefinition>(runtime, Json), publish = true, activate = true }));
         }
         return output.ToArray();

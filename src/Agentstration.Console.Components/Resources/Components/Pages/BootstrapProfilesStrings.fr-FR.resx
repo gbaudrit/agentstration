@@ -104,10 +104,10 @@
   <data name="LoadingSourceFiles" xml:space="preserve"><value>Chargement des fichiers du profil…</value></data>
   <data name="SourceFile" xml:space="preserve"><value>Fichier du profil</value></data>
   <data name="Seed.Title" xml:space="preserve"><value>Initialiser un Workspace depuis une amorce</value></data>
-  <data name="Seed.Help" xml:space="preserve"><value>Sélectionnez un Workspace existant et fournissez une seule entrée : un paquet ZIP (4 Mio maximum), un document pointeur JSON brut ou son URL HTTPS publique. Les capacités installées et les autorisations doivent être disponibles.</value></data>
+  <data name="Seed.Help" xml:space="preserve"><value>Sélectionnez un Workspace existant et fournissez une seule entrée : un paquet ZIP (4 Mio maximum), un document pointeur YAML brut ou son URL HTTPS publique. Les capacités installées et les autorisations doivent être disponibles.</value></data>
   <data name="Seed.Workspace" xml:space="preserve"><value>Workspace cible</value></data>
-  <data name="Seed.Document" xml:space="preserve"><value>Document d’amorce brut (JSON)</value></data>
-  <data name="Seed.Url" xml:space="preserve"><value>URL du document d’amorce (HTTPS .json)</value></data>
+  <data name="Seed.Document" xml:space="preserve"><value>Document d’amorce brut (YAML)</value></data>
+  <data name="Seed.Url" xml:space="preserve"><value>URL du document d’amorce (HTTPS .yaml/.yml)</value></data>
   <data name="Seed.Archive" xml:space="preserve"><value>Paquet d’amorce complet (.zip)</value></data>
   <data name="Seed.Ingest" xml:space="preserve"><value>Inspecter l’amorce</value></data>
   <data name="Seed.Clear" xml:space="preserve"><value>Changer d’amorce</value></data>
@@ -128,7 +128,7 @@
   <data name="Seed.Handover.Pending" xml:space="preserve"><value>Synchronisation en cours</value></data>
   <data name="Seed.Handover.Succeeded" xml:space="preserve"><value>Synchronisé</value></data>
   <data name="Seed.Handover.Failed" xml:space="preserve"><value>Synchronisation incomplète</value></data>
-  <data name="Seed.ProjectRecord" xml:space="preserve"><value>Inspecter le Project {0}/{1} (JSON)</value></data>
+  <data name="Seed.ProjectRecord" xml:space="preserve"><value>Inspecter le Project {0}/{1} (YAML)</value></data>
   <data name="Seed.Revision" xml:space="preserve"><value>Révision partagée</value></data>
   <data name="Seed.ImportedPlans" xml:space="preserve"><value>{0} plans explicitement importés comme brouillons</value></data>
   <data name="Seed.HandoverHelp" xml:space="preserve"><value>Les ressources créées sont conservées. Vérifiez la connexion, puis soumettez une nouvelle prévisualisation et application pour réessayer ; les modifications locales sont préservées.</value></data>

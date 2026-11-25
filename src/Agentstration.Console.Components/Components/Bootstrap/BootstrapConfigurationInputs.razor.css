@@ -1,3 +1,5 @@
 .bootstrap-input-list { display: grid; gap: var(--space-4); min-width: 0; }
 .bootstrap-configuration-input { min-width: 0; }
 .bootstrap-configuration-input p { margin: 0; overflow-wrap: anywhere; }
+.bootstrap-configuration-input ::deep .binding-requirement > .panel-header { flex-wrap: wrap; }
+.bootstrap-configuration-input ::deep .binding-requirement > .panel-header > div:first-child { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }

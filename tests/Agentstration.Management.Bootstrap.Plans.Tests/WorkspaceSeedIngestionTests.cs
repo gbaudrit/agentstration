@@ -7,6 +7,7 @@ using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Microsoft.AspNetCore.Hosting;
@@ -31,7 +32,7 @@ public sealed class WorkspaceSeedIngestionTests
         var request = new IngestWorkspaceSeedRequest(Guid.NewGuid(), target, Convert.ToBase64String(bytes));
         var full = await IngestAsync(http, request);
         var pointer = new WorkspaceSeedPointer(WorkspaceSeedFormat.Version, new("https://seed.example/content.zip"), Digest(bytes));
-        var minimal = await IngestAsync(http, new(Guid.NewGuid(), target, Document: JsonSerializer.Serialize(pointer, Json)));
+        var minimal = await IngestAsync(http, new(Guid.NewGuid(), target, Document: ResourceManifestSerializer.ToYaml(pointer)));
         Assert.AreEqual(full.Provenance.ArchiveDigest, minimal.Provenance.ArchiveDigest);
         Assert.AreEqual(full.Profile.Digest, minimal.Profile.Digest);
         Assert.AreEqual(JsonSerializer.Serialize(full.Manifest, Json), JsonSerializer.Serialize(minimal.Manifest, Json));
@@ -58,6 +59,10 @@ public sealed class WorkspaceSeedIngestionTests
         { Seed = pin, Target = target });
         Assert.AreEqual(HttpStatusCode.OK, filesResponse.StatusCode, await filesResponse.Content.ReadAsStringAsync());
         Assert.HasCount(2, (await filesResponse.Content.ReadFromJsonAsync<BootstrapProfileFiles>())!.Files);
+        using var nested = await http.PostAsJsonAsync("/api/bootstrap/profiles/files", new BootstrapProfileFilesRequest(full.Profile.Name,
+            "connections/project.yaml", ExpectedDigest: full.Profile.Digest) { Seed = pin, Target = target });
+        Assert.AreEqual(HttpStatusCode.OK, nested.StatusCode, await nested.Content.ReadAsStringAsync());
+        Assert.Contains("ProjectSharing", (await nested.Content.ReadFromJsonAsync<BootstrapProfileFiles>())!.Yaml!);
         using var accepted = await http.PostAsJsonAsync("/api/bootstrap/applications", new ApplyBootstrapProfilesRequest([], preview.Digest, target,
             RequestId: Guid.NewGuid())
         { Seed = pin });
@@ -94,20 +99,51 @@ public sealed class WorkspaceSeedIngestionTests
             services.AddHttpClient("workspace-seed-ingestion").ConfigurePrimaryHttpMessageHandler(() => remote)));
         var actor = await host.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         using var http = host.CreateClient(); var target = new BootstrapApplicationTarget(actor.TenantId, actor.WorkspaceId);
-        _ = await IngestAsync(http, new(Guid.NewGuid(), target, DocumentUrl: new("https://seed.example/seed.json")));
+        _ = await IngestAsync(http, new(Guid.NewGuid(), target, DocumentUrl: new("https://seed.example/seed.yaml")));
         Assert.AreEqual(2, remote.Calls);
         foreach (var url in new[] { "http://127.0.0.1/content.zip", "https://127.0.0.1/content.zip", "https://seed.example/", "https://seed.example/content.zip?token=private" })
         {
             using var rejected = await http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(), target,
-                Document: JsonSerializer.Serialize(new WorkspaceSeedPointer("1.0", new(url), Digest(remote.Bytes)), Json)));
+                Document: ResourceManifestSerializer.ToYaml(new WorkspaceSeedPointer(WorkspaceSeedFormat.Version, new(url), Digest(remote.Bytes)))));
             Assert.AreEqual(HttpStatusCode.BadRequest, rejected.StatusCode);
             Assert.Contains("seed_url_invalid", await rejected.Content.ReadAsStringAsync());
         }
         Assert.AreEqual(2, remote.Calls, "Unsafe URLs must fail before making a request.");
         using var mismatch = await http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(), target,
-            Document: JsonSerializer.Serialize(new WorkspaceSeedPointer("1.0", new("https://seed.example/content.zip"), new string('0', 64)), Json)));
+            Document: ResourceManifestSerializer.ToYaml(new WorkspaceSeedPointer(WorkspaceSeedFormat.Version, new("https://seed.example/content.zip"), new string('0', 64)))));
         Assert.AreEqual(HttpStatusCode.BadRequest, mismatch.StatusCode);
         Assert.Contains("seed_integrity_mismatch", await mismatch.Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
+    [DataRow("../connections/project.yaml")]
+    [DataRow("/connections/project.yaml")]
+    [DataRow("missing.yaml")]
+    [DataRow("profile.yaml")]
+    public async Task ExplicitNestedCompositionRejectsUnsafeMissingAndDescriptorSelections(string selection)
+    {
+        await using var host = LoadTestFactory();
+        var actor = await host.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        using var http = host.CreateClient();
+        using var response = await http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(),
+            new(actor.TenantId, actor.WorkspaceId), Convert.ToBase64String(Archive(selectedResource: selection))));
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("seed_profile_invalid", await response.Content.ReadAsStringAsync());
+    }
+
+    [TestMethod]
+    [DataRow("formatVersion: \"2.0\"\nformatVersion: \"2.0\"")]
+    [DataRow("formatVersion: \"2.0\"\nunknown: value")]
+    [DataRow("formatVersion: &version \"2.0\"")]
+    public async Task SeedPointersUseTheStrictYamlContract(string document)
+    {
+        await using var host = LoadTestFactory();
+        var actor = await host.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        using var http = host.CreateClient();
+        using var response = await http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(),
+            new(actor.TenantId, actor.WorkspaceId), Document: document));
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("seed_content_invalid", await response.Content.ReadAsStringAsync());
     }
 
     private static async Task<WorkspaceSeedReceipt> IngestAsync(HttpClient http, IngestWorkspaceSeedRequest request)
@@ -118,17 +154,17 @@ public sealed class WorkspaceSeedIngestionTests
         return (await response.Content.ReadFromJsonAsync<WorkspaceSeedReceipt>())!;
     }
 
-    private static byte[] Archive(string scope = "workspace", bool traversal = false)
+    private static byte[] Archive(string scope = "workspace", bool traversal = false, string selectedResource = "connections/project.yaml")
     {
-        var manifest = new WorkspaceSeedManifest("1.0", "1.0.0", "fixture-v1", "workspace-coding", "bootstrap", new("fixture", default),
+        var manifest = new WorkspaceSeedManifest(WorkspaceSeedFormat.Version, "1.0.0", "fixture-v1", "workspace-coding", "bootstrap", new("fixture", default),
             new([new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.Git", ContributionId = "git.repository" }], [new("seed-model", ResourceScopeRef.Instance)], [new("coding-local", ResourceScopeRef.Instance)],
                 new("coding-cli", "1.0", "1.0")));
         using var memory = new MemoryStream();
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, true))
         {
-            Write(zip, WorkspaceSeedFormat.ManifestPath, JsonSerializer.Serialize(manifest, Json));
-            Write(zip, "bootstrap/profile.yaml", $"apiVersion: agentstration.io/v1\nkind: BootstrapProfile\nmetadata:\n  name: workspace-coding\ndefinition:\n  targetScope: {scope}\n");
-            Write(zip, "bootstrap/10-project.yaml", "apiVersion: agentstration.io/v1\nkind: ProjectSharing\nmetadata:\n  name: fixture\ndefinition:\n  projectId:\n    value: 04bf923e-0c0a-4c30-a013-43a9b6ed90a0\n  participantId:\n    value: b7d1e58a-4526-4f6a-9b92-e1577f1be3c8\n  location: shared\n  toolName: agentstration.fixture.v1.0.0\n");
+            Write(zip, WorkspaceSeedFormat.ManifestPath, ResourceManifestSerializer.ToYaml(manifest));
+            Write(zip, "bootstrap/profile.yaml", $"apiVersion: agentstration.io/v1\nkind: BootstrapProfile\nmetadata:\n  name: workspace-coding\ndefinition:\n  targetScope: {scope}\n  resources:\n    - {JsonSerializer.Serialize(selectedResource)}\n");
+            Write(zip, "bootstrap/connections/project.yaml", "apiVersion: agentstration.io/v1\nkind: ProjectSharing\nmetadata:\n  name: fixture\ndefinition:\n  projectId:\n    value: 04bf923e-0c0a-4c30-a013-43a9b6ed90a0\n  participantId:\n    value: b7d1e58a-4526-4f6a-9b92-e1577f1be3c8\n  location: shared\n  toolName: agentstration.fixture.v1.0.0\n");
             if (traversal) Write(zip, "../outside.yaml", "refused");
         }
         return memory.ToArray();
@@ -143,8 +179,8 @@ public sealed class WorkspaceSeedIngestionTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); Calls++;
-            if (request.RequestUri!.AbsolutePath == "/seed.json")
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new WorkspaceSeedPointer("1.0", new("https://seed.example/content.zip"), Digest(bytes))) });
+            if (request.RequestUri!.AbsolutePath == "/seed.yaml")
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ResourceManifestSerializer.ToYaml(new WorkspaceSeedPointer(WorkspaceSeedFormat.Version, new("https://seed.example/content.zip"), Digest(bytes))), Encoding.UTF8, "application/yaml") });
             var content = new ByteArrayContent(bytes); content.Headers.ContentType = new("application/zip");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
         }

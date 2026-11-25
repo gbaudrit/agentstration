@@ -234,7 +234,7 @@ public sealed partial class ProjectSharingApiTests
         var original = SeedArchive(native, git, new(Guid.NewGuid(), new string('a', 64)));
         using var input = new MemoryStream(original); using var zip = new ZipArchive(input, ZipArchiveMode.Read);
         var entries = zip.Entries.ToDictionary(entry => entry.FullName, entry => { using var reader = new StreamReader(entry.Open()); return reader.ReadToEnd(); });
-        var manifest = JsonSerializer.Deserialize<WorkspaceSeedManifest>(entries[WorkspaceSeedFormat.ManifestPath], Json)!;
+        var manifest = ResourceManifestSerializer.FromYamlStrict<WorkspaceSeedManifest>(entries[WorkspaceSeedFormat.ManifestPath]);
         manifest = manifest with
         {
             ImportPlans = [],
@@ -245,7 +245,7 @@ public sealed partial class ProjectSharingApiTests
             new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.GitHub", ContributionId = "github.coding" }]
             }
         };
-        entries[WorkspaceSeedFormat.ManifestPath] = JsonSerializer.Serialize(manifest, Json);
+        entries[WorkspaceSeedFormat.ManifestPath] = ResourceManifestSerializer.ToYaml(manifest);
         var sharing = ResourceManifestSerializer.FromYaml<JsonElement>(entries["bootstrap/10-relay.yaml"]);
         var sharingNode = JsonNode.Parse(sharing.GetRawText())!;
         var shareBindings = sharingNode["definition"]!["bindings"]!.AsArray();

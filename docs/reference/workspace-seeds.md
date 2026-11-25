@@ -2,36 +2,43 @@
 
 An installed instance can initialize an **existing Workspace** without a preconfigured Source or
 Project connector. Under **System > Bootstrap profiles** (`/settings/bootstrap`), select the Workspace
-and supply exactly one ZIP package, raw JSON pointer document, or public HTTPS URL to that JSON.
+and supply exactly one ZIP package, raw YAML pointer document, or public HTTPS URL to that YAML.
 Inspect the content, resolve local inputs, review prerequisites and the exact preview, then apply.
 This uses the ordinary administrative Bootstrap application worker and history.
 
 ## Accepted package
 
-Format `1.0` accepts at most 4 MiB compressed, 32 MiB expanded and 8192 entries. Paths, duplicate/case
+Format `2.0` accepts at most 4 MiB compressed, 32 MiB expanded and 8192 entries. Paths, duplicate/case
 collisions, links and traversal use Source archive validation. Include exactly one `profile.yaml`,
 with `targetScope: workspace`, under the manifest's `path`. The path is relative to the ZIP root.
-The package may contain supporting repository content. A root `agentstration-workspace-seed.json`
+The package may contain supporting repository content. A root `agentstration-workspace-seed.yaml`
 contains, for example:
 
-```json
-{
-  "formatVersion": "1.0",
-  "version": "1.0.0",
-  "providerRevision": "release-1",
-  "profile": "local-coding",
-  "path": "bootstrap",
-  "project": { "name": "shared-project", "namespace": "default" },
-  "requirements": {
-    "contributions": [
-      { "kind": "Tool", "extensionId": "Agentstration.Extensions.Git", "contributionId": "git.repository" }
-    ],
-    "modelProviders": [{ "name": "installed-model", "scopeRef": "/instance" }],
-    "runtimeProfiles": [{ "name": "coding-local", "scopeRef": "/instance" }],
-    "runtime": { "name": "coding-cli", "capabilityVersion": "1.0", "materialVersion": "1.0" }
-  },
-  "importPlans": []
-}
+```yaml
+formatVersion: '2.0'
+version: 1.0.0
+providerRevision: release-1
+profile: local-coding
+path: bootstrap
+project:
+  name: shared-project
+  namespace: default
+requirements:
+  contributions:
+  - kind: Tool
+    extensionId: Agentstration.Extensions.Git
+    contributionId: git.repository
+  modelProviders:
+  - name: installed-model
+    scopeRef: /instance
+  runtimeProfiles:
+  - name: coding-local
+    scopeRef: /instance
+  runtime:
+    name: coding-cli
+    capabilityVersion: '1.0'
+    materialVersion: '1.0'
+importPlans: []
 ```
 
 `version` is semantic version evidence; `providerRevision` identifies the provider's immutable source
@@ -74,17 +81,15 @@ No binaries, models, providers or grants are installed by seeding.
 
 ## Minimal document and HTTP
 
-A JSON pointer is at most 64 KiB:
+A YAML pointer is at most 64 KiB:
 
-```json
-{
-  "formatVersion": "1.0",
-  "archiveUrl": "https://example.org/releases/workspace-seed.zip",
-  "sha256": "<64 lowercase hexadecimal characters>"
-}
+```yaml
+formatVersion: '2.0'
+archiveUrl: https://example.org/releases/workspace-seed.zip
+sha256: <64 lowercase hexadecimal characters>
 ```
 
-Only explicit HTTPS port 443 `.json` and `.zip` URLs are accepted. Credentials, query strings,
+Only explicit HTTPS port 443 `.yaml`/`.yml` and `.zip` URLs are accepted. Credentials, query strings,
 fragments, encoded paths, redirects and private/reserved network destinations are refused. The
 existing Source DNS/IP connection policy is reused. Acquisition has one ten-second deadline and
 bounded streaming reads. A raw repository root is not a recursive source or directory listing.
@@ -116,3 +121,35 @@ plans or admit work. See [ADR-0271](../decisions/0271-workspace-seeds-reuse-pinn
 
 The deferred reusable Console journey is #1350. Its maintainer validation/merge gate still applies;
 it is separate from implementation behavior checks and desktop/mobile smoke.
+
+## Explicit Bootstrap file composition
+
+For nested manifests, declare their exact relative paths in the profile descriptor, in dependency
+order. For example, `bootstrap/profile.yaml` may contain:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: local-coding
+definition:
+  targetScope: workspace
+  resources:
+    - connections/git.yaml
+    - project.yaml
+    - harness/native.yaml
+    - harness/coder.yaml
+    - flows/coding.yaml
+```
+
+Only selected resources are applied. Without `resources`, existing flat profiles retain lexical
+root-file order; nested YAML is not implicitly applied. Duplicate/missing paths, traversal, nested
+profile descriptors and duplicate resource identities are rejected. The source viewer includes the
+descriptor and selected nested paths; the complete profile files remain part of its exact content
+digest. Bootstrap remains the single definition location for Flows; `data/` contains work declarations
+and retained records, never a second Flow definition.
+
+Format 1.0 JSON seeds must be regenerated as format 2.0 YAML packages/pointers. Existing receipts and
+historical artifacts remain private retained evidence; the loader does not silently reinterpret an
+old package. Sharing independently uses its format-2.0 YAML contract. See
+[ADR-0275](../decisions/0275-yaml-seeds-select-explicit-bootstrap-compositions.md).

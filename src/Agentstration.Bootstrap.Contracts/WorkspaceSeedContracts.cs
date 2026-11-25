@@ -6,8 +6,8 @@ namespace Agentstration.Bootstrap.Contracts;
 
 public static class WorkspaceSeedFormat
 {
-    public const string Version = "1.0";
-    public const string ManifestPath = "agentstration-workspace-seed.json";
+    public const string Version = "2.0";
+    public const string ManifestPath = "agentstration-workspace-seed.yaml";
     public const int MaximumArchiveBytes = 4 * 1024 * 1024;
     public const int MaximumExpandedBytes = 32 * 1024 * 1024;
     public const int MaximumEntries = 8192;

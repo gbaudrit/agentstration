@@ -342,3 +342,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 273. [ADR-0273 — Coding delivery retains frozen intents and recovers native effects](0273-coding-delivery-retains-frozen-intents-and-recovers-native-effects.md)
 
 274. [ADR-0274 — Tracking documents use strict versioned YAML](0274-tracking-documents-use-strict-versioned-yaml.md)
+
+275. [ADR-0275 — YAML seeds select explicit Bootstrap compositions](0275-yaml-seeds-select-explicit-bootstrap-compositions.md)

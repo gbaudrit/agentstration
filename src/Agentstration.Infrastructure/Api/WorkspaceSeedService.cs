@@ -67,9 +67,9 @@ public sealed partial class WorkspaceSeedService(IResourceStore resources, IIden
             else
             {
                 var pointerBytes = request.Document is { } text ? Encoding.UTF8.GetBytes(text)
-                    : await DownloadAsync(request.DocumentUrl!, ".json", WorkspaceSeedFormat.MaximumDocumentBytes, cancellation.Token);
+                    : await DownloadAsync(request.DocumentUrl!, ".yaml", WorkspaceSeedFormat.MaximumDocumentBytes, cancellation.Token);
                 documentDigest = Digest(pointerBytes);
-                var pointer = JsonSerializer.Deserialize<WorkspaceSeedPointer>(pointerBytes, Json);
+                var pointer = ResourceManifestSerializer.FromYamlStrict<WorkspaceSeedPointer>(new UTF8Encoding(false, true).GetString(pointerBytes));
                 if (pointer is not { FormatVersion: WorkspaceSeedFormat.Version } || !DigestValue(pointer.Sha256)) throw Invalid("seed_pointer_invalid");
                 archiveUrl = pointer.ArchiveUrl;
                 bytes = await DownloadAsync(archiveUrl, ".zip", WorkspaceSeedFormat.MaximumArchiveBytes, cancellation.Token);
@@ -81,8 +81,8 @@ public sealed partial class WorkspaceSeedService(IResourceStore resources, IIden
             var artifact = await artifacts.SaveAsync(new(digest, "application/zip", bytes, expanded, entries, new("sha256", digest)), cancellation.Token);
             await VerifyArtifactAsync(artifact, cancellation.Token);
             await using var snapshot = await content.OpenAsync(artifact, cancellation.Token);
-            var manifest = JsonSerializer.Deserialize<WorkspaceSeedManifest>(await snapshot.ReadBytesAsync(
-                WorkspaceSeedFormat.ManifestPath, WorkspaceSeedFormat.MaximumDocumentBytes, cancellation.Token), Json);
+            var manifest = ResourceManifestSerializer.FromYamlStrict<WorkspaceSeedManifest>(new UTF8Encoding(false, true).GetString(await snapshot.ReadBytesAsync(
+                WorkspaceSeedFormat.ManifestPath, WorkspaceSeedFormat.MaximumDocumentBytes, cancellation.Token)));
             ValidateManifest(manifest);
             if (snapshot.Paths.Count(path => path.Equals("profile.yaml", StringComparison.OrdinalIgnoreCase)
                     || path.EndsWith("/profile.yaml", StringComparison.OrdinalIgnoreCase)) != 1
@@ -118,7 +118,7 @@ public sealed partial class WorkspaceSeedService(IResourceStore resources, IIden
         catch (DeclarativeBootstrapException exception) when (!exception.Message.StartsWith("seed_", StringComparison.Ordinal)) { throw Invalid("seed_profile_invalid"); }
         catch (HttpRequestException) { throw Invalid("seed_download_unavailable"); }
         catch (SourceRetrievalException) { throw Invalid("seed_artifact_unavailable"); }
-        catch (Exception exception) when (exception is JsonException or FormatException or InvalidDataException or OverflowException or SourceValidationException)
+        catch (Exception exception) when (exception is JsonException or FormatException or InvalidDataException or OverflowException or SourceValidationException or DecoderFallbackException or YamlDotNet.Core.YamlException)
         { throw Invalid("seed_content_invalid"); }
     }
 
@@ -153,7 +153,7 @@ public sealed partial class WorkspaceSeedService(IResourceStore resources, IIden
     private async Task<byte[]> DownloadAsync(Uri url, string suffix, int maximum, CancellationToken token)
     {
         if (url is not { IsAbsoluteUri: true, Scheme: "https", UserInfo.Length: 0, Query.Length: 0, Fragment.Length: 0 }
-            || url.Port != 443 || url.AbsolutePath.Contains('%') || !url.AbsolutePath.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            || url.Port != 443 || url.AbsolutePath.Contains('%') || !(url.AbsolutePath.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) || suffix == ".yaml" && url.AbsolutePath.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))
             || IPAddress.TryParse(url.IdnHost, out var address) && !SourceRegistryNetworkPolicy.IsAddressAllowed(address, false))
             throw Invalid("seed_url_invalid");
         using var client = http.CreateClient(HttpClientName);
@@ -164,7 +164,7 @@ public sealed partial class WorkspaceSeedService(IResourceStore resources, IIden
         if (response.Content.Headers.ContentLength > maximum) throw Invalid("seed_download_size_limit");
         var mediaType = response.Content.Headers.ContentType?.MediaType;
         if (mediaType is not null && mediaType != "application/octet-stream"
-            && !(suffix == ".json" && mediaType == "application/json")
+            && !(suffix == ".yaml" && mediaType is "application/yaml" or "application/x-yaml" or "text/yaml" or "text/x-yaml" or "text/plain")
             && !(suffix == ".zip" && mediaType is "application/zip" or "application/x-zip-compressed")) throw Invalid("seed_media_type_invalid");
         await using var input = await response.Content.ReadAsStreamAsync(token);
         using var output = new MemoryStream(); var buffer = new byte[81920];
