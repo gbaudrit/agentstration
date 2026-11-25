@@ -1,0 +1,116 @@
+{
+  "apiVersion": "agentstration.io/v1",
+  "kind": "Schema",
+  "metadata": {
+    "name": "rss-2-0-mapping"
+  },
+  "definition": {
+    "displayName": "RSS 2.0 XML to feed JSON mapping",
+    "format": "xml-json-transformation",
+    "dialect": "agentstration.io/xml-json-transformation/v1",
+    "content": {
+      "engine": {
+        "name": "xml-to-json-builtin",
+        "version": "1.0.0",
+        "scopeRef": "/instance"
+      },
+      "input": {
+        "name": "rss-2-0-xml",
+        "version": "1.0.0"
+      },
+      "output": {
+        "name": "rss-2-0-json",
+        "version": "1.0.0"
+      },
+      "rules": {
+        "namespaces": {
+          "dc": "http://purl.org/dc/elements/1.1/"
+        },
+        "root": {
+          "path": "/rss",
+          "type": "object",
+          "fields": {
+            "version": {
+              "path": "@version",
+              "type": "string"
+            },
+            "title": {
+              "path": "channel/title",
+              "type": "string"
+            },
+            "link": {
+              "path": "channel/link",
+              "type": "string"
+            },
+            "description": {
+              "path": "channel/description",
+              "type": "string"
+            },
+            "items": {
+              "path": "channel/item",
+              "type": "array",
+              "fields": {
+                "guid": {
+                  "path": "guid",
+                  "type": "string",
+                  "optional": true
+                },
+                "title": {
+                  "path": "title",
+                  "type": "string",
+                  "optional": true
+                },
+                "description": {
+                  "path": "description",
+                  "type": "string",
+                  "optional": true
+                },
+                "publishedAt": {
+                  "path": "pubDate",
+                  "type": "dateTime",
+                  "optional": true
+                },
+                "sourceUrl": {
+                  "path": "source/@url",
+                  "type": "string",
+                  "optional": true
+                },
+                "link": {
+                  "path": "link",
+                  "type": "string",
+                  "optional": true
+                },
+                "sourceTitle": {
+                  "path": "source",
+                  "type": "string",
+                  "optional": true
+                },
+                "creator": {
+                  "path": "dc:creator",
+                  "type": "string",
+                  "optional": true
+                },
+                "guidIsPermaLink": {
+                  "path": "guid/@isPermaLink",
+                  "type": "boolean",
+                  "optional": true
+                }
+              }
+            },
+            "generator": {
+              "path": "channel/generator",
+              "type": "string",
+              "optional": true
+            },
+            "language": {
+              "path": "channel/language",
+              "type": "string",
+              "optional": true
+            }
+          }
+        }
+      }
+    },
+    "publishVersion": "1.0.0"
+  }
+}

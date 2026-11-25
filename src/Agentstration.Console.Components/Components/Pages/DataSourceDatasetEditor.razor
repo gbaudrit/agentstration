@@ -164,6 +164,11 @@
         && operation.Definition.Definition.TryGetProperty(property, out var schema) && schema.ValueKind == JsonValueKind.Object ? schema : null;
     private JsonElement? InputSchema => SelectedType?.Acquisition is { } adapter ? DefinitionSchema(adapter.InputSchemaProperty)
         : HasSavedOperationPin ? readiness?.Dataset?.InputSchema : null;
+    private JsonElement? AcquisitionResponseSchema => model.AcquisitionOutputBinding is null
+        ? SelectedType?.Acquisition is { } adapter ? DefinitionSchema(adapter.OutputSchemaProperty)
+            : HasSavedOperationPin ? readiness?.Dataset?.OperationOutputSchema : null
+        : HasSavedOperationPin && source?.Definition.Dataset?.Acquisition.OutputSchemaBinding == model.AcquisitionOutputBinding
+            ? readiness?.Dataset?.OperationOutputSchema : null;
     private string? AcquisitionIssue => SelectedType is not { } type ? "DatasetOperationTypeUnavailable"
         : type.Acquisition is not { } adapter ? "DatasetOperationAdapterUnavailable"
         : type.Interaction != ConnectedServiceOperationInteraction.RequestResponse
@@ -364,7 +369,7 @@
     </div>;
 
     private RenderFragment TreatmentsContent => @<div class="dataset-step-fields">
-<SourceFlowCompositionEditor @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
+<SourceFlowCompositionEditor AcquisitionOutputSchema="AcquisitionResponseSchema" @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
     </div>;
 
     private RenderFragment ContractsContent => @<div class="dataset-step-fields">
@@ -527,6 +532,7 @@
                 "data_source_retained_storage_required" => "LifecycleStorageRequired",
                 "data_source_lifecycle_invalid" => "LifecycleDurationInvalid",
                 "data_source_direct_permission_required" => "DirectPermission",
+                "data_source_composition_invalid" when compositionErrorCode == "flow_composition_function_input_incompatible" => "SequenceFunctionInputIncompatible",
                 "data_source_composition_invalid" or "data_source_composition_ambiguous" => "SequenceInvalid",
                 "data_source_rule_invalid" => "DatasetPrefixInvalid",
                 _ => "DatasetActionFailed"

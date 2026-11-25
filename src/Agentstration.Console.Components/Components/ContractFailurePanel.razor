@@ -3,17 +3,17 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
 @if (Failure is not null || IsContractCode(Code) || Message is not null)
 {
-    <section class="contract-failure-details @(Compact ? "is-compact" : null)" role="note">
+    <section class="contract-failure-details @(Compact ? "is-compact" : null)" role="note" data-interactive="@(interactive ? "true" : "false")">
         <header class="contract-failure-heading">
             <span class="contract-failure-icon"><UiIcon Name="alert-triangle" /></span>
             <div><strong class="contract-failure-title">@Localizer[TitleKey]</strong>
                 @if (Failure is { } boundaryFailure) { <span class="contract-boundary">@Localizer[BoundaryKey(boundaryFailure.Boundary)]</span> }
             </div>
         </header>
-        <p class="contract-failure-summary">@(IsContract ? Localizer[SummaryKey].Value : Code == "artifact_storage_failed" ? Localizer["FailureSummary.Storage"].Value : Code == "model_output_token_limit" ? Localizer["Error.ModelOutputTokenLimit"].Value : Code == "model_empty_response" ? Localizer["Error.ModelEmptyResponse"].Value : Message)</p>
+        <p class="contract-failure-summary">@(Failure?.Limit is { } limit ? LimitSummary(limit) : IsContract ? Localizer[SummaryKey].Value : Code == "artifact_storage_failed" ? Localizer["FailureSummary.Storage"].Value : Code == "model_output_token_limit" ? Localizer["Error.ModelOutputTokenLimit"].Value : Code == "model_empty_response" ? Localizer["Error.ModelEmptyResponse"].Value : Message)</p>
         @if (Collapsible && (Failure is not null || !IsContract))
         {
-            <button type="button" class="contract-failure-toggle" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="() => expanded = !expanded">@Localizer[IsContract ? (expanded ? "ContractHideDetails" : "ContractShowDetails") : (expanded ? "FailureHideDetails" : "FailureShowDetails")] <UiIcon Name="chevron-down" /></button>
+            <button type="button" class="contract-failure-toggle" disabled="@(!interactive)" aria-expanded="@(expanded ? "true" : "false")" aria-controls="@bodyId" @onclick="() => expanded = !expanded">@Localizer[IsContract ? (expanded ? "ContractHideDetails" : "ContractShowDetails") : (expanded ? "FailureHideDetails" : "FailureShowDetails")] <UiIcon Name="chevron-down" /></button>
         }
         @if (!Collapsible || expanded)
         {
@@ -23,8 +23,23 @@
             @if (!Compact)
             {
                 <dl class="contract-format-comparison">
-                    <div><dt>@Localizer["ContractExpected"]</dt><dd>@ExpectedText @if (ExpectedContract?.MediaType is { } mime) { <code class="contract-mime">@mime</code> }</dd></div>
-                    <div><dt>@Localizer["ContractActual"]</dt><dd>@ActualText</dd></div>
+                    <div><dt>@Localizer["ContractExpected"]</dt><dd>@ExpectedText @if (Failure?.Limit is null && Failure?.Xml is null && ExpectedContract?.MediaType is { } mime) { <code class="contract-mime">@mime</code> }</dd></div>
+                    <div><dt>@Localizer[Failure?.Limit is not null ? "ContractLimit.Measured" : "ContractActual"]</dt><dd>@ActualText</dd></div>
+                </dl>
+            }
+            @if (failure.Xml is { } xml)
+            {
+                <dl class="contract-failure-readable contract-xml-diagnostic">
+                    @if (xml.Schema is { } schema)
+                    { <div><dt>@Localizer["ContractXml.Schema"]</dt><dd><code>@schema.Name · @schema.Version</code></dd></div> }
+                    @if (xml.NodePath is { } nodePath)
+                    { <div><dt>@Localizer["ContractXml.Path"]</dt><dd><code>@nodePath</code></dd></div> }
+                    @if (xml.Line is { } line)
+                    { <div><dt>@Localizer["ContractXml.Location"]</dt><dd>@(xml.Column is { } column ? Localizer["ContractXml.LineColumn", line, column].Value : Localizer["ContractXml.LineOnly", line].Value)</dd></div> }
+                    @if (xml.ExpectedType is { } expectedType)
+                    { <div><dt>@Localizer["ContractXml.Type"]</dt><dd><code>@expectedType</code></dd></div> }
+                    @if (!string.IsNullOrEmpty(xml.ExpectedStructure))
+                    { <div><dt>@Localizer["ContractXml.Structure"]</dt><dd><code>@xml.ExpectedStructure</code></dd></div> }
                 </dl>
             }
             <dl class="contract-failure-readable">
@@ -42,7 +57,10 @@
             @if (!Compact)
             {
                 <p class="contract-data-path"><span>@Localizer["ContractPath"]</span> @(failure.Path == "$" ? Localizer["ContractWholeValue"].Value : failure.Path)</p>
-                <aside class="contract-failure-advice"><strong><UiIcon Name="bulb" />@Localizer["ContractCorrectionTitle"]</strong><p>@Localizer[AdviceKey]</p></aside>
+                <aside class="contract-failure-advice"><strong><UiIcon Name="bulb" />@Localizer["ContractCorrectionTitle"]</strong><p>@Localizer[AdviceKey]</p>
+                    @if (failure.Limit?.Setting is { } setting)
+                    { <p>@Localizer["ContractLimit.Setting"] <code>@setting</code></p> }
+                </aside>
                 <details class="contract-failure-technical">
                     <summary>@Localizer["ContractTechnicalDetails"]</summary>
                     <dl class="details-list">
@@ -53,9 +71,15 @@
                         <dt>@Localizer["ContractExpected"]</dt><dd><code>@failure.Expected</code></dd>
                         <dt>@Localizer["ContractActual"]</dt><dd><code>@failure.Actual</code></dd>
                         <dt>@Localizer["ContractRule"]</dt><dd><code>@failure.Rule</code></dd>
+                        @if (failure.Limit is { } measured)
+                        { <dt>@Localizer["ContractLimit.Measured"]</dt><dd>@LimitValue(measured.Actual, measured.Unit)</dd>
+                          @if (measured.Minimum is { } minimum) { <dt>@Localizer["ContractLimit.Minimum"]</dt><dd>@LimitValue(minimum, measured.Unit)</dd> }
+                          @if (measured.Maximum is { } maximum) { <dt>@Localizer["ContractLimit.Maximum"]</dt><dd>@LimitValue(maximum, measured.Unit)</dd> } }
                         <dt>@Localizer["ContractOrigin"]</dt><dd><code>@failure.Origin</code></dd>
                     </dl>
-                    @if (ExpectedContract is { } contract)
+                    @if (failure.Xml?.Schema is { } nativeSchema)
+                    { <pre>@JsonSerializer.Serialize(nativeSchema, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })</pre> }
+                    else if (ExpectedContract is { } contract)
                     { <pre>@JsonSerializer.Serialize(contract, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })</pre> }
                 </details>
             }
@@ -80,18 +104,23 @@
     [Parameter] public IReadOnlyList<FlowRun> RelatedRuns { get; set; } = [];
     [Parameter] public bool Compact { get; set; }
     [Parameter] public bool Collapsible { get; set; }
-    private bool expanded;
+    private bool expanded, interactive;
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender) { interactive = true; StateHasChanged(); }
+    }
     private readonly string bodyId = "contract-failure-" + Guid.NewGuid().ToString("N");
     private DataContractFailure? Failure => DataContracts.ParseFailure(Details);
     private string? Code => Failure?.Code ?? ErrorCode;
-    public static bool IsContractCode(string? code) => code?.StartsWith("data_contract_", StringComparison.Ordinal) == true
+    public static bool IsContractCode(string? code) => code == "transformation_input_invalid" || code?.StartsWith("data_contract_", StringComparison.Ordinal) == true
         || code is "flow_input_invalid" or "flow_input_required" or "flow_input_type_invalid" or "flow_composition_value_invalid"
             or "tool_argument_type_invalid" or "tool_argument_required" or "tool_argument_unknown"
             or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
     private bool IsJson => Code is "data_contract_json_invalid" or "artifact_processing_json_invalid" or "artifact_processing_input_json_invalid";
     private bool IsContract => Failure is not null || IsContractCode(Code);
-    private string TitleKey => !IsContract ? Code switch { "artifact_storage_failed" => "FailureTitle.Storage", "tool_contract_required" or "tool_contract_stale" => "FailureTitle.ToolContract", _ => "FailureTitle.Execution" } : Code == "data_contract_mapping_unavailable" ? "ContractTitle.Mapping" : IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
-    private string SummaryKey => Code == "artifact_processing_input_json_invalid" ? "Error.ArtifactInputJsonInvalid" : Code == "artifact_processing_json_invalid" ? "Error.ArtifactOutputJsonInvalid" : IsJson ? "ContractSummary.Json" : Code switch
+    private string TitleKey => Failure?.Limit is not null ? "ContractTitle.Limit" : Failure?.Xml is not null || Code == "transformation_input_invalid" ? "ContractTitle.Xml" : !IsContract ? Code switch { "artifact_storage_failed" => "FailureTitle.Storage", "tool_contract_required" or "tool_contract_stale" => "FailureTitle.ToolContract", _ => "FailureTitle.Execution" } : Code == "data_contract_mapping_unavailable" ? "ContractTitle.Mapping" : IsJson || Code is "data_contract_encoding_invalid" or "data_contract_media_mismatch" ? "ContractTitle.Format" : "ContractTitle.Schema";
+    private string SummaryKey => Failure?.Xml is { } xml ? "ContractSummary.Xml." + xml.Kind
+        : Code == "transformation_input_invalid" ? "ContractSummary.Xml.legacy" : Failure?.Rule == "json_schema_instance_length" ? "ContractSummary.LengthLegacy" : Code == "artifact_processing_input_json_invalid" ? "Error.ArtifactInputJsonInvalid" : Code == "artifact_processing_json_invalid" ? "Error.ArtifactOutputJsonInvalid" : IsJson ? "ContractSummary.Json" : Code switch
     {
         "data_contract_mapping_unavailable" => "ContractSummary.Mapping",
         "data_contract_encoding_invalid" => "ContractSummary.Encoding",
@@ -100,14 +129,23 @@
         "data_contract_conflict" => "ContractSummary.Conflict",
         _ => "ContractSummary.Schema"
     };
-    private string AdviceKey => Code == "data_contract_mapping_unavailable" ? "ContractAdvice.Mapping" : IsJson ? "ContractAdvice.Json" : Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp";
+    private string AdviceKey => Failure?.Xml is { } xml ? "ContractAdvice.Xml." + xml.Kind
+        : Failure?.Limit is { Setting: not null } ? "ContractAdvice.OperatorLimit" : Failure?.Limit is not null ? "ContractAdvice.SchemaLimit" : Code == "transformation_input_invalid" ? "ContractAdvice.Xml.legacy" : Failure?.Rule == "json_schema_instance_length" ? "ContractAdvice.SchemaLimit" : Code == "data_contract_mapping_unavailable" ? "ContractAdvice.Mapping" : IsJson ? "ContractAdvice.Json" : Code == "data_contract_unresolved" ? "Error.ContractUnresolved" : "ContractFailureHelp";
     private FlowRun? Producer => RelatedRuns.FirstOrDefault(value => value.Id == Failure?.FlowRunId)
         ?? (Run?.Id == Failure?.FlowRunId ? Run : null);
     private ResolvedDataContract? ExpectedContract => Producer?.Steps.FirstOrDefault(step => step.StepName == Failure?.StepName)?.Contracts?.ExpectedOutput
         ?? Producer?.ContractContext?.ExpectedOutput;
-    private string ExpectedText => IsJson ? Localizer["ContractValue.Json"].Value
+    private string ExpectedText => Failure?.Xml is not null ? Localizer["ContractXml.Expected"].Value : Failure?.Limit is { } limit
+        ? limit.Maximum is { } max && limit.Actual > max ? Localizer["ContractLimit.AtMost", LimitValue(max, limit.Unit)].Value
+            : Localizer["ContractLimit.AtLeast", LimitValue(limit.Minimum!.Value, limit.Unit)].Value
+        : IsJson ? Localizer["ContractValue.Json"].Value
         : HumanValue(Failure?.Expected);
-    private string ActualText => IsJson ? Localizer["ContractValue.InvalidJson"].Value : HumanValue(Failure?.Actual);
+    private string ActualText => Failure?.Xml is { } xml ? Localizer["ContractXml.Actual." + xml.Kind].Value : Failure?.Limit is { } limit ? LimitValue(limit.Actual, limit.Unit) : IsJson ? Localizer["ContractValue.InvalidJson"].Value : HumanValue(Failure?.Actual);
+    private string LimitValue(long value, string unit) => Localizer["ContractLimit.Value",
+        value.ToString("N0", System.Globalization.CultureInfo.CurrentCulture), Localizer["ContractLimit.Unit." + unit].Value].Value;
+    private string LimitSummary(DataContractLimit limit) => Localizer[limit.Maximum is { } max && limit.Actual > max
+        ? "ContractSummary.LimitMaximum" : "ContractSummary.LimitMinimum", LimitValue(limit.Actual, limit.Unit),
+        LimitValue((limit.Maximum is { } maximum && limit.Actual > maximum ? maximum : limit.Minimum)!.Value, limit.Unit)].Value;
     private string HumanValue(string? value) => value switch
     {
         "string" => Localizer["ContractValue.String"], "object" => Localizer["ContractValue.Object"],
@@ -124,6 +162,7 @@
     };
     private static string BoundaryKey(string boundary) => boundary switch
     {
+        "function-input" => "ContractLevel.FunctionInput", "function-output" => "ContractLevel.FunctionOutput",
         "agent-input" => "ContractLevel.AgentInput", "agent-output" => "ContractLevel.AgentOutput",
         "tool-input" => "ContractLevel.ToolInput", "tool-output" => "ContractLevel.ToolOutput",
         "flow-input" => "ContractLevel.FlowInput", "flow-output" => "ContractLevel.FlowOutput",

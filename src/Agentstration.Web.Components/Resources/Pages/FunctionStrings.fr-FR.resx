@@ -47,4 +47,7 @@
   <data name="ResourceIdentityMismatch" xml:space="preserve"><value>La fonction retournée ne correspond pas à l’identité demandée.</value></data>
   <data name="SelectionUnavailable" xml:space="preserve"><value>Le type de fonction ou l’implémentation native sélectionné n’est plus disponible.</value></data>
   <data name="KindInspectionOnly" xml:space="preserve"><value>La définition des types de fonction est consultable ici ; l’activation est gérée depuis le catalogue.</value></data>
+  <data name="Native.xml.to_json.Description" xml:space="preserve"><value>Convertit du XML borné avec des chemins explicites d’éléments et d’attributs, des alias d’espaces de noms et des tableaux stables. Exposez un schéma de transformation pour figer et valider les contrats XSD d’entrée et JSON de sortie.</value></data>
+  <data name="TransformationEvidence" xml:space="preserve"><value>Contrats de transformation acceptés</value></data>
+  <data name="TransformationPinnedHelp" xml:space="preserve"><value>Cette version expose une déclaration de transformation immuable. Adoptez une nouvelle version depuis la page du schéma ; les versions existantes conservent leurs contrats exacts.</value></data>
 </root>

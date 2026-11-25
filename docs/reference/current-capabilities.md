@@ -393,6 +393,8 @@ The Flow console at `/flows` provides creation templates, a four-zone visual des
 
 ### Reusable Schemas
 
+Standalone XSD 1.0 contracts (`xml-xsd`) and independent XML-to-JSON mapping declarations (`xml-json-transformation`) also work locally. Explicit exposure creates a named function with exact declaration/engine/input/output evidence. Declaration-only Bootstrap creates no named function. See [Transformation Schemas](transformation-schemas.md) and ADR-0238 for rules, processing limits and the synthetic RSS example.
+
 The Schema library at `/schemas` owns scoped format-neutral drafts and immutable published versions. The built-in `json-schema` handler supports the 2020-12 dialect without AEP and exposes governed definition and instance validation through `/api/schemas/formats`. Provider selection uses explicit identities, capabilities, availability and default designation; ambiguous providers are rejected instead of being selected by registration order.
 
 The reusable editor offers visual authoring for the bounded common JSON Schema subset, Monaco source editing and instance preview. Definitions using unsupported composition or reference constructs remain source-only and are preserved without a lossy visual round trip. See [Schemas](../concepts/schemas.md) and [ADR-0170](../decisions/0170-schema-format-resolution-is-explicit.md).

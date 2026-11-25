@@ -175,7 +175,8 @@ validated audience snapshot. A successful configuration check does **not** prove
 
 These are acceptance checks for the deployed route. The default
 Python suite tests policy rejection, scope isolation, credential-safe HTTP
-failures, pagination and the trusted-workflow boundary without network access:
+failures, pagination and the trusted-workflow boundary without internet access
+or cloud credentials; HTTP transport regression uses a disposable loopback server:
 
 ```bash
 python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
@@ -214,15 +215,30 @@ Deployment always verifies guest image/source identity, loopback binding,
 connector readiness, observed Azure NIC/NSG ingress and current Access/ingress
 configuration. The optional `test_profile: none` does not disable these gates.
 It then verifies anonymous and invalid-token denial and authenticated readiness
-over HTTPS. Probe requests never follow redirects or export response bodies,
+over HTTPS. All three probe phases send the descriptive
+`User-Agent: Agentstration-Preview-Probe/1.0`, rather than Python's library default;
+the User-Agent identifies the client and grants no authorization.
+Probe requests never follow redirects or export response bodies,
 cookies or credentials. Only then does the result contain the stable HTTPS URL.
 Failed HTTP probes report their phase, numeric HTTP status and, when present,
 the fixed `CF-Mitigated: challenge` marker. Arbitrary header values are withheld. A 401/403
-alone does not identify whether rejection occurred at Access or at the origin
-JWT guard; inspect that distinction before changing credentials. Redirect
+alone does not identify whether rejection occurred at Access, the origin JWT
+guard or another edge security control; inspect that distinction before changing
+credentials. Redirect
 locations, response bodies, cookies and authentication headers remain withheld.
 `status` repeats the protection checks before returning it; an unhealthy/stopped
 guest returns no URL. The result exposes public tunnel/DNS IDs, never tokens.
+
+If a 403 has no matching Access log, inspect the zone's **Security Events** for
+the preview hostname, `/health/ready` and the workflow's time window. Browser
+Integrity Check can reject the default `Python-urllib` User-Agent before Access,
+as observed during route qualification. Cloudflare recommends a descriptive
+[application User-Agent](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/).
+Keep Browser Integrity Check and Access enabled while retrying with the identified
+probe; a missing Access event alone does not establish a credential fault. The
+offline loopback HTTP regression checks the actual headers and authorization
+outcome across anonymous, invalid-token and authenticated requests. Successful
+Cloudflare authentication still requires a live deployed check after merge.
 
 Redeploy withdraws the old DNS record before updating the guest. A failed deploy
 withdraws its owned DNS publication, retains ownership metadata and can be retried.

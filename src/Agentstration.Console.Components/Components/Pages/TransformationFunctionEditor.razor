@@ -90,12 +90,14 @@ else
     private string Fingerprint => JsonSerializer.Serialize(model);
     private bool HasDraft => !loading && baseline.Length > 0 && (Fingerprint != baseline || invalidInput);
     private ResourceScopeRef? RequestedOwner => string.IsNullOrWhiteSpace(ScopeRef) ? ResourceOwnershipContext.TryGetCurrent(Services) : ResourceScopeRef.Parse(ScopeRef);
-    private bool CanEdit => Context.HasPermission("resources/write") && (IsNew || original is not null && !original.Governance.IsManaged && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
+    private bool CanEdit => Context.HasPermission("resources/write") && (IsNew || original is not null && !original.Governance.IsManaged && !original.Definition.Versions.Any(v => v.TransformationSchema is not null) && ResourceOwnershipContext.CanManage(original.ScopeRef, Services));
     private string NavigationScope => ResourceOwnershipContext.TryGetCurrent(Services)?.Value ?? Context.Current?.SelectedScopeRef ?? string.Empty;
     private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/transformation-functions", Services);
     private string SavedYaml => original is null ? string.Empty : ResourceManifestSerializer.ToYaml(original);
-    private NativeFunctionDescriptor? Selected => implementations.FirstOrDefault(item => TransformationFunctionEditorModel.ImplementationIdentity(item) == model.ImplementationKey);
-    private NativeFunctionDescriptor? SavedImplementation => original is null ? null : implementations.FirstOrDefault(item => TransformationFunctionEditorModel.ImplementationIdentity(item) == TransformationFunctionEditorModel.From(original).ImplementationKey);
+    private NativeFunctionDescriptor? Selected => WithContentContracts(implementations.FirstOrDefault(item => TransformationFunctionEditorModel.ImplementationIdentity(item) == model.ImplementationKey));
+    private NativeFunctionDescriptor? SavedImplementation => original is null ? null : WithContentContracts(implementations.FirstOrDefault(item => TransformationFunctionEditorModel.ImplementationIdentity(item) == TransformationFunctionEditorModel.From(original).ImplementationKey));
+    private NativeFunctionDescriptor? WithContentContracts(NativeFunctionDescriptor? descriptor) => descriptor is not null && original?.Definition.Versions.LastOrDefault()?.TransformationSnapshot is { } mapping
+        ? descriptor with { InputSchema = FunctionInvocationSchemas.XmlContent, OutputSchema = mapping.Output.Content } : descriptor;
     private IReadOnlyList<ResourceScopeTargetResponse>? ScopeTargets => model.ScopeRef is { } owner ? [new(owner, owner.Kind, owner.Value, CanEdit)] : null;
     private string T(string key) => Localizer[key];
     private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)

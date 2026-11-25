@@ -15,3 +15,5 @@ dt{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.8rem}dt
 @media(max-width:600px){.contract-failure-details{padding-left:12px}.contract-failure-details.is-compact{padding:12px}.contract-failure-technical dl{grid-template-columns:minmax(0,1fr);gap:4px}.contract-failure-technical dd{margin-bottom:8px}}
 
 .contract-failure-body{display:grid;gap:14px;min-width:0}.contract-failure-toggle{justify-self:start;display:inline-flex;align-items:center;gap:7px;padding:5px 0;border:0;background:transparent;color:var(--primary);font-size:.85rem;cursor:pointer}.contract-failure-toggle .ui-icon{width:15px;height:15px}.contract-failure-toggle[aria-expanded=true] .ui-icon{transform:rotate(180deg)}
+
+.contract-failure-advice code{white-space:pre-wrap;overflow-wrap:anywhere}

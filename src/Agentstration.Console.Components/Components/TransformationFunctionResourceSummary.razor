@@ -1,4 +1,5 @@
 @namespace Agentstration.Web.Components
+@using System.Text.Json
 @using Agentstration.Web.Components.Pages
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
@@ -20,6 +21,16 @@
         <CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>
     </FormSection>
     @AdditionalContent
+    @if (Resource?.Definition.Versions.Any(v => v.TransformationSnapshot is not null) == true)
+    {
+        <section class="panel form-section function-transformation-evidence" data-testid="function-transformation-evidence">
+            <h2>@T("TransformationEvidence")</h2><p>@T("TransformationPinnedHelp")</p>
+            @foreach (var item in Resource.Definition.Versions.Where(v => v.TransformationSnapshot is not null))
+            {
+                <details><summary>@item.Version</summary><pre>@JsonSerializer.Serialize(item.TransformationSnapshot, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true })</pre></details>
+            }
+        </section>
+    }
 </ResourceSummary>
 
 @code {

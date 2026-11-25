@@ -1,0 +1,84 @@
+{
+  "apiVersion": "agentstration.io/v1",
+  "kind": "Schema",
+  "metadata": {
+    "name": "rss-2-0-json"
+  },
+  "definition": {
+    "displayName": "RSS 2.0 feed JSON",
+    "format": "json-schema",
+    "dialect": "https://json-schema.org/draft/2020-12/schema",
+    "content": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "link": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "enum": [
+            "2.0"
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "guid": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sourceUrl": {
+                "type": "string"
+              },
+              "link": {
+                "type": "string"
+              },
+              "sourceTitle": {
+                "type": "string"
+              },
+              "creator": {
+                "type": "string"
+              },
+              "guidIsPermaLink": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "generator": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "link",
+        "description",
+        "version",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "publishVersion": "1.0.0"
+  }
+}
