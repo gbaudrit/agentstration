@@ -50,12 +50,21 @@ a lost registration acknowledgement uses the same Artifact identity. No distribu
 transaction or exactly-once network transport is claimed. Failed/cancelled output
 retains preparation/sealing evidence and is never a successful acquisition.
 
-An explicit retry after a failed publication resumes the same acquisition/root and
-successful checkpoints. A functional error output completes the assignment transport;
-the existing fenced requeue path starts its next attempt. Source/transform failures
-retain the existing new-acquisition retry behavior. Cancellation/timeout never resumes
-a publication automatically. A crash between recording the resumed run and enqueueing
-is recovered through ordinary Pending Flow recovery.
+An explicit retry after a failed publication or interrupted Worker resumes the same
+acquisition/root and successful checkpoints, including partial transformation and
+child-Flow checkpoints. Required children interrupted by the same assignment are
+made resumable before the root is queued; successful children remain unchanged.
+A functional error output completes the assignment transport. Interrupted/failed
+transport uses a separate, explicit mode of the existing fenced assignment requeue,
+restricted to failed Flow targets with material 1.2. The same assignment receives a
+new attempt/fence; old ownership proofs stay invalid. Ordinary successful-suspension
+requeue, capacity rules and Worker scheduling remain unchanged. This covers loss
+before preparation, after registration and after output but before terminal
+acknowledgement, without requiring a failed publication node to exist.
+Functional source/transform failures retain the existing new-acquisition retry
+behavior. Cancellation/timeout never resumes a publication automatically. A crash
+between recording the resumed run and enqueueing is recovered through ordinary
+Pending Flow recovery.
 
 Normal graph progression executes publication immediately. The existing bounded
 assignment, ownership proof, fencing and cancellation remain authoritative. Transient

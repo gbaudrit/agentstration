@@ -68,6 +68,10 @@ public sealed class AwpFlowRunQueue(
                 || run.Value.Status == FlowRunStatus.Pending && run.Value.DefinitionSnapshot.Metadata.GetValueOrDefault("flow.durableGraph") == "true")
                 && existing.Value.State == RuntimeAssignmentState.Succeeded)
                 await assignments.RequeueExactAsync(item.Scope.ScopeRef, existing.Value.Id, cancellationToken);
+            else if (run.Value.Status == FlowRunStatus.Pending
+                && run.Value.DefinitionSnapshot.Metadata.GetValueOrDefault("flow.durableGraph") == "true"
+                && existing.Value.State == RuntimeAssignmentState.Failed)
+                await assignments.RequeueInterruptedFlowExactAsync(item.Scope.ScopeRef, existing.Value.Id, cancellationToken);
             return;
         }
 

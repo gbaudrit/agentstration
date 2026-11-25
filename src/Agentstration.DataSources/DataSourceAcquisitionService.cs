@@ -453,7 +453,8 @@ public sealed class DataSourceAcquisitionService(
         if (!IsTerminal(original.Value.State))
             throw Error("data_source_acquisition_retry_not_terminal", "Only a terminal acquisition can be retried.");
         if (original.Value.Dataset?.DurablePublication == true && datasets is not null
-            && (await flowRuns.GetAsync(context.WorkspaceId, original.Value.FlowRunId, context.TenantId, original.Value.CreatedBy, cancellationToken))?.ProcessingOutput is not null)
+            && await flowRuns.GetAsync(context.WorkspaceId, original.Value.FlowRunId, context.TenantId, original.Value.CreatedBy, cancellationToken) is { } interrupted
+            && (interrupted.ProcessingOutput is not null || interrupted.ErrorCode is "worker_lost" or "worker_execution_failed"))
         {
             await datasets.ValidateExecutionAsync(original.Value, cancellationToken);
             // Admission stays pinned to the same root. Successful source/transform steps are authoritative checkpoints.

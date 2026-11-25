@@ -435,19 +435,34 @@ public sealed class SqliteRuntimeWorkerAssignmentStore(
         CancellationToken cancellationToken) =>
         await RequeueExactAsync(ResourceScopeRef.Workspace(workspaceId.Value), assignmentId, requestedAt, cancellationToken);
 
-    public async Task<StoredRuntimeWorkerAssignment> RequeueExactAsync(
+    public Task<StoredRuntimeWorkerAssignment> RequeueExactAsync(ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId, DateTimeOffset requestedAt, CancellationToken cancellationToken) =>
+        RequeueCoreAsync(scopeRef, assignmentId, requestedAt, false, cancellationToken);
+
+    public Task<StoredRuntimeWorkerAssignment> RequeueInterruptedFlowExactAsync(ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId, DateTimeOffset requestedAt, CancellationToken cancellationToken) =>
+        RequeueCoreAsync(scopeRef, assignmentId, requestedAt, true, cancellationToken);
+
+    private async Task<StoredRuntimeWorkerAssignment> RequeueCoreAsync(
         ResourceScopeRef scopeRef,
         RuntimeAssignmentId assignmentId,
         DateTimeOffset requestedAt,
+        bool interruptedFlow,
         CancellationToken cancellationToken)
     {
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var document = await RequiredAsync(context, scopeRef, assignmentId, cancellationToken);
         var assignment = Deserialize(document).Value;
-        if (assignment.State != RuntimeAssignmentState.Succeeded
-            || assignment.CurrentAttempt?.State != RuntimeAssignmentAttemptState.Succeeded)
+        var eligible = interruptedFlow
+            ? assignment.TargetKind == RuntimeAssignmentTargetKind.FlowRun
+                && assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.DurableGraph
+                && assignment.State == RuntimeAssignmentState.Failed
+                && assignment.CurrentAttempt?.State is RuntimeAssignmentAttemptState.Interrupted or RuntimeAssignmentAttemptState.Failed
+            : assignment.State == RuntimeAssignmentState.Succeeded
+                && assignment.CurrentAttempt?.State == RuntimeAssignmentAttemptState.Succeeded;
+        if (!eligible)
             throw new RuntimeAssignmentException(RuntimeAssignmentErrorCodes.TerminalConflict,
-                "Only a successfully suspended assignment can be requeued.");
+                interruptedFlow ? "Only a failed durable Flow assignment can be resumed." : "Only a successfully suspended assignment can be requeued.");
         assignment = assignment with
         {
             State = RuntimeAssignmentState.Pending,

@@ -13,22 +13,43 @@ public sealed partial class FlowRunService
         var run = stored.Value;
         if (run.Status != FlowRunStatus.Failed || run.DefinitionSnapshot.Metadata.GetValueOrDefault("flow.durableGraph") != "true"
             || run.Steps.SingleOrDefault(step => step.StepName == "transformations")?.Status != FlowStepRunStatus.Succeeded
-            || !run.Steps.Any(step => step.StepName.StartsWith("publication-", StringComparison.Ordinal) && step.Status == FlowStepRunStatus.Failed))
+                && run.Error?.Code is not ("worker_lost" or "worker_execution_failed"))
             throw new FlowValidationException("flow_publication_resume_refused", "Only a failed publication can resume its accepted graph.");
-        var resumed = await SaveAsync(stored, run with
+        var pending = new Queue<string>(Children(run));
+        var visited = new HashSet<string>(StringComparer.Ordinal) { runId };
+        while (pending.TryDequeue(out var childId))
         {
-            Status = FlowRunStatus.Pending,
-            CompletedAt = null,
-            Error = null,
-            Output = null,
-            OutputName = null,
-            OutputOutcome = null,
-            Steps = run.Steps.Select(step => step.Status == FlowStepRunStatus.Failed || step.StepType == "output"
-                ? step with { Status = FlowStepRunStatus.NotStarted, CompletedAt = null, Error = null, Output = null, SelectedTransition = null } : step).ToArray()
-        }, token);
+            if (!visited.Add(childId)) continue;
+            var child = await repository.GetRunExactAsync(run.Scope.ScopeRef, childId, token);
+            if (child is null) continue;
+            if (child.Value.RootFlowRunId != runId)
+                throw new FlowValidationException("flow_root_composition_conflict", "Recovery requires children of the accepted root.");
+            foreach (var nested in Children(child.Value)) pending.Enqueue(nested);
+            if (child.Value.Status == FlowRunStatus.Failed)
+                await repository.UpdateRunAsync(ResumeCheckpoint(child.Value), child.ETag, token);
+        }
+        var resumed = await SaveAsync(stored, ResumeCheckpoint(run), token);
         await EmitAsync(scope.ScopeRef, runId, FlowRunEventType.FlowRunResumed, null,
             JsonSerializer.SerializeToElement(new { reason = "publicationRetry" }), token);
         await queue.EnqueueAsync(new(runId, run.Scope), token);
         return resumed;
     }
+
+    private static IEnumerable<string> Children(FlowRun run) => (run.ReservedDescendantRunIds ?? [])
+        .Concat(run.Steps.SelectMany(step => step.ChildFlowRunIds))
+        .Concat(run.Steps.Where(step => step.ChildFlowRunId is not null).Select(step => step.ChildFlowRunId!));
+
+    private static FlowRun ResumeCheckpoint(FlowRun run) => run with
+    {
+        Status = FlowRunStatus.Pending,
+        CompletedAt = null,
+        Error = null,
+        Output = null,
+        OutputName = null,
+        OutputOutcome = null,
+        ExecutionLeaseId = null,
+        ExecutionLeaseExpiresAt = null,
+        Steps = run.Steps.Select(step => step.Status is FlowStepRunStatus.Failed or FlowStepRunStatus.Skipped || step.StepType == "output"
+            ? step with { Status = FlowStepRunStatus.NotStarted, CompletedAt = null, Error = null, Output = null, SelectedTransition = null } : step).ToArray()
+    };
 }
