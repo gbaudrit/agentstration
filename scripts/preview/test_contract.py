@@ -57,13 +57,21 @@ class ContractTests(unittest.TestCase):
     def test_mutable_digests_wrong_kinds_and_protocols_are_rejected(self):
         for path, invalid in ((("digest",), "latest"), (("sourceSha",), "branch"), (("schemaVersion",), True),
                               (("component", "kind"), "aep-extension"), (("component", "version"), "1.0.0-alpha.01"),
-                              (("component", "awpVersion"), "99.0"), (("component", "executionMaterialVersions"), [["1.0"]])):
+                              (("component", "awpVersion"), "99.0"), (("component", "executionMaterialVersions"), [["1.0"]]),
+                              (("component", "executionMaterialVersions"), ["99.0"])):
             value = request()
             current = value["deliveries"]["worker"]
             for key in path[:-1]:
                 current = current[key]
             current[path[-1]] = invalid
             with self.subTest(path=path), self.assertRaises(ValueError):
+                contract.validate(value)
+
+    def test_durable_material_and_older_delivery_capabilities_are_accepted(self):
+        for versions in (["1.0"], ["1.0", "1.1"], ["1.0", "1.1", "1.2"]):
+            value = request()
+            value["deliveries"]["worker"]["component"]["executionMaterialVersions"] = versions
+            with self.subTest(versions=versions):
                 contract.validate(value)
 
     def test_provider_fields_are_isolated_and_only_ssh_execution_is_unavailable(self):

@@ -92,7 +92,7 @@ def _validate(request):
                     and worker["capabilityVersion"] == "1.0"
                     and isinstance(worker["executionMaterialVersions"], list)
                     and bool(worker["executionMaterialVersions"])
-                    and set(worker["executionMaterialVersions"]) <= {"1.0", "1.1"}, "Unsupported Worker protocol metadata.")
+                    and set(worker["executionMaterialVersions"]) <= {"1.0", "1.1", "1.2"}, "Unsupported Worker protocol metadata.")
     if request["database"] == "postgresql":
         preview.require(preview.POSTGRES_IMAGE.fullmatch(request["postgresImage"]), "PostgreSQL requires an exact supported image digest.")
     target = request["target"]

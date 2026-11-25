@@ -13,5 +13,5 @@
   "awpVersion": "1.0",
   "runtimeKind": "microsoft-agent-framework",
   "capabilityVersion": "1.0",
-  "executionMaterialVersions": ["1.0", "1.1"]
+  "executionMaterialVersions": ["1.0", "1.1", "1.2"]
 }
