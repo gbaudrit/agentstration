@@ -21,12 +21,7 @@
                 <MetricCard Label="@T("Protocol")" Value="@details.Worker.ProtocolVersion" Detail="@T("ProtocolDetail")" Status="@UiStatus.Info" />
                 <MetricCard Label="@T("LastSeen")" Value="@(details.Worker.LastSeenAt?.LocalDateTime.ToString("g") ?? "—")" Detail="@T("ServerObserved")" Status="@PresenceStatus(details.Worker.Presence)" />
             </section>
-            <FormSection Title="@Shared["Identity"]">
-                <dl class="details-list"><dt>@T("Worker")</dt><dd>@details.Worker.DisplayName</dd><dt>@T("WorkerId")</dt><dd><CopyableValue Value="@details.Worker.WorkerId.ToString("D")" /></dd><dt>@T("Session")</dt><dd><code>@(details.Worker.SessionId?.ToString("D") ?? "—")</code></dd><dt>@T("Registered")</dt><dd>@(details.Worker.RegisteredAt?.LocalDateTime.ToString("g") ?? "—")</dd></dl>
-            </FormSection>
-            <FormSection Title="@Shared["Configuration"]" Description="@T("CompatibilityAndCapacity")">
-                <dl class="details-list"><dt>@T("Version")</dt><dd><span>@SoftwareVersion(details.Worker.SoftwareVersion)</span>@if (SoftwareBuild(details.Worker.SoftwareVersion) is { } build) { <small class="worker-build" title="@details.Worker.SoftwareVersion">+@build</small> }</dd><dt>@T("Protocol")</dt><dd>@details.Worker.ProtocolVersion</dd><dt>@T("Capacity")</dt><dd>@(details.Worker.MaximumConcurrentAssignments?.ToString() ?? "—")</dd><dt>@T("Capabilities")</dt><dd>@(details.Worker.Capabilities.Count == 0 ? "—" : string.Join(", ", details.Worker.Capabilities.Select(FormatCapability)))</dd></dl>
-            </FormSection>
+            <RuntimeWorkerResourceSummary Resource="details.Worker" />
         </div>
         <div data-worker-section="assignments" hidden="@(!sectionState.Is("assignments"))">
             <article class="panel worker-assignments" data-testid="runtime-worker-assignments">

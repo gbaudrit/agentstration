@@ -12,15 +12,29 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
-                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="source-provider-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="@SourceResourceKinds.SourceProvider" ContextKey="@contextKey" Enabled="@(hasCatalogAuthorization && contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><SourceProviderResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(SourceProviderSummaryResponse item) => hasCatalogAuthorization && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(SourceProviderSummaryResponse item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, ResourceNamespace.Parse(item.Namespace), SourceResourceKinds.SourceProvider, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/sourceproviders", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key) => Localizer[key];
     private string StatusLabel(string? status) => T($"Status.{StatusValue(status)}");
     // Both endpoints require PlatformAdmin; creation also honors the target context's resource-write restriction.
     private RenderFragment? CreateAction => hasCatalogAuthorization && Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/sourceproviders/new", Services)">@T("CreateProvider")</a> : null;
-    private CollectionColumn<SourceProviderSummaryResponse> IdentityColumn => new("identity", T("Provider"), provider => @<CollectionIdentity DisplayName="@provider.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@DetailsUrl(provider)" IconName="server">
+    private CollectionColumn<SourceProviderSummaryResponse> IdentityColumn => new("identity", T("Provider"), provider => @<CollectionIdentity DisplayName="@provider.DisplayName" Namespace="@provider.Namespace" Name="@provider.Name" Href="@(DetailsUrl(provider) + "#overview")" IconName="server">
         <IconBadges><ResourceScopeBadge ScopeRef="provider.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusLabel(provider.Status)" Status="@ModelManagementUi.Status(provider.Status)" IconOnly /><ManagedResourceBadge IsReadOnly="@(!ResourceOwnershipContext.CanManage(provider.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {

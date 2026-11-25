@@ -26,12 +26,7 @@
                 <MetricCard Label="@T("Expires")" Value="@artifact.ExpiresAt.ToLocalTime().ToString("g")" Detail="@T("LeaseCount", artifact.Leases.Count)" />
             </section>
 
-            <FormSection Title="@Shared["Identity"]" Class="resource-identity-summary"><dl class="resource-details artifact-details-grid"><dt>@T("Artifact")</dt><dd>@artifact.FileName</dd><dt>@T("Identifier")</dt><dd><CopyableValue Value="@artifact.ArtifactId.ToString()" /></dd><dt>@T("Created")</dt><dd>@artifact.CreatedAt.ToLocalTime().ToString("g")</dd></dl></FormSection>
-
-            <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary"><CollectionView TItem="SavedSetting" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-                <Identity Context="row"><strong class="configuration-key">@row.Label</strong></Identity>
-                <Information Context="row"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@row.Value</span></CollectionValue></Information>
-            </CollectionView></FormSection>
+            <StagedArtifactResourceSummary Resource="artifact" Metadata="savedMetadata" PresentationScopeRef="PresentationScope" />
 
             <FormSection Title="@T("Producer")" Eyebrow="@T("Provenance")"><ChildContent>
                 <dl class="resource-details artifact-details-grid">
@@ -94,9 +89,14 @@
 </ResourceDetailsTemplate>
 
 @code {
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedOwner { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? RequestedNamespace { get; set; }
+    private ScopedResourceAddress? ExactAddress => RequestedOwner is null ? null : ScopedResourceAddress.Create(ResourceScopeRef.Parse(RequestedOwner), ResourceNamespace.Parse(RequestedNamespace), ArtifactResourceKinds.StagedArtifact, ArtifactId.ToString());
+    private ResourceScopeRef? PresentationScope => ResourceOwnershipContext.TryGetCurrent(Services);
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private StagedArtifactView? artifact;
+    private StagedArtifactSavedSummary? savedMetadata;
     private readonly ResourceSectionState sectionState = new();
     private readonly CancellationToken lifetimeToken;
     public StagedArtifactDetails() => lifetimeToken = cancellation.Token;
@@ -120,8 +120,6 @@
     private string ContentIdentity => $"{ContentMetadata?.ArtifactId}|{ContentMetadata?.Status}|{ContentMetadata?.Sha256}|{ContentMetadata?.Length}";
     private bool CanExtendRetention => artifact is not null && retention.CanExtend(artifact.ExpiresAt);
     private bool PurgeEligible => StagedArtifactRetentionModel.CanPurge(artifact, TimeProvider.GetUtcNow());
-    private sealed record SavedSetting(string Label, string Value);
-    private IReadOnlyList<SavedSetting> SavedConfiguration => artifact is null ? [] : [new(T("MediaType"), artifact.MediaType), new(T("Size"), ExactSize(artifact.Length)), new("SHA-256", artifact.Sha256 ?? T("NotSealed"))];
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string SizeInMegabytes(long value) => T("SizeMegabytes", value / 1024d / 1024d);
     private string ExactSize(long value) => T("ExactBytes", value);
@@ -149,14 +147,14 @@
 
     protected override Task OnParametersSetAsync()
     {
-        var key = $"{Id}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        var key = $"{Id}|{RequestedOwner}|{RequestedNamespace}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
         if (loadedKey == key) return Task.CompletedTask;
         loadedKey = key; ClearPrivate(); sectionState.Reset(key);
         return LoadAsync();
     }
     private void ClearPrivate()
     {
-        artifact = newerArtifact = null; retention.Clear(); message = null; busy = confirmPurge = failed = false;
+        artifact = newerArtifact = null; savedMetadata = null; retention.Clear(); message = null; busy = confirmPurge = failed = false;
     }
     private Task RefreshAsync() => IsBusy ? Task.CompletedTask : LoadAsync();
     private async Task LoadAsync()
@@ -166,15 +164,16 @@
         try
         {
             var id = ArtifactId;
-            var saved = await Client.GetStagedAsync(id, lifetimeToken);
+            var summary = ExactAddress is { } exact ? await Client.GetStagedAtAddressAsync(exact, lifetimeToken) : null;
+            var saved = summary?.Value ?? await Client.GetStagedAsync(id, lifetimeToken);
             if (request != loadVersion || disposed) return;
-            if (saved is null || saved.ArtifactId != id)
+            if (saved is null || saved.ArtifactId != id || ExactAddress is { } requested && (summary is null || summary.ScopeRef != requested.ScopeRef || summary.Metadata.Namespace != requested.Namespace || summary.Metadata.Name != requested.Name))
             { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
             if (HasRetentionDraft)
             {
                 if (JsonSerializer.Serialize(saved) != JsonSerializer.Serialize(artifact)) newerArtifact = saved;
             }
-            else Adopt(saved);
+            else { savedMetadata = summary; Adopt(saved); }
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested) { }

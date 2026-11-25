@@ -23,8 +23,15 @@ export class GovernedExtensionInventoryPage {
   }
 
   private async navigate(url: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'networkidle' });
-    expect(response?.ok(), `Governed inventory route ${url}`).toBe(true);
+    const current = new URL(this.page.url());
+    const target = new URL(url);
+    if (current.origin === target.origin && current.pathname === target.pathname && current.search === target.search && target.hash) {
+      await selectResourceSection(this.page, target.hash.slice(1));
+    } else {
+      const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+      expect(response?.ok(), `Governed inventory route ${url}`).toBe(true);
+    }
+    await expect(this.page).toHaveURL(url);
     await expect(this.page.locator('[aria-busy="true"]')).toHaveCount(0);
   }
 
@@ -156,12 +163,12 @@ export class GovernedExtensionInventoryPage {
     ] as const) {
       const card = this.contributions.locator(`[data-contribution-id='fixture.${id}']`);
       await expect(card).toContainText(label);
-      await expect(card.locator('.extension-materialized-resources a')).toHaveCount(hasLink ? 1 : 0);
+      await expect(card.locator('.extension-materialized-resources a.resource-name-link')).toHaveCount(hasLink ? 1 : 0);
       if (id === 'conflict') await expect(card.locator('a')).toHaveCount(0);
       if (id === 'missing') this.assertScopedLink(await card.locator("a[href^='/tools/providers/qa-managed?']").getAttribute('href'));
     }
     const ready = this.contributions.locator("[data-contribution-id='fixture.ready']");
-    await ready.locator('.extension-materialized-resources a').click();
+    await ready.locator('.extension-materialized-resources a.resource-name-link').click();
     await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeDisabled();
     const provider = this.page.locator("a[href^='/tools/providers/qa-managed?']");
     this.assertScopedLink(await provider.getAttribute('href'));

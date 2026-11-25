@@ -18,20 +18,25 @@ public sealed class FlowRunOutputTests
     public async Task ExpiredDirectOutputStillLinksTheProducedArtifact(string language, string explanation)
     {
         using var culture = new TestCultureScope(language);
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactAdministrationComponentTests.ArtifactClient("output");
         var run = Run(client.Durable.WorkspaceId) with { TransientPayloads = true, TransientPayloadsAvailable = false };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IArtifactsClient>(client);
-        var rendered = context.Render<FlowRunOutput>(p => p.Add(c => c.Run, run));
+        ScopedResourceAddress? requested = null;
+        var rendered = context.Render<FlowRunOutput>(p => p.Add(c => c.Run, run).Add(c => c.PreviewRequested, address => requested = address));
         Assert.Contains(explanation, rendered.Find("[data-testid='flow-run-output-expired']").TextContent);
         var link = rendered.Find("[data-testid='flow-run-output-artifact'] a");
-        Assert.AreEqual($"/artifacts/durable/{client.Durable.ArtifactId}?context=%2Finstance", link.GetAttribute("href"));
+        Assert.AreEqual($"/artifacts/durable/{client.Durable.ArtifactId}?context=%2Finstance&scopeRef={Uri.EscapeDataString(client.Durable.ScopeRef!.Value.Value)}#overview", link.GetAttribute("href"));
         var artifact = rendered.Find("[data-testid='flow-run-output-artifact']");
         Assert.AreEqual(client.Durable.ArtifactId.ToString(), artifact.QuerySelector(".collection-qualified-name code")!.TextContent);
         Assert.AreEqual(link.GetAttribute("href"), artifact.QuerySelector(".collection-primary-actions a")!.GetAttribute("href"));
         Assert.AreEqual(0, artifact.QuerySelectorAll("a button").Length, "Copy must remain separate from artifact navigation.");
-        Assert.AreEqual(0, artifact.QuerySelectorAll(".collection-actions-menu").Length, "Inspect is a direct primary action.");
+        Assert.AreEqual(1, artifact.QuerySelectorAll(".collection-actions-menu").Length);
+        await artifact.QuerySelector("[data-testid=flow-output-artifact-preview]")!.ClickAsync(new());
+        Assert.AreEqual(client.Durable.ScopeRef, requested?.ScopeRef);
+        Assert.AreEqual(client.Durable.Name, requested?.Name);
+        Assert.AreEqual(client.Durable.Namespace, requested?.Namespace);
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-ui.js");
         var copy = module.SetupVoid("copyText", client.Durable.ArtifactId.ToString());
         copy.SetVoidResult();
@@ -43,7 +48,7 @@ public sealed class FlowRunOutputTests
     [TestMethod]
     public void OutputCatalogueFiltersUnrelatedAndForeignWorkspaceArtifactsAndCanRefreshAfterPublication()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactAdministrationComponentTests.ArtifactClient("output") { DurableCatalog = [] };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IArtifactsClient>(client);
@@ -69,7 +74,7 @@ public sealed class FlowRunOutputTests
     public void CatalogueFailureDoesNotHideTheReturnedFlowOutput()
     {
         using var culture = new TestCultureScope("en-US");
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactAdministrationComponentTests.ArtifactClient("output") { RejectDurableCatalog = true };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IArtifactsClient>(client);
@@ -85,7 +90,7 @@ public sealed class FlowRunOutputTests
     [TestMethod]
     public void PublishedExistingArtifactAppearsAsAnOutputWithoutChangingItsProducer()
     {
-        using var context = new BunitContext();
+        using var context = new BunitContext().WithCollectionPresentation();
         var client = new ArtifactAdministrationComponentTests.ArtifactClient("output");
         client.Durable = client.Durable with { ProducerFlowRunId = "original-acquisition" };
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");

@@ -1,4 +1,5 @@
 using Agentstration.Api.Contracts;
+using Agentstration.Resources;
 using Agentstration.Sources;
 using Agentstration.Sources.Contracts;
 using Agentstration.Web.Api.Management;
@@ -18,6 +19,7 @@ public static class SourceRegistryEndpoints
         registries.MapPost("/discovery/imports", ImportDiscoveredSourceAsync)
             .RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapGet("/", ListAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        registries.MapGet("/{registryName}/registration", GetRegistrationAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapGet("/{registryName}", GetAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapPost("/", CreateAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         registries.MapPut("/{registryName}", UpdateAsync).RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
@@ -85,6 +87,14 @@ public static class SourceRegistryEndpoints
     private static Task<IResult> ListAsync(SourceRegistryManagementService service, CancellationToken cancellationToken) =>
         SourcesApiHttp.ExecuteAsync(async () =>
             Results.Ok(new ValueResponse<SourceRegistryRegistrationView>(await service.ListAsync(cancellationToken))));
+
+    private static Task<IResult> GetRegistrationAsync(string registryName, string scopeRef, string? @namespace, HttpResponse response,
+        SourceRegistryManagementService service, CancellationToken cancellationToken) => SourcesApiHttp.ExecuteAsync(async () =>
+        {
+            var stored = await service.GetRegistrationExactAsync(ResourceScopeRef.Parse(scopeRef), ResourceNamespace.Parse(@namespace), registryName, cancellationToken)
+                ?? throw new SourceRegistryNotFoundException(registryName);
+            return SourcesApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
+        });
 
     private static Task<IResult> GetAsync(
         string registryName,

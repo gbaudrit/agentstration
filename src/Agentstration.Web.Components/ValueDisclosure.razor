@@ -11,18 +11,37 @@
     private readonly string panelId = $"full-value-{Guid.NewGuid():N}";
     private ElementReference root;
     private IJSObjectReference? module;
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private Task pendingInterop = Task.CompletedTask;
+    private Task? disposal;
+    private bool disposed;
+    protected override Task OnAfterRenderAsync(bool firstRender)
+        => firstRender ? pendingInterop = AttachAsync() : Task.CompletedTask;
+    private async Task AttachAsync()
     {
-        if (!firstRender) return;
-        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
-        await module.InvokeVoidAsync("attachDisclosure", root);
-    }
-    public async ValueTask DisposeAsync()
-    {
-        if (module is not null)
+        try
         {
-            try { await module.InvokeVoidAsync("releaseDisclosure", root); await module.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+            if (!disposed) await module.InvokeVoidAsync("attachDisclosure", root);
         }
+        catch (JSDisconnectedException) when (disposed) { }
+        catch (OperationCanceledException) when (disposed) { }
+    }
+    public ValueTask DisposeAsync()
+    {
+        disposed = true;
+        return new(disposal ??= ReleaseAsync());
+    }
+    private async Task ReleaseAsync()
+    {
+        try
+        {
+            await pendingInterop;
+            if (module is null) return;
+            await module.InvokeVoidAsync("releaseDisclosure", root);
+            await module.DisposeAsync();
+            module = null;
+        }
+        catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) { }
     }
 }

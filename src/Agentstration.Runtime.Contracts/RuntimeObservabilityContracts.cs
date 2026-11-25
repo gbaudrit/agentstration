@@ -78,6 +78,8 @@ public sealed record AgentInstanceResponse(
 public interface IRuntimeObservabilityQueryService
 {
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> ListWorkersAsync(CancellationToken cancellationToken);
+    Task<RuntimeWorkerSummaryResponse?> GetWorkerSummaryAsync(Guid workerId, CancellationToken token) =>
+        throw new NotSupportedException("This service does not support exact Worker summaries.");
     Task<RuntimeWorkerDetailsResponse?> GetWorkerAsync(Guid workerId, CancellationToken cancellationToken);
     Task<IReadOnlyList<AgentInstanceResponse>> ListAgentInstancesAsync(WorkspaceId workspaceId, CancellationToken cancellationToken);
     Task<IReadOnlyList<AgentInstanceResponse>> ListAgentInstancesExactAsync(ResourceScopeRef scopeRef, CancellationToken cancellationToken);

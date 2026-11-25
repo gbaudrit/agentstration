@@ -23,6 +23,8 @@ public interface IModelProvidersClient
         GetModelProvidersAsync(cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(string providerName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) => GetModelProviderAsync(providerName, cancellationToken);
+    Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact scoped Model Provider reads.");
     Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ModelProviderResource>> UpdateModelProviderAsync(ResourceNamespace @namespace, string providerName, PutModelProviderRequest request, string etag, CancellationToken cancellationToken) => UpdateModelProviderAsync(providerName, request, etag, cancellationToken);
@@ -44,6 +46,8 @@ public interface IModelProvidersClient
 
 public interface IModelsClient
 {
+    Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Model reads.");
     Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace @namespace, string modelName, CancellationToken cancellationToken);
 }
 
@@ -94,6 +98,8 @@ public interface IExtensionsClient
         CancellationToken cancellationToken) =>
         Task.FromException<AepEnrollmentSettingsSnapshot>(new NotSupportedException("Enrollment settings are not supported by this client."));
 
+    Task<ResourceSnapshot<AepEnrollmentRequestResource>> GetEnrollmentAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact enrollment summaries.");
     Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AepEnrollmentRequestResource>>([]);
 
@@ -149,6 +155,20 @@ public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClie
         message.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
         using var response = await httpClient.SendAsync(message, cancellationToken);
         await ApiResponse.EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<AepEnrollmentRequestResource>> GetEnrollmentAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != ExtensionKinds.AepEnrollmentRequest || address.ScopeRef != ResourceScopeRef.Instance || !address.Namespace.IsDefault
+            || !Guid.TryParseExact(address.Name, "N", out var id) || id == Guid.Empty)
+            throw new HttpRequestException("The exact enrollment address is unavailable.", null, System.Net.HttpStatusCode.NotFound);
+        using var response = await httpClient.GetAsync($"api/aep/enrollments/{id:D}/summary?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        var value = await response.Content.ReadFromJsonAsync<AepEnrollmentRequestResource>(token)
+            ?? throw new AgentstrationApiException("The enrollment snapshot is empty.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag)) throw new AgentstrationApiException("The enrollment ETag is missing.", Guid.NewGuid().ToString("N"));
+        return new(value, etag);
     }
 
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> GetEnrollmentsAsync(CancellationToken cancellationToken) =>
@@ -295,6 +315,8 @@ public interface IRuntimeProfilesClient
     Task<IReadOnlyList<RuntimeProfileSummaryResponse>> GetRuntimeProfilesAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(string profileName, CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) => GetRuntimeProfileAsync(profileName, cancellationToken);
+    Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This client does not support exact scoped Runtime Profile reads.");
     Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<RuntimeProfileResource>> UpdateRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, PutRuntimeProfileRequest request, string etag, CancellationToken cancellationToken) => UpdateRuntimeProfileAsync(profileName, request, etag, cancellationToken);
@@ -319,6 +341,9 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 
     public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace @namespace, string providerName, CancellationToken cancellationToken) =>
         ReadResourceAsync(HttpMethod.Get, Path(@namespace, providerName), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<ModelProviderResource>> GetModelProviderAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) =>
+        ReadResourceAsync(HttpMethod.Get, Path(ns, name) + $"&scopeRef={Uri.EscapeDataString(owner.Value)}", null, null, token);
 
     public Task<ResourceSnapshot<ModelProviderResource>> CreateModelProviderAsync(CreateModelProviderRequest request, CancellationToken cancellationToken) =>
         ReadResourceAsync(HttpMethod.Post, "api/modelproviders", JsonContent.Create(request), null, cancellationToken);
@@ -415,6 +440,17 @@ public sealed class ModelProvidersApiClient(HttpClient httpClient) : IModelProvi
 
 public sealed class ModelsApiClient(HttpClient httpClient) : IModelsClient
 {
+    public async Task<ResourceSnapshot<ModelResource>> GetModelAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"api/models/{Uri.EscapeDataString(name)}?resourceNamespace={Uri.EscapeDataString(ns.Value)}&scopeRef={Uri.EscapeDataString(owner.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        var resource = await response.Content.ReadFromJsonAsync<ModelResource>(token)
+            ?? throw new AgentstrationApiException("The model snapshot is empty.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag)) throw new AgentstrationApiException("The model ETag is missing.", Guid.NewGuid().ToString("N"));
+        return new(resource, etag);
+    }
+
     public async Task<ResourceSnapshot<ModelResource>> GetModelAsync(
         ResourceNamespace @namespace,
         string modelName,
@@ -652,6 +688,9 @@ public sealed class RuntimeProfilesApiClient(HttpClient httpClient) : IRuntimePr
 
     public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, CancellationToken cancellationToken) =>
         ReadAsync(HttpMethod.Get, Path(@namespace, profileName), null, null, cancellationToken);
+
+    public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace @namespace, string profileName, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
+        ReadAsync(HttpMethod.Get, Path(@namespace, profileName) + $"&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", null, null, cancellationToken);
 
     public Task<ResourceSnapshot<RuntimeProfileResource>> CreateRuntimeProfileAsync(CreateRuntimeProfileRequest request, CancellationToken cancellationToken) =>
         ReadAsync(HttpMethod.Post, "api/runtimeprofiles", JsonContent.Create(request), null, cancellationToken);

@@ -269,6 +269,8 @@ public sealed class RuntimeProfileEditorTests
         public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(string profileName, CancellationToken cancellationToken) =>
             Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<RuntimeProfileResource>(Profile, "\"runtime-profile\""));
 
+        public Task<ResourceSnapshot<RuntimeProfileResource>> GetRuntimeProfileAsync(ResourceNamespace ns, string name, ResourceScopeRef owner, CancellationToken token) => GetRuntimeProfileAsync(name, token);
+
         public Task<RuntimeProfileUsagesResponse> GetRuntimeProfileUsagesAsync(string profileName, CancellationToken cancellationToken) =>
             Task.FromResult(new RuntimeProfileUsagesResponse([], 0));
 

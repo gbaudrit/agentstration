@@ -1,0 +1,36 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProviderDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="model-provider-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="model-provider-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="model-provider-configuration-summary">
+        <CollectionView TItem="Setting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ModelProviderResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private sealed record Setting(string Label, string Value);
+    private IEnumerable<Setting> SavedEntries =>  new Setting[] { new(T("ExtensionRegistration"), $"{Resource.Definition.Extension.ScopeRef} {(Resource.Definition.Extension.Namespace ?? Resource.Namespace).Value}/{Resource.Definition.Extension.Name}".Trim()), new(T("ModelProviderContribution"), Resource.Definition.ContributionId), new(T("ValueBindings"), JsonSerializer.Serialize(Resource.Definition.ValueBindings)), new(T("SpecificationOverrides"), JsonSerializer.Serialize(Resource.Definition.SpecificationOverrides)) };
+
+}

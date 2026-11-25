@@ -48,7 +48,7 @@ export function observe(root, reference, externalTriggerId) {
     // entries or reload the document. Cancel that push before it commits and
     // let the same public Blazor path used by menu links create the entry.
     const nativeHash = event => {
-        if (!active || !root.isConnected || !event.hashChange || !event.cancelable || event.navigationType === "traverse") return;
+        if (!active || !root.isConnected || event.defaultPrevented || !event.hashChange || !event.cancelable || event.navigationType === "traverse") return;
         event.preventDefault();
         send("NavigateLocation", event.destination.url);
     };

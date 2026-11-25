@@ -10,8 +10,10 @@
     else
     {
         <ResourceIdentitySummary DisplayName="@DisplayName" TechnicalName="@(Resource?.Name ?? Item?.ExtensionId ?? string.Empty)" Namespace="@Resource?.Namespace.Value"
-            ResourceUid="Resource?.Uid" Description="@Item?.Extension?.Extension?.Description" Labels="Resource?.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="extension-identity-summary">
+            Version="@KnownVersion" VersionDescription="@Localizer["ObservedVersion"]" ResourceUid="Resource?.Uid" Description="@Item?.Extension?.Extension?.Description" Labels="Resource?.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="extension-identity-summary">
             <Scope>@if (Resource?.ScopeRef is { } owner) { <ResourceScopeBadge ScopeRef="owner" /> }</Scope>
+            <Badges><ManagedResourceBadge IsManaged="@(Resource?.Governance.IsManaged == true)" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource?.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
         </ResourceIdentitySummary>
     }
     <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="extension-configuration-summary">
@@ -30,6 +32,8 @@
     [Parameter] public RenderFragment? QuickActions { get; set; }
     [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
     [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    [Parameter] public bool ReadOnly { get; set; }
+    private string? KnownVersion => Resource is AepEnrollmentRequestResource enrollment ? enrollment.Definition.ExtensionVersion : Item?.Version;
     private string DisplayName => Resource switch
     {
         ExtensionRegistrationResource registration => registration.Definition.DisplayName,
@@ -43,7 +47,7 @@
         get
         {
             var registration = Resource as ExtensionRegistrationResource;
-            var endpoint = registration?.Definition.Endpoint ?? Item?.Endpoint;
+            var endpoint = registration?.Definition.Endpoint ?? (Resource as AepEnrollmentRequestResource)?.Definition.Endpoint ?? Item?.Endpoint;
             var values = new List<SavedSetting>();
             if (Item is { } item)
             {
@@ -52,6 +56,17 @@
                 values.Add(new(T("Availability"), T($"Status.{item.AvailabilityStatus}")));
                 values.Add(new(T("Enrollment"), item.EnrollmentStatus is { } state ? T($"EnrollmentStatus.{state}") : "—"));
                 if (item.AnnouncedAt is { } announced) values.Add(new(T("AnnouncedAt"), announced.LocalDateTime.ToString("g")));
+            }
+            if (Resource is AepEnrollmentRequestResource enrollment)
+            {
+                var enrollmentDefinition = enrollment.Definition;
+                if (Item is null) { values.Add(new(T("ExtensionId"), enrollmentDefinition.ExtensionId)); values.Add(new(T("ObservedVersion"), enrollmentDefinition.ExtensionVersion)); }
+                values.Add(new(T("EnrollmentInstance"), enrollmentDefinition.InstanceId.ToString("D")));
+                values.Add(new(T("EnrollmentState"), T($"EnrollmentStatus.{enrollmentDefinition.State}")));
+                values.Add(new(T("AnnouncedAt"), enrollmentDefinition.AnnouncedAt.ToLocalTime().ToString("g")));
+                if (enrollmentDefinition.TargetScopeRef is { } target) values.Add(new(Shared["Scope"], target.Value));
+                if (enrollmentDefinition.RegistrationName is { } name) values.Add(new(T("Registration"), name));
+                if (enrollmentDefinition.Outcome is { } outcome) values.Add(new(T("Outcome"), outcome));
             }
             if (endpoint is not null) values.Add(new(T("AepEndpoint"), endpoint.AbsoluteUri, endpoint.AbsoluteUri));
             if (registration is { } saved)

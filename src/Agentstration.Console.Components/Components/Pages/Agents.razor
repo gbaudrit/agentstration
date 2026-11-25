@@ -19,7 +19,7 @@
     </Feedback>
     <ItemActions Context="item"><CollectionActions ResourceName="@($"{item.Name} ({item.Namespace}/{item.Id}, {item.ScopeRef})")" Destructive="@DeleteAction(item)" ShowDestructiveActions="ShowDeleteAction">
         <a href="@OverviewUrl(item)"><UiIcon Name="arrow-up-right" /><span>@T("Open")</span></a>
-        @if (item.Namespace.IsDefault && !item.IsManaged && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@DefinitionUrl(item)"><UiIcon Name="pencil" /><span>@T("EditDefinition")</span></a></PermissionGate> }
+        @if (!item.IsManaged && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services)) { <PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a href="@DefinitionUrl(item)"><UiIcon Name="pencil" /><span>@T("EditDefinition")</span></a></PermissionGate> }
         @if (item.Namespace.IsDefault) { <PermissionGate Permission="@AuthorizationPermissions.RunsExecute"><a href="@RunUrl(item)"><UiIcon Name="play-circle" /><span>@T("Run")</span></a></PermissionGate> }
         <button type="button" data-testid="agent-preview" disabled="@(item.ScopeRef is null)" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" /><span>@T("Preview")</span></button>
     </CollectionActions></ItemActions>
@@ -36,7 +36,7 @@
     private ResourceCollectionPreview? preview;
     private void OpenPreview(AgentSummary item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, AgentResourceKinds.Agent, item.Id)); }
     private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.Agent(address.Namespace, address.Name, address.ScopeRef), Services).Split('#')[0] + "#" + section;
-    private string PreviewRunUrl(ScopedResourceAddress address) => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.WithOwnerScope($"/agents/{Uri.EscapeDataString(address.Name)}/run", address.ScopeRef), Services);
+    private string PreviewRunUrl(ScopedResourceAddress address) => ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation($"/agents/{Uri.EscapeDataString(address.Name)}/run", Services), address.ScopeRef);
     private RenderFragment? DeleteAction(AgentSummary item) => !CanDelete(item) ? null : @<button class="danger-text" type="button" disabled="@deleting" @onclick="() => RequestDelete(item)"><UiIcon Name="trash" /><span>@T("Delete")</span></button>;
     private CollectionColumn<AgentSummary> IdentityColumn => new("identity", T("Agents"), item => @<CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Id" Href="@OverviewUrl(item)" IconName="agent" Domain="agent"><Versions><CollectionVersion Label="@T("GenerationHeader")" Value="@item.Version" /></Versions><IconBadges><ResourceScopeBadge ShowName ScopeRef="@item.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(item.Status)" Status="@StatusPresentation.Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity>);
     private IReadOnlyList<CollectionColumn<AgentSummary>> Columns =>

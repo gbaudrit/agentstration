@@ -10,6 +10,7 @@ interface AgentstrationWorkerFixtures {
   governedInventoryFixture: boolean;
   organizationStructureFixture: boolean;
   collectionCampaign: boolean;
+  collectionLayoutFixture: boolean;
   authenticationMode: 'Development' | 'Local';
   initialBootstrapEnabled: boolean;
   formPendingFixture: boolean;
@@ -32,15 +33,16 @@ export const test = base.extend<AgentstrationTestFixtures, AgentstrationWorkerFi
   governedInventoryFixture: [false, { option: true, scope: 'worker' }],
   organizationStructureFixture: [false, { option: true, scope: 'worker' }],
   // The worker-scoped key gives the expanded campaign its own managed product data.
+  collectionLayoutFixture: [false, { option: true, scope: 'worker' }],
   collectionCampaign: [false, { option: true, scope: 'worker' }],
-  product: [async ({ authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture }, use) => {
+  product: [async ({ collectionLayoutFixture, authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture }, use) => {
     const external = resolveExternalProductAddresses(process.env);
     if (external) {
       await use({ ...external, stop: async () => {} });
       return;
     }
 
-    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture);
+    const product = await startProductHosts(authenticationMode, aiProvider, acquisitionFailureFixture, governedInventoryFixture, organizationStructureFixture, sourcePolicyFixture, initialBootstrapEnabled, formPendingFixture, bootstrapProvenanceFixture, collectionLayoutFixture);
     try {
       await use(product);
     } finally {

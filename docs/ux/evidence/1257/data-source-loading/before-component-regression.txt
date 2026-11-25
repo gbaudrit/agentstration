@@ -1,0 +1,25 @@
+Telemetry
+---------
+Microsoft Testing Platform collects usage data in order to help us improve your experience. The data is collected by Microsoft and are not shared with anyone.
+You can opt-out of telemetry by setting the TESTINGPLATFORM_TELEMETRY_OPTOUT or DOTNET_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your favorite shell.
+
+Read more about Microsoft Testing Platform telemetry: https://aka.ms/testingplatform/telemetry
+failed APreviousLoadCannotMarkAStillPendingReplacementAsReady (705ms)
+  Test method Agentstration.Web.Tests.DataSourceEditorTests.APreviousLoadCannotMarkAStillPendingReplacementAsReady threw exception:
+  System.InvalidOperationException: A pending resource requires a blocking load state.
+    at Agentstration.Web.Components.ConsoleResourceDetailsTemplate.OnParametersSet() in /workspace/agentstration/src/Agentstration.Console.Components/Components/ConsoleResourceDetailsTemplate.razor:135
+    at Microsoft.AspNetCore.Components.ComponentBase.CallOnParametersSetAsync()
+    at Microsoft.AspNetCore.Components.ComponentBase.SetParametersAsync(ParameterView parameters)
+    at Microsoft.AspNetCore.Components.Rendering.ComponentState.SupplyCombinedParameters(ParameterView directAndCascadingParameters)
+    --- End of stack trace from previous location ---
+    at Bunit.RenderedComponentWaitForHelperExtensions.WaitForAssertion[TComponent](IRenderedComponent`1 renderedComponent, Action assertion, Nullable`1 timeout) in /_/src/bunit/Extensions/WaitForHelpers/RenderedComponentWaitForHelperExtensions.WaitForState.cs:102
+    at Agentstration.Web.Tests.DataSourceEditorTests.APreviousLoadCannotMarkAStillPendingReplacementAsReady() in /workspace/agentstration/tests/Agentstration.Console.Components.Tests/DataSourceEditorTests.Foundation.cs:149
+    at Microsoft.VisualStudio.TestPlatform.MSTest.TestAdapter.Execution.TestMethodInfo.ExecuteInternalAsync(Object[] arguments, CancellationTokenSource timeoutTokenSource)
+    
+
+Test run summary: Failed! - /workspace/agentstration/tests/Agentstration.Console.Components.Tests/bin/Release/net10.0/Agentstration.Console.Components.Tests.dll (net10.0|x64)
+  total: 1
+  failed: 1
+  succeeded: 0
+  skipped: 0
+  duration: 1s 010ms

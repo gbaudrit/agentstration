@@ -1,0 +1,34 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SchemasStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="schema-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="schema-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="schema-configuration-summary">
+        <CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+    @if (Resource?.Definition.SourceEvidence is { } evidence) { <FormSection Title="@T("SourceEvidence")"><details><summary>@T("SourceEvidence")</summary><pre class="runner-json">@JsonSerializer.Serialize(evidence, new JsonSerializerOptions { WriteIndented = true })</pre></details></FormSection> }
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public SchemaResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private IReadOnlyList<KeyValuePair<string,string>> SavedSettings => [new(T("Format"), Resource.Definition.Format), new(T("Dialect"), Resource.Definition.Dialect ?? "—"), new(T("DefinitionSource"), Resource.Definition.Content.GetRawText())];
+}

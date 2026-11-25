@@ -212,6 +212,19 @@ public sealed partial class NamespacedAgentDetailsTests
         Assert.IsNotNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.Resource);
     }
 
+    [TestMethod]
+    public void ManagedOverviewUsesTheSameSavedSummaryAsCollectionInspection()
+    {
+        using var context = ManagedContext(out _);
+        var cut = RenderManaged(context);
+        Assert.IsNotNull(cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance.OverviewSummary);
+        var summary = cut.FindComponent<AgentResourceSummary>().Instance;
+        Assert.AreEqual(FakeManagementClient.PackNamespace, summary.Resource.Namespace);
+        Assert.IsNotNull(summary.Identity);
+        Assert.IsFalse(summary.ShowModelResolution);
+        Assert.IsEmpty(cut.FindAll("[data-testid=agent-summary-run], [data-testid=agent-summary-reconcile]"));
+    }
+
     private static BunitContext ManagedContext(out FakeManagementClient client, ResourceListContextProvider? provider = null)
     {
         var context = new BunitContext().WithCollectionPresentation();

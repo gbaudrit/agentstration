@@ -1,12 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
 using Agentstration.ResourcePlanning.Contracts;
+using Agentstration.Resources;
 
 namespace Agentstration.Web.Console;
 
 public interface IResourcePlansApiClient
 {
     Task<ResourcePlanPage> ListPlansAsync(ResourcePlanStatus? status, int skip, int take, CancellationToken cancellationToken);
+    Task<ResourcePlanSnapshot> GetPlanAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Plan inspection.");
     Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<ResourcePlanActivity>> ListActivitiesAsync(Guid id, CancellationToken cancellationToken);
     Task<ResourcePlanBindingDraftSnapshot?> GetBindingsAsync(Guid id, CancellationToken cancellationToken);
@@ -29,6 +32,15 @@ public sealed class ResourcePlansApiClient(HttpClient httpClient) : IResourcePla
         var query = $"?skip={Math.Max(0, skip)}&take={Math.Clamp(take, 1, 200)}";
         if (status is not null) query += $"&status={Uri.EscapeDataString(status.Value.ToString())}";
         return ApiResponse.ReadAsync<ResourcePlanPage>(httpClient, BasePath + query, cancellationToken);
+    }
+
+    public async Task<ResourcePlanSnapshot> GetPlanAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != "ResourcePlan" || address.ScopeRef == default || address.ScopeRef.Kind != ResourceScopeKind.Workspace || !address.Namespace.IsDefault
+            || !Guid.TryParseExact(address.Name, "N", out var id) || id == Guid.Empty)
+            throw new HttpRequestException("The exact Plan address is unavailable.", null, HttpStatusCode.NotFound);
+        using var response = await httpClient.GetAsync($"{BasePath}/{id:D}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace=default", token);
+        return await ReadSnapshotAsync<ResourcePlan, ResourcePlanSnapshot>(response, (value, etag) => new(value, etag), token);
     }
 
     public async Task<ResourcePlanSnapshot?> GetPlanAsync(Guid id, CancellationToken cancellationToken)

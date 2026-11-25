@@ -237,12 +237,28 @@ public sealed class ToolProviderEditorTests
         Assert.AreEqual(0, client.Writes);
     }
 
-    private static BunitContext Context(ProviderClient client, bool create)
+    [TestMethod]
+    public async Task EmbeddedToolsUseTheSameLazyExactPreviewWithoutMutatingProviderOrTool()
+    {
+        var client = new ProviderClient { IncludeTool = true };
+        using var context = Context(client, false, true);
+        var cut = context.Render<ToolProviderEditor>(p => p.Add(c => c.Name, "microsoft-learn"));
+        await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("tools"));
+        Assert.AreEqual(0, client.ToolReads);
+        await cut.Find("[data-testid=provider-tool-preview]").ClickAsync(new());
+        Assert.HasCount(1, cut.FindComponents<ToolResourceSummary>());
+        Assert.AreEqual(1, client.ToolReads);
+        Assert.AreEqual(0, client.Writes);
+        Assert.IsEmpty(cut.FindAll("[data-testid=tool-preview-edit]"));
+    }
+
+    private static BunitContext Context(ProviderClient client, bool create, bool inspectTools = false)
     {
         var context = new BunitContext().WithCollectionPresentation();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IToolsClient>(client);
+        if (inspectTools) context.WithResourceListContext();
         var uri = create ? "http://localhost/tools/providers/new" : "http://localhost/tools/providers/microsoft-learn?scopeRef=%2Finstance";
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(uri);
         var module = context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/resource-navigation.js");
@@ -288,7 +304,7 @@ public sealed class ToolProviderEditorTests
             return GetProviderAsync(name, cancellationToken);
         }
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<ToolResource>>([]);
+            Task.FromResult<IReadOnlyList<ToolResource>>(IncludeTool ? [Tool] : []);
         public Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
         public int Writes { get; private set; }
         public string? LastEtag { get; private set; }
@@ -304,6 +320,21 @@ public sealed class ToolProviderEditorTests
         }
         public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public bool IncludeTool { get; set; }
+        public int ToolReads { get; private set; }
+        private ToolResource Tool => new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.Tool,
+            Metadata = new() { Name = "saved-tool" },
+            ScopeRef = Provider.ScopeRef,
+            Definition = new() { DisplayName = "Saved tool", ExternalId = "saved-tool", Provider = new(Provider.Name, Provider.ScopeRef, Provider.Namespace) }
+        };
+        public Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token)
+        {
+            ToolReads++; Assert.AreEqual(Provider.ScopeRef, owner); Assert.AreEqual(Provider.Namespace, ns); Assert.AreEqual("saved-tool", name);
+            return Task.FromResult(new ResourceSnapshot<ToolResource>(Tool, "\"tool\""));
+        }
         public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) => throw new NotSupportedException();
     }

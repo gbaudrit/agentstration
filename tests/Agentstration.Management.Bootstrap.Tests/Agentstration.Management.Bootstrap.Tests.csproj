@@ -1,6 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
     <Compile Include="../BootstrapApiOnlyWebApplicationFactory.cs" Link="BootstrapApiOnlyWebApplicationFactory.cs" />
+    <Compile Include="../BootstrapDeclarativeTestFixture.cs" Link="BootstrapDeclarativeTestFixture.cs" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Profiles/Agentstration.Runtime.Profiles.csproj" />
     <ProjectReference Include="../../src/Agentstration.Bootstrap.Contracts/Agentstration.Bootstrap.Contracts.csproj" />
     <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />

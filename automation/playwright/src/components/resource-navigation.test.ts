@@ -55,7 +55,7 @@ test('native hash pushes use guarded Blazor navigation before committing a histo
   e.entryListeners.get('navigate')!(event);
   assert.equal(prevented, 1);
   assert.deepEqual(e.calls, [['NavigateLocation', destination]]);
-  for (const change of [{ navigationType: 'traverse' }, { hashChange: false }, { cancelable: false }])
+  for (const change of [{ navigationType: 'traverse' }, { hashChange: false }, { cancelable: false }, { defaultPrevented: true }])
     e.entryListeners.get('navigate')!({ ...event, ...change });
   assert.equal(prevented, 1);
   e.registration.dispose(); assert.equal(e.entryListeners.size, 0);

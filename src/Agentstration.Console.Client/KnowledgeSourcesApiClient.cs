@@ -10,6 +10,8 @@ public interface IKnowledgeSourcesClient
     IKnowledgeSourcesClient WithOwner(ResourceScopeRef? owner) => this;
     Task<IReadOnlyList<KnowledgeSourceResource>> GetAsync(CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken = default);
+    Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken ct = default) =>
+        throw new NotSupportedException("This client does not support exact scoped Knowledge Source reads.");
     Task<ResourceSnapshot<KnowledgeSourceResource>> CreateAsync(CreateKnowledgeSourceRequest request, CancellationToken cancellationToken = default);
     Task<ResourceSnapshot<KnowledgeSourceResource>> UpdateAsync(ResourceNamespace @namespace, string name,
         PutKnowledgeSourceRequest request, string etag, CancellationToken cancellationToken = default);
@@ -57,6 +59,9 @@ public sealed class KnowledgeSourcesApiClient(HttpClient httpClient) : IKnowledg
             (await response.Content.ReadFromJsonAsync<KnowledgeSourceResource>(cancellationToken))!,
             response.Headers.ETag?.ToString() ?? throw new InvalidOperationException("Missing ETag."));
     }
+
+    public Task<ResourceSnapshot<KnowledgeSourceResource>> GetAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken ct = default) =>
+        new KnowledgeSourcesApiClient(httpClient) { Owner = owner }.GetAsync(ns, name, ct);
 
     public Task<ResourceSnapshot<KnowledgeSourceResource>> CreateAsync(
         CreateKnowledgeSourceRequest request,

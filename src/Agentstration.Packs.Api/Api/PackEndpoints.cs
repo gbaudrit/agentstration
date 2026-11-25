@@ -25,6 +25,7 @@ internal sealed class PackEndpoints : IManagementEndpoint
         group.MapPost("/pack-projects/composer/preview", PreviewCompositionAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapPost("/pack-projects", CreateProjectFromWorkspaceAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapGet("/pack-projects", ListProjectsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        group.MapGet("/pack-projects/resources/{name}", GetProjectAtAddressAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapGet("/pack-projects/{projectId:guid}", GetProjectAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         group.MapPut("/pack-projects/{projectId:guid}", UpdateProjectAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         group.MapGet("/pack-projects/{projectId:guid}/resources", ListProjectResourcesAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
@@ -203,6 +204,14 @@ internal sealed class PackEndpoints : IManagementEndpoint
         {
             var project = await service.GetProjectAsync(projectId, token) ?? throw new KeyNotFoundException($"Pack Project '{projectId}' was not found.");
             return PacksApiHttp.ResourceResult(project, response, StatusCodes.Status200OK);
+        });
+
+    private static Task<IResult> GetProjectAtAddressAsync(string name, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>
+        PacksApiHttp.ExecuteAsync(async () =>
+        {
+            var project = ResourceScopeRef.TryParse(request.Query["scopeRef"].ToString(), out var owner)
+                ? await service.GetProjectExactAsync(owner, ResourceNamespace.Parse(request.Query["namespace"].ToString()), name, token) : null;
+            return project is null ? Results.NotFound() : PacksApiHttp.ResourceResult(project, response, StatusCodes.Status200OK);
         });
 
     private static Task<IResult> UpdateProjectAsync(Guid projectId, UpdatePackProjectCommand command, HttpRequest request, HttpResponse response, PackAuthoringService service, CancellationToken token) =>

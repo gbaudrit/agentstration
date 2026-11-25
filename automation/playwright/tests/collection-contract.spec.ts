@@ -5,6 +5,7 @@ import { inspectCollections } from '../src/journeys/inspect-collections.journey.
 import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { test } from '../src/fixtures/test.js';
+import { TransformationFunctionCollectionPage } from '../src/pages/transformation-function-collection.page.js';
 
 test.use({ authenticationMode: 'Local', collectionCampaign: true });
 
@@ -52,5 +53,32 @@ for (const variant of [
         await testInfo.attach('collection-contract-rendering', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
       });
     }
+  });
+}
+
+for (const variant of [
+  { name: 'desktop French light', locale: 'fr-FR', theme: 'light', width: 1659, height: 1000, tag: '@locale' },
+  { name: 'desktop English dark', locale: 'en-US', theme: 'dark', width: 1280, height: 900, tag: '' },
+  { name: 'mobile French light', locale: 'fr-FR', theme: 'light', width: 390, height: 844, tag: '@responsive' },
+  { name: 'mobile English dark', locale: 'en-US', theme: 'dark', width: 390, height: 844, tag: '@responsive' },
+] as const) {
+  test.describe(`function catalogue ${variant.name}`, () => {
+    test.use({ locale: variant.locale, colorScheme: variant.theme, hasTouch: variant.width < 761, viewport: { width: variant.width, height: variant.height } });
+    test.afterEach(async ({ page, product }) => {
+      if (variant.locale !== 'en-US') await new ProductPages(page).consoleAdministration.restoreLanguage(product.consoleUrl, 'en-US');
+    });
+    test(`transformation function column widths ${variant.tag} @collections @smoke`, async ({ page, product }, testInfo) => {
+      const pages = new ProductPages(page);
+      await authenticateConsole({ ...product, pages, checkpoint: ignoreCheckpoints }, {});
+      await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
+      await pages.ensureTheme(variant.theme);
+      await new CollectionContractPage(page).open(product.consoleUrl, '/transformation-functions');
+      const functions = new TransformationFunctionCollectionPage(page);
+      const geometry = await functions.inspectTable();
+      await testInfo.attach('function-column-geometry', { body: JSON.stringify(geometry, null, 2), contentType: 'application/json' });
+      await testInfo.attach('function-table', { body: await functions.capture(), contentType: 'image/png' });
+      await functions.inspectCards();
+      await testInfo.attach('function-cards', { body: await functions.capture(), contentType: 'image/png' });
+    });
   });
 }

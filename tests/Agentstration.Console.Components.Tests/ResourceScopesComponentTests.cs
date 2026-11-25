@@ -1,10 +1,18 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Agentstration.Agents;
+using Agentstration.Identity.Contracts;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.Pages;
+using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Localization;
 
@@ -38,8 +46,8 @@ public sealed class ResourceScopesComponentTests
 
         var rendered = context.Render<ResourceScopes>();
 
-        Assert.IsNotNull(rendered.Find($"a[href='/namespaces/team-a/agents/support%20agent?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}']"));
-        Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}']"));
+        Assert.IsNotNull(rendered.Find($"a[href='/namespaces/team-a/agents/support%20agent?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}#overview']"));
+        Assert.IsNotNull(rendered.Find($"a[href='/secrets/api%20key?scopeRef={Uri.EscapeDataString(workspaceScope.Value)}&context={Uri.EscapeDataString(workspaceScope.Value)}#overview']"));
         Assert.HasCount(2, rendered.FindAll("a.resource-name-link"));
         Assert.IsEmpty(rendered.FindAll("td.resource-action"));
         Assert.HasCount(4, rendered.FindAll(".data-grid thead th"));
@@ -129,7 +137,7 @@ public sealed class ResourceScopesComponentTests
         context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
         var rendered = context.Render<ResourceScopes>();
         var links = rendered.FindAll("a.resource-name-link");
-        Assert.HasCount(3, links);
+        Assert.HasCount(4, links);
         foreach (var link in links)
         {
             var href = link.GetAttribute("href");
@@ -140,6 +148,69 @@ public sealed class ResourceScopesComponentTests
         Assert.IsTrue(links.Any(link => link.GetAttribute("href")!.StartsWith("/storage-types/", StringComparison.Ordinal)));
         Assert.IsTrue(links.Any(link => link.GetAttribute("href")!.StartsWith("/transformation-functions/", StringComparison.Ordinal)));
         Assert.HasCount(4, rendered.FindAll("tr.resource-row"));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task MixedInventoryInspectsAnExactInheritedResourceLazilyAndRestoresOffWindowLinks(bool direct)
+    {
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var name = direct ? "off-window" : "same-name";
+        var rows = direct ? Array.Empty<ResourceScopeInventoryItemResponse>() : new[] { new ResourceScopeInventoryItemResponse(Guid.NewGuid(), ResourceNamespace.Default, "Parameter", name, DateTimeOffset.UnixEpoch) };
+        var inventory = new ResourceScopeInventoryResponse([
+            new(ResourceScopeRef.Instance, ResourceScopeKind.Instance, "Instance", null, false, rows),
+            new(workspace, ResourceScopeKind.Workspace, "Workspace", ResourceScopeRef.Instance, true, [])]);
+        using var handler = new ParameterHandler(name);
+        using var context = new BunitContext().WithCollectionPresentation().WithResourceListContext(new() { Scope = workspace.Value, PhysicalWorkspaceId = workspace.TargetId!.Value });
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        context.Services.AddSingleton<IResourceScopeInventoryClient>(new FakeClient(inventory));
+        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(workspace.Value));
+        context.Services.AddSingleton<IParametersClient>(new ParametersApiClient(new HttpClient(handler) { BaseAddress = new("https://agentstration.test/") }));
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/settings/resource-scopes?context={Uri.EscapeDataString(workspace.Value)}" + (direct ? "#preview/Parameter/%2Finstance/default/off-window" : ""));
+        var cut = context.Render<ResourceScopes>();
+        if (!direct)
+        {
+            Assert.AreEqual(0, handler.Reads);
+            var root = cut.FindComponents<ResourceScopeTreeNode>().Single(node => node.Instance.Scope.ScopeRef == ResourceScopeRef.Instance);
+            await cut.InvokeAsync(() => root.Instance.OnSelected.InvokeAsync(ResourceScopeRef.Instance));
+            await cut.Find("[data-testid=scope-resource-preview]").ClickAsync(new());
+        }
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindComponents<ParameterResourceSummary>()));
+        Assert.AreEqual(1, handler.Reads);
+        var href = cut.Find("[data-testid=parameter-preview-open]").GetAttribute("href")!;
+        Assert.Contains("scopeRef=%2Finstance", href);
+        Assert.Contains("context=" + Uri.EscapeDataString(workspace.Value), href);
+        Assert.IsTrue(href.EndsWith("#overview", StringComparison.Ordinal));
+        Assert.IsEmpty(cut.FindAll("[data-testid=parameter-preview-edit], form"));
+    }
+    private sealed class NavigationContext(string scope) : IConsoleNavigationContext
+    {
+        public string ScopeRef => scope;
+        public string AddToUri(string uri) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(uri, "context", scope);
+    }
+    private sealed class ParameterHandler(string name) : HttpMessageHandler
+    {
+        public int Reads { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            Reads++;
+            Assert.AreEqual($"/api/parameters/{name}?scopeRef=%2Finstance", request.RequestUri!.PathAndQuery);
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new ParameterResource
+                {
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = "Parameter",
+                    ScopeRef = ResourceScopeRef.Instance,
+                    Metadata = new() { Name = name },
+                    Definition = new() { DisplayName = "Saved parameter", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("saved-value") }
+                })
+            };
+            response.Headers.ETag = new("\"saved\"");
+            return Task.FromResult(response);
+        }
     }
 
     private sealed class FakeClient(ResourceScopeInventoryResponse inventory) : IResourceScopeInventoryClient

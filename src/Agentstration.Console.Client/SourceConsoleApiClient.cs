@@ -9,6 +9,8 @@ public interface ISourceConsoleApiClient
 {
     Task<IReadOnlyList<SourceConsoleListItem>> ListAsync(CancellationToken cancellationToken);
     Task<SourceConsoleDetailView> GetAsync(ResourceScopeRef scopeRef, string publisher, string name, Guid? versionUid, string? locale, CancellationToken cancellationToken);
+    Task<SourceSavedSummarySnapshot> GetSavedSummaryAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact scoped Source Summary reads.");
     Task<SourceImportResult> ImportYamlAsync(string manifest, ResourceScopeRef scopeRef, CancellationToken cancellationToken);
     Task<SourceImportResult> ImportUrlAsync(Uri url, ResourceScopeRef scopeRef, CancellationToken cancellationToken);
     Task UpdateDisplayNameAsync(ResourceScopeRef scopeRef, string publisher, string name, string displayName, string etag, CancellationToken cancellationToken);
@@ -28,6 +30,9 @@ public sealed class SourceConsoleApiClient(HttpClient httpClient) : ISourceConso
 
     public Task<SourceConsoleDetailView> GetAsync(ResourceScopeRef scopeRef, string publisher, string name, Guid? versionUid, string? locale, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<SourceConsoleDetailView>(httpClient, ConsolePath(scopeRef, publisher, name, versionUid, locale), cancellationToken);
+
+    public Task<SourceSavedSummarySnapshot> GetSavedSummaryAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        ApiResponse.ReadAsync<SourceSavedSummarySnapshot>(httpClient, $"api/sources/{Escape(ns.Value)}/{Escape(name)}/summary?scopeRef={Escape(owner.Value)}", token);
 
     public Task<SourceImportResult> ImportYamlAsync(string manifest, ResourceScopeRef scopeRef, CancellationToken cancellationToken) =>
         PostAsync<SourceImportResult>("api/sources/imports/yaml", new ImportSourceYamlRequest(manifest, scopeRef), cancellationToken);

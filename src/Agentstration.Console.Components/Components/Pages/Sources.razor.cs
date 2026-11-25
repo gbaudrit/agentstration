@@ -63,10 +63,10 @@ public partial class Sources
         pending = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != collectionContextKey) { sources = null; hasCollectionAuthorization = false; sourceQuery = new(); collectionContextKey = scope; }
+        if (scope != collectionContextKey) { collectionPreview?.Close(); sources = null; hasCollectionAuthorization = false; sourceQuery = new(); collectionContextKey = scope; }
         if (ContextState.Error is not null)
         {
-            sources = null; hasCollectionAuthorization = false;
+            collectionPreview?.Close(); sources = null; hasCollectionAuthorization = false;
             collectionLoad = new(ResourceLoadStatus.Failed);
             return;
         }
@@ -86,7 +86,7 @@ public partial class Sources
             if (!IsCurrent(requestRevision, scope)) return;
             var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
             var forbidden = status is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized;
-            if (forbidden) { sources = null; hasCollectionAuthorization = false; ResetImportDraft(); busy = false; }
+            if (forbidden) { collectionPreview?.Close(); sources = null; hasCollectionAuthorization = false; ResetImportDraft(); busy = false; }
             collectionLoad = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed)
             {
                 HasContent = sources is not null,

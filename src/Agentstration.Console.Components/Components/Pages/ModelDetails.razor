@@ -22,8 +22,11 @@
         <MetricCard Label="@T("InputModalities")" Value="@(model is null ? "—" : Modalities(EffectiveSpecification.Input))" Detail="@ProvenanceLabel(HasInputOverride)" HelpText="@T("InputHelp")" Status="@(model is not null && EffectiveSpecification.Input is not null ? UiStatus.Info : UiStatus.Neutral)" />
         <MetricCard Label="@T("OutputModalities")" Value="@(model is null ? "—" : Modalities(EffectiveSpecification.Output))" Detail="@ProvenanceLabel(HasOutputOverride)" HelpText="@T("OutputHelp")" Status="@(model is not null && EffectiveSpecification.Output is not null ? UiStatus.Info : UiStatus.Neutral)" />
     </OverviewMetrics>
-    <OverviewConfiguration><p class="field-help">@T("ReadOnlyDescription")</p>@ProviderFacts</OverviewConfiguration>
-    <OverviewContent><div class="resource-editor-view">@Capabilities(true) @Limits</div></OverviewContent>
+    <OverviewSummary Context="identity">@if (model is not null) {
+        <ModelResourceSummary Resource="model" Identity="identity" KnownEffectiveSpecification="@(effective?.Specification ?? EffectiveModelSpecificationResolver.Resolve(model.Definition.Specification, SavedOverride))" KnownOverride="SavedOverride">
+            <ConfigurationActions>@if (SavedOverride is not null) { <StatusBadge Text="@T("OverrideApplied")" Status="UiStatus.Info" /> }@if (CanEditOverrides) { <button class="button-secondary" type="button" data-testid="edit-model-override" @onclick="OpenOverrides">@(SavedOverride is null ? T("AddOverride") : T("EditOverride"))</button> }</ConfigurationActions>
+        </ModelResourceSummary>
+    }</OverviewSummary>
     <DefinitionContent Context="path">@if (overrideEditor is not null) {
         <ResourceDefinitionForm @key="overrideEditor" EditContext="InspectionContext" FieldLabels="FieldLabels" Id="model-inspection-form" FormName="model-inspection"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" />
@@ -155,7 +158,8 @@
         loadState = new(refresh && model is not null ? ResourceLoadStatus.Refreshing : ResourceLoadStatus.Loading) { HasContent = model is not null };
         try
         {
-            var snapshot = await ModelsClient.GetModelAsync(ModelNamespace, Name, cancellation.Token);
+            var snapshot = await (string.IsNullOrWhiteSpace(ScopeRefValue) ? ModelsClient.GetModelAsync(ModelNamespace, Name, cancellation.Token)
+                : ModelsClient.GetModelAsync(ModelNamespace, Name, ResourceScopeRef.Parse(ScopeRefValue), cancellation.Token));
             if (request != loadVersion) return;
             var value = snapshot.Value;
             if (value.Name != Name || value.Namespace != ModelNamespace || value.ScopeRef != ResourceScopeRef.Instance

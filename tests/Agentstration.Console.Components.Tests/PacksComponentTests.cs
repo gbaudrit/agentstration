@@ -47,11 +47,11 @@ public sealed class PacksComponentTests
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
         CollectionAssert.AreEqual(new[] { "1", "2", "0", "0" }, rendered.FindAll(".metric-card strong").Select(element => element.TextContent).ToArray());
-        await rendered.Find(".collection-identity-button").ClickAsync(new());
+        await rendered.Find("[data-testid=pack-manage]").ClickAsync(new());
         Assert.IsTrue(rendered.Markup.Contains("Managed resources", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("reasoning-default", StringComparison.Ordinal));
         Assert.IsTrue(rendered.Markup.Contains("default/openai-production", StringComparison.Ordinal));
-        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant#definition/configuration", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
+        Assert.AreEqual("/namespaces/agentstration.starter/agents/assistant?scopeRef=%2Finstance&context=%2Finstance#definition/configuration", rendered.FindAll("a").Single(link => link.TextContent.Trim() == "Form").GetAttribute("href"));
     }
 
     [TestMethod]
@@ -130,7 +130,7 @@ public sealed class PacksComponentTests
         var rendered = context.Render<PacksPage>();
         rendered.WaitForAssertion(() => Assert.IsTrue(rendered.Markup.Contains("Starter Pack", StringComparison.Ordinal)));
 
-        await rendered.Find(".collection-identity-button").ClickAsync(new());
+        await rendered.Find("[data-testid=pack-manage]").ClickAsync(new());
         await rendered.FindAll("button").Single(button => button.TextContent.Trim().Equals("Fork", StringComparison.Ordinal)).ClickAsync(new());
 
         Assert.IsTrue(rendered.Markup.Contains("Source archive required", StringComparison.Ordinal));
@@ -230,6 +230,7 @@ public sealed class PacksComponentTests
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackKinds.InstalledPack,
+            ScopeRef = ResourceScopeRef.Instance,
             Metadata = new ResourceMetadata { Name = "13-agentstration-starter" },
             Definition = new InstalledPackProperties
             {
@@ -254,6 +255,7 @@ public sealed class PacksComponentTests
 
         public Task<IReadOnlyList<InstalledPackResource>> GetPacksAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<InstalledPackResource>>([pack]);
         public Task<ResourceSnapshot<InstalledPackResource>> GetPackAsync(string publisher, string name, CancellationToken cancellationToken) => Task.FromResult(new ResourceSnapshot<InstalledPackResource>(pack, "\"etag-1\""));
+        public Task<ResourceSnapshot<InstalledPackResource>> GetPackAtScopeAsync(ResourceScopeRef owner, string publisher, string name, CancellationToken token) => GetPackAsync(publisher, name, token);
         public Task<PackInstallationPreview> PreviewAsync(byte[] archive, string fileName, CancellationToken cancellationToken) =>
             Task.FromResult(PreviewResult ?? throw new NotSupportedException());
         public Task<ResourceSnapshot<InstalledPackResource>> InstallAsync(byte[] archive, string fileName, bool replaceExisting, bool removeDashboardReferences, IReadOnlyList<PackBindingSelection> bindings, CancellationToken cancellationToken)

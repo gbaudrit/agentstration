@@ -88,7 +88,7 @@ else if (inventory is not null)
                             <span class="cleanup-row-detail">@KindLabel(candidate.Kind)@if (!string.IsNullOrWhiteSpace(candidate.Detail)) { <small>@candidate.Detail</small> }</span>
                             <StatusBadge Text="@StatusLabel(candidate.Status)" Status="@PlatformDashboardService.ToStatus(candidate.Status)" />
                             <time datetime="@candidate.UpdatedAt.ToString("O")">@FormatDate(candidate.UpdatedAt)</time>
-                        <CollectionActions ResourceName="@($"{candidate.DisplayName} ({candidate.Namespace}/{candidate.Id}, {candidate.ScopeRef})")"><a href="@CandidateUrl(candidate)">@Shared["OpenItem"]</a></CollectionActions>
+                        <CollectionActions ResourceName="@($"{candidate.DisplayName} ({candidate.Namespace}/{candidate.Id}, {candidate.ScopeRef})")"><a href="@CandidateUrl(candidate)"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>@if (CandidateAddressForPreview(candidate) is { } target) { <button type="button" disabled="@(!ContextState.HasPermission(AuthorizationPermissions.ResourcesRead) || deleting)" data-testid="cleanup-resource-preview" @onclick="() => preview?.Open(target)"><UiIcon Name="eye" />@Shared["Preview"]</button> }</CollectionActions>
                         </div>
                     }
                 </div>
@@ -135,8 +135,25 @@ else if (inventory is not null)
     </div>
 }
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="" ResourceKinds="PreviewKinds" ContextKey="@PreviewContextKey" Enabled="@(HasAccess && ContextState.Error is null && ContextState.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address">@switch (address.Kind) {
+        case "Agent": <AgentResourcePreview Address="address" OverviewHref="@PreviewUrl(address)" DefinitionHref="@(PreviewUrl(address).Split('#')[0] + "#definition/configuration")" RunHref="@ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation($"/agents/{Uri.EscapeDataString(address.Name)}/run", Services), address.ScopeRef)" /> break;
+        case "Flow": <FlowResourcePreview Address="address" OverviewHref="@PreviewUrl(address)" DefinitionHref="@(PreviewUrl(address).Split('#')[0] + "#definition/configuration")" DesignerHref="@(PreviewUrl(address).Split('#')[0].Replace("?", "/designer?", StringComparison.Ordinal))" /> break;
+        case "Entry": <EntryResourcePreview Address="address" OverviewHref="@PreviewUrl(address)" DefinitionHref="@(PreviewUrl(address).Split('#')[0] + "#definition/configuration")" /> break;
+    }</ChildContent>
+</ResourceCollectionPreview>
+
 @code {
-    private static string CandidateUrl(CleanupCandidate candidate)
+    private ResourceCollectionPreview? preview;
+    private static readonly IReadOnlySet<string> PreviewKinds = new HashSet<string> { "Agent", "Flow", "Entry" };
+    private string? PreviewContextKey => ContextState.Current is { } current ? $"{current.UserId}|{current.SelectedScopeRef}|{current.WorkspaceId}" : null;
+    private static ScopedResourceAddress? CandidateAddressForPreview(CleanupCandidate value) => value.ScopeRef is { } owner && value.Kind is CleanupResourceKind.Agent or CleanupResourceKind.Flow or CleanupResourceKind.Entry
+        ? ScopedResourceAddress.Create(owner, value.Namespace, value.Kind.ToString(), value.Id) : null;
+    private string PreviewUrl(ScopedResourceAddress address) => ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(address.Kind switch {
+        "Agent" => ConsoleResourceUrls.Agent(address.Namespace, address.Name),
+        "Flow" => ConsoleResourceUrls.Flow(new(address.Name, address.Namespace)),
+        _ => ConsoleResourceUrls.Entry(new(address.Name, address.Namespace)) }, Services), address.ScopeRef) + "#overview";
+    private string CandidateUrl(CleanupCandidate candidate)
     {
         var path = candidate.Kind switch
         {
@@ -147,7 +164,8 @@ else if (inventory is not null)
             CleanupResourceKind.Task => $"/tasks/{Uri.EscapeDataString(candidate.Id)}",
             _ => $"/runs/{Uri.EscapeDataString(candidate.Id)}"
         };
-        return candidate.ScopeRef is { } owner ? $"{path}?scopeRef={Uri.EscapeDataString(owner.Value)}&context={Uri.EscapeDataString(owner.Value)}" : path;
+        var target = candidate.ScopeRef is { } owner ? ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(path, Services), owner) : ResourceOwnershipContext.PreserveNavigation(path, Services);
+        return CandidateAddressForPreview(candidate) is null ? target : target + "#overview";
     }
 
     private sealed record CleanupFailure(CleanupCandidate Candidate, string Message, string ErrorId);
@@ -193,21 +211,28 @@ else if (inventory is not null)
     protected override async Task OnInitializedAsync()
     {
         if (ContextState.Current is null) await ContextState.LoadAsync(cancellation.Token);
+        ContextState.Changed += ContextChanged;
         if (HasAccess) await LoadAsync(false);
     }
 
+    private void ContextChanged() => _ = InvokeAsync(async () => { if (disposed) return; preview?.Close(); inventory = null; selected.Clear(); confirming = false; if (HasAccess && ContextState.Error is null) await LoadAsync(false); StateHasChanged(); });
+    private long loadRevision;
+    private bool disposed;
     private async Task LoadAsync(bool preserveSelection)
     {
+        var request = ++loadRevision; var key = PreviewContextKey;
         loading = true;
         error = null;
         try
         {
-            inventory = await Client.GetInventoryAsync(cancellation.Token);
+            var saved = await Client.GetInventoryAsync(cancellation.Token);
+            if (disposed || request != loadRevision || key != PreviewContextKey || !HasAccess) return;
+            inventory = saved;
             if (preserveSelection) selected.IntersectWith(inventory.All.Select(candidate => candidate.Key));
             else selected.Clear();
         }
-        catch (AgentstrationApiException exception) { error = exception; }
-        finally { loading = false; }
+        catch (AgentstrationApiException exception) { if (!disposed && request == loadRevision && key == PreviewContextKey) error = exception; }
+        finally { if (!disposed && request == loadRevision) loading = false; }
     }
 
     private IReadOnlyList<CleanupCandidate> Filter(IReadOnlyList<CleanupCandidate> candidates) => candidates
@@ -275,5 +300,5 @@ else if (inventory is not null)
     private string FormatDate(DateTimeOffset value) => value == DateTimeOffset.MinValue ? T("UnknownDate") : value.LocalDateTime.ToString("g", System.Globalization.CultureInfo.CurrentCulture);
     private static string CandidateAddress(CleanupCandidate candidate) => candidate.Namespace.IsDefault ? candidate.Id : $"{candidate.Namespace.Value}/{candidate.Id}";
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
+    public void Dispose() { disposed = true; loadRevision++; ContextState.Changed -= ContextChanged; cancellation.Cancel(); cancellation.Dispose(); }
 }

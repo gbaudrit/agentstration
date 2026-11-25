@@ -39,9 +39,7 @@ else
         Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
         Yaml="@SavedYaml" Busy="busy" TestId="resource-tool-category-editor" SectionTestIdPrefix="category">
         <OverviewMetrics><MetricCard Label="@T("Members")" Value="@category!.Definition.Tools.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
-        </CollectionView></OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (category is not null) { <ToolCategoryResourceSummary Resource="category" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="formContext" FieldLabels="FieldLabels" Id="category-resource-form" FormName="tool-category-editor"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
             InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
@@ -238,10 +236,10 @@ else
                 model.ScopeRef = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
                 baseline = Fingerprint; loadState = new(ResourceLoadStatus.Ready); return;
             }
-            var categoryTask = Categories.GetCategoryAsync(ns, Name!, cancellation.Token); var membersTask = Categories.GetMembersAsync(ns, Name!, cancellation.Token);
+            ResourceScopeRef? requestedOwner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
+            var categoryTask = requestedOwner is { } exactOwner ? Categories.GetCategoryAsync(exactOwner, ns, Name!, cancellation.Token) : Categories.GetCategoryAsync(ns, Name!, cancellation.Token); var membersTask = Categories.GetMembersAsync(ns, Name!, cancellation.Token);
             await Task.WhenAll(categoryTask, membersTask); if (version != loadVersion) return;
             var snapshot = categoryTask.Result; var known = membersTask.Result;
-            ResourceScopeRef? requestedOwner = string.IsNullOrWhiteSpace(ScopeRefValue) ? null : ResourceScopeRef.Parse(ScopeRefValue);
             if (snapshot.Value.Namespace != ns || snapshot.Value.Name != Name || snapshot.Value.ScopeRef is null || requestedOwner is { } owner && snapshot.Value.ScopeRef != owner) throw new InvalidOperationException(T("ScopeMismatch"));
             Apply(new(snapshot.Value, snapshot.ETag, known, catalog, discoveredProviders));
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
@@ -263,7 +261,7 @@ else
         var version = ++loadVersion; refreshing = true; loadState = new(ResourceLoadStatus.Refreshing) { HasContent = true };
         try
         {
-            var snapshot = await Categories.GetCategoryAsync(current.Namespace, current.Name, cancellation.Token);
+            var snapshot = await Categories.GetCategoryAsync(owner, current.Namespace, current.Name, cancellation.Token);
             if (version != loadVersion) return;
             var value = snapshot.Value;
             if (value.Uid != current.Uid || value.ScopeRef != owner || value.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
@@ -358,8 +356,6 @@ else
         finally { if (request == loadVersion) busy = false; }
     }
     private string ReferenceText(ResourceReference reference) => $"{(reference.ScopeRef is { } owner ? owner.Value + " · " : "")}{reference.Namespace ?? category?.Namespace ?? ResourceNamespace.Parse(model.Namespace)}/{reference.Name}";
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => category is null ? [] : [new(T("Members"), category.Definition.Tools.Count == 0 ? Shared["NotProvided"] : string.Join("\n", category.Definition.Tools.Select(ReferenceText)))];
     private static string ToolKey(ToolResource tool) => ToolCategoryEditorModel.ToolKey(tool);
     private static string MemberKey(ToolCategoryMember member) => ToolCategoryEditorModel.MemberKey(member);
     private string ProviderLabel(ToolResource tool) => providers.FirstOrDefault(provider => MatchesProvider(tool, provider))?.Definition.DisplayName ?? tool.Definition.Provider?.Name ?? T("NoProvider");

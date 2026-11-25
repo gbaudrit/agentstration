@@ -33,6 +33,8 @@ internal static class FixtureHost
         var lifetime = factory.Services.GetRequiredService<IHostApplicationLifetime>();
         using var registration = lifetime.ApplicationStopping.Register(() => shutdown.TrySetResult());
         await factory.Services.GetRequiredService<InventorySeeder>().SeedAsync(lifetime.ApplicationStopping);
+        if (Environment.GetEnvironmentVariable("COLLECTION_LAYOUT_FIXTURE") == "true")
+            await CollectionLayoutSeeds.SeedAsync(factory.Services, lifetime.ApplicationStopping);
         var readyFile = Environment.GetEnvironmentVariable("GOVERNED_INVENTORY_READY_FILE")
             ?? throw new InvalidOperationException("The browser fixture requires a readiness file.");
         await File.WriteAllTextAsync(readyFile, "ready", lifetime.ApplicationStopping);

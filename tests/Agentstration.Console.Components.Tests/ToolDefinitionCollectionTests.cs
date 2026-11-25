@@ -26,9 +26,9 @@ public sealed class ToolDefinitionCollectionTests
         using var context = Context(handler);
         var cut = context.Render<ToolDefinitions>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.HasCount(20, cut.FindAll(".collection-primary-actions a.button-secondary"));
-        Assert.AreEqual(cultureName == "fr-FR" ? "Modifier" : "Edit", cut.Find(".collection-primary-actions a").TextContent);
-        Assert.IsEmpty(cut.FindAll(".collection-actions-menu"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions-menu a[href*=\"definition/configuration\"]"));
+        Assert.AreEqual(cultureName == "fr-FR" ? "Modifier la définition" : "Edit definition", cut.Find(".collection-actions-menu a[href*=\"definition/configuration\"]").TextContent.Trim());
+        Assert.HasCount(20, cut.FindAll(".collection-actions-menu"));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/tools/definitions/definition-0?namespace=team&scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&context=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         Assert.HasCount(5, cut.FindAll(".resource-tabs a"));
@@ -111,7 +111,7 @@ public sealed class ToolDefinitionCollectionTests
     }
 
     [TestMethod]
-    public async Task MixedKindsKeepTargetsApprovalStateAndDirectEditCommands()
+    public async Task MixedKindsKeepTargetsApprovalStateAndOverviewCommands()
     {
         using var culture = new TestCultureScope("en-US");
         using var handler = new Handler(_ => Task.FromResult(Response(45)));
@@ -125,7 +125,7 @@ public sealed class ToolDefinitionCollectionTests
         await cut.Find("[data-filter-key=enabled] select").ChangeAsync(new() { Value = "false" });
         Assert.HasCount(7, cut.FindAll("tbody tr"));
         StringAssert.Contains(cut.Find("tbody tr").TextContent, "relay-ns/tool-3 · 17");
-        Assert.AreEqual(cut.Find(".resource-name-link").GetAttribute("href"), cut.Find(".collection-primary-actions a").GetAttribute("href"));
+        Assert.AreEqual(cut.Find(".resource-name-link").GetAttribute("href"), cut.Find(".collection-actions-menu a[href$=\"#overview\"]").GetAttribute("href"));
         Assert.AreEqual(1, handler.Requests);
     }
 

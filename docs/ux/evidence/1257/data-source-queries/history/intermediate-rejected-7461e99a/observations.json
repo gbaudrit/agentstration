@@ -1,0 +1,259 @@
+{
+  "testedCommit": "7461e99a847f870520a90e4feaca7139b65e34aa",
+  "testCommand": "npm run test:smoke -- collection-layout.spec.ts --config=/tmp/1257-layout-evidence.config.mts",
+  "runtime": "Linux; Chromium 154; Playwright 1.63.0; frozen Release hosts; disposable local inventory fixture",
+  "sourceProofEncoding": "SHA-256 of UTF-8 text with LF line endings",
+  "sourceProof": {
+    "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor": "7e5772785107d89531b8ce2fa58e0b7f0cb2117448ca4c77e63e704ef977b72d",
+    "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor.css": "79802f0abfe70fc5001b3df1f94405945b31514ad0506bb8365a994636f556e4",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor": "bf0db25d8e2a39fbe7173e4ce5f09f5755b3585a381ee1cf5bef04448d9d6289",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor.css": "6d2f88b61627731124126e6535545c029f85ed2bef5c9a10075a5a1f4edb68ad",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "7d60e68a32eb640079eeadb189f1f5103590a83d48822af35a4cddc31c86c551",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor": "43a7e2f4a34b081341d2acfae0d4ee43d25b9c020e3a905c7b09166a029ec06c",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.css": "16a9512496ae965350afa9190a45122f584c2ea08bc5fd44f614a352d3edb9b0",
+    "src/Agentstration.Web.Components/CollectionIdentity.razor": "4f7abca6d18618884a3d152b5b0fa47f0ddace2624f18ebef35eae80ef123e69",
+    "src/Agentstration.Web.Components/ResourceScopeBadge.razor": "2975159d4d0dd11d6ba7cb1d65a919b0700551d4cb30c2407f1f584b878b0204",
+    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "8fe4f3f12ba17306e9b3506e9560f2a9695e1c152e1629659b0080e1ac4046f5",
+    "src/Agentstration.Web.Components/wwwroot/management.css": "f07a2850a20ae0f6c20e58863594b69caa4a8eb99cc5709e18d75ae7739bb815",
+    "src/Agentstration.Web.Components/wwwroot/collection-ui.js": "463ca21a209abd9fbe987d5852fa12dccfc1ca7c58110fe37f7c69cbe9829be6",
+    "src/Agentstration.Web.Components/wwwroot/dialog.js": "8c9d75ec30d717f861a698cc680f058e8df21b997a1090acb989f513e6a83699",
+    "src/Agentstration.Web.Components/wwwroot/agentstration.css": "a79eb40f961f6c2aa327dbd4944cbf09a7e65c1b23698ca1d87011f9f0367cc2",
+    "src/Agentstration.Web.Components/CollectionView.razor": "93e933abd6791e5a3661d21baac1ee0463127f30198a81afceaa9ba9fc792cef",
+    "src/Agentstration.Web.Components/DataGrid.razor": "a0bc6ca6f37c8e5450bf421a5db8b90c3047eccad830a25df5f37a988a774041",
+    "src/Agentstration.Web.Components/ModalFrame.razor": "2f41cd1f5928c31e8c53b4c4e2be0ad69f0c0da255ac747864cd65ede039fdea",
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor": "fa41b7cb259961b1993f34531140dc3982cf3a3700a825cb1c7cb6fd591005e5",
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor.css": "c478cfc0eb44b9dcfced3b1c8815cad66bee88116f7e44f9e4dd495258b1da13",
+    "src/Agentstration.Web.Components/ResourceNavigation.razor": "56ba15b89dc694e1d5df308746330f80bbe82a7c6282784d9b7176f78aa46025",
+    "src/Agentstration.Web.Components/ResourceNavigation.razor.css": "d6248979605bbefe2b9371d10e61ae7d10f384d2bc231c0ce659c94d23fb0b8a",
+    "automation/playwright/src/pages/collection-layout.page.ts": "a64523bc7c82dc5f40e95f3bad2470b716625e99b0b993eac4c1fabff717cd37",
+    "automation/playwright/src/pages/transformation-function-collection.page.ts": "d31fd66f3c2c5e3391dd7daf7446d0c619abd95787bd8ac72b0be182f7f9e13e",
+    "automation/playwright/tests/collection-layout.spec.ts": "d291051360863a19ecc3bfbc758d6f7c3d65ed59841d385ef8bfaaf95f4b6209",
+    "automation/playwright/fixtures/GovernedInventoryHost/CollectionLayoutSeeds.cs": "8709cf84e1dd1282e91493d872e33496ecba2787631fbe8bce94feb2df7ca557",
+    "automation/playwright/fixtures/GovernedInventoryHost/FixtureHost.cs": "0bcf6296e38c1ed843e9f9ca92053e7537b4d4f353feba426d89d8ba442258ba",
+    "automation/playwright/src/fixtures/source-lifecycle.ts": "0e59e5f335e09177f46b5a641d3ae5a8f7701b83a6d39698d0386b111785a934",
+    "automation/playwright/src/fixtures/product-hosts.ts": "fb5e5554d816bbb176c08e4bfacf8858fb072585d1464474aa96df589843f461",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor": "e95d612b9b692c974b6721f2ac703d37825a122026bd7ec31bf38017a666ee89",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor.css": "fdef898f88c876434b6a2e87e53fd21907d0bb537fa52f5733d5f7e2d2b238ab"
+  },
+  "causeAndCorrection": "Le badge de périmètre textuel occupait la couche absolue IconBadges. Il utilise désormais Indicators, dans le flux normal, entre l’icône et le texte. Le conteneur imbriqué nécessite aussi min-width:0. La fermeture du Preview restaure le fragment natif #queries.",
+  "cases": [
+    {
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 1040,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 123.78125,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.78125,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.28125,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 948.78125,
+              "right": 1293.96875,
+              "textRight": 416.25
+            },
+            {
+              "width": 91.21875,
+              "right": 1385.1875,
+              "textRight": 1365.03125
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 258,
+          "scrollWidth": 1040,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 123.78125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.78125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.28125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 948.78125,
+              "right": 1035.96875,
+              "textRight": 158.25
+            },
+            {
+              "width": 91.21875,
+              "right": 1127.1875,
+              "textRight": 1107.03125
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 258,
+          "scrollWidth": 1040,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 123.78125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.78125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.28125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 948.78125,
+              "right": 1035.96875,
+              "textRight": 158.25
+            },
+            {
+              "width": 91.21875,
+              "right": 1127.1875,
+              "textRight": 1107.03125
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 258,
+          "scrollWidth": 1040,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 123.78125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.78125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 123.28125,
+              "iconLeft": 109.578125,
+              "textLeft": 220.015625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 948.78125,
+              "right": 1035.96875,
+              "textRight": 158.25
+            },
+            {
+              "width": 91.21875,
+              "right": 1127.1875,
+              "textRight": 1107.03125
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "after-close": {
+          "path": "table-en-US-light-1440-after-close.png",
+          "sha256": "a036f5c92318755d0a6bf68760c31fbcdb266e473853ce486b1e4a0a456a2bb0",
+          "visuallyInspected": false
+        }
+      }
+    }
+  ],
+  "automaticChecks": [
+    "multiple persisted resources and long identities",
+    "header text fits allocated columns",
+    "bounded row heights and readable function descriptions",
+    "scope badge/icon/text do not overlap",
+    "no document horizontal overflow",
+    "mouse/touch Actions; Escape/End; menu and dialog focus restoration; menu viewport bounds",
+    "Preview open/close preserves horizontal position",
+    "durable identity stays visible through horizontal scrolling",
+    "native section restored after close"
+  ],
+  "visualInspection": {
+    "status": "rejected",
+    "findings": "Actions label wraps vertically in Query table; Artifact desktop table unnecessarily scrolls. Only the rejected image and its phase geometry are retained."
+  },
+  "limitations": [
+    "Les trois requêtes désactivées et le dataset désactivé sont des métadonnées synthétiques persistées dans le hôte jetable, avec des pins inertes. Aucune acquisition, création de collection documentaire, exécution ou publication de requête n’est validée.",
+    "Le contrat Query ne possède pas de Description ; les noms d’affichage et techniques longs sont testés."
+  ]
+}

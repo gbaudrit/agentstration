@@ -1,0 +1,18 @@
+<Project Sdk="MSTest.Sdk/4.3.3">
+  <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Infrastructure/Agentstration.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Models.Application/Agentstration.Models.Application.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Models.Contracts/Agentstration.Models.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ModelProviders/Agentstration.ModelProviders.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.ResourceManagement.Contracts/Agentstration.ResourceManagement.Contracts.csproj" />
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
+    <Compile Include="../ManagementApiTestFixtures/ModelManagementApiTestBase.cs" Link="Fixtures/ModelManagementApiTestBase.cs" />
+    <Compile Include="../ManagementApiTestFixtures/AwpTestWorker.cs" Link="Fixtures/AwpTestWorker.cs" />
+    <Compile Include="../TestHostMetrics.cs" Link="TestHostMetrics.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+</Project>

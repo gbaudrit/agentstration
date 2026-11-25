@@ -141,6 +141,47 @@ public sealed partial class DataSourceEditorTests
     }
 
     [TestMethod]
+    public void APreviousLoadCannotMarkAStillPendingReplacementAsReady()
+    {
+        var operations = new TaskCompletionSource<IReadOnlyList<DataSourceDiscoveryResource>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replacement = new TaskCompletionSource<ResourceSnapshot<DataSourceResource>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new SourceClientStub(targeted: true) { DeferredDiscoveryRead = operations };
+        using var context = FoundationContext(client);
+        var cut = context.Render<DataSourceEditor>(p => p.Add(c => c.Name, "documentation"));
+        cut.WaitForAssertion(() => Assert.IsTrue(client.ReadingDeferredDiscovery));
+        var saved = client.Saved with
+        {
+            Metadata = client.Saved.Metadata with { Name = "replacement" },
+            Definition = client.Saved.Definition with { DisplayName = "Replacement source" }
+        };
+        try
+        {
+            client.PendingRead = replacement.Task;
+            cut.Render(p => p.Add(c => c.Name, "replacement"));
+            var renders = cut.RenderCount;
+            operations.SetResult([]);
+            cut.WaitForAssertion(() => Assert.IsTrue(cut.RenderCount > renders));
+            var pending = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;
+            Assert.IsNull(pending.Resource);
+            Assert.AreEqual(ResourceLoadStatus.Loading, pending.LoadState!.Status);
+            Assert.DoesNotContain("Documentation", cut.Markup);
+
+            replacement.SetResult(new(saved, "\"replacement-etag\""));
+            cut.WaitForAssertion(() =>
+            {
+                var loaded = cut.FindComponent<ConsoleResourceDetailsTemplate>().Instance;
+                Assert.AreEqual("replacement", loaded.Resource!.Name);
+                Assert.AreEqual(ResourceLoadStatus.Ready, loaded.LoadState!.Status);
+            });
+        }
+        finally
+        {
+            operations.TrySetResult([]);
+            replacement.TrySetResult(new(saved, "\"replacement-etag\""));
+        }
+    }
+
+    [TestMethod]
     public async Task TypingDuringAnUnchangedRefreshKeepsTheSameFormWithoutAFalseConflict()
     {
         var client = new SourceClientStub(); using var context = FoundationContext(client);

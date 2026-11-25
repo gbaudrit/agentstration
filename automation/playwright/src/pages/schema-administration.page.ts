@@ -215,8 +215,9 @@ export class SchemaAdministrationPage {
     const denied = await this.page.request.get(this.schemaUrl(consoleUrl,
       '/workspaces/00000000-0000-0000-0000-000000000001', namespace, name));
     const body = await denied.text();
-    expect(denied.status(), body).toBe(422);
-    expect(body).toContain('does not exist');
+    expect(denied.status(), body).toBe(404);
+    expect(body).toContain('Schema not found');
+    expect(body).not.toContain('x-browser-contract');
   }
 
   private async reloadEditor(consoleUrl: string, scopeRef: string, namespace: string, name: string, view: string): Promise<void> {

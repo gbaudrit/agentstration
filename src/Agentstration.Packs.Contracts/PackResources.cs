@@ -119,6 +119,21 @@ public sealed record PackRequirement
 
 public readonly record struct PackIdentity(string Publisher, string Name)
 {
+    public static bool TryParseResourceName(string value, out PackIdentity identity)
+    {
+        identity = default;
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 512) return false;
+        var separator = value.IndexOf('-');
+        if (separator <= 0 || !int.TryParse(value.AsSpan(0, separator), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var length) || length < 1 || length > value.Length - separator - 2) return false;
+        var nameStart = separator + length + 2;
+        if (nameStart >= value.Length || value[nameStart - 1] != '-') return false;
+        var parsed = new PackIdentity(value.Substring(separator + 1, length), value[nameStart..]);
+        if (!string.Equals(parsed.ResourceName, value, StringComparison.Ordinal)) return false;
+        identity = parsed;
+        return true;
+    }
+
     public string ResourceName => $"{Publisher.Length}-{Publisher}-{Name}";
     public ResourceNamespace Namespace => new($"{Publisher}.{Name}");
     public override string ToString() => $"{Publisher}/{Name}";

@@ -517,8 +517,8 @@ public partial class Extensions
                 provider.ExtensionNamespace == item.RegistrationNamespace
                 && provider.ExtensionName == item.RegistrationName
                 && provider.ExtensionScopeRef == item.RegistrationScopeRef).ToArray();
-    private static string SourceProviderUrl(SourceProviderSummaryResponse provider) =>
-        $"/sourceproviders/{Uri.EscapeDataString(provider.Name)}?namespace={Uri.EscapeDataString(provider.Namespace)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef!.Value.Value)}&context={Uri.EscapeDataString(provider.ScopeRef!.Value.Value)}";
+    private string SourceProviderUrl(SourceProviderSummaryResponse provider) =>
+        ResourceOwnershipContext.Resource(Services, "/sourceproviders", provider.Name, ResourceNamespace.Parse(provider.Namespace), provider.ScopeRef);
     private static string ConfigureSourceProviderUrl(ExtensionInventoryItemResponse item, ExtensionContributionResponse contribution) =>
         $"/sourceproviders/new?extension={Uri.EscapeDataString(item.RegistrationName!)}&extensionNamespace={Uri.EscapeDataString(item.RegistrationNamespace)}&extensionScopeRef={Uri.EscapeDataString(item.RegistrationScopeRef!.Value.Value)}&contributionId={Uri.EscapeDataString(contribution.Id)}&displayName={Uri.EscapeDataString(item.DisplayName)}";
     private static string DetailUrl(ExtensionInventoryItemResponse item) => item.RegistrationName is not null

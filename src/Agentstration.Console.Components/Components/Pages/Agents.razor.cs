@@ -132,6 +132,6 @@ public partial class Agents
         : DeploymentLocalizer[$"Status.{value}"];
     private string T(string key) => Localizer[key];
     private string F(string key, params object[] arguments) => Localizer[key, arguments];
-    private string DeploymentUrl(AgentSummary item) => ResourceOwnershipContext.PreserveNavigation(ConsoleResourceUrls.WithOwnerScope(item.DeploymentUrl!, item.ScopeRef), Services);
+    private string DeploymentUrl(AgentSummary item) => ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(item.DeploymentUrl!, Services), item.ScopeRef);
     public void Dispose() { disposed = true; revision++; Context.Changed -= ContextChanged; pending?.Cancel(); pending?.Dispose(); cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
 }

@@ -281,19 +281,5 @@ public partial class ToolDefinitionEditor
     private static JsonElement? ParseOrNull(string value) { if (string.IsNullOrWhiteSpace(value)) return null; try { using var document = JsonDocument.Parse(value); return document.RootElement.Clone(); } catch (JsonException) { return null; } }
     private static string FlowText(ToolDefinitionFlowTarget flow, ResourceNamespace ns) => $"{(flow.ScopeRef is { } owner ? owner.Value + " · " : "")}{flow.Namespace ?? ns}/{flow.Name}{(!flow.UseActiveVersion && !string.IsNullOrWhiteSpace(flow.Version) ? " · " + flow.Version : "")}";
     private string UsageUrl(ToolDefinitionUsage usage) => ResourceOwnershipContext.Resource(Services, usage.Kind switch { "Agent" => "/agents", "Flow" => "/flows", _ => "/tools/sets" }, usage.Name, usage.Namespace, usage.ScopeRef);
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration
-    {
-        get
-        {
-            if (resource is null) return [];
-            var value = resource.Definition; var result = new List<ConfigurationEntry> { new(T("Enabled"), T(value.Enabled ? "Yes" : "No")), new(T("RequiresApproval"), T(value.RequiresApproval ? "Yes" : "No")), new(T("TimeoutSeconds"), value.InvocationTimeoutSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)), new(T("RelayVersion"), value.Version), new(T("PublishVersion"), T(value.Publish ? "Yes" : "No")), new(T("InputContract"), Pretty(value.InputSchema)), new(T("OutputContract"), value.OutputSchema is { } output ? Pretty(output) : "—") };
-            if (value.Bindings.Count > 0 || value.FixedArguments is not null) result.Add(new(T("FixedInputBindings"), JsonSerializer.Serialize(new { value.Bindings, value.FixedArguments }, IndentedJson)));
-            if (value.InputSchemaBinding is not null || value.OutputSchemaBinding is not null) result.Add(new(T("SchemaReferences"), JsonSerializer.Serialize(new { value.InputSchemaBinding, value.OutputSchemaBinding }, IndentedJson)));
-            if (value is FlowToolDefinitionProperties flow) { result.Add(new(T("Flow"), FlowText(flow.Flow, resource.Namespace))); result.Add(new(T("UseActiveVersion"), T(flow.Flow.UseActiveVersion ? "Yes" : "No"))); }
-            if (value is AcquisitionToolDefinitionProperties acquisition) { result.Add(new(T("AcquisitionTemplate"), $"{acquisition.Acquisition.TemplateNamespace}/{acquisition.Acquisition.TemplateId}")); result.Add(new(T("AcquisitionOutput"), acquisition.Acquisition.ArtifactName ?? "artifact")); }
-            return result;
-        }
-    }
     public void Dispose() { disposed = true; if (subscribed && contextState is not null) contextState.Changed -= ContextChanged; loadVersion++; contractVersion++; formContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); GC.SuppressFinalize(this); }
 }

@@ -41,6 +41,10 @@ public sealed class ModelDiscoveryService(
         CancellationToken cancellationToken) =>
         store.GetAsync<ModelResource>(ResourceKey.Create(ModelResourceKinds.Model, name, @namespace), cancellationToken);
 
+    public Task<StoredResource<ModelResource>?> GetExactAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        owner != ResourceScopeRef.Instance ? Task.FromResult<StoredResource<ModelResource>?>(null)
+            : store.GetExactAsync<ModelResource>(ScopedResourceAddress.Create(owner, ns, ModelResourceKinds.Model, name), token);
+
     public async Task<IReadOnlyList<StoredResource<ModelResource>>> ListProviderModelsAsync(
         ResourceNamespace providerNamespace,
         string providerName,

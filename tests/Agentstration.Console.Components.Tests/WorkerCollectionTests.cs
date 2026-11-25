@@ -24,7 +24,7 @@ public sealed class WorkerCollectionTests
         using var context = Context(handler);
         var cut = context.Render<RuntimeWorkers>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/settings/runtime-workers/00000001-0000-0000-0000-000000000000");
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());

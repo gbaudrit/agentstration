@@ -35,7 +35,7 @@ else
         Busy="busy" TestId="data-source-profile-editor" SectionTestIdPrefix="data-source-profile">
         <Feedback>@Feedback</Feedback>
         <OverviewMetrics>@if (profile is not null) { <MetricCard Label="@T("ActiveVersion")" Value="@(profile.ActiveVersion ?? "—")" Detail="@T("Published")" Status="@(profile.ActiveVersion is null ? UiStatus.Neutral : UiStatus.Success)" /> }</OverviewMetrics>
-        <OverviewConfiguration>@Configuration</OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (profile is not null) { <DataSourceProfileResourceSummary Resource="profile" Identity="identity" PublishedVersion="@revisions.OrderByDescending(revision => revision.PublishedAt).FirstOrDefault()?.Version" /> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="profile-resource-form" FormName="data-source-profile" data-resource-etag="@etag"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection" OnValidSubmit="SaveAsync"
             Busy="busy" ReadOnly="@(!CanManage)" Disabled="@(HasRawDraft || !interactive)" InvalidInputChanged="value => invalidInput = value" /></DefinitionContent>
@@ -60,7 +60,6 @@ else
         <AdditionalPanels>@if (IsNew) { <FormSection Title="@T("State")"><label class="resource-enabled-toggle"><FormCheckbox @bind-Value="model.Enabled" role="switch" /><span>@T("Enabled")</span></label></FormSection> }</AdditionalPanels>
     </ResourceIdentityEditor>;
     private RenderFragment ScopeValidation => @<ValidationMessage For="() => model.ScopeRef" />;
-    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
     private RenderFragment AcquisitionFields => @<FormSection Title="@T("WizardAcquisition")"><FormGrid>
         <FormField Label="@T("Version")" Required="true"><Validation><ValidationMessage For="() => model.Version" /></Validation><ChildContent><ClearableText @bind-Value="model.Version" data-testid="profile-version" /></ChildContent></FormField>
         <FormField Label="@T("Flow")" Required="true"><Validation><ValidationMessage For="() => model.FlowKey" /></Validation><ChildContent><ClearableSelect TValue="string" @bind-Value="model.FlowKey" data-testid="profile-flow"><option value="">@T("Select")</option>@if (profile is not null) { <option value="saved-acquisition">@FlowLabel(profile.Definition.AcquisitionFlow)</option> }@foreach (var flow in flows.Where(f => f.ScopeRef is not null)) { <option value="@Key(flow)">@flow.ScopeRef · @flow.Namespace/@flow.Name · @(flow.PublishedVersion ?? flow.ActiveVersion ?? "—")</option> }</ClearableSelect></ChildContent></FormField>
@@ -330,18 +329,5 @@ else
     private string Url(DataSourceProfileResource item) => ResourceOwnershipContext.Resource(Services, "/data-source-profiles", item.Name, item.Namespace, item.ScopeRef);
     private sealed record RawProfile { public required string ApiVersion { get; init; } public required string Kind { get; init; } public required ResourceMetadata Metadata { get; init; } public ResourceScopeRef? ScopeRef { get; init; } public required DataSourceProfileProperties Definition { get; init; } }
     private static string ToYaml(DataSourceProfileResource resource) => ResourceManifestSerializer.ToYaml(new RawProfile { ApiVersion = resource.ApiVersion, Kind = resource.Kind, Metadata = resource.Metadata, ScopeRef = resource.ScopeRef, Definition = resource.Definition });
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => profile is null ? [] :
-    [
-        new(T("State"), T(profile.Definition.Enabled ? "Enabled" : "Disabled")),
-        new(T("PublishedVersion"), profile.ActiveVersion ?? profile.PublishedVersion ?? revisions.OrderByDescending(revision => revision.PublishedAt).FirstOrDefault()?.Version ?? "—"),
-        new(T("Flow"), FlowLabel(profile.Definition.AcquisitionFlow)),
-        new(T("DiscoveryFlow"), profile.Definition.DiscoveryFlow is { } discovery ? FlowLabel(discovery) : T("None")),
-        new(T("Schema"), Json(profile.Definition.ConfigurationSchema)),
-        new(T("ToolBindings"), Json(profile.Definition.ToolBindings)),
-        new(T("DiscoveryToolBindings"), Json(profile.Definition.DiscoveryToolBindings)),
-        new(T("Limits"), Json(profile.Definition.Limits)),
-        new(T("Policies"), Json(profile.Definition.Policies))
-    ];
     public void Dispose() { ++loadVersion; ReleaseContext(); cancellation.Cancel(); cancellation.Dispose(); }
 }

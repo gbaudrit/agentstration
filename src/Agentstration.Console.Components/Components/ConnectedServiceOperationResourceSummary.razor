@@ -1,0 +1,57 @@
+@namespace Agentstration.Web.Components
+@using System.Text.Json
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="connected-service-operation-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (ShowIdentity)
+    {
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="connected-service-operation-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    }
+    @if (ShowConfiguration)
+    {
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="connected-service-operation-configuration-summary">
+        <CollectionView TItem="SavedSetting" Items="SavedSettings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="row"><strong class="configuration-key">@row.Label</strong></Identity><Information Context="row"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+    }
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ConnectedServiceOperationResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    [Parameter] public bool ShowIdentity { get; set; } = true;
+    [Parameter] public bool ShowConfiguration { get; set; } = true;
+    private sealed record SavedSetting(string Label, string Value);
+    private static string Json<T>(T value) => JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    private IReadOnlyList<SavedSetting> SavedSettings =>
+    [
+        new(Shared["Enabled"], Shared[Resource.Enabled ? "Enabled" : "Disabled"]),
+        new(T("Generation"), Resource.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        new(T("OperationExternalId"), Resource.Definition.ExternalId),
+        new(T("OperationServiceRevision"), Json(Resource.Definition.Service)),
+        new(T("Type"), Json(Resource.Definition.Type)),
+        new(T("OperationDefinitionDigest"), Resource.Definition.DefinitionDigest),
+        new(T("Availability"), T($"Discovery.Availability.{Resource.ObservedState.Availability}")),
+        new(T("OperationProvenance"), $"{Resource.Definition.Provenance.ManifestDigest}\n{Resource.Definition.Provenance.DiscoveredAt:O}"),
+        new(T("RawDefinition"), Json(Resource.Definition.Definition))
+    ];
+
+}

@@ -412,7 +412,7 @@ public sealed partial class StorageComponentTests
         Assert.AreEqual(inherited, row.QuerySelector(".managed-resource-badge") is not null);
         Assert.IsNotNull(row.QuerySelector(".collection-family-icon .resource-icon"));
         page.Find(".collection-view-switch button:last-child").Click();
-        Assert.AreEqual(StorageLinks.Details(Resource()), page.Find("li[data-testid=storage-row] [data-testid=storage-name-link]").GetAttribute("href"));
+        Assert.AreEqual(StorageLinks.Details(Resource()) + "#overview", page.Find("li[data-testid=storage-row] [data-testid=storage-name-link]").GetAttribute("href"));
         Assert.AreEqual("evidence/documents", page.Find("li[data-testid=storage-row] .copyable-value code").TextContent);
     }
 

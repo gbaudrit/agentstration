@@ -16,11 +16,24 @@
     <Navigation>
         <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a class="active" href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
     </Navigation>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="tool-set-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ToolResourceKinds.ToolSet" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ToolSetResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(ToolSetResource item) => false;
+    private void OpenPreview(ToolSetResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, ToolResourceKinds.ToolSet, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/tools/sets", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
-    private CollectionColumn<ToolSetResource> IdentityColumn => new("identity", T("ToolSet"), toolSet => @<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@DetailsUrl(toolSet)" IconName="layers">
+    private CollectionColumn<ToolSetResource> IdentityColumn => new("identity", T("ToolSet"), toolSet => @<CollectionIdentity DisplayName="@toolSet.Definition.DisplayName" Namespace="@toolSet.Namespace.Value" Name="@toolSet.Name" Href="@(DetailsUrl(toolSet) + "#overview")" IconName="layers">
         <Versions><CollectionVersion Label="@T("Version")" Value="@toolSet.PublishedVersion" /></Versions>
         <IconBadges><ResourceScopeBadge ScopeRef="toolSet.ScopeRef" ShowName IconOnly /><StatusBadge Text="@T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(toolSet.Definition.Enabled ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@toolSet.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(toolSet.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)

@@ -1,0 +1,26 @@
+{
+  "testedCommit": "171b792a74902bf2ad78bba01e62c06000aafc5e",
+  "beforeCommit": "4ac33e7f74b0475ece7d183f8df909e61d97c2a7",
+  "fixCommit": "1dff056b80217245c9d6f1049d1c00b8fd9fbbda",
+  "cause": "Superseded LoadAsync marks a pending replacement Ready after awaiting operations.",
+  "regression": "APreviousLoadCannotMarkAStillPendingReplacementAsReady",
+  "before": "Deterministic component failure and reproduced mobile Blazor circuit exception.",
+  "after": {
+    "componentCasesPassed": 54,
+    "browserCasesPassed": 14,
+    "browserCasesFailed": 0
+  },
+  "visualInspection": {
+    "date": "2026-11-25",
+    "method": "Native view_image; original 390x844 images",
+    "images": {
+      "after-mobile-journey.png": "5ef2360573b8cab3fdbfe2059ac16abf87dcb7aec14f871c33a86c053284b7df",
+      "before-mobile-loading.png": "76bb130d7ce1ff77f22970bfb77dd93ad96e20fa266933a4453c8e3aea9a30f2",
+      "after-mobile-data-source-queries.png": "37878653d3a5a70928d44ad4e23550a3f297c9fcce7d61a3e90afaedf438e799"
+    }
+  },
+  "limitations": [
+    "Before screenshot uses pre-preferences light appearance.",
+    "Successful journey end shows projection in progress; completion is not claimed."
+  ]
+}

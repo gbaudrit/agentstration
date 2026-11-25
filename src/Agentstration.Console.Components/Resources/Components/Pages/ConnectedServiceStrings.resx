@@ -171,4 +171,9 @@
   <data name="OperationAccess" xml:space="preserve"><value>Discovered operation access</value></data>
   <data name="ExposeOperationsToDescendants" xml:space="preserve"><value>Expose all discovered operations using the service access rules</value></data>
   <data name="ExposeOperationsToDescendantsHelp" xml:space="preserve"><value>Manage descendant scopes and permitted actions in the service’s Access section. Authorized descendants can discover and use all operations under the current service access rules. Operations still require activation and valid service and type revisions.</value></data>
+  <data name="OperationInspectionOnly" xml:space="preserve"><value>Operation definitions are supplied by discovery. Manage activation from the Connected Service.</value></data>
+  <data name="OperationExternalId" xml:space="preserve"><value>External operation identifier</value></data>
+  <data name="OperationServiceRevision" xml:space="preserve"><value>Saved Connected Service revision</value></data>
+  <data name="OperationDefinitionDigest" xml:space="preserve"><value>Definition digest</value></data>
+  <data name="OperationProvenance" xml:space="preserve"><value>Discovery manifest and timestamp</value></data>
 </root>

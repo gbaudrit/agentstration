@@ -1,0 +1,37 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<KnowledgeSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="knowledge-source-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="knowledge-source-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="knowledge-source-configuration-summary">
+        <CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="row"><strong class="configuration-key">@row.Key</strong></Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+    @AdditionalContent
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public KnowledgeSourceResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private IReadOnlyList<KeyValuePair<string,string>> SavedSettings =>  [new(T("Enabled"), T(Resource.Definition.Enabled ? "Enabled" : "Disabled")), new(T("ProjectionFlow"), FlowLabel(Resource.Definition.ProjectionFlow)), new(T("NativeLegacyRetrieval"), FlowLabel(Resource.Definition.RetrievalFlow)), new(T("ProjectionParameters"), Resource.Definition.ProjectionParameters.GetRawText()), new(T("OutputStorage"), Resource.Definition.Output is { } output ? $"{output.Storage.Storage.Namespace}/{output.Storage.Storage.Name} · {output.Storage.Storage.ScopeRef} · g{output.Storage.Generation}" : T("ArtifactOutputDefault")), new(T("ProjectionInputs"), JsonSerializer.Serialize(Resource.Definition.DataSources)), new(T("LifecycleTitle"), JsonSerializer.Serialize(Resource.Definition.Lifecycle)), new(T("FlowBindings"), JsonSerializer.Serialize(new { Resource.Definition.Orchestration, Resource.Definition.Transformations, Resource.Definition.Compositions }))];
+    private string FlowLabel(KnowledgeFlowTarget? target) => target is null ? "—" : $"{target.Namespace ?? Resource.Namespace}/{target.Name}:{target.Version ?? T("ActiveVersionLabel")} · {target.ScopeRef}";
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+
+}

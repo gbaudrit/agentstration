@@ -5,7 +5,7 @@
     {
       "id": "agent-runner-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/AgentRunner.razor",
-      "line": 62,
+      "line": 60,
       "host": "console",
       "routes": [
         "/agents/{Name}/run",
@@ -42,7 +42,7 @@
     {
       "id": "flow-run-details-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunDetails.razor",
-      "line": 83,
+      "line": 68,
       "host": "console",
       "routes": [
         "/flow-runs/{RunId}"
@@ -112,7 +112,7 @@
     {
       "id": "agent-editor-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
-      "line": 43,
+      "line": 42,
       "host": "console",
       "routes": [
         "/agents/{Name}",
@@ -146,11 +146,12 @@
     },
     {
       "id": "connected-service-details-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDetails.razor",
-      "line": 41,
+      "source": "src/Agentstration.Console.Components/Components/ConnectedServiceResourceSummary.razor",
+      "line": 38,
       "host": "console",
       "routes": [
-        "/connected-services/{Name}"
+        "/connected-services/{Name}",
+        "/connected-services"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationRow",
@@ -170,7 +171,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Bindings and literal options are source-reviewed. Existing family regression mapping is partial and does not claim populated detail-summary browser coverage; historical captures remain historical."
+        "interpretation": "Saved ConnectedService configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -364,7 +365,7 @@
     {
       "id": "tool-provider-editor-tool-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
-      "line": 65,
+      "line": 82,
       "host": "console",
       "routes": [
         "/tools/providers/new",
@@ -410,7 +411,7 @@
     {
       "id": "extensions-extension-inventory-item-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/Extensions.razor",
-      "line": 194,
+      "line": 16,
       "host": "console",
       "routes": [
         "/extensions"
@@ -605,7 +606,7 @@
     {
       "id": "agent-editor-resolved-agent-tool-set-assignment",
       "source": "src/Agentstration.Console.Components/Components/AgentResourceSummary.razor",
-      "line": 23,
+      "line": 22,
       "host": "console",
       "routes": [
         "/agents/{Name}"
@@ -656,7 +657,7 @@
     {
       "id": "runtime-worker-details-runtime-assignment-placement-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeWorkerDetails.razor",
-      "line": 50,
+      "line": 33,
       "host": "console",
       "routes": [
         "/settings/runtime-workers/{WorkerId:guid}"
@@ -713,7 +714,7 @@
       "identityLabel": "ToolSet",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Members",
         "Category"
@@ -812,7 +813,7 @@
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Type",
         "Tools"
@@ -898,7 +899,7 @@
     {
       "id": "model-provider-details-available-model-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
-      "line": 79,
+      "line": 175,
       "host": "console",
       "routes": [
         "/modelproviders/new",
@@ -948,7 +949,7 @@
     {
       "id": "trigger-details-trigger-occurrence",
       "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
-      "line": 63,
+      "line": 232,
       "host": "console",
       "routes": [
         "/triggers/{Name}"
@@ -1050,7 +1051,7 @@
     {
       "id": "pack-project-details-pack-project-build-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
-      "line": 212,
+      "line": 69,
       "host": "console",
       "routes": [
         "/pack-projects/{ProjectId:guid}"
@@ -1099,7 +1100,7 @@
     {
       "id": "tool-set-details-published-tool-set-member",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
-      "line": 37,
+      "line": 48,
       "host": "console",
       "routes": [
         "/tools/sets/{Name}"
@@ -1602,7 +1603,7 @@
       "identityLabel": "Pack",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Purpose",
         "Audience",
@@ -1687,7 +1688,7 @@
     {
       "id": "staged-artifact-details-artifact-lease",
       "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
-      "line": 109,
+      "line": 74,
       "host": "console",
       "routes": [
         "/artifacts/staged/{Id}"
@@ -1743,7 +1744,7 @@
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Profile"
       ],
@@ -1834,7 +1835,7 @@
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Vault",
         "Type"
@@ -2151,7 +2152,7 @@
     {
       "id": "extension-details-extension-inventory-connection-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
-      "line": 85,
+      "line": 106,
       "host": "console",
       "routes": [
         "/extensions/{RegistrationName}",
@@ -2198,7 +2199,7 @@
     {
       "id": "extension-details-extension-managed-resource-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
-      "line": 240,
+      "line": 256,
       "host": "console",
       "routes": [
         "/extensions/{RegistrationName}",
@@ -2247,7 +2248,7 @@
     {
       "id": "extension-details-extension-option-set-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
-      "line": 276,
+      "line": 292,
       "host": "console",
       "routes": [
         "/extensions/{RegistrationName}",
@@ -2295,7 +2296,7 @@
     {
       "id": "extension-details-extension-option-usage-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionDetails.razor",
-      "line": 296,
+      "line": 312,
       "host": "console",
       "routes": [
         "/extensions/{RegistrationName}",
@@ -2352,7 +2353,7 @@
       "identityLabel": "Provider",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Extension",
         "Contribution"
@@ -2434,7 +2435,7 @@
     {
       "id": "resource-plans-resource-plan-snapshot",
       "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlans.razor",
-      "line": 10,
+      "line": 11,
       "host": "console",
       "routes": [
         "/resource-plans"
@@ -2444,7 +2445,7 @@
       "identityLabel": "Plan",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Changes",
         "Validation",
@@ -2535,7 +2536,7 @@
       "identityLabel": "Worker",
       "scope": false,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Session",
         "Version",
@@ -2826,7 +2827,7 @@
       "identityLabel": "Trigger",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Schedule",
         "Target",
@@ -2920,7 +2921,7 @@
       "identityLabel": "Name",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Provider",
         "Location"
@@ -3012,7 +3013,7 @@
       "identityLabel": "Name",
       "scope": true,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "ManagingExtension"
       ],
@@ -3096,7 +3097,7 @@
     {
       "id": "source-registries-source-registry-registration-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistryCollection.razor",
-      "line": 8,
+      "line": 9,
       "host": "console",
       "routes": [
         "/settings/source-registries",
@@ -3202,7 +3203,7 @@
       "identityLabel": "Provider",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Type",
         "Management",
@@ -3296,7 +3297,7 @@
       "identityLabel": "Name",
       "scope": true,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "ValueType",
         "Value"
@@ -3376,7 +3377,7 @@
     {
       "id": "artifacts-staged-artifact-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor",
-      "line": 22,
+      "line": 26,
       "host": "console",
       "routes": [
         "/artifacts"
@@ -3386,7 +3387,7 @@
       "identityLabel": "Artifact",
       "scope": false,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Producer",
         "Size",
@@ -3479,7 +3480,7 @@
       "identityLabel": "Artifact",
       "scope": false,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "FlowRun",
         "Step",
@@ -3663,7 +3664,7 @@
       "identityLabel": "Category",
       "scope": true,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "DescriptionColumn",
         "Members"
@@ -3932,7 +3933,7 @@
     {
       "id": "data-source-editor-data-source-acquisition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 63,
+      "line": 611,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -3983,7 +3984,7 @@
     {
       "id": "data-source-editor-data-source-discovery-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 131,
+      "line": 677,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -4032,7 +4033,7 @@
     {
       "id": "data-source-editor-data-source-discovery-choice",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 147,
+      "line": 693,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -4081,7 +4082,7 @@
     {
       "id": "data-source-editor-data-source-acquisition-target-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
-      "line": 161,
+      "line": 707,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -4225,7 +4226,7 @@
     {
       "id": "model-profile-editor-model-capability-response",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
-      "line": 201,
+      "line": 681,
       "host": "console",
       "routes": [
         "/modelprofiles/new",
@@ -4277,7 +4278,7 @@
     {
       "id": "knowledge-source-details-knowledge-data-source-binding-readiness",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 52,
+      "line": 42,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4326,7 +4327,7 @@
     {
       "id": "knowledge-source-details-knowledge-projection-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 86,
+      "line": 591,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4377,7 +4378,7 @@
     {
       "id": "knowledge-source-details-knowledge-projection-input-evidence",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 102,
+      "line": 607,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4428,7 +4429,7 @@
     {
       "id": "knowledge-source-details-knowledge-snapshot-view",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 128,
+      "line": 630,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4477,7 +4478,7 @@
     {
       "id": "knowledge-source-details-knowledge-snapshot-artifact",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 149,
+      "line": 651,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4528,7 +4529,7 @@
     {
       "id": "knowledge-source-details-knowledge-source-tool-operation-exposure",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 213,
+      "line": 709,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -4588,7 +4589,7 @@
       "identityLabel": "Schema",
       "scope": true,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Format",
         "Dialect"
@@ -4673,7 +4674,7 @@
     {
       "id": "data-source-profile-editor-data-source-profile-revision-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
-      "line": 54,
+      "line": 70,
       "host": "console",
       "routes": [
         "/data-source-profiles/new",
@@ -4729,7 +4730,7 @@
       "identityLabel": "KnowledgeSource",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "DataSources",
         "ProjectionFlow",
@@ -4822,7 +4823,7 @@
       "identityLabel": "Profile",
       "scope": true,
       "state": false,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Runtime",
         "Session",
@@ -4905,7 +4906,7 @@
     {
       "id": "tool-governance-audit-tool-execution-hook-evaluation",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolGovernanceAudit.razor",
-      "line": 74,
+      "line": 75,
       "host": "console",
       "routes": [
         "/tool-governance/{Owner}/{RunId}"
@@ -5041,7 +5042,7 @@
     {
       "id": "schema-editor-schema-version-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
-      "line": 100,
+      "line": 279,
       "host": "console",
       "routes": [
         "/schemas/new",
@@ -5090,7 +5091,7 @@
     {
       "id": "sources-source-console-list-item",
       "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
-      "line": 37,
+      "line": 18,
       "host": "console",
       "routes": [
         "/settings/sources",
@@ -5101,7 +5102,7 @@
       "identityLabel": "Source",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Origin",
         "LatestImport"
@@ -5183,7 +5184,7 @@
     {
       "id": "organization-member-details-external-identity",
       "source": "src/Agentstration.Console.Components/Components/Pages/OrganizationMemberDetails.razor",
-      "line": 34,
+      "line": 44,
       "host": "console",
       "routes": [
         "/settings/organization/members/{UserId:guid}"
@@ -5296,7 +5297,7 @@
       "identityLabel": "Tool",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Provider"
       ],
@@ -5426,7 +5427,7 @@
     {
       "id": "tool-relay-editor-tool-definition-version-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
-      "line": 28,
+      "line": 151,
       "host": "console",
       "routes": [
         "/tools/definitions/new",
@@ -5460,7 +5461,7 @@
     {
       "id": "tool-relay-editor-tool-definition-usage",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
-      "line": 41,
+      "line": 163,
       "host": "console",
       "routes": [
         "/tools/definitions/new",
@@ -5494,7 +5495,7 @@
     {
       "id": "knowledge-source-details-knowledge-tool-proposal",
       "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
-      "line": 183,
+      "line": 679,
       "host": "console",
       "routes": [
         "/knowledge-sources/{Name}"
@@ -5527,7 +5528,7 @@
     {
       "id": "transformation-functions-function-kind-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
-      "line": 22,
+      "line": 28,
       "host": "console",
       "routes": [
         "/transformation-functions",
@@ -5569,7 +5570,7 @@
     {
       "id": "transformation-functions-transformation-function-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
-      "line": 13,
+      "line": 14,
       "host": "console",
       "routes": [
         "/transformation-functions",
@@ -5579,7 +5580,7 @@
       "itemType": "TransformationFunctionResource",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Kind",
         "Version",
@@ -5618,7 +5619,7 @@
     {
       "id": "storages-storage-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/Storages.razor",
-      "line": 9,
+      "line": 10,
       "host": "console",
       "routes": [
         "/storages"
@@ -5627,7 +5628,7 @@
       "itemType": "StorageResource",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Type"
       ],
@@ -5679,7 +5680,7 @@
       "itemType": "ConnectedServiceResource",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Type"
       ],
@@ -5712,7 +5713,7 @@
     {
       "id": "data-source-queries-data-source-query-tool-publication",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
-      "line": 14,
+      "line": 16,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -5747,7 +5748,7 @@
     {
       "id": "data-source-queries-data-source-query-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor",
-      "line": 51,
+      "line": 53,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -5811,7 +5812,7 @@
     {
       "id": "connected-service-discovery-panel-connected-service-operation-discovery-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/ConnectedServiceDiscoveryPanel.razor",
-      "line": 44,
+      "line": 46,
       "host": "console",
       "routes": [
         "/connected-services/{Name}"
@@ -5844,7 +5845,7 @@
     {
       "id": "flow-run-artifact-details-record-row",
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
-      "line": 103,
+      "line": 107,
       "host": "console",
       "routes": [
         "/artifacts/durable/{Id}"
@@ -5876,7 +5877,7 @@
     {
       "id": "storage-types-storage-type-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypes.razor",
-      "line": 9,
+      "line": 10,
       "host": "console",
       "routes": [
         "/storage-types"
@@ -5885,7 +5886,7 @@
       "itemType": "StorageTypeResource",
       "scope": true,
       "state": true,
-      "actions": false,
+      "actions": true,
       "informationKeys": [
         "Origin"
       ],
@@ -5931,7 +5932,7 @@
     {
       "id": "data-source-dataset-editor-data-source-acquisition-resource",
       "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
-      "line": 173,
+      "line": 583,
       "host": "console",
       "routes": [
         "/data-sources/new",
@@ -5964,11 +5965,12 @@
     },
     {
       "id": "storage-details-storage-export-binding",
-      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
-      "line": 43,
+      "source": "src/Agentstration.Console.Components/Components/StorageResourceSummary.razor",
+      "line": 62,
       "host": "console",
       "routes": [
-        "/storages/{Name}"
+        "/storages/{Name}",
+        "/storages"
       ],
       "renderer": "CollectionView",
       "itemType": "StorageExportBinding",
@@ -6000,11 +6002,12 @@
     },
     {
       "id": "parameter-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ParameterEditor.razor",
-      "line": 41,
+      "source": "src/Agentstration.Console.Components/Components/ParameterResourceSummary.razor",
+      "line": 19,
       "host": "console",
       "routes": [
-        "/parameters/{Name}"
+        "/parameters/{Name}",
+        "/parameters"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6022,7 +6025,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Component checks cover saved typed values and draft isolation; new screenshot validation is recorded separately."
+        "interpretation": "Saved Parameter configuration shared between overview and lazy exact-address Preview; current validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6032,11 +6035,12 @@
     },
     {
       "id": "vault-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
-      "line": 41,
+      "source": "src/Agentstration.Console.Components/Components/VaultResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/vaults/{Name}"
+        "/vaults/{Name}",
+        "/vaults"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6056,7 +6060,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved Vault provider and allowed descendant scopes; component checks cover draft isolation and grants. Browser evidence is recorded after host validation."
+        "interpretation": "Saved Vault configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6066,11 +6070,12 @@
     },
     {
       "id": "secret-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SecretEditor.razor",
-      "line": 43,
+      "source": "src/Agentstration.Console.Components/Components/SecretResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/secrets/{Name}"
+        "/secrets/{Name}",
+        "/secrets"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6090,7 +6095,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved metadata only: exact Vault reference, key, opaque type and allowed descendant scopes. Values remain write-only and are never loaded for the overview."
+        "interpretation": "Saved Secret configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6100,11 +6105,12 @@
     },
     {
       "id": "tool-provider-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolProviderEditor.razor",
-      "line": 39,
+      "source": "src/Agentstration.Console.Components/Components/ToolProviderResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/tools/providers/{Name}"
+        "/tools/providers/{Name}",
+        "/tools/providers"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6123,7 +6129,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved provider type, activation and transport-specific settings; references are displayed without resolving Secret contents. Existing tools remain scoped to the loaded provider."
+        "interpretation": "Saved ToolProvider configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6133,11 +6139,12 @@
     },
     {
       "id": "runtime-profile-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/RuntimeProfileEditor.razor",
-      "line": 40,
+      "source": "src/Agentstration.Console.Components/Components/RuntimeProfileResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/runtimeprofiles/{Name}"
+        "/runtimeprofiles/{Name}",
+        "/runtimeprofiles"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6156,7 +6163,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved runtime type, execution modes and structured adapter options. Existing deployment usages and access policies retain family semantics."
+        "interpretation": "Saved RuntimeProfile configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6166,11 +6173,12 @@
     },
     {
       "id": "source-provider-details-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
-      "line": 40,
+      "source": "src/Agentstration.Console.Components/Components/SourceProviderResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/sourceproviders/{Name}"
+        "/sourceproviders/{Name}",
+        "/sourceproviders"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6188,7 +6196,7 @@
           "tests/distribution.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved extension coordinates and source-provider contribution; option contracts remain specialized descriptors with their own preferred versions and source-channel context."
+        "interpretation": "Saved SourceProvider configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6198,11 +6206,12 @@
     },
     {
       "id": "data-source-profile-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceProfileEditor.razor",
-      "line": 40,
+      "source": "src/Agentstration.Console.Components/Components/DataSourceProfileResourceSummary.razor",
+      "line": 34,
       "host": "console",
       "routes": [
-        "/data-source-profiles/{Name}"
+        "/data-source-profiles/{Name}",
+        "/data-source-profiles"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6221,7 +6230,7 @@
           "tests/source-lifecycle.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved profile settings and exact declared Flow references; fresh browser validation remains pending."
+        "interpretation": "Saved DataSourceProfile configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6232,7 +6241,7 @@
     {
       "id": "namespaced-agent-configuration-summary",
       "source": "src/Agentstration.Console.Components/Components/Pages/NamespacedAgentDetails.razor",
-      "line": 46,
+      "line": 45,
       "host": "console",
       "routes": [
         "/namespaces/{AgentNamespace}/agents/{Name}"
@@ -6265,11 +6274,12 @@
     },
     {
       "id": "tool-category-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolCategoryEditor.razor",
-      "line": 33,
+      "source": "src/Agentstration.Console.Components/Components/ToolCategoryResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/tools/categories/{Name}"
+        "/tools/categories/{Name}",
+        "/tools/categories"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6288,7 +6298,7 @@
           "tests/resource-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved declarations remain separate from the retained provider-grouped membership editor. Current browser validation is pending."
+        "interpretation": "Saved ToolCategory configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6299,11 +6309,12 @@
     },
     {
       "id": "tool-details-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDetails.razor",
-      "line": 25,
+      "source": "src/Agentstration.Console.Components/Components/ToolResourceSummary.razor",
+      "line": 40,
       "host": "console",
       "routes": [
-        "/tools/{Name}"
+        "/tools/{Name}",
+        "/tools"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6323,7 +6334,7 @@
           "tests/resource-access.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved Tool configuration is separate from the retained execution input and access policy editors. Fresh browser validation pending."
+        "interpretation": "Saved Tool configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6334,11 +6345,12 @@
     },
     {
       "id": "tool-set-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolSetDetails.razor",
-      "line": 28,
+      "source": "src/Agentstration.Console.Components/Components/ToolSetResourceSummary.razor",
+      "line": 37,
       "host": "console",
       "routes": [
-        "/tools/sets/{Name}"
+        "/tools/sets/{Name}",
+        "/tools/sets"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6357,7 +6369,7 @@
           "tests/governed-extension-inventory.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved ToolSet declarations and original working version remain distinct from immutable published membership. Current browser validation pending."
+        "interpretation": "Saved ToolSet configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6368,11 +6380,12 @@
     },
     {
       "id": "tool-definition-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
-      "line": 28,
+      "source": "src/Agentstration.Console.Components/Components/ToolDefinitionResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/tools/definitions/{Name}"
+        "/tools/definitions/{Name}",
+        "/tools/definitions"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6391,7 +6404,7 @@
           "tests/schema-contract-bindings.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Flow/acquisition definition saved composition and exact-owner history adapters. Implementation in progress; current validation pending."
+        "interpretation": "Saved ToolDefinition configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6403,7 +6416,7 @@
     {
       "id": "tool-definition-published-versions",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
-      "line": 28,
+      "line": 36,
       "host": "console",
       "routes": [
         "/tools/definitions/{Name}"
@@ -6438,7 +6451,7 @@
     {
       "id": "tool-definition-consumers",
       "source": "src/Agentstration.Console.Components/Components/Pages/ToolDefinitionEditor.razor",
-      "line": 28,
+      "line": 40,
       "host": "console",
       "routes": [
         "/tools/definitions/{Name}"
@@ -6472,8 +6485,8 @@
     },
     {
       "id": "tool-relay-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ToolRelayEditor.razor",
-      "line": 42,
+      "source": "src/Agentstration.Console.Components/Components/ToolDefinitionResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
         "/tools/definitions/{Name}"
@@ -6495,7 +6508,7 @@
           "tests/schema-contract-bindings.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Saved Relay definition/target/binding overview is separate from retained editors, immutable publications and consumers. Current validation pending."
+        "interpretation": "Saved Relay configuration shared by full detail and exact-address Preview; no source lookup occurs in Summary."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6506,11 +6519,12 @@
     },
     {
       "id": "transformation-function-editor-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor",
-      "line": 69,
+      "source": "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
-        "/transformation-functions/{Name}"
+        "/transformation-functions/{Name}",
+        "/transformation-functions"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationEntry",
@@ -6526,13 +6540,13 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "Reconciles the existing read-only saved configuration frame introduced upstream; no editor UI change or new browser claim."
+        "interpretation": "Saved TransformationFunction configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       }
     },
     {
       "id": "flowrunartifactdetails-configurationentry",
       "source": "src/Agentstration.Console.Components/Components/Pages/FlowRunArtifactDetails.razor",
-      "line": 35,
+      "line": 34,
       "host": "console",
       "routes": [
         "/artifacts/durable/{Id}"
@@ -6556,12 +6570,13 @@
     },
     {
       "id": "modelprofileeditor-profilesetting",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProfileEditor.razor",
-      "line": 167,
+      "source": "src/Agentstration.Console.Components/Components/ModelProfileResourceSummary.razor",
+      "line": 21,
       "host": "console",
       "routes": [
         "/modelprofiles/new",
-        "/modelprofiles/{Name}"
+        "/modelprofiles/{Name}",
+        "/modelprofiles"
       ],
       "renderer": "CollectionView",
       "itemType": "ProfileSetting",
@@ -6577,17 +6592,18 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+        "interpretation": "Saved ModelProfile configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       }
     },
     {
       "id": "modelproviderdetails-setting",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
-      "line": 168,
+      "source": "src/Agentstration.Console.Components/Components/ModelProviderResourceSummary.razor",
+      "line": 20,
       "host": "console",
       "routes": [
         "/modelproviders/new",
-        "/modelproviders/{Name}"
+        "/modelproviders/{Name}",
+        "/modelproviders"
       ],
       "renderer": "CollectionView",
       "itemType": "Setting",
@@ -6603,13 +6619,13 @@
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "routeEvidence": [],
-        "interpretation": "Inventory-only reconciliation of upstream embedded frame; protected editor/detail UI unchanged, no new browser claim."
+        "interpretation": "Saved ModelProvider configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       }
     },
     {
       "id": "modelproviderdetails-modelproviderusageresponse",
       "source": "src/Agentstration.Console.Components/Components/Pages/ModelProviderDetails.razor",
-      "line": 171,
+      "line": 176,
       "host": "console",
       "routes": [
         "/modelproviders/new",
@@ -6632,8 +6648,8 @@
     },
     {
       "id": "staged-artifact-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/StagedArtifactDetails.razor",
-      "line": 31,
+      "source": "src/Agentstration.Console.Components/Components/StagedArtifactResourceSummary.razor",
+      "line": 19,
       "host": "console",
       "routes": [
         "/artifacts/staged/{Id}"
@@ -6691,7 +6707,7 @@
     },
     {
       "id": "data-source-dataset-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/data-sources/new?composition=dataset",
@@ -6706,7 +6722,7 @@
       "informationKeys": [
         "SourceSettingValue"
       ],
-      "line": 51,
+      "line": 23,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6726,11 +6742,12 @@
     },
     {
       "id": "data-source-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/data-sources/new",
-        "/data-sources/{Name}"
+        "/data-sources/{Name}",
+        "/data-sources"
       ],
       "renderer": "CollectionView",
       "itemType": "SourceSetting",
@@ -6741,7 +6758,7 @@
       "informationKeys": [
         "SourceSettingValue"
       ],
-      "line": 54,
+      "line": 27,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6751,7 +6768,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved DataSource configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -6762,7 +6779,7 @@
     },
     {
       "id": "entry-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/EntryEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/EntryResourceSummary.razor",
       "host": "console",
       "routes": [
         "/entries/{Name}",
@@ -6777,7 +6794,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 53,
+      "line": 23,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6850,7 +6867,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 18,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6885,7 +6902,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 80,
+      "line": 73,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -6905,43 +6922,11 @@
     },
     {
       "id": "knowledge-source-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
       "host": "console",
       "routes": [
-        "/knowledge-sources/{Name}"
-      ],
-      "renderer": "CollectionView",
-      "itemType": "KeyValuePair<string,string>",
-      "identityLabel": "SettingName",
-      "scope": false,
-      "state": false,
-      "actions": false,
-      "informationKeys": [
-        "SettingValue"
-      ],
-      "line": 27,
-      "validation": "source-reviewed-regression-owned",
-      "verification": {
-        "sourceReviewed": true,
-        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
-        "domainSpecifications": [
-          "tests/governed-knowledge.spec.ts"
-        ],
-        "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
-      },
-      "compactAdoption": {
-        "decision": "shared-frame-business-contract",
-        "domainSemantics": "Saved knowledge binding and retrieval settings are configuration values, not additional resources.",
-        "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
-      },
-      "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
-    },
-    {
-      "id": "knowledge-source-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/KnowledgeSourceEditor.razor",
-      "host": "console",
-      "routes": [
+        "/knowledge-sources/{Name}",
+        "/knowledge-sources",
         "/knowledge-sources/new",
         "/knowledge-sources/{Name}/edit"
       ],
@@ -6954,17 +6939,16 @@
       "informationKeys": [
         "SettingValue"
       ],
-      "line": 27,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
         "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
         "domainSpecifications": [
-          "tests/governed-knowledge.spec.ts",
-          "tests/shared-forms.spec.ts"
+          "tests/governed-knowledge.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved KnowledgeSource configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7009,7 +6993,7 @@
     },
     {
       "id": "pack-project-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/PackProjectDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/PackProjectResourceSummary.razor",
       "host": "console",
       "routes": [
         "/pack-projects/{ProjectId:guid}"
@@ -7023,7 +7007,7 @@
       "informationKeys": [
         "Project.Value"
       ],
-      "line": 54,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7072,12 +7056,12 @@
       "scope": false,
       "state": true,
       "actions": true,
-      "line": 62,
+      "line": 54,
       "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
     },
     {
       "id": "resource-plan-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/ResourcePlanDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanResourceSummary.razor",
       "host": "console",
       "routes": [
         "/resource-plans/{Id:guid}"
@@ -7091,7 +7075,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 46,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7112,11 +7096,12 @@
     },
     {
       "id": "schema-editor-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SchemaEditor.razor",
+      "source": "src/Agentstration.Console.Components/Components/SchemaResourceSummary.razor",
       "host": "console",
       "routes": [
         "/schemas/new",
-        "/schemas/{Name}"
+        "/schemas/{Name}",
+        "/schemas"
       ],
       "renderer": "CollectionView",
       "itemType": "KeyValuePair<string,string>",
@@ -7127,7 +7112,7 @@
       "informationKeys": [
         "SettingValue"
       ],
-      "line": 34,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7136,7 +7121,7 @@
           "tests/schema-administration.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Schema configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7147,7 +7132,7 @@
     },
     {
       "id": "source-registries-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/SourceRegistries.razor",
+      "source": "src/Agentstration.Console.Components/Components/SourceRegistryRegistrationResourceSummary.razor",
       "host": "console",
       "routes": [
         "/settings/source-registries",
@@ -7163,7 +7148,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 97,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7173,7 +7158,7 @@
           "tests/shared-forms.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved SourceRegistryRegistration configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7184,7 +7169,7 @@
     },
     {
       "id": "sources-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Sources.razor",
+      "source": "src/Agentstration.Console.Components/Components/SourceResourceSummary.razor",
       "host": "console",
       "routes": [
         "/settings/sources",
@@ -7199,7 +7184,7 @@
       "informationKeys": [
         "Saved"
       ],
-      "line": 65,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7208,7 +7193,7 @@
           "tests/distribution.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Source configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7219,10 +7204,11 @@
     },
     {
       "id": "storage-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/StorageDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/StorageResourceSummary.razor",
       "host": "console",
       "routes": [
-        "/storages/{Name}"
+        "/storages/{Name}",
+        "/storages"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationRow",
@@ -7233,7 +7219,7 @@
       "informationKeys": [
         "Type.Value"
       ],
-      "line": 215,
+      "line": 44,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7242,7 +7228,7 @@
           "tests/connected-storage-collection.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Storage configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7253,10 +7239,11 @@
     },
     {
       "id": "storage-type-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/StorageTypeDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/StorageTypeResourceSummary.razor",
       "host": "console",
       "routes": [
-        "/storage-types/{Name}"
+        "/storage-types/{Name}",
+        "/storage-types"
       ],
       "renderer": "CollectionView",
       "itemType": "ConfigurationRow",
@@ -7267,7 +7254,7 @@
       "informationKeys": [
         "Type.Value"
       ],
-      "line": 218,
+      "line": 41,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7276,7 +7263,7 @@
           "tests/connected-storage-collection.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved StorageType configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7287,11 +7274,12 @@
     },
     {
       "id": "trigger-details-saved-configuration-summary",
-      "source": "src/Agentstration.Console.Components/Components/Pages/TriggerDetails.razor",
+      "source": "src/Agentstration.Console.Components/Components/TriggerResourceSummary.razor",
       "host": "console",
       "routes": [
         "/triggers/{Name}",
-        "/triggers/{Name}/edit"
+        "/triggers/{Name}/edit",
+        "/triggers"
       ],
       "renderer": "CollectionView",
       "itemType": "Setting",
@@ -7302,7 +7290,7 @@
       "informationKeys": [
         "Value"
       ],
-      "line": 233,
+      "line": 20,
       "validation": "source-reviewed-regression-owned",
       "verification": {
         "sourceReviewed": true,
@@ -7311,7 +7299,7 @@
           "tests/operational-triggers.spec.ts"
         ],
         "routeEvidence": [],
-        "interpretation": "Current source and family regression ownership reviewed. This entry does not claim a populated browser capture for this embedded dataset."
+        "interpretation": "Saved Trigger configuration shared between overview and lazy exact-address Preview; validation is recorded in collection-previews-1257.md."
       },
       "compactAdoption": {
         "decision": "shared-frame-business-contract",
@@ -7424,6 +7412,95 @@
         "reason": "Shared catalog and bounded progress tables; ordered target/binding/preview/confirmation remain Bootstrap-owned.",
         "review": "evidence/1250/startup-progress/viewport-and-diagnostics/README.md",
         "uiChanged": true
+      }
+    },
+    {
+      "id": "connected-service-operation-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/ConnectedServiceOperationResourceSummary.razor",
+      "line": 26,
+      "host": "console",
+      "routes": [
+        "/connected-service-operations/{Name}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Value"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Parameter configuration shared between overview and lazy exact-address Preview; current validation is recorded in collection-previews-1257.md."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
+        "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
+      }
+    },
+    {
+      "id": "durable-artifact-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
+      "line": 19,
+      "host": "console",
+      "routes": [
+        "/artifacts/durable/{Id}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "SavedSetting",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "identityLabel": "Configuration",
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-reviewed-existing-frame",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "routeEvidence": [],
+        "interpretation": "Final inventory-only reconciliation of upstream 67784be2 saved configuration frame; protected detail UI unchanged, no new browser claim."
+      }
+    },
+    {
+      "id": "data-source-query-saved-summary",
+      "source": "src/Agentstration.Console.Components/Components/DataSourceQueryResourceSummary.razor",
+      "line": 19,
+      "host": "console",
+      "routes": [
+        "/data-sources/{Name}#queries"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ConfigurationEntry",
+      "identityLabel": "Configuration",
+      "scope": false,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Saved"
+      ],
+      "validation": "source-adopted-and-regression-mapped",
+      "verification": {
+        "sourceReviewed": true,
+        "domainSpecifications": [
+          "tests/shared-forms.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Saved Parameter configuration shared between overview and lazy exact-address Preview; current validation is recorded in collection-previews-1257.md."
+      },
+      "compactAdoption": {
+        "decision": "shared-frame-business-contract",
+        "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
+        "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
       }
     }
   ],
@@ -8486,13 +8563,13 @@
     },
     {
       "id": "packs-pack-bindings",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "source": "src/Agentstration.Console.Components/Components/InstalledPackResourceSummary.razor",
       "host": "console",
       "routes": [
         "/packs"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "adaptation": "Persisted installation records shared by native management, read-only overview and exact-address Preview; existing resource destinations retain owner/current context.",
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
         "sourceReviewed": true,
@@ -8560,13 +8637,13 @@
     },
     {
       "id": "packs-managed-resources",
-      "source": "src/Agentstration.Console.Components/Components/Pages/Packs.razor",
+      "source": "src/Agentstration.Console.Components/Components/InstalledPackResourceSummary.razor",
       "host": "console",
       "routes": [
         "/packs"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Preserve archive preview, scoped source selection, immutable provenance and install confirmations. Installed rows use the common frame; resource/project cards reuse identity/scope/actions.",
+      "adaptation": "Persisted installation records shared by native management, read-only overview and exact-address Preview; existing resource destinations retain owner/current context.",
       "validation": "source-adopted-and-regression-mapped",
       "verification": {
         "sourceReviewed": true,
@@ -17410,14 +17487,14 @@
     },
     {
       "id": "function-kind-version-contracts",
-      "source": "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor",
+      "source": "src/Agentstration.Console.Components/Components/FunctionKindResourceSummary.razor",
       "host": "console",
       "routes": [
         "/transformation-functions",
         "/function-kinds"
       ],
       "renderer": "native-specialized",
-      "adaptation": "Expanded kind contracts retain immutable versions, executor and schema inspection within the selected actual kind; historical contract versions remain useful evidence.",
+      "adaptation": "The same immutable version/executor/schema dataset is shared by native expansion, read-only details and exact-address Preview.",
       "validation": "source-reviewed-current-validation-pending",
       "discoveredDuring": "2026-11-18 main synchronization #1174",
       "verification": {
@@ -18071,6 +18148,28 @@
       "verification": {
         "sourceReviewed": true,
         "interpretation": "Implementation review only; native UX child #1217 remains blocked by validation and merge. No new reusable journey is claimed."
+      }
+    },
+    {
+      "id": "tool-summary-schema-properties",
+      "source": "src/Agentstration.Console.Components/Components/ToolResourceSummary.razor",
+      "host": "console",
+      "routes": [
+        "/tools",
+        "/tools/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Programmatic saved input/output schema property renderer retains actual field names, types and required constraints. These are contract values, not governed resource rows.",
+      "validation": "source-reviewed-current-validation-pending",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native saved schema facts and invariant technical identifiers; no per-property resource actions.",
+        "domainSpecifications": [
+          "tests/resource-administration.spec.ts",
+          "tests/tool-execution.spec.ts"
+        ],
+        "routeEvidence": [],
+        "interpretation": "Existing Tool component and browser regressions remain mapped; FR #1257 Preview evidence is recorded independently."
       }
     }
   ],
@@ -18817,8 +18916,8 @@
     },
     {
       "source": "src/Agentstration.Console.Components/Components/Pages/VaultEditor.razor",
-      "classification": "inventoried",
-      "reason": "Saved Vault configuration summary is a functional collection recorded in shared frames; fixed wizard/navigation entries remain controls."
+      "classification": "non-collection-control",
+      "reason": "FR #1257 source reconciliation: this source composes shared saved Summary/identity sections or fixed metadata/capability fields. Its moved functional dataset is inventoried at the concrete family Summary; it has no additional independent collection renderer."
     },
     {
       "source": "src/Agentstration.Web.Components/ResourceCollectionTemplate.razor",
@@ -18889,6 +18988,191 @@
       "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationProgress.razor",
       "classification": "non-collection-control",
       "reason": "Configured process-step navigation delegates resource rows to BootstrapApplicationResources."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ParameterResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Parameter configuration; commands and disclosures are controls, not extra datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SchemaResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Schema configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/VaultResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Vault configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SecretResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Secret configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ConnectedServiceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ConnectedService configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/StorageTypeResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved StorageType configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/StorageResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Storage configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DataSourceProfileResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved DataSourceProfile configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/RuntimeProfileResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved RuntimeProfile configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolProviderResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolProvider configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Tool configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolSetResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolSet configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolCategoryResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolCategory configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ToolDefinitionResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ToolDefinition configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ModelProviderResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ModelProvider configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ModelProfileResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved ModelProfile configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DataSourceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved DataSource configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved KnowledgeSource configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SourceProviderResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved SourceProvider configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SourceRegistryRegistrationResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved SourceRegistryRegistration configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceDetails.razor",
+      "classification": "non-collection-control",
+      "reason": "FR #1257 source reconciliation: this source composes shared saved Summary/identity sections or fixed metadata/capability fields. Its moved functional dataset is inventoried at the concrete family Summary; it has no additional independent collection renderer."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/SourceResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Source configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/TriggerResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved Trigger configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved TransformationFunction configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/FunctionKindResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted existing native immutable version contracts shared by overview and Preview."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/FunctionKindDetails.razor",
+      "classification": "non-collection-control",
+      "reason": "FR #1257 source reconciliation: this source composes shared saved Summary/identity sections or fixed metadata/capability fields. Its moved functional dataset is inventoried at the concrete family Summary; it has no additional independent collection renderer."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/InstalledPackResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Extracted saved InstalledPack configuration; action and disclosure controls are not datasets."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/InstalledPackDetails.razor",
+      "classification": "non-collection-control",
+      "reason": "FR #1257 source reconciliation: this source composes shared saved Summary/identity sections or fixed metadata/capability fields. Its moved functional dataset is inventoried at the concrete family Summary; it has no additional independent collection renderer."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/PackProjectResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared saved Pack Project Summary."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/RuntimeWorkerResourceSummary.razor",
+      "classification": "non-collection-control",
+      "reason": "FR #1257 source reconciliation: this source composes shared saved Summary/identity sections or fixed metadata/capability fields. Its moved functional dataset is inventoried at the concrete family Summary; it has no additional independent collection renderer."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/EntryResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Pure saved Entry Summary; native identity has no Resource UID/labels."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ModelResourceSummary.razor",
+      "classification": "non-collection-control",
+      "reason": "FR #1257 source reconciliation: this source composes shared saved Summary/identity sections or fixed metadata/capability fields. Its moved functional dataset is inventoried at the concrete family Summary; it has no additional independent collection renderer."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ResourcePlanResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared native saved Resource Plan review facts."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/ConnectedServiceOperationResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Pure saved discovered-operation inspection Summary."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/StagedArtifactResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared saved Artifact configuration values used by native full overview and metadata-only Preview. No content/backend/record dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DurableArtifactResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Shared saved Artifact configuration values used by native full overview and metadata-only Preview. No content/backend/record dataset."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/DataSourceQueryResourceSummary.razor",
+      "classification": "inventoried",
+      "reason": "Saved Data Source Query configuration is shared by the native embedded query overview and exact-address Preview. Draft JSON remains in the existing native editor."
     }
   ],
   "reconciliation": {
@@ -19054,6 +19338,15 @@
       "activeCollections": 387,
       "auditedRepeatedItemSources": 155,
       "validation": "Source catalog checked locally; family browser results and optional limitations are reported in PR #1238 for the final head. Historical screenshots retain their original provenance."
+    },
+    {
+      "date": "2026-11-21",
+      "issue": 1257,
+      "description": "Family Summary renderer migration, explicit embedded/administration/operational assessment and physical Razor frame reconciliation. Historical evidence/provenance remains historical.",
+      "frames": 133,
+      "specialized": 261,
+      "activeSurfaces": 394,
+      "validation": "Static catalog guard and final broad/browser verification recorded by the FR #1257 ledger; no old screenshot certifies new Preview history."
     }
   ],
   "retiredSurfaces": [
@@ -19091,6 +19384,46 @@
           "domainSemantics": "Native contract disclosure composes existing framed ResourceIcon, authorized I/T/W/state/managed markers, exact type navigation and qualified copy; keep each actual immutable version and independent summary expansion.",
           "evidenceStatus": "Fresh validation pending final merged source."
         }
+      }
+    },
+    {
+      "reason": "FR #1257 unifies both old page-local saved configuration renderers in one KnowledgeSourceResourceSummary. Historical surface ID remains an alias in the adoption matrix; it is not a second physical CollectionView.",
+      "aliasOf": "knowledge-source-details-saved-configuration-summary",
+      "surface": {
+        "id": "knowledge-source-editor-saved-configuration-summary",
+        "source": "src/Agentstration.Console.Components/Components/KnowledgeSourceResourceSummary.razor",
+        "host": "console",
+        "routes": [
+          "/knowledge-sources/new",
+          "/knowledge-sources/{Name}/edit"
+        ],
+        "renderer": "CollectionView",
+        "itemType": "KeyValuePair<string,string>",
+        "identityLabel": "SettingName",
+        "scope": false,
+        "state": false,
+        "actions": false,
+        "informationKeys": [
+          "SettingValue"
+        ],
+        "line": 20,
+        "validation": "source-reviewed-regression-owned",
+        "verification": {
+          "sourceReviewed": true,
+          "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+          "domainSpecifications": [
+            "tests/governed-knowledge.spec.ts",
+            "tests/shared-forms.spec.ts"
+          ],
+          "routeEvidence": [],
+          "interpretation": "Legacy standalone edit overview now reuses the same complete saved configuration as full details and Preview; the two adapter inventory IDs point at the shared frame."
+        },
+        "compactAdoption": {
+          "decision": "shared-frame-business-contract",
+          "domainSemantics": "Saved knowledge binding and retrieval settings are configuration values, not additional resources.",
+          "evidenceStatus": "Source inventory checked by collection-surface-catalog.spec.ts; browser campaign results reported separately for the exact PR head."
+        },
+        "discoveredDuring": "2026-11-20 PR #1238 resource-screen CI reconciliation"
       }
     }
   ]

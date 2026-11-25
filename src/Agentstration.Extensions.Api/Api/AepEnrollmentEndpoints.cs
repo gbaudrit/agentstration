@@ -39,6 +39,15 @@ public static class AepEnrollmentEndpoints
             ExecuteAsync(() => service.ListAsync(current.Current, token)))
             .Produces<IEnumerable<AepEnrollmentRequestResource>>()
             .WithSummary("List AEP enrollment requests");
+        administration.MapGet("/{requestId:guid}/summary", (Guid requestId, HttpRequest request, HttpResponse response, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
+            ExecuteAsync(async () =>
+            {
+                if (!ResourceScopeRef.TryParse(request.Query["scopeRef"].ToString(), out var owner))
+                    throw new AepEnrollmentException("request_not_found", "The enrollment request was not found.", 404);
+                var saved = await service.GetSavedExactAsync(current.Current, owner, ResourceNamespace.Parse(request.Query["namespace"].ToString()), requestId, token);
+                response.Headers.ETag = saved.ETag;
+                return saved.Value;
+            })).Produces<AepEnrollmentRequestResource>().WithSummary("Inspect a sanitized saved AEP enrollment request at its exact owner");
         administration.MapPost("/{requestId:guid}/assign", (Guid requestId, AssignAepEnrollmentRequest body, ICurrentRequestContext current, AepEnrollmentService service, CancellationToken token) =>
             ExecuteNoContentAsync(() => service.AssignAsync(current.Current, requestId, body.ScopeRef, token)))
             .Produces(StatusCodes.Status204NoContent)

@@ -24,7 +24,7 @@ public sealed partial class StorageTypeComponentTests
         using var context = Setup(client);
         var page = context.Render<StorageTypes>();
         page.WaitForElement("[data-testid=storage-type-name-link]");
-        Assert.AreEqual(StorageTypeLinks.Details(client.Resource), page.Find("[data-testid=storage-type-name-link]").GetAttribute("href"));
+        Assert.AreEqual(StorageTypeLinks.Details(client.Resource) + "#overview", page.Find("[data-testid=storage-type-name-link]").GetAttribute("href"));
         Assert.AreEqual(Scope, client.ListScope);
         Assert.IsEmpty(page.FindAll("input[type=search], [data-filter-key]"));
         Assert.HasCount(1, page.FindAll("[data-testid=storage-type-row]"));
@@ -160,7 +160,8 @@ public sealed partial class StorageTypeComponentTests
         Assert.AreEqual(client.Resource.Definition.PreferredVersion, page.Find(".collection-version code").TextContent);
         Assert.AreEqual("catalog/custom", page.Find(".copyable-value code").GetAttribute("title"));
         StringAssert.Contains(page.Find(".managed-resource-badge").TextContent, "Managed");
-        Assert.IsEmpty(page.FindAll(".collection-actions-menu"));
+        Assert.HasCount(1, page.FindAll(".collection-actions-menu"));
+        Assert.IsEmpty(page.FindAll(".collection-actions-menu a[href*='definition/configuration']"));
     }
 
     [TestMethod]

@@ -13,16 +13,30 @@
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" EmptyActions="CreateAction" PrimaryActions="CreateAction"
-                            OnRefresh="LoadAsync" OnRetry="RetryAsync" />
+                            OnRefresh="LoadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(Url(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(Url(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="runtime-profile-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+
+<ResourceCollectionPreview @ref="preview" ResourceKind="@RuntimeProfileResourceKinds.RuntimeProfile" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><RuntimeProfileResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(RuntimeProfileSummaryResponse item) => !item.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(RuntimeProfileSummaryResponse item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, ResourceNamespace.Parse(item.Namespace), RuntimeProfileResourceKinds.RuntimeProfile, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string DeploymentCount(int count) => T(count == 1 ? "DeploymentCount.One" : "DeploymentCount.Many", count);
     private string SessionLabel(RuntimeSessionMode value) => Localizer[$"Session.{value}"];
     private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/runtimeprofiles/new", Services)">@T("CreateProfile")</a></PermissionGate> : null;
-    private CollectionColumn<RuntimeProfileSummaryResponse> IdentityColumn => new("identity", T("Profile"), profile => @<CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@Url(profile)" IconName="server" Domain="runtime">
+    private CollectionColumn<RuntimeProfileSummaryResponse> IdentityColumn => new("identity", T("Profile"), profile => @<CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@(Url(profile) + "#overview")" IconName="server" Domain="runtime">
         <IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>);
     private IReadOnlyList<CollectionColumn<RuntimeProfileSummaryResponse>> Columns =>
@@ -57,5 +71,5 @@
             Options = (profiles ?? []).Select(profile => profile.Namespace).Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, value)).ToArray()
         }
     ];
-    private string Url(RuntimeProfileSummaryResponse profile) => ResourceOwnershipContext.PreserveNavigation($"/runtimeprofiles/{Uri.EscapeDataString(profile.Name)}?namespace={Uri.EscapeDataString(profile.Namespace)}", Services);
+    private string Url(RuntimeProfileSummaryResponse profile) => ResourceOwnershipContext.Resource(Services, "/runtimeprofiles", profile.Name, ResourceNamespace.Parse(profile.Namespace), profile.ScopeRef);
 }

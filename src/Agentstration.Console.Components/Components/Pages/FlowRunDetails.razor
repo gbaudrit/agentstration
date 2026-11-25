@@ -212,7 +212,7 @@
         <div hidden="@(activeTab != RunTab.InputOutput)">
             <section class="flow-run-io-panels" aria-label="@T("RunInputAndOutput")">
                 <article class="panel io-panel flow-run-tab-card"><div class="panel-header"><h2>@T("Input")</h2></div><pre>@Pretty(run.Input)</pre></article>
-                <FlowRunOutput Run="run" />
+                <FlowRunOutput Run="run" PreviewRequested="OpenArtifactPreview" />
             </section>
         </div>
         }
@@ -232,7 +232,15 @@
     </ResourceDetailsTemplate>
 
 </div>
+<ResourceCollectionPreview @ref="artifactPreview" ResourceKind="@ArtifactResourceKinds.FlowRunArtifact" ContextKey="@loadedKey" Enabled="@(run is not null)">
+    <ChildContent Context="address"><DurableArtifactResourcePreview Address="address" OverviewHref="@ArtifactOverviewUrl(address)" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? artifactPreview;
+    private void OpenArtifactPreview(ScopedResourceAddress address) => artifactPreview?.Open(address);
+    private string ArtifactOverviewUrl(ScopedResourceAddress address) => ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation($"/artifacts/durable/{Uri.EscapeDataString(address.Name)}", Services), address.ScopeRef) + "#overview";
+
     private string? RunCollectionUrl => run is null ? null : $"/flow-runs?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}{(run.Scope.LogicalScopeRef is { } logical ? "&context=" + Uri.EscapeDataString(logical.Value) : string.Empty)}";
     [Parameter] public string RunId { get; set; } = string.Empty;
     [SupplyParameterFromQuery(Name = "step")] public string? FocusStep { get; set; }

@@ -113,7 +113,9 @@
     width: auto;
 }
 
-@media (max-width: 860px) {
+.schema-document-editor { container-type: inline-size; }
+
+@container (max-width: 860px) {
     .schema-visual-workbench { grid-template-columns: 1fr; }
     .schema-tree-panel { max-height: 20rem; position: static; }
 

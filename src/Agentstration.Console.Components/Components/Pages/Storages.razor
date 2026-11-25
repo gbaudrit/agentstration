@@ -3,6 +3,7 @@
 @inject IServiceProvider Services
 @inject IStoragesClient Client
 @inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<StorageStrings> Localizer
 
 <PageTitle>@T("Storages") · Agentstration</PageTitle>
@@ -12,13 +13,27 @@
                             PrimaryActions="CreateAction" EmptyActions="CreateAction" EmptyTitle="@T("Empty.Title")" EmptyMessage="@T("Empty.Description")"
                             OnRefresh="ReloadAsync" OnRetry="RetryAsync">
     <Actions>@if (Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { <a class="button-secondary" href="@Navigate("/storage-types")" data-testid="storage-types-manage">@T("Type.Browse")</a> }</Actions>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="storage-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@StorageResourceKinds.Storage" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><StorageResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(StorageResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(StorageResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, StorageResourceKinds.Storage, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/storages", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
+    private string DetailsUrl(StorageResource item) => Navigate(StorageLinks.Details(item));
     private string T(string key) => Localizer[key].Value;
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/storages/new")" data-testid="storage-create">@T("Create")</a></PermissionGate> : null;
-    private CollectionColumn<StorageResource> IdentityColumn => new("identity", T("Storage"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@Navigate(StorageLinks.Details(item))" IconName="database" data-testid="storage-name-link">
+    private CollectionColumn<StorageResource> IdentityColumn => new("identity", T("Storage"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@(DetailsUrl(item) + "#overview")" IconName="database" data-testid="storage-name-link">
         <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" IconOnly /><StatusBadge Text="@T($"Availability.{Availability(item)}")" Status="@AvailabilityStatus(Availability(item))" IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" IconOnly /></IconBadges>
     </CollectionIdentity>);
     // The primary collection endpoint has no global search/filter contract.
