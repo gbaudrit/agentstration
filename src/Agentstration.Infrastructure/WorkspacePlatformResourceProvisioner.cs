@@ -9,6 +9,7 @@ using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
 using Agentstration.Runtime.Profiles;
+using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.Infrastructure;
 
@@ -30,7 +31,9 @@ internal sealed class WorkspacePlatformResourceProvisioner(
     Agentstration.Infrastructure.Functions.NativeFunctionPlatformResourceProvisioner functions,
     LocalStorageDefaultsProvisioner localStorage,
     ArtifactPlatformResourceProvisioner artifacts,
-    KnowledgePlatformResourceProvisioner knowledge) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
+    KnowledgePlatformResourceProvisioner knowledge,
+    IConfiguration configuration,
+    BootstrapStartupState startup) : IWorkspacePlatformResourceProvisioner, IWorkspaceProvisioner
 {
     public async Task EnsureAllAsync(CancellationToken cancellationToken)
     {
@@ -42,7 +45,9 @@ internal sealed class WorkspacePlatformResourceProvisioner(
         {
             var workspaces = await identities.ListWorkspacesAsync(tenant.Id, cancellationToken);
             foreach (var workspace in workspaces.Where(value => value.Status is WorkspaceStatus.Initializing or WorkspaceStatus.Active))
+            {
                 await EnsureWorkspaceResourcesAsync(tenant.Id, workspace.Id, cancellationToken);
+            }
         }
     }
 
@@ -84,8 +89,20 @@ internal sealed class WorkspacePlatformResourceProvisioner(
             await identities.UpdateWorkspaceAsync(workspace with { Status = WorkspaceStatus.Active }, cancellationToken);
     }
 
-    public Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken) =>
-        EnsureAsync(workspace.TenantId, workspace.Id, cancellationToken);
+    public async Task ProvisionAsync(Workspace workspace, CancellationToken cancellationToken)
+    {
+        if (!startup.IsReady && startup.Read().ActiveStepId == "topology"
+            && configuration.GetValue<bool>("Agentstration:Bootstrap:InitialBootstrapEnabled"))
+        {
+            // Topology consumers (including PrincipalDefaultContext) require an
+            // active structural Workspace. Global readiness still fences use until
+            // the following built-in phase has materialized its platform resources.
+            if (workspace.Status == WorkspaceStatus.Initializing)
+                await identities.UpdateWorkspaceAsync(workspace with { Status = WorkspaceStatus.Active }, cancellationToken);
+            return;
+        }
+        await EnsureAsync(workspace.TenantId, workspace.Id, cancellationToken);
+    }
 
     private async Task<StoredResource<RuntimeProfileResource>> EnsureStandardRuntimeProfileAsync(CancellationToken cancellationToken)
     {

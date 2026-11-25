@@ -523,6 +523,14 @@ public sealed class DataSourceManagementService(
         return stored;
     }
 
+    public async Task ValidateForCreateAsync(DataSourceResource resource, CancellationToken cancellationToken)
+    {
+        var scope = resource.ScopeRef ?? scopeOperations.DefaultScopeRef(DataSourceResourceKinds.DataSource);
+        var desired = resource with { ScopeRef = scope };
+        if (datasets is not null) desired = await datasets.AdoptSchemasAsync(desired, cancellationToken);
+        _ = await ValidateAndResolveAsync(desired, false, cancellationToken);
+    }
+
     public async Task<StoredResource<DataSourceResource>> PutAsync(ResourceNamespace ns, string name,
         ResourceScopeRef? scopeRef, DataSourceProperties definition, string? ifMatch, CancellationToken cancellationToken)
     {

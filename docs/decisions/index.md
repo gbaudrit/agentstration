@@ -306,4 +306,16 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 250. [ADR-0250 — Initial Bootstrap waits for required extension contributions](0250-initial-bootstrap-waits-for-required-extension-contributions.md)
 
+251. [ADR-0251 — Bootstrap configures resource graphs and discovers operations](0251-bootstrap-configures-resource-graphs-and-discovers-operations.md)
+
 252. [ADR-0252 — Extension images have independent OCI releases](0252-extension-images-have-independent-oci-releases.md)
+
+253. [ADR-0253 — Initial Bootstrap admits its own Worker assignments](0253-initial-bootstrap-admits-its-own-worker-assignments.md)
+
+254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
+255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)
+
+256. [ADR-0256 — Preview lifecycle binds provider-neutral requests to owned resources](0256-preview-lifecycle-binds-provider-neutral-requests-to-owned-resources.md)
+257. [ADR-0257 — Azure previews use OIDC and credential-free OCI transfer](0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
+258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
+259. [ADR-0259 — Preview routes use owned tunnels and an isolated Access proxy](0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)

@@ -7,6 +7,42 @@ namespace Agentstration.Web.Tests;
 public sealed class BootstrapStartupProgressStateTests
 {
     [TestMethod]
+    public void DiscoveryRunsAreInspectableDuringBootstrapWhileExecutionCommandsStayFenced()
+    {
+        Assert.IsTrue(BootstrapStartupNavigation.IsInspectionPath("/flow-runs/discovery"));
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        context.Request.Path = "/api/flowRuns/discovery";
+        context.Request.Method = "GET";
+        Assert.IsTrue(Agentstration.Web.Hosting.BootstrapAdministrationAccess.IsInspectionRead(context.Request));
+        context.Request.Method = "POST";
+        context.Request.Path = "/api/flowRuns/discovery/cancel";
+        Assert.IsFalse(Agentstration.Web.Hosting.BootstrapAdministrationAccess.IsInspectionRead(context.Request));
+        Assert.IsFalse(Agentstration.Web.Hosting.BootstrapAdministrationAccess.IsAdministrationPath(context.Request.Path));
+    }
+    [TestMethod]
+    public void WorkerAdmissionIsAttemptBoundAndDoesNotReleaseOrdinaryWorkersBeforeReadiness()
+    {
+        var startup = new BootstrapStartupState();
+        startup.Begin();
+        CollectionAssert.AreEqual(new[] { "topology", "workers", "builtins", "extensions", "resources", "finalization" }, startup.Read().Steps.Select(step => step.Id).ToArray());
+        Assert.IsFalse(startup.WorkerCommunicationOpen);
+        Assert.HasCount(0, startup.ClaimableAssignmentIds!);
+        var attempt = startup.Read().AttemptId;
+        startup.MoveTo("workers"); startup.OpenWorkerCommunication();
+        Assert.IsFalse(startup.IsReady);
+        var id = new Agentstration.Runtime.Abstractions.RuntimeAssignmentId(Guid.NewGuid());
+        startup.AdmitAssignment(attempt, id);
+        Assert.Contains(id, startup.ClaimableAssignmentIds!);
+        startup.Fail("bootstrap_discovery_timeout");
+        Assert.HasCount(0, startup.ClaimableAssignmentIds!);
+        startup.BeginRetry(); startup.OpenWorkerCommunication();
+        startup.AdmitAssignment(startup.Read().AttemptId, id);
+        Assert.Contains(id, startup.ClaimableAssignmentIds!);
+        Assert.ThrowsExactly<InvalidOperationException>(() => startup.AdmitAssignment(attempt, id));
+        startup.Complete();
+        Assert.IsNull(startup.ClaimableAssignmentIds);
+    }
+    [TestMethod]
     public void BootstrapEntryPreservesAValidatedInspectionScopeSeparatelyFromItsReturnDestination()
     {
         var url = BootstrapStartupNavigation.ProgressUrl("/?context=%2Finstance");

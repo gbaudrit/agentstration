@@ -218,4 +218,30 @@
   <data name="Completed" xml:space="preserve"><value>Bootstrap completed</value></data>
   <data name="CompletedDescription" xml:space="preserve"><value>Preparation is complete. Review the results, then open the Console when you are ready.</value></data>
   <data name="OpenConsole" xml:space="preserve"><value>Open Console</value></data>
+  <data name="RequiredExtensionUnavailable" xml:space="preserve"><value>The required extension is not available in the target scope. Start or enroll this extension.</value></data>
+  <data name="RequiredContributionUnavailable" xml:space="preserve"><value>The selected contribution is not available from this extension. Check its enrollment, published contributions and required version.</value></data>
+  <data name="ContributionType" xml:space="preserve"><value>Contribution type</value></data>
+  <data name="RequiredVersion" xml:space="preserve"><value>Required version</value></data>
+  <data name="RequiredInstallation" xml:space="preserve"><value>Required installation</value></data>
+  <data name="RequiredByResource" xml:space="preserve"><value>Required by resource</value></data>
+  <data name="RequiredDependency" xml:space="preserve"><value>Required dependency</value></data>
+  <data name="BlockedByBootstrapFailure" xml:space="preserve"><value>This resource was not applied because Bootstrap stopped after the failure below.</value></data>
+  <data name="FailureDiscoveryRequiresManualApplication" xml:space="preserve"><value>One of the selected profiles requests Connected Service operation discovery. This discovery uses Flows and Workers admitted only after initial Bootstrap completes, so it cannot run during initial Bootstrap. Remove that profile from the initial selection, restart, then apply it from System &gt; Bootstrap profiles.</value></data>
+  <data name="Family_ConnectedServiceOperationDiscovery" xml:space="preserve"><value>Operation discovery</value></data>
+  <data name="Stage_workers" xml:space="preserve"><value>Worker communications</value></data>
+  <data name="Explanation_workers" xml:space="preserve"><value>Allow authenticated Workers to connect. A compatible Worker is required only when a Bootstrap operation needs execution. Ordinary work remains suspended until initialization completes.</value></data>
+  <data name="Stage_builtins" xml:space="preserve"><value>Built-in resources</value></data>
+  <data name="Explanation_builtins" xml:space="preserve"><value>Materialize and publish the platform Tools, Flows and contracts in their administrative scopes before applying dependent profile resources.</value></data>
+  <data name="WaitingForWorker" xml:space="preserve"><value>Waiting for a compatible Worker</value></data>
+  <data name="WorkerWaitDescription" xml:space="preserve"><value>The discovery is queued. Connect a Worker supporting the expected Runtime capability before the deadline.</value></data>
+  <data name="DiscoveryInProgress" xml:space="preserve"><value>Operation discovery</value></data>
+  <data name="DiscoveryRunningDescription" xml:space="preserve"><value>The discovery Flow is executing. Dependent resources will be applied after its outputs are validated.</value></data>
+  <data name="DiscoveryValidationDescription" xml:space="preserve"><value>Validate the discovered operations against the profile selectors.</value></data>
+  <data name="RuntimeCapability" xml:space="preserve"><value>Expected Runtime capability</value></data>
+  <data name="Elapsed" xml:space="preserve"><value>Elapsed time</value></data>
+  <data name="ElapsedSeconds" xml:space="preserve"><value>{0} s</value></data>
+  <data name="DiscoveryDeadline" xml:space="preserve"><value>Discovery deadline</value></data>
+  <data name="DiscoveryFlowRun" xml:space="preserve"><value>Open the discovery Flow Run</value></data>
+  <data name="FailureDiscoveryActorRequired" xml:space="preserve"><value>Operation discovery requires an authorized execution identity. Initial Bootstrap must create or retain a Platform administrator in its structure phase.</value></data>
+  <data name="FailureDiscoveryTimeout" xml:space="preserve"><value>The discovery deadline expired. Check that a compatible Worker is connected and that the discovery provider is reachable, then retry Bootstrap. Dependent resources have not been applied.</value></data>
 </root>

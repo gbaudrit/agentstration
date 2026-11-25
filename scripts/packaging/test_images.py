@@ -1,4 +1,5 @@
 """Offline publication contracts; no registry, cloud credential or model access."""
+import argparse
 import copy
 import hashlib
 import http.server
@@ -39,6 +40,77 @@ class ImageContracts(unittest.TestCase):
         for extension in ("../foundry", "foundry;command", "unimplemented"):
             with self.subTest(extension=extension), self.assertRaises(ValueError):
                 images.catalogue(extension)
+
+    def test_awp_worker_has_an_independent_catalogue_and_release_namespace(self):
+        worker = images.catalogue("maf-worker")
+        self.assertEqual("awp-worker", worker["kind"])
+        self.assertEqual((images.ROOT / worker["versionFile"]).read_text().strip(), worker["version"])
+        self.assertEqual("Dockerfile.worker", worker["dockerfile"])
+        self.assertNotIn("aepVersion", worker)
+        images.release_tag(worker, "worker/maf-worker/v" + worker["version"])
+        with self.assertRaises(ValueError):
+            images.release_tag(worker, "extension/maf-worker/v" + worker["version"])
+        with self.assertRaises(ValueError):
+            images.release_tag(self.entry, "worker/foundry/v" + self.entry["version"])
+
+    def test_server_follows_product_properties_without_a_second_version_source(self):
+        entry = json.loads((images.ROOT / "deploy/images/applications/server.json").read_text())
+        root = self.directory / "repository"
+        for name in ("project", "dockerfile", "versionFile", "testProject"):
+            path = root / entry[name]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("fixture")
+        path = root / "deploy/images/applications/server.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(entry))
+        for properties, expected in (("<VersionPrefix>7.4.2</VersionPrefix><VersionSuffix>preview.9</VersionSuffix>", "7.4.2-preview.9"),
+                                     ("<VersionPrefix>8.0.0</VersionPrefix>", "8.0.0")):
+            with self.subTest(expected=expected), patch.object(images, "ROOT", root):
+                (root / entry["versionFile"]).write_text("<Project><PropertyGroup>" + properties + "</PropertyGroup></Project>")
+                server = images.catalogue("server")
+                self.assertEqual(expected, server["version"])
+                self.assertEqual("server", server["kind"])
+                with self.assertRaises(ValueError):
+                    images.release_tag(server, "v" + expected)
+        with patch.object(images, "ROOT", root):
+            (root / entry["versionFile"]).write_text("<Project><PropertyGroup><VersionPrefix>$(Undefined)</VersionPrefix></PropertyGroup></Project>")
+            with self.assertRaises(ValueError):
+                images.catalogue("server")
+
+    def test_server_build_reuses_the_exact_pinned_companion_inputs(self):
+        bases = {"sdk": "sdk@sha256:" + "a" * 64, "runtime": "runtime@sha256:" + "b" * 64}
+        directory = self.directory / "server"
+
+        def build_fixture(command, **_arguments):
+            (directory / "image.oci.tar").write_bytes(b"offline-server-archive")
+            (directory / "build-metadata.json").write_text(json.dumps({"containerimage.digest": "sha256:" + "c" * 64}))
+
+        with patch.object(images, "output", side_effect=["", "d" * 40]), \
+                patch.object(images, "resolve_image") as resolve, \
+                patch.object(images.subprocess, "run", side_effect=build_fixture) as build:
+            delivery = images.build("server", directory, "owner/repo", bases=bases)
+        resolve.assert_not_called()
+        self.assertEqual("server", delivery["component"]["kind"])
+        self.assertEqual(bases, delivery["buildImages"])
+        self.assertIn("SDK_IMAGE=" + bases["sdk"], build.call_args.args[0])
+        self.assertNotIn("extension", delivery)
+
+    def test_unpinned_companion_inputs_fail_before_a_build(self):
+        with patch.object(images, "output", side_effect=["", "d" * 40]), \
+                patch.object(images.subprocess, "run") as build, patch.object(images, "resolve_image") as resolve:
+            with self.assertRaises(ValueError):
+                images.build("server", self.directory / "invalid", "owner/repo",
+                             bases={"sdk": "sdk:latest", "runtime": "runtime@sha256:" + "b" * 64})
+        build.assert_not_called()
+        resolve.assert_not_called()
+
+    def test_delivery_accepts_legacy_aep_and_neutral_worker_metadata_without_ambiguity(self):
+        worker = images.catalogue("maf-worker")
+        self.assertEqual(self.entry, images.delivery_entry({"extension": self.entry}))
+        self.assertEqual(worker, images.delivery_entry({"component": worker}))
+        for delivery in ({}, {"component": worker, "extension": self.entry}):
+            with self.subTest(delivery=delivery), self.assertRaises(ValueError):
+                images.delivery_entry(delivery)
 
     def test_release_tag_is_extension_specific_and_matches_its_version(self):
         entry = {**self.entry, "version": "1.0.0"}
@@ -103,6 +175,62 @@ class ImageContracts(unittest.TestCase):
         with patch.object(images, "output", return_value="User"), patch.object(images.subprocess, "run", return_value=result):
             with self.assertRaises(ValueError):
                 images.private_package("owner/repo", "repo-extension-foundry")
+
+    def test_unknown_or_nonprivate_package_stops_before_any_image_copy(self):
+        path, delivery = self.delivery()
+        delivery["repository"] = "owner/repo"
+        path.write_text(json.dumps(delivery))
+        arguments = argparse.Namespace(action="publish", delivery=path, registry="ghcr",
+                                       authfile=self.directory / "auth.json", release_tag=None, namespace=None)
+        responses = [subprocess.CompletedProcess([], 1, stdout="", stderr=f"HTTP {status}")
+                     for status in (404, 403, 500)]
+        responses += [subprocess.CompletedProcess([], 0, stdout=json.dumps({"visibility": visibility}), stderr="")
+                      for visibility in ("public", "internal")]
+        for response in responses:
+            with self.subTest(response=response), \
+                    patch.object(images.argparse.ArgumentParser, "parse_args", return_value=arguments), \
+                    patch.object(images, "output", side_effect=lambda command: "a" * 40 if command[0] == "git" else "User"), \
+                    patch.object(images.subprocess, "run", return_value=response), \
+                    patch.object(images, "copy_archive") as copy_archive:
+                with self.assertRaises(ValueError):
+                    images.main()
+                copy_archive.assert_not_called()
+                self.assertFalse((self.directory / "publication-ghcr.json").exists())
+
+    def test_verified_private_package_records_digest_after_copy_and_privacy_recheck(self):
+        path, delivery = self.delivery()
+        delivery["repository"] = "owner/repo"
+        path.write_text(json.dumps(delivery))
+        arguments = argparse.Namespace(action="publish", delivery=path, registry="ghcr",
+                                       authfile=self.directory / "auth.json", release_tag=None, namespace=None)
+        response = subprocess.CompletedProcess([], 0, stdout='{"visibility":"private"}', stderr="")
+        with patch.object(images.argparse.ArgumentParser, "parse_args", return_value=arguments), \
+                patch.object(images, "output", side_effect=lambda command: "a" * 40 if command[0] == "git" else "User"), \
+                patch.object(images.subprocess, "run", return_value=response) as api, \
+                patch.object(images, "copy_archive") as copy_archive, patch("builtins.print"):
+            images.main()
+        copy_archive.assert_called_once()
+        self.assertEqual(2, api.call_count)
+        receipt = json.loads((self.directory / "publication-ghcr.json").read_text())
+        self.assertEqual("ghcr.io/owner/repo-extension-foundry@" + delivery["digest"], receipt["reference"])
+
+    def test_worker_publication_reuses_the_privacy_gate_and_digest_receipt(self):
+        path, delivery = self.delivery()
+        del delivery["extension"]
+        delivery.update(component=images.catalogue("maf-worker"), repository="owner/repo")
+        path.write_text(json.dumps(delivery))
+        arguments = argparse.Namespace(action="publish", delivery=path, registry="ghcr",
+                                       authfile=self.directory / "auth.json", release_tag=None, namespace=None)
+        with patch.object(images.argparse.ArgumentParser, "parse_args", return_value=arguments), \
+                patch.object(images, "output", return_value="a" * 40), \
+                patch.object(images, "private_package") as privacy, \
+                patch.object(images, "copy_archive") as copy_archive, patch("builtins.print"):
+            images.main()
+        copy_archive.assert_called_once()
+        self.assertEqual(2, privacy.call_count)
+        privacy.assert_called_with("owner/repo", "repo-worker-maf")
+        receipt = json.loads((self.directory / "publication-ghcr.json").read_text())
+        self.assertEqual("ghcr.io/owner/repo-worker-maf@" + delivery["digest"], receipt["reference"])
 
     def test_real_aep_manifest_shape_checks_identity_protocol_and_contribution(self):
         _, delivery = self.delivery()

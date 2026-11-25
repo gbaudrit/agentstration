@@ -34,7 +34,7 @@ using Crawl4AiDataSourceProfileBundle = crawl4ai::Agentstration.Extensions.Crawl
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class AgentstrationDocumentationEndToEndTests
+public sealed partial class AgentstrationDocumentationEndToEndTests
 {
     private const string Password = "Initial123!Password";
     private static readonly byte[] FixtureCorpus = Encoding.UTF8.GetBytes("""

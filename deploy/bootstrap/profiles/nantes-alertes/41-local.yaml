@@ -1,0 +1,21 @@
+apiVersion: agentstration.io/v1
+kind: Storage
+metadata:
+  name: nantes-alertes-content
+  namespace: default
+definition:
+  configuration: {}
+  type:
+    resourceRef:
+      name: local
+      version: 1.0.0
+  envelope:
+    stat: true
+    maximumPageSize: 100
+    maximumWriteBytes: 10485760
+    read: true
+    prefix: ""
+    maximumReadBytes: 10485760
+    write: true
+    list: true
+  displayName: Nantes - RSS et Knowledge

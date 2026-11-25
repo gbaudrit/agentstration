@@ -14,7 +14,7 @@ foreach ($path in @('src/Agentstration.ResourcePlanning.Storage.PostgreSql/Migra
 }
 $result = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('docs/contributing/testing.md')
 Require (-not ($result.storage -or $result.dotnet -or $result.aep -or $result.container -or $result.extensionImages)) 'Documentation should skip expensive jobs.'
-foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'src/extensions/Agentstration.Extensions.Foundry/version.txt', 'tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs', 'tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs', 'deploy/images/extensions/foundry.json', 'scripts/packaging/images.py', 'Dockerfile.extension', '.github/workflows/validate-extension-image.yml', '.github/workflows/extension-images.yml')) {
+foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'src/extensions/Agentstration.Extensions.Foundry/version.txt', 'tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs', 'tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs', 'deploy/images/extensions/foundry.json', 'scripts/packaging/images.py', 'Dockerfile.extension', '.github/workflows/validate-oci-image.yml', '.github/workflows/oci-images.yml')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path, 'docs/contributing/image-packaging.md')
     Require ($selection.extensionImages -and -not ($selection.dotnet -or $selection.aep -or $selection.container -or $selection.storage)) "Isolated image changes selected transverse validation: $path"
 }
@@ -25,6 +25,20 @@ foreach ($path in @('aep/src/Agentstration.Aep.Abstractions/AepProtocol.cs', 'Di
 foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Extensions.Contracts/ExtensionContracts.cs', 'src/extensions/Agentstration.Extensions.OpenApi/Program.cs', 'src/extensions/Unknown/Program.cs', 'deploy/images/extensions/openapi.json')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', $path)
     Require ($selection.dotnet -and $selection.container -and $selection.extensionImages) "Mixed/unknown changes must retain product and image validation: $path"
+}
+foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'scripts/packaging/enrollment_smoke.py')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path"
+}
+foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Program.cs', 'Dockerfile.worker', 'deploy/images/workers/maf-worker.json', 'scripts/packaging/worker_smoke.py', 'awp/src/Agentstration.Awp.Abstractions/AwpProtocol.cs')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker,server') "Worker inputs must validate the Worker and its real preview composition: $path"
+}
+$selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
+Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
+foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml', '.github/workflows/preview-azure-validation.yml', '.github/workflows/preview-azure-environment.yml', '.github/workflows/preview-on-demand.yml')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
 }
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.OpenApi/Program.cs')
 Require ($selection.dotnet -and $selection.container -and -not $selection.extensionImages) 'Unimplemented packaging verticals must retain current validation.'
@@ -74,13 +88,26 @@ $ci = Get-Content (Join-Path $root '.github/workflows/ci.yml') -Raw
 Require ($ci.Contains('needs: [changes, build, functional-tests, aep-tests, extension-images]')) 'The required check must wait for the selected image validation.'
 Require ($ci.Contains('EXTENSION_IMAGES_SELECTED: ${{ needs.changes.outputs.extension-images }}') -and $ci.Contains('EXTENSION_IMAGES_RESULT: ${{ needs.extension-images.result }}')) 'The result gate must receive image selection and status.'
 Require ($ci.Contains('run: ./scripts/ci/assert-validation-results.ps1')) 'CI must execute the tested result gate.'
-$delivery = Get-Content (Join-Path $root '.github/workflows/extension-images.yml') -Raw
+Require ($ci.Contains('matrix: ${{ fromJSON(needs.changes.outputs.image-matrix) }}') -and $ci.Contains('extension: ${{ matrix.image }}')) 'Image validation must consume the classified matrix.'
+$delivery = Get-Content (Join-Path $root '.github/workflows/oci-images.yml') -Raw
 Require (-not $delivery.Contains('pull_request:')) 'PR images must not build a second time in the delivery workflow.'
 foreach ($workflow in @($ci, $delivery)) {
-    Require ($workflow.Contains('uses: ./.github/workflows/validate-extension-image.yml')) 'CI and delivery must share the same OCI validation.'
+    Require ($workflow.Contains('uses: ./.github/workflows/validate-oci-image.yml')) 'CI and delivery must share the same OCI validation.'
 }
-$validation = Get-Content (Join-Path $root '.github/workflows/validate-extension-image.yml') -Raw
+$validation = Get-Content (Join-Path $root '.github/workflows/validate-oci-image.yml') -Raw
 Require (-not ($validation.Contains('packages: write') -or $validation.Contains('secrets.') -or $validation.Contains('  publish:'))) 'Reusable PR validation must not include registry publication credentials.'
+$enrollmentSteps = @($validation -split '(?m)^      - name: ' | Where-Object { $_.Contains('scripts/packaging/enrollment_smoke.py') })
+Require ($enrollmentSteps.Count -eq 1 -and $enrollmentSteps[0].Contains("if: steps.select.outputs.kind == 'aep-extension'")) 'The enrollment smoke must run for every selected AEP image, not a provider ID.'
+$previewSteps = @($validation -split '(?m)^      - name: ' | Where-Object { $_.Contains('scripts/preview/preview_smoke.py') })
+Require ($previewSteps.Count -eq 1 -and $previewSteps[0].Contains("if: steps.select.outputs.kind == 'server'")) 'Server delivery must execute the actual digest-pinned preview before publication.'
+Require ($previewSteps[0].Contains("for database in ('sqlite', 'postgresql'):") -and $previewSteps[0].Contains("'--database', database")) 'The same server archive must pass both database previews before publication.'
+$lifecycle = Get-Content (Join-Path $root '.github/workflows/preview-environment.yml') -Raw
+Require ($lifecycle.Contains('workflow_call:') -and $lifecycle.Contains('workflow_dispatch:')) 'Lifecycle entrypoints must be reusable and manually invokable.'
+Require ($lifecycle.Contains('scripts/preview/lifecycle.py') -and $lifecycle.Contains('cancel-in-progress: false')) 'Lifecycle workflows must delegate to versioned scripts and serialize environment mutations.'
+Require (-not ($lifecycle.Contains('packages: write') -or $lifecycle.Contains('GHCR_BOOTSTRAP_TOKEN') )) 'Portable Docker lifecycle must have read-only package delivery and no cloud publication credentials.'
+$dockerLifecycle = ($lifecycle -split '(?m)^  azure:')[0]
+Require (-not $dockerLifecycle.Contains('id-token: write')) 'Docker execution and pure validation must not obtain Azure OIDC permissions.'
+Require ($lifecycle.Contains('azure/login@v2') -and $lifecycle.Contains("needs.validate.outputs.provider == 'azure-vm'")) 'Azure execution must be routed explicitly and use OIDC.'
 $resourceUx = Get-Content (Join-Path $root '.github/workflows/resource-plan-ux.yml') -Raw
 Require ($resourceUx.Contains("      - 'src/**'") -and $resourceUx.Contains("      - '!src/extensions/Agentstration.Extensions.Foundry/**'")) 'Resource Plan UX must exclude Foundry-only source edits while retaining mixed product edits.'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())

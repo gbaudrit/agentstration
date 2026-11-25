@@ -1,0 +1,82 @@
+name: Preview Azure environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Lifecycle operation (reset is explicit destroy only)
+        type: choice
+        options: [validate, deploy, status, destroy]
+        default: validate
+        required: true
+      request:
+        description: Public request JSON; deploy/validate can omit Azure image/version/size defaults
+        type: string
+        required: true
+      azure_vm_size_profile:
+        description: Configured size slot, or request to preserve explicit values
+        type: choice
+        options: [request, '1', '2', '3', '4', '5']
+        default: request
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: preview-deployment
+    outputs:
+      request: ${{ steps.resolve.outputs.request }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Freeze the protected environment defaults without Azure authentication
+        id: resolve
+        env:
+          REQUEST_JSON: ${{ inputs.request }}
+          OPERATION: ${{ inputs.operation }}
+          SIZE_PROFILE: ${{ inputs.azure_vm_size_profile }}
+          AZURE_PREVIEW_IMAGE_VERSION: ${{ vars.AZURE_PREVIEW_IMAGE_VERSION }}
+          AZURE_PREVIEW_OS_PROFILE: ${{ vars.AZURE_PREVIEW_OS_PROFILE }}
+          AZURE_PREVIEW_VM_SIZE1: ${{ vars.AZURE_PREVIEW_VM_SIZE1 }}
+          AZURE_PREVIEW_VM_SIZE2: ${{ vars.AZURE_PREVIEW_VM_SIZE2 }}
+          AZURE_PREVIEW_VM_SIZE3: ${{ vars.AZURE_PREVIEW_VM_SIZE3 }}
+          AZURE_PREVIEW_VM_SIZE4: ${{ vars.AZURE_PREVIEW_VM_SIZE4 }}
+          AZURE_PREVIEW_VM_SIZE5: ${{ vars.AZURE_PREVIEW_VM_SIZE5 }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import contract, github_request, preview
+          request = github_request.resolve(os.environ['REQUEST_JSON'], os.environ,
+                                           os.environ['SIZE_PROFILE'], os.environ['OPERATION'])
+          preview.require(request['provider'] == 'azure-vm', 'This entrypoint accepts Azure requests only.')
+          contract.operation(os.environ['OPERATION'], request)
+          preview.private_write(Path(os.environ['RUNNER_TEMP']) / 'resolved-request.json', json.dumps(request) + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('request=' + json.dumps(request) + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: azure-resolved-request-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/resolved-request.json
+          retention-days: 30
+          if-no-files-found: error
+
+  execute:
+    needs: resolve
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    uses: ./.github/workflows/preview-environment.yml
+    # Required for the called job to resolve its protected environment secrets.
+    secrets: inherit
+    with:
+      operation: ${{ inputs.operation }}
+      request: ${{ needs.resolve.outputs.request }}

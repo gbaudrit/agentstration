@@ -169,7 +169,8 @@ else
         if (!stopping.IsCancellationRequested) StateHasChanged();
     }
     private static bool IsWaiting(BootstrapStartupSnapshot value) =>
-        value.Activity?.WaitReason is not null || value.Steps.Any(step => step.State == "waiting");
+        value.Activity?.WaitReason is { } reason && reason is not ("discovery_running" or "discovery_validation")
+        || value.Steps.Any(step => step.State == "waiting");
 
     private void OpenConsole()
     {

@@ -57,6 +57,14 @@ public static class BootstrapProfileEndpoints
             .WithSummary("Accept a versioned provider and model substitution for a pending Bootstrap profile");
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
         group.MapGet("/profiles", GetAsync);
+        group.MapPost("/profiles/files", async (BootstrapProfileFilesRequest request, IBootstrapProfileApiService service,
+            ICurrentRequestContext requestContext, HttpContext context, CancellationToken token) =>
+            await ExecuteAsync(async () =>
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                return Results.Ok(await service.GetFilesAsync(request, requestContext.Current.PrincipalId, token));
+            })).Produces<BootstrapProfileFiles>().ProducesProblem(400).ProducesProblem(403)
+            .WithSummary("Inspect original Bootstrap profile manifests without resolving configuration inputs");
         group.MapPost("/source-profile", GetSourceProfileAsync);
         group.MapPost("/binding-targets", GetBindingTargetsAsync);
         group.MapPost("/profiles/preview", PreviewAsync);
@@ -100,7 +108,7 @@ public static class BootstrapProfileEndpoints
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
         await ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
-            new(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications),
+            new(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications, request.Inputs),
             requestContext.Current.PrincipalId,
             cancellationToken)));
 

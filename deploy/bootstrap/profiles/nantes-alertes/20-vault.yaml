@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: Vault
+metadata:
+  name: nantes-alertes-vault
+  namespace: default
+definition:
+  providerType: local
+  displayName: Nantes - Alertes
