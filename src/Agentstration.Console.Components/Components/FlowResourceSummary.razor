@@ -6,10 +6,11 @@
 
 <div class="flow-resource-summary" data-testid="flow-summary">
     @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]" TestId="flow-quick-actions">@QuickActions</ResourceQuickActions> }
-    <FormSection Title="@T("ExecutionPreview")" Class="flow-overview-preview" Collapsible>
+    @if (Resource.Definition is RuntimeFlowDefinition) { <p class="muted">@T("RuntimeExecutionHelp")</p> }
+    else { <FormSection Title="@T("ExecutionPreview")" Class="flow-overview-preview" Collapsible>
         <Actions>@if (Resource.Definition is OrchestrationFlowDefinition orchestration) { <StatusBadge Text="@Localizer[$"Strategy.{orchestration.Strategy}"]" Status="UiStatus.Info" /> }</Actions>
         <ChildContent><FlowTopologyViewer Graph="@FlowTopologyProjector.ProjectPreview(Resource.Definition, Resource.Graph)" Title="@T("FlowTopology")" InitiallyFit="true" /></ChildContent>
-    </FormSection>
+    </FormSection> }
     @if (Identity is not null) { @Identity }
     else
     {

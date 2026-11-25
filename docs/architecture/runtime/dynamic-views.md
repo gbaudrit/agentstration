@@ -215,3 +215,29 @@ Preparation retains real governed Flow Runs. Reading and status inspection do no
 create retrieval Runs. Protected cursors and durable expiring read leases preserve
 an exact historical selection across later publication. See
 [ADR-0210](../../decisions/0210-knowledge-exposes-native-snapshot-access-tools.md).
+
+## Execute an admitted native Coding task
+
+```mermaid
+sequenceDiagram
+    participant Work as WorkPlan admission
+    participant Coding as Coding application
+    participant AWP as Authoritative Flow/AWP
+    participant Worker as Native Coding AWP worker
+    participant Helper as Isolated native helper
+    Work->>Coding: Resolve pinned harness/runtime and protected Project repository
+    Coding-->>Work: Captured authorization and repository identity evidence
+    Work->>AWP: Submit complete Runtime Flow Run
+    Worker->>AWP: Claim compatible capability and material under fenced lease
+    AWP->>Coding: Reauthorize exact captured attempt and connection
+    AWP-->>Worker: Pinned bounded native material
+    Worker->>Helper: Exact cache identity, commit, profile and task
+    Helper->>Helper: Isolated checkout, native CLI and bounded checks
+    Helper-->>Worker: Patch/check/result and usage observations
+    Worker->>AWP: Fenced observations and terminal result/failure
+    AWP->>Work: Persist technical evidence without functional acceptance
+```
+
+The helper never receives AWP credentials or server database access. Cancellation kills its process
+tree; worker loss remains an explicit failure without automatic replay. See
+[ADR-0270](../../decisions/0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).

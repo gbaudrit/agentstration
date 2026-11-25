@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Coding.Contracts/Agentstration.Coding.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Work/Agentstration.Work.csproj" />
+  </ItemGroup>
+</Project>

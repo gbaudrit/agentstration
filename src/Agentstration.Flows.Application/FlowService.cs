@@ -36,6 +36,13 @@ public interface IFlowToolContractResolver
     Task<FlowToolReference> ResolveAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace, FlowToolReference reference, CancellationToken cancellationToken);
 }
 
+public interface IFlowRuntimeDefinitionResolver
+{
+    string RuntimeCapability { get; }
+    Task<RuntimeFlowDefinition> PinAsync(ResourceScopeRef ownerScopeRef, ResourceNamespace ownerNamespace,
+        RuntimeFlowDefinition definition, CancellationToken cancellationToken);
+}
+
 public interface IFlowDiscoveryPolicy
 {
     Task<bool> CanDiscoverAsync(FlowResource flow, ResourceScopeRef consumerScopeRef,
@@ -61,7 +68,8 @@ public sealed class FlowService(
     IFlowResourceReferenceResolver? resourceReferenceResolver = null,
     IFlowUsePolicy? usePolicy = null,
     IFlowToolContractResolver? toolContracts = null,
-    Agentstration.Functions.Contracts.ITransformationFunctionResolver? functions = null)
+    Agentstration.Functions.Contracts.ITransformationFunctionResolver? functions = null,
+    IEnumerable<IFlowRuntimeDefinitionResolver>? runtimeDefinitions = null)
 {
     public async Task<Agentstration.Functions.Contracts.ResolvedTransformationFunction> ResolveFunctionAsync(
         Agentstration.Functions.Contracts.FunctionReference reference, ResourceScopeRef consumer, CancellationToken ct)
@@ -300,6 +308,12 @@ public sealed class FlowService(
         if (await repository.GetVersionExactAsync(scopeRef, id, version, cancellationToken) is not null)
             throw new FlowValidationException("flow_version_already_published", $"Flow version '{version}' has already been published. Choose a new version.");
         var definition = await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Definition, cancellationToken);
+        if (definition is RuntimeFlowDefinition runtime)
+        {
+            var resolvers = (runtimeDefinitions ?? []).Where(value => value.RuntimeCapability == runtime.RuntimeCapability).ToArray();
+            if (resolvers.Length != 1) throw new FlowValidationException("flow_runtime_unavailable", "The selected runtime capability is not installed unambiguously.");
+            definition = await resolvers[0].PinAsync(scopeRef, id.Namespace, runtime, cancellationToken);
+        }
         var graph = stored.Value.Graph is null ? null : await PinAgentsAsync(scopeRef, id.Namespace, stored.Value.Graph, cancellationToken);
         IReadOnlyDictionary<string, SchemaBindingSnapshot>? schemaBindings = null;
         if (graph is not null)

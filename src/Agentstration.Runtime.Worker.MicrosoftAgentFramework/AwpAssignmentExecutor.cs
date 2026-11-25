@@ -13,7 +13,7 @@ namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 
 internal sealed partial class AwpAssignmentExecutor(
     ILoggerFactory loggerFactory,
-    ILogger<AwpAssignmentExecutor> logger)
+    ILogger<AwpAssignmentExecutor> logger) : IAwpAssignmentExecutor
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public async Task<AwpAssignmentExecutionResult> ExecuteAsync(AwpAssignmentSession session, AwpExecutionMaterial material,
@@ -1266,25 +1266,6 @@ internal sealed partial class AwpAssignmentExecutor(
             _ => throw new InvalidOperationException("The assignment execution scope is invalid.")
         };
 }
-
-internal class AwpExecutionNotSupportedException(string code, string message) : Exception(message)
-{
-    public string Code { get; } = code;
-    public string? Details { get; init; }
-    public FlowFailureOrigin? Origin { get; init; }
-}
-
-internal sealed class AwpExecutionTimedOutException()
-    : AwpExecutionNotSupportedException("flow_run_timed_out", "The Flow Run exceeded its execution timeout.");
-
-internal sealed record AwpAssignmentExecutionResult(
-    JsonElement? Output,
-    string? OutputName = null,
-    string? Outcome = null,
-    string? ErrorCode = null,
-    string? ErrorMessage = null,
-    string? ErrorDetails = null,
-    FlowFailureOrigin? ErrorOrigin = null);
 
 internal sealed record AwpChildExecutionResult(
     string RunId,

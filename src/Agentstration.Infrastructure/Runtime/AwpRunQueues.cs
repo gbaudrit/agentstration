@@ -73,11 +73,13 @@ public sealed class AwpFlowRunQueue(
         var materialVersion = run.Value.DefinitionSnapshot.Graph?.Steps.Any(step => step.Region() is not null
             || step is FlowCallStepDefinition or RepeatFlowStepDefinition || step.ArtifactOutput is not null) == true
                 ? RuntimeExecutionMaterialVersions.CoordinatedProcesses : RuntimeExecutionMaterialVersions.V1;
+        var runtime = run.Value.DefinitionSnapshot.Definition as RuntimeFlowDefinition;
+        if (runtime is not null) materialVersion = runtime.MaterialVersion;
         var hash = run.Value.DefinitionHash ?? Digest(JsonSerializer.Serialize(run.Value.DefinitionSnapshot));
         await assignments.CreateExactAsync(item.Scope.ScopeRef,
             item.Scope.TenantId == Guid.Empty ? null : item.Scope.TenantId,
             RuntimeAssignmentTargetKind.FlowRun, item.RunId,
-            MicrosoftAgentFramework, "1.0", materialVersion,
+            runtime?.RuntimeCapability ?? MicrosoftAgentFramework, runtime?.CapabilityVersion ?? "1.0", materialVersion,
             $"flow-run:{item.RunId}", Digest($"{item.Scope.ScopeRef}:{item.RunId}:{run.Value.FlowId}:{run.Value.FlowVersion}:{hash}"),
             cancellationToken);
     }

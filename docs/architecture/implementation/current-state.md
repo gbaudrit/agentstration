@@ -730,3 +730,16 @@ with SQLite/PostgreSQL backfill. Existing result/artifact tables provide exact t
 Evidence validates admission pins, current task/plan versions and same-run output references without
 changing functional acceptance. See [Task execution evidence](../../reference/task-execution-evidence.md)
 and [ADR-0269](../../decisions/0269-task-execution-evidence-projects-canonical-plan-attempts.md).
+
+## Native Coding execution
+
+The optional Linux Coding worker executes one admitted atomic WorkPlan task through the same AWP
+Core lifecycle as MAF, advertising `coding-cli` capability/material `1.0`. A provider-neutral Runtime
+Flow pins installed/granted RuntimeProfile and HarnessProfile configuration. Admission captures the
+Project repository identity; material resolution reauthorizes the captured connection. A curated
+Bubblewrap helper checks out an exact commit from an operator-approved bare cache and isolates
+Codex, checks and post-execution Git inspection from worker credentials and server storage. Fenced
+Diagnostics retain bounded patch/test/result and stable known/partial/unavailable usage observations,
+including failures and cancellation. No implicit code publication, acceptance, worker recovery or
+remote fetch is added. See [worker prerequisites and contracts](../../reference/coding-worker.md) and
+[ADR-0270](../../decisions/0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).

@@ -21,7 +21,7 @@ public partial class FlowResourcePreview
     private long revision;
     private bool disposed;
     private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
-    private bool CanEdit => resource is not null && !resource.Governance.IsManaged && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef
+    private bool CanEdit => resource is not null && resource.Definition is not RuntimeFlowDefinition && !resource.Governance.IsManaged && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef
         && Context.HasPermission(AuthorizationPermissions.ResourcesWrite);
     protected override Task OnParametersSetAsync() => requestedKey == SelectionKey ? Task.CompletedTask : LoadAsync();
     private async Task LoadAsync()

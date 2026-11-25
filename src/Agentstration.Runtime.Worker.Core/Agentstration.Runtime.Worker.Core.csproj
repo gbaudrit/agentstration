@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />
+    <ProjectReference Include="../Agentstration.Flows/Agentstration.Flows.csproj" />
+    <ProjectReference Include="../Agentstration.Schemas/Agentstration.Schemas.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Agentstration.Runtime.Worker.MicrosoftAgentFramework" />
+    <InternalsVisibleTo Include="Agentstration.Runtime.Worker.Coding" />
+    <InternalsVisibleTo Include="Agentstration.Runtime.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Bootstrap.Scenarios.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Execution.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Resources.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.DataSources.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Artifacts.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Management.Api.Tests" />
+  </ItemGroup>
+</Project>

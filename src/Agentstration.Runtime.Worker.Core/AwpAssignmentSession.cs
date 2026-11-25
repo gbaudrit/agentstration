@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 
-namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+namespace Agentstration.Runtime.Worker.Core;
 
 internal sealed class AwpAssignmentSession
 {

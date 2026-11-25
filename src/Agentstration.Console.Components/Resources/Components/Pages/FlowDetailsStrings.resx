@@ -99,4 +99,5 @@
   <data name="OpenFlowEditor" xml:space="preserve"><value>Open Flow editor</value></data>
   <data name="RefreshDraftConflict"><value>The saved Flow or its metadata draft changed elsewhere. Your inputs are retained; discard them to load the newer snapshot.</value></data>
   <data name="HistoryUnavailable"><value>Published versions or recent runs could not be read. Refresh to try again.</value></data>
+  <data name="RuntimeExecutionHelp" xml:space="preserve"><value>This Flow delegates one complete Run to its compatible runtime worker through an admitted WorkPlan task. Inspect its pinned configuration in YAML.</value></data>
 </root>

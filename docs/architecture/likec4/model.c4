@@ -154,7 +154,7 @@ model {
       }
 
       runtime = component 'Runtime execution' {
-        description 'Durable technical Runs, agent materialization, model resolution, attempts, and normalized events'
+        description 'Durable technical Runs, AWP capability placement and pinned material, governed model resolution, fenced attempts, and normalized events'
       }
 
       tools = component 'Tool execution pipeline' {
@@ -168,6 +168,14 @@ model {
       scheduling = component 'Scheduling and background processing' {
         description 'API-driven Trigger administration and run-now commands, plus internal scheduling, reconciliation, refresh, and recovery workers'
       }
+    }
+
+    mafWorker = container 'MAF AWP worker' {
+      description 'Independent Microsoft Agent Framework execution using shared Worker Core enrollment, claims, leases and fencing; no server database access'
+    }
+
+    codingWorker = container 'Native Coding AWP worker' {
+      description 'Optional single-assignment coding-cli worker and Bubblewrap-isolated native helper; pinned local bare cache, bounded patch/check/usage evidence, no server storage'
     }
 
     console = container 'Operations Console host' {
@@ -225,6 +233,9 @@ model {
   endUser -> agentstration.workplace 'Uses'
   operator -> agentstration.console 'Administers and supervises'
   apiConsumer -> agentstration.server 'Invokes governed APIs'
+  agentstration.mafWorker -> agentstration.server 'Claims AWP assignments and invokes governed operations'
+  agentstration.codingWorker -> agentstration.server 'Claims compatible AWP assignments and reports fenced evidence'
+
   agentstration.console -> agentstration.server 'Uses Management, Work, Flow, and Runtime APIs'
   agentstration.workplace -> agentstration.server 'Uses Entry, Work, interaction, and realtime APIs'
   apiConsumer -> agentstration.server.transport 'Invokes REST, MCP, and realtime APIs'

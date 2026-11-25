@@ -24,7 +24,7 @@ public sealed record FlowReference(
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(FlowId.Value, Namespace ?? ownerNamespace);
 }
 
-public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite }
+public enum FlowKind { Direct, Routing, Workflow, Orchestration, Composite, Runtime }
 public enum FlowTargetKind { Agent, Flow }
 public enum FlowRoutingStrategy { Deterministic, Capabilities, Semantic, Llm, Hybrid, Custom }
 public enum FlowNodeKind { Input, Agent, Router, Condition, Transform, Output, Flow, Function, ExternalCall, HumanApproval, Custom }

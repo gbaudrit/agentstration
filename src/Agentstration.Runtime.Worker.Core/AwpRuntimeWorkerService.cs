@@ -1,14 +1,14 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
-using System.Reflection;
 using Agentstration.Awp.Abstractions;
 using Microsoft.Extensions.Options;
 
-namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+namespace Agentstration.Runtime.Worker.Core;
 
 internal sealed class AwpRuntimeWorkerService(
     IOptions<RuntimeWorkerOptions> options,
+    AwpWorkerRuntimeDescriptor runtime,
     AwpWorkerCredentialProvider credentials,
     AwpAssignmentRunner assignmentRunner,
     RuntimeWorkerReadiness readiness,
@@ -16,7 +16,7 @@ internal sealed class AwpRuntimeWorkerService(
     IHttpClientFactory httpClientFactory,
     ILogger<AwpRuntimeWorkerService> logger) : BackgroundService
 {
-    public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime.Worker.MicrosoftAgentFramework");
+    public static readonly ActivitySource ActivitySource = new("Agentstration.Runtime.Worker");
 
     private readonly ConcurrentDictionary<AwpAssignmentId, Task> active = new();
     private int activeCount;
@@ -110,17 +110,9 @@ internal sealed class AwpRuntimeWorkerService(
         }
     }
 
-    private static AwpWorkerRegistrationRequest Registration(AwpClient client, RuntimeWorkerOptions configured)
-    {
-        var softwareVersion = typeof(AwpRuntimeWorkerService).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-            ?? typeof(AwpRuntimeWorkerService).Assembly.GetName().Version?.ToString() ?? "unknown";
-        var mafVersion = typeof(Agentstration.Runtime.MicrosoftAgentFramework.AgentFrameworkRuntimeFactory)
-            .Assembly.GetName().Version?.ToString();
-        return new([AwpProtocol.Version], new(client.WorkerId, client.SessionId, softwareVersion,
-            configured.MaximumConcurrentAssignments,
-            [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"], mafVersion)]));
-    }
+    private AwpWorkerRegistrationRequest Registration(AwpClient client, RuntimeWorkerOptions configured) =>
+        new([AwpProtocol.Version], new(client.WorkerId, client.SessionId, runtime.SoftwareVersion,
+            configured.MaximumConcurrentAssignments, runtime.Capabilities));
 
     private static bool IsAuthenticationFailure(AwpClientException exception) =>
         exception.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden;

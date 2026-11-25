@@ -99,4 +99,5 @@
   <data name="OpenFlowEditor" xml:space="preserve"><value>Ouvrir l’éditeur du Flow</value></data>
   <data name="RefreshDraftConflict"><value>Le Flow enregistré ou son brouillon de métadonnées a changé ailleurs. Vos saisies sont conservées ; abandonnez-les pour charger la version plus récente.</value></data>
   <data name="HistoryUnavailable"><value>Les versions publiées ou les exécutions récentes n’ont pas pu être chargées. Actualisez pour réessayer.</value></data>
+  <data name="RuntimeExecutionHelp" xml:space="preserve"><value>Ce Flow délègue un Run complet à son worker compatible depuis une tâche admise d’un WorkPlan. Consultez sa configuration figée dans le YAML.</value></data>
 </root>

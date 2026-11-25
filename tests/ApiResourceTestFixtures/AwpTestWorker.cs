@@ -15,14 +15,14 @@ using AwpWorker = awpworker::Agentstration.Runtime.Worker.MicrosoftAgentFramewor
 
 internal sealed class AwpTestWorker : IAsyncDisposable
 {
-    private readonly AwpWorker.AwpClientCredential credential;
-    private readonly AwpWorker.AwpClient client;
-    private readonly AwpWorker.AwpAssignmentRunner runner;
-    private readonly AwpWorker.RuntimeWorkerOptions options = new() { LeaseSafetyMarginSeconds = 1 };
+    private readonly Agentstration.Runtime.Worker.Core.AwpClientCredential credential;
+    private readonly Agentstration.Runtime.Worker.Core.AwpClient client;
+    private readonly Agentstration.Runtime.Worker.Core.AwpAssignmentRunner runner;
+    private readonly Agentstration.Runtime.Worker.Core.RuntimeWorkerOptions options = new() { LeaseSafetyMarginSeconds = 1 };
     private readonly CancellationTokenSource shutdown = new();
     private readonly Task processing;
 
-    private AwpTestWorker(AwpWorker.AwpClientCredential credential, AwpWorker.AwpClient client)
+    private AwpTestWorker(Agentstration.Runtime.Worker.Core.AwpClientCredential credential, Agentstration.Runtime.Worker.Core.AwpClient client)
     {
         this.credential = credential;
         this.client = client;
@@ -31,7 +31,7 @@ internal sealed class AwpTestWorker : IAsyncDisposable
                 NullLoggerFactory.Instance,
                 NullLogger<AwpWorker.AwpAssignmentExecutor>.Instance),
             TimeProvider.System,
-            NullLogger<AwpWorker.AwpRuntimeWorkerService>.Instance);
+            NullLogger<Agentstration.Runtime.Worker.Core.AwpRuntimeWorkerService>.Instance);
         processing = Task.Run(ProcessAsync, CancellationToken.None);
     }
 
@@ -56,12 +56,12 @@ internal sealed class AwpTestWorker : IAsyncDisposable
             AwpWorkerAuthentication.ProtocolVersion), default);
         var pairing = await identities.IssuePairingCodeAsync(workerId, default);
         var issued = await identities.ClaimAsync(new(workerId, pairing.Code), "api-test", default);
-        var credential = new AwpWorker.AwpClientCredential(
+        var credential = new Agentstration.Runtime.Worker.Core.AwpClientCredential(
             issued.WorkerId,
             issued.CredentialId,
             issued.InstanceId,
             Encoding.UTF8.GetBytes(issued.Secret));
-        var client = new AwpWorker.AwpClient(
+        var client = new Agentstration.Runtime.Worker.Core.AwpClient(
             new Uri("https://localhost"),
             credential,
             new(Guid.NewGuid()),

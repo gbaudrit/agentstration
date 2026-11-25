@@ -5,6 +5,7 @@ using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Http.Diagnostics;
 using Agentstration.Identity.Contracts;
+using Agentstration.Runtime.Worker.Core;
 using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +29,8 @@ public sealed class AwpWorkerClientTests
         using var handler = new UnavailableEnrollmentHandler();
         var factory = new EnrollmentHttpFactory(handler);
         var provider = new AwpWorkerCredentialProvider(configured, factory, NullLogger<AwpWorkerCredentialProvider>.Instance);
-        using var service = new AwpRuntimeWorkerService(configured, provider,
+        using var service = new AwpRuntimeWorkerService(configured,
+            new("fixture", [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"])]), provider,
             new AwpAssignmentRunner(new AwpAssignmentExecutor(NullLoggerFactory.Instance, NullLogger<AwpAssignmentExecutor>.Instance),
                 TimeProvider.System, NullLogger<AwpRuntimeWorkerService>.Instance),
             new RuntimeWorkerReadiness(), TimeProvider.System, factory, NullLogger<AwpRuntimeWorkerService>.Instance);
@@ -155,9 +157,9 @@ public sealed class AwpWorkerClientTests
     }
 
     [TestMethod]
-    public void WorkerUsesDedicatedTelemetrySource()
+    public void SharedWorkerLifecycleUsesDedicatedTelemetrySource()
     {
-        Assert.AreEqual("Agentstration.Runtime.Worker.MicrosoftAgentFramework",
+        Assert.AreEqual("Agentstration.Runtime.Worker",
             AwpRuntimeWorkerService.ActivitySource.Name);
     }
 

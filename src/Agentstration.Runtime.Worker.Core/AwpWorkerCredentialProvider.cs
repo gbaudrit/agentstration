@@ -4,7 +4,7 @@ using System.Text.Json;
 using Agentstration.Identity.Contracts;
 using Microsoft.Extensions.Options;
 
-namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+namespace Agentstration.Runtime.Worker.Core;
 
 internal sealed record AwpClientCredential(Guid WorkerId, Guid CredentialId, string InstanceId, byte[] Secret) : IDisposable
 {

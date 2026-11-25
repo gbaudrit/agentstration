@@ -41,4 +41,5 @@
   <data name="Kind.Orchestration" xml:space="preserve"><value>Orchestration</value></data>
   <data name="Kind.Composite" xml:space="preserve"><value>Composite</value></data>
   <data name="PublishedVersion" xml:space="preserve"><value>Version publiée</value></data>
+  <data name="Kind.Runtime" xml:space="preserve"><value>Exécution déléguée</value></data>
 </root>

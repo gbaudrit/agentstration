@@ -253,5 +253,3 @@ internal sealed class AwpRuntimeExecutionStateStore(
     public Task DeleteAsync(WorkspaceId workspaceId, string runId, string? runtimeType,
         CancellationToken cancellationToken) => Task.CompletedTask;
 }
-
-internal sealed class AwpWaitingForInputException : Exception;

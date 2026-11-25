@@ -28,6 +28,12 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkTaskProviderService>();
         services.AddSingleton<CodexHarnessMaterializer>();
         services.AddSingleton<HarnessProfileService>();
+        services.AddSingleton<CodingFlowConfigurationService>();
+        services.AddSingleton<IFlowRuntimeDefinitionResolver>(provider => provider.GetRequiredService<CodingFlowConfigurationService>());
+        services.AddSingleton<ICodingRuntimeProfileResolver, CodingRuntimeProfileResolver>();
+        services.AddSingleton<CodingExecutionService>();
+        services.AddSingleton<IWorkPlanAdmissionGate>(provider => provider.GetRequiredService<CodingExecutionService>());
+        services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeCapabilityMaterialProvider>(provider => provider.GetRequiredService<CodingExecutionService>());
         services.AddSingleton<CodingRepositoryService>();
         services.AddSingleton<CodingIssueCoordinationService>();
         services.AddSingleton<ICodingIssueBindingPolicy, CodingIssueBindingPolicy>();

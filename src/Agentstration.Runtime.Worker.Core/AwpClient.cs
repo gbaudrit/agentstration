@@ -7,7 +7,7 @@ using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Identity.Contracts;
 
-namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+namespace Agentstration.Runtime.Worker.Core;
 
 internal sealed class AwpClient : IDisposable
 {

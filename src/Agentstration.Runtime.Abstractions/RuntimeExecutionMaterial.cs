@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Agentstration.Resources;
 using Agentstration.Schemas;
 
@@ -111,6 +112,17 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     public string? FlowScopeRef { get; init; }
     public InvocationDataContracts? ContractContext { get; init; }
     public JsonElement? ProcessOrigin { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? RuntimeConfiguration { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? WorkItemResourceId { get; init; }
+}
+
+public interface IRuntimeCapabilityMaterialProvider
+{
+    string RuntimeCapability { get; }
+    Task<RuntimeRootFlowExecutionMaterial> EnrichAsync(RuntimeWorkerAssignment assignment,
+        RuntimeRootFlowExecutionMaterial material, CancellationToken cancellationToken);
 }
 
 public sealed record RuntimeFlowResumeMaterial(

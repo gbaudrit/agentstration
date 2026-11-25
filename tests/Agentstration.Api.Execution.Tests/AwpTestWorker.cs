@@ -15,26 +15,31 @@ using AwpWorker = awpworker::Agentstration.Runtime.Worker.MicrosoftAgentFramewor
 
 internal sealed class AwpTestWorker : IAsyncDisposable
 {
-    private readonly AwpWorker.AwpClientCredential credential;
-    private readonly AwpWorker.AwpClient client;
-    private readonly AwpWorker.AwpAssignmentRunner runner;
-    private readonly AwpWorker.RuntimeWorkerOptions options = new() { LeaseSafetyMarginSeconds = 1 };
+    private readonly Agentstration.Runtime.Worker.Core.AwpClientCredential credential;
+    private readonly Agentstration.Runtime.Worker.Core.AwpClient client;
+    private readonly Agentstration.Runtime.Worker.Core.AwpAssignmentRunner runner;
+    private readonly Agentstration.Runtime.Worker.Core.RuntimeWorkerOptions options = new() { LeaseSafetyMarginSeconds = 1 };
     private readonly CancellationTokenSource shutdown = new();
     private readonly Task processing;
+    private bool disposed;
+    internal Guid WorkerId => client.WorkerId.Value;
+    internal Task<AwpClaimResponse> ClaimOnceAsync(CancellationToken token = default) =>
+        client.ClaimAsync(new(client.WorkerId, client.SessionId, 1, 1), token);
 
     private AwpTestWorker(
-        AwpWorker.AwpClientCredential credential,
-        AwpWorker.AwpClient client,
-        bool processAssignments)
+        Agentstration.Runtime.Worker.Core.AwpClientCredential credential,
+        Agentstration.Runtime.Worker.Core.AwpClient client,
+        bool processAssignments,
+        Agentstration.Runtime.Worker.Core.IAwpAssignmentExecutor? executor = null)
     {
         this.credential = credential;
         this.client = client;
         runner = new(
-            new AwpWorker.AwpAssignmentExecutor(
+            executor ?? new AwpWorker.AwpAssignmentExecutor(
                 NullLoggerFactory.Instance,
                 NullLogger<AwpWorker.AwpAssignmentExecutor>.Instance),
             TimeProvider.System,
-            NullLogger<AwpWorker.AwpRuntimeWorkerService>.Instance);
+            NullLogger<Agentstration.Runtime.Worker.Core.AwpRuntimeWorkerService>.Instance);
         processing = processAssignments
             ? Task.Run(ProcessAsync, CancellationToken.None)
             : Task.CompletedTask;
@@ -53,7 +58,9 @@ internal sealed class AwpTestWorker : IAsyncDisposable
 
     public static async Task<AwpTestWorker> StartAsync(
         WebApplicationFactory<Program> factory,
-        bool processAssignments = true)
+        bool processAssignments = true,
+        Agentstration.Runtime.Worker.Core.IAwpAssignmentExecutor? executor = null,
+        IReadOnlyList<AwpRuntimeCapability>? capabilities = null)
     {
         _ = await factory.Services.GetRequiredService<ILocalEnvironmentBootstrapper>()
             .EnsureInitializedAsync(default);
@@ -63,12 +70,12 @@ internal sealed class AwpTestWorker : IAsyncDisposable
             AwpWorkerAuthentication.ProtocolVersion), default);
         var pairing = await identities.IssuePairingCodeAsync(workerId, default);
         var issued = await identities.ClaimAsync(new(workerId, pairing.Code), "api-test", default);
-        var credential = new AwpWorker.AwpClientCredential(
+        var credential = new Agentstration.Runtime.Worker.Core.AwpClientCredential(
             issued.WorkerId,
             issued.CredentialId,
             issued.InstanceId,
             Encoding.UTF8.GetBytes(issued.Secret));
-        var client = new AwpWorker.AwpClient(
+        var client = new Agentstration.Runtime.Worker.Core.AwpClient(
             new Uri("https://localhost"),
             credential,
             new(Guid.NewGuid()),
@@ -79,8 +86,8 @@ internal sealed class AwpTestWorker : IAsyncDisposable
         _ = await client.RegisterAsync(new(
             [AwpProtocol.Version],
             new(client.WorkerId, client.SessionId, "api-test", 1,
-                [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"])])), default);
-        return new AwpTestWorker(credential, client, processAssignments);
+                capabilities ?? [new(AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"])])), default);
+        return new AwpTestWorker(credential, client, processAssignments, executor);
     }
 
     public Task<AwpClaimResponse> ClaimAsync(int maximumWaitSeconds = 5, CancellationToken cancellationToken = default) =>
@@ -117,10 +124,16 @@ internal sealed class AwpTestWorker : IAsyncDisposable
         catch (HttpRequestException) when (shutdown.IsCancellationRequested)
         {
         }
+        catch (IOException) when (shutdown.IsCancellationRequested)
+        {
+            // TestServer can surface an aborted long-poll response as I/O during shutdown.
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (disposed) return;
+        disposed = true;
         await shutdown.CancelAsync();
         try { await processing; }
         catch (OperationCanceledException) { }

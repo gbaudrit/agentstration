@@ -1,3 +1,4 @@
+extern alias codingworker;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -37,6 +38,7 @@ using Agentstration.Runtime.Core;
 using Agentstration.Runtime.MicrosoftAgentFramework;
 using Agentstration.Runtime.Profiles;
 using Agentstration.Runtime.Storage.Sqlite;
+using Agentstration.Runtime.Worker.Core;
 using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 using Agentstration.Secrets;
 using Agentstration.Security.Contracts;
@@ -63,6 +65,22 @@ namespace Agentstration.ArchitectureTests;
 [TestClass]
 public sealed class DependencyTests
 {
+    [TestMethod]
+    public void NativeCodingAndSharedWorkerCoreCannotAccessServerStorageOrMaf()
+    {
+        var assemblies = new[] { typeof(RuntimeWorkerOptions).Assembly,
+            typeof(codingworker::Agentstration.Runtime.Worker.Coding.CodingWorkerOptions).Assembly,
+            typeof(Agentstration.Coding.CodexHarnessMaterializer).Assembly };
+        foreach (var assembly in assemblies)
+        {
+            var forbidden = assembly.GetReferencedAssemblies().Select(value => value.Name!).Where(value =>
+                value.Contains("EntityFramework", StringComparison.Ordinal) || value.Contains("Sqlite", StringComparison.Ordinal)
+                || value.Contains("PostgreSql", StringComparison.Ordinal) || value.Contains("Microsoft.Agents.AI", StringComparison.Ordinal)
+                || value.StartsWith("Agentstration.Application", StringComparison.Ordinal) || value.StartsWith("Agentstration.Infrastructure", StringComparison.Ordinal)
+                || value.Contains("Storage.", StringComparison.Ordinal) || value.StartsWith("Agentstration.Runtime.MicrosoftAgentFramework", StringComparison.Ordinal)).ToArray();
+            Assert.IsEmpty(forbidden, assembly.GetName().Name + ": " + string.Join(", ", forbidden));
+        }
+    }
     [TestMethod]
     public void GenericGitOperationsStayInsideTheAutonomousExtensionWithoutHostBusinessDependencies()
     {
@@ -736,7 +754,9 @@ public sealed class DependencyTests
     [TestMethod]
     public void MicrosoftAgentFrameworkWorkerHasNoServerStorageOrInfrastructureDependency()
     {
-        var references = typeof(RuntimeWorkerOptions).Assembly.GetReferencedAssemblies()
+        var references = new[] { typeof(RuntimeWorkerOptions).Assembly,
+                System.Reflection.Assembly.Load("Agentstration.Runtime.Worker.MicrosoftAgentFramework") }
+            .SelectMany(assembly => assembly.GetReferencedAssemblies())
             .Select(reference => reference.Name ?? string.Empty)
             .ToArray();
         var forbidden = new[]
@@ -1561,7 +1581,7 @@ public sealed class DependencyTests
                 // The native Git HTTP fixture is owned by the test root and reused
                 // only by its provider and governed transport integration modules.
                 if (include.Replace('\\', '/') == "../fixtures/Git/AuthenticatedGitFixture.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.SourceProviders.Git.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Api.Execution.Tests" or "Agentstration.SourceProviders.Git.Tests") continue;
 
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.

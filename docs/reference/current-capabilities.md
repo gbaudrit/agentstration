@@ -472,3 +472,13 @@ Warnings are errors, .NET analyzers are enabled, and NuGet audit findings fail r
 This is a product foundation, not a production multi-tenant release. Pack dependency resolution, updates, signatures and Gallery access, parallel Flow scheduling, loops, arbitrary graph waits, HumanApproval nodes, subflows, semantic/LLM routing, durable distributed Work dispatch, authorization coverage outside the first Management/identity vertical, external-only identity provisioning, external artifact storage, general retry policies, provider-level tool idempotency, revision traffic splitting, dedicated process/container hosting, Foundry bindings, and runtime session storage remain planned. Interactive orchestration recovery is implemented for the standalone SQLite/MAF path; it provides at-least-once execution and does not claim exactly-once external effects.
 
 See [architecture](../architecture.md), [decisions](../decisions/index.md), [security](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/SECURITY.md), and [contributing](https://github.com/gbaudrit/microsoft-agent-framework/blob/main/CONTRIBUTING.md).
+
+## Optional native Coding execution
+
+A separate Linux [Coding AWP worker](coding-worker.md) can execute one admitted atomic task using
+pinned Codex native configuration and an explicitly authorized cached repository commit. The same
+enrollment, lease, fencing and cancellation lifecycle governs MAF and native workers; capability and
+material versions control placement. An isolated helper retains bounded patch/check/result evidence
+and known, partial or unavailable usage across failure and cancellation. Native inference, CLI
+installation, Bubblewrap and cache preparation are explicit optional prerequisites. Code publication,
+shared accounting, issue acceptance and automatic lost-worker recovery are not provided by this slice.

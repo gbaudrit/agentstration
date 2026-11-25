@@ -332,3 +332,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 268. [ADR-0268 — HarnessProfiles publish pinned standalone native configuration](0268-harness-profiles-publish-pinned-standalone-native-configuration.md)
 
 269. [ADR-0269 — Task execution evidence projects canonical plan attempts](0269-task-execution-evidence-projects-canonical-plan-attempts.md)
+
+270. [ADR-0270 — Coding CLI Runs use AWP and an isolated native helper](0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md)

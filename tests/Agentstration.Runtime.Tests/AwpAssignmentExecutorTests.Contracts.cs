@@ -74,7 +74,7 @@ public sealed partial class AwpAssignmentExecutorTests
             Transitions = [new("child-success", "child", "completed", "postAggregate"), new("done", "postAggregate", "completed", "done")]
         };
         var handler = new GraphHandler(TestNow) { ChildGraph = child };
-        var error = await Assert.ThrowsAsync<Agentstration.Runtime.Worker.MicrosoftAgentFramework.AwpExecutionNotSupportedException>(
+        var error = await Assert.ThrowsAsync<Agentstration.Runtime.Worker.Core.AwpExecutionNotSupportedException>(
             () => ExecuteGraphAsync(graph, JsonSerializer.SerializeToElement(new { }), handler));
         Assert.AreEqual("data_contract_violation", error.Code);
         var failure = DataContracts.ParseFailure(error.Details)!;

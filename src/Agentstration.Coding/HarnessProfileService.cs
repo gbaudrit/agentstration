@@ -30,9 +30,16 @@ public sealed partial class HarnessProfileService(IResourceStore store, IResourc
             : ConfigurationFailure("harness_configuration_version_conflict");
         var resource = new HarnessNativeConfigurationResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = HarnessResourceKinds.NativeConfiguration, ScopeRef = scope,
-            Metadata = new() { Name = address.Name, Namespace = command.Namespace }, ConfigurationName = command.Name, Version = command.Version,
-            Definition = command.Definition, ContentDigest = digest, PublishedAt = clock.GetUtcNow(), Generation = 1,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = HarnessResourceKinds.NativeConfiguration,
+            ScopeRef = scope,
+            Metadata = new() { Name = address.Name, Namespace = command.Namespace },
+            ConfigurationName = command.Name,
+            Version = command.Version,
+            Definition = command.Definition,
+            ContentDigest = digest,
+            PublishedAt = clock.GetUtcNow(),
+            Generation = 1,
             Status = Succeeded()
         };
         try
@@ -112,7 +119,7 @@ public sealed partial class HarnessProfileService(IResourceStore store, IResourc
         var native = valid.Value!.Value;
         var pin = new HarnessNativeConfigurationPin(Scope(workspaceId), native.Namespace, native.ConfigurationName, native.Version,
             native.Uid, native.Generation, native.ContentDigest, native.Definition);
-        var digest = CodexHarnessMaterializer.ContentDigest(new { source.Definition, Native = new { pin.Namespace, pin.Name, pin.Version, pin.ContentDigest } });
+        var digest = CodexHarnessMaterializer.ProfileDigest(source.Definition, pin);
         var address = Address(Scope(workspaceId), resourceNamespace, HarnessResourceKinds.ProfileVersion, VersionName(name, command.Version));
         var existing = await store.GetExactAsync<HarnessProfileVersionResource>(address, token);
         if (existing is not null) return existing.Value.ContentDigest == digest ? Result<StoredResource<HarnessProfileVersionResource>>.Success(existing)
@@ -122,9 +129,21 @@ public sealed partial class HarnessProfileService(IResourceStore store, IResourc
         activity?.SetTag("workspace.id", workspaceId.ToString()); activity?.SetTag("resource.uid", source.Uid); activity?.SetTag("harness.version", command.Version);
         var published = new HarnessProfileVersionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = HarnessResourceKinds.ProfileVersion, ScopeRef = Scope(workspaceId), Metadata = source.Metadata with { Name = address.Name },
-            Governance = source.Governance, ProfileName = name, ProfileUid = source.Uid, ProfileGeneration = source.Generation, Version = command.Version,
-            Definition = source.Definition, NativeConfiguration = pin, ContentDigest = digest, PublishedAt = clock.GetUtcNow(), Generation = 1, Status = Succeeded()
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = HarnessResourceKinds.ProfileVersion,
+            ScopeRef = Scope(workspaceId),
+            Metadata = source.Metadata with { Name = address.Name },
+            Governance = source.Governance,
+            ProfileName = name,
+            ProfileUid = source.Uid,
+            ProfileGeneration = source.Generation,
+            Version = command.Version,
+            Definition = source.Definition,
+            NativeConfiguration = pin,
+            ContentDigest = digest,
+            PublishedAt = clock.GetUtcNow(),
+            Generation = 1,
+            Status = Succeeded()
         };
         try
         {

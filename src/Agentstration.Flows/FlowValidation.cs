@@ -37,6 +37,8 @@ public static class FlowValidator
         ValidateVersion(resource.Version);
         if (resource.ActiveVersion is not null) ValidateVersion(resource.ActiveVersion);
         ValidateDefinition(resource.Id, resource.Definition);
+        if (resource.Definition is RuntimeFlowDefinition && resource.Graph is not null)
+            throw new FlowValidationException("runtime_flow_graph_not_supported", "A runtime Flow delegates one complete Run and cannot contain a separate graph.");
     }
 
     public static void ValidateVersion(FlowVersion version)
@@ -45,6 +47,8 @@ public static class FlowValidator
         ValidateName(version.FlowId.Value, "flow_id_invalid");
         ValidateVersion(version.Version);
         ValidateDefinition(version.FlowId, version.Definition);
+        if (version.Definition is RuntimeFlowDefinition && version.Graph is not null)
+            throw new FlowValidationException("runtime_flow_graph_not_supported", "A runtime Flow delegates one complete Run and cannot contain a separate graph.");
     }
 
     public static void ValidateReference(FlowReference reference)
@@ -63,6 +67,11 @@ public static class FlowValidator
         ArgumentNullException.ThrowIfNull(definition);
         switch (definition)
         {
+            case RuntimeFlowDefinition runtime:
+                if (!RuntimeName(runtime.RuntimeCapability) || !RuntimeName(runtime.CapabilityVersion) || !RuntimeName(runtime.MaterialVersion)
+                    || runtime.Configuration.ValueKind != JsonValueKind.Object || System.Text.Encoding.UTF8.GetByteCount(runtime.Configuration.GetRawText()) > 64 * 1024)
+                    throw new FlowValidationException("runtime_flow_configuration_invalid", "A bounded runtime capability, versions and object configuration are required.");
+                break;
             case DirectFlowDefinition direct:
                 ValidateTarget(direct.Target);
                 if (direct.Target?.Kind == FlowTargetKind.Flow) throw new FlowValidationException("direct_target_invalid", "A Direct Flow must target an Agent.");
@@ -102,6 +111,9 @@ public static class FlowValidator
                 throw new FlowValidationException("flow_definition_unknown", "The Flow definition type is not supported.");
         }
     }
+
+    private static bool RuntimeName(string? value) => value is { Length: > 0 and <= 64 }
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
 
     private static void ValidateOrchestration(OrchestrationFlowDefinition orchestration)
     {

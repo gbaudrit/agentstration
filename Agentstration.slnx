@@ -52,6 +52,7 @@
   </Folder>
   <Folder Name="/src/Coding/">
     <Project Path="src/Agentstration.Coding/Agentstration.Coding.csproj" />
+    <Project Path="src/Agentstration.Coding.Native/Agentstration.Coding.Native.csproj" />
     <Project Path="src/Agentstration.Coding.Contracts/Agentstration.Coding.Contracts.csproj" />
     <Project Path="src/Agentstration.Coding.Api/Agentstration.Coding.Api.csproj" />
   </Folder>
@@ -169,6 +170,8 @@
     <Project Path="src/Agentstration.Runtime.Local/Agentstration.Runtime.Local.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.Sqlite/Agentstration.Runtime.Storage.Sqlite.csproj" />
     <Project Path="src/Agentstration.Runtime.Storage.PostgreSql/Agentstration.Runtime.Storage.PostgreSql.csproj" />
+    <Project Path="src/Agentstration.Runtime.Worker.Core/Agentstration.Runtime.Worker.Core.csproj" />
+    <Project Path="src/Agentstration.Runtime.Worker.Coding/Agentstration.Runtime.Worker.Coding.csproj" />
     <Project Path="src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" />
   </Folder>
   <Folder Name="/src/Secrets/">
@@ -245,6 +248,7 @@
   </Folder>
   <Folder Name="/tests/fixtures/">
     <Project Path="tests/fixtures/NativeHarnessProbe/NativeHarnessProbe.csproj" />
+    <Project Path="tests/fixtures/NativeCodingCli/NativeCodingCli.csproj" />
     <Project Path="tests/fixtures/StorageVolumeProbe/StorageVolumeProbe.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">

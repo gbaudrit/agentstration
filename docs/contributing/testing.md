@@ -213,3 +213,14 @@ that version and put `aspire` on PATH before building the complete solution. Lin
 x64 CI uses `scripts/ci/install-aspire-cli-linux.sh` with a pinned archive SHA-512;
 Windows/macOS installations can use the same version's official release asset.
 The Web executable and isolated protocol tests do not require the AppHost to run.
+
+### Native Coding isolation tests
+
+The deterministic native Coding cases in Runtime and API Execution tests require Linux, Git and
+`/usr/bin/bwrap` with usable user/PID namespaces. Verify `bwrap --unshare-user --unshare-pid
+--ro-bind / / -- /usr/bin/true` before running these cases. A nested restricted execution sandbox
+may prohibit creating a second namespace even when the host supports it; report that limitation
+and run the unchanged tests in a namespace-capable test session. Non-Linux hosts report these
+platform cases as inconclusive; material/usage and existing AWP tests remain ordinary offline tests.
+No vendor account or model inference is used. Missing Linux isolation is a failed prerequisite,
+never authorization to disable isolation in the product or report the native validation as passed.

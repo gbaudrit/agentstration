@@ -20,7 +20,8 @@ public sealed class RuntimeExecutionMaterialResolver(
     IToolCatalog tools,
     IOptions<FlowRunExecutionOptions> flowOptions,
     Agentstration.DataSources.DataSourceDatasetAcquisitionService? datasetAcquisitions = null,
-    IEnumerable<IRuntimeAgentPresentationEnricher>? presentationEnrichers = null) : IRuntimeExecutionMaterialResolver
+    IEnumerable<IRuntimeAgentPresentationEnricher>? presentationEnrichers = null,
+    IEnumerable<IRuntimeCapabilityMaterialProvider>? runtimeCapabilities = null) : IRuntimeExecutionMaterialResolver
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -205,7 +206,7 @@ public sealed class RuntimeExecutionMaterialResolver(
                     response.Value.Clone(), response.ReceivedAt, response.PrincipalId);
         }
 
-        return new RuntimeRootFlowExecutionMaterial(
+        var resolvedMaterial = new RuntimeRootFlowExecutionMaterial(
             string.Equals(run.Id, assignment.TargetRunId, StringComparison.Ordinal)
                 ? assignment.ExecutionMaterialId : $"{assignment.ExecutionMaterialId}:child:{run.Id}",
             assignment.ExecutionMaterialVersion,
@@ -231,8 +232,21 @@ public sealed class RuntimeExecutionMaterialResolver(
             LogicalScopeRef = run.Scope.LogicalScopeRef,
             FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value,
             ProcessOrigin = run.ProcessOrigin is null ? null : JsonSerializer.SerializeToElement(run.ProcessOrigin, JsonOptions),
-            ContractContext = run.ContractContext
+            ContractContext = run.ContractContext,
+            WorkItemResourceId = run.WorkItemResourceId
         };
+        if (run.DefinitionSnapshot.Definition is RuntimeFlowDefinition runtime)
+        {
+            if (run.Id != assignment.TargetRunId || assignment.RuntimeCapability != runtime.RuntimeCapability
+                || assignment.RuntimeCapabilityVersion != runtime.CapabilityVersion || assignment.ExecutionMaterialVersion != runtime.MaterialVersion)
+                throw new RuntimeExecutionMaterialException("execution_material_version_unsupported", "The assigned runtime does not match the pinned Flow capability.");
+            var providers = (runtimeCapabilities ?? []).Where(value => value.RuntimeCapability == runtime.RuntimeCapability).ToArray();
+            if (providers.Length != 1) throw new RuntimeExecutionMaterialException("execution_runtime_unavailable", "The runtime material provider is not installed unambiguously.");
+            return await providers[0].EnrichAsync(assignment, resolvedMaterial, cancellationToken);
+        }
+        if (assignment.RuntimeCapability != "microsoft-agent-framework")
+            throw new RuntimeExecutionMaterialException("execution_runtime_mismatch", "The assigned runtime does not match this Flow.");
+        return resolvedMaterial;
     }
 
     private static bool BelongsToAssignment(RuntimeWorkerAssignment assignment, FlowRun run) =>

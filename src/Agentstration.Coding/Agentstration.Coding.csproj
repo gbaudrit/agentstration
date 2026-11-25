@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Coding.Native/Agentstration.Coding.Native.csproj" />
+    <ProjectReference Include="../Agentstration.Runtime.Abstractions/Agentstration.Runtime.Abstractions.csproj" />
+    <ProjectReference Include="../Agentstration.Flows.Application/Agentstration.Flows.Application.csproj" />
+    <ProjectReference Include="../Agentstration.Work.Storage.Abstractions/Agentstration.Work.Storage.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Coding.Contracts/Agentstration.Coding.Contracts.csproj" />
     <ProjectReference Include="../Agentstration.Application/Agentstration.Application.csproj" />
     <ProjectReference Include="../Agentstration.Resources/Agentstration.Resources.csproj" />

@@ -12,6 +12,36 @@ namespace Agentstration.Web.Tests;
 
 public sealed partial class FlowDetailsDesignerTests
 {
+    [TestMethod]
+    [DataRow("en-US", "This Flow delegates one complete Run")]
+    [DataRow("fr-FR", "Ce Flow délègue un Run complet")]
+    public async Task RuntimeFlowRemainsInspectableWithoutAWorkflowDesigner(string culture, string help)
+    {
+        var previous = System.Globalization.CultureInfo.CurrentUICulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentUICulture = new(culture);
+            using var context = FlowContext();
+            context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+            var client = new FlowClientStub();
+            var saved = await client.GetFlowAsync("sample", default);
+            client.SnapshotOverride = new(saved with { Definition = new Agentstration.Flows.RuntimeFlowDefinition("coding-cli", "1.0", "1.0", System.Text.Json.JsonSerializer.SerializeToElement(new { })), Graph = null }, "\"runtime\"");
+            context.Services.AddSingleton<IFlowApiClient>(client); AddConsoleContext(context);
+            var page = context.Render<FlowDetails>(p => p.Add(value => value.FlowId, "sample"));
+            page.WaitForElement("[data-testid=flow-identity-summary]");
+            Assert.Contains(help, page.Markup); Assert.DoesNotContain("Kind.Runtime", page.Markup);
+            Assert.HasCount(0, page.FindAll(".flow-header-designer"));
+            SelectFlowSection(context, "definition/configuration");
+            page.WaitForElement("[data-testid=flow-definition-form]");
+            Assert.AreEqual(0, client.DraftLoadCount);
+            Assert.IsTrue(page.FindComponent<ResourceDefinitionForm>().Instance.ReadOnly);
+            Assert.HasCount(0, page.FindAll("a[href*='/designer']"));
+            SelectFlowSection(context, "yaml");
+            Assert.Contains("coding-cli", page.Markup);
+        }
+        finally { System.Globalization.CultureInfo.CurrentUICulture = previous; }
+    }
+
     private static (BunitContext Context, FlowClientStub Client, IRenderedComponent<FlowDetails> Page) DetailsFoundation()
     {
         var context = FlowContext();

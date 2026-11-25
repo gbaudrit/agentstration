@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Runtime.Worker.Core/Agentstration.Runtime.Worker.Core.csproj" />
+    <ProjectReference Include="../Agentstration.Coding.Native/Agentstration.Coding.Native.csproj" />
+    <ProjectReference Include="../Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Agentstration.Runtime.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Execution.Tests" />
+    <Using Include="Agentstration.Runtime.Worker.Core" />
+  </ItemGroup>
+</Project>

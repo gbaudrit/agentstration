@@ -30,8 +30,8 @@
         Yaml="@FlowYaml" YamlReadOnly="true" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("ResourceManifestHelp")" YamlLabel="@Shared["ResourceManifest"]">
         <Metadata>@if (flow is not null) { <ResourceMetadataBadge Value="@FlowLabels[$"Kind.{flow.Definition.Kind}"]" /> }</Metadata>
         <PrimaryActions>
-            @if (flow is not null && !IsOrchestration && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@T("OpenFlowDesigner")</a> }
-            @if (versions.Count > 0) { <button type="button" class="button-primary" data-testid="flow-run-open" disabled="@(!CanExecute || Busy)" @onclick="OpenRun">@T("RunFlow")</button> }
+            @if (flow is not null && HasWorkflowDesigner && IsEditable) { <a class="button-primary flow-header-designer" href="@EditorUrl" data-enhance-nav="false"><UiIcon Name="workflow" />@T("OpenFlowDesigner")</a> }
+            @if (versions.Count > 0 && flow?.Definition is not RuntimeFlowDefinition) { <button type="button" class="button-primary" data-testid="flow-run-open" disabled="@(!CanExecute || Busy)" @onclick="OpenRun">@T("RunFlow")</button> }
         </PrimaryActions>
         <Feedback>
             @if (error is not null && !showRun) { <p class="error-panel" role="alert">@error</p> }
@@ -47,7 +47,7 @@
             @if (flow is not null)
             {
                 <MetricCard Label="@T("Status")" Value="@StatusLabel" Detail="@T("ImmutableVersions")" Status="@(HasPublishedVersion ? UiStatus.Success : UiStatus.Neutral)" />
-                <MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" />
+                @if (flow.Definition is not RuntimeFlowDefinition) { <MetricCard Label="@(IsOrchestration ? T("Participants") : T("Steps"))" Value="@TopologyNodeCount.ToString(System.Globalization.CultureInfo.InvariantCulture)" Detail="@(IsOrchestration ? StrategyLabel(Orchestration!.Strategy) : Topology.Layout)" Status="UiStatus.Neutral" /> }
                 <MetricCard Label="@T("RecentRuns")" Value="@(runsKnown ? runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) : "—")" Detail="@(runsKnown ? SucceededRunCount(runs.Count(value => value.Status == FlowRunStatus.Succeeded)) : T("HistoryUnavailable"))" Status="UiStatus.Neutral" />
             }
         </OverviewMetrics>
@@ -113,9 +113,9 @@
         Namespace="@definitionModel.Namespace" NamespaceExpression="@(() => definitionModel.Namespace)" ScopeRef="flow?.ScopeRef"
         @bind-Description="definitionModel.Description" @bind-Labels="definitionModel.Tags" ReadOnly="@(!CanEditDefinition)" NamePolicy="ResourceNamePolicy.Flow"
         TestId="flow-identity-editor" DisplayNameTestId="flow-definition-display-name" TechnicalNameTestId="flow-definition-name" NamespaceTestId="flow-definition-namespace" DescriptionTestId="flow-definition-description" />;
-    private RenderFragment ConfigurationFields => @<FormSection Title="@Shared["Configuration"]"><p>@T(CanEditDefinition ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></FormSection>;
+    private RenderFragment ConfigurationFields => @<FormSection Title="@Shared["Configuration"]"><p>@T(flow?.Definition is RuntimeFlowDefinition ? "RuntimeExecutionHelp" : CanEditDefinition ? "DefinitionDraftHelp" : "DefinitionPublishedHelp")</p></FormSection>;
     private RenderFragment<string> DefinitionSectionContent => path => path == "definition/identity" ? IdentityFields : ConfigurationFields;
-    private RenderFragment? DesignerAction => flow is null || !IsEditable || IsOrchestration ? null : @<a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T(sectionState.Is("yaml") ? "OpenYamlEditor" : "OpenFlowDesigner")</a>;
+    private RenderFragment? DesignerAction => flow is null || !IsEditable || !HasWorkflowDesigner ? null : @<a class="button-primary" href="@EditorUrl" data-enhance-nav="false">@T(sectionState.Is("yaml") ? "OpenYamlEditor" : "OpenFlowDesigner")</a>;
     private RenderFragment? DiscardAction => !HasDefinitionDraft ? null : @<button type="button" class="button-secondary" disabled="@Busy" @onclick="DiscardDefinitionAsync">@Shared["Discard"]</button>;
     private IReadOnlyDictionary<string, ResourceSectionPresentation> SectionPresentations
     {
@@ -126,7 +126,7 @@
                 : new Dictionary<string, ResourceSectionPresentation>(StringComparer.Ordinal)
                 {
                     ["definition/identity"] = new() { HasRequiredFields = true, Fields = [nameof(definitionModel.Name), nameof(definitionModel.Namespace), nameof(definitionModel.DisplayName), nameof(definitionModel.Description), nameof(definitionModel.Tags)], ReadOnly = !CanEditDefinition, ReadOnlyActions = DiscardAction },
-                    ["definition/configuration"] = new() { Actions = DesignerAction, ReadOnlyActions = DesignerAction ?? DiscardAction }
+                    ["definition/configuration"] = new() { ReadOnly = flow?.Definition is RuntimeFlowDefinition, Actions = DesignerAction, ReadOnlyActions = DesignerAction ?? DiscardAction }
                 };
             if (IsOrchestration && HasDefinitionDraft)
             {

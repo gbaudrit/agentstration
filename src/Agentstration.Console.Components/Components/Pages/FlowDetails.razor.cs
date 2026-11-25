@@ -47,8 +47,9 @@ public partial class FlowDetails
     private ResourceScopeRef FlowScopeRef => flow!.ScopeRef!.Value;
     private bool IsOwnerContext => ResourceOwnershipContext.CanManage(flow?.ScopeRef, Services);
     private bool IsEditable => !disposed && flow is { Governance.IsManaged: false } && IsOwnerContext && ContextState.HasPermission("resources/write");
-    private bool CanExecute => !disposed && ContextState.HasPermission("runs/execute");
+    private bool CanExecute => !disposed && flow?.Definition is not RuntimeFlowDefinition && ContextState.HasPermission("runs/execute");
     private bool Busy => loading || busy || definitionSaving || orchestrationSaving;
+    private bool HasWorkflowDesigner => flow?.Definition is not (OrchestrationFlowDefinition or RuntimeFlowDefinition);
     private bool IsOrchestration => flow?.Definition is OrchestrationFlowDefinition;
     private OrchestrationFlowDefinition? Orchestration => flow?.Definition as OrchestrationFlowDefinition;
     private string? PublishedVersion => flow?.ActiveVersion ?? versions.OrderByDescending(value => value.PublishedAt).FirstOrDefault()?.Version;
@@ -63,10 +64,10 @@ public partial class FlowDetails
     private bool HasDefinitionDraft => DefinitionDirty || definitionInvalid || definitionContext?.GetValidationMessages().Any() == true || orchestrationDirty || orchestrationEditor?.HasUnsavedChanges == true;
     private bool HasNewerSnapshot => newerSnapshot is not null || newerDefinitionDraft is not null;
     private bool HasRunDraft => showRun && (runInput.GetRawText() != runInputBaseline || !runInputValid);
-    private bool CanEditDefinition => IsEditable && definitionDraft is not null;
+    private bool CanEditDefinition => IsEditable && flow?.Definition is not RuntimeFlowDefinition && definitionDraft is not null;
     private ResourceReadOnlyReason? ReadOnlyReason => flow is null ? null : !IsOwnerContext ? ResourceReadOnlyReason.Inherited
         : flow.Governance.IsManaged ? ResourceReadOnlyReason.Managed : !ContextState.HasPermission("resources/write") ? ResourceReadOnlyReason.InsufficientPermissions
-        : !IsOrchestration && definitionLoaded && definitionDraft is null ? ResourceReadOnlyReason.Unspecified : null;
+        : flow.Definition is RuntimeFlowDefinition || !IsOrchestration && definitionLoaded && definitionDraft is null ? ResourceReadOnlyReason.Unspecified : null;
     private static string? NormalizeDescription(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private FlowVersionResponse? SelectedRunVersion => versions.SingleOrDefault(version => version.Version == runVersion);
     private FlowTopologyGraph Topology => flow is null ? new([], [], "horizontal", T("FlowTopology")) : FlowTopologyProjector.Project(flow.Definition, flow.Graph);
@@ -236,6 +237,7 @@ public partial class FlowDetails
     private async Task RefreshDefinitionAsync(long revision, string? key)
     {
         var current = flow; if (current is null) return;
+        if (current.Definition is RuntimeFlowDefinition) { if (definitionContext is null) ResetDefinition(null); return; }
         if (!IsEditable) { if (definitionContext is null) ResetDefinition(null); return; }
         FlowDraftResponse? incoming;
         try { incoming = await Client.GetDraftAsync(current.Namespace, current.Id, current.ScopeRef!.Value, lifetimeToken); }

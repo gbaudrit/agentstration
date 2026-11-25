@@ -25,23 +25,54 @@ public sealed class CodingRepositoryService(WorkProjectService projects, WorkTas
         var selected = authorized.Value!;
         if (!ValidRepositories(command.Repositories) || selected.Task.Definition.Kind == WorkTaskKind.Atomic && command.Repositories.Count != 1)
             return Result<CodingRepositorySelection>.Failure("coding_repository_selection_invalid");
-        var key = WorkPlanDefinition.Digest(new { workspaceId, context.PrincipalId, projectId, command.TaskId, InvocationId = Guid.NewGuid() });
-        var input = JsonSerializer.SerializeToElement(new { repositories = command.Repositories }, Json);
+        var repositoriesResult = await ResolveBoundAsync(workspaceId, selected.Binding, command.Repositories, token);
+        if (!repositoriesResult.IsSuccess) return Result<CodingRepositorySelection>.Failure(repositoriesResult.ErrorCode!);
+        var repositories = repositoriesResult.Value!;
+        return Result<CodingRepositorySelection>.Success(new(projectId.Value, selected.Project.Version, command.TaskId, selected.Task.Version,
+            selected.Binding.Target, repositories, WorkPlanDefinition.Digest(new
+            {
+                ProjectId = selected.Project.Id,
+                ProjectVersion = selected.Project.Version,
+                TaskId = command.TaskId,
+                TaskVersion = selected.Task.Version,
+                selected.Binding.Target,
+                Repositories = repositories
+            }), clock.GetUtcNow()));
+    }
+
+    internal async Task<Result<CodingRepositoryIdentity>> ResolveAdmittedAsync(WorkspaceId workspaceId, WorkPlanId planId, Guid attemptId,
+        string repository, CancellationToken token)
+    {
+        if (workspaceId != context.WorkspaceId || context.PrincipalId == Guid.Empty) return Result<CodingRepositoryIdentity>.Failure("coding_task_not_found");
+        var plan = await plans.GetAsync(workspaceId, planId, token);
+        var attempt = plan.Value?.Plan.Attempts.SingleOrDefault(value => value.Id == attemptId);
+        if (!plan.IsSuccess || attempt is not { Status: WorkPlanAttemptStatus.Admitted or WorkPlanAttemptStatus.Submitted, CancellationRequested: false, ProjectContext: { } captured })
+            return Result<CodingRepositoryIdentity>.Failure("coding_plan_attempt_required");
+        var binding = captured.Bindings.SingleOrDefault(value => value.Binding.Purpose == WorkProjectBindingPurpose.Repository)?.Binding;
+        if (binding is null) return Result<CodingRepositoryIdentity>.Failure("coding_repository_connection_required");
+        var resolved = await ResolveBoundAsync(workspaceId, binding, [repository], token);
+        return resolved.IsSuccess ? Result<CodingRepositoryIdentity>.Success(resolved.Value!.Single()) : Result<CodingRepositoryIdentity>.Failure(resolved.ErrorCode!);
+    }
+
+    private async Task<Result<IReadOnlyList<CodingRepositoryIdentity>>> ResolveBoundAsync(WorkspaceId workspaceId, WorkProjectContextBinding binding,
+        IReadOnlyList<string> requested, CancellationToken token)
+    {
+        if (!ValidRepositories(requested)) return Result<IReadOnlyList<CodingRepositoryIdentity>>.Failure("coding_repository_selection_invalid");
+        var key = WorkPlanDefinition.Digest(new { workspaceId, context.PrincipalId, binding.Target, Repositories = requested, InvocationId = Guid.NewGuid() });
+        var input = JsonSerializer.SerializeToElement(new { repositories = requested }, Json);
         var digest = WorkPlanDefinition.Digest(input);
-        var response = await providers.InvokeAsync(workspaceId, context.PrincipalId, selected.Binding,
+        var response = await providers.InvokeAsync(workspaceId, context.PrincipalId, binding,
             new(CodingProviderProtocol.ResolveRepositories, "execute", key, digest, input), token);
-        if (!response.IsSuccess) return Result<CodingRepositorySelection>.Failure(response.ErrorCode!);
+        if (!response.IsSuccess) return Result<IReadOnlyList<CodingRepositoryIdentity>>.Failure(response.ErrorCode!);
         var result = response.Value!;
-        if (result.Status != CodingProviderStatus.Succeeded) return Result<CodingRepositorySelection>.Failure(result.ErrorCode ?? "coding_repository_unavailable");
+        if (result.Status != CodingProviderStatus.Succeeded) return Result<IReadOnlyList<CodingRepositoryIdentity>>.Failure(result.ErrorCode ?? "coding_repository_unavailable");
         var repositories = result.Repositories;
-        if (repositories is null || repositories.Count != command.Repositories.Count || repositories.Any(repository => !ValidIdentity(repository))
+        if (repositories is null || repositories.Count != requested.Count || repositories.Any(repository => !ValidIdentity(repository))
             || repositories.Select(repository => repository.Provider + ":" + repository.NativeId).Distinct(StringComparer.Ordinal).Count() != repositories.Count
             || !repositories.Select(repository => repository.Repository).Order(StringComparer.Ordinal)
-                .SequenceEqual(command.Repositories.Order(StringComparer.Ordinal), StringComparer.Ordinal))
-            return Result<CodingRepositorySelection>.Failure("coding_repository_response_invalid");
-        return Result<CodingRepositorySelection>.Success(new(projectId.Value, selected.Project.Version, command.TaskId, selected.Task.Version,
-            selected.Binding.Target, repositories, WorkPlanDefinition.Digest(new { ProjectId = selected.Project.Id, ProjectVersion = selected.Project.Version,
-                TaskId = command.TaskId, TaskVersion = selected.Task.Version, selected.Binding.Target, Repositories = repositories }), clock.GetUtcNow()));
+                .SequenceEqual(requested.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+            return Result<IReadOnlyList<CodingRepositoryIdentity>>.Failure("coding_repository_response_invalid");
+        return Result<IReadOnlyList<CodingRepositoryIdentity>>.Success(repositories);
     }
 
     public async Task<Result<CodingPullRequestResponse>> InvokePullRequestAsync(WorkspaceId workspaceId, WorkProjectId projectId,

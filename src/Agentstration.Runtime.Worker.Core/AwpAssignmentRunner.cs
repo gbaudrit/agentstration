@@ -3,10 +3,10 @@ using System.Text.Json;
 using Agentstration.Awp.Abstractions;
 using Agentstration.Schemas;
 
-namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+namespace Agentstration.Runtime.Worker.Core;
 
 internal sealed class AwpAssignmentRunner(
-    AwpAssignmentExecutor executor,
+    IAwpAssignmentExecutor executor,
     TimeProvider timeProvider,
     ILogger<AwpRuntimeWorkerService> logger)
 {
@@ -27,6 +27,9 @@ internal sealed class AwpAssignmentRunner(
             _ => null
         });
         activity?.SetTag("agentstration.run.target_kind", assignment.Target.GetType().Name);
+        activity?.SetTag("agentstration.runtime.kind", assignment.Runtime.RuntimeKind);
+        activity?.SetTag("agentstration.runtime.capability_version", assignment.Runtime.CapabilityVersion);
+        activity?.SetTag("agentstration.runtime.material_version", assignment.Runtime.ExecutionMaterialVersion);
         var session = new AwpAssignmentSession(client, assignment, serverTime, timeProvider,
             TimeSpan.FromSeconds(configured.LeaseSafetyMarginSeconds), configured.MaximumConcurrentProcessRuns);
         using var execution = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
@@ -69,6 +72,14 @@ internal sealed class AwpAssignmentRunner(
             await client.CompleteAsync(new(session.Context, new(Guid.NewGuid()), null), stoppingToken);
             activity?.SetStatus(ActivityStatusCode.Ok, "waiting_for_input");
         }
+        catch (AwpExecutionCancelledException exception) when (session.CanStartMutation()
+            && (cancellationRequested || stoppingToken.IsCancellationRequested))
+        {
+            using var terminalDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5), timeProvider);
+            await TryFailAsync(session, AwpExecutionFailureKind.Cancelled, "assignment_cancelled", "The assigned execution was cancelled.",
+                terminalDeadline.Token, JsonSerializer.Deserialize<JsonElement>(exception.Details));
+            activity?.SetStatus(ActivityStatusCode.Error, "assignment_cancelled");
+        }
         catch (OperationCanceledException) when (cancellationRequested && session.CanStartMutation())
         {
             activity?.SetStatus(ActivityStatusCode.Error, "assignment_cancelled");
@@ -97,7 +108,7 @@ internal sealed class AwpAssignmentRunner(
         {
             activity?.SetStatus(ActivityStatusCode.Error, exception.Code);
             await TryFailAsync(session, AwpExecutionFailureKind.TimedOut, exception.Code,
-                exception.Message, stoppingToken);
+                exception.Message, stoppingToken, exception.Details is { Length: > 0 } details ? JsonSerializer.Deserialize<JsonElement>(details) : null);
         }
         catch (Exception exception) when (session.CanStartMutation())
         {

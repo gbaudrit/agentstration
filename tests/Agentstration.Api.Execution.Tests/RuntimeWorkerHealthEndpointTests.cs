@@ -25,12 +25,12 @@ public sealed class RuntimeWorkerHealthEndpointTests
             {
                 // Test the real HTTP health routes without starting an authority or registration loop.
                 foreach (var service in services.Where(value => value.ServiceType == typeof(IHostedService)
-                    && value.ImplementationType == typeof(Worker.AwpRuntimeWorkerService)).ToArray())
+                    && value.ImplementationType == typeof(Agentstration.Runtime.Worker.Core.AwpRuntimeWorkerService)).ToArray())
                     services.Remove(service);
             });
         });
         using var client = factory.CreateClient();
-        var readiness = factory.Services.GetRequiredService<Worker.RuntimeWorkerReadiness>();
+        var readiness = factory.Services.GetRequiredService<Agentstration.Runtime.Worker.Core.RuntimeWorkerReadiness>();
         Assert.AreEqual(HttpStatusCode.OK, (await client.GetAsync("/health/live")).StatusCode);
         Assert.AreEqual(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/health/ready")).StatusCode);
         readiness.MarkReady();

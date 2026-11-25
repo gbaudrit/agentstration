@@ -13,7 +13,7 @@
             <QuickActions>
                 <a class="button-secondary" href="@OverviewHref" data-testid="flow-preview-open"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
                 @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="flow-preview-edit"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
-                @if (CanEdit && resource.Definition is not OrchestrationFlowDefinition) { <a class="button-primary" href="@DesignerHref" data-enhance-nav="false" data-testid="flow-preview-designer"><UiIcon Name="workflow" />@Localizer["OpenFlowDesigner"]</a> }
+                @if (CanEdit && resource.Definition is not (OrchestrationFlowDefinition or RuntimeFlowDefinition)) { <a class="button-primary" href="@DesignerHref" data-enhance-nav="false" data-testid="flow-preview-designer"><UiIcon Name="workflow" />@Localizer["OpenFlowDesigner"]</a> }
             </QuickActions>
         </FlowResourceSummary>
     }

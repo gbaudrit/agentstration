@@ -1,4 +1,4 @@
-namespace Agentstration.Runtime.Worker.MicrosoftAgentFramework;
+namespace Agentstration.Runtime.Worker.Core;
 
 public sealed class RuntimeWorkerOptions
 {

@@ -1,3 +1,4 @@
+using System.Reflection;
 using Agentstration.Http.Diagnostics;
 using Agentstration.Runtime.Worker.MicrosoftAgentFramework;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -63,6 +64,11 @@ builder.Services.AddHttpClient("agentstration-awp-enrollment");
 builder.Services.AddSingleton<RuntimeWorkerReadiness>();
 builder.Services.AddSingleton<AwpWorkerCredentialProvider>();
 builder.Services.AddSingleton<AwpAssignmentExecutor>();
+builder.Services.AddSingleton<IAwpAssignmentExecutor>(provider => provider.GetRequiredService<AwpAssignmentExecutor>());
+builder.Services.AddSingleton(new AwpWorkerRuntimeDescriptor(
+    typeof(Program).Assembly.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown",
+    [new(Agentstration.Awp.Abstractions.AwpRuntimeKinds.MicrosoftAgentFramework, "1.0", ["1.0", "1.1"],
+        typeof(Agentstration.Runtime.MicrosoftAgentFramework.AgentFrameworkRuntimeFactory).Assembly.GetName().Version?.ToString())]));
 builder.Services.AddSingleton<AwpAssignmentRunner>();
 builder.Services.AddHostedService<AwpRuntimeWorkerService>();
 builder.Services.AddHealthChecks()

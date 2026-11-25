@@ -797,6 +797,7 @@ public static class AwpRuntimeWorkerEndpoints
             checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds)))
         {
             FlowScopeRef = flow.FlowScopeRef,
+            RuntimeConfiguration = flow.RuntimeConfiguration,
             ProcessOrigin = flow.ProcessOrigin,
             ContractContext = flow.ContractContext is null ? null : JsonSerializer.SerializeToElement(flow.ContractContext, ContractJson)
         },

@@ -56,6 +56,8 @@ public sealed partial class CodexHarnessMaterializer
     }
     public static IReadOnlyList<string> Placeholders(string instructions) => Placeholder().Matches(instructions).Select(match => match.Groups[1].Value).Distinct(StringComparer.Ordinal).ToArray();
     public static string ContentDigest<T>(T value) => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Json)));
+    public static string ProfileDigest(HarnessProfileDefinition definition, HarnessNativeConfigurationPin native) =>
+        ContentDigest(new { Definition = definition, Native = new { native.Namespace, native.Name, native.Version, native.ContentDigest } });
     public static bool SafePath(string? path) => path is { Length: > 0 and <= 240 } && !path.StartsWith('/') && !path.Contains('\\') && !path.Contains(':')
         && !path.Any(char.IsControl) && path.Split('/').All(segment => segment.Length > 0 && segment is not ("." or "..")
             && !segment.Equals(".git", StringComparison.OrdinalIgnoreCase) && !segment.EndsWith('.') && !segment.EndsWith(' ')

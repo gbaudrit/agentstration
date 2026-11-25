@@ -4,6 +4,8 @@
     <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/version.txt').Trim())</Version>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../Agentstration.Runtime.Worker.Core/Agentstration.Runtime.Worker.Core.csproj" />
+    <Using Include="Agentstration.Runtime.Worker.Core" />
     <ProjectReference Include="../Agentstration.Http.Diagnostics/Agentstration.Http.Diagnostics.csproj" />
     <ProjectReference Include="../../awp/src/Agentstration.Awp.Abstractions/Agentstration.Awp.Abstractions.csproj" />
     <ProjectReference Include="../Agentstration.Identity.Contracts/Agentstration.Identity.Contracts.csproj" />

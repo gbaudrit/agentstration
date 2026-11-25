@@ -10,10 +10,18 @@ namespace Agentstration.Flows;
 [JsonDerivedType(typeof(WorkflowFlowDefinition), "workflow")]
 [JsonDerivedType(typeof(OrchestrationFlowDefinition), "orchestration")]
 [JsonDerivedType(typeof(CompositeFlowDefinition), "composite")]
+[JsonDerivedType(typeof(RuntimeFlowDefinition), "runtime")]
 public abstract record FlowDefinition
 {
     [JsonIgnore]
     public abstract FlowKind Kind { get; }
+}
+
+/// <summary>A complete Run executed by one explicitly compatible runtime capability.</summary>
+public sealed record RuntimeFlowDefinition(string RuntimeCapability, string CapabilityVersion, string MaterialVersion,
+    JsonElement Configuration) : FlowDefinition
+{
+    public override FlowKind Kind => FlowKind.Runtime;
 }
 
 public sealed record DirectFlowDefinition(FlowTargetReference Target) : FlowDefinition
