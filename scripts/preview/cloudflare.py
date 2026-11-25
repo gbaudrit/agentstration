@@ -154,19 +154,27 @@ def audit(values, api):
     group = groups[0]['azureAD']
     preview.require(isinstance(group, dict) and 'id' in group,
                     'Azure Groups must contain an Entra group object ID, not a display name.')
-    extra_fields = len(set(group) - {'id', 'identity_provider_id'})
+    provider_fields = ('identity_provider_id', 'connection_id')
+    extra_fields = len(set(group) - {'id', *provider_fields})
+    # Only fixed protocol names are reported, never arbitrary keys or values.
+    known_shape = ','.join(key for key in ('id', *provider_fields, 'name', 'display_name') if key in group)
     preview.require(extra_fields == 0, 'Azure Groups returned ' + str(extra_fields)
-                    + ' unexpected selector field(s); expected id and optional identity_provider_id. Values are withheld.')
+                    + ' unexpected selector field(s); known fields present: ' + known_shape
+                    + '. Accepted fields: id, identity_provider_id, connection_id. Values are withheld.')
     identifier(group['id'], 'The human Azure Group must contain its Entra object ID.')
     # The application has already been restricted to one verified Entra provider.
     # Manual group selectors can therefore inherit that source without requiring SCIM.
-    group_provider = group.get('identity_provider_id')
     binding = 'application-only'
-    if group_provider is not None and group_provider != '':
-        identifier(group_provider, 'Azure Groups returned an invalid identity_provider_id; use the Cloudflare IdP ID.')
-        preview.require(identifier(group_provider) == identifier(provider_id),
-                        'Azure Groups explicitly references another identity provider; use the application\'s selected Entra provider.')
-        binding = 'application-and-rule'
+    # Legacy API schemas use connection_id. Verify every populated alias, not just
+    # the first one, so an apparently valid modern field cannot hide a mismatch.
+    for field in provider_fields:
+        group_provider = group.get(field)
+        if group_provider is not None and group_provider != '':
+            identifier(group_provider, 'Azure Groups returned an invalid ' + field + '; use the Cloudflare IdP ID.')
+            preview.require(identifier(group_provider) == identifier(provider_id),
+                            'Azure Groups ' + field + ' explicitly references another identity provider; '
+                            'use the application\'s selected Entra provider.')
+            binding = 'application-and-rule'
     for rule in policy_rules(human[0], 'require'):
         preview.require(set(rule) == {'login_method'} and isinstance(rule['login_method'], dict)
                         and identifier(rule['login_method'].get('id')) == identifier(provider_id),
@@ -206,6 +214,7 @@ def audit(values, api):
     return {'schemaVersion': 1, 'state': 'configuration-validated', 'hostnamePattern': expected,
             'teamDomain': values['TEAM_DOMAIN'], 'accessAppId': app['id'],
             'checks': {'humanPolicy': 'entra-group', 'humanProviderBinding': binding,
+                       'humanProviderFields': [field for field in provider_fields if field in group],
                        'automationPolicy': 'dedicated-service-token',
                        'overlappingApplications': False, 'tunnelInventoryReadable': True, 'dnsInventoryReadable': True},
             'automationCredentials': 'configured-not-exercised',

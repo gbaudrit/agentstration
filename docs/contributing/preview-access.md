@@ -53,10 +53,18 @@ Configure exactly two policies in the initial audited setup:
 
 For a manually entered Azure Group, the audit accepts an omitted, null or empty
 `identity_provider_id` only within the application's already-verified single
-Entra provider scope. A non-empty rule-level provider ID must match that provider;
+Entra provider scope. Legacy API representations can use `connection_id` for the
+provider reference. Every non-empty value in either field must match the selected
+provider; if both fields are returned, both are checked. Neither alias takes
+precedence over a conflicting value. For a legacy schema example, see the
+[Cloudflare Access group API client representation](https://hub.windmill.dev/scripts/cloudflare/6362/create-an-access-group-cloudflare).
+Unknown selector fields remain an error. Diagnostic output includes only a fixed
+set of known field names and the extra-field count, never keys outside that set,
+group names, provider IDs or credential values. With either representation,
 multiple login providers, other provider types and disabled group support remain
 errors. The result records `humanProviderBinding` as `application-only` or
-`application-and-rule`. This is configuration evidence, not a successful group
+`application-and-rule`; `humanProviderFields` records the recognized alias names
+present in the response without their values. This is configuration evidence, not a successful group
 membership/authentication test.
 
 If the picker reports **Failed to retrieve SCIM groups**, use the Entra group's
