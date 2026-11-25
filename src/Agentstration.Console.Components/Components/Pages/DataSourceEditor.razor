@@ -312,6 +312,7 @@ else
             if (disposed || version != loadVersion) return;
             if (IsNew) { model.Scope = selectedScope; baseline = JsonSerializer.Serialize(model); }
             else await LoadOperationsAsync(version);
+            if (disposed || version != loadVersion) return;
             loadState = new(ResourceLoadStatus.Ready) { HasContent = source is not null };
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
