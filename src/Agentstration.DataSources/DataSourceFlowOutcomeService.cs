@@ -33,7 +33,14 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                     {
                         if (output is not { } directOutput) throw new DataSourceAcquisitionException("data_source_output_missing", "No direct output is available.");
                         var projection = direct.Composition is null ? null : JsonRecordProjection.Parse(directOutput);
-                        DataSourceDatasetCompositionService.ValidateOutput(direct.OutputSchema, projection?.Value ?? directOutput, (contentOptions ?? new()).MaximumValueBytes);
+                        var valueToValidate = projection?.Value ?? directOutput;
+                        if (direct.OutputSchemaSnapshot is not null)
+                        {
+                            if (JsonSerializer.SerializeToUtf8Bytes(valueToValidate).Length > (contentOptions ?? new()).MaximumValueBytes)
+                                throw new DataSourceAcquisitionException("data_source_output_too_large", "The direct result exceeds its accepted limit.");
+                            DataContracts.Validate(DataSourceDatasetCompositionService.Contract(direct, value.Name), valueToValidate, "acquisition-output", runId);
+                        }
+                        else DataSourceDatasetCompositionService.ValidateOutput(direct.OutputSchema, valueToValidate, (contentOptions ?? new()).MaximumValueBytes);
                         projection ??= JsonRecordProjection.Normalize(directOutput, DataSourceDatasetCompositionService.Contract(direct, value.Name));
                         var bytes = StorageRecordSets.Encode(projection.Value.EnumerateArray().ToArray());
                         value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), completedAt.AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
@@ -41,6 +48,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                     catch (Exception exception) when (exception is ArgumentException or DataContractException or DataSourceValidationException or DataSourceAcquisitionException)
                     {
                         finalState = DataSourceAcquisitionState.Failed;
+                        contractFailure = (exception as DataContractException)?.Failure;
                         errorCode = exception switch
                         {
                             DataSourceValidationException invalid => invalid.Code,
@@ -61,7 +69,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                     {
                         Generation = checked(value.Generation + 1),
                         State = finalState,
-                        Progress = progress,
+                        Progress = progress with { State = finalState.ToString(), ErrorCode = errorCode },
                         CompletedAt = completedAt,
                         ErrorCode = errorCode,
                         ContractFailure = contractFailure,
