@@ -9,6 +9,7 @@
     <Project Path="tests/Agentstration.Management.Bootstrap.Tests/Agentstration.Management.Bootstrap.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Startup.Tests/Agentstration.Management.Bootstrap.Startup.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Scenarios.Tests/Agentstration.Management.Bootstrap.Scenarios.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Bootstrap.Progress.Tests/Agentstration.Management.Bootstrap.Progress.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Plans.Tests/Agentstration.Management.Bootstrap.Plans.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
     <Project Path="tests/Agentstration.Workplace.Web.Tests/Agentstration.Workplace.Web.Tests.csproj" />

@@ -1520,6 +1520,10 @@ public sealed class DependencyTests
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests"
                         or "Agentstration.Management.Models.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
+                if (include.Replace('\\', '/') == "../AepEnrollmentTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Aep.Tests"
+                        or "Agentstration.Management.Aep.Automatic.Tests") continue;
+
                 // Declarative fixtures are shared only by these bounded Bootstrap modules.
                 if (include.Replace('\\', '/') == "../BootstrapDeclarativeTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
@@ -1531,11 +1535,13 @@ public sealed class DependencyTests
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
                         or "Agentstration.Management.Bootstrap.Scenarios.Tests"
                         or "Agentstration.Management.Bootstrap.Plans.Tests"
-                        or "Agentstration.Management.Bootstrap.Startup.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Startup.Tests"
+                        or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
 
                 if (include.Replace('\\', '/') == "../BootstrapApplicationTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Scenarios.Tests"
-                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Plans.Tests"
+                        or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
 
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.
