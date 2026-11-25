@@ -63,7 +63,7 @@ public sealed class DataSourceDatasetCompositionService(
             }
         }
         var flow = await flows.ResolveOperationAsync(operation.ScopeRef!.Value, adapter.Flow, cancellationToken);
-        if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
+        if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null && (definition.Storage is null || accepted is not null))
             return new(definition, operation, type, input, output, partition, flow)
             { OperationOutputSchema = rawOutput, OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot };
         if (sequences is null || definition.Compositions.ContainsKey("acquisition"))
@@ -76,7 +76,12 @@ public sealed class DataSourceDatasetCompositionService(
         }
         bindings.Add("acquisition", [new() { Flow = new(flow.Name, FlowCallVersionStrategy.Exact, flow.Version, flow.Namespace, flow.ScopeRef)
             { DefinitionHash = flow.DefinitionHash, OutputSchema = rawOutput.Clone() }, PassInputDirectly = true }]);
-        var root = definition.Orchestration ?? new FlowCallReference("data-source-orchestration-builtin", ScopeRef: ResourceScopeRef.Instance);
+        var root = definition.Orchestration ?? new FlowCallReference("data-source-orchestration-builtin",
+            FlowCallVersionStrategy.Exact, definition.Storage is null ? "1.0.0" : "2.0.0", ScopeRef: ResourceScopeRef.Instance);
+        if (definition.Storage is null && root.ResourceId == "data-source-orchestration-builtin" && root.VersionStrategy == FlowCallVersionStrategy.Active)
+            root = root with { VersionStrategy = FlowCallVersionStrategy.Exact, Version = "1.0.0" };
+        if (definition.Storage is null && root.ResourceId == "data-source-orchestration-builtin" && root.Version == "2.0.0")
+            throw Invalid("data_source_orchestration_storage_required", "This orchestration requires retained Storage.");
         if (accepted?.Composition is { } pinned)
         { root = pinned.Orchestration; bindings = pinned.Receipt!.Bindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); }
         try
@@ -90,6 +95,9 @@ public sealed class DataSourceDatasetCompositionService(
             { ScopeRef = composed.Orchestration.ScopeRef };
             return new(definition, operation, type, input, finalSnapshot is not null ? output : composed.OutputSchema ?? output, partition, targetFlow)
             {
+                DurablePublication = accepted?.DurablePublication ?? (definition.Storage is not null
+                    && composed.Orchestration.ResourceId == "data-source-orchestration-builtin"
+                    && composed.Orchestration.ScopeRef == ResourceScopeRef.Instance && composed.Orchestration.Version == "2.0.0"),
                 OperationFlow = flow,
                 Composition = composed,
                 OperationOutputSchema = rawOutput,

@@ -74,6 +74,7 @@ internal static class FlowInspectorPresentation
 
     internal static string StepDisplayLabel(IStringLocalizer<FlowDesignerStrings> localizer, string label)
     {
+        if (label is "publication-prepare" or "publication-seal" or "publication-register") return localizer["Publication." + label].Value;
         if (label is "postAggregate" or "Transform before publication") return localizer["BeforePublication"].Value;
         if (label.StartsWith("postAggregate ", StringComparison.Ordinal) && int.TryParse(label[14..], out var index))
             return localizer["BeforePublication"].Value + " " + index;

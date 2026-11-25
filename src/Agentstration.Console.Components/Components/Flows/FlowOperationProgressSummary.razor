@@ -1,0 +1,26 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedUiStrings> Localizer
+@inject TimeProvider Clock
+<ExecutionProgress Label="@(PhaseLabel + " · " + Localizer[$"OperationProgress.State.{State}"].Value)" RunUrl="@RunUrl" Active="IsActive" Elapsed="Elapsed">
+    <Details>
+        <span>@Localizer["OperationProgress.Attempt", Attempt]</span>
+        @if (StartedAt is { } start) { <span>@Localizer["OperationProgress.Since", start.ToLocalTime().ToString("g")]</span> }
+        @if (ErrorCode is { } errorCode) { <code>@errorCode</code> }
+    </Details>
+</ExecutionProgress>
+@code {
+    [Parameter, EditorRequired] public string StepName { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string State { get; set; } = string.Empty;
+    [Parameter] public int Attempt { get; set; }
+    [Parameter] public DateTimeOffset? StartedAt { get; set; }
+    [Parameter] public DateTimeOffset? UpdatedAt { get; set; }
+    [Parameter] public DateTimeOffset? CompletedAt { get; set; }
+    [Parameter] public string? ErrorCode { get; set; }
+    [Parameter] public string? RunUrl { get; set; }
+    private bool IsActive => State is not ("Succeeded" or "Failed" or "Cancelled" or "TimedOut");
+    private TimeSpan? Elapsed => StartedAt is { } start && (CompletedAt ?? (IsActive ? Clock.GetUtcNow() : UpdatedAt)) is { } end ? end - start : null;
+    private string PhaseLabel => StepName switch
+    {
+        "publication-prepare" or "publication-seal" or "publication-register" => Localizer[$"OperationProgress.Phase.{StepName}"],
+        _ => Localizer["OperationProgress.Phase.Processing"]
+    };
+}

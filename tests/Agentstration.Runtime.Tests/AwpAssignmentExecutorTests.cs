@@ -1326,6 +1326,7 @@ public sealed partial class AwpAssignmentExecutorTests
         string? correlationId = null,
         AwpExecutionAgentMaterial? agentMaterial = null,
         bool directAgent = false,
+        IReadOnlyList<FlowStepRun>? completedSteps = null,
         CancellationToken cancellationToken = default)
     {
         using var credential = new AwpClientCredential(Guid.NewGuid(), Guid.NewGuid(), "test-instance",
@@ -1348,7 +1349,8 @@ public sealed partial class AwpAssignmentExecutorTests
             runId, "root", "default", "1.0", "sha256:root", input,
             JsonSerializer.SerializeToElement(definition, JsonOptions), [agentMaterial ?? AgentMaterial()], Guid.NewGuid(),
             RootFlowRunId: rootRunId ?? runId, ParentFlowRunId: parentRunId,
-            CorrelationId: correlationId);
+            CorrelationId: correlationId)
+        { CompletedGraphSteps = completedSteps is null ? null : JsonSerializer.SerializeToElement(completedSteps, JsonOptions) };
         if (directAgent)
             material = new AwpDirectAgentExecutionMaterial("material-1", "1.0", "sha256:material", runId,
                 [new("user", "Answer the request.")], null, new(90, "disabled", null, new Dictionary<string, JsonElement>()),

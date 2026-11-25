@@ -64,6 +64,14 @@ internal static class InternalToolsServiceCollectionExtensions
                 provider.GetRequiredService<Agentstration.Identity.Contracts.ICurrentRequestContext>()));
             services.AddSingleton<IInternalMcpToolDefinitionProvider>(_ => new ArtifactProcessingToolDefinition(operation));
         }
+        foreach (var phase in new[] { "prepare", "seal", "register" })
+        {
+            services.AddSingleton<IInternalMcpToolHandler>(provider => new DataSourcePublicationTool(phase,
+                provider.GetRequiredService<Agentstration.DataSources.DataSourceDatasetAcquisitionService>(),
+                provider.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>(),
+                provider.GetRequiredService<Agentstration.Identity.Contracts.ICurrentRequestContext>(), provider.GetRequiredService<TimeProvider>(), provider.GetRequiredService<Agentstration.Flows.Application.IFlowRunEventSink>()));
+            services.AddSingleton<IInternalMcpToolDefinitionProvider>(provider => new DataSourcePublicationDefinition(phase));
+        }
         AddInternalTool<DataSourceArtifactImportMcpTool>(services);
         AddInternalTool<WebFetchMcpTool>(services);
         AddInternalTool<RestGetMcpTool>(services);
@@ -88,6 +96,11 @@ internal static class InternalToolsServiceCollectionExtensions
         services.AddSingleton(provider => new Lazy<IEnumerable<IInternalMcpToolHandler>>(
             () => provider.GetServices<IInternalMcpToolHandler>()));
         return services;
+    }
+
+    private sealed class DataSourcePublicationDefinition(string phase) : IInternalMcpToolDefinitionProvider
+    {
+        public InternalMcpToolDefinition Definition { get; } = DataSourcePublicationTool.CreateDefinition(phase);
     }
 
     private sealed class ArtifactProcessingToolDefinition(Agentstration.Runtime.Abstractions.RuntimeExecutionToolMaterial operation)

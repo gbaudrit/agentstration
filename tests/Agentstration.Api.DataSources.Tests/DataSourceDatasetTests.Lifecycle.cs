@@ -37,6 +37,7 @@ public sealed partial class DataSourceDatasetTests
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
             services.AddSingleton<IStoragePublicationGateway>(p => controlled = new(ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock)));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
+            services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeAssignmentProjection>(p => ActivatorUtilities.CreateInstance<Agentstration.Infrastructure.Runtime.AwpAssignmentProjection>(p, clock));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeAccessService>(p, clock));
@@ -131,6 +132,7 @@ public sealed partial class DataSourceDatasetTests
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<LocalStoragePublicationGateway>(p, clock));
             services.AddSingleton<IStoragePublicationGateway>(p => ActivatorUtilities.CreateInstance<StoragePublicationGateway>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<DataSourceDatasetAcquisitionService>(p, clock));
+            services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeAssignmentProjection>(p => ActivatorUtilities.CreateInstance<Agentstration.Infrastructure.Runtime.AwpAssignmentProjection>(p, clock));
             services.AddSingleton<IKnowledgeProjectionInputResolver>(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionInputResolver>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeProjectionService>(p, clock));
             services.AddSingleton(p => ActivatorUtilities.CreateInstance<KnowledgeAccessService>(p, clock));

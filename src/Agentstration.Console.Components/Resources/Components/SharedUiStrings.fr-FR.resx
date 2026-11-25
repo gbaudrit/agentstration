@@ -20,4 +20,20 @@
   <data name="ExecutionProgress.CurrentStep" xml:space="preserve"><value>Étape en cours :</value></data>
   <data name="ExecutionProgress.WaitingStep" xml:space="preserve"><value>En attente de l’étape suivante</value></data>
   <data name="ExecutionProgress.BeforePublication" xml:space="preserve"><value>Transformation avant publication</value></data>
+  <data name="OperationProgress.Phase.publication-prepare" xml:space="preserve"><value>Préparer la publication Storage</value></data>
+  <data name="OperationProgress.Phase.publication-seal" xml:space="preserve"><value>Confirmer la publication Storage</value></data>
+  <data name="OperationProgress.Phase.publication-register" xml:space="preserve"><value>Enregistrer l’artefact</value></data>
+  <data name="OperationProgress.Phase.Processing" xml:space="preserve"><value>Acquérir et transformer</value></data>
+  <data name="OperationProgress.State.Pending" xml:space="preserve"><value>En attente de prise en charge</value></data>
+  <data name="OperationProgress.State.Running" xml:space="preserve"><value>En cours</value></data>
+  <data name="OperationProgress.State.Active" xml:space="preserve"><value>Travail actif</value></data>
+  <data name="OperationProgress.State.WaitingForChild" xml:space="preserve"><value>En attente de l’exécution enfant</value></data>
+  <data name="OperationProgress.State.WaitingForInput" xml:space="preserve"><value>En attente de réponse</value></data>
+  <data name="OperationProgress.State.WaitingForProvider" xml:space="preserve"><value>En attente du fournisseur ; nouvelle tentative prévue</value></data>
+  <data name="OperationProgress.State.Succeeded" xml:space="preserve"><value>Réussie</value></data>
+  <data name="OperationProgress.State.Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="OperationProgress.State.Cancelled" xml:space="preserve"><value>Annulée</value></data>
+  <data name="OperationProgress.State.TimedOut" xml:space="preserve"><value>Délai dépassé</value></data>
+  <data name="OperationProgress.Attempt" xml:space="preserve"><value>Tentative {0}</value></data>
+  <data name="OperationProgress.Since" xml:space="preserve"><value>Démarrée le {0}</value></data>
 </root>

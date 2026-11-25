@@ -41,6 +41,8 @@ public sealed record DataSourceFlowRunSnapshot(
     DateTimeOffset? CompletedAt)
 {
     public bool TransientPayloadsAvailable { get; init; } = true;
+    public DataSourceAcquisitionProgress? Progress { get; init; }
+    public JsonElement? ProcessingOutput { get; init; }
     public string? RootFlowRunId { get; init; }
     public string? FlowName { get; init; }
     public ResourceNamespace? FlowNamespace { get; init; }
@@ -83,7 +85,11 @@ public interface IDataSourceAcquisitionFlowGateway
 {
     Task<DataSourceFlowRunSnapshot> StartAsync(DataSourceFlowRunRequest request, CancellationToken cancellationToken);
     Task<DataSourceFlowRunSnapshot?> GetAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken cancellationToken);
+    Task<DataSourceFlowRunSnapshot?> ObserveAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken cancellationToken) =>
+        GetAsync(workspaceId, runId, tenantId, principalId, cancellationToken);
     Task<DataSourceFlowRunSnapshot> CancelAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken cancellationToken);
+    Task ResumePublicationAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken cancellationToken) =>
+        Task.FromException(new DataSourceAcquisitionException("data_source_publication_resume_unavailable", "Publication recovery is unavailable."));
 }
 
 public interface IDataSourceArtifactReferenceValidator
@@ -401,7 +407,7 @@ public sealed class DataSourceAcquisitionService(
         {
             // Native synchronization may publish/seal every record or repair Artifact metadata.
             // History reads leave that durable work to recovery, outside the HTTP lifetime.
-            result.Add(item.Value.Dataset is not null ? item.Value
+            result.Add(item.Value.Dataset is not null ? (datasets is null ? item.Value : (await datasets.ObserveAsync(item, cancellationToken)).Value)
                 : (await SynchronizeAsync(item, context, cancellationToken)).Value);
         }
         return result;
@@ -444,6 +450,37 @@ public sealed class DataSourceAcquisitionService(
         var original = await GetCoreAsync(@namespace, acquisitionId, context, cancellationToken);
         if (!IsTerminal(original.Value.State))
             throw Error("data_source_acquisition_retry_not_terminal", "Only a terminal acquisition can be retried.");
+        if (original.Value.Dataset?.DurablePublication == true && datasets is not null
+            && (await flowRuns.GetAsync(context.WorkspaceId, original.Value.FlowRunId, context.TenantId, original.Value.CreatedBy, cancellationToken))?.ProcessingOutput is not null)
+        {
+            await datasets.ValidateExecutionAsync(original.Value, cancellationToken);
+            // Admission stays pinned to the same root. Successful source/transform steps are authoritative checkpoints.
+            if (original.Value.State != DataSourceAcquisitionState.Failed)
+                throw Error("data_source_publication_resume_refused", "This accepted publication cannot be resumed.");
+            var resumed = await execution.InWorkspaceAsync(() => store.PutExactAsync(original.Value.ScopeRef!.Value, original.Value with
+            {
+                Generation = checked(original.Value.Generation + 1),
+                State = DataSourceAcquisitionState.Pending,
+                CompletedAt = null,
+                ErrorCode = null,
+                ErrorMessage = null,
+                ContractFailure = null,
+                Attempt = checked(original.Value.Attempt + 1),
+                Status = new() { ProvisioningState = ProvisioningState.Accepted }
+            }, original.ETag, false, cancellationToken));
+            try
+            {
+                await flowRuns.ResumePublicationAsync(context.WorkspaceId, original.Value.FlowRunId, context.TenantId, context.PrincipalId, cancellationToken);
+            }
+            catch
+            {
+                // A refused resume never turns into a new source invocation.
+                _ = await datasets.SynchronizeAsync(resumed, cancellationToken);
+                throw;
+            }
+            await AuditAsync(SecurityAuditActions.DataSourceAcquisitionRetried, acquisitionId, context, cancellationToken);
+            return resumed;
+        }
         if (original.Value.Dataset is not null)
         {
             var source = await sources.ResolveForUseAsync(original.Value.DataSourceNamespace, original.Value.DataSourceName,
@@ -558,7 +595,9 @@ public sealed class DataSourceAcquisitionService(
             DataSourceResourceKinds.DataSourceAcquisition, acquisitionId);
         var stored = await execution.InWorkspaceAsync(() => store.GetExactAsync<DataSourceAcquisitionResource>(address, cancellationToken))
             ?? throw Error("data_source_acquisition_not_found", $"Data Source acquisition '{acquisitionId}' was not found.");
-        return await SynchronizeAsync(stored, context, cancellationToken);
+        return stored.Value.Dataset is not null && datasets is not null
+            ? await datasets.ObserveAsync(stored, cancellationToken)
+            : await SynchronizeAsync(stored, context, cancellationToken);
     }
 
     private async Task<StoredResource<DataSourceAcquisitionResource>> SynchronizeAsync(

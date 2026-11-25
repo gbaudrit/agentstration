@@ -15,7 +15,8 @@ public sealed class AwpAssignmentProjection(
     TimeProvider timeProvider,
     IOptions<FlowRunExecutionOptions> flowOptions,
     IFlowInputRequestSink? inputRequestSink = null,
-    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null) : IRuntimeAssignmentProjection
+    FlowRunTokenUsageConsolidator? configuredTokenUsageConsolidator = null,
+    Agentstration.DataSources.DataSourceFlowOutcomeService? dataSourceOutcomes = null) : IRuntimeAssignmentProjection
 {
     private static readonly JsonSerializerOptions ContractJson = new(JsonSerializerDefaults.Web);
     private readonly FlowRunTokenUsageConsolidator tokenUsageConsolidator =
@@ -112,6 +113,14 @@ public sealed class AwpAssignmentProjection(
             TokenUsage = await tokenUsageConsolidator.FinalizeAsync(updated, cancellationToken)
         };
         await flowRuns.UpdateRunAsync(updated, stored.ETag, cancellationToken);
+        if (dataSourceOutcomes is not null && runId == assignment.TargetRunId)
+            await dataSourceOutcomes.ApplyAsync(updated.WorkspaceId.Value, runId, status switch
+            {
+                FlowRunStatus.Succeeded => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.Succeeded,
+                FlowRunStatus.Cancelled => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.Cancelled,
+                FlowRunStatus.TimedOut => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.TimedOut,
+                _ => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.Failed
+            }, now, updated.Error?.Code, updated.Output, Agentstration.Infrastructure.Flows.DataSourceAcquisitionFlowGateway.Progress(updated), cancellationToken);
         await AppendFlowEventAsync(updated, status switch
         {
             FlowRunStatus.Succeeded => FlowRunEventType.FlowRunCompleted,

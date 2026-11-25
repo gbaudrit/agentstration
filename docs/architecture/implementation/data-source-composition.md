@@ -150,8 +150,9 @@ Source or acquired content, or implement native Knowledge Snapshot composition.
   Published output is not reacquired. A conditional write has a persisted
   validity window; recovery confirms its unique key and digest first.
 - Cancellation follows the existing durable Flow lifecycle. A cancelled or
-  failed Flow publishes no dataset content. Storage failures preserve the Flow
-  and acceptance evidence and expose a bounded failure code.
+  failed Flow never advertises usable dataset output. Prepared or sealed Storage
+  evidence can remain for recovery and cleanup by its existing owner. Storage
+  failures preserve the Flow and acceptance evidence and expose a bounded failure code.
 - Parameters/results are bounded to 64 KiB by the initial schema profile and
   intersected Storage limits. The profile includes typed objects/arrays/scalars,
   required fields, enums and the existing validator's supported constraints;
@@ -419,3 +420,25 @@ direct handoffs keep concrete content evidence; Flow Run diagnostics preserve
 causal contract failures across child executions.
 
 OpenAPI acquisition schema discovery recognizes `application/json` with media-type parameters such as `charset=utf-8`, including case variants and local schema references. Conflicting JSON representations are rejected rather than silently choosing one. Existing Operation revisions remain pinned; rediscovery is explicit. Contract mismatch diagnostics include the composition point, boundary, template/version and JSON type summaries, without invocation values or schema defaults.
+
+## Durable standard publication
+
+New Storage-backed standard acquisitions select
+`data-source-orchestration-builtin@2.0.0`. Its ordinary Flow graph executes
+`publication-prepare`, `publication-seal` and `publication-register` after the
+operation and configured transformations. The root remains nonterminal until
+publication is confirmed and its logical Artifact is registered. These Tools are
+internal and run through the existing governed Flow/AWP boundary and Storage ports.
+
+AWP material 1.2 carries successful step checkpoints from the Flow store; updated
+Workers reuse their outputs/transitions on recovery. A publication retry retains
+the acquisition/publication identity and Artifact registration key. Provider wait,
+active work, attempts and safe errors are persisted. The Data Source progress is a
+projection of this same evidence, with a link to the root Flow Run. No per-record
+percentage is inferred. Metadata history/detail/status reads perform no execution
+or repair, and cancelling a reader cannot cancel accepted work.
+
+Existing immutable versions and accepted acquisitions are unchanged. Profile/custom
+or explicitly selected older orchestration keeps its original path. Direct results
+have no Storage step. See [ADR-0263](../../decisions/0263-native-acquisition-publication-is-durable-flow-execution.md)
+for the shared #1373 interface, commit boundaries and Worker compatibility.

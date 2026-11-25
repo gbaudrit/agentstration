@@ -8,6 +8,7 @@ public static class RuntimeExecutionMaterialVersions
 {
     public const string V1 = "1.0";
     public const string CoordinatedProcesses = "1.1";
+    public const string DurableGraph = "1.2";
 }
 
 public sealed record RuntimeExecutionToolMaterial(
@@ -108,6 +109,8 @@ public sealed record RuntimeRootFlowExecutionMaterial(
     TimeSpan OrchestrationTimeout = default)
     : RuntimeExecutionMaterial(MaterialId, SchemaVersion, Digest, RuntimeAssignmentTargetKind.FlowRun, WorkspaceId, TenantId, PrincipalId, RunId)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? CompletedGraphSteps { get; init; }
     public string? FlowScopeRef { get; init; }
     public InvocationDataContracts? ContractContext { get; init; }
     public JsonElement? ProcessOrigin { get; init; }

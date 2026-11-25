@@ -60,7 +60,8 @@ public enum FlowRunEventType
     ChildFlowRunCreated,
     FlowRunWaitingForChild,
     FlowRunResumedFromChild,
-    ProcessUnitChanged
+    ProcessUnitChanged,
+    StepProgressChanged
 }
 
 public enum InputRequestType { Text, Choice, Confirmation }

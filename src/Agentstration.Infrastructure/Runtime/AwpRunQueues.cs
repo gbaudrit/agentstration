@@ -64,13 +64,15 @@ public sealed class AwpFlowRunQueue(
             item.RunId, cancellationToken);
         if (existing is not null)
         {
-            if (run.Value.Status == FlowRunStatus.WaitingForInput
+            if ((run.Value.Status == FlowRunStatus.WaitingForInput
+                || run.Value.Status == FlowRunStatus.Pending && run.Value.DefinitionSnapshot.Metadata.GetValueOrDefault("flow.durableGraph") == "true")
                 && existing.Value.State == RuntimeAssignmentState.Succeeded)
                 await assignments.RequeueExactAsync(item.Scope.ScopeRef, existing.Value.Id, cancellationToken);
             return;
         }
 
-        var materialVersion = run.Value.DefinitionSnapshot.Graph?.Steps.Any(step => step.Region() is not null
+        var materialVersion = run.Value.DefinitionSnapshot.Metadata.GetValueOrDefault("flow.durableGraph") == "true"
+            ? RuntimeExecutionMaterialVersions.DurableGraph : run.Value.DefinitionSnapshot.Graph?.Steps.Any(step => step.Region() is not null
             || step is FlowCallStepDefinition or RepeatFlowStepDefinition || step.ArtifactOutput is not null) == true
                 ? RuntimeExecutionMaterialVersions.CoordinatedProcesses : RuntimeExecutionMaterialVersions.V1;
         var hash = run.Value.DefinitionHash ?? Digest(JsonSerializer.Serialize(run.Value.DefinitionSnapshot));

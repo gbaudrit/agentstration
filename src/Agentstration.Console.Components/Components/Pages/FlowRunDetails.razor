@@ -127,6 +127,8 @@
                         }
                         else
                         {
+                            @if (selected.OperationProgress is { } operationProgress)
+                            { <FlowOperationProgressSummary StepName="@selected.StepName" State="@(selected.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed or FlowStepRunStatus.Cancelled ? selected.Status.ToString() : operationProgress.State)" Attempt="operationProgress.Attempt" StartedAt="selected.StartedAt" UpdatedAt="operationProgress.UpdatedAt" CompletedAt="selected.CompletedAt" ErrorCode="@(selected.Error?.Code ?? operationProgress.ErrorCode)" /> }
                             <dl class="details-list"><dt>@T("Status")</dt><dd>@StepStatusLabel(selected.Status)</dd><dt>@T("Type")</dt><dd>@selected.StepType</dd><dt>@T("Duration")</dt><dd>@Duration(selected.StartedAt, selected.CompletedAt)</dd><dt>@T("Attempt")</dt><dd>@selected.Attempt</dd><dt>@T("Transition")</dt><dd>@(selected.SelectedTransition ?? "—")</dd><dt>@T("ChildFlowRun")</dt><dd>@if (selected.ChildFlowRunId is { } childRunId) { <a href="@($"/flow-runs/{Uri.EscapeDataString(childRunId)}?scopeRef={Uri.EscapeDataString(run.ExecutionScopeRef.Value)}")"><code>@childRunId</code></a> } else { <span>—</span> }</dd><dt>@T("Agent")</dt><dd>@(selected.AgentResourceId ?? "—")</dd><dt>@T("AgentVersion")</dt><dd>@(selected.AgentVersion?.ToString() ?? "—")</dd><dt>@T("ModelProfile")</dt><dd>@(selected.ModelProfileResourceId ?? "—")</dd><dt>@T("Provider")</dt><dd>@(selected.Provider ?? "—")</dd><dt>@T("Tokens")</dt><dd>@TokenUsage(selected.Usage)</dd><dt>@T("Tools")</dt><dd>@(selected.Tools.Count == 0 ? "—" : string.Join(", ", selected.Tools))</dd></dl>
                             @if (IsContractFailure(selected.Error))
                             { <ContractFailurePanel Details="@selected.Error!.Details" ErrorCode="@selected.Error.Code" Run="run" RelatedRuns="contractOrigins" /> }
@@ -664,7 +666,7 @@
 
     private static bool IsReplayFrame(FlowRunEvent runEvent) => runEvent.Type is
         FlowRunEventType.FlowRunStarted or FlowRunEventType.FlowRunResumed or
-        FlowRunEventType.StepRunStarted or FlowRunEventType.StepRunCompleted or FlowRunEventType.StepRunFailed or
+        FlowRunEventType.StepProgressChanged or FlowRunEventType.StepRunStarted or FlowRunEventType.StepRunCompleted or FlowRunEventType.StepRunFailed or
         FlowRunEventType.ParticipantTurnStarted or FlowRunEventType.ParticipantTurnCompleted or FlowRunEventType.ParticipantHandoff or
         FlowRunEventType.FlowRunCompleted or FlowRunEventType.FlowRunFailed or FlowRunEventType.FlowRunCancelled or FlowRunEventType.FlowRunTimedOut;
 

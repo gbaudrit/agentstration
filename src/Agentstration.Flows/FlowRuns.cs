@@ -119,8 +119,11 @@ public sealed record FlowToolRouteResolution(
     long ToolGeneration,
     string ProviderName,
     ResourceNamespace ProviderNamespace);
+public sealed record FlowOperationProgress(string State, int Attempt, DateTimeOffset UpdatedAt, string? ErrorCode = null);
+
 public sealed record FlowStepRun
 {
+    public FlowOperationProgress? OperationProgress { get; init; }
     public FlowProcessAdmission? Process { get; init; }
     public required string StepName { get; init; }
     public required string StepType { get; init; }

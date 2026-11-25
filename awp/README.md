@@ -115,10 +115,27 @@ the root ends. Derived children remain on the owning Worker; they are not indepe
 placed assignments. See [ADR-0215](../docs/decisions/0215-process-regions-have-derived-flow-identities.md).
 
 New root graphs containing process regions, named/repeated child calls or Artifact
-capture use execution-material schema `1.1`. Current Workers advertise `1.0` and
-`1.1`; a `1.0`-only Worker cannot claim these new assignments. Existing `1.0`
+capture use execution-material schema `1.1`. Current Workers advertise `1.0`, `1.1` and
+`1.2`; a `1.0`-only Worker cannot claim these new assignments. Existing `1.0`
 assignments keep their immutable references and legacy terminal-child response shape.
 Resolving a new generic process or explicitly parallel Artifact process through an
 old assignment fails explicitly instead of silently treating it as an ordinary
 mapping. Start a new run with an updated Worker in that case. Wire protocol and
 Runtime capability versions remain `1.0`; these are separate version dimensions.
+
+
+## Durable graph publication material (1.2)
+
+New standard Storage-backed Data Source roots use material `1.2`. Root and child
+material may include authority-derived `completedGraphSteps`: successful persisted
+Flow steps, including their outputs and selected transition identities. An updated
+Worker restores that evidence without reopening or reinvoking successful source,
+transformation or publication steps. An incomplete step uses the existing governed
+Tool/child boundaries and stable publication/Artifact identities on retry.
+
+This evidence comes from the authoritative Flow store; it is distinct from the
+explicit `/assignments/checkpoints` runtime-state endpoint. Older material omits
+this field and keeps its original behavior. Workers supporting only `1.0`/`1.1`
+cannot claim a `1.2` assignment. Wire protocol and Runtime capability versions are
+unchanged. See [ADR-0263](../docs/decisions/0263-native-acquisition-publication-is-durable-flow-execution.md)
+for publication commits, explicit resume and compatibility.

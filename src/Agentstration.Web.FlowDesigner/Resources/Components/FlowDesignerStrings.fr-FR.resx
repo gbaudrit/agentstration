@@ -252,4 +252,7 @@
     <value>Le brouillon a changé pendant la sauvegarde. Vos modifications locales sont conservées. Rechargez le Flow avant de réessayer.</value>
   </data>
   <data name="IdentityMismatch"><value>Le Flow reçu ne correspond pas à l’espace de noms, au propriétaire, au nom ou à la version publiée demandés.</value></data>
+  <data name="Publication.publication-prepare" xml:space="preserve"><value>Préparer la publication Storage</value></data>
+  <data name="Publication.publication-seal" xml:space="preserve"><value>Confirmer la publication Storage</value></data>
+  <data name="Publication.publication-register" xml:space="preserve"><value>Enregistrer l’artefact</value></data>
 </root>

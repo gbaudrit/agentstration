@@ -29,7 +29,7 @@ public sealed partial class DataSourceDatasetTests
         var scopes = factory.Services.GetRequiredService<IRequestContextScopeFactory>();
         using var scope = scopes.PushInstance(fixture.Context);
         var source = (await factory.Services.GetRequiredService<DataSourceManagementService>().CreateAsync(
-            Source("history", fixture, JsonSerializer.SerializeToElement(new { dataset = "history" })), default)).Value;
+            LegacyHistorySource(fixture), default)).Value;
         var acquisitions = factory.Services.GetRequiredService<DataSourceAcquisitionService>();
         var accepted = await acquisitions.StartAsync(source.Namespace, source.Name, Owner, Empty, null, null, default);
         flow.Completed = true;
@@ -74,6 +74,19 @@ public sealed partial class DataSourceDatasetTests
             .Single(value => value.Uid == legacy.Value.Uid);
         Assert.IsNull(unchanged.Manifest);
         Assert.AreEqual(legacy.Value.Generation, unchanged.Generation);
+    }
+
+    private static DataSourceResource LegacyHistorySource(Fixture fixture)
+    {
+        var source = Source("history", fixture, JsonSerializer.SerializeToElement(new { dataset = "history" }));
+        return source with
+        {
+            Definition = source.Definition with
+            {
+                Dataset = source.Definition.Dataset! with
+                { Orchestration = new("data-source-orchestration-builtin", Agentstration.Flows.FlowCallVersionStrategy.Exact, "1.0.0", ScopeRef: Owner) }
+            }
+        };
     }
 
     private sealed class HistoryFlowGateway : IDataSourceAcquisitionFlowGateway

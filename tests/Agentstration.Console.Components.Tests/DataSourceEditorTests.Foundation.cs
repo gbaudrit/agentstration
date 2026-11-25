@@ -44,6 +44,20 @@ public sealed partial class DataSourceEditorTests
             Task.FromResult<IReadOnlyList<ResourceScopeTargetResponse>>([new(Scope, ResourceScopeKind.Workspace, "Catalog", true)]);
     }
 
+    [TestMethod]
+    [DataRow(DataSourceAcquisitionState.Running)]
+    [DataRow(DataSourceAcquisitionState.Failed)]
+    [DataRow(DataSourceAcquisitionState.Cancelled)]
+    public void RegisteredArtifactEvidenceIsNotAdvertisedAsAnAcquiredResultBeforeGlobalSuccess(DataSourceAcquisitionState state)
+    {
+        using var context = FoundationContext(new SourceClientStub { AcquisitionResult = Acquisition with { State = state } });
+        var rendered = context.Render<DataSourceEditor>(parameters => parameters.Add(component => component.Name, "documentation"));
+        DataSourceScreenTestSupport.Select(rendered, "acquisitions");
+        rendered.WaitForAssertion(() => Assert.HasCount(1, rendered.FindAll("[data-testid='data-source-acquisition-row']")));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='data-source-acquisition-preview']"));
+        Assert.HasCount(0, rendered.FindAll("[data-testid='data-source-create-tool']"));
+    }
+
     private static BunitContext FoundationContext(SourceClientStub client)
     {
         var context = new BunitContext().WithCollectionPresentation();
