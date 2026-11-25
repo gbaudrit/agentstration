@@ -36,7 +36,10 @@ public static class WorkSharingContent
         catch (JsonException) { return Failure(); }
     }
 
-    private static WorkSharingPlan? Plan(WorkSharingPlan? plan)
+    public static Result<WorkSharingPlan> NormalizeDraft(WorkSharingPlan plan) => Plan(plan, false) is { } normalized
+        ? Result<WorkSharingPlan>.Success(normalized) : Result<WorkSharingPlan>.Failure("work_data_plan_invalid");
+
+    private static WorkSharingPlan? Plan(WorkSharingPlan? plan, bool requireAllocation = true)
     {
         if (plan is null || !ValidIssue(plan.Issue) || plan.PlanId.Value == Guid.Empty || plan.Definition is null || plan.Trees is not { Count: > 0 and <= 100 }
             || plan.Allocation is null || plan.Allocation.Count > 100) return null;
@@ -48,7 +51,7 @@ public static class WorkSharingContent
             || definition.Value!.TaskIds.Any(id => !tasks.Any(task => task.Id == id))) return null;
         var atomic = tasks.Where(task => task.Kind == WorkTaskKind.Atomic && definition.Value.TaskIds.Contains(task.Id)).Select(task => task.Id).OrderBy(id => id.Value);
         if (plan.Allocation.Any(allocation => allocation is null || allocation.ParticipantId.Value == Guid.Empty)
-            || !atomic.SequenceEqual(plan.Allocation.Select(allocation => allocation.TaskId).OrderBy(id => id.Value))) return null;
+            || (requireAllocation ? !atomic.SequenceEqual(plan.Allocation.Select(allocation => allocation.TaskId).OrderBy(id => id.Value)) : plan.Allocation.Count != 0)) return null;
         // The same combined dependency/hierarchy graph used by WorkPlan validation must be acyclic.
         var required = tasks.Where(task => task.ParentTaskId is { } parent && definition.Value.TaskIds.Contains(parent) && !task.IsOptional).ToArray();
         if (required.Any(task => !definition.Value.TaskIds.Contains(task.Id))) return null;

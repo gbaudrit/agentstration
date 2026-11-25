@@ -104,6 +104,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskAttempts(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
+        ConfigureWorkTracking(modelBuilder);
         ConfigureWorkUsage(modelBuilder);
         ConfigureWorkTaskDeliveries(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
@@ -1043,6 +1044,7 @@ public static class PostgreSqlWorkServiceCollectionExtensions
         services.AddSingleton<IWorkPlanRepository, PostgreSqlWorkPlanRepository>();
         services.AddSingleton<IWorkProjectRepository, PostgreSqlWorkProjectRepository>();
         services.AddSingleton<IWorkProjectSharingRepository, PostgreSqlWorkProjectSharingRepository>();
+        services.AddSingleton<IWorkDataRepository, PostgreSqlWorkDataRepository>();
         services.AddSingleton<IWorkUsageRepository, PostgreSqlWorkUsageRepository>();
         services.AddSingleton<IWorkTaskDeliveryRepository, PostgreSqlWorkTaskDeliveryRepository>();
         services.AddSingleton<IWorkTaskOperationRepository, PostgreSqlWorkTaskOperationRepository>();

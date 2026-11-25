@@ -767,3 +767,13 @@ bindings are created through their owning services; explicit first-sync/draft-im
 application history. Restart still interrupts manual applications; explicit new reviewed applications
 retry create-only configuration without replacing operator edits. Sharing never auto-applies Bootstrap.
 See [Workspace seeds](../../reference/workspace-seeds.md) and ADR-0271.
+
+### Reviewed YAML Work data
+
+The tracking repository represents one project. Configuration/Flow definitions remain in Bootstrap;
+Work catalog, plan and task-tree YAML lives under `data/`. The same Application service previews and
+imports uploaded local files or protected exact-revision Git content, reusing Work validation and
+canonical draft creation. Private Work operation documents retain frozen intent, local observations,
+per-plan progress and explicit partial/resume state in SQLite/PostgreSQL. Import never activates,
+allocates, dispatches or acknowledges repository issues. See [Work data](../../reference/work-data.md)
+and ADR-0276.

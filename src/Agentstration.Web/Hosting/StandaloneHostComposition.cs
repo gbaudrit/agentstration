@@ -257,6 +257,7 @@ internal static class StandaloneHostCompositionExtensions
                 await app.Services.GetRequiredService<WorkPlanService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<WorkProjectService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<WorkProjectSharingService>().InitializeAsync(app.Lifetime.ApplicationStopping);
+                await app.Services.GetRequiredService<WorkDataImportService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<WorkUsageService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<CodingDeliveryService>().InitializeAsync(app.Lifetime.ApplicationStopping);
                 await app.Services.GetRequiredService<WorkTaskProviderService>().InitializeAsync(app.Lifetime.ApplicationStopping);

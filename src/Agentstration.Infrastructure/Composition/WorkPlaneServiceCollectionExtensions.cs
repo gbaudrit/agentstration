@@ -24,6 +24,9 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkProjectService>();
         services.AddSingleton<IWorkDocumentCodec, YamlWorkDocumentCodec>();
         services.AddSingleton<WorkProjectSharingService>();
+        services.AddSingleton<WorkDataReader>();
+        services.AddSingleton<WorkDataImportService>();
+        services.AddSingleton<IWorkProjectDataGateway>(provider => provider.GetRequiredService<GitWorkProjectSharingGateway>());
         services.AddSingleton<IWorkPlanAdmissionGate, WorkProjectSharingAdmissionGate>();
         services.AddSingleton<GitWorkProjectSharingGateway>();
         services.AddSingleton<IWorkProjectSharingGateway>(provider => provider.GetRequiredService<GitWorkProjectSharingGateway>());

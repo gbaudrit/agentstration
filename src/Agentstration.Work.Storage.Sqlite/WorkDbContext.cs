@@ -103,6 +103,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskAttempts(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
+        ConfigureWorkTracking(modelBuilder);
         ConfigureWorkUsage(modelBuilder);
         ConfigureWorkTaskDeliveries(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
