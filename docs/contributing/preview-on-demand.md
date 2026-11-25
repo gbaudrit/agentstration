@@ -12,6 +12,10 @@ verifies Cloudflare Tunnel and Access protection. #1284 remains open for that
 acceptance criterion. Automatic PR deployment/TTL cleanup is #1286; deployed
 smoke/Playwright journeys are #1287. No Runtime deployment service is introduced.
 
+Prepare the [shared Access configuration](preview-access.md) and run its opt-in,
+read-only audit before the protected route increment. It uses the same protected
+environment without creating cloud resources or publishing a URL.
+
 ## Prepare a published selection
 
 Use the **OCI images** packaging workflow to publish the desired server source
@@ -126,7 +130,7 @@ runner terminated while holding its infinite lease, follow the
 ## Validation
 
 The default Python suite uses fake API, registry and cloud boundaries and requires
-no network, cloud credentials or model. The **Preview Azure contracts** workflow
+no network, cloud credentials or model. The **Preview deployment contracts** workflow
 also offers an optional `published_revision` dispatch input to check the real
 private GHCR selector. That opt-in job uses only repository/package read access,
 uploads public selection metadata and has neither OIDC permission nor an Azure

@@ -1,4 +1,4 @@
-name: Preview Azure contracts
+name: Preview deployment contracts
 on:
   pull_request:
     branches: [main]
@@ -8,6 +8,10 @@ on:
     paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
   workflow_dispatch:
     inputs:
+      cloudflare_access:
+        description: Read-only shared Cloudflare Access audit from trusted main (no VM or tunnel creation)
+        type: boolean
+        default: false
       retail_prices:
         description: Collect optional public PAYG rates (no Azure login)
         type: boolean
@@ -27,6 +31,35 @@ on:
 permissions:
   contents: read
 jobs:
+  access-configuration:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.cloudflare_access
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: preview-deployment
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Audit shared access configuration without provisioning resources
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_TEAM_DOMAIN: ${{ vars.CLOUDFLARE_TEAM_DOMAIN }}
+          CLOUDFLARE_PREVIEW_DOMAIN: ${{ vars.CLOUDFLARE_PREVIEW_DOMAIN }}
+          CLOUDFLARE_ACCESS_APP_ID: ${{ vars.CLOUDFLARE_ACCESS_APP_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        run: python3 scripts/preview/cloudflare.py --output "$RUNNER_TEMP/preview-access-audit.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-access-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-access-audit.json
+          retention-days: 30
+          if-no-files-found: error
+
   published-selection:
     if: github.event_name == 'workflow_dispatch' && inputs.published_revision != ''
     runs-on: ubuntu-24.04
