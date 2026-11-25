@@ -55,7 +55,7 @@ public sealed partial class DataSourceDatasetTests
     }
 
     [TestMethod]
-    public async Task StartupSeedsGenericJsonOrchestrationAtItsSingleInitialVersion()
+    public async Task StartupPreservesOriginalJsonOrchestrationAndSeedsDurablePublicationVersion()
     {
         await using var factory = Factory();
         _ = await GetBootstrapContextAsync(factory);
@@ -65,17 +65,23 @@ public sealed partial class DataSourceDatasetTests
         FlowId id = new("data-source-orchestration-builtin");
         var current = (await flows.GetExactAsync(Owner, id, default))!;
         var original = (await flows.GetVersionExactAsync(Owner, id, "1.0.0", default))!;
-        Assert.AreEqual("1.0.0", current.Value.ActiveVersion);
+        var durable = (await flows.GetVersionExactAsync(Owner, id, "2.0.0", default))!;
+        Assert.AreEqual("2.0.0", current.Value.ActiveVersion);
         Assert.IsEmpty(original.Value.Graph!.OutputSchema!.Value.EnumerateObject());
+        Assert.IsFalse(original.Value.Graph.Steps.Any(step => step.Name.StartsWith("publication-", StringComparison.Ordinal)));
+        CollectionAssert.AreEqual(new[] { "publication-prepare", "publication-seal", "publication-register" },
+            durable.Value.Graph!.Steps.OfType<ToolFlowStepDefinition>().Select(step => step.Name).ToArray());
         var acquisition = original.Value.Graph.Steps.OfType<FlowCompositionPointStepDefinition>().Single(step => step.Point == "acquisition");
         Assert.AreEqual("object", acquisition.InputSchema.GetProperty("type").GetString());
         Assert.IsEmpty(acquisition.OutputSchema.EnumerateObject());
         await factory.Services.GetRequiredService<IWorkspacePlatformResourceProvisioner>().EnsureAllAsync(default);
         var restored = (await flows.GetExactAsync(Owner, id, default))!;
         Assert.AreEqual(current.Value.Uid, restored.Value.Uid);
-        Assert.AreEqual("1.0.0", restored.Value.ActiveVersion);
+        Assert.AreEqual("2.0.0", restored.Value.ActiveVersion);
         Assert.AreEqual(original.Value.DefinitionHash, (await flows.GetVersionExactAsync(Owner, id, "1.0.0", default))!.Value.DefinitionHash);
-        foreach (var name in new[] { id.Value, "knowledge-orchestration-builtin", "content-transformation-sequence-builtin" })
+        Assert.AreEqual(durable.Value.DefinitionHash, (await flows.GetVersionExactAsync(Owner, id, "2.0.0", default))!.Value.DefinitionHash);
+        CollectionAssert.AreEquivalent(new[] { "1.0.0", "2.0.0" }, (await flows.ListVersionsExactAsync(Owner, id, default)).Select(version => version.Value.Version).ToArray());
+        foreach (var name in new[] { "knowledge-orchestration-builtin", "content-transformation-sequence-builtin" })
             Assert.AreEqual("1.0.0", (await flows.ListVersionsExactAsync(Owner, new(name), default)).Single().Value.Version);
     }
 
@@ -117,7 +123,7 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(HttpStatusCode.Created, response.StatusCode, await response.Content.ReadAsStringAsync());
         var acquisition = await AcquireAsync(client, source.Name);
         Assert.AreEqual("object", acquisition.Dataset!.OperationOutputSchema!.Value.GetProperty("type").GetString());
-        Assert.AreEqual("1.0.0", acquisition.Dataset.Composition!.Orchestration.Version);
+        Assert.AreEqual("2.0.0", acquisition.Dataset.Composition!.Orchestration.Version);
         var content = await factory.Services.GetRequiredService<DataSourceDatasetAcquisitionService>().ReadAsync(acquisition, 0, 65536, default);
         using var json = JsonDocument.Parse(Convert.FromBase64String(content.ContentBase64));
         var selectedValue = json.RootElement[0].GetProperty("selected");

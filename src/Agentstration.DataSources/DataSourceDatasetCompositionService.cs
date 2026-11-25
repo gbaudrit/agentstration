@@ -84,16 +84,20 @@ public sealed class DataSourceDatasetCompositionService(
             throw Invalid("data_source_orchestration_storage_required", "This orchestration requires retained Storage.");
         if (accepted?.Composition is { } pinned)
         { root = pinned.Orchestration; bindings = pinned.Receipt!.Bindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); }
+        var durablePublication = accepted?.DurablePublication ?? (definition.Storage is not null
+            && root.ResourceId == "data-source-orchestration-builtin" && root.ScopeRef == ResourceScopeRef.Instance && root.Version == "2.0.0");
+        var templateUseScope = durablePublication && definition.Orchestration is null ? ResourceScopeRef.Instance : (ResourceScopeRef?)null;
+        var unchangedOutput = definition.Transformations.Count == 0 && definition.Compositions.All(pair => pair.Value.Count == 0);
         try
         {
-            var composed = accepted?.Composition is not null
-                ? await sequences.ResolveAcceptedAsync(consumer, source.Namespace, root, bindings, cancellationToken)
-                : await sequences.ResolveAsync(consumer, source.Namespace, root, bindings, cancellationToken);
+            var composed = await sequences.ResolveOwnedAsync(consumer, source.Namespace, root, bindings, templateUseScope,
+                    new Dictionary<string, ResourceScopeRef> { ["acquisition"] = flow.DefinitionUseScopeRef ?? operation.ScopeRef!.Value },
+                    accepted?.Composition is not null, cancellationToken);
             var targetFlow = new ResolvedDataSourceFlowBinding(composed.Orchestration.ResourceId,
                 composed.Orchestration.Namespace ?? source.Namespace, composed.Orchestration.Version!, false,
                 composed.InputSchema, composed.OutputSchema, "datasource.orchestration/v1", composed.Orchestration.DefinitionHash ?? throw Invalid("data_source_composition_invalid", "The orchestration has no immutable definition hash."))
-            { ScopeRef = composed.Orchestration.ScopeRef };
-            return new(definition, operation, type, input, finalSnapshot is not null ? output : composed.OutputSchema ?? output, partition, targetFlow)
+            { ScopeRef = composed.Orchestration.ScopeRef, DefinitionUseScopeRef = templateUseScope };
+            return new(definition, operation, type, input, finalSnapshot is not null || unchangedOutput ? output : composed.OutputSchema ?? output, partition, targetFlow)
             {
                 DurablePublication = accepted?.DurablePublication ?? (definition.Storage is not null
                     && composed.Orchestration.ResourceId == "data-source-orchestration-builtin"
@@ -101,7 +105,8 @@ public sealed class DataSourceDatasetCompositionService(
                 OperationFlow = flow,
                 Composition = composed,
                 OperationOutputSchema = rawOutput,
-                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null ? definition.Acquisition.OutputSchemaSnapshot : null)
+                OutputSchemaSnapshot = finalSnapshot ?? (composed.OutputSchema is null || unchangedOutput
+                    ? definition.Acquisition.OutputSchemaSnapshot : null)
             };
         }
         catch (FlowValidationException exception)

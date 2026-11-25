@@ -27,6 +27,7 @@ public sealed record DataSourceFlowRunRequest(
     Guid WorkspaceId,
     Guid PrincipalId)
 {
+    public IReadOnlyDictionary<string, ResourceScopeRef> CompositionDefinitionUseScopes { get; init; } = new Dictionary<string, ResourceScopeRef>();
     public bool TransientPayloads { get; init; }
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? LogicalScopeRef { get; init; }
@@ -40,6 +41,7 @@ public sealed record DataSourceFlowRunSnapshot(
     string? ErrorMessage,
     DateTimeOffset? CompletedAt)
 {
+    public Agentstration.Schemas.DataContractFailure? ContractFailure { get; init; }
     public bool TransientPayloadsAvailable { get; init; } = true;
     public DataSourceAcquisitionProgress? Progress { get; init; }
     public JsonElement? ProcessingOutput { get; init; }

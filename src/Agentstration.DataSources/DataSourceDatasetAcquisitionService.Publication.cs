@@ -29,6 +29,7 @@ public sealed partial class DataSourceDatasetAcquisitionService
             {
                 State = state,
                 Progress = run.Progress,
+                ContractFailure = run.ContractFailure ?? value.ContractFailure,
                 CompletedAt = Terminal(state) ? run.CompletedAt ?? value.CompletedAt : null,
                 ErrorCode = run.ErrorCode ?? (state == DataSourceAcquisitionState.Failed ? value.ErrorCode ?? "data_source_publication_unconfirmed" : null),
                 ErrorMessage = run.ErrorMessage ?? value.ErrorMessage

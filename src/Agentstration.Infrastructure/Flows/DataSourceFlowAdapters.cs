@@ -330,6 +330,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
                 DefinitionUseScopeRef = request.Flow.DefinitionUseScopeRef,
+                CompositionDefinitionUseScopes = request.CompositionDefinitionUseScopes,
                 Compositions = request.Compositions,
                 AcceptedCompositionSchemas = true,
                 TransientPayloads = request.TransientPayloads
@@ -397,6 +398,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
         TransientPayloadsAvailable = run.TransientPayloadsAvailable,
         ProcessingOutput = includePayloads ? run.Steps.SingleOrDefault(step => step.StepName == "transformations" && step.Status == FlowStepRunStatus.Succeeded)?.Output?.Clone() : null,
         Progress = Progress(run),
+        ContractFailure = Agentstration.Schemas.DataContracts.ParseFailure(run.Error?.Details),
         RootFlowRunId = run.RootFlowRunId,
         FlowName = run.FlowId.Value,
         FlowNamespace = run.FlowId.Namespace,

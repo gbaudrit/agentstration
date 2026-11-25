@@ -140,6 +140,9 @@ public sealed partial class DataSourceDatasetAcquisitionService(
             acquisition.TenantId, acquisition.WorkspaceId, acquisition.CreatedBy)
         {
             LogicalScopeRef = acquisition.LogicalScopeRef,
+            CompositionDefinitionUseScopes = acquisition.Dataset!.Composition is not null
+                ? new Dictionary<string, ResourceScopeRef> { ["acquisition"] = acquisition.Dataset.OperationFlow!.DefinitionUseScopeRef ?? acquisition.Dataset.Operation.ScopeRef!.Value }
+                : new Dictionary<string, ResourceScopeRef>(),
             TransientPayloads = acquisition.Dataset!.Definition.Storage is null,
             Compositions = acquisition.Dataset.Composition?.Receipt?.Bindings
             ?? new Dictionary<string, IReadOnlyList<Agentstration.Flows.FlowCompositionCall>>()

@@ -15,11 +15,19 @@ public sealed class FlowCompositionService(FlowService flows, FlowContentOptions
     public const int MaximumCalls = 128;
     public async Task<CompiledFlowComposition> ResolveAsync(FlowVersion template,
         IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, ResourceScopeRef consumer, CancellationToken ct,
-        bool acceptedSchemaBindings = false, ResourceNamespace? ownerNamespace = null)
+        bool acceptedSchemaBindings = false, ResourceNamespace? ownerNamespace = null,
+        IReadOnlyDictionary<string, ResourceScopeRef>? ownedPointUseScopes = null)
     {
         var templateHash = template.DefinitionHash ?? (template.Graph is { } templateGraph ? FlowDefinitionHash.Compute(templateGraph) : FlowDefinitionHash.Compute(template.Definition));
         template = await flows.CompileFunctionsAsync(template, consumer, ct);
         var points = template.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().ToArray() ?? [];
+        foreach (var owned in ownedPointUseScopes ?? new Dictionary<string, ResourceScopeRef>())
+        {
+            var boundary = points.SingleOrDefault(point => point.Point == owned.Key);
+            if (boundary is null || boundary.AllowEmpty || bindings.GetValueOrDefault(owned.Key) is not { Count: 1 } calls
+                || !calls[0].PassInputDirectly)
+                throw Error("flow_definition_authorization_invalid");
+        }
         if (points.Length == 0)
         {
             if (bindings.Count != 0) throw Error("flow_composition_point_unknown");
@@ -109,8 +117,9 @@ public sealed class FlowCompositionService(FlowService flows, FlowContentOptions
                 }
                 if (call.FunctionInputSource is not null) throw Error("flow_composition_function_ambiguous");
                 var reference = call.Flow ?? throw Error("flow_composition_target_required");
-                var child = await ResolveCallAsync(reference, consumer, template.FlowId.Namespace, ct);
-                await RejectCyclesAsync(child, consumer, [Key(template)], 0, ct);
+                var definitionConsumer = ownedPointUseScopes?.GetValueOrDefault(point.Point, consumer) ?? consumer;
+                var child = await ResolveCallAsync(reference, definitionConsumer, template.FlowId.Namespace, ct);
+                await RejectCyclesAsync(child, definitionConsumer, [Key(template)], 0, ct);
                 if (child.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().Any(p => !p.AllowEmpty) == true)
                     throw Error("flow_composition_child_binding_required");
                 var inputSchema = child.Graph?.ResolveInputSchema() ?? throw Error("flow_composition_contract_required");

@@ -50,6 +50,14 @@ internal sealed class DataSourcePublicationTool(string phase, DataSourceDatasetA
             {
                 // Re-read the committed receipt. A competing recovery can never change publication identity.
             }
+            catch (StorageException error)
+            {
+                throw new ToolDefinitionInvocationException(error.Code, "Storage publication failed.");
+            }
+            catch (DataSourceAcquisitionException error)
+            {
+                throw new ToolDefinitionInvocationException(error.Code, "The accepted publication is unavailable or no longer authorized.");
+            }
         }
     }
 

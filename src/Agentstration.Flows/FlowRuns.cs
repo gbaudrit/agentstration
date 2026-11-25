@@ -156,6 +156,8 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, ResourceScopeRef>? CompositionDefinitionUseScopes { get; init; }
     public FlowProcessRunOrigin? ProcessOrigin { get; init; }
     public IReadOnlyList<string>? ReservedDescendantRunIds { get; init; }
     public FlowArtifactProcessingContext? ArtifactProcessing { get; init; }

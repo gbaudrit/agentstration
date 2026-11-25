@@ -120,7 +120,8 @@ public sealed class AwpAssignmentProjection(
                 FlowRunStatus.Cancelled => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.Cancelled,
                 FlowRunStatus.TimedOut => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.TimedOut,
                 _ => Agentstration.DataSources.Contracts.DataSourceAcquisitionState.Failed
-            }, now, updated.Error?.Code, updated.Output, Agentstration.Infrastructure.Flows.DataSourceAcquisitionFlowGateway.Progress(updated), cancellationToken);
+            }, now, updated.Error?.Code, updated.Output, Agentstration.Infrastructure.Flows.DataSourceAcquisitionFlowGateway.Progress(updated),
+                Agentstration.Schemas.DataContracts.ParseFailure(updated.Error?.Details), cancellationToken);
         await AppendFlowEventAsync(updated, status switch
         {
             FlowRunStatus.Succeeded => FlowRunEventType.FlowRunCompleted,

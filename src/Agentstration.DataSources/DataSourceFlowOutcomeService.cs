@@ -14,7 +14,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
     IDataSourceHistoryMaintenance? history = null, DataSourceContentOptions? contentOptions = null)
 {
     public async Task ApplyAsync(Guid workspaceId, string runId, DataSourceAcquisitionState state,
-        DateTimeOffset completedAt, string? code, JsonElement? output, DataSourceAcquisitionProgress progress, CancellationToken token)
+        DateTimeOffset completedAt, string? code, JsonElement? output, DataSourceAcquisitionProgress progress, DataContractFailure? contractFailure, CancellationToken token)
     {
         using var system = scopes.PushSystem();
         var owner = ResourceScopeRef.Workspace(workspaceId);
@@ -64,6 +64,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                         Progress = progress,
                         CompletedAt = completedAt,
                         ErrorCode = errorCode,
+                        ContractFailure = contractFailure,
                         Status = new() { ProvisioningState = finalState == DataSourceAcquisitionState.Succeeded ? ProvisioningState.Succeeded : ProvisioningState.Failed }
                     }, stored.ETag, false, token);
                     if (finalState == DataSourceAcquisitionState.Succeeded && history is not null)

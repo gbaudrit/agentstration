@@ -28,6 +28,18 @@ Workspace, logical scope, root run and exact step, and reads the completed
 execution and dependency permissions at each phase. No Worker-supplied destination,
 record body, binding token or credential determines publication authority.
 
+An operation shared with a descendant does not expose its private implementation
+Flow. The existing owner-side definition authority is retained for the required
+`acquisition` composition boundary only. `CompositionDefinitionUseScopes` is
+server-only root admission input (ignored on JSON deserialization), persisted on
+the accepted Flow Run and checked again when admitting the exact child. The implicit
+standard template is resolved in its platform scope. User transformations continue
+to resolve against the actual consumer, and child execution keeps the original
+principal, logical scope and physical Workspace. No editable Flow or source field
+can grant definition authority. Explicit custom orchestration keeps its normal Use
+policy. The existing shared-operation test also rejects using that private adapter
+as a user-selected transformation.
+
 Preparation persists its deadline before writing and its immutable membership and
 record contract before sealing. Sealing persists separate confirmation before
 registration. Registration reuses `dataset:{acquisitionUid}` in the existing Artifact
@@ -86,6 +98,9 @@ GET/list/render/refresh never prepare, seal, register or repair native acquisiti
   authoritative; a preview/sample identity must never stand in for a production one.
 - Operation contracts, adopted native-content contracts, sequence editing, raw samples
   and preview/replay remain owned by #1373. This change does not modify their editor.
+- `IFlowCompositionResolver.ResolveOwnedAsync` supplies only server-validated
+  definition authority for a required source boundary. Authoring/sample paths must
+  keep using ordinary consumer authorization; this is not a preview permission.
 
 ## Compatibility and consequences
 
