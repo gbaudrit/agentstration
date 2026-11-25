@@ -137,11 +137,14 @@ public sealed class AepDiscoveryOperationTests
         var http = new ManifestHttpFactory();
         var transport = new AepMcpTransport(http, NullLoggerFactory.Instance);
         var registration = Extension("authenticated").Registration;
-        registration = registration with { Definition = registration.Definition with
+        registration = registration with
         {
-            AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
-            Credential = new ResourceReference("fixture-token", registration.ScopeRef)
-        } };
+            Definition = registration.Definition with
+            {
+                AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
+                Credential = new ResourceReference("fixture-token", registration.ScopeRef)
+            }
+        };
         var firstSecrets = new FixtureSecrets();
         var otherSecrets = new FixtureSecrets();
         using var operation = transport.BeginDiscoveryOperation(default);
@@ -274,8 +277,11 @@ public sealed class AepDiscoveryOperationTests
                 Assert.AreEqual(AepProtocol.DiscoveryPath, request.RequestUri!.AbsolutePath);
                 Interlocked.Increment(ref owner.calls);
                 if (owner.BeforeReply is { } wait) await wait(cancellationToken);
-                return new(HttpStatusCode.OK) { Content = JsonContent.Create(new AepManifest(AepProtocol.Version,
-                    new(owner.ExtensionId, "Fixture extension", owner.Version), new Dictionary<string, AepCapabilityDescriptor>(), new([])), options: AepProtocol.JsonOptions) };
+                return new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new AepManifest(AepProtocol.Version,
+                    new(owner.ExtensionId, "Fixture extension", owner.Version), new Dictionary<string, AepCapabilityDescriptor>(), new([])), options: AepProtocol.JsonOptions)
+                };
             }
         }
     }
