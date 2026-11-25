@@ -216,6 +216,11 @@ configuration. The optional `test_profile: none` does not disable these gates.
 It then verifies anonymous and invalid-token denial and authenticated readiness
 over HTTPS. Probe requests never follow redirects or export response bodies,
 cookies or credentials. Only then does the result contain the stable HTTPS URL.
+Failed HTTP probes report their phase, numeric HTTP status and, when present,
+the fixed `CF-Mitigated: challenge` marker. Arbitrary header values are withheld. A 401/403
+alone does not identify whether rejection occurred at Access or at the origin
+JWT guard; inspect that distinction before changing credentials. Redirect
+locations, response bodies, cookies and authentication headers remain withheld.
 `status` repeats the protection checks before returning it; an unhealthy/stopped
 guest returns no URL. The result exposes public tunnel/DNS IDs, never tokens.
 

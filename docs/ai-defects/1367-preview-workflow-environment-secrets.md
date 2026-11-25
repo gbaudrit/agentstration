@@ -2,13 +2,14 @@
 
 ## Status
 
-Open — 2026-11-25
+Prevented — 2026-11-25
 
 ## References
 
 - Issue: [#1367](https://github.com/gbaudrit/agentstration/issues/1367), child of [#1285](https://github.com/gbaudrit/agentstration/issues/1285).
 - Introducing change: [#1366](https://github.com/gbaudrit/agentstration/pull/1366), merged as [8adbdba3](https://github.com/gbaudrit/agentstration/commit/8adbdba3f7a463e71036556e570a52d821a38809).
 - Corrective pull request: [#1368](https://github.com/gbaudrit/agentstration/pull/1368).
+- Verification and safe probe diagnostics: [#1371](https://github.com/gbaudrit/agentstration/pull/1371).
 - Related ADRs: [ADR-0259](../decisions/0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md).
 
 ## Defect
@@ -90,5 +91,13 @@ Document the operational distinction in the Access guide.
   session for #1366: Release build with zero warnings/errors, Fast 2,670 passed
   on rerun and Integration 1,681 passed with 28 optional skips. Those lanes were
   not repeated for this workflow-only correction.
-- Live resolution in the corrected reusable deployment remains pending merge to
-  protected main. Keep this CAR Open until that qualification is complete.
+- Live secret delivery is validated by [deployment 45650059013](https://github.com/gbaudrit/agentstration/actions/runs/45650059013)
+  on protected main `e56dffb9d0fbc8a7387dc1c309c452e992b0fe9d` after #1368.
+  Both secret fields are present in the job; their values and lengths were not
+  inspected or exported. Configuration validation, owned tunnel setup, healthy
+  guest/connector and observed closed-ingress checks complete before the later
+  authenticated HTTPS readiness probe fails. That downstream failure remains
+  #1285 qualification work; it does not negate the corrected secret delivery.
+- API-triggered [preserve teardown 45651693763](https://github.com/gbaudrit/agentstration/actions/runs/45651693763)
+  also succeeds through the corrected caller: it stops the guest, deallocates
+  the VM and removes the owned tunnel while retaining application data.
