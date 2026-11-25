@@ -1,5 +1,8 @@
 {
   "subscriptionId": "00000000-0000-4000-8000-000000000001",
+  "resourceGroup": "agentstration-previews",
   "region": "westeurope",
-  "vmSize": "Standard_B2ms"
+  "vmSize": "Standard_B2ms",
+  "osProfile": "ubuntu-24.04",
+  "imageVersion": "24.04.202611170"
 }

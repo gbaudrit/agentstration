@@ -1,4 +1,4 @@
-# ADR-0258: Acquisition text content is selected at admission
+# ADR-0260: Acquisition text content is selected at admission
 
 ## Status
 
@@ -6,7 +6,7 @@ Proposed
 
 ## Context
 
-The explicit `json.select /content` sequence in ADR-0257 exposes a transport detail
+The explicit `json.select /content` sequence in ADR-0259 exposes a transport detail
 for the common case of a text acquisition followed by a text transformation.
 The maintainer requested direct selection of the first function in #1214 / PR #1218.
 JSON invocation contracts and native content contracts must remain distinct.
@@ -43,7 +43,7 @@ and ordinary Flow transforms keep their existing invocation mappings. The shared
 sequence editor explains automatic content selection only for the first text
 function and a qualifying acquisition contract.
 
-This supersedes ADR-0257's requirement to manually select `/content` for this narrow
+This supersedes ADR-0259's requirement to manually select `/content` for this narrow
 case. It does not change Schema exposure, Bootstrap procedure, provider identities,
 authorization or processing limits, and introduces no RSS-specific product code.
 

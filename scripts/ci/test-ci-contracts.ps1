@@ -36,7 +36,7 @@ foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Pr
 }
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
 Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
-foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml')) {
+foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml', '.github/workflows/preview-azure-validation.yml', '.github/workflows/preview-azure-environment.yml', '.github/workflows/preview-on-demand.yml')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
 }
@@ -104,7 +104,10 @@ Require ($previewSteps[0].Contains("for database in ('sqlite', 'postgresql'):") 
 $lifecycle = Get-Content (Join-Path $root '.github/workflows/preview-environment.yml') -Raw
 Require ($lifecycle.Contains('workflow_call:') -and $lifecycle.Contains('workflow_dispatch:')) 'Lifecycle entrypoints must be reusable and manually invokable.'
 Require ($lifecycle.Contains('scripts/preview/lifecycle.py') -and $lifecycle.Contains('cancel-in-progress: false')) 'Lifecycle workflows must delegate to versioned scripts and serialize environment mutations.'
-Require (-not ($lifecycle.Contains('packages: write') -or $lifecycle.Contains('GHCR_BOOTSTRAP_TOKEN') -or $lifecycle.Contains('id-token: write'))) 'Portable Docker lifecycle must have read-only package delivery and no cloud publication credentials.'
+Require (-not ($lifecycle.Contains('packages: write') -or $lifecycle.Contains('GHCR_BOOTSTRAP_TOKEN') )) 'Portable Docker lifecycle must have read-only package delivery and no cloud publication credentials.'
+$dockerLifecycle = ($lifecycle -split '(?m)^  azure:')[0]
+Require (-not $dockerLifecycle.Contains('id-token: write')) 'Docker execution and pure validation must not obtain Azure OIDC permissions.'
+Require ($lifecycle.Contains('azure/login@v2') -and $lifecycle.Contains("needs.validate.outputs.provider == 'azure-vm'")) 'Azure execution must be routed explicitly and use OIDC.'
 $resourceUx = Get-Content (Join-Path $root '.github/workflows/resource-plan-ux.yml') -Raw
 Require ($resourceUx.Contains("      - 'src/**'") -and $resourceUx.Contains("      - '!src/extensions/Agentstration.Extensions.Foundry/**'")) 'Resource Plan UX must exclude Foundry-only source edits while retaining mixed product edits.'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())

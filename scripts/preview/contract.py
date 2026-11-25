@@ -8,6 +8,12 @@ from images import delivery_entry
 
 PROVIDERS = {"docker", "azure-vm", "ssh-docker"}
 OPERATIONS = {"deploy", "status", "destroy", "validate"}
+AZURE_OS_PROFILE = "ubuntu-24.04"
+
+
+def azure_target(request):
+    # Legacy v1 Azure requests already meant this fixed Ubuntu profile.
+    return {"osProfile": AZURE_OS_PROFILE, **request["target"]}
 
 
 def fields(value, expected):
@@ -36,6 +42,25 @@ def images(request):
     if request["database"] == "postgresql":
         selected["postgres"] = {"reference": request["postgresImage"], "platform": "linux/amd64"}
     return selected
+
+
+def validate_azure_target(target):
+    expected_target = {"subscriptionId", "resourceGroup", "region", "vmSize", "imageVersion"}
+    if "osProfile" in target:
+        expected_target.add("osProfile")
+    fields(target, expected_target)
+    preview.require(target.get("osProfile", AZURE_OS_PROFILE) == AZURE_OS_PROFILE,
+                    "Only the qualified ubuntu-24.04 OS profile is supported.")
+    try:
+        uuid.UUID(target["subscriptionId"])
+    except (ValueError, TypeError, AttributeError) as error:
+        raise ValueError("Invalid Azure subscription identity.") from error
+    preview.require(isinstance(target["region"], str) and re.fullmatch(r"[a-z][a-z0-9]{1,31}", target["region"])
+                    and target["vmSize"] in ("Standard_B2ms", "Standard_B4ms"), "Invalid Azure region or VM size.")
+    preview.require(isinstance(target["resourceGroup"], str)
+                    and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", target["resourceGroup"]), "Invalid dedicated Azure resource group.")
+    preview.require(isinstance(target["imageVersion"], str) and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", target["imageVersion"]),
+                    "Azure requires an exact Ubuntu image version, never latest.")
 
 
 def _validate(request):
@@ -77,13 +102,7 @@ def _validate(request):
         preview.require(isinstance(target["daemonId"], str) and re.fullmatch(r"[a-zA-Z0-9:_-]{1,128}", target["daemonId"]),
                         "An exact trusted Docker daemon identity is required.")
     elif request["provider"] == "azure-vm":
-        fields(target, ("subscriptionId", "region", "vmSize"))
-        try:
-            uuid.UUID(target["subscriptionId"])
-        except (ValueError, TypeError, AttributeError) as error:
-            raise ValueError("Invalid Azure subscription identity.") from error
-        preview.require(isinstance(target["region"], str) and re.fullmatch(r"[a-z][a-z0-9]{1,31}", target["region"])
-                        and target["vmSize"] in ("Standard_B2ms", "Standard_B4ms"), "Invalid Azure region or VM size.")
+        validate_azure_target(target)
     else:
         fields(target, ("host", "sshPort", "user", "hostKeyFingerprint", "port"))
         preview.require(isinstance(target["host"], str) and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}", target["host"])
@@ -120,15 +139,19 @@ def operation(action, request):
     preview.require(action in OPERATIONS, "Unsupported lifecycle operation.")
     validate(request)
     preview.require(action != "deploy" or request["dataMode"] == "preserve", "Reset is explicit destroy only; destroy with reset before redeploying.")
-    preview.require(action == "validate" or request["provider"] == "docker",
-                    "This provider is contract-only: Azure execution is #1283; SSH execution is #1288.")
+    preview.require(action == "validate" or request["provider"] in ("docker", "azure-vm"),
+                    "SSH execution remains #1288; it never falls back to another provider.")
 
 
-def loads(text):
+def parse(text):
     preview.require(len(text.encode("utf-8")) <= 65536, "Deployment requests are limited to 64 KiB.")
 
     def unique(pairs):
         preview.require(len(pairs) == len(dict(pairs)), "Duplicate JSON contract fields are not accepted.")
         return dict(pairs)
 
-    return validate(json.loads(text, object_pairs_hook=unique))
+    return json.loads(text, object_pairs_hook=unique)
+
+
+def loads(text):
+    return validate(parse(text))

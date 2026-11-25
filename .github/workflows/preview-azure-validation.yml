@@ -1,0 +1,185 @@
+name: Preview deployment contracts
+on:
+  pull_request:
+    branches: [main]
+    paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
+  push:
+    branches: [main]
+    paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
+  workflow_dispatch:
+    inputs:
+      cloudflare_access:
+        description: Read-only shared Cloudflare Access audit from trusted main (no VM or tunnel creation)
+        type: boolean
+        default: false
+      retail_prices:
+        description: Collect optional public PAYG rates (no Azure login)
+        type: boolean
+        default: false
+      pricing_region:
+        description: Azure region for the optional public price snapshot
+        type: string
+        default: westeurope
+      published_revision:
+        description: Optional read-only GHCR selection check (server revision; empty disables)
+        type: string
+        default: ''
+      worker_revision:
+        description: Worker revision for the optional registry check
+        type: string
+        default: published
+permissions:
+  contents: read
+jobs:
+  access-configuration:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.cloudflare_access
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: preview-deployment
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Audit shared access configuration without provisioning resources
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_TEAM_DOMAIN: ${{ vars.CLOUDFLARE_TEAM_DOMAIN }}
+          CLOUDFLARE_PREVIEW_DOMAIN: ${{ vars.CLOUDFLARE_PREVIEW_DOMAIN }}
+          CLOUDFLARE_ACCESS_APP_ID: ${{ vars.CLOUDFLARE_ACCESS_APP_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+        run: python3 scripts/preview/cloudflare.py --output "$RUNNER_TEMP/preview-access-audit.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-access-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-access-audit.json
+          retention-days: 30
+          if-no-files-found: error
+
+  published-selection:
+    if: github.event_name == 'workflow_dispatch' && inputs.published_revision != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install OCI metadata reader without cloud credentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Verify published revision selection without deploying
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SERVER_REVISION: ${{ inputs.published_revision }}
+          WORKER_REVISION: ${{ inputs.worker_revision }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/preview')
+          import contract, manual, preview
+          selector = manual.PublishedImages(os.environ['GITHUB_REPOSITORY'])
+          server = selector.select('server', os.environ['SERVER_REVISION'])
+          worker = selector.select('maf-worker', os.environ['WORKER_REVISION'])
+          target = preview.read_json('deploy/preview/targets/azure-vm.example.json')
+          request = contract.plan(server, worker, 'selection-validation-only', provider='azure-vm', target=target)
+          preview.private_write(Path(os.environ['RUNNER_TEMP']) / 'published-selection.json', json.dumps(request) + '\n')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: preview-published-selection
+          path: ${{ runner.temp }}/published-selection.json
+          retention-days: 30
+          if-no-files-found: error
+
+  retail-prices:
+    if: github.event_name == 'workflow_dispatch' && inputs.retail_prices
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Snapshot public Azure PAYG rates without cloud credentials
+        env:
+          PRICING_REGION: ${{ inputs.pricing_region }}
+        run: python3 scripts/preview/azure_prices.py --region "$PRICING_REGION" --output "$RUNNER_TEMP/azure-prices.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: azure-public-retail-prices
+          path: ${{ runner.temp }}/azure-prices*.json
+          retention-days: 30
+          if-no-files-found: warn
+  offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check deployment and ownership contracts without cloud credentials
+        run: python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
+      - name: Compile the Azure template without provisioning
+        run: |
+          az bicep install --version v0.44.1
+          az bicep build --file deploy/preview/azure/main.bicep --outfile "$RUNNER_TEMP/preview-azure.json"
+
+  requests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    outputs:
+      docker: ${{ steps.requests.outputs.docker }}
+      azure-vm: ${{ steps.requests.outputs.azure-vm }}
+      ssh-docker: ${{ steps.requests.outputs.ssh-docker }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Prepare public provider fixtures without accessing images or infrastructure
+        id: requests
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, 'scripts/preview')
+          import contract, preview
+          from test_contract import receipts
+          server, worker = receipts()
+          for receipt in (server, worker):
+              receipt['repository'] = os.environ['GITHUB_REPOSITORY']
+          targets = {'docker': {'port': 5080, 'daemonId': 'contract-validation-only'},
+                     'azure-vm': preview.read_json('deploy/preview/targets/azure-vm.example.json'),
+                     'ssh-docker': preview.read_json('deploy/preview/targets/ssh-docker.example.json')}
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for provider, target in targets.items():
+                  request = contract.plan(server, worker, 'ci-' + provider, provider=provider, target=target)
+                  output.write(provider + '=' + json.dumps(request) + '\n')
+          PY
+
+  portable-call:
+    needs: requests
+    strategy:
+      matrix:
+        provider: [docker, azure-vm, ssh-docker]
+    # GitHub checks all conditional callee jobs. Validation itself receives no OIDC token.
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    uses: ./.github/workflows/preview-environment.yml
+    with:
+      operation: validate
+      request: ${{ needs.requests.outputs[matrix.provider] }}

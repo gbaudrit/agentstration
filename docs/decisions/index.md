@@ -318,8 +318,12 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 256. [ADR-0256 — Preview lifecycle binds provider-neutral requests to owned resources](0256-preview-lifecycle-binds-provider-neutral-requests-to-owned-resources.md)
 
-257. [ADR-0257 — Transformation Schemas have explicit function exposure](0257-transformation-schemas-have-explicit-function-exposure.md)
+257. [ADR-0257 — Azure previews use OIDC and credential-free OCI transfer](0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
 
-258. [ADR-0258 — Acquisition text content is selected at admission](0258-acquisition-text-content-is-selected-at-admission.md)
+258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
 
-259. [ADR-0259 — XML processing uses operator content settings](0259-xml-processing-uses-operator-content-settings.md)
+259. [ADR-0259 — Transformation Schemas have explicit function exposure](0259-transformation-schemas-have-explicit-function-exposure.md)
+
+260. [ADR-0260 — Acquisition text content is selected at admission](0260-acquisition-text-content-is-selected-at-admission.md)
+
+261. [ADR-0261 — XML processing uses operator content settings](0261-xml-processing-uses-operator-content-settings.md)
