@@ -1543,6 +1543,11 @@ public sealed class DependencyTests
                         or "Agentstration.Management.Bootstrap.Plans.Tests"
                         or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
 
+                if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/DataSourceDatasetTestFixture.cs"
+                        or "../ApiResourceTestFixtures/StructuredStorageFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.DataSources.Tests"
+                        or "Agentstration.Api.DataSources.Rss.Tests") continue;
+
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.
                 if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"
@@ -1550,7 +1555,8 @@ public sealed class DependencyTests
                         or "../ApiResourceTestFixtures/AwpTestWorker.cs"
                         or "../ApiResourceTestFixtures/RssTransformationTestData.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Resources.Tests"
-                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests") continue;
+                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests"
+                        or "Agentstration.Api.DataSources.Rss.Tests") continue;
 
                 // These test-root fixtures are compiled into the independently
                 // bounded Management API and Model API test processes.

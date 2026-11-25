@@ -2,6 +2,7 @@
   <Folder Name="/tests/coverage-a/">
     <Project Path="tests/Agentstration.Api.Resources.Tests/Agentstration.Api.Resources.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.DataSources.Tests/Agentstration.Api.DataSources.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.DataSources.Rss.Tests/Agentstration.Api.DataSources.Rss.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Artifacts.Tests/Agentstration.Api.Artifacts.Tests.csproj" />
     <Project Path="tests/Agentstration.Application.Tests/Agentstration.Application.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Api.Tests/Agentstration.Management.Api.Tests.csproj" />

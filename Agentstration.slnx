@@ -215,6 +215,7 @@
     <Project Path="tests/Agentstration.Api.Execution.Tests/Agentstration.Api.Execution.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Resources.Tests/Agentstration.Api.Resources.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.DataSources.Tests/Agentstration.Api.DataSources.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.DataSources.Rss.Tests/Agentstration.Api.DataSources.Rss.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Artifacts.Tests/Agentstration.Api.Artifacts.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Application/">
