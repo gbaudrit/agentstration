@@ -663,5 +663,35 @@
       "Live provider integrations and Windows baseline not run locally.",
       "Local browser video disabled; hosted checks remain required."
     ]
+  },
+  "coverageWaitFollowup": {
+    "ciHead": "f2a90aff20f51e20cc74d07a9bfe0d99b5cdfa14",
+    "hostedBrowserPassed": 514,
+    "hostedBrowserRetries": 0,
+    "hostedBrowserSkipped": 0,
+    "hostedFastPassed": 3277,
+    "hostedIntegrationPassed": 1718,
+    "hostedIntegrationOptionalSkipped": 28,
+    "hostedMemoryDiagnostics": "all passed at unchanged budgets",
+    "coverageShardAFailure": "Discovery helper can return a nonterminal snapshot after 50 polls, before stale-target assertions.",
+    "correction": "200 polls and explicit Succeeded precondition; retained Workspace/recovery case delays next completion by 80 reads.",
+    "localNegative": {
+      "passed": 5,
+      "failed": 1,
+      "expectedDeferredReads": 80,
+      "observedDeferredReads": 50
+    },
+    "localCorrectedTargeted": {
+      "passed": 6,
+      "failed": 0
+    },
+    "localCorrectedWholeModuleCoverage": {
+      "passed": 127,
+      "failed": 0,
+      "skipped": 0,
+      "format": "Explicit changed-file dotnet format verified."
+    },
+    "evidence": "../../../site/static/test-diagnostics/ci-1273-coverage-wait.json",
+    "renderSources": "All three observation sourceProof dictionaries match current files; no product/UI changes in this correction."
   }
 }
