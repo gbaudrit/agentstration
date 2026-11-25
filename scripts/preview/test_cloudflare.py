@@ -67,6 +67,7 @@ class AccessAuditTests(unittest.TestCase):
     def test_valid_shared_policies_are_read_only_and_do_not_claim_end_to_end_protection(self):
         result = self.audit()
         self.assertEqual('configuration-validated', result['state'])
+        self.assertEqual('application-and-rule', result['checks']['humanProviderBinding'])
         self.assertEqual('configured-not-exercised', result['automationCredentials'])
         self.assertEqual('not-created', result['deployment'])
         self.assertIsNone(result['url'])
@@ -145,6 +146,48 @@ class AccessAuditTests(unittest.TestCase):
                 self.cloud = Cloud()
                 self.cloud.policies[0]['include'][0]['azureAD'][key] = value
                 self.audit()
+
+    def test_manual_group_can_use_the_only_verified_application_provider(self):
+        for rule in ({'id': GROUP}, {'id': GROUP, 'identity_provider_id': None},
+                     {'id': GROUP, 'identity_provider_id': ''}):
+            with self.subTest(rule=rule):
+                self.cloud.policies[0]['include'][0]['azureAD'] = rule
+                result = self.audit()
+                self.assertEqual('application-only', result['checks']['humanProviderBinding'])
+                self.assertIsNone(result['url'])
+                self.assertEqual('configured-not-exercised', result['automationCredentials'])
+
+    def test_manual_group_never_inherits_an_ambiguous_or_unverified_provider(self):
+        for change in ('all-providers', 'multiple', 'other-type', 'no-group-support'):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.cloud = Cloud()
+                self.cloud.policies[0]['include'][0]['azureAD'] = {'id': GROUP}
+                if change == 'all-providers':
+                    self.cloud.app['allowed_idps'] = []
+                elif change == 'multiple':
+                    self.cloud.app['allowed_idps'] = [IDP, APP]
+                elif change == 'other-type':
+                    self.cloud.provider['type'] = 'onetimepin'
+                else:
+                    self.cloud.provider['config']['support_groups'] = False
+                self.audit()
+
+    def test_manual_group_still_requires_a_valid_object_id(self):
+        for rule in ({}, {'id': 'Agentstration-Preview-Users'}, {'id': '*'}, {'id': None}):
+            with self.subTest(rule=rule), self.assertRaisesRegex(ValueError, 'object ID'):
+                self.cloud.policies[0]['include'][0]['azureAD'] = rule
+                self.audit()
+
+    def test_selector_shape_and_explicit_provider_mismatch_have_safe_distinct_diagnostics(self):
+        for rule, message in (({'id': GROUP, 'unknown': 'private-selector-fixture'}, 'unexpected selector'),
+                              ({'id': GROUP, 'identity_provider_id': 'private-provider-fixture'}, 'invalid identity_provider_id'),
+                              ({'id': GROUP, 'identity_provider_id': APP}, 'another identity provider')):
+            with self.subTest(message=message):
+                self.cloud.policies[0]['include'][0]['azureAD'] = rule
+                with self.assertRaisesRegex(ValueError, message) as error:
+                    self.audit()
+                self.assertNotIn('private-', str(error.exception))
+                self.assertNotIn(APP, str(error.exception))
 
     def test_requiring_the_selected_entra_login_method_is_supported(self):
         self.cloud.policies[0]['require'] = [{'login_method': {'id': IDP}}]

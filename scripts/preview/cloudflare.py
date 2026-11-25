@@ -152,10 +152,21 @@ def audit(values, api):
     preview.require(len(groups) == 1 and set(groups[0]) == {'azureAD'},
                     'The human policy must Include only the dedicated Azure Group.')
     group = groups[0]['azureAD']
-    preview.require(isinstance(group, dict) and set(group) == {'id', 'identity_provider_id'}
-                    and identifier(group['identity_provider_id']) == identifier(provider_id),
-                    'The human group must use the selected Entra identity provider.')
+    preview.require(isinstance(group, dict) and 'id' in group,
+                    'Azure Groups must contain an Entra group object ID, not a display name.')
+    extra_fields = len(set(group) - {'id', 'identity_provider_id'})
+    preview.require(extra_fields == 0, 'Azure Groups returned ' + str(extra_fields)
+                    + ' unexpected selector field(s); expected id and optional identity_provider_id. Values are withheld.')
     identifier(group['id'], 'The human Azure Group must contain its Entra object ID.')
+    # The application has already been restricted to one verified Entra provider.
+    # Manual group selectors can therefore inherit that source without requiring SCIM.
+    group_provider = group.get('identity_provider_id')
+    binding = 'application-only'
+    if group_provider is not None and group_provider != '':
+        identifier(group_provider, 'Azure Groups returned an invalid identity_provider_id; use the Cloudflare IdP ID.')
+        preview.require(identifier(group_provider) == identifier(provider_id),
+                        'Azure Groups explicitly references another identity provider; use the application\'s selected Entra provider.')
+        binding = 'application-and-rule'
     for rule in policy_rules(human[0], 'require'):
         preview.require(set(rule) == {'login_method'} and isinstance(rule['login_method'], dict)
                         and identifier(rule['login_method'].get('id')) == identifier(provider_id),
@@ -194,7 +205,8 @@ def audit(values, api):
     api.list('/zones/' + values['ZONE_ID'] + '/dns_records')
     return {'schemaVersion': 1, 'state': 'configuration-validated', 'hostnamePattern': expected,
             'teamDomain': values['TEAM_DOMAIN'], 'accessAppId': app['id'],
-            'checks': {'humanPolicy': 'entra-group', 'automationPolicy': 'dedicated-service-token',
+            'checks': {'humanPolicy': 'entra-group', 'humanProviderBinding': binding,
+                       'automationPolicy': 'dedicated-service-token',
                        'overlappingApplications': False, 'tunnelInventoryReadable': True, 'dnsInventoryReadable': True},
             'automationCredentials': 'configured-not-exercised',
             'deployment': 'not-created', 'url': None}

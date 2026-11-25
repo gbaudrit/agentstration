@@ -51,6 +51,21 @@ Configure exactly two policies in the initial audited setup:
    `agentstration-preview-ci`. Use the service token selector, not "any valid
    service token". No interactive login requirement belongs on this policy.
 
+For a manually entered Azure Group, the audit accepts an omitted, null or empty
+`identity_provider_id` only within the application's already-verified single
+Entra provider scope. A non-empty rule-level provider ID must match that provider;
+multiple login providers, other provider types and disabled group support remain
+errors. The result records `humanProviderBinding` as `application-only` or
+`application-and-rule`. This is configuration evidence, not a successful group
+membership/authentication test.
+
+If the picker reports **Failed to retrieve SCIM groups**, use the Entra group's
+object ID as the manual value; a name alone is not accepted by the audit. SCIM
+synchronization is not a prerequisite for this manual configuration. Check that
+**Support Groups** is enabled and save the rule. If an audit still fails, its
+diagnostic distinguishes an invalid group ID, unexpected selector fields, an
+invalid provider ID and an explicit provider mismatch without logging values.
+
 All other access is implicitly denied. The initial audit refuses extra policies,
 Exclude rules, alternate authentication paths, OPTIONS bypass and additional
 hostnames. It also refuses another application covering a preview hostname or
