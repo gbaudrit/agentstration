@@ -1,0 +1,69 @@
+{
+  "sourceRevision": "61328e0794d0e226bb76c2287f490c32098fdb86",
+  "previousHead": "2d7f0b59c0ae3acfc6c86695202f5da41c4e9412",
+  "automationFixRevision": "8db501d3268cda1360ab67f3eda4853cf9db2976",
+  "failedRun": "https://github.com/gbaudrit/agentstration/actions/runs/45656333320",
+  "baseline": "Unchanged scenario passed normally; the retained regression fails with the previous open helper when the ToolDefinition context-selector import is delayed by 1500 ms.",
+  "cause": "Editing before implicit context URL normalization triggers the unsaved-navigation confirmation.",
+  "correction": "Carry the selected context into navigations and await shell data-preferences-ready before editing. Preserve the guard.",
+  "result": {
+    "passed": 9,
+    "failed": 0,
+    "retries": 0,
+    "skipped": 0,
+    "repetitions": 3,
+    "cases": [
+      "schema-contract-bindings desktop with delayed shell import",
+      "Flow connection contracts desktop",
+      "Flow connection contracts mobile"
+    ]
+  },
+  "visualInspection": {
+    "method": "Each retained original PNG viewed at native size; no montage or downscaling.",
+    "files": [
+      {
+        "file": "before-desktop-en-US-dark.png",
+        "sha256": "209372bce6c571cf775c46aac6de77840933b8297ead6c5f5eff604902a3c068"
+      },
+      {
+        "file": "after-desktop-en-US-dark.png",
+        "sha256": "377f716bfe73f92f930473ec6a3a85f76cc509187c0caa500dd66a0608a9b6ca"
+      },
+      {
+        "file": "after-connections-desktop-en-US-dark.png",
+        "sha256": "6011e9b62ba8187f2a8d5bb38477415956ea93274b28d54e5eb49af24a6a0035"
+      },
+      {
+        "file": "after-connections-mobile-en-US-dark.png",
+        "sha256": "17196c4456c6d42750e161326a61aba5ace281e771d21a47d9e58e3e01ca3fae"
+      }
+    ],
+    "observations": [
+      "Before: discard confirmation obstructs the configured ToolDefinition.",
+      "After: configured Flow and inherited output contract remain visible with no confirmation overlay.",
+      "Desktop connection: connected canvas and inspector remain usable.",
+      "Mobile connection: responsive header and canvas remain visible after dismissing the contract prompt; canvas contents remain pannable."
+    ]
+  },
+  "limits": [
+    "This targeted CI investigation is en-US/dark; it does not renew the earlier FR/EN/light/dark collection evidence.",
+    "The original CI screenshot ZIP could not be downloaded into this Cloud workspace because its Azure artifact redirect is outside the network allowlist; the before image is the locally reproduced failure.",
+    "Local video is disabled; original PNGs, assertions and failure trace were used.",
+    "Full local functional coverage and hosted CI were pending when this evidence was committed; the PR Validation section records their final results."
+  ],
+  "environment": {
+    "sdk": "10.0.404",
+    "childRuntime": "10.0.15",
+    "browser": "system Chromium",
+    "buildOutputsFrozen": true
+  },
+  "provenance": "The final retained repeat-2 captures were taken after source commit 61328e07. Earlier repetitions exercised the identical working-tree code before commit; product/Razor outputs stayed frozen. The temporary runner metadata still named the previous head and is not used as source evidence.",
+  "sourceFingerprints": {
+    "automation/playwright/src/pages/schema-contracts.page.ts": "5488cbe1228a279573c41400034285a6333399e31b023bbfa7d8ceb31fa70e75",
+    "automation/playwright/tests/schema-contract-bindings.spec.ts": "18ca8b6efc73b470295434b2d5dfe134d159f6fa906595fb702297544501d0c9",
+    "src/Agentstration.Web.Components/MainLayout.razor.cs": "52294705d02c6e7f25d208a3b0c12db21f9dc05b61f782641b6c21504373e4fa",
+    "src/Agentstration.Web.Components/wwwroot/context-selector.js": "84a212003c7da49066c3ef038932b6c938340042a0d35aa56968b24603cad89e",
+    "src/Agentstration.Web.Components/UnsavedNavigationGuard.razor": "05591a364861e717685a136a43fb2c587c839611dbcf79a6ed850566f03da36b",
+    "src/Agentstration.Console.Components/Components/Pages/NewToolDefinition.razor": "28707715701627b3bfec61134b11720c2664b983827c8b11dcd6d2e5d761c2dd"
+  }
+}

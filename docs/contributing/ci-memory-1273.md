@@ -69,3 +69,24 @@ The initial Fast check identified the missing explicit architecture allowlist fo
 A subsequent uninstrumented Fast execution overlapped coverage instrumentation and produced Bad IL errors. That execution is discarded as invalid: coverage mutates the same output assemblies while they are loaded. Complete functional validation and instrumentation must be serialized when they use the same output tree. The completed uninstrumented module diagnostics above predate that overlap and are unaffected.
 
 The serialized coverage campaign completed Fast with **3146 passed, zero failed/skipped** before starting Integration. Integration and consolidated report generation were still running when this evidence was committed; use the PR validation status for their completed result.
+
+## After synchronizing main on PR head 2d7f0b59
+
+The [new CI run](https://github.com/gbaudrit/agentstration/actions/runs/45656333424) passes functional Fast/Integration and consolidated coverage, but Bootstrap framework diagnostics now run **61 cases** and reach **738.9 MiB**, exceeding the unchanged 700 MiB failure ceiling. Local reproduction passes all 61 cases at **711.2 MiB** and fails the same budget.
+
+Corrective source: `61328e0794d0e226bb76c2287f490c32098fdb86`. Move the initialization coordinator, AEP bundle installer and complete-profile application cases into `Agentstration.Management.Bootstrap.Startup.Tests`. The original framework module retains **34** cases; the startup/profile module runs **27**. Their exact sorted discovery inventory, including data rows, still contains the same 61 cases (SHA-256 `0215e18e08185b4d9b37bf81b2c85ebaee98cf0d242829e8896bfae8dc6a15f2`). All three moved files are byte-identical. Extract the existing private declarative fixture without changing its helper or test-method content (LF-normalized Git/checkout proof recorded). Share only the two explicit test-root fixture paths through the architecture allowlist, and grant the new assembly the existing initialization internals access.
+
+| Uninstrumented local execution | Cases passed | Peak working set (MiB) | Failure ceiling (MiB) |
+| --- | ---: | ---: | ---: |
+| Before: consolidated framework | 61 | 711.2 | 700 |
+| Rejected intermediate: framework | 45 | 701.2 | 700 |
+| After: framework | 34 | 567.1 | 700 |
+| After: startup and complete profiles | 27 | 488.0 | 700 |
+| Unchanged scenarios | 13 | 657.6 | 700 |
+| Unchanged plans | 6 | 429.5 | 700 |
+
+Moving only the 16 lightweight cases was insufficient; retain that rejected measurement explicitly. The final split bounds complete-profile host retention as well. Preserve one class worker per process, 500/700 MiB budgets, existing lane concurrency and sequential diagnostics. Register the new process in the root solution, Integration, coverage shard A and hosted diagnostics. Strengthen diagnostics to require **34 + 27 + 13 + 6** Bootstrap cases.
+
+[Retained measurements and source/inventory proofs](/test-diagnostics/ci-1273-resync.json) use Release, SDK 10.0.404, child runtime **10.0.15** and Debian 13. The collector runtime field belongs to PowerShell, not the child. Concurrent browser hosts and format verification affect aggregate dotnet memory; compare the per-process peaks above. Warning budgets remain visible. No product allocation fix or Windows baseline is claimed.
+
+Release restore/build and changed-source formatting pass. Existing schema-contract browser regression maintenance also passes nine repeated checks; [native screenshots and reproduction](../ux/evidence/1257/ci-schema-contract-bindings/README.md) document the independent shell-readiness race. Full local functional coverage and final hosted CI were pending when this evidence was committed; PR #1273 Validation records their final results. Earlier results in this page remain historical to their stated revisions.
