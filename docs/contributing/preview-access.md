@@ -58,7 +58,15 @@ provider reference. Every non-empty value in either field must match the selecte
 provider; if both fields are returned, both are checked. Neither alias takes
 precedence over a conflicting value. For a legacy schema example, see the
 [Cloudflare Access group API client representation](https://hub.windmill.dev/scripts/cloudflare/6362/create-an-access-group-cloudflare).
-Unknown selector fields remain an error. Diagnostic output includes only a fixed
+Cloudflare can also include `name` display-label metadata in the Azure Group
+selector, as observed in the [live configuration audit](https://github.com/gbaudrit/agentstration/actions/runs/45627527234).
+The audit accepts a missing/null label or a string of at most 256 characters;
+it never uses the label instead of the group object ID or provider checks, and
+never exports its value. `humanGroupLabelPresent` records only field presence.
+The specific CI service-token selector accepts the same bounded `name` metadata;
+`token_id` remains mandatory and no other selector fields are accepted.
+`automationTokenLabelPresent` records only label presence, never its value.
+Other unknown selector fields remain an error. Diagnostic output includes only a fixed
 set of known field names and the extra-field count, never keys outside that set,
 group names, provider IDs or credential values. With either representation,
 multiple login providers, other provider types and disabled group support remain
