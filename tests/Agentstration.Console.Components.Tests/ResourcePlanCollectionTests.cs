@@ -37,9 +37,9 @@ public sealed class ResourcePlanCollectionTests
         StringAssert.Contains(handler.Requests[1].Query, "skip=20&take=20");
         Assert.HasCount(1, cut.FindAll(".collection-card"));
         StringAssert.Contains(cut.Find(".resource-name-link").TextContent, "second");
-        await cut.Find(".collection-page-size select").ChangeAsync(new() { Value = "50" });
+        await cut.InvokeAsync(() => cut.Find(".collection-page-size select").Change("50"));
         StringAssert.Contains(handler.Requests[2].Query, "skip=0&take=50");
-        await cut.Find("[data-filter-key=status] select").ChangeAsync(new() { Value = "Ready" });
+        await cut.InvokeAsync(() => cut.Find("[data-filter-key=status] select").Change("Ready"));
         StringAssert.Contains(handler.Requests[3].Query, "skip=0&take=50&status=Ready");
         Assert.IsEmpty(cut.FindAll("input[type=search], .collection-page-number, .collection-pager [role=status]"));
     }
