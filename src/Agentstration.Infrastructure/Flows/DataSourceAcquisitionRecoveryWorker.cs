@@ -2,6 +2,7 @@ using Agentstration.DataSources;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Artifacts;
 using Agentstration.Knowledge;
+using Agentstration.Tools.Mcp;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +14,8 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
     StoredArtifactReconciliationService artifactReconciliation,
     IRequestContextScopeFactory requestScopes,
     TimeProvider timeProvider,
-    ILogger<DataSourceAcquisitionRecoveryWorker> logger, Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance? history = null) : BackgroundService
+    ILogger<DataSourceAcquisitionRecoveryWorker> logger, Agentstration.Infrastructure.Knowledge.SourceHistoryMaintenance? history = null,
+    AepMcpTransport? aepTransport = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -26,6 +28,7 @@ public sealed class DataSourceAcquisitionRecoveryWorker(
     {
         try
         {
+            using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken);
             using var scope = requestScopes.PushSystem();
             await acquisitions.RecoverPendingAsync(cancellationToken);
             await discoveries.RecoverPendingAsync(cancellationToken);

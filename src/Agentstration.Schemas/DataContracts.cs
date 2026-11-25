@@ -42,7 +42,24 @@ public sealed record ResolvedDataContract(JsonElement? Schema, string? MediaType
 public sealed record InvocationDataContracts(ResolvedDataContract? Input = null, ResolvedDataContract? ExpectedOutput = null, bool ArtifactDraft = false, bool FinalResultMapped = false);
 
 public sealed record DataContractFailure(string Boundary, string Origin, string Path, string Rule,
-    string Expected, string Actual, string? FlowRunId = null, string? StepName = null, string? Code = null);
+    string Expected, string Actual, string? FlowRunId = null, string? StepName = null, string? Code = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DataContractLimit? Limit { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public XmlContractDiagnostic? Xml { get; init; }
+}
+
+public sealed record DataContractLimit(string Unit, long Actual, long? Minimum = null, long? Maximum = null, string? Setting = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsValid => Unit is "utf8Bytes" or "jsonBytes" or "characters" or "items" or "xmlDepth" or "xmlNodes"
+        or "xmlAttributes" or "selectedNodes" or "arrayItems" or "mappingOperations"
+        && Actual >= 0 && (Minimum is { } lower && Actual < lower || Maximum is { } upper && Actual > upper) && Minimum is not < 0 && Maximum is not < 0
+        && !(Minimum is { } min && Maximum is { } max && min > max)
+        && (Setting is null || Setting.Length is > 0 and <= 128
+            && Setting.All(value => char.IsAsciiLetterOrDigit(value) || value is ':' or '_'));
+}
 
 public sealed class DataContractException(string code, DataContractFailure failure) : ArgumentException(
     $"Contract {failure.Boundary} failed at '{failure.Path}': expected {failure.Expected}; received {failure.Actual}. " +
@@ -68,7 +85,8 @@ public static partial class DataContracts
             if (root.ValueKind != JsonValueKind.Object) return null;
             var failure = (root.TryGetProperty("contractFailure", out var nested) ? nested : root).Deserialize<DataContractFailure>(FailureJson);
             return failure is not null && Valid(failure.Boundary, 128) && Valid(failure.Origin, 512)
-                && Valid(failure.Path, 2048) && Valid(failure.Rule, 128) && Valid(failure.Expected, 256) && Valid(failure.Actual, 256) ? failure : null;
+                && Valid(failure.Path, 2048) && Valid(failure.Rule, 128) && Valid(failure.Expected, 256) && Valid(failure.Actual, 256)
+                && (failure.Limit is null || failure.Limit.IsValid) && (failure.Xml is null || failure.Xml.IsValid) ? failure : null;
         }
         catch (JsonException) { return null; }
         static bool Valid(string? value, int maximum) => value is { Length: > 0 } && value.Length <= maximum;
@@ -131,7 +149,7 @@ public static partial class DataContracts
             (expected, actual) = ("only declared properties", "undeclared property (name withheld)");
         else if (issue.Code == "json_schema_instance_required")
             (expected, actual) = ("required property", "absent");
-        throw Failure("data_contract_violation", boundary, contract.Origin, path, issue.Code, expected, actual, runId, stepName);
+        throw Failure("data_contract_violation", boundary, contract.Origin, path, issue.Code, expected, actual, runId, stepName, issue.Limit);
     }
 
     public static bool IsJsonMediaType(string media) => media.Split(';', 2)[0].Trim() is { } type
@@ -190,8 +208,8 @@ public static partial class DataContracts
         JsonSerializer.Serialize(new { contract.MediaType, contract.Schema });
 
     public static DataContractException Failure(string code, string boundary, string origin, string path, string rule,
-        string expected, string actual, string? runId = null, string? stepName = null) =>
-        new(code, new(boundary, origin.Length > 512 ? origin[..512] : origin, path, rule, expected, actual, runId, stepName, code));
+        string expected, string actual, string? runId = null, string? stepName = null, DataContractLimit? limit = null, XmlContractDiagnostic? xml = null) =>
+        new(code, new(boundary, origin.Length > 512 ? origin[..512] : origin, path, rule, expected, actual, runId, stepName, code) { Limit = limit, Xml = xml });
 
     private static (string Path, string Expected, string Actual) DescribePath(JsonElement schema, JsonElement value, string requested)
     {

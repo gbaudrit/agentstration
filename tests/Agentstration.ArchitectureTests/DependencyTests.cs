@@ -1535,6 +1535,7 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"
                         or "../ApiResourceTestFixtures/ResourceServiceFixture.cs"
                         or "../ApiResourceTestFixtures/AwpTestWorker.cs"
+                        or "../ApiResourceTestFixtures/RssTransformationTestData.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Resources.Tests"
                         or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests") continue;
 

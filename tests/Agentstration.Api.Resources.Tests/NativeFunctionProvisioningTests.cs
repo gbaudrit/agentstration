@@ -72,9 +72,9 @@ public sealed class NativeFunctionProvisioningTests : ResourceManagementApiTestB
         using (scopes.PushSystem())
         {
             builtins = await functions.ListAsync(ResourceScopeRef.Instance, 0, 100, default);
-            Assert.HasCount(6, builtins);
+            Assert.HasCount(7, builtins);
             Assert.IsTrue(builtins.All(value => !string.IsNullOrWhiteSpace(value.Value.Definition.Description)));
-            CollectionAssert.AreEquivalent(new[] { "json-select-builtin", "json-project-builtin", "collection-filter-builtin", "collection-distinct-builtin", "artifact-explode-builtin", "json-explode-builtin" }, builtins.Select(value => value.Value.Name).ToArray());
+            CollectionAssert.AreEquivalent(new[] { "json-select-builtin", "json-project-builtin", "collection-filter-builtin", "collection-distinct-builtin", "artifact-explode-builtin", "json-explode-builtin", "xml-to-json-builtin" }, builtins.Select(value => value.Value.Name).ToArray());
             var kind = (await functions.GetKindAsync(ResourceScopeRef.Instance, ResourceNamespace.Default, "native", default))!;
             foreach (var resource in builtins.Select(value => (Resource)value.Value).Append(kind.Value))
             {
@@ -95,7 +95,7 @@ public sealed class NativeFunctionProvisioningTests : ResourceManagementApiTestB
         using (scopes.Push(context))
         {
             var workspace = ResourceScopeRef.Workspace(context.WorkspaceId);
-            Assert.HasCount(6, await functions.ListAsync(workspace, 0, 100, default));
+            Assert.HasCount(7, await functions.ListAsync(workspace, 0, 100, default));
             Assert.IsEmpty(await resources.ListExactAsync<TransformationFunctionResource>(workspace, FunctionResourceKinds.TransformationFunction, 0, 100, default));
             Assert.IsEmpty(await resources.ListExactAsync<FunctionKindResource>(workspace, FunctionResourceKinds.FunctionKind, 0, 100, default));
             var function = await functions.ResolveAsync(new("json-select-builtin", "1.0.0", ResourceScopeRef.Instance), workspace, default);
@@ -108,7 +108,7 @@ public sealed class NativeFunctionProvisioningTests : ResourceManagementApiTestB
 
         SelectConsoleContext(client, ResourceScopeRef.Instance);
         var listed = await client.GetFromJsonAsync<ValueResponse<TransformationFunctionResource>>("/api/transformation-functions?scopeRef=%2Finstance");
-        Assert.HasCount(6, listed!.Value);
+        Assert.HasCount(7, listed!.Value);
         var original = builtins.Single(value => value.Value.Name == "json-select-builtin");
         using var update = new HttpRequestMessage(HttpMethod.Put, "/api/transformation-functions/json-select-builtin?scopeRef=%2Finstance")
         { Content = JsonContent.Create(original.Value with { Definition = original.Value.Definition with { Enabled = false } }) };

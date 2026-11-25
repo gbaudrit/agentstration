@@ -80,3 +80,13 @@ window.agentstrationDataSources.bindTransformationCreator = function (element) {
         if (create && !create.disabled) create.click();
     });
 };
+
+// Native schema editors can be present on the first render of a deep link.
+window.agentstrationMonaco = {
+    ready: function () {
+        if (window.monaco?.editor) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            window.require(['vs/editor/editor.main'], () => resolve(), reject);
+        });
+    }
+};

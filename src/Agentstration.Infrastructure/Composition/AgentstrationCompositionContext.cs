@@ -19,6 +19,8 @@ internal sealed class AgentstrationCompositionContext
         options.DataSourceContent.Validate();
         ArgumentNullException.ThrowIfNull(options.FunctionContent);
         options.FunctionContent.Validate();
+        ArgumentNullException.ThrowIfNull(options.XmlContent);
+        options.XmlContent.Validate();
         ArgumentNullException.ThrowIfNull(options.FlowContent);
         options.FlowContent.Validate();
         StorageProvider = options.Storage.GetProvider();

@@ -1,0 +1,277 @@
+apiVersion: agentstration.io/v1
+kind: Schema
+metadata:
+  name: rss-2-0-xml
+definition:
+  displayName: RSS 2.0 XML structural input
+  format: xml-xsd
+  dialect: http://www.w3.org/2001/XMLSchema
+  content: |
+    <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+      <xs:annotation>
+        <xs:documentation>Permissive RSS 2.0 structural input contract, based on https://www.rssboard.org/rss-specification and https://www.rssboard.org/rss-profile. Resource version 1.0.0 is independent of RSS format version 2.0. Namespace extensions are admitted without external resolution. Scalar values are text: this contract does not certify full RSS conformance or enforce image dimensions, date/email/URL syntax, numeric ranges or protocol vocabularies. Mapping conversions and operator limits remain independent; see transformation-schemas.md.</xs:documentation>
+      </xs:annotation>
+      <xs:element name="rss">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:any namespace="##other" processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="channel" type="Channel">
+              <xs:key name="Channel_required">
+                <xs:selector xpath="." />
+                <xs:field xpath="title" />
+                <xs:field xpath="link" />
+                <xs:field xpath="description" />
+              </xs:key>
+              <xs:unique name="Channel_language">
+                <xs:selector xpath="." />
+                <xs:field xpath="language" />
+              </xs:unique>
+              <xs:unique name="Channel_copyright">
+                <xs:selector xpath="." />
+                <xs:field xpath="copyright" />
+              </xs:unique>
+              <xs:unique name="Channel_managingEditor">
+                <xs:selector xpath="." />
+                <xs:field xpath="managingEditor" />
+              </xs:unique>
+              <xs:unique name="Channel_webMaster">
+                <xs:selector xpath="." />
+                <xs:field xpath="webMaster" />
+              </xs:unique>
+              <xs:unique name="Channel_pubDate">
+                <xs:selector xpath="." />
+                <xs:field xpath="pubDate" />
+              </xs:unique>
+              <xs:unique name="Channel_lastBuildDate">
+                <xs:selector xpath="." />
+                <xs:field xpath="lastBuildDate" />
+              </xs:unique>
+              <xs:unique name="Channel_generator">
+                <xs:selector xpath="." />
+                <xs:field xpath="generator" />
+              </xs:unique>
+              <xs:unique name="Channel_docs">
+                <xs:selector xpath="." />
+                <xs:field xpath="docs" />
+              </xs:unique>
+              <xs:unique name="Channel_ttl">
+                <xs:selector xpath="." />
+                <xs:field xpath="ttl" />
+              </xs:unique>
+              <xs:unique name="Channel_rating">
+                <xs:selector xpath="." />
+                <xs:field xpath="rating" />
+              </xs:unique>
+              <xs:unique name="Channel_cloud">
+                <xs:selector xpath="." />
+                <xs:field xpath="cloud/@domain" />
+              </xs:unique>
+              <xs:unique name="Channel_image">
+                <xs:selector xpath="." />
+                <xs:field xpath="image/url" />
+              </xs:unique>
+              <xs:unique name="Channel_textInput">
+                <xs:selector xpath="." />
+                <xs:field xpath="textInput/name" />
+              </xs:unique>
+            </xs:element>
+            <xs:any namespace="##other" processContents="skip" minOccurs="0" maxOccurs="unbounded" />
+          </xs:sequence>
+          <xs:attribute name="version" type="xs:string" use="required" fixed="2.0" />
+          <xs:anyAttribute namespace="##other" processContents="skip" />
+        </xs:complexType>
+      </xs:element>
+      <xs:complexType name="Channel">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="title" type="xs:string" />
+          <xs:element name="link" type="xs:string" />
+          <xs:element name="description" type="xs:string" />
+          <xs:element name="language" type="xs:string" />
+          <xs:element name="copyright" type="xs:string" />
+          <xs:element name="managingEditor" type="xs:string" />
+          <xs:element name="webMaster" type="xs:string" />
+          <xs:element name="pubDate" type="xs:string" />
+          <xs:element name="lastBuildDate" type="xs:string" />
+          <xs:element name="generator" type="xs:string" />
+          <xs:element name="docs" type="xs:string" />
+          <xs:element name="ttl" type="xs:string" />
+          <xs:element name="rating" type="xs:string" />
+          <xs:element name="category" type="Category" />
+          <xs:element name="cloud" type="Cloud" />
+          <xs:element name="image" type="Image">
+            <xs:key name="Image_required">
+              <xs:selector xpath="." />
+              <xs:field xpath="url" />
+              <xs:field xpath="title" />
+              <xs:field xpath="link" />
+            </xs:key>
+            <xs:unique name="Image_width">
+              <xs:selector xpath="." />
+              <xs:field xpath="width" />
+            </xs:unique>
+            <xs:unique name="Image_height">
+              <xs:selector xpath="." />
+              <xs:field xpath="height" />
+            </xs:unique>
+            <xs:unique name="Image_description">
+              <xs:selector xpath="." />
+              <xs:field xpath="description" />
+            </xs:unique>
+          </xs:element>
+          <xs:element name="textInput" type="TextInput">
+            <xs:key name="TextInput_required">
+              <xs:selector xpath="." />
+              <xs:field xpath="title" />
+              <xs:field xpath="description" />
+              <xs:field xpath="name" />
+              <xs:field xpath="link" />
+            </xs:key>
+          </xs:element>
+          <xs:element name="skipHours">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="hour" type="xs:string" minOccurs="0" maxOccurs="24" />
+              </xs:sequence>
+              <xs:anyAttribute namespace="##other" processContents="skip" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="skipDays">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="day" type="xs:string" minOccurs="0" maxOccurs="7" />
+              </xs:sequence>
+              <xs:anyAttribute namespace="##other" processContents="skip" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="item" type="Item">
+            <xs:unique name="Item_title">
+              <xs:selector xpath="." />
+              <xs:field xpath="title" />
+            </xs:unique>
+            <xs:unique name="Item_description">
+              <xs:selector xpath="." />
+              <xs:field xpath="description" />
+            </xs:unique>
+            <xs:unique name="Item_link">
+              <xs:selector xpath="." />
+              <xs:field xpath="link" />
+            </xs:unique>
+            <xs:unique name="Item_author">
+              <xs:selector xpath="." />
+              <xs:field xpath="author" />
+            </xs:unique>
+            <xs:unique name="Item_comments">
+              <xs:selector xpath="." />
+              <xs:field xpath="comments" />
+            </xs:unique>
+            <xs:unique name="Item_guid">
+              <xs:selector xpath="." />
+              <xs:field xpath="guid" />
+            </xs:unique>
+            <xs:unique name="Item_pubDate">
+              <xs:selector xpath="." />
+              <xs:field xpath="pubDate" />
+            </xs:unique>
+            <xs:unique name="Item_source">
+              <xs:selector xpath="." />
+              <xs:field xpath="source" />
+            </xs:unique>
+            <xs:unique name="Item_enclosure">
+              <xs:selector xpath="." />
+              <xs:field xpath="enclosure/@url" />
+            </xs:unique>
+          </xs:element>
+          <xs:any namespace="##other" processContents="skip" />
+        </xs:choice>
+        <xs:anyAttribute namespace="##other" processContents="skip" />
+      </xs:complexType>
+      <xs:group name="ItemMetadata">
+        <xs:choice>
+          <xs:element name="link" type="xs:string" />
+          <xs:element name="author" type="xs:string" />
+          <xs:element name="category" type="Category" />
+          <xs:element name="comments" type="xs:string" />
+          <xs:element name="enclosure" type="Enclosure" />
+          <xs:element name="guid" type="Guid" />
+          <xs:element name="pubDate" type="xs:string" />
+          <xs:element name="source" type="Source" />
+          <xs:any namespace="##other" processContents="skip" />
+        </xs:choice>
+      </xs:group>
+      <xs:complexType name="Item">
+        <xs:sequence>
+          <xs:group ref="ItemMetadata" minOccurs="0" maxOccurs="unbounded" />
+          <xs:choice>
+            <xs:element name="title" type="xs:string" />
+            <xs:element name="description" type="xs:string" />
+          </xs:choice>
+          <xs:choice minOccurs="0" maxOccurs="unbounded">
+            <xs:element name="title" type="xs:string" />
+            <xs:element name="description" type="xs:string" />
+            <xs:group ref="ItemMetadata" />
+          </xs:choice>
+        </xs:sequence>
+        <xs:anyAttribute namespace="##other" processContents="skip" />
+      </xs:complexType>
+      <xs:complexType name="Category">
+        <xs:simpleContent>
+          <xs:extension base="xs:string">
+            <xs:attribute name="domain" type="xs:string" />
+            <xs:anyAttribute namespace="##other" processContents="skip" />
+          </xs:extension>
+        </xs:simpleContent>
+      </xs:complexType>
+      <xs:complexType name="Guid">
+        <xs:simpleContent>
+          <xs:extension base="xs:string">
+            <xs:attribute name="isPermaLink" type="xs:string" default="true" />
+            <xs:anyAttribute namespace="##other" processContents="skip" />
+          </xs:extension>
+        </xs:simpleContent>
+      </xs:complexType>
+      <xs:complexType name="Source">
+        <xs:simpleContent>
+          <xs:extension base="xs:string">
+            <xs:attribute name="url" type="xs:string" use="required" />
+            <xs:anyAttribute namespace="##other" processContents="skip" />
+          </xs:extension>
+        </xs:simpleContent>
+      </xs:complexType>
+      <xs:complexType name="Enclosure">
+        <xs:attribute name="url" type="xs:string" use="required" />
+        <xs:attribute name="length" type="xs:string" use="required" />
+        <xs:attribute name="type" type="xs:string" use="required" />
+        <xs:anyAttribute namespace="##other" processContents="skip" />
+      </xs:complexType>
+      <xs:complexType name="Cloud">
+        <xs:attribute name="domain" type="xs:string" use="required" />
+        <xs:attribute name="port" type="xs:string" use="required" />
+        <xs:attribute name="path" type="xs:string" use="required" />
+        <xs:attribute name="registerProcedure" type="xs:string" use="required" />
+        <xs:attribute name="protocol" type="xs:string" use="required" />
+        <xs:anyAttribute namespace="##other" processContents="skip" />
+      </xs:complexType>
+      <xs:complexType name="Image">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="url" type="xs:string" />
+          <xs:element name="title" type="xs:string" />
+          <xs:element name="link" type="xs:string" />
+          <xs:element name="width" type="xs:string" />
+          <xs:element name="height" type="xs:string" />
+          <xs:element name="description" type="xs:string" />
+          <xs:any namespace="##other" processContents="skip" />
+        </xs:choice>
+        <xs:anyAttribute namespace="##other" processContents="skip" />
+      </xs:complexType>
+      <xs:complexType name="TextInput">
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="title" type="xs:string" />
+          <xs:element name="description" type="xs:string" />
+          <xs:element name="name" type="xs:string" />
+          <xs:element name="link" type="xs:string" />
+          <xs:any namespace="##other" processContents="skip" />
+        </xs:choice>
+        <xs:anyAttribute namespace="##other" processContents="skip" />
+      </xs:complexType>
+    </xs:schema>
+  publishVersion: 1.0.0

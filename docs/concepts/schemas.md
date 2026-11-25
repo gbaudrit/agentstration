@@ -63,3 +63,13 @@ Structured Storage collections support inline or shared bindings. Create or expl
 An enabled AEP Extension Registration may contribute one or more additional Schema format handlers through the `aep.schema-formats` capability. Each contribution maps definition and instance validation to private MCP operations. These operations reuse the registration's scope, expected extension identity and credential, but they are not Agent Tools and never appear in the Tool catalog.
 
 The adapter validates bounded structured results and enforces an operation timeout. If an extension that was discovered previously becomes unreachable, its providers remain inspectable as unavailable rather than disappearing silently. The built-in JSON Schema provider remains independent and the default; an AEP implementation for the same format must be selected by the registry's explicit default or exact provider-pin rules.
+
+## XML contracts and transformation declarations
+
+The local format registry also provides standalone XSD 1.0 (`xml-xsd`) and
+independent XML-to-JSON mapping declarations (`xml-json-transformation`). Native
+XSD content is XML text, carried as a JSON string. Published mappings are exposed
+explicitly as named TransformationFunctions; publication alone creates no named
+function. Input XML validation and output JSON validation retain separate exact
+contract evidence. See [Transformation Schemas](../reference/transformation-schemas.md)
+and [ADR-0260](../decisions/0260-transformation-schemas-have-explicit-function-exposure.md).

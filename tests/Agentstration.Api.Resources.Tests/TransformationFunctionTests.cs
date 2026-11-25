@@ -118,7 +118,7 @@ public sealed class TransformationFunctionTests : ResourceManagementApiTestBase
         var largeValue = new string('x', 1024 * 1024);
         Assert.AreEqual(largeValue, (await service.InvokeAsync(resolved, owner,
             JsonSerializer.SerializeToElement(new { value = largeValue, path = "" }), default)).GetString());
-        var tooLarge = await Assert.ThrowsExactlyAsync<TransformationFunctionException>(() => service.InvokeAsync(resolved, owner,
+        var tooLarge = await Assert.ThrowsExactlyAsync<Agentstration.Schemas.DataContractException>(() => service.InvokeAsync(resolved, owner,
             JsonSerializer.SerializeToElement(new { value = new string('x', 2 * 1024 * 1024), path = "" }), default));
         Assert.AreEqual("function_value_too_large", tooLarge.Code);
         function = await service.PutAsync(function.Value with { Definition = function.Value.Definition with { Description = "Select the alert payload." } }, function.ETag, false, default);

@@ -68,6 +68,11 @@ Configure the authoritative server in `appsettings.json` or environment variable
       "MaximumHttpResponseBytes": 10485760
     },
     "FunctionContent": { "MaximumValueBytes": 10485760 },
+    "XmlContent": {
+      "MaximumDocumentBytes": 10485760, "MaximumDepth": 32, "MaximumNodes": 8192,
+      "MaximumAttributesPerElement": 64, "MaximumSelectedNodes": 8192,
+      "MaximumArrayItems": 100, "MaximumMappingOperations": 32768
+    },
     "FlowContent": { "MaximumValueBytes": 10485760 }
   }
 }
@@ -286,3 +291,10 @@ See the [ASP protocol](https://github.com/gbaudrit/agentstration/blob/integratio
 The additive [document/query vertical](structured-documents.md) uses the same MCP,
 AEP, Connected Service and exact Storage resolution boundaries. Its separate
 `asp.documents/1` mapping does not change the content sessions described above.
+
+XML instance validation and mapping use the positive `Agentstration:XmlContent`
+settings documented in [Transformation Schemas](transformation-schemas.md#xml-processing-settings-and-limit-diagnostics).
+The XML document budget defaults to 10 MiB; mapped JSON uses the existing function
+value budget. These replace the unreleased fixed 64 KiB XML instance/output caps
+without changing the schema-authoring or external protocol profiles. Limit errors
+carry measured counts, units and configuration keys, without source content.

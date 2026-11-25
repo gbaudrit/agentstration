@@ -12,4 +12,9 @@
   <data name="NestedProperties"><value>Nested properties</value></data><data name="AddChildProperty"><value>Add child property</value></data><data name="EmptyNestedProperties"><value>No child properties are defined yet.</value></data>
   <data name="PropertyNameRequired"><value>The property name is required.</value></data><data name="PropertyNameAlreadyExists"><value>A property named “{0}” already exists at this level.</value></data>
   <data name="InstancePreview"><value>Instance preview</value></data><data name="InstancePreviewHelp"><value>Enter a sample value and validate it against the current definition.</value></data><data name="ValidateInstance"><value>Validate instance</value></data><data name="InstanceValid"><value>The sample instance is valid.</value></data><data name="InstanceInvalid"><value>The sample instance contains validation issues.</value></data>
+  <data name="Issue.xml_invalid" xml:space="preserve"><value>Invalid or unsupported XML/XSD document, or a processing limit was exceeded.</value></data>
+  <data name="Issue.xml_contract_invalid" xml:space="preserve"><value>The XML content does not satisfy the standalone XSD contract.</value></data>
+  <data name="Issue.transformation_definition_invalid" xml:space="preserve"><value>Provide exact engine and input/output Schema versions, namespace aliases and bounded mapping rules.</value></data>
+  <data name="NativeDefinitionSource" xml:space="preserve"><value>Native definition</value></data>
+  <data name="LoadingEditor" xml:space="preserve"><value>Loading the source editor…</value></data>
 </root>
