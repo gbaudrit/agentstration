@@ -85,6 +85,8 @@ public sealed record AwpRootFlowExecutionMaterial(
     int OrchestrationTimeoutMilliseconds = 0)
     : AwpExecutionMaterial(MaterialId, SchemaVersion, Digest, RunId)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? CompletedGraphSteps { get; init; }
     public string? FlowScopeRef { get; init; }
     public JsonElement? ContractContext { get; init; }
     public JsonElement? ProcessOrigin { get; init; }

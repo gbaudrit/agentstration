@@ -10,7 +10,7 @@ using Agentstration.Storage.Contracts;
 
 namespace Agentstration.DataSources;
 
-public sealed class DataSourceDatasetAcquisitionService(
+public sealed partial class DataSourceDatasetAcquisitionService(
     IResourceStore store,
     ICurrentRequestContext current,
     IRequestContextScopeFactory scopes,
@@ -140,6 +140,9 @@ public sealed class DataSourceDatasetAcquisitionService(
             acquisition.TenantId, acquisition.WorkspaceId, acquisition.CreatedBy)
         {
             LogicalScopeRef = acquisition.LogicalScopeRef,
+            CompositionDefinitionUseScopes = acquisition.Dataset!.Composition is not null
+                ? new Dictionary<string, ResourceScopeRef> { ["acquisition"] = acquisition.Dataset.OperationFlow!.DefinitionUseScopeRef ?? acquisition.Dataset.Operation.ScopeRef!.Value }
+                : new Dictionary<string, ResourceScopeRef>(),
             TransientPayloads = acquisition.Dataset!.Definition.Storage is null,
             Compositions = acquisition.Dataset.Composition?.Receipt?.Bindings
             ?? new Dictionary<string, IReadOnlyList<Agentstration.Flows.FlowCompositionCall>>()
@@ -167,6 +170,26 @@ public sealed class DataSourceDatasetAcquisitionService(
     public async Task<StoredResource<DataSourceAcquisitionResource>> SynchronizeAsync(
         StoredResource<DataSourceAcquisitionResource> stored, CancellationToken cancellationToken)
     {
+        if (stored.Value.Dataset?.DurablePublication == true)
+        {
+            var observed = await ObserveCoreAsync(stored, true, cancellationToken);
+            if (observed.Value.State == stored.Value.State) return stored;
+            var observedValue = observed.Value with
+            {
+                Generation = checked(stored.Value.Generation + 1),
+                CompletedAt = Terminal(observed.Value.State)
+                    ? stored.Value.CompletedAt ?? DataSourceFlowOutcomeService.ResolveCompletedAt(stored.Value, observed.Value.CompletedAt) : null,
+                Progress = observed.Value.Progress is { } progress
+                    ? progress with { State = observed.Value.State.ToString(), ErrorCode = observed.Value.ErrorCode } : null,
+                Status = new()
+                {
+                    ProvisioningState = observed.Value.State == DataSourceAcquisitionState.Succeeded ? ProvisioningState.Succeeded
+                        : Terminal(observed.Value.State) ? ProvisioningState.Failed : ProvisioningState.Accepted
+                }
+            };
+            try { return await execution.InWorkspaceAsync(() => store.PutExactAsync(observedValue.ScopeRef!.Value, observedValue, stored.ETag, false, cancellationToken)); }
+            catch (ResourceConcurrencyException) { return stored; }
+        }
         if (Terminal(stored.Value.State))
         {
             if (stored.Value.State == DataSourceAcquisitionState.Succeeded && stored.Value.Manifest is null
@@ -452,7 +475,8 @@ public sealed class DataSourceDatasetAcquisitionService(
         var artifact = await execution.InWorkspaceAsync(() => artifacts.RegisterStoredAsync(new(
             "dataset:" + acquisition.Uid.ToString("N"), acquisition.FlowRunId,
             new(acquisition.DataSourceScopeRef, acquisition.DataSourceNamespace, DataSourceResourceKinds.DataSource, acquisition.DataSourceName),
-            acquisition.Name, "application/json", materialization, ProducerUid: acquisition.DataSourceUid,
+            acquisition.Name, "application/json", materialization,
+            ProducerFlowStepId: acquisition.Dataset.DurablePublication ? "publication-register" : null, ProducerUid: acquisition.DataSourceUid,
             ProducerGeneration: acquisition.DataSourceGeneration, DataContract: JsonRecordProjection.Collection(acquisition.RecordContract!)), cancellationToken));
         var updated = acquisition with
         {

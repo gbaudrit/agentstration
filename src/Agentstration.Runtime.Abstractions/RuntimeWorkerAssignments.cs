@@ -300,6 +300,10 @@ public interface IRuntimeWorkerAssignmentStore
         RuntimeAssignmentTerminalCommand command,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken);
+    // Explicit durable-Flow recovery only; ordinary suspension requeue keeps its original contract.
+    Task<StoredRuntimeWorkerAssignment> RequeueInterruptedFlowExactAsync(ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId, DateTimeOffset requestedAt, CancellationToken cancellationToken) =>
+        Task.FromException<StoredRuntimeWorkerAssignment>(new NotSupportedException("Interrupted Flow recovery is not supported by this store."));
     Task<IReadOnlyList<RuntimeAssignmentTerminalResult>> ExpireLeasesAsync(
         DateTimeOffset observedAt,
         int take,

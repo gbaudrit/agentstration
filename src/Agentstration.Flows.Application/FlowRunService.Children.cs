@@ -187,10 +187,13 @@ public sealed partial class FlowRunService
 
         var targetId = call.Flow.Resolve(parent.FlowId.Namespace);
         var requestedVersion = call.Flow.VersionStrategy == FlowCallVersionStrategy.Exact ? call.Flow.Version : null;
-        var resolved = inlineVersion ?? await ResolveVersionAsync(parent.Scope.AccessScopeRef, targetId, requestedVersion,
+        var definitionUseScope = call.CompositionPoint is { } point
+            ? parent.CompositionDefinitionUseScopes?.GetValueOrDefault(point, parent.Scope.AccessScopeRef) ?? parent.Scope.AccessScopeRef
+            : parent.Scope.AccessScopeRef;
+        var resolved = inlineVersion ?? await ResolveVersionAsync(definitionUseScope, targetId, requestedVersion,
             call.Flow.ScopeRef, cancellationToken);
         if (call.CompositionPoint is not null && flowDefinitions is not null)
-            await flowDefinitions.ValidateUseAsync(resolved.ScopeRef, targetId, resolved.Version, parent.Scope.AccessScopeRef, call.Flow.ResourceUid, cancellationToken);
+            await flowDefinitions.ValidateUseAsync(resolved.ScopeRef, targetId, resolved.Version, definitionUseScope, call.Flow.ResourceUid, cancellationToken);
         if (call.Flow.DefinitionHash is { } expected && expected != resolved.DefinitionHash)
             throw new FlowValidationException("flow_composition_child_changed", "The accepted child Flow no longer matches its exact version.");
         var outputExpectation = DataContracts.Declared(resolved.Graph?.ResolveSingleSuccessOutputSchema(out _), $"flow:{resolved.FlowId}/output", resolved.Graph is { } outputGraph ? FlowDataContracts.OutputMediaType(outputGraph) : null)

@@ -796,6 +796,7 @@ public static class AwpRuntimeWorkerEndpoints
             flow.CorrelationId,
             checked((int)Math.Ceiling(flow.OrchestrationTimeout.TotalMilliseconds)))
         {
+            CompletedGraphSteps = flow.CompletedGraphSteps,
             FlowScopeRef = flow.FlowScopeRef,
             ProcessOrigin = flow.ProcessOrigin,
             ContractContext = flow.ContractContext is null ? null : JsonSerializer.SerializeToElement(flow.ContractContext, ContractJson)

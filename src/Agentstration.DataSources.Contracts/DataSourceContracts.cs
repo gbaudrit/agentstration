@@ -135,6 +135,8 @@ public sealed record ResolvedDataSourceDataset(
     public JsonElement? OperationOutputSchema { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool DurablePublication { get; init; }
     public ResolvedDataSourceFlowBinding? OperationFlow { get; init; }
     public ResolvedFlowComposition? Composition { get; init; }
 }
@@ -408,8 +410,15 @@ public sealed record DataSourceAcquisitionInput
     public DataSourceAcquisitionTargetResource? Target { get; init; }
 }
 
+public sealed record DataSourceAcquisitionProgress(string StepName, string State, int Attempt,
+    DateTimeOffset? StartedAt, DateTimeOffset UpdatedAt, DateTimeOffset? CompletedAt = null, string? ErrorCode = null);
+
 public sealed record DataSourceAcquisitionResource : Resource
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DataSourceAcquisitionProgress? Progress { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? PublicationSealedAt { get; init; }
     public Agentstration.Schemas.ResolvedDataContract? RecordContract { get; init; }
     public required ResourceScopeRef DataSourceScopeRef { get; init; }
     public required Guid DataSourceUid { get; init; }

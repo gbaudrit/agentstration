@@ -119,8 +119,11 @@ public sealed record FlowToolRouteResolution(
     long ToolGeneration,
     string ProviderName,
     ResourceNamespace ProviderNamespace);
+public sealed record FlowOperationProgress(string State, int Attempt, DateTimeOffset UpdatedAt, string? ErrorCode = null);
+
 public sealed record FlowStepRun
 {
+    public FlowOperationProgress? OperationProgress { get; init; }
     public FlowProcessAdmission? Process { get; init; }
     public required string StepName { get; init; }
     public required string StepType { get; init; }
@@ -153,6 +156,8 @@ public sealed record FlowStepRun
 
 public sealed record FlowRun
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, ResourceScopeRef>? CompositionDefinitionUseScopes { get; init; }
     public FlowProcessRunOrigin? ProcessOrigin { get; init; }
     public IReadOnlyList<string>? ReservedDescendantRunIds { get; init; }
     public FlowArtifactProcessingContext? ArtifactProcessing { get; init; }

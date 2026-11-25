@@ -526,21 +526,46 @@ public sealed class KnowledgePlatformResourceProvisioner(
                 OutputSchema = result,
                 InputMapping = JsonSerializer.SerializeToElement(boundary is null ? "${input}" : "${steps." + boundary + ".output}")
             });
+            if (boundary == "acquisition")
+                foreach (var phase in new[] { "prepare", "seal", "register" })
+                    nodes.Add(new ToolFlowStepDefinition
+                    {
+                        Name = "publication-" + phase,
+                        Tool = new(AgentstrationToolProvider.ToolResourceName("data-source.publication." + phase), ScopeRef: scope),
+                        ArgumentsMapping = JsonSerializer.SerializeToElement(new { acquisitionId = "${input.acquisitionId}" })
+                    });
             nodes.Add(new OutputFlowStepDefinition
             {
                 Name = "output",
                 Schema = result,
                 OutputMapping = JsonSerializer.SerializeToElement("${steps." + sequence + ".output}")
             });
-            await CreateAndPublishFlowAsync(scope, name, name, contract, null, CompositionFlowVersion, new()
+            var graph = new FlowGraphDefinition
             {
                 EntryStep = "input",
                 InputSchema = boundary is null ? result : value,
                 OutputSchema = result,
                 Steps = nodes,
                 Transitions = nodes.Zip(nodes.Skip(1), (left, right) => new FlowTransitionDefinition(left.Name + "-next", left.Name,
-                    "completed", right.Name)).ToArray()
-            }, ct);
+                    left is ToolFlowStepDefinition ? "success" : "completed", right.Name)).ToArray()
+            };
+            if (boundary == "acquisition")
+            {
+                var legacyNodes = nodes.Where(node => !node.Name.StartsWith("publication-", StringComparison.Ordinal)).ToArray();
+                await CreateAndPublishFlowAsync(scope, name, name, contract, null, CompositionFlowVersion, graph with
+                {
+                    Steps = legacyNodes,
+                    Transitions = legacyNodes.Zip(legacyNodes.Skip(1), (left, right) => new FlowTransitionDefinition(left.Name + "-next", left.Name, "completed", right.Name)).ToArray()
+                }, ct);
+            }
+            if (boundary == "acquisition")
+                graph = graph with
+                {
+                    Steps = [.. graph.Steps, new OutputFlowStepDefinition { Name = "publication-failure", Outcome = FlowOutputOutcome.Error }],
+                    Transitions = [.. graph.Transitions, .. new[] { "prepare", "seal", "register" }.Select(phase =>
+                        new FlowTransitionDefinition("publication-" + phase + "-failed", "publication-" + phase, "error", "publication-failure"))]
+                };
+            await CreateAndPublishFlowAsync(scope, name, name, contract, null, boundary == "acquisition" ? "2.0.0" : CompositionFlowVersion, graph, ct);
             var flow = (await flows.GetExactAsync(scope, new(name), ct))!.Value;
             for (var attempt = 0; attempt < 3; attempt++)
             {
@@ -607,6 +632,7 @@ public sealed class KnowledgePlatformResourceProvisioner(
             [ResourceProvenanceAnnotations.BuiltIn] = "true",
             [FlowMetadataKeys.Contract] = contract
         };
+        if (name == DatasetOrchestrationFlowName && version == "2.0.0") metadata["flow.durableGraph"] = "true";
         if (capabilities is not null) metadata[KnowledgeFlowContracts.CapabilitiesMetadataKey] = capabilities;
         var id = new FlowId(name);
         var existing = await flows.GetExactAsync(scope, id, cancellationToken);

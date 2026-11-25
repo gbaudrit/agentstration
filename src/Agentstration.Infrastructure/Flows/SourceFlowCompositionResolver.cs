@@ -8,24 +8,31 @@ public sealed class SourceFlowCompositionResolver(FlowService flows, FlowContent
 {
     public async Task<ResolvedFlowComposition> ResolveAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken cancellationToken)
-        => await ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, false, cancellationToken);
+        => await ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, false, null, null, cancellationToken);
 
     public Task<ResolvedFlowComposition> ResolveAcceptedAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, CancellationToken cancellationToken)
-        => ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, true, cancellationToken);
+        => ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, true, null, null, cancellationToken);
+
+    public Task<ResolvedFlowComposition> ResolveOwnedAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
+        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings,
+        ResourceScopeRef? templateUseScope, IReadOnlyDictionary<string, ResourceScopeRef> ownedPointUseScopes,
+        bool accepted, CancellationToken cancellationToken) =>
+        ResolveCoreAsync(consumer, ownerNamespace, orchestration, bindings, accepted, templateUseScope, ownedPointUseScopes, cancellationToken);
 
     private async Task<ResolvedFlowComposition> ResolveCoreAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
-        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, bool accepted, CancellationToken cancellationToken)
+        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings, bool accepted,
+        ResourceScopeRef? templateUseScope, IReadOnlyDictionary<string, ResourceScopeRef>? ownedPointUseScopes, CancellationToken cancellationToken)
     {
         var compiler = new FlowCompositionService(flows, contentOptions);
-        var template = await compiler.ResolveCallAsync(orchestration, consumer, ownerNamespace, cancellationToken);
+        var template = await compiler.ResolveCallAsync(orchestration, templateUseScope ?? consumer, ownerNamespace, cancellationToken);
         foreach (var binding in bindings.Where(pair => pair.Value.Any(call => call.PassInputDirectly)))
         {
             var point = template.Graph?.Steps.OfType<FlowCompositionPointStepDefinition>().SingleOrDefault(point => point.Point == binding.Key);
             if (point is null || point.AllowEmpty || binding.Value.Count != 1 || !DominatesSuccess(template.Graph!, point.Name))
                 throw new FlowValidationException("flow_composition_boundary_invalid", "The governed source boundary must be required on every successful path.");
         }
-        var compiled = await compiler.ResolveAsync(template, bindings, consumer, cancellationToken, accepted, ownerNamespace);
+        var compiled = await compiler.ResolveAsync(template, bindings, consumer, cancellationToken, accepted, ownerNamespace, ownedPointUseScopes);
         var resource = await flows.GetExactAsync(template.ScopeRef, template.FlowId, cancellationToken);
         return new(orchestration with
         {

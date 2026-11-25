@@ -229,6 +229,8 @@ public sealed class RuntimeExecutionMaterialResolver(
         {
             ScopeRef = run.ExecutionScopeRef,
             LogicalScopeRef = run.Scope.LogicalScopeRef,
+            CompletedGraphSteps = assignment.ExecutionMaterialVersion == RuntimeExecutionMaterialVersions.DurableGraph
+                ? JsonSerializer.SerializeToElement(run.Steps.Where(step => step.Status == FlowStepRunStatus.Succeeded), JsonOptions) : null,
             FlowScopeRef = (run.DefinitionScopeRef ?? run.DefinitionSnapshot.ScopeRef).Value,
             ProcessOrigin = run.ProcessOrigin is null ? null : JsonSerializer.SerializeToElement(run.ProcessOrigin, JsonOptions),
             ContractContext = run.ContractContext

@@ -330,6 +330,7 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
             {
                 DefinitionScopeRef = request.Flow.ScopeRef,
                 DefinitionUseScopeRef = request.Flow.DefinitionUseScopeRef,
+                CompositionDefinitionUseScopes = request.CompositionDefinitionUseScopes,
                 Compositions = request.Compositions,
                 AcceptedCompositionSchemas = true,
                 TransientPayloads = request.TransientPayloads
@@ -353,6 +354,12 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
         return stored is null ? null : Snapshot(stored.Value);
     }
 
+    public async Task<DataSourceFlowRunSnapshot?> ObserveAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken token)
+    {
+        var stored = await runs.GetAsync(runId, Scope(workspaceId, tenantId, principalId), token);
+        return stored is null ? null : Snapshot(stored.Value, includePayloads: false);
+    }
+
     public async Task<DataSourceFlowRunSnapshot> CancelAsync(
         Guid workspaceId,
         string runId,
@@ -361,9 +368,16 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
         CancellationToken cancellationToken) => Snapshot((await runs.CancelAsync(
             runId, Scope(workspaceId, tenantId, principalId), cancellationToken)).Value);
 
+    public async Task ResumePublicationAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId, CancellationToken token)
+    {
+        try { _ = await runs.ResumePublicationAsync(runId, Scope(workspaceId, tenantId, principalId), token); }
+        catch (FlowValidationException exception) { throw new DataSourceAcquisitionException(exception.Code, exception.Message); }
+        catch (FlowRunNotFoundException) { throw new DataSourceAcquisitionException("data_source_acquisition_not_found", "The accepted execution is unavailable."); }
+    }
+
     private static FlowRunScope Scope(Guid workspaceId, Guid tenantId, Guid principalId) =>
         new(tenantId, new WorkspaceId(workspaceId), principalId);
-    private static DataSourceFlowRunSnapshot Snapshot(FlowRun run) => new(
+    private static DataSourceFlowRunSnapshot Snapshot(FlowRun run, bool includePayloads = true) => new(
         run.Id,
         run.Status switch
         {
@@ -376,18 +390,34 @@ public sealed class DataSourceAcquisitionFlowGateway(FlowRunService runs, IReque
             FlowRunStatus.TimedOut => DataSourceAcquisitionState.TimedOut,
             _ => DataSourceAcquisitionState.Failed
         },
-        run.Output?.Clone(),
+        includePayloads ? run.Output?.Clone() : null,
         run.Error?.Code,
         run.Error?.Message,
         run.CompletedAt)
     {
         TransientPayloadsAvailable = run.TransientPayloadsAvailable,
+        ProcessingOutput = includePayloads ? run.Steps.SingleOrDefault(step => step.StepName == "transformations" && step.Status == FlowStepRunStatus.Succeeded)?.Output?.Clone() : null,
+        Progress = Progress(run),
+        ContractFailure = Agentstration.Schemas.DataContracts.ParseFailure(run.Error?.Details),
         RootFlowRunId = run.RootFlowRunId,
         FlowName = run.FlowId.Value,
         FlowNamespace = run.FlowId.Namespace,
         DefinitionScope = run.DefinitionScopeRef,
         DefinitionHash = run.Composition?.TemplateHash ?? run.DefinitionHash
     };
+    internal static DataSourceAcquisitionProgress Progress(FlowRun run)
+    {
+        var step = run.Steps.FirstOrDefault(value => value.Status == FlowStepRunStatus.Running)
+            ?? run.Steps.FirstOrDefault(value => value.Status == FlowStepRunStatus.Failed && value.StepType != "output")
+            ?? run.Steps.LastOrDefault(value => value.StepType != "output" && value.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed)
+            ?? run.Steps.FirstOrDefault();
+        var state = run.Status.IsTerminal() ? run.Status.ToString() : run.Status == FlowRunStatus.Pending ? "Pending"
+            : step?.OperationProgress?.State ?? run.Status.ToString();
+        return new(step?.StepName ?? "input", state, step?.OperationProgress?.Attempt ?? step?.Attempt ?? 0,
+            step?.StartedAt, run.CompletedAt ?? step?.OperationProgress?.UpdatedAt ?? step?.StartedAt ?? run.CreatedAt,
+            step?.CompletedAt, run.Error?.Code ?? step?.Error?.Code ?? step?.OperationProgress?.ErrorCode);
+    }
+
 }
 
 public sealed class DataSourceArtifactReferenceValidator(IResourceStore store)

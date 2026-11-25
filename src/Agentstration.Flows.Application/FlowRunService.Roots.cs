@@ -32,6 +32,8 @@ public sealed record EnsureRootFlowRunCommand(
     public ResourceScopeRef? DefinitionScopeRef { get; init; }
     [System.Text.Json.Serialization.JsonIgnore]
     public ResourceScopeRef? DefinitionUseScopeRef { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyDictionary<string, ResourceScopeRef> CompositionDefinitionUseScopes { get; init; } = new Dictionary<string, ResourceScopeRef>();
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];
 }
 
@@ -49,17 +51,21 @@ public sealed partial class FlowRunService
             return existing;
         }
 
-        if (command.DefinitionUseScopeRef is not null && !command.AcceptedCompositionSchemas)
+        if ((command.DefinitionUseScopeRef is not null || command.CompositionDefinitionUseScopes.Count != 0) && !command.AcceptedCompositionSchemas)
             throw new FlowValidationException("flow_definition_authorization_invalid", "Owner-side definition authorization requires an accepted internal composition.");
         var definitionUseScope = command.DefinitionUseScopeRef ?? command.Scope.AccessScopeRef;
         var resolved = await ResolveVersionAsync(definitionUseScope, command.FlowId, command.Version, command.DefinitionScopeRef, cancellationToken);
         var composed = flowDefinitions is null ? new CompiledFlowComposition(resolved, null)
-            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved, command.Compositions, definitionUseScope, cancellationToken, command.AcceptedCompositionSchemas);
+            : await new FlowCompositionService(flowDefinitions, contentOptions).ResolveAsync(resolved, command.Compositions,
+                command.CompositionDefinitionUseScopes.Count == 0 ? definitionUseScope : command.Scope.AccessScopeRef,
+                cancellationToken, command.AcceptedCompositionSchemas, ownedPointUseScopes: command.CompositionDefinitionUseScopes);
         resolved = composed.Definition;
         ValidateInput(resolved.Graph?.ResolveInputSchema(), command.Input, command.SecretInputs);
         var now = timeProvider.GetUtcNow();
         var run = new FlowRun
         {
+            CompositionDefinitionUseScopes = command.CompositionDefinitionUseScopes.Count == 0 ? null
+                : command.CompositionDefinitionUseScopes.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
             Composition = composed.Receipt,
             TransientPayloads = command.TransientPayloads,
             WorkspaceId = command.Scope.WorkspaceId,
@@ -115,6 +121,9 @@ public sealed partial class FlowRunService
 
     private static void ValidateRootIdentity(FlowRun run, EnsureRootFlowRunCommand command)
     {
+        if ((run.CompositionDefinitionUseScopes?.Count ?? 0) != command.CompositionDefinitionUseScopes.Count
+            || command.CompositionDefinitionUseScopes.Any(pair => run.CompositionDefinitionUseScopes?.GetValueOrDefault(pair.Key) != pair.Value))
+            throw new FlowValidationException("flow_root_composition_conflict", "The accepted definition authority cannot change.");
         if (run.TransientPayloads && !run.TransientPayloadsAvailable)
             throw new FlowValidationException("direct_content_unavailable", "The ephemeral execution payload is no longer available.");
         if (run.TransientPayloads != command.TransientPayloads || run.Scope != command.Scope

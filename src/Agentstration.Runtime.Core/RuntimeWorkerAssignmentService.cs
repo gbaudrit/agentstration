@@ -453,6 +453,14 @@ public sealed class RuntimeWorkerAssignmentService(
         return stored;
     }
 
+    public async Task<StoredRuntimeWorkerAssignment> RequeueInterruptedFlowExactAsync(ResourceScopeRef scopeRef,
+        RuntimeAssignmentId assignmentId, CancellationToken cancellationToken)
+    {
+        var stored = await assignments.RequeueInterruptedFlowExactAsync(scopeRef, assignmentId, timeProvider.GetUtcNow(), cancellationToken);
+        availability.Pulse();
+        return stored;
+    }
+
     private void EnsureAdmitted(RuntimeAssignmentOwnershipProof proof)
     {
         if (admission?.ClaimableAssignmentIds is { } allowed && !allowed.Contains(proof.AssignmentId))

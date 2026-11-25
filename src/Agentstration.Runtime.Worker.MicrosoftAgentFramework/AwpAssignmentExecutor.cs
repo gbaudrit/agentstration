@@ -261,6 +261,8 @@ internal sealed partial class AwpAssignmentExecutor(
     {
         // Keep declared, unselected branches nullable; only references outside this graph are invalid.
         var outputs = graph.Steps.ToDictionary(step => step.Name, _ => (JsonElement?)null, StringComparer.Ordinal);
+        var completedSteps = material.CompletedGraphSteps?.Deserialize<FlowStepRun[]>(JsonOptions) ?? [];
+        var completed = completedSteps.ToDictionary(step => step.StepName, StringComparer.Ordinal);
         var current = graph.EntryStep;
         var visited = new HashSet<string>(StringComparer.Ordinal);
         JsonElement? transitionOutput = null;
@@ -273,6 +275,15 @@ internal sealed partial class AwpAssignmentExecutor(
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var stepDefinition = graph.Steps.Single(value => value.Name == current);
+                if (completed.TryGetValue(current, out var checkpoint) && stepDefinition is not OutputFlowStepDefinition)
+                {
+                    outputs[current] = checkpoint.Output?.Clone();
+                    transitionOutput = checkpoint.Output?.Clone();
+                    var selected = graph.Transitions.SingleOrDefault(value => value.Id == checkpoint.SelectedTransition && value.FromStep == current)
+                        ?? throw new AwpExecutionNotSupportedException("flow_checkpoint_invalid", "The persisted transition does not belong to this graph.");
+                    current = selected.ToStep;
+                    continue;
+                }
                 var context = ExecutionContext(material, stepDefinition, outputs, transitionOutput);
                 var step = await OpenStepAsync(session, material, current, cancellationToken);
                 var location = new AwpExecutionLocation(material.RunId, FlowStep: step);

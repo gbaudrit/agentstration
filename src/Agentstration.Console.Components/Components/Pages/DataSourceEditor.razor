@@ -52,6 +52,8 @@ else
                 <MetricCard Label="@T("LastAcquisition")" Value="@(LatestAcquisition is null ? "—" : AcquisitionStateLabel(LatestAcquisition.State))" Detail="@(LatestAcquisition?.CreatedAt.ToLocalTime().ToString("g"))" Status="@AcquisitionTone(LatestAcquisition?.State)" Url="@(source is null ? null : AcquisitionsUrl)" />
             </OverviewMetrics>
             <OverviewSummary Context="identity">@if (source is not null) { <DataSourceResourceSummary Resource="source" Identity="identity"><AdditionalContent>
+                @if (LatestAcquisition is { Progress: { } progress } latest)
+                { <FlowOperationProgressSummary StepName="@progress.StepName" State="@progress.State" Attempt="progress.Attempt" StartedAt="progress.StartedAt" UpdatedAt="progress.UpdatedAt" CompletedAt="progress.CompletedAt" ErrorCode="@progress.ErrorCode" RunUrl="@FlowRunUrl(latest.FlowRunId, latest.ScopeRef, latest.LogicalScopeRef)" /> }
                 @if (readiness?.Issues.Count > 0) { <FormSection Title="@T("State")">@foreach (var issue in readiness.Issues) { <p>@issue</p> }</FormSection> }
                 @if (AcquisitionFlow is { } flow) { <FormSection Title="@T("AcquisitionFlow")" Description="@T("AcquisitionFlowHelp")" TestId="data-source-flow-composition"><a class="data-source-flow-card" href="@AcquisitionFlowUrl" data-testid="data-source-acquisition-flow-link"><UiIcon Name="workflow" /><strong>@flow.Name</strong><code>@AcquisitionFlowIdentity</code></a></FormSection> }
             </AdditionalContent></DataSourceResourceSummary> }</OverviewSummary>
@@ -609,17 +611,19 @@ else
         }
         else
         {
-            <CollectionView TItem="DataSourceAcquisitionResource" Items="acquisitions" RowTestId="data-source-acquisition-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" InformationLabels="@(new[] { T("Created"), T("FlowRun"), T("Version"), T("AcquiredArtifacts") })" IsExpanded="@(item => previewAcquisition == item.Uid && item.Manifest is { Artifacts.Count: > 0 })">
+            <CollectionView TItem="DataSourceAcquisitionResource" Items="acquisitions" RowTestId="data-source-acquisition-row" ItemAttributes="@((item) => new Dictionary<string, object> { ["data-state"] = item.State.ToString() })" InformationLabels="@(new[] { T("Created"), T("FlowRun"), T("Version"), T("AcquiredArtifacts") })" IsExpanded="@(item => previewAcquisition == item.Uid && item.State == DataSourceAcquisitionState.Succeeded && item.Manifest is { Artifacts.Count: > 0 })">
                 <Identity Context="item"><CollectionIdentity DisplayName="@item.Name" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" IconName="database" ><IconBadges><StatusBadge Text="@AcquisitionStateLabel(item.State)" Status="@AcquisitionTone(item.State)" IconOnly /></IconBadges></CollectionIdentity></Identity>
-                <Scope Context="item"><ResourceScopeBadge ScopeRef="item.ScopeRef" /></Scope>
+                <Scope Context="item"><ResourceScopeBadge ScopeRef="@(item.LogicalScopeRef ?? item.ScopeRef)" /></Scope>
                 <Information Context="item">
                     <CollectionValue Label="@T("Created")">@item.CreatedAt.ToLocalTime().ToString("g")</CollectionValue>
-                    <CollectionValue Label="@T("FlowRun")"><code>@item.FlowRunId</code></CollectionValue>
+                    <CollectionValue Label="@T("FlowRun")"><code>@item.FlowRunId</code>
+                    @if (item.Progress is { } progress) { <FlowOperationProgressSummary StepName="@progress.StepName" State="@progress.State" Attempt="progress.Attempt" StartedAt="progress.StartedAt" UpdatedAt="progress.UpdatedAt" CompletedAt="progress.CompletedAt" ErrorCode="@progress.ErrorCode" /> }
+                    </CollectionValue>
                     <CollectionValue Label="@T("Version")"><code>@(item.Composition?.Profile.Version ?? item.Dataset?.OperationType.Version)</code></CollectionValue>
-                    <CollectionValue Label="@T("AcquiredArtifacts")">@(item.Manifest?.Artifacts.Count.ToString() ?? "—")</CollectionValue>
+                    <CollectionValue Label="@T("AcquiredArtifacts")">@(item.State == DataSourceAcquisitionState.Succeeded ? item.Manifest?.Artifacts.Count.ToString() ?? "—" : "—")</CollectionValue>
                 </Information>
                 <Actions Context="item"><CollectionActions ResourceName="@item.Name"><a class="text-button data-source-flow-run" href="@FlowRunUrl(item.FlowRunId, item.ScopeRef, item.LogicalScopeRef)" title="@item.FlowRunId">@T("FlowRun")</a>
-                            @if (item.Manifest is { Artifacts.Count: > 0 })
+                            @if (item.State == DataSourceAcquisitionState.Succeeded && item.Manifest is { Artifacts.Count: > 0 })
                             {
                                 <div class="data-source-acquisition-actions">
                                     <button class="button-secondary" type="button" aria-expanded="@(previewAcquisition == item.Uid ? "true" : "false")" data-testid="data-source-acquisition-preview" @onclick="() => ToggleAcquisitionPreview(item.Uid)">

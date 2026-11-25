@@ -5,3 +5,5 @@
 .execution-progress-location{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin:0;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--primary) 12%,var(--border))}.execution-progress-location>div{min-width:0}dt{font-size:.75rem;color:var(--muted);margin-bottom:4px}dd{margin:0;font-size:.85rem;line-height:1.4;overflow-wrap:anywhere}dd a{text-decoration:none}dd a:hover{text-decoration:underline}dd strong{font-weight:600}
 @keyframes execution-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.execution-progress-spinner{animation:none}progress::-webkit-progress-value{transition:none}}
 @media(max-width:600px){.execution-progress{padding:12px}.execution-progress-location{grid-template-columns:minmax(0,1fr)}.execution-progress-elapsed{margin-left:auto}.execution-progress-link{margin-left:26px}.execution-progress-count{flex-wrap:wrap}progress{flex:1;max-width:100%}}
+
+.execution-progress-details{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:.8rem;color:var(--muted);min-width:0;overflow-wrap:anywhere}

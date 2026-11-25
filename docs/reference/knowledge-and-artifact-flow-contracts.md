@@ -182,3 +182,25 @@ caller and exact scope and refuses changed accepted Source generation. Projectio
 execution uses the same application use case as recovery. Console monitoring replaces
 an earlier communication failure with the persisted model/contract execution error;
 a launch timeout does not imply that its Flow failed or should be submitted twice.
+
+## Production acquisition progress
+
+The acquisition response optionally includes `progress`: `stepName`, invariant
+`state`, `attempt`, available `startedAt`, `updatedAt`, `completedAt` and safe
+`errorCode`. New standard retained executions expose real preparation, sealing and
+Artifact registration nodes in their global `flowRunId`. `Pending` means waiting
+for pickup; `Active` means work is running; `WaitingForProvider` means a retryable
+provider wait. Completion still uses the existing acquisition state and manifest.
+Batch publication has no invented record percentage.
+
+History and detail/status are metadata-only for native acquisitions. They cannot
+start a source operation, transform content, publish or repair Artifact metadata.
+Explicit content access retains current permission and exact historical target
+validation. Direct results and previously accepted/custom executions preserve their
+original publication mode. New standard roots require a Worker supporting AWP
+execution material 1.2; deploy the updated Worker alongside the server.
+
+An explicit retry after a failed standard publication retains the same acquisition
+and root identities and successful source/transformation checkpoints. Preparation,
+sealed membership and Artifact identity remain fixed; changing references requires
+a separately admitted acquisition. Cancellation and timeout do not resume implicitly.

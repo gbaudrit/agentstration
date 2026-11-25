@@ -183,6 +183,7 @@ public sealed partial class ConnectedServiceApiTests
             storage.Uid, storage.Generation, storage.ObservedState!.BindingDigest!);
         if (ownerKind == "instance-shared")
         {
+            FlowCallReference privateAdapter;
             using (scopes.PushSystem())
             {
                 var policies = factory.Services.GetRequiredService<IResourceAccessPolicyService>();
@@ -203,12 +204,25 @@ public sealed partial class ConnectedServiceApiTests
                 var operationType = (await store.GetExactAsync<ConnectedServiceOperationTypeResource>(new(adapter.Type.ScopeRef!.Value,
                     adapter.Type.Namespace ?? operation.Namespace, ConnectedServiceResourceKinds.ConnectedServiceOperationType, adapter.Type.Name), timeout.Token))!.Value;
                 var acquisition = operationType.Definition.Versions.Single(v => v.Version == adapter.Version).Acquisition!.Flow;
+                privateAdapter = new(acquisition.Flow.Name, FlowCallVersionStrategy.Exact, acquisition.Version,
+                    acquisition.Flow.Namespace, acquisition.Flow.ScopeRef)
+                { DefinitionHash = acquisition.DefinitionHash };
                 Assert.IsFalse((await factory.Services.GetRequiredService<IResourceAccessPolicyService>().EvaluateAsync(
                     new(acquisition.FlowUid, acquisition.Flow.ScopeRef!.Value, acquisition.Flow.Namespace ?? ResourceNamespace.Default,
                         FlowResourceKinds.Flow, Version: acquisition.Version), consumer, ResourceAccessAction.Use, timeout.Token)).Allowed);
             }
             using var contract = await client.PostAsJsonAsync("/api/connected-service-operations/contract", pin, timeout.Token);
             Assert.AreEqual(HttpStatusCode.OK, contract.StatusCode, await contract.Content.ReadAsStringAsync(timeout.Token));
+            using var forbiddenTransform = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest("http-private-transform",
+                new()
+                {
+                    DisplayName = "Private transform",
+                    Dataset = new(storagePin, new(Write: true), new(pin, JsonSerializer.SerializeToElement(new { })))
+                    { Transformations = [new() { Flow = privateAdapter }] }
+                }, ScopeRef: consumer), timeout.Token);
+            Assert.AreEqual(HttpStatusCode.UnprocessableEntity, forbiddenTransform.StatusCode);
+            Assert.AreEqual("flow_composition_access_denied", (await forbiddenTransform.Content.ReadFromJsonAsync<JsonElement>(timeout.Token))
+                .GetProperty("compositionErrorCode").GetString(), "Operation definition authority must not authorize a transformation.");
         }
         using var invalid = await client.PostAsJsonAsync("/api/datasources", new CreateDataSourceRequest("http-invalid",
             new() { DisplayName = "Invalid", Dataset = new(storagePin, new(Write: true), new(pin, JsonSerializer.SerializeToElement(new { q = 42 }))) }, ScopeRef: consumer));

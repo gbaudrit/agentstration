@@ -41,6 +41,14 @@ public sealed record ResolvedFlowComposition(FlowCallReference Orchestration, Js
 
 public interface IFlowCompositionResolver
 {
+    // Only application-owned required boundaries may supply owner-side definition authority.
+    Task<ResolvedFlowComposition> ResolveOwnedAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
+        FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings,
+        ResourceScopeRef? templateUseScope, IReadOnlyDictionary<string, ResourceScopeRef> ownedPointUseScopes,
+        bool accepted, CancellationToken cancellationToken) => accepted
+        ? ResolveAcceptedAsync(consumer, ownerNamespace, orchestration, bindings, cancellationToken)
+        : ResolveAsync(consumer, ownerNamespace, orchestration, bindings, cancellationToken);
+
     // Accepted receipts originate in server storage, never in caller-authored resource definitions.
     Task<ResolvedFlowComposition> ResolveAcceptedAsync(ResourceScopeRef consumer, ResourceNamespace ownerNamespace,
         FlowCallReference orchestration, IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> bindings,

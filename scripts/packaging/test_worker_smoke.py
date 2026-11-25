@@ -13,12 +13,14 @@ class WorkerEvidenceTests(unittest.TestCase):
         self.worker = {"workerId": "worker", "sessionId": "session", "enrollmentState": "Active",
                        "softwareVersion": self.entry["version"] + "+source", "maximumConcurrentAssignments": 1,
                        "capabilities": [{"runtimeKind": "microsoft-agent-framework", "capabilityVersion": "1.0",
-                                         "executionMaterialVersions": ["1.0", "1.1"]}]}
+                                         "executionMaterialVersions": ["1.0", "1.1", "1.2"]}]}
 
     def test_registered_version_and_material_compatibility_are_required(self):
         self.assertEqual("session", worker_evidence(self.worker, self.entry, "worker")["sessionId"])
         for key, value in (("workerId", "another-worker"), ("softwareVersion", "9.0.0"),
-                           ("enrollmentState", "Pending"), ("capabilities", [])):
+                           ("enrollmentState", "Pending"), ("capabilities", []),
+                           ("capabilities", [{"runtimeKind": "microsoft-agent-framework", "capabilityVersion": "1.0",
+                                              "executionMaterialVersions": ["1.0", "1.1"]}])):
             with self.subTest(key=key):
                 worker = copy.deepcopy(self.worker)
                 worker[key] = value

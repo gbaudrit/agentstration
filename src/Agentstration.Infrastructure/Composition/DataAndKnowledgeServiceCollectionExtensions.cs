@@ -26,6 +26,7 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         services.AddSingleton<DataSourceDatasetCompositionService>();
         services.AddSingleton<DataSourceDocumentStorage>();
         services.AddSingleton<DataSourceDatasetAcquisitionService>();
+        services.AddSingleton<DataSourceFlowOutcomeService>();
         services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, DataSourceStorageUsageProvider>();
         services.AddSingleton<DataSourceAcquisitionService>();
         services.AddSingleton<DataSourceDocumentAccessService>();

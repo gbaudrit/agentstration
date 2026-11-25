@@ -257,4 +257,7 @@
     <value>The draft changed while saving. Your local changes are preserved. Reload the Flow before retrying.</value>
   </data>
   <data name="IdentityMismatch"><value>The returned Flow does not match the requested namespace, owner, name or published version.</value></data>
+  <data name="Publication.publication-prepare" xml:space="preserve"><value>Prepare Storage publication</value></data>
+  <data name="Publication.publication-seal" xml:space="preserve"><value>Confirm Storage publication</value></data>
+  <data name="Publication.publication-register" xml:space="preserve"><value>Register Artifact</value></data>
 </root>

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Runtime.Tests;
 
 [TestClass]
-public sealed class RuntimeWorkerAssignmentTests
+public sealed partial class RuntimeWorkerAssignmentTests
 {
     [TestMethod]
     public async Task HostAdmissionSkipsOlderOrdinaryWorkAndAnEmptySetClaimsNothing()
