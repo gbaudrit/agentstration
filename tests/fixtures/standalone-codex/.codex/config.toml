@@ -1,0 +1,6 @@
+model = "fixture-model"
+sandbox_mode = "read-only"
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+network_access = false

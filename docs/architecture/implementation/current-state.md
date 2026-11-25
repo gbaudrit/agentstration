@@ -716,3 +716,8 @@ AGENTS/config/provenance files without resolving Secrets or writing Git. Existin
 stores/governance retain exact source/native pins; owning Workspace Bootstrap handlers resolve
 semantic version references. See [HarnessProfiles](../../reference/harness-profiles.md) and
 [ADR-0268](../../decisions/0268-harness-profiles-publish-pinned-standalone-native-configuration.md).
+
+The standalone native fixture is verified against a real API ZIP, committed and freshly cloned in
+the offline integration scenario. A separate dependency-free process verifies native inventory with
+the authority stopped; publishing v2 leaves v1 unchanged, and native edits retain normal Git merge
+conflicts. This fixture does not emulate vendor inference or install an automatic update mechanism.

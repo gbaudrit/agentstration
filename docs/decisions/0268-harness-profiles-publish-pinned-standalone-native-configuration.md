@@ -55,7 +55,8 @@ The portable file digest describes contents independently from archive encoding.
 Standalone use still requires an installed/authenticated compatible native CLI and the user's native
 project trust/configuration workflow. Native user/system settings and nested instruction overrides
 can affect effective execution after clone. Export pins generated content, not a claim that every
-external CLI configuration source has disappeared. Local bounded execution belongs to #961.
+external CLI configuration source has disappeared. Standalone clone verification belongs to #961;
+coordinated local Coding execution belongs to #966.
 
 Codex's executable reporting path is `codex exec --json`: `turn.completed` events may report usage
 counters. Preview documents the known input/cached-input/output/optional reasoning-output fields;

@@ -244,6 +244,7 @@
     <Project Path="tests/Agentstration.Extensions.PostgreSql.Tests/Agentstration.Extensions.PostgreSql.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/fixtures/">
+    <Project Path="tests/fixtures/NativeHarnessProbe/NativeHarnessProbe.csproj" />
     <Project Path="tests/fixtures/StorageVolumeProbe/StorageVolumeProbe.csproj" />
   </Folder>
   <Folder Name="/tests/Models/">

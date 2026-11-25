@@ -88,7 +88,33 @@ can include `input_tokens`, `cached_input_tokens`, `output_tokens` and optional
 `reasoning_output_tokens`. Cached input is a subset of input, and reasoning output is a subset of
 output when reported. Do not add those subsets again to totals. Missing counters, provider
 cost/currency and provider duration stay unavailable. Automatic correlated accounting belongs to
-#1348; bounded local execution belongs to #961.
+#1348; coordinated local Coding execution belongs to #966.
+
+## Reproduce a standalone clone
+
+The checked-in [standalone fixture](https://github.com/gbaudrit/agentstration/tree/codex/946-durable-task-trees/tests/fixtures/standalone-codex) contains an
+exact deterministic v1 export and a native Git recipe. It is also reusable as a minimal repository
+input for Workspace seeding. Its `fixture-model` is intentionally offline; a vendor smoke needs
+a separately published native configuration naming an available model. The ordinary
+`workspace-codex-harness` catalog demonstrates that publication shape without enabling it by default.
+
+`HarnessProfileApiTests.FreshGitCloneRunsOfflineAfterAuthorityStopsAndRetainsV1AndNativeMergeConflicts`
+publishes through the real service/API/SQLite path, commits the downloaded archive, clones it and
+disposes the authority before starting a separate inventory probe. The probe references only the
+.NET base libraries. The test restarts/publishes v2 and proves the v1 clone's bytes/commit remain
+unchanged, then asserts ordinary Git conflict markers for divergent native edits. Changed native
+files invalidate provenance. No background propagation, runtime profile fetch or Git reconciliation
+is installed. This extends ADR-0268 without adding another execution authority.
+
+Run the offline scenario with the standard Release build:
+
+```sh
+dotnet test --project tests/Agentstration.Api.Tests --configuration Release --no-build --filter 'FullyQualifiedName~FreshGitCloneRunsOffline'
+```
+
+The fixture README separates an installed vendor CLI smoke from the offline process probe. Native
+help/parser/diagnostic checks are not evidence of a successful live model turn. Preserve the
+native project's trust/override behavior; publishing or cloning does not authorize permanent trust.
 
 Native references: [non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode),
 [configuration precedence](https://learn.chatgpt.com/docs/config-file/config-basic), and

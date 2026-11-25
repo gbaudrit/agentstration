@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -20,6 +21,99 @@ namespace Agentstration.Web.Tests;
 public sealed class HarnessProfileApiTests
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    [TestMethod]
+    public async Task FreshGitCloneRunsOfflineAfterAuthorityStopsAndRetainsV1AndNativeMergeConflicts()
+    {
+        await using var fixture = new Fixture(); await fixture.StartAsync();
+        using var native = await fixture.Http.PostAsJsonAsync(fixture.Prefix + "/harness-configurations", Native());
+        Assert.AreEqual(HttpStatusCode.Created, native.StatusCode);
+        using var created = await fixture.Http.PostAsJsonAsync(fixture.Prefix + "/harness-profiles", Profile());
+        var draft = (await created.Content.ReadFromJsonAsync<HarnessProfileResource>())!;
+        using var published = await fixture.Http.PostAsJsonAsync(fixture.Prefix + "/namespaces/default/harness-profiles/coder/versions", new PublishHarnessProfileRequest("1.0.0", draft.ETag!));
+        var v1 = (await published.Content.ReadFromJsonAsync<HarnessProfileVersionResource>())!;
+        using var export = await fixture.Http.PostAsJsonAsync(fixture.Prefix + "/harness-export", Export(v1));
+        Assert.AreEqual(HttpStatusCode.OK, export.StatusCode);
+        var root = Path.Combine(Path.GetTempPath(), "agentstration-standalone-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(root);
+        try
+        {
+            var repository = Path.Combine(root, "repository"); var clone = Path.Combine(root, "clone");
+            System.IO.Directory.CreateDirectory(repository);
+            using (var archive = new ZipArchive(new MemoryStream(await export.Content.ReadAsByteArrayAsync()))) archive.ExtractToDirectory(repository);
+            await File.WriteAllTextAsync(Path.Combine(repository, ".gitattributes"), "* text eol=lf\n");
+            var sourceRoot = RepositoryRoot();
+            foreach (var relative in new[] { "AGENTS.md", ".codex/config.toml", "agentstration-harness.provenance.json" })
+                CollectionAssert.AreEqual(await File.ReadAllBytesAsync(Path.Combine(sourceRoot, "tests/fixtures/standalone-codex", relative)),
+                    await File.ReadAllBytesAsync(Path.Combine(repository, relative)), relative);
+            await RunAsync(repository, "git", "init", "--initial-branch=main");
+            await GitIdentityAsync(repository); await RunAsync(repository, "git", "add", ".");
+            await RunAsync(repository, "git", "commit", "-m", "Native harness v1");
+            var original = (await RunAsync(repository, "git", "rev-parse", "HEAD")).Trim();
+            await RunAsync(root, "git", "-c", "core.autocrlf=false", "clone", "--no-local", repository, clone);
+            var cloneBytes = await File.ReadAllBytesAsync(Path.Combine(clone, "AGENTS.md"));
+            await fixture.StopAsync();
+            var configuration = new DirectoryInfo(AppContext.BaseDirectory).Parent!.Name;
+            var probe = Path.Combine(sourceRoot, "tests/fixtures/NativeHarnessProbe/bin", configuration, "net10.0/NativeHarnessProbe.dll");
+            // No request context, server, SDK or resource store is present in this launched process.
+            using var report = JsonDocument.Parse(await RunAsync(clone, DotnetHost(), probe, "--verify"));
+            Assert.AreEqual("offline-inventory-probe", report.RootElement.GetProperty("mode").GetString());
+            Assert.AreEqual("1.0.0", report.RootElement.GetProperty("version").GetString());
+            Assert.AreEqual("Implement fixture-project.\n", report.RootElement.GetProperty("instructions").GetString());
+            await fixture.StartAsync();
+            using var update = await fixture.Http.PutAsJsonAsync(fixture.Prefix + "/namespaces/default/harness-profiles/coder",
+                new HarnessProfileUpdateRequest(draft.Definition with { Instructions = "Deliver {{project-name}} v2." }, draft.ETag!));
+            var changed = (await update.Content.ReadFromJsonAsync<HarnessProfileResource>())!;
+            using var publishedV2 = await fixture.Http.PostAsJsonAsync(fixture.Prefix + "/namespaces/default/harness-profiles/coder/versions", new PublishHarnessProfileRequest("2.0.0", changed.ETag!));
+            Assert.AreEqual(HttpStatusCode.Created, publishedV2.StatusCode);
+            CollectionAssert.AreEqual(cloneBytes, await File.ReadAllBytesAsync(Path.Combine(clone, "AGENTS.md")));
+            Assert.AreEqual(original, (await RunAsync(clone, "git", "rev-parse", "HEAD")).Trim());
+            await fixture.StopAsync();
+            await GitIdentityAsync(clone); await RunAsync(clone, "git", "checkout", "-b", "local-edit");
+            await File.WriteAllTextAsync(Path.Combine(clone, "AGENTS.md"), "Local native instruction edit.\n");
+            await RunAsync(clone, "git", "add", "AGENTS.md"); await RunAsync(clone, "git", "commit", "-m", "Local edit");
+            await RunAsync(clone, "git", "checkout", "main");
+            await File.WriteAllTextAsync(Path.Combine(clone, "AGENTS.md"), "Another native instruction edit.\n");
+            await RunAsync(clone, "git", "add", "AGENTS.md"); await RunAsync(clone, "git", "commit", "-m", "Conflicting edit");
+            await RunAsync(clone, "git", 1, "merge", "--no-edit", "local-edit");
+            StringAssert.Contains(await RunAsync(clone, "git", "diff", "--name-only", "--diff-filter=U"), "AGENTS.md");
+            StringAssert.Contains(await File.ReadAllTextAsync(Path.Combine(clone, "AGENTS.md")), "<<<<<<< HEAD");
+            await RunAsync(clone, DotnetHost(), 6, probe, "--verify");
+        }
+        finally { System.IO.Directory.Delete(root, true); }
+    }
+
+    private static async Task GitIdentityAsync(string directory)
+    {
+        await RunAsync(directory, "git", "config", "user.name", "Standalone fixture");
+        await RunAsync(directory, "git", "config", "user.email", "fixture@agentstration.invalid");
+        await RunAsync(directory, "git", "config", "commit.gpgsign", "false");
+        await RunAsync(directory, "git", "config", "core.autocrlf", "false");
+    }
+    private static string RepositoryRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+            if (File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx"))) return directory.FullName;
+        throw new InvalidOperationException("Repository fixture unavailable.");
+    }
+    private static string DotnetHost() => Environment.GetEnvironmentVariable("DOTNET_HOST_PATH")
+        ?? Path.Combine(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(), "../../../dotnet" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+    private static Task<string> RunAsync(string directory, string executable, params string[] arguments) => RunAsync(directory, executable, 0, arguments);
+    private static async Task<string> RunAsync(string directory, string executable, int expectedExit, params string[] arguments)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var start = new ProcessStartInfo(executable) { WorkingDirectory = directory, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+        foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        start.Environment["GIT_TERMINAL_PROMPT"] = "0";
+        using var process = Process.Start(start)!;
+        try
+        {
+            var output = process.StandardOutput.ReadToEndAsync(timeout.Token); var error = process.StandardError.ReadToEndAsync(timeout.Token);
+            await process.WaitForExitAsync(timeout.Token);
+            Assert.AreEqual(expectedExit, process.ExitCode, await error); return await output;
+        }
+        finally { if (!process.HasExited) process.Kill(true); }
+    }
 
     [TestMethod]
     public async Task PublishExportAndRestartKeepExactVersionsAndDeterministicOwnedNativeFiles()
@@ -173,6 +267,7 @@ public sealed class HarnessProfileApiTests
         public string Prefix => $"/api/workspaces/{Context.WorkspaceId}/coding";
         public async Task StartAsync()
         {
+            stopped = false;
             Host = new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development"); builder.UseSetting("Data:Directory", Directory);
@@ -182,7 +277,9 @@ public sealed class HarnessProfileApiTests
             Http = Host.CreateClient(); Context = await Host.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         }
         public IDisposable Scope() => Host.Services.GetRequiredService<IRequestContextScopeFactory>().Push(Context);
-        public async Task RestartAsync() { Http.Dispose(); await Host.DisposeAsync(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); await StartAsync(); }
-        public async ValueTask DisposeAsync() { Http.Dispose(); await Host.DisposeAsync(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); if (System.IO.Directory.Exists(Directory)) System.IO.Directory.Delete(Directory, true); }
+        private bool stopped;
+        public async Task StopAsync() { if (stopped) return; stopped = true; Http.Dispose(); await Host.DisposeAsync(); Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); }
+        public async Task RestartAsync() { await StopAsync(); await StartAsync(); }
+        public async ValueTask DisposeAsync() { await StopAsync(); if (System.IO.Directory.Exists(Directory)) System.IO.Directory.Delete(Directory, true); }
     }
 }
