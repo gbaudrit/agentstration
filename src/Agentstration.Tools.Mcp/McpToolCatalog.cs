@@ -398,7 +398,7 @@ public sealed class McpToolInvoker(
 
     public async ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken, joinExisting: true);
+        using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken);
         var (tool, provider) = await ResolveAsync(context, cancellationToken);
         using var resolved = await ResolveInputsAsync(context, cancellationToken);
         ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
@@ -417,7 +417,7 @@ public sealed class McpToolInvoker(
 
     public async ValueTask<ToolInvocationResult> InvokeDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
-        using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken, joinExisting: true);
+        using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken);
         try { return await InvokeCoreAsync(context, cancellationToken); }
         catch (Exception exception) when (exception is not OperationCanceledException && context.SecretInputs.Count > 0)
         {

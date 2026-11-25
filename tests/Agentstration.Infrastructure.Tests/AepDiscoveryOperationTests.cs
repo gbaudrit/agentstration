@@ -93,7 +93,7 @@ public sealed class AepDiscoveryOperationTests
     }
 
     [TestMethod]
-    public async Task NestedOperationsRestoreTheirParentAndJoiningKeepsItsDiscovery()
+    public async Task NestedOperationsRestoreTheirParentsDiscovery()
     {
         var http = new ManifestHttpFactory();
         var transport = new AepMcpTransport(http, NullLoggerFactory.Instance);
@@ -101,8 +101,7 @@ public sealed class AepDiscoveryOperationTests
         using var outer = transport.BeginDiscoveryOperation(default);
         var first = await transport.DiscoverAsync(extension, "example.extension", default);
         http.Version = "2.0.0";
-        using (transport.BeginDiscoveryOperation(default, joinExisting: true))
-            Assert.AreSame(first, await transport.DiscoverAsync(extension, "example.extension", default));
+        Assert.AreSame(first, await transport.DiscoverAsync(extension, "example.extension", default));
         using (transport.BeginDiscoveryOperation(default))
             Assert.AreEqual("2.0.0", (await transport.DiscoverAsync(extension, "example.extension", default)).Extension.Version);
         Assert.AreSame(first, await transport.DiscoverAsync(extension, "example.extension", default));
@@ -185,6 +184,29 @@ public sealed class AepDiscoveryOperationTests
         release.SetResult();
         Assert.AreEqual("2.0.0", (await child).Extension.Version);
         Assert.AreEqual(2, http.Calls);
+    }
+
+    [TestMethod]
+    public async Task AnIndependentChildOperationSurvivesTheEndOfItsParentOperation()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var http = new ManifestHttpFactory { BeforeReply = async token => { entered.SetResult(); await release.Task.WaitAsync(token); } };
+        var transport = new AepMcpTransport(http, NullLoggerFactory.Instance);
+        var extension = Extension("independent-child");
+        Task<AepManifest> child;
+        using (transport.BeginDiscoveryOperation(default))
+        {
+            child = Task.Run(async () =>
+            {
+                using var operation = transport.BeginDiscoveryOperation(default);
+                return await transport.DiscoverAsync(extension, "example.extension", default);
+            });
+            await entered.Task;
+        }
+        release.SetResult();
+        Assert.AreEqual("example.extension", (await child).Extension.Id);
+        Assert.AreEqual(1, http.Calls);
     }
 
     [TestMethod]

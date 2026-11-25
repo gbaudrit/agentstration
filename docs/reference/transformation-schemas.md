@@ -292,6 +292,8 @@ configuration, expected identity, credentials source and caller context use one
 pending discovery. A new operation discovers again; there is no cross-request TTL
 or credential-value cache. Streaming HTTP sessions do not own a long-lived cache;
 each MCP call owns its operation instead.
+Independent Tool invocations and background operations start their own scope,
+so completing a parent HTTP operation cannot cancel an independent child.
 
 Only discovery descriptors are shared. Schema resolution, authorization,
 definition/instance validation, provider selection and ambiguity rules remain

@@ -11,10 +11,9 @@ public sealed partial class AepMcpTransport
     private readonly AsyncLocal<DiscoveryOperation?> discoveryOperation = new();
 
     /// <summary>Shares descriptor discovery for one bounded operation, never across requests.</summary>
-    public IDisposable BeginDiscoveryOperation(CancellationToken cancellationToken, bool joinExisting = false)
+    public IDisposable BeginDiscoveryOperation(CancellationToken cancellationToken)
     {
         var previous = discoveryOperation.Value;
-        if (joinExisting && previous is { IsDisposed: false }) return new DiscoveryLease(null);
         var operation = new DiscoveryOperation(cancellationToken);
         discoveryOperation.Value = operation;
         return new DiscoveryLease(() =>
@@ -107,7 +106,7 @@ public sealed partial class AepMcpTransport
         }
     }
 
-    private sealed class DiscoveryLease(Action? close) : IDisposable
+    private sealed class DiscoveryLease(Action close) : IDisposable
     {
         private Action? close = close;
         public void Dispose() => Interlocked.Exchange(ref close, null)?.Invoke();
