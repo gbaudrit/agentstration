@@ -174,7 +174,11 @@ public sealed partial class DataSourceDatasetAcquisitionService(
         {
             var observed = await ObserveAsync(stored, cancellationToken);
             if (observed.Value.State == stored.Value.State) return stored;
-            var observedValue = observed.Value with { Generation = checked(stored.Value.Generation + 1) };
+            var observedValue = observed.Value with
+            {
+                Generation = checked(stored.Value.Generation + 1),
+                CompletedAt = Terminal(observed.Value.State) ? stored.Value.CompletedAt ?? clock.GetUtcNow() : null
+            };
             try { return await execution.InWorkspaceAsync(() => store.PutExactAsync(observedValue.ScopeRef!.Value, observedValue, stored.ETag, false, cancellationToken)); }
             catch (ResourceConcurrencyException) { return stored; }
         }

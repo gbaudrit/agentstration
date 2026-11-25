@@ -27,6 +27,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
             for (var retry = 0; ; retry++)
             {
                 var value = stored.Value;
+                var completionTime = value.CompletedAt ?? clock.GetUtcNow();
                 var finalState = state;
                 var errorCode = code;
                 if (state == DataSourceAcquisitionState.Succeeded && value.Dataset is { Definition.Storage: null } direct)
@@ -45,7 +46,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                         else DataSourceDatasetCompositionService.ValidateOutput(direct.OutputSchema, valueToValidate, (contentOptions ?? new()).MaximumValueBytes);
                         projection ??= JsonRecordProjection.Normalize(directOutput, DataSourceDatasetCompositionService.Contract(direct, value.Name));
                         var bytes = StorageRecordSets.Encode(projection.Value.EnumerateArray().ToArray());
-                        value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), value.DirectResult?.ExpiresAt ?? clock.GetUtcNow().AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
+                        value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), value.DirectResult?.ExpiresAt ?? completionTime.AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
                     }
                     catch (Exception exception) when (exception is ArgumentException or DataContractException or DataSourceValidationException or DataSourceAcquisitionException)
                     {
@@ -71,8 +72,8 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                     {
                         Generation = checked(value.Generation + 1),
                         State = finalState,
-                        Progress = progress with { State = finalState.ToString(), ErrorCode = errorCode },
-                        CompletedAt = completedAt,
+                        Progress = progress with { State = finalState.ToString(), ErrorCode = errorCode, CompletedAt = progress.CompletedAt ?? completedAt },
+                        CompletedAt = completionTime,
                         ErrorCode = errorCode,
                         ContractFailure = contractFailure,
                         Status = new() { ProvisioningState = finalState == DataSourceAcquisitionState.Succeeded ? ProvisioningState.Succeeded : ProvisioningState.Failed }

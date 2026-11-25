@@ -34,6 +34,7 @@ public sealed partial class DataSourceDatasetTests
         SelectConsoleContext(client, Owner);
         var acquisition = await WaitAsync(client, accepted.Value.Name);
         var receipt = acquisition.DirectResult!;
+        Assert.AreEqual(clock.Now, acquisition.CompletedAt!.Value);
         Assert.AreEqual(clock.Now.AddMinutes(5), receipt.ExpiresAt);
         var output = await datasets.ReadDirectAsync(acquisition, receipt.RequestId, default);
         Assert.AreEqual("ephemeral", output[0].GetProperty("dataset").GetString());
@@ -47,6 +48,8 @@ public sealed partial class DataSourceDatasetTests
         var replay = (await factory.Services.GetRequiredService<DataSourceAcquisitionService>().GetAsync(
             ResourceNamespace.Default, acquisition.Name, default)).Value;
         Assert.AreEqual(receipt, replay.DirectResult);
+        Assert.AreEqual(acquisition.CompletedAt, replay.CompletedAt);
+        Assert.AreEqual(acquisition.Progress!.CompletedAt, replay.Progress!.CompletedAt);
         var expired = await Assert.ThrowsAsync<DataSourceAcquisitionException>(() => datasets.ReadDirectAsync(replay, receipt.RequestId, default));
         Assert.AreEqual("data_source_direct_content_unavailable", expired.Code);
     }
