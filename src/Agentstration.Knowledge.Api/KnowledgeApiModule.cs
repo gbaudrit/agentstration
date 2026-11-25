@@ -22,7 +22,9 @@ public static class KnowledgeApiModule
             catch (Agentstration.DataSources.Contracts.SourceSampleUnavailableException error) { return Results.Problem(statusCode: 422, title: error.Code); }
             catch (KnowledgeSourceValidationException error) { return Results.Problem(statusCode: 422, title: error.Code); }
             catch (Agentstration.Flows.FlowValidationException error) { return Results.Problem(statusCode: 422, title: error.Code); }
-        }).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns);
+        }).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns)
+            .Produces<Agentstration.Knowledge.Contracts.PreparedKnowledgePreview>()
+            .WithSummary("Prepare a Knowledge Source aggregate preview input");
         return endpoints;
     }
 }
