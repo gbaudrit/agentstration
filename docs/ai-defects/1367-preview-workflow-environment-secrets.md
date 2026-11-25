@@ -8,7 +8,7 @@ Open — 2026-11-25
 
 - Issue: [#1367](https://github.com/gbaudrit/agentstration/issues/1367), child of [#1285](https://github.com/gbaudrit/agentstration/issues/1285).
 - Introducing change: [#1366](https://github.com/gbaudrit/agentstration/pull/1366), merged as [8adbdba3](https://github.com/gbaudrit/agentstration/commit/8adbdba3f7a463e71036556e570a52d821a38809).
-- Corrective pull request: Pending creation.
+- Corrective pull request: [#1368](https://github.com/gbaudrit/agentstration/pull/1368).
 - Related ADRs: [ADR-0259](../decisions/0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md).
 
 ## Defect
