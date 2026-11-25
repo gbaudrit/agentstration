@@ -1,0 +1,17 @@
+@using Agentstration.Schemas.Contracts
+@using Agentstration.Web.Components.Schemas
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+<details class="sequence-contract" data-testid="sequence-contract-details">
+    <summary>@Label · @(Contract?.Format ?? Localizer["Preview.Undetermined"].Value) @Contract?.Source?.Name @Contract?.Source?.Version</summary>
+    @if (Contract is { } contract)
+    {
+        <p>@Localizer["Preview.Origin"] <code>@contract.Path</code></p>
+        <p><code>@contract.Source?.SchemaPath</code> <code>@contract.DefinitionHash</code></p>
+        @if (contract.ParentDefinitionHash is { } parent) { <p>@Localizer["Preview.ParentHash"] <code>@parent</code></p> }
+        <SchemaDocumentEditor Value="contract.Content" Format="@contract.Format" Dialect="@contract.Dialect" ReadOnly="true" />
+    }
+</details>
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public SchemaBindingSnapshot? Contract { get; set; }
+}

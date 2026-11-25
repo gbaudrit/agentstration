@@ -256,7 +256,8 @@ public sealed partial class ConnectedServiceApiTests
         _ = await DiscoverAsync();
         var rediscovered = (await client.GetFromJsonAsync<ConnectedServiceOperationResource[]>(operationsUrl, timeout.Token))!.Single();
         Assert.AreEqual(operation.Uid, rediscovered.Uid);
-        Assert.AreEqual(operation.Generation + 1, rediscovered.Generation);
+        // Observation of an identical producer does not invalidate exact consumer/content pins.
+        Assert.AreEqual(operation.Generation, rediscovered.Generation);
         Assert.AreEqual(operation.Definition.DefinitionDigest, rediscovered.Definition.DefinitionDigest);
         Assert.IsTrue(rediscovered.Enabled);
         Assert.HasCount(3, requests);

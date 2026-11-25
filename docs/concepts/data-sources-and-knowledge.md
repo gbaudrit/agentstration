@@ -366,3 +366,49 @@ and explicitly adopt a new exposure to use contribution-specific access. Older
 native relay contracts which no longer match their platform source fail
 explicitly and require republication; historical Snapshot content remains intact.
 See [ADR-0237](../decisions/0237-knowledge-toolsets-describe-and-restrict-contributions.md).
+
+## Guided contracts and authoring samples
+
+Source sequence cards expose effective input/output contracts and exact origin.
+Expand a summary on the left to inspect its Schema; select a card to inspect its
+value on the right. The right panel has no independent step navigation.
+Compatibility is verified, incompatible or undetermined. Matching media types do
+not prove structural compatibility.
+
+`json.explode` offers object-collection paths from the preceding declared JSON
+Schema and derives the exact item binding, parent/version/hash and Schema path.
+Manual configuration remains available for ambiguous or unsupported selections.
+Samples never define authoritative contracts. Correct a stale derived choice
+explicitly after an upstream contract change.
+
+Operation discovery exposes separate transport and adopted content contracts.
+Adopt an exact published Schema version explicitly. XSD validates the matching
+`mediaType` envelope's `content` string; the JSON transport contract remains enforced.
+New Schema publications do not change adoption or accepted consumer pins.
+
+**Acquire a sample** calls only the configured read-only operation and captures
+its response before Data Source transformations. **Recalculate preview** replays
+the supported draft sequence against that same sample without another operation
+call. Neither publishes a production result, changes last success/freshness nor
+activates a Knowledge Snapshot. Unsupported steps stop preview explicitly. Draft
+changes mark results stale; changed operation parameters require explicit sampling.
+
+Samples are principal/context-bound ephemeral evidence, limited to 1 MiB and
+15 minutes within the existing bounded execution payload budgets. They support
+explicit deletion and disappear on restart. Invalid responses remain inspectable
+with failed validation but cannot be replayed as valid input. Display excerpts do
+not truncate engine execution.
+
+Knowledge bindings explicitly select compatible completed retained acquisitions.
+These are already transformed Data Source results, represented by the same Artifact
+manifest consumed in production. They are not raw operation samples. Prepare named
+bindings before the aggregate input. Missing required inputs block preparation;
+optional failures stay explicit. Global transformations run once on the builtin
+projection result. Custom points are compatible only when their input directly maps
+to a supported governed boundary. When no retained result exists, acquire a raw sample explicitly on the Data Source and
+prepare its saved sequence result once by sample ID. This supports direct inputs without
+publishing production content. Historical Profile inputs without an exact native
+consumption boundary remain unavailable; rendering never starts production acquisition.
+
+See [ADR-0264](../decisions/0264-source-authoring-keeps-contracts-and-raw-samples-separate.md)
+for lifecycle, compatibility and integration boundaries.

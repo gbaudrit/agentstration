@@ -33,6 +33,8 @@ internal static class InternalToolsServiceCollectionExtensions
         services.AddSingleton<BuiltinHttpOperationExecutor>();
         AddInternalTool<ConnectedServiceAcquisitionMcpTool>(services);
         services.AddSingleton<ConnectedServiceAcquisitionExecutor>();
+        services.AddSingleton<ConnectedServiceRawOperationExecutor>();
+        services.AddSingleton<Agentstration.DataSources.ISourceOperationSampleExecutor>(provider => provider.GetRequiredService<ConnectedServiceRawOperationExecutor>());
         AddInternalTool<ResourcePlanCreateMcpTool>(services);
         AddInternalTool<ResourcePlanGetMcpTool>(services);
         AddInternalTool<ResourcePlanRefineMcpTool>(services);

@@ -454,7 +454,10 @@ public sealed class ConnectedServiceOperationDiscoveryService(
                 Metadata = new() { Name = operationName, Namespace = discovery.Namespace },
                 ScopeRef = serviceScope,
                 Generation = existing.TryGetValue(candidate.ExternalId, out var previous)
-                    ? checked(previous.Value.Generation + 1) : 1,
+                    ? previous.Value.Definition.DefinitionDigest == definitionDigest
+                        && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(previous.Value.Definition.Service), JsonSerializer.SerializeToElement(discovery.Service))
+                        && JsonElement.DeepEquals(JsonSerializer.SerializeToElement(previous.Value.Definition.Type), JsonSerializer.SerializeToElement(candidate.Type))
+                            ? previous.Value.Generation : checked(previous.Value.Generation + 1) : 1,
                 Enabled = previous?.Value.Enabled ?? false,
                 Status = Succeeded(),
                 Definition = new()
@@ -465,6 +468,8 @@ public sealed class ConnectedServiceOperationDiscoveryService(
                     Type = candidate.Type,
                     ExternalId = candidate.ExternalId,
                     Definition = candidate.Definition.Clone(),
+                    AdoptedContentContract = previous?.Value.Definition.AdoptedContentContract,
+                    ContentContractRevisions = previous?.Value.Definition.ContentContractRevisions,
                     DefinitionDigest = definitionDigest,
                     Provenance = provenance
                 },

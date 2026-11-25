@@ -247,8 +247,25 @@ public sealed record ConnectedServiceOperationDiscoveryProvenance
     public required DateTimeOffset DiscoveredAt { get; init; }
 }
 
+public sealed record AdoptOperationContentContractRequest(string MediaType, string ContentPointer, Agentstration.Schemas.Contracts.SchemaVersionReference Schema);
+
+/// <summary>Administrative adoption; separate from the provider-owned JSON transport definition.</summary>
+public sealed record OperationContentContract(string MediaType, string ContentPointer,
+    Agentstration.Schemas.Contracts.SchemaBindingSnapshot Schema)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ProducerDefinitionDigest { get; init; }
+}
+
+public sealed record OperationContentContractRevision(long Generation, string DefinitionDigest,
+    ConnectedServiceRevisionReference Service, ConnectedServiceOperationTypeReference Type, OperationContentContract? Content);
+
 public sealed record ConnectedServiceOperationProperties
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<OperationContentContractRevision>? ContentContractRevisions { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OperationContentContract? AdoptedContentContract { get; init; }
     public required string DisplayName { get; init; }
     public string? Description { get; init; }
     public required ConnectedServiceRevisionReference Service { get; init; }

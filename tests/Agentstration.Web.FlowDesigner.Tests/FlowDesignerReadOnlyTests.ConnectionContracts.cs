@@ -144,9 +144,12 @@ public sealed partial class FlowDesignerReadOnlyTests
 
         await rendered.InvokeAsync(() => rendered.FindComponent<FlowCanvas>().Instance.StepSettingsRequested.InvokeAsync("input"));
         rendered.Find("[data-testid='step-settings-tab-output']").Click();
-        StringAssert.Contains(rendered.Find("[data-testid='input-output-contract']").TextContent, "Same as input contract");
-        Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
-            .GetProperty("properties").GetProperty("request").GetProperty("type").GetString());
+        rendered.WaitForAssertion(() =>
+        {
+            StringAssert.Contains(rendered.Find("[data-testid='input-output-contract']").TextContent, "Same as input contract");
+            Assert.AreEqual("string", rendered.FindComponent<SchemaDocumentEditor>().Instance.Value
+                .GetProperty("properties").GetProperty("request").GetProperty("type").GetString());
+        });
     }
 
     [TestMethod]

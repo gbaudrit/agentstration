@@ -5,17 +5,75 @@
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> FunctionLocalizer
 
-<section class="form-section" data-testid="flow-sequence-editor" aria-busy="@loading.ToString().ToLowerInvariant()" data-load-revision="@loadRevision">
+<section class="form-section" data-testid="flow-sequence-editor" aria-busy="@loading.ToString().ToLowerInvariant()" data-load-revision="@loadRevision" data-preview-state="@(replay is null ? "none" : PreviewStale ? "stale" : "current")">
     <h3>@Title</h3><p>@T("SequenceHelp")</p>
     @if (loadFailed) { <p role="status">@T("SequenceUnavailable")</p> }
     @if (!loading && !loadFailed && options.Count == 0 && functionOptions.Count == 0) { <p role="status">@T("SequenceNoPublishedFlows")</p> }
+    <FormActions>
+        @if (SampleAcquisition is not null) { <button class="button-secondary" type="button" disabled="@(sampleBusy)" @onclick="AcquireSampleAsync" data-testid="source-sample-acquire">@T("Preview.Acquire")</button> }
+        <button class="button-primary" type="button" disabled="@(sampleBusy || sample?.State != SourceSampleState.Ready || PreparedInputStale || SampleExpired || SampleParametersStale)" @onclick="ReplayAsync" data-testid="source-preview-recalculate">@T("Preview.Recalculate")</button>
+        @if (sampleBusy && sample is { State: SourceSampleState.Pending or SourceSampleState.Running }) { <button type="button" class="button-secondary" @onclick="CancelSampleAsync">@T("Preview.CancelSample")</button> }
+        @if (sample is not null) { <button class="text-button" type="button" disabled="@sampleBusy" @onclick="DeleteSampleAsync">@T("Preview.DeleteSample")</button> }
+    </FormActions>
+    @if (ConsumedSource is not null)
+    {
+        <div @oninput:stopPropagation @onchange:stopPropagation>
+        <FormField Label="@T("Preview.RawSampleId")" Help="@T("Preview.PrepareSourceHelp")"><ClearableText @bind-Value="rawSourceSampleId" Disabled="sampleBusy" maxlength="32" /></FormField>
+        <button type="button" class="button-secondary" disabled="@(sampleBusy || string.IsNullOrEmpty(rawSourceSampleId))" @onclick="PrepareSourceSampleAsync">@T("Preview.PrepareSource")</button>
+        <FormActions><button type="button" class="button-secondary" disabled="@sampleBusy" @onclick="LoadConsumedAsync">@T("Preview.FindConsumed")</button></FormActions>
+        @if (consumedLoaded)
+        {
+            @if (consumedCandidates.Count == 0) { <p role="status">@T("Preview.NoConsumed")</p> }
+            else
+            {
+                <FormField Label="@T("Preview.ConsumedAcquisition")"><ClearableSelect TValue="string" @bind-Value="consumedId" disabled="@sampleBusy"><option value="">@T("Preview.SelectAcquisition")</option>@foreach (var candidate in consumedCandidates) { <option value="@candidate.Id">@candidate.Id · @candidate.CompletedAt?.ToLocalTime()</option> }</ClearableSelect></FormField>
+                <button type="button" class="button-secondary" disabled="@(sampleBusy || string.IsNullOrEmpty(consumedId))" @onclick="PrepareConsumedAsync">@T("Preview.PrepareConsumed")</button>
+            }
+        }
+        </div>
+    }
+    @if (SampleExpired) { <p role="status">@T("Preview.Expired")</p> }
+    @if (SampleParametersStale) { <p role="status">@T("Preview.PreparedStale")</p> }
+    @if (PreparedInputStale) { <p role="status">@T("Preview.PreparedStale")</p> }
+    @if (sample?.ContextEvidence is { } evidence) { <details><summary>@T("Preview.Origin")</summary><SourceValueInspector Value="evidence" /></details> }
+    @if (sample is not null) { <p role="status">@T("Preview.State." + sample.State) · @sample.ExpiresAt.ToLocalTime() <code>@sample.ErrorCode</code> <CopyableValue Value="@sample.Id" /></p> }
+    @if (authoringFailed) { <p role="alert">@T("Preview.Unavailable")</p> }
+    <div class="source-sequence-workbench"><div class="source-sequence-cards">
+    <button type="button" class="button-secondary source-input-card" aria-pressed="@(selectedPosition == 0)" @onclick="() => selectedPosition = 0" data-testid="source-sequence-input">0 · @T("Preview.Input")</button>
+    <button type="button" class="text-button" @onclick="FocusPreviewAsync">@T("Preview.Focus")</button>
+    @if (ContentInput is { } native) { <SequenceContractDetails Label="@T("Preview.Content")" Contract="native" /> }
+    @if ((analysis?.Input ?? InputContract ?? sample?.Contract) is { } initial) { <SequenceContractDetails Label="@T("Preview.Output")" Contract="initial" /> }
     @if (Value.Count == 0) { <p class="muted">@T("SequenceIdentity")</p> }
     @for (var index = 0; index < Value.Count; index++)
     {
         var position = index; var call = Value[index]; var selected = options.FirstOrDefault(option => Key(option.Reference) == Key(FlowReference(call)));
         var function = call.Function is null ? null : functionOptions.FirstOrDefault(option => FunctionKey(option.Function.Reference) == FunctionKey(call.Function));
-        <fieldset class="form-section" disabled="@ReadOnly" data-testid="flow-sequence-call" data-flow-reference="@Key(FlowReference(call))">
-            <legend>@Localizer["SequencePosition", index + 1]</legend>
+        <fieldset class="form-section @(selectedPosition == position + 1 ? "source-sequence-selected" : "")" data-testid="flow-sequence-call" data-flow-reference="@Key(FlowReference(call))">
+            <legend><button type="button" class="text-button" aria-pressed="@(selectedPosition == position + 1)" @onclick="() => selectedPosition = position + 1" data-testid="source-sequence-select">@Localizer["SequencePosition", index + 1]</button></legend>
+            @if (analysis?.Steps.ElementAtOrDefault(position) is { } contracts)
+            {
+                <p role="status" data-testid="sequence-compatibility">@T("Preview.Compatibility." + contracts.Compatibility)</p>
+                <SequenceContractDetails Label="@T("Preview.Input")" Contract="contracts.Input" />
+                <SequenceContractDetails Label="@T("Preview.Output")" Contract="contracts.Output" />
+                @if (function?.Function.ImplementationId == "json.explode")
+                {
+                    @if (contracts.Collections.Count > 0)
+                    {
+                        <FormField Label="@T("Preview.Collection")" Help="@T("Preview.DerivedHelp")"><ClearableText Type="search" Value="@collectionSearches.GetValueOrDefault(position)" ValueChanged="value => collectionSearches[position] = value" Disabled="ReadOnly" />
+                        <ClearableSelect TValue="string" Value="@(call.Parameters.TryGetProperty("path", out _) ? "path:" + CollectionPath(call) : "")" ValueChanged="path => SetCollectionAsync(position, path, contracts)" disabled="@ReadOnly">
+                            <option value="">@T("Preview.SelectCollection")</option>
+                            @if (call.Parameters.TryGetProperty("path", out _) && contracts.Collections.All(c => c.DataPath != CollectionPath(call)))
+                            { <option value="@("path:" + CollectionPath(call))">@CollectionPath(call) · @T("SequenceUnavailable")</option> }
+                            @foreach (var collection in contracts.Collections.Where(c => c.DataPath.Contains(collectionSearches.GetValueOrDefault(position) ?? "", StringComparison.OrdinalIgnoreCase)))
+                            { <option value="@("path:" + collection.DataPath)">@(collection.DataPath.Length == 0 ? "$" : collection.DataPath) · @T("Preview.ObjectArray")</option> }
+                        </ClearableSelect></FormField>
+                    }
+                    else { <p role="status">@T("Preview.ManualRequired") <code>@contracts.Diagnostic</code></p> }
+                }
+                @if (contracts.Unavailable) { <p role="alert">@T("Preview.Unavailable") <code>@contracts.Diagnostic</code></p> }
+                @if (contracts.Diagnostic == "sequence_derived_contract_stale") { <p role="alert">@T("Preview.DerivedStale")</p> }
+                @if (contracts.Diagnostic == "preview_flow_unsupported") { <p role="status">@T("Preview.UnsupportedFlow")</p> }
+            }
             @if (call.Function is not null)
             {
                 <FormField Label="@T("SequenceFunction")"><ClearableSelect TValue="string" AllowClear="false" Value="@FunctionKey(call.Function)" ValueChanged="value => SelectFunctionAsync(position, value)" disabled="@ReadOnly" data-testid="function-sequence-target">
@@ -28,6 +86,10 @@
                 { <p class="muted" data-testid="function-sequence-text-input-help">@T(position == 0 && call.FunctionInputSource != FlowCompositionFunctionInputSource.PreviousResult
                         && AcquisitionOutputSchema is { } response && FlowCompositionInputs.IsTextResponse(response)
                             ? "SequenceAcquisitionContentHelp" : "SequenceTextInputHelp")</p> }
+                @if (function?.Function.ImplementationId == "json.explode" && analysis?.Steps.ElementAtOrDefault(position)?.Collections.Count > 0)
+                { <button type="button" class="text-button" @onclick="() => ToggleAdvanced(position)">@T("Preview.Advanced")</button> }
+                @if (function?.Function.ImplementationId != "json.explode" || analysis?.Steps.ElementAtOrDefault(position)?.Collections.Count is not > 0 || advanced.Contains(position))
+                {
                 <JsonSchemaInputEditor Schema="@(function is null ? null : FunctionParameters(function.Function.InputSchema))" Value="OrdinaryParameters(call, function)" ValueChanged="value => SetFunctionParametersAsync(position, value, function)" Disabled="ReadOnly" />
                 @if (function is not null)
                 {
@@ -38,6 +100,7 @@
                             HelpText="@FunctionLocalizer["OptionalSchemaParameterHelp"]" ReadOnly="ReadOnly"
                             ValueChanged="value => SetSchemaParameterAsync(position, parameter, value)" />
                     }
+                }
                 }
             }
             else
@@ -63,6 +126,15 @@
             </FormActions>
         </fieldset>
     }
+    </div><aside class="source-sequence-preview" aria-label="@T("Preview.Title")" data-testid="source-sequence-preview" @ref="previewRegion" tabindex="-1">
+        <h3>@T("Preview.Title") · @(selectedPosition == 0 ? T("Preview.Input") : Localizer["SequencePosition", selectedPosition].Value)</h3><p class="muted">@Title</p>
+        @if (PreviewStale) { <p role="status" data-testid="source-preview-stale">@T("Preview.Stale")</p> }
+        @if (replay?.ErrorCode is { } previewError) { <p role="alert">@T("Preview.Partial") <code>@previewError</code></p> }
+        @if (SelectedPreview is { } shown) { <SourceValueInspector Value="shown" MediaType="@(selectedPosition == 0 ? InputMediaType : null)" />
+            @if (selectedPosition == 0 && InputMediaType is not null && sample?.Value is { } envelope)
+            { <details><summary>@T("Preview.Transport")</summary><SourceValueInspector Value="envelope" /></details> } }
+        else { <p>@T(sample is null ? SampleAcquisition is not null ? "Preview.NoSample" : "Preview.NoPreparedSample" : "Preview.NoStepResult")</p> }
+    </aside></div>
     <FormActions>
         <button type="button" class="button-secondary" disabled="@(!CanAddFunction)" @onclick="AddFunctionAsync" data-testid="function-sequence-add">@T("SequenceAddFunction")</button>
         <button type="button" class="button-secondary" disabled="@(!CanAddFlow)" @onclick="AddAsync" data-testid="flow-sequence-add">@T("SequenceAdd")</button>
@@ -85,6 +157,154 @@
     [Parameter] public FlowCallReference? TemplateFlow { get; set; }
     [Parameter] public string TemplatePoint { get; set; } = "transformations";
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public DataSourceOperationAcquisitionBinding? SampleAcquisition { get; set; }
+    [Parameter] public SchemaBindingSnapshot? ContentInput { get; set; }
+    [Parameter] public SchemaBinding? InputBinding { get; set; }
+    [Parameter] public SchemaBindingSnapshot? InputContract { get; set; }
+    [Parameter] public ResourceReference? ConsumedSource { get; set; }
+    [Parameter] public EventCallback<SourceSample?> SampleChanged { get; set; }
+    [Parameter] public bool PreparedInputStale { get; set; }
+    private string rawSourceSampleId = "";
+    private async Task PrepareSourceSampleAsync()
+    {
+        if (Authoring is not { } client || ConsumedSource is null || sampleBusy) return;
+        sampleBusy = true; authoringFailed = false;
+        var source = ConsumedSource; var context = PrivacyKey;
+        try
+        {
+            var prepared = await client.PrepareDataSourceAsync(new(source, rawSourceSampleId), cancellation.Token);
+            if (context == PrivacyKey && source == ConsumedSource) { sample = prepared; analyzed = ""; await AnalyzeAsync(); await SampleChanged.InvokeAsync(sample); }
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { if (context == PrivacyKey) { authoringFailed = true; sample = null; replay = null; } }
+        finally { sampleBusy = false; }
+    }
+    private async Task CancelSampleAsync()
+    {
+        if (Authoring is not { } client || sample is null) return;
+        try { await client.CancelAsync(sample.Id, cancellation.Token); }
+        catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; }
+    }
+    private IReadOnlyList<ConsumedSampleCandidate> consumedCandidates = [];
+    private string consumedId = "", consumedKey = "";
+    private bool consumedLoaded;
+    private async Task LoadConsumedAsync()
+    {
+        if (Authoring is not { } client || ConsumedSource is null) return;
+        sampleBusy = true; authoringFailed = false;
+        try { consumedCandidates = await client.CandidatesAsync(ConsumedSource, cancellation.Token); consumedLoaded = true; }
+        catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; }
+        finally { sampleBusy = false; }
+    }
+    private async Task PrepareConsumedAsync()
+    {
+        if (Authoring is not { } client || ConsumedSource is null || consumedCandidates.SingleOrDefault(c => c.Id == consumedId) is not { } candidate) return;
+        sampleBusy = true; authoringFailed = false;
+        var source = ConsumedSource; var context = PrivacyKey;
+        try { var prepared = await client.PrepareConsumedAsync(new(source, candidate.Id, candidate.Namespace), cancellation.Token); if (context == PrivacyKey && source == ConsumedSource) { sample = prepared; analyzed = ""; await AnalyzeAsync(); await SampleChanged.InvokeAsync(sample); } }
+        catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; }
+        finally { sampleBusy = false; }
+    }
+    [Parameter] public SourceSample? PreparedSample { get; set; }
+    [Parameter] public ResourceNamespace OwnerNamespace { get; set; } = ResourceNamespace.Default;
+    private ElementReference previewRegion;
+    private async Task FocusPreviewAsync() => await previewRegion.FocusAsync();
+    private SourceSample? sample;
+    private SourceSequencePreview? replay;
+    private SourceSequenceAnalysis? analysis;
+    private int selectedPosition;
+    private bool sampleBusy, authoringFailed;
+    private string analyzed = "", replayDraft = "";
+    private readonly HashSet<int> advanced = [];
+    private void ToggleAdvanced(int position) { if (!advanced.Add(position)) advanced.Remove(position); }
+    private readonly Dictionary<int, string?> collectionSearches = [];
+    private ISourceAuthoringClient? Authoring => Services.GetService(typeof(ISourceAuthoringClient)) as ISourceAuthoringClient;
+    private SchemaBindingSnapshot? DeclaredInputContract => InputSchema is { } schema
+        ? new("composition-point.input", SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema,
+            JsonSchemaSelection.DefinitionHash(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema)) : null;
+    private string DraftKey => FunctionDigests.Compute(new { Value, SampleAcquisition, InputContract, InputSchema, ContentInput, InputBinding, preparedSampleId = PreparedSample?.Id, sampleId = sample?.Id, ConsumedSource, PreparedInputStale, PrivacyKey });
+    private string PrivacyKey => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state && state.Current is { } context
+        ? $"{context.UserId}:{context.SelectedScopeRef}:{context.WorkspaceId}" : "";
+    private string privacyKey = "";
+    private string? InputMediaType => sample is { IsRawOperationResponse: true, Value: { ValueKind: JsonValueKind.Object } value }
+        && value.TryGetProperty("mediaType", out var media) && media.ValueKind == JsonValueKind.String
+        && value.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String
+        && media.GetString()?.Split(';')[0].Trim() is "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain" ? media.GetString()!.Split(';')[0].Trim() : null;
+    private bool SampleExpired => sample is { } stored && stored.ExpiresAt <= (Services.GetService(typeof(TimeProvider)) as TimeProvider ?? TimeProvider.System).GetUtcNow();
+    private bool SampleParametersStale => SampleAcquisition is { } authored && sample is { IsRawOperationResponse: true } captured
+        && (!JsonElement.DeepEquals(authored.Parameters, captured.Acquisition.Parameters) || authored.Operation != captured.Acquisition.Operation);
+    private bool PreviewStale => replay is not null && DraftKey != replayDraft;
+    private JsonElement? SelectedPreview => SampleExpired ? null : selectedPosition == 0 ? !SampleExpired ? InputMediaType is not null ? sample?.Value?.GetProperty("content") : sample?.Value : null : !PreviewStale ? replay?.Values.ElementAtOrDefault(selectedPosition) is { ValueKind: not JsonValueKind.Undefined } value ? value : null : null;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (privacyKey != PrivacyKey) { privacyKey = PrivacyKey; sample = null; replay = null; analysis = null; analyzed = ""; consumedCandidates = []; consumedLoaded = false; }
+        selectedPosition = Math.Min(selectedPosition, Value.Count);
+        var nextConsumed = ConsumedSource is null ? "" : FunctionDigests.Compute(ConsumedSource);
+        if (nextConsumed != consumedKey) { consumedKey = nextConsumed; consumedCandidates = []; consumedLoaded = false; sample = null; replay = null; await SampleChanged.InvokeAsync(null); }
+        if (PreparedSample is not null && sample?.Id != PreparedSample.Id) sample = PreparedSample;
+        await AnalyzeAsync();
+    }
+    private async Task AnalyzeAsync()
+    {
+        if (Authoring is not { } client || ResourceOwnershipContext.TryGetCurrent(Services) is not { } owner || analyzed == DraftKey) return;
+        var key = DraftKey;
+        analysis = null;
+        try { var result = await client.AnalyzeAsync(new(owner, OwnerNamespace, Value, sample?.Contract ?? InputContract ?? DeclaredInputContract, SampleAcquisition is not null, ContentInput ?? sample?.ContentContract, InputBinding), cancellation.Token); if (key == DraftKey) { analysis = result; analyzed = key; } }
+        catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; }
+    }
+    private async Task AcquireSampleAsync()
+    {
+        if (Authoring is not { } client || SampleAcquisition is null || sampleBusy) return;
+        sampleBusy = true; authoringFailed = false;
+        var context = PrivacyKey;
+        var acquisition = SampleAcquisition;
+        try
+        {
+            var acquired = await client.AcquireAsync(new(acquisition, OwnerNamespace), cancellation.Token);
+            while (acquired.State is SourceSampleState.Pending or SourceSampleState.Running)
+            {
+                if (context != PrivacyKey) return;
+                sample = acquired;
+                StateHasChanged();
+                await Task.Delay(500, cancellation.Token);
+                acquired = await client.GetAsync(acquired.Id, cancellation.Token);
+            }
+            if (context != PrivacyKey) return;
+            sample = acquired;
+            analyzed = ""; await AnalyzeAsync();
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { if (context == PrivacyKey) { authoringFailed = true; sample = null; replay = null; } }
+        finally { sampleBusy = false; }
+    }
+    private async Task ReplayAsync()
+    {
+        if (Authoring is not { } client || sample is null || sampleBusy) return;
+        sampleBusy = true; authoringFailed = false;
+        var key = DraftKey;
+        try { var result = await client.ReplayAsync(sample.Id, new(OwnerNamespace, Value), cancellation.Token); if (key == DraftKey) { replay = result; replayDraft = key; } }
+        catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; sample = null; replay = null; }
+        finally { sampleBusy = false; }
+    }
+    private async Task DeleteSampleAsync()
+    {
+        if (Authoring is not { } client || sample is null) return;
+        try { await client.DeleteAsync(sample.Id, cancellation.Token); }
+        catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; }
+        sample = null; replay = null; await SampleChanged.InvokeAsync(null);
+    }
+    private static string CollectionPath(FlowCompositionCall call) => call.Parameters.TryGetProperty("path", out var path) ? path.GetString() ?? "" : "";
+    private Task SetCollectionAsync(int position, string? path, SequenceStepContract contract)
+    {
+        if (path?.StartsWith("path:", StringComparison.Ordinal) != true) return Task.CompletedTask;
+        path = path[5..];
+        var collection = contract.Collections.SingleOrDefault(c => c.DataPath == path);
+        if (collection is null) return Task.CompletedTask;
+        var parameters = Value[position].Parameters.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
+        parameters["path"] = JsonSerializer.SerializeToElement(path);
+        parameters["itemSchema"] = JsonSerializer.SerializeToElement(collection.Binding, FunctionJson);
+        var updated = Value.Select((call, index) => index == position ? call with { Parameters = JsonSerializer.SerializeToElement(parameters), FunctionSchemaSnapshots = null,
+            DerivedItemSchemaParentHash = contract.Input?.DefinitionHash } : call).ToArray();
+        return ValueChanged.InvokeAsync(updated);
+    }
     private readonly CancellationTokenSource cancellation = new();
     private readonly List<Option> options = [];
     private IReadOnlyList<FunctionChoice> functionOptions = [];
@@ -131,6 +351,7 @@
         }
         catch (Exception exception) when (exception is not OperationCanceledException) { options.Clear(); loadFailed = true; }
         finally { loading = false; loadRevision++; }
+        await AnalyzeAsync();
     }
     private void OpenCreator()
     {
@@ -142,7 +363,7 @@
     private Task AddFunctionAsync() => CanAddFunction
         ? ValueChanged.InvokeAsync([.. Value, new FlowCompositionCall { Function = functionOptions[0].Function.Reference }])
         : Task.CompletedTask;
-    private static string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.Name}|{reference.Version}";
+    private string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef ?? ResourceOwnershipContext.TryGetCurrent(Services)}|{reference.Namespace ?? ResourceNamespace.Default}|{reference.Name}|{reference.Version}";
     private Task SelectFunctionAsync(int position, string? key) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position
         ? new FlowCompositionCall { Function = functionOptions.Single(choice => FunctionKey(choice.Function.Reference) == key).Function.Reference } : value).ToArray());
     private static JsonElement FunctionParameters(JsonElement schema) => FunctionInvocationSchemas.WithoutSchemaParameters(FunctionInvocationSchemas.Parameters(schema));
@@ -160,7 +381,14 @@
         var parameters = value.EnumerateObject().ToDictionary(property => property.Name, property => property.Value.Clone());
         foreach (var name in function is null ? [] : FunctionInvocationSchemas.SchemaParameters(function.Function.InputSchema))
             if (Value[position].Parameters.TryGetProperty(name, out var schema)) parameters[name] = schema.Clone();
-        return SetParametersAsync(position, JsonSerializer.SerializeToElement(parameters));
+        var derived = Value[position].DerivedItemSchemaParentHash;
+        var path = value.TryGetProperty("path", out var selected) && selected.ValueKind == JsonValueKind.String ? selected.GetString() ?? "" : "";
+        if (derived is not null && path != CollectionPath(Value[position]))
+        {
+            parameters.Remove("itemSchema");
+            derived = null;
+        }
+        return SetParametersAsync(position, JsonSerializer.SerializeToElement(parameters), derived);
     }
     private Task SetSchemaParameterAsync(int position, string name, Agentstration.Web.FlowDesigner.Components.SchemaBindingEditorValue value)
     {
@@ -178,11 +406,21 @@
     private Task AddAsync() => CanAddFlow
         ? ValueChanged.InvokeAsync([.. Value, new FlowCompositionCall { Flow = options[0].Reference }])
         : Task.CompletedTask;
-    private Task RemoveAsync(int position) => ValueChanged.InvokeAsync(Value.Where((_, index) => index != position).ToArray());
-    private Task SetParametersAsync(int position, JsonElement parameters) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position ? value with { Parameters = parameters.Clone(), FunctionSchemaSnapshots = null } : value).ToArray());
+    private Task RemoveAsync(int position)
+    {
+        if (selectedPosition >= position + 1) selectedPosition = Math.Max(0, selectedPosition - 1);
+        return ValueChanged.InvokeAsync(Value.Where((_, index) => index != position).ToArray());
+    }
+    private Task SetParametersAsync(int position, JsonElement parameters, string? derivedParentHash = null) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position ? value with { Parameters = parameters.Clone(), FunctionSchemaSnapshots = null, DerivedItemSchemaParentHash = derivedParentHash } : value).ToArray());
     private Task SelectAsync(int position, string? key) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position ? value with { Flow = options.Single(option => Key(option.Reference) == key).Reference } : value).ToArray());
     private Task MoveAsync(int position, int direction)
-    { var values = Value.ToArray(); (values[position], values[position + direction]) = (values[position + direction], values[position]); return ValueChanged.InvokeAsync(values); }
+    {
+        var values = Value.ToArray();
+        (values[position], values[position + direction]) = (values[position + direction], values[position]);
+        if (selectedPosition == position + 1) selectedPosition += direction;
+        else if (selectedPosition == position + direction + 1) selectedPosition -= direction;
+        return ValueChanged.InvokeAsync(values);
+    }
     private string T(string key) => Localizer[key];
     private sealed record Option(FlowCallReference Reference, string Label, JsonElement Parameters, JsonElement? OutputSchema, DateTimeOffset PublishedAt);
     private readonly Dictionary<int, string> searches = [];

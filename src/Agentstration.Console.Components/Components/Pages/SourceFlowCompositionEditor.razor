@@ -14,8 +14,9 @@
     {
         @if (!DeclaredPointNames.Contains(point, StringComparer.Ordinal))
         { <p role="status">@T("CompositionOrphanHelp") <button type="button" class="text-button" disabled="@ReadOnly" @onclick="() => RemovePointAsync(point)">@T("CompositionRemovePoint")</button></p> }
+        @if (!PreviewUsesBoundary(point)) { <p role="status">@T("Preview.UnsupportedFlow")</p> }
         @if (point == "postAggregate") { <p>@T("BeforePublicationHelp")</p> }
-        <FlowSequenceEditor @key="point" Title="@(point == "postAggregate" ? T("BeforePublicationTitle") : point)" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" OutputSchema="@DeclaredPoint(point)?.OutputSchema" AcquisitionOutputSchema="@(ReceivesAcquisition(point) ? AcquisitionOutputSchema : null)" ReadOnly="ReadOnly" />
+        <FlowSequenceEditor @key="point" Title="@(point == "postAggregate" ? T("BeforePublicationTitle") : point)" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" SampleAcquisition="@(PreviewUsesBoundary(point) ? SampleAcquisition : null)" InputContract="@(PreviewUsesBoundary(point) ? InputContract : null)" ContentInput="@(PreviewUsesBoundary(point) ? ContentInput : null)" InputBinding="@(PreviewUsesBoundary(point) ? InputBinding : null)" OwnerNamespace="OwnerNamespace" PreparedSample="@(PreviewUsesBoundary(point) ? PreparedSample : null)" PreparedInputStale="@(PreviewUsesBoundary(point) && PreparedInputStale)" OutputSchema="@DeclaredPoint(point)?.OutputSchema" AcquisitionOutputSchema="@(ReceivesAcquisition(point) ? AcquisitionOutputSchema : null)" ReadOnly="ReadOnly" />
     }
 </section>
 @code {
@@ -25,11 +26,21 @@
     [Parameter] public EventCallback<FlowCallReference?> OrchestrationChanged { get; set; }
     [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Value { get; set; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     [Parameter] public EventCallback<IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>>> ValueChanged { get; set; }
+    [Parameter] public SourceSample? PreparedSample { get; set; }
+    [Parameter] public bool PreparedInputStale { get; set; }
+    [Parameter] public DataSourceOperationAcquisitionBinding? SampleAcquisition { get; set; }
+    [Parameter] public SchemaBindingSnapshot? ContentInput { get; set; }
+    [Parameter] public SchemaBinding? InputBinding { get; set; }
+    [Parameter] public SchemaBindingSnapshot? InputContract { get; set; }
+    [Parameter] public ResourceNamespace OwnerNamespace { get; set; } = ResourceNamespace.Default;
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public JsonElement? AcquisitionOutputSchema { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private readonly List<Option> options = [];
     private bool loadFailed;
+    private bool PreviewUsesBoundary(string point) => Orchestration is null ? point == StandardPoint
+        : DeclaredPoint(point)?.InputMapping is { ValueKind: JsonValueKind.String } mapping
+            && mapping.GetString() == "${steps." + SelectedOption?.BoundaryStepName + ".output}";
     private string SelectedKey => Orchestration is null ? string.Empty : Key(Orchestration);
     private Option? SelectedOption => Orchestration is null
         ? options.FirstOrDefault(option => option.IsActive && option.Reference.ScopeRef == ResourceScopeRef.Instance && option.Reference.Namespace == ResourceNamespace.Default && option.Reference.ResourceId == (Boundary == "projection" ? "knowledge-orchestration-builtin" : "data-source-orchestration-builtin"))
@@ -38,7 +49,7 @@
     private FlowCompositionPointStepDefinition? DeclaredPoint(string name) => SelectedOption?.Points.FirstOrDefault(point => point.Point == name);
     private bool ReceivesAcquisition(string point) => Boundary == "acquisition" && (SelectedOption is { } option
         ? DeclaredPoint(point)?.InputMapping is { ValueKind: JsonValueKind.String } mapping
-            && mapping.GetString() == "${steps." + option.BoundaryStep + ".output}"
+            && mapping.GetString() == "${steps." + option.BoundaryStepName + ".output}"
         : Orchestration is null && point == StandardPoint);
     private IEnumerable<string> PointNames => DeclaredPointNames.Concat(Value.Keys.Where(name => name != Boundary)).Distinct(StringComparer.Ordinal);
     protected override async Task OnInitializedAsync()
@@ -71,6 +82,6 @@
     { var next = Value.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); next[point] = calls; return ValueChanged.InvokeAsync(next); }
     private static string Key(FlowCallReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.ResourceId}|{reference.Version}";
     private string T(string key) => Localizer[key];
-    private sealed record Option(FlowCallReference Reference, string Label, IReadOnlyList<FlowCompositionPointStepDefinition> Points, bool IsActive, string BoundaryStep);
+    private sealed record Option(FlowCallReference Reference, string Label, IReadOnlyList<FlowCompositionPointStepDefinition> Points, bool IsActive, string BoundaryStepName);
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

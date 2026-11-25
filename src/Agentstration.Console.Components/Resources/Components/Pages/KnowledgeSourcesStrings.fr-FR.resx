@@ -209,4 +209,12 @@
   <data name="IdentityChanged" xml:space="preserve"><value>L’identité de la ressource a changé. Rouvrez la source.</value></data>
 <data name="Identity" xml:space="preserve"><value>Identité</value></data>
 <data name="SettingName" xml:space="preserve"><value>Nom</value></data>
+  <data name="Preview.FindConsumed" xml:space="preserve"><value>Rechercher les acquisitions compatibles</value></data>
+  <data name="Preview.NoConsumed" xml:space="preserve"><value>Aucune entrée conservée compatible n’est disponible. Préparez explicitement la Data Source en amont. Un résultat final publié est une entrée consommée, jamais un échantillon brut de l’opération.</value></data>
+  <data name="Preview.ConsumedAcquisition" xml:space="preserve"><value>Acquisition consommée exacte</value></data>
+  <data name="Preview.SelectAcquisition" xml:space="preserve"><value>Sélectionner une acquisition</value></data>
+  <data name="Preview.PrepareConsumed" xml:space="preserve"><value>Préparer cette entrée consommée</value></data>
+  <data name="Preview.PreparedStale" xml:space="preserve"><value>L’entrée préparée est périmée. Préparez-la à nouveau après modification des liaisons, règles ou compositions.</value></data>
+  <data name="Preview.PrepareAggregate" xml:space="preserve"><value>Préparer l’entrée agrégée de l’aperçu</value></data>
+  <data name="Preview.AggregateUnavailable" xml:space="preserve"><value>Aperçu agrégé indisponible. Les entrées compatibles obligatoires doivent être préparées. Les projections et points de composition personnalisés sans frontière d’aperçu gouvernée sont indisponibles.</value></data>
 </root>

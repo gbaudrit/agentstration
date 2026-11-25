@@ -1,0 +1,92 @@
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+
+@if (Value is { } value)
+{
+    <div class="source-value-inspector" data-testid="source-value-inspector">
+        <div class="form-actions"><button type="button" class="@(source ? "button-secondary" : "button-primary")" aria-pressed="@(!source)" @onclick="() => source = false">@Localizer["Preview.Tree"]</button><button type="button" class="@(source ? "button-primary" : "button-secondary")" aria-pressed="@source" @onclick="() => source = true">@Localizer[MediaType is "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain" ? "Preview.Source" : "Preview.JsonSource"]</button></div>
+        @if (source)
+        {
+            <pre data-testid="preview-json-source">@Source(value)</pre>
+            @if (Source(value).Length >= MaximumSourceCharacters) { <p role="status">@Localizer["Preview.Excerpt"]</p> }
+        }
+        else
+        {
+            <div class="source-value-scroll"><table><thead><tr><th>@Localizer["Preview.Property"]</th><th>@Localizer["Preview.Type"]</th><th>@Localizer["Preview.Value"]</th></tr></thead>
+                <tbody>
+                @foreach (var row in Rows(LogicalValue(value)))
+                {
+                    <tr>
+                    @if (row.More)
+                    { <td colspan="3"><button type="button" class="text-button" @onclick="() => pages[row.Path] = pages.GetValueOrDefault(row.Path, 20) + 20">@Localizer["Preview.More"]</button></td> }
+                    else
+                    {
+                        <td style="padding-inline-start: @(row.Depth * .75)rem">
+                            @if (row.Value.ValueKind is JsonValueKind.Object or JsonValueKind.Array && row.Depth < 12)
+                            { <button type="button" class="text-button" aria-expanded="@expanded.Contains(row.Path)" @onclick="() => Toggle(row.Path)"><span aria-hidden="true">@(expanded.Contains(row.Path) ? "▾" : "▸")</span> @row.Name</button> }
+                            else { <span>@row.Name</span> }
+                        </td>
+                        <td>@Localizer[$"Preview.Type.{row.Value.ValueKind}"]</td><td>@Summary(row.Value)</td>
+                    }
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+            <p class="muted">@Localizer["Preview.DisplayBounds"]</p>
+        }
+    </div>
+}
+@code {
+    [Parameter] public string? MediaType { get; set; }
+    [Parameter] public JsonElement? Value { get; set; }
+    private string? previous;
+    private bool source;
+    private static readonly JsonSerializerOptions Pretty = new() { WriteIndented = true };
+    private readonly HashSet<string> expanded = [];
+    private readonly Dictionary<string, int> pages = [];
+    public const int MaximumSourceCharacters = 65536;
+    protected override void OnParametersSet() { if (Value?.GetRawText() != previous) { previous = Value?.GetRawText(); expanded.Clear(); pages.Clear(); source = MediaType is "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain"; } }
+    private void Toggle(string path) { if (!expanded.Add(path)) expanded.Remove(path); }
+    private sealed record Row(string Path, string Name, JsonElement Value, int Depth, bool More = false);
+    private IReadOnlyList<Row> Rows(JsonElement root)
+    {
+        var rows = new List<Row>();
+        Add(root, "$", "$", 0);
+        return rows;
+        void Add(JsonElement value, string name, string path, int depth)
+        {
+            if (rows.Count >= 512) return;
+            rows.Add(new(path, name, value, depth));
+            if (depth >= 12 || !expanded.Contains(path)) return;
+            var children = value.ValueKind == JsonValueKind.Object ? value.EnumerateObject().Select(p => (p.Name, p.Value))
+                : value.ValueKind == JsonValueKind.Array ? value.EnumerateArray().Select((v, i) => ($"[{i}]", v)) : [];
+            var count = 0;
+            var limit = Math.Min(pages.GetValueOrDefault(path, 20), 100);
+            foreach (var (childName, child) in children)
+            {
+                if (count >= limit || rows.Count >= 512)
+                {
+                    if (limit < 100 && rows.Count < 512) rows.Add(new(path, "", default, depth, true));
+                    break;
+                }
+                Add(child, childName, path + "/" + count++, depth + 1);
+            }
+        }
+    }
+    private static JsonElement LogicalValue(JsonElement value)
+    {
+        try { return JsonRecordProjection.Parse(value)?.Value ?? value; }
+        catch (Exception error) when (error is ArgumentException or DataContractException or JsonException) { return value; }
+    }
+    private string Summary(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Object => Localizer["Preview.Properties", value.EnumerateObject().Count()],
+        JsonValueKind.Array => Localizer["Preview.Items", value.GetArrayLength()],
+        _ => value.GetRawText().Length > 512 ? value.GetRawText()[..512] + "…" : value.GetRawText()
+    };
+    private string Source(JsonElement value)
+    {
+        var json = value.ValueKind == JsonValueKind.String && MediaType is ("application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain")
+            ? value.GetString()! : JsonSerializer.Serialize(value, Pretty);
+        return json.Length > MaximumSourceCharacters ? json[..MaximumSourceCharacters] : json;
+    }
+}

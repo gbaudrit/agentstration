@@ -25,6 +25,12 @@ internal static class DataAndKnowledgeServiceCollectionExtensions
         services.AddSingleton<DataSourceManagementService>();
         services.AddSingleton<DataSourceDatasetCompositionService>();
         services.AddSingleton<DataSourceDocumentStorage>();
+        services.AddSingleton<Agentstration.Flows.ISourceSequenceService, Agentstration.Flows.Application.SourceSequenceService>();
+        services.AddSingleton<SourceSampleService>();
+        services.AddSingleton<ISourceAuthoringSamples>(provider => provider.GetRequiredService<SourceSampleService>());
+        services.AddSingleton<KnowledgePreviewService>();
+        services.AddSingleton<ISourceSampleStore, SourceSampleStore>();
+        if (enableHostedServices) services.AddHostedService<SourceSampleWorker>();
         services.AddSingleton<DataSourceDatasetAcquisitionService>();
         services.AddSingleton<Agentstration.Storage.Contracts.IStorageUsageProvider, DataSourceStorageUsageProvider>();
         services.AddSingleton<DataSourceAcquisitionService>();

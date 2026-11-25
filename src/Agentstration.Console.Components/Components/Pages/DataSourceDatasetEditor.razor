@@ -62,6 +62,11 @@
     [Parameter] public string? Namespace { get; set; }
     [Parameter] public string? ScopeRef { get; set; }
 
+    private ResourceNamespace AuthoringNamespace => model.NamespaceValid ? ResourceNamespace.Parse(model.Namespace) : ResourceNamespace.Default;
+    private DataSourceOperationAcquisitionBinding? PreviewAcquisition => SelectedOperation is { } operation ? new(new(new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest), model.Parameters) { OutputSchemaBinding = model.AcquisitionOutputBinding }
+        : HasSavedOperationPin && source?.Definition.Dataset?.Acquisition is { } savedAcquisition ? savedAcquisition with { Parameters = model.Parameters, OutputSchemaBinding = model.AcquisitionOutputBinding } : null;
+    private SchemaBindingSnapshot? PreviewContract => SelectedType?.Acquisition is { } adapter && DefinitionSchema(adapter.OutputSchemaProperty) is { } schema
+        ? new("operation", SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema, JsonSchemaSelection.DefinitionHash(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema)) : null;
     private readonly CancellationTokenSource cancellation = new();
     private DataSourceResource? source;
     private DataSourceReadiness? readiness;
@@ -132,7 +137,11 @@
     private IEnumerable<ConnectedServiceOperationResource> ServiceOperations => operations.Where(item => SelectedService is { } service
         && item.Definition.Service.ServiceUid == service.Uid && item.Definition.Service.Service.ScopeRef == service.ScopeRef
         && item.Definition.Service.Service.Address == service.Address);
-    private ConnectedServiceOperationResource? SelectedOperation => ServiceOperations.FirstOrDefault(item => OperationKey(item) == model.OperationKey);
+    private ConnectedServiceOperationResource? SelectedOperation => ServiceOperations.FirstOrDefault(item => OperationKey(item) == model.OperationKey)
+        ?? (HasSavedOperationPin && readiness?.Dataset?.Operation is { } pinned
+            && source?.Definition.Dataset?.Acquisition.Operation is { } reference
+            && pinned.Uid == reference.OperationUid && pinned.ScopeRef == reference.Operation.ScopeRef
+            && pinned.Address == reference.Operation.Address && OperationKey(pinned) == model.OperationKey ? pinned : null);
     private bool HasSavedOperationPin => source?.Definition.Dataset?.Acquisition.Operation is { } saved
         && model.OperationKey == $"{saved.OperationUid}:{saved.Generation}:{saved.DefinitionDigest}" && model.ServiceKey == savedServiceKey;
     private bool HasOperationSelection => SelectedOperation is not null || HasSavedOperationPin;
@@ -321,7 +330,7 @@
                 <FormField Label="@T("DatasetOperation")" Class="form-field-wide" Help="@T("DatasetOperationHelp")" Required="true"><ChildContent><ClearableSelect TValue="string" Value="@model.OperationKey" ValueExpression="@(() => model.OperationKey)" ValueChanged="value => ChangeOperation(new ChangeEventArgs { Value = value })" data-testid="dataset-operation" required Disabled="@(SelectedService is null && !HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var operation in ServiceOperations) { <option value="@OperationKey(operation)">@operation.Definition.DisplayName · @operation.Generation · @T(operation.Enabled ? "Enabled" : "Disabled")</option> }
-                    @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != model.OperationKey)) { <option value="@model.OperationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
+                    @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != model.OperationKey)) { <option value="@model.OperationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @(SelectedOperation is { } pinned ? $"{T("Generation")} {pinned.Generation}" : T("DatasetPinnedUnavailable"))</option> }
                 </ClearableSelect></ChildContent><Validation><ValidationMessage For="@(() => model.OperationKey)" /></Validation></FormField>
                 @if (SelectedService is not null && !ServiceOperations.Any() && !HasSavedOperationPin) { <p class="form-field-wide" role="status">@T("DatasetNoServiceOperations")</p> }
                 @if (loadingOperationContract) { <p class="form-field-wide" role="status">@T("Loading")</p> }
@@ -363,10 +372,11 @@
     </div>;
 
     private RenderFragment TreatmentsContent => @<div class="dataset-step-fields">
-<SourceFlowCompositionEditor AcquisitionOutputSchema="AcquisitionResponseSchema" @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
+<SourceFlowCompositionEditor AcquisitionOutputSchema="AcquisitionResponseSchema" InputBinding="model.AcquisitionOutputBinding" SampleAcquisition="@PreviewAcquisition" InputContract="@PreviewContract" ContentInput="@SelectedOperation?.Definition.AdoptedContentContract?.Schema" OwnerNamespace="AuthoringNamespace" @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
     </div>;
 
     private RenderFragment ContractsContent => @<div class="dataset-step-fields">
+<SourceContractsSummary InputBinding="model.AcquisitionOutputBinding" Input="PreviewContract" Content="@SelectedOperation?.Definition.AdoptedContentContract?.Schema" Calls="@(model.CompositionPoints.GetValueOrDefault("transformations") ?? [])" OwnerNamespace="AuthoringNamespace" />
 <ReusableSchemaBindingEditor Title="@T("AcquisitionOutputSchema")" TestId="dataset-acquisition-schema"
                     Binding="@model.AcquisitionOutputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
                     ValueChanged="value => model.AcquisitionOutputBinding = value.Binding" />

@@ -15,6 +15,8 @@ public sealed record FlowCompositionCall
     // Resolved at admission and retained in the server-owned receipt. Null on older receipts means previous result.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public FlowCompositionFunctionInputSource? FunctionInputSource { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? DerivedItemSchemaParentHash { get; init; }
     public JsonElement Parameters { get; init; } = JsonSerializer.SerializeToElement(new { });
     // Used by platform-owned acquisition bindings whose existing contract receives the complete envelope.
     public bool PassInputDirectly { get; init; }

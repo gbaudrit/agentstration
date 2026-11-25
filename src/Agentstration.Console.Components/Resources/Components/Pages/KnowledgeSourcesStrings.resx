@@ -209,4 +209,12 @@
   <data name="IdentityChanged" xml:space="preserve"><value>The resource identity changed. Reopen the source.</value></data>
 <data name="Identity" xml:space="preserve"><value>Identity</value></data>
 <data name="SettingName" xml:space="preserve"><value>Name</value></data>
+  <data name="Preview.FindConsumed" xml:space="preserve"><value>Find compatible acquisitions</value></data>
+  <data name="Preview.NoConsumed" xml:space="preserve"><value>No compatible retained input is available. Prepare the underlying Data Source explicitly. A published final result is a consumed input, never a raw operation sample.</value></data>
+  <data name="Preview.ConsumedAcquisition" xml:space="preserve"><value>Exact consumed acquisition</value></data>
+  <data name="Preview.SelectAcquisition" xml:space="preserve"><value>Select an acquisition</value></data>
+  <data name="Preview.PrepareConsumed" xml:space="preserve"><value>Prepare this consumed input</value></data>
+  <data name="Preview.PreparedStale" xml:space="preserve"><value>The prepared input is stale. Prepare it again after changing bindings, policies or composition.</value></data>
+  <data name="Preview.PrepareAggregate" xml:space="preserve"><value>Prepare aggregate preview input</value></data>
+  <data name="Preview.AggregateUnavailable" xml:space="preserve"><value>Aggregate preview unavailable. Required compatible inputs must be prepared. Custom projections and composition points without a governed preview boundary are unavailable.</value></data>
 </root>

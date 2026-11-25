@@ -18072,6 +18072,54 @@
         "sourceReviewed": true,
         "interpretation": "Implementation review only; native UX child #1217 remains blocked by validation and merge. No new reusable journey is claimed."
       }
+    },
+    {
+      "id": "operation-content-contract-schema-choices",
+      "source": "src/Agentstration.Console.Components/Components/Pages/OperationContentContractEditor.razor",
+      "host": "console",
+      "routes": [
+        "/connected-services/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Exact published Schema/version choices for explicit native-content adoption; preserve the reviewed ETag, content boundary and administrative authorization.",
+      "validation": "implementation-tested-reusable-ux-scenario-gated",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native resource selection retains exact Schema/version identity and existing ClearableSelect semantics.",
+        "behaviorTests": [
+          "tests/Agentstration.Api.DataSources.Tests/DataSourceDatasetTests.GuidedContracts.cs"
+        ],
+        "routeEvidence": [],
+        "trackingIssue": 1374,
+        "implementationPR": 1375,
+        "interpretation": "Source and application/API behavior are verified in #1375. This inventory is not a populated browser coverage claim. The reusable adoption journey remains blocked by explicit maintainer UX validation and implementation merge under #1374."
+      }
+    },
+    {
+      "id": "source-value-inspector-json-values",
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceValueInspector.razor",
+      "host": "console",
+      "routes": [
+        "/data-sources/new",
+        "/data-sources/{Name}",
+        "/knowledge-sources/new",
+        "/knowledge-sources/{Name}"
+      ],
+      "renderer": "native-specialized",
+      "adaptation": "Bounded recursive Property / Type / Value inspection preserves object, array, scalar and null values, expansion and JSON/native source views. Step selection remains owned by the left sequence.",
+      "validation": "implementation-tested-reusable-ux-scenario-gated",
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "Native recursive value inspection has no resource identity, owner badge, lifecycle or production action.",
+        "behaviorTests": [
+          "tests/Agentstration.Console.Components.Tests/SourceValueInspectorTests.cs",
+          "tests/Agentstration.Console.Components.Tests/FlowSequencePreviewTests.cs"
+        ],
+        "routeEvidence": [],
+        "trackingIssue": 1374,
+        "implementationPR": 1375,
+        "interpretation": "Component tests and desktop/mobile en-US/fr-FR implementation smoke are verified in #1375. Existing route checks do not certify populated preview coverage. The reusable paired-source journey remains gated under #1374."
+      }
     }
   ],
   "sourceAudit": [
@@ -18889,6 +18937,16 @@
       "source": "src/Agentstration.Console.Components/Components/Bootstrap/BootstrapApplicationProgress.razor",
       "classification": "non-collection-control",
       "reason": "Configured process-step navigation delegates resource rows to BootstrapApplicationResources."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/OperationContentContractEditor.razor",
+      "classification": "inventoried",
+      "reason": "Native functional surface is explicitly inventoried; implementation checks and gated reusable coverage under #1374 remain distinct."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/SourceValueInspector.razor",
+      "classification": "inventoried",
+      "reason": "Native functional surface is explicitly inventoried; implementation checks and gated reusable coverage under #1374 remain distinct."
     }
   ],
   "reconciliation": {

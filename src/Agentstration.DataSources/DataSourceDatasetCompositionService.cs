@@ -75,7 +75,7 @@ public sealed class DataSourceDatasetCompositionService(
             bindings.Add("transformations", definition.Transformations);
         }
         bindings.Add("acquisition", [new() { Flow = new(flow.Name, FlowCallVersionStrategy.Exact, flow.Version, flow.Namespace, flow.ScopeRef)
-            { DefinitionHash = flow.DefinitionHash, OutputSchema = rawOutput.Clone() }, PassInputDirectly = true }]);
+            { DefinitionHash = flow.DefinitionHash, OutputSchema = rawOutput.Clone(), OutputSchemaSnapshot = definition.Acquisition.OutputSchemaSnapshot }, PassInputDirectly = true }]);
         var root = definition.Orchestration ?? new FlowCallReference("data-source-orchestration-builtin", ScopeRef: ResourceScopeRef.Instance);
         if (accepted?.Composition is { } pinned)
         { root = pinned.Orchestration; bindings = pinned.Receipt!.Bindings.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal); }

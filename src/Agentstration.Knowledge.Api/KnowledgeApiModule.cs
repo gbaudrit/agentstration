@@ -15,6 +15,16 @@ public static class KnowledgeApiModule
         KnowledgeSnapshotEndpoints.Map(sources, endpoints.MapGroup("/api/knowledgesnapshots"));
         KnowledgeRetrievalEndpoints.Map(sources);
         KnowledgeAccessEndpoints.Map(sources);
+        endpoints.MapPost("/api/knowledge-previews/prepare", async (Agentstration.Knowledge.Contracts.PrepareKnowledgePreviewRequest body,
+            KnowledgePreviewService service, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await service.PrepareAsync(body, ct)); }
+            catch (Agentstration.DataSources.Contracts.SourceSampleUnavailableException error) { return Results.Problem(statusCode: 422, title: error.Code); }
+            catch (KnowledgeSourceValidationException error) { return Results.Problem(statusCode: 422, title: error.Code); }
+            catch (Agentstration.Flows.FlowValidationException error) { return Results.Problem(statusCode: 422, title: error.Code); }
+        }).RequireAuthorization(Agentstration.Web.Security.AgentstrationPolicies.CanExecuteRuns)
+            .Produces<Agentstration.Knowledge.Contracts.PreparedKnowledgePreview>()
+            .WithSummary("Prepare a Knowledge Source aggregate preview input");
         return endpoints;
     }
 }

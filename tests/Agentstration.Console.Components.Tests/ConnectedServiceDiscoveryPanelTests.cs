@@ -76,6 +76,7 @@ public sealed class ConnectedServiceDiscoveryPanelTests
         await state.EnsureLoadedAsync(default);
         context.Services.AddSingleton(state);
         context.Services.AddSingleton<IConnectedServiceOperationsClient>(new ConnectedServiceOperationsApiClient(http));
+        context.Services.AddSingleton<ISchemasClient>(new SchemasApiClient(http));
         return context;
     }
 
@@ -180,6 +181,7 @@ public sealed class ConnectedServiceDiscoveryPanelTests
                 Operation = Operation with { Enabled = change!.Enabled, Generation = Operation.Generation + 1 };
                 body = Operation;
             }
+            else if (path == "/api/schemas") body = new { value = Array.Empty<Agentstration.Schemas.SchemaResource>() };
             else return new(HttpStatusCode.NotFound);
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) };
             response.Headers.ETag = new("\"reviewed\"");

@@ -247,6 +247,15 @@ internal static class ConnectedServiceEndpoints
             .Produces<ConnectedServiceOperationContract>()
             .WithSummary("Inspect the exact contract of an authorized Connected Service operation")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        operations.MapPut("/{name}/content-contract", async (string name, string scopeRef, string? @namespace,
+            AdoptOperationContentContractRequest body, HttpRequest request, HttpResponse response,
+            ConnectedServiceOperationService service, CancellationToken token) => await Execute(async () =>
+                Resource(await service.AdoptContentAsync(new(ResourceScopeRef.Parse(scopeRef),
+                    ResourceNamespace.Parse(@namespace), ConnectedServiceResourceKinds.ConnectedServiceOperation, name),
+                    body, request.Headers.IfMatch.FirstOrDefault(), token), response, 200)))
+            .Produces<ConnectedServiceOperationResource>()
+            .WithSummary("Explicitly adopt an exact published native response content contract")
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         operations.MapPut("/{name}/enabled", async (string name, string scopeRef, string? @namespace,
             SetConnectedServiceOperationEnabledRequest body, HttpRequest request, HttpResponse response,
             ConnectedServiceOperationService service, CancellationToken token) => await Execute(async () =>
@@ -298,6 +307,8 @@ internal static class ConnectedServiceEndpoints
         { return Results.Problem(statusCode: 404, title: "Connected Service operation type not found", detail: exception.Message); }
         catch (ConnectedServiceOperationTypeInUseException exception)
         { return Results.Problem(statusCode: 409, title: "Connected Service operation type in use", detail: exception.Message); }
+        catch (Agentstration.Schemas.Contracts.SchemaBindingResolutionException exception)
+        { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
         catch (ConnectedServiceOperationDiscoveryException exception)
         { return Results.Problem(statusCode: 422, title: exception.Code, detail: exception.Message); }
         catch (ResourceConcurrencyException exception)
