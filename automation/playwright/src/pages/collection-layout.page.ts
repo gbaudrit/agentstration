@@ -19,7 +19,15 @@ export class CollectionLayoutPage {
     const route = this.family === 'queries' ? '/data-sources/layout-query-dataset?composition=dataset&namespace=default&scopeRef=%2Finstance&context=%2Finstance#queries'
       : this.family === 'artifacts' ? `/artifacts?context=${encodeURIComponent(this.artifactScope)}` : '/transformation-functions?context=%2Finstance';
     await this.page.goto(`${consoleUrl}${route}`);
-    await expect(this.rows).toHaveCount(this.family === 'functions' ? 9 : 3);
+    if (this.family === 'functions') {
+      // Native functions can grow independently of this layout fixture.
+      // Require each long fixture identity; geometry below still checks every row.
+      for (const index of [1, 2, 3]) {
+        await expect(this.rows.filter({ has: this.page.getByRole('link', { name: new RegExp(`^AAA Function ${index} —`) }) })).toHaveCount(1);
+      }
+    } else {
+      await expect(this.rows).toHaveCount(3);
+    }
     for (const view of ['table', 'cards'] as const) {
       const viewButton = this.root.locator('.collection-view-switch button').nth(view === 'table' ? 0 : 1);
       await viewButton.evaluate(el => el.scrollIntoView({ block: 'center' }));
