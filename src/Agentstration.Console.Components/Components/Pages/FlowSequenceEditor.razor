@@ -82,6 +82,10 @@
                 </ClearableSelect></FormField>
                 @if (function is not null)
                 { <FunctionDescription Description="@function.Description" ImplementationId="@function.Function.ImplementationId" BuiltIn="function.IsBuiltIn" /> }
+                @if (function is not null && FlowCompositionInputs.ExpectsText(function.Function.InputSchema))
+                { <p class="muted" data-testid="function-sequence-text-input-help">@T(position == 0 && call.FunctionInputSource != FlowCompositionFunctionInputSource.PreviousResult
+                        && AcquisitionOutputSchema is { } response && FlowCompositionInputs.IsTextResponse(response)
+                            ? "SequenceAcquisitionContentHelp" : "SequenceTextInputHelp")</p> }
                 @if (function?.Function.ImplementationId == "json.explode" && analysis?.Steps.ElementAtOrDefault(position)?.Collections.Count > 0)
                 { <button type="button" class="text-button" @onclick="() => ToggleAdvanced(position)">@T("Preview.Advanced")</button> }
                 @if (function?.Function.ImplementationId != "json.explode" || analysis?.Steps.ElementAtOrDefault(position)?.Collections.Count is not > 0 || advanced.Contains(position))
@@ -149,6 +153,7 @@
     [Parameter] public EventCallback<IReadOnlyList<FlowCompositionCall>> ValueChanged { get; set; }
     [Parameter] public JsonElement? InputSchema { get; set; }
     [Parameter] public JsonElement? OutputSchema { get; set; }
+    [Parameter] public JsonElement? AcquisitionOutputSchema { get; set; }
     [Parameter] public FlowCallReference? TemplateFlow { get; set; }
     [Parameter] public string TemplatePoint { get; set; } = "transformations";
     [Parameter] public bool ReadOnly { get; set; }

@@ -21,7 +21,7 @@ public sealed class NativeFunctionPlatformResourceProvisioner(
         ["json.select", "json.project", "collection.filter", "collection.distinct", "artifact.explode", "json.explode", "xml.to_json"];
     private static readonly IReadOnlyDictionary<string, string> Descriptions = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["xml.to_json"] = "Convert bounded XML using explicit paths and namespace mappings. Expose a published transformation Schema to validate exact XSD input and JSON output contracts.",
+        ["xml.to_json"] = "Convert bounded XML using explicit child/attribute paths and namespace mappings. Expose a published transformation Schema to validate exact XSD input and JSON output contracts.",
         ["json.select"] = "Select a JSON value at a JSON Pointer path. Returns the selected object, array or scalar as one value. An empty path selects the root; a missing path fails.",
         ["json.explode"] = "Select a non-empty array of JSON objects as records of one logical Artifact. path selects the data; itemSchema selects an exact record contract, including a published sub-schema. Document Storage stores separate rows; builtin local Storage stores separate JSON files. At most 100 records and 64 KiB of JSON per Artifact. Existing artifact.explode creates independent Artifacts instead.",
         ["json.project"] = "Build an object by selecting and renaming properties from a JSON value. Each name/path pair creates one output property. Selected arrays remain arrays inside that object.",

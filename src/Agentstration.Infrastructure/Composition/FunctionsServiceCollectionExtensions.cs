@@ -12,12 +12,12 @@ internal static class FunctionsServiceCollectionExtensions
     {
         services.AddSingleton(context.Options.FunctionContent);
         services.AddSingleton<INativeTransformationFunction, JsonSelectFunction>();
+        services.AddSingleton<INativeTransformationFunction, XmlToJsonFunction>();
         services.AddSingleton<INativeTransformationFunction, JsonProjectFunction>();
         services.AddSingleton<INativeTransformationFunction, CollectionFilterFunction>();
         services.AddSingleton<INativeTransformationFunction, CollectionDistinctFunction>();
         services.AddSingleton<INativeTransformationFunction, Agentstration.Infrastructure.Functions.ArtifactExplodeFunction>();
         services.AddSingleton<INativeTransformationFunction, Agentstration.Infrastructure.Functions.JsonExplodeFunction>();
-        services.AddSingleton<INativeTransformationFunction, XmlToJsonFunction>();
         services.AddSingleton<NativeFunctionRegistry>();
         services.AddSingleton<NativeFunctionExecutionContext>();
         services.AddSingleton<INativeFunctionExecutionContext>(provider => provider.GetRequiredService<NativeFunctionExecutionContext>());

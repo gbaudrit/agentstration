@@ -127,7 +127,7 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = 2,
             [typeof(IBootstrapContributionResourceResolver)] = 4,
-            [typeof(IBootstrapResourceHandler)] = 30,
+            [typeof(IBootstrapResourceHandler)] = 31,
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = 7,
             [typeof(Agentstration.Schemas.ISchemaFormatHandler)] = 3,
             [typeof(IPackResourceHandler)] = 11,

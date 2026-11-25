@@ -283,7 +283,10 @@ public sealed class RuntimeWorkerOperationGateway(
                 Agentstration.Schemas.DataContracts.Validate(Agentstration.Schemas.DataContracts.Declared(expectedOutput, "function-output"), functionOutput, "function-output", run.Id, step.Name);
         }
         catch (Agentstration.Schemas.DataContractException exception)
-        { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.Failure }; }
+        {
+            throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception)
+            { ContractFailure = exception.Failure with { FlowRunId = exception.Failure.FlowRunId ?? run.Id, StepName = exception.Failure.StepName ?? step.Name } };
+        }
         catch (FlowValidationException exception)
         { throw new RuntimeGovernedOperationException(exception.Code, exception.Message, exception) { ContractFailure = exception.ContractFailure }; }
         catch (ToolDefinitionInvocationException exception)

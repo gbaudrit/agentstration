@@ -15,7 +15,7 @@
         @if (!DeclaredPointNames.Contains(point, StringComparer.Ordinal))
         { <p role="status">@T("CompositionOrphanHelp") <button type="button" class="text-button" disabled="@ReadOnly" @onclick="() => RemovePointAsync(point)">@T("CompositionRemovePoint")</button></p> }
         @if (point == "postAggregate") { <p>@T("BeforePublicationHelp")</p> }
-        <FlowSequenceEditor @key="point" Title="@(point == "postAggregate" ? T("BeforePublicationTitle") : point)" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" SampleAcquisition="@(PreviewUsesBoundary(point) ? SampleAcquisition : null)" InputContract="@(PreviewUsesBoundary(point) ? InputContract : null)" ContentInput="ContentInput" InputBinding="InputBinding" OwnerNamespace="OwnerNamespace" PreparedSample="@(PreviewUsesBoundary(point) ? PreparedSample : null)" PreparedInputStale="@(PreviewUsesBoundary(point) && PreparedInputStale)" OutputSchema="@DeclaredPoint(point)?.OutputSchema" ReadOnly="ReadOnly" />
+        <FlowSequenceEditor @key="point" Title="@(point == "postAggregate" ? T("BeforePublicationTitle") : point)" Value="@(Value.GetValueOrDefault(point) ?? [])" ValueChanged="value => SetPointAsync(point, value)" InputSchema="@DeclaredPoint(point)?.InputSchema" SampleAcquisition="@(PreviewUsesBoundary(point) ? SampleAcquisition : null)" InputContract="@(PreviewUsesBoundary(point) ? InputContract : null)" ContentInput="ContentInput" InputBinding="InputBinding" OwnerNamespace="OwnerNamespace" PreparedSample="@(PreviewUsesBoundary(point) ? PreparedSample : null)" PreparedInputStale="@(PreviewUsesBoundary(point) && PreparedInputStale)" OutputSchema="@DeclaredPoint(point)?.OutputSchema" AcquisitionOutputSchema="@(ReceivesAcquisition(point) ? AcquisitionOutputSchema : null)" ReadOnly="ReadOnly" />
     }
 </section>
 @code {
@@ -33,6 +33,7 @@
     [Parameter] public SchemaBindingSnapshot? InputContract { get; set; }
     [Parameter] public ResourceNamespace OwnerNamespace { get; set; } = ResourceNamespace.Default;
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public JsonElement? AcquisitionOutputSchema { get; set; }
     private readonly CancellationTokenSource cancellation = new();
     private readonly List<Option> options = [];
     private bool loadFailed;
@@ -45,6 +46,10 @@
         : options.FirstOrDefault(option => Key(option.Reference) == SelectedKey);
     private IEnumerable<string> DeclaredPointNames => SelectedOption?.Points.Select(point => point.Point) ?? (Orchestration is null ? [StandardPoint] : []);
     private FlowCompositionPointStepDefinition? DeclaredPoint(string name) => SelectedOption?.Points.FirstOrDefault(point => point.Point == name);
+    private bool ReceivesAcquisition(string point) => Boundary == "acquisition" && (SelectedOption is { } option
+        ? DeclaredPoint(point)?.InputMapping is { ValueKind: JsonValueKind.String } mapping
+            && mapping.GetString() == "${steps." + option.BoundaryStepName + ".output}"
+        : Orchestration is null && point == StandardPoint);
     private IEnumerable<string> PointNames => DeclaredPointNames.Concat(Value.Keys.Where(name => name != Boundary)).Distinct(StringComparer.Ordinal);
     protected override async Task OnInitializedAsync()
     {

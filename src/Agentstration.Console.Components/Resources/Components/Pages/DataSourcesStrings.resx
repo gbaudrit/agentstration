@@ -356,4 +356,10 @@
   <data name="Preview.RawSampleId" xml:space="preserve"><value>Raw Data Source sample ID</value></data>
   <data name="Preview.PrepareSourceHelp" xml:space="preserve"><value>Acquire a raw sample explicitly on the Data Source, then paste its ID here. Preparation applies that saved Data Source sequence once without publishing production content.</value></data>
   <data name="Preview.PrepareSource" xml:space="preserve"><value>Prepare the Data Source result</value></data>
+<data name="SequenceTextInputHelp" xml:space="preserve"><value>This function expects text from the previous step. If that step returns a JSON object, first add JSON selection to extract the text field (for an HTTP response: /content).</value></data>
+
+<data name="SequenceFunctionInputIncompatible" xml:space="preserve"><value>A transformation function cannot accept the previous step’s result. Use JSON selection or projection to supply a value that matches its input contract.</value></data>
+
+<data name="SequenceAcquisitionContentHelp" xml:space="preserve"><value>This transformation receives the text content of the acquisition response. This selection is fixed when saved.</value></data>
+
 </root>

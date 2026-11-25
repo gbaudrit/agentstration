@@ -85,6 +85,7 @@ internal sealed class ToolAepAccessTokenProvider(
     string extensionName) : IAepAccessTokenProvider
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+    internal ISecretResolver DiscoverySecretResolver => secrets;
 
     public async ValueTask<string?> GetAccessTokenAsync(CancellationToken cancellationToken = default)
     {

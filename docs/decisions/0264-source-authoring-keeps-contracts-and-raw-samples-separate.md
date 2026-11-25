@@ -71,8 +71,8 @@ The generic XML/mapping/function-exposure and viewer slice is reused from
 [PR #1218](https://github.com/gbaudrit/agentstration/pull/1218), initial baseline
 `5e4a5ed67e2856d0dffc7ea57ca091e22acb36c6`. That PR subsequently merged into main
 at `e052dadfe511b97985a040fefb76a4b37d544797`; integration reconciles against its
-merged implementation rather than maintaining another copy of the engines. RSS profiles, AEP discovery sharing,
-history finalization and the complete branch are excluded. Reconcile shared composition,
+merged implementation rather than maintaining another copy of the engines. RSS profiles, AEP discovery sharing
+and history finalization remain owned by that change. Reconcile shared composition,
 function contracts, operation executor and editors against #1218/#1369 before integration,
 then run the combined regression suite.
 

@@ -40,7 +40,7 @@ public sealed class RegistrationContractTests
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
             [typeof(IBootstrapContributionResourceResolver)] = (4, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (29, ServiceLifetime.Scoped),
+            [typeof(IBootstrapResourceHandler)] = (30, ServiceLifetime.Scoped),
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = (7, ServiceLifetime.Singleton),
             [typeof(Agentstration.Schemas.ISchemaFormatHandler)] = (3, ServiceLifetime.Singleton),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),

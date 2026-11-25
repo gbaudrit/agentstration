@@ -20,6 +20,7 @@ internal static class AgentstrationMcpHandlers
         CancellationToken cancellationToken)
     {
         var services = request.Services ?? throw new InvalidOperationException("MCP request services are unavailable.");
+        using var discovery = services.GetRequiredService<AepMcpTransport>().BeginDiscoveryOperation(cancellationToken);
         var current = services.GetRequiredService<ICurrentRequestContext>().Current;
         var workspaceScope = ResourceScopeRef.Workspace(current.WorkspaceId);
         await services.GetRequiredService<InternalMcpToolProjectionService>().EnsureAsync(
@@ -80,6 +81,7 @@ internal static class AgentstrationMcpHandlers
         {
             var parameters = request.Params ?? throw new ToolDefinitionInvocationException("tool_call_invalid", "Tool call parameters are required.");
             var services = request.Services ?? throw new ToolDefinitionInvocationException("tool_execution_scope_required", "MCP request services are unavailable.");
+            using var discovery = services.GetRequiredService<AepMcpTransport>().BeginDiscoveryOperation(cancellationToken);
             var context = services.GetRequiredService<ICurrentRequestContext>();
             var current = context.Current;
             var workspaceScope = ResourceScopeRef.Workspace(current.WorkspaceId);
