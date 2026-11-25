@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -104,6 +104,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskAttempts(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
+        ConfigureWorkUsage(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
     }
 
@@ -1041,6 +1042,7 @@ public static class PostgreSqlWorkServiceCollectionExtensions
         services.AddSingleton<IWorkPlanRepository, PostgreSqlWorkPlanRepository>();
         services.AddSingleton<IWorkProjectRepository, PostgreSqlWorkProjectRepository>();
         services.AddSingleton<IWorkProjectSharingRepository, PostgreSqlWorkProjectSharingRepository>();
+        services.AddSingleton<IWorkUsageRepository, PostgreSqlWorkUsageRepository>();
         services.AddSingleton<IWorkTaskOperationRepository, PostgreSqlWorkTaskOperationRepository>();
         services.AddSingleton<IWorkplaceRepository, PostgreSqlWorkplaceRepository>();
         return services;

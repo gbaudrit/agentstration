@@ -78,12 +78,37 @@ public sealed class CodingWorkerApiTests
         if (mode == "fail") Assert.AreEqual(17, receipt.CliExitCode);
         using var advance = await fixture.Http.PostAsync(fixture.PlanUrl + "/execution/advance", null);
         Assert.HasCount(1, (await advance.Content.ReadFromJsonAsync<WorkPlanResponse>())!.Attempts);
+        var usageUrl = $"/api/workspaces/default/projects/{fixture.ProjectId}/usage";
+        using var captured = await fixture.Http.PostAsJsonAsync(usageUrl + "/captures", new CaptureWorkUsageRequest(fixture.PlanId, attempt.Id));
+        Assert.AreEqual(HttpStatusCode.OK, captured.StatusCode, await captured.Content.ReadAsStringAsync());
+        var capture = (await captured.Content.ReadFromJsonAsync<WorkUsageCapture>())!;
+        Assert.HasCount(1, capture.Items); Assert.IsFalse(capture.Replayed);
+        var accounted = capture.Items.Single().Record;
+        Assert.AreEqual(mode is "cancel" or "partial" or "no-usage" ? null : (long?)23, accounted.Totals.Direct.TotalTokens);
+        Assert.AreEqual(mode == "no-usage" ? null : (long?)13, accounted.Totals.Direct.InputTokens);
+        Assert.AreEqual(1, accounted.Totals.Direct.InvocationCount);
+        Assert.AreEqual(mode == "no-usage" ? WorkUsageMeasurement.Unknown : WorkUsageMeasurement.Measured, accounted.Measurement);
+        Assert.AreEqual(mode == "no-usage" ? FlowRunTokenUsageCoverage.Unavailable : mode is "cancel" or "partial"
+            ? FlowRunTokenUsageCoverage.Partial : FlowRunTokenUsageCoverage.Complete, accounted.Totals.Direct.Coverage);
+        Assert.AreEqual(1, accounted.Observations.Count); // Stream, final native receipt and Flow output identify the same turn.
+        Assert.AreEqual(expected, accounted.Source.Outcome); Assert.IsNull(accounted.ProjectId);
         var before = JsonSerializer.Serialize(assignment);
         await worker.DisposeAsync(); await fixture.RestartAsync();
         var retained = (await fixture.Http.GetFromJsonAsync<WorkTaskExecutionPage>($"/api/workspaces/default/tasks/{fixture.TaskId}/execution-history"))!;
         Assert.HasCount(1, retained.Items); Assert.AreEqual(attempt.Id, retained.Items.Single().Attempt.Id);
         var persisted = await fixture.WaitAssignmentAsync(attempt.FlowRunId, _ => true);
         Assert.AreEqual(before, JsonSerializer.Serialize(persisted));
+        using var recaptured = await fixture.Http.PostAsJsonAsync(usageUrl + "/captures", new CaptureWorkUsageRequest(fixture.PlanId, attempt.Id));
+        Assert.AreEqual(HttpStatusCode.OK, recaptured.StatusCode, await recaptured.Content.ReadAsStringAsync());
+        var replay = (await recaptured.Content.ReadFromJsonAsync<WorkUsageCapture>())!;
+        Assert.IsTrue(replay.Replayed); Assert.AreEqual(capture.Items.Single().Digest, replay.Items.Single().Digest);
+        using var summary = await fixture.Http.PostAsJsonAsync(usageUrl + "/summary", new WorkUsageSummaryQuery([new(fixture.PlanId), new(fixture.PlanId)]));
+        Assert.AreEqual(HttpStatusCode.OK, summary.StatusCode);
+        var totals = (await summary.Content.ReadFromJsonAsync<WorkUsageSummary>())!;
+        Assert.AreEqual(1, totals.OriginalRecords);
+        Assert.AreEqual(mode == "no-usage" ? 0 : 1, totals.Measured.Direct.InvocationCount);
+        using var noSharing = await fixture.Http.PostAsync(usageUrl + $"/{accounted.Id}/publication", null);
+        Assert.AreEqual(HttpStatusCode.BadRequest, noSharing.StatusCode);
         if (expected == WorkPlanAttemptStatus.Completed) Assert.IsNotNull(retained.Items.Single().Attempt.Result);
         else Assert.IsNotNull(retained.Items.Single().Attempt.Error);
         using var foreign = await fixture.Http.GetAsync($"/api/workspaces/{Guid.NewGuid()}/tasks/{fixture.TaskId}/execution-history");
@@ -117,7 +142,7 @@ public sealed class CodingWorkerApiTests
         internal RequestContext Context { get; private set; } = null!;
         internal Guid PlanId { get; } = Guid.NewGuid();
         internal Guid TaskId { get; } = Guid.NewGuid();
-        private Guid ProjectId { get; } = Guid.NewGuid();
+        internal Guid ProjectId { get; } = Guid.NewGuid();
         private WorkProjectResourceReference connection = null!;
         private RuntimeProfileResource runtime = null!;
         internal RuntimeFlowDefinition RuntimeDefinition { get; private set; } = null!;

@@ -336,3 +336,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 270. [ADR-0270 — Coding CLI Runs use AWP and an isolated native helper](0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md)
 
 271. [ADR-0271 — Workspace seeds reuse pinned Bootstrap and explicit sharing handover](0271-workspace-seeds-reuse-pinned-bootstrap-and-explicit-sharing-handover.md)
+
+272. [ADR-0272 — Terminal Work usage retains immutable corrections and portable accounting](0272-terminal-work-usage-retains-immutable-corrections-and-portable-accounting.md)

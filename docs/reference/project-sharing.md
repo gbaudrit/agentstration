@@ -65,7 +65,7 @@ only some members, preserving the ordinary WorkPlan hierarchy rules.
 
 Use a new operation ID for a new intent. Replay an existing ID only with the same normalized
 changes. Contributions and usage use stable UUID record names and immutable content; identical
-records count once. Usage contains bounded nonnegative named counters. Contributions carry
+records count once. Usage supports legacy bounded named counters and [typed canonical Work accounting](work-usage.md), including immutable correction lineages. Contributions carry
 explicit evidence and artifact references; neither implies functional acceptance of local Work.
 Bootstrap records carry portable declarations, not credentials or physical scope references.
 

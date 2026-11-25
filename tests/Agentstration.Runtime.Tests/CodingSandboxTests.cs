@@ -70,6 +70,18 @@ public sealed class CodingSandboxTests
     }
 
     [TestMethod]
+    public async Task NativeUsageRetainsOnlyAnExplicitProviderTotal()
+    {
+        await using var fixture = await Fixture.CreateAsync("success");
+        var explicitTotal = new Native.CodingUsageReader(fixture.Material.Coordinates, TimeProvider.System).Read(
+            "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20,\"cached_input_tokens\":0,\"output_tokens\":5,\"total_tokens\":30}}");
+        Assert.AreEqual(30L, explicitTotal!.ProviderTotalTokens, "Keep the provider value even when it differs from input plus output.");
+        var absentTotal = new Native.CodingUsageReader(fixture.Material.Coordinates, TimeProvider.System).Read(
+            "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20,\"cached_input_tokens\":0,\"output_tokens\":5}}");
+        Assert.IsNull(absentTotal!.ProviderTotalTokens);
+    }
+
+    [TestMethod]
     public async Task TimeoutRetainsPartialUsageAndNativeCredentialOutputIsRefused()
     {
         if (!OperatingSystem.IsLinux()) Assert.Inconclusive("The optional native Coding worker requires Linux Bubblewrap.");

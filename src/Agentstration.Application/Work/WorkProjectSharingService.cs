@@ -42,6 +42,12 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         var prior = await repository.GetOperationAsync(workspaceId, context.PrincipalId, projectId, command.Id, token);
         if (prior is not null) return prior.IntentDigest != digest ? Failure("sharing_command_conflict") : await ResumeAsync(workspaceId, projectId, command.Id, token);
         if (project.Version != command.ExpectedProjectVersion) return Failure("work_project_conflict");
+        foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.Usage))
+        {
+            var usage = change.Content.Deserialize<WorkSharingUsage>(Json)!;
+            if (usage.Accounting is { } accounting && (accounting.ProjectId != project.Definition.Sharing!.ProjectId
+                || accounting.ParticipantId != project.Definition.Sharing.ParticipantId)) return Failure("usage_identity_invalid");
+        }
         var observations = new List<WorkSharingPlanObservation>();
         foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.Plan))
         {
@@ -54,7 +60,8 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         }
         var now = clock.GetUtcNow();
         var operation = new WorkSharingOperation(command.Id, workspaceId, context.PrincipalId, projectId, project.Version,
-            project.Definition.Sharing!, Binding(project), changes, digest, WorkSharingOperationStatus.Pending, 1, now, now, []) { Plans = observations };
+            project.Definition.Sharing!, Binding(project), changes, digest, WorkSharingOperationStatus.Pending, 1, now, now, [])
+        { Plans = observations };
         var saved = await repository.AdmitAsync(operation, token);
         if (saved != WorkSharingSaveStatus.Saved)
         {
@@ -89,8 +96,14 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
                 if (!prepared.IsSuccess) return await SaveAsync(operation, WorkSharingOperationStatus.Conflict, null, prepared.ErrorCode, token);
                 if (prepared.Value!.Records.Count == 0) return await SaveAsync(operation, WorkSharingOperationStatus.Succeeded, snapshot.Value!.Revision, null, token);
                 if (operation.Attempts.Count >= 8) return await SaveAsync(operation, WorkSharingOperationStatus.Conflict, null, "sharing_retry_limit", token);
-                var next = operation with { Attempts = [.. operation.Attempts, prepared.Value], Version = operation.Version + 1,
-                    UpdatedAt = clock.GetUtcNow(), Status = WorkSharingOperationStatus.Pending, ErrorCode = null };
+                var next = operation with
+                {
+                    Attempts = [.. operation.Attempts, prepared.Value],
+                    Version = operation.Version + 1,
+                    UpdatedAt = clock.GetUtcNow(),
+                    Status = WorkSharingOperationStatus.Pending,
+                    ErrorCode = null
+                };
                 if (!await repository.UpdateOperationAsync(next, operation.Version, token)) return Failure("sharing_operation_conflict");
                 operation = next;
             }
@@ -137,8 +150,11 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         var project = loaded.Value!;
         if (project.Definition.Sharing is not { } connection) return Result<WorkProjectSnapshot>.Failure("sharing_connection_required");
         var capabilities = await gateway.DiscoverAsync(workspaceId, context.PrincipalId, Binding(project), connection, token);
-        return capabilities.Value is { Version: WorkSharingFormat.Version, Read: true, Write: true, ExactRevisions: true,
-            CompareAndSwap: true, History: true, IdempotentOperations: true, Recovery: true } && capabilities.IsSuccess
+        return capabilities.Value is
+        {
+            Version: WorkSharingFormat.Version, Read: true, Write: true, ExactRevisions: true,
+            CompareAndSwap: true, History: true, IdempotentOperations: true, Recovery: true
+        } && capabilities.IsSuccess
             ? loaded : Result<WorkProjectSnapshot>.Failure(capabilities.ErrorCode ?? "sharing_capability_missing");
     }
     private async Task<Result<WorkSharingSnapshot>> ReadAsync(WorkProjectSnapshot project, string? revision, CancellationToken token)
@@ -152,6 +168,9 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
             || snapshot.Records.Any(record => record is null || !WorkSharingFormat.Validate(record).IsSuccess
                 || !WorkSharingContent.Normalize(new(record.Key, record.Version - 1, record.Content)).IsSuccess
                 || !snapshot.Space.Records.Any(entry => entry.Key == record.Key && entry.Version == record.Version && entry.Digest == record.Digest))
+            || snapshot.Records.Where(record => record.Key.Domain == WorkSharingDomain.Usage).Any(record =>
+                record.Content.Deserialize<WorkSharingUsage>(Json)?.Accounting is { } accounting
+                    && (accounting.ProjectId != snapshot.Space.ProjectId || accounting.ParticipantId != record.ParticipantId))
             || JsonSerializer.SerializeToUtf8Bytes(snapshot, Json).Length > WorkSharingFormat.MaximumSnapshotBytes
             || snapshot.Revision?.Length is > 256 || revision is not null && snapshot.Revision != revision)
             return Result<WorkSharingSnapshot>.Failure("sharing_snapshot_invalid");

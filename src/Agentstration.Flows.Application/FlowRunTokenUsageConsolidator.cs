@@ -23,7 +23,7 @@ public sealed class FlowRunTokenUsageConsolidator(IFlowRepository repository)
             childTotals.Add(child.Value.TokenUsage.Inclusive);
         }
 
-        return new(FlowRunTokenUsageState.Final, direct, Combine([direct, .. childTotals]));
+        return new(FlowRunTokenUsageState.Final, direct, FlowRunTokenUsageAggregation.Combine([direct, .. childTotals]));
     }
 
     private static IEnumerable<string> ChildRunIds(FlowRun run) => run.Steps
@@ -31,50 +31,10 @@ public sealed class FlowRunTokenUsageConsolidator(IFlowRepository repository)
             string.IsNullOrWhiteSpace(step.ChildFlowRunId) ? [] : [step.ChildFlowRunId]))
         .Distinct(StringComparer.Ordinal)!;
 
-    private static FlowRunTokenUsageTotal AggregateSteps(IReadOnlyList<FlowStepRun> steps)
-    {
-        var invocations = steps
+    private static FlowRunTokenUsageTotal AggregateSteps(IReadOnlyList<FlowStepRun> steps) =>
+        FlowRunTokenUsageAggregation.Combine(steps
             .Where(step => string.Equals(step.StepType, "agent", StringComparison.OrdinalIgnoreCase)
                 && step.Status is FlowStepRunStatus.Succeeded or FlowStepRunStatus.Failed or FlowStepRunStatus.Cancelled)
-            .ToArray();
-        var reported = invocations.Count(step => step.Usage is
-        { InputTokens: not null } or { OutputTokens: not null } or { TotalTokens: not null });
-        var complete = invocations.Count(step => step.Usage is
-        { InputTokens: not null, OutputTokens: not null, TotalTokens: not null });
-        return new(
-            Sum(invocations.Select(step => (long?)step.Usage?.InputTokens)),
-            Sum(invocations.Select(step => (long?)step.Usage?.OutputTokens)),
-            Sum(invocations.Select(step => (long?)step.Usage?.TotalTokens)),
-            Coverage(invocations.Length, reported, complete == invocations.Length),
-            reported,
-            invocations.Length);
-    }
-
-    private static FlowRunTokenUsageTotal Combine(IReadOnlyList<FlowRunTokenUsageTotal> totals)
-    {
-        var invocationCount = totals.Sum(total => total.InvocationCount);
-        var reported = totals.Sum(total => total.ReportedInvocationCount);
-        var complete = totals.Where(total => total.InvocationCount > 0)
-            .All(total => total.Coverage == FlowRunTokenUsageCoverage.Complete);
-        return new(
-            Sum(totals.Select(total => total.InputTokens)),
-            Sum(totals.Select(total => total.OutputTokens)),
-            Sum(totals.Select(total => total.TotalTokens)),
-            Coverage(invocationCount, reported, complete),
-            reported,
-            invocationCount);
-    }
-
-    private static long? Sum(IEnumerable<long?> values)
-    {
-        var known = values.Where(value => value is not null).Select(value => value!.Value).ToArray();
-        return known.Length == 0 ? null : known.Sum();
-    }
-
-    private static FlowRunTokenUsageCoverage Coverage(int invocations, int reported, bool complete) =>
-        invocations == 0 || reported == 0
-            ? FlowRunTokenUsageCoverage.Unavailable
-            : complete
-                ? FlowRunTokenUsageCoverage.Complete
-                : FlowRunTokenUsageCoverage.Partial;
+            .Select(step => FlowRunTokenUsageAggregation.Invocation(step.Usage?.InputTokens, step.Usage?.OutputTokens, step.Usage?.TotalTokens))
+            .ToArray());
 }

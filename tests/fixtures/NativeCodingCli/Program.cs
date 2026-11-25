@@ -20,7 +20,7 @@ if (mode == "flood")
 }
 if (mode != "no-usage") Console.WriteLine(mode == "partial" || mode == "cancel"
     ? "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":13}}"
-    : "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":13,\"cached_input_tokens\":3,\"output_tokens\":7,\"reasoning_output_tokens\":2}}");
+    : "{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":13,\"cached_input_tokens\":3,\"output_tokens\":7,\"total_tokens\":23,\"reasoning_output_tokens\":2}}");
 await Console.Out.FlushAsync();
 if (mode == "cancel") { await Task.Delay(Timeout.InfiniteTimeSpan); return 0; }
 await File.WriteAllTextAsync("/work/answer.txt", "42\n");

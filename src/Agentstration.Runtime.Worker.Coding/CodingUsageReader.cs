@@ -24,13 +24,15 @@ internal sealed class CodingUsageReader(CodingInvocationCoordinates coordinates,
             if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
                 return new(id, coordinates, CodingConsumptionAvailability.Unavailable, null, null, null, null, clock.GetUtcNow(), "usage_unreported");
             var input = Count(usage, "input_tokens"); var cached = Count(usage, "cached_input_tokens");
+            var total = Count(usage, "total_tokens");
             var output = Count(usage, "output_tokens"); var reasoning = Count(usage, "reasoning_output_tokens");
             if (input is { } i && cached > i || output is { } o && reasoning > o)
                 return new(id, coordinates, CodingConsumptionAvailability.Unavailable, null, null, null, null, clock.GetUtcNow(), "usage_inconsistent");
-            var available = input is not null || cached is not null || output is not null || reasoning is not null;
+            var available = input is not null || cached is not null || output is not null || reasoning is not null || total is not null;
             var complete = input is not null && cached is not null && output is not null;
             return new(id, coordinates, complete ? CodingConsumptionAvailability.Known : available ? CodingConsumptionAvailability.Partial : CodingConsumptionAvailability.Unavailable,
-                input, cached, output, reasoning, clock.GetUtcNow(), complete ? reasoning is null ? "reasoning_unreported" : null : "usage_partial_or_unreported");
+                input, cached, output, reasoning, clock.GetUtcNow(), complete ? reasoning is null ? "reasoning_unreported" : null : "usage_partial_or_unreported")
+            { ProviderTotalTokens = total };
         }
     }
     private static long? Count(JsonElement usage, string name) => usage.TryGetProperty(name, out var value)

@@ -45,6 +45,7 @@ public static class SqliteWorkServiceCollectionExtensions
         services.AddSingleton<IWorkPlanRepository, SqliteWorkPlanRepository>();
         services.AddSingleton<IWorkProjectRepository, SqliteWorkProjectRepository>();
         services.AddSingleton<IWorkProjectSharingRepository, SqliteWorkProjectSharingRepository>();
+        services.AddSingleton<IWorkUsageRepository, SqliteWorkUsageRepository>();
         services.AddSingleton<IWorkTaskOperationRepository, SqliteWorkTaskOperationRepository>();
         services.AddSingleton<IWorkplaceRepository, SqliteWorkplaceRepository>();
         return services;

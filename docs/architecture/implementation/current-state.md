@@ -4,6 +4,12 @@
 
 Agentstration keeps explicit Management Plane, Runtime Plane, and Work Plane boundaries in one modular codebase and one authoritative standalone server. `Agentstration.Web` remains the all-in-one executable composition root, family-owned `Agentstration.*.Api` modules own REST, MCP, SignalR, request-context, and authorization transport, and the lightweight `Agentstration.Api` aggregator composes them with global OpenAPI and health conventions. `Agentstration.Console.Web` is an independently hostable operations Console process shell that consumes typed clients but owns no authoritative API, store, worker, or business service. The end-user Workplace remains a separate HTTP/SignalR client UI. The Management Plane is authoritative for definitions, revisions, and desired deployment state. The Runtime Plane owns technical execution. The Work Plane owns the functional lifecycle, history, interactions, and results of delegated work. Runtime `AIAgent` objects are reconstructible and never persisted. The default launch is fully local; Foundry, PostgreSQL, Ollama, and OTLP are optional profiles, while Aspire orchestrates the server, Workplace, and optional extensions.
 
+Terminal [Work usage](../../reference/work-usage.md) explicitly captures historical Flow/AWP evidence
+into the Work store before recoverable Project sharing publication. It reuses canonical nullable
+Flow totals, deduplicates native observations, retains immutable corrections and separates measured,
+estimated and unknown rollups. Portable producer attribution is captured at admission; physical
+Workspace/private Project ownership remains local (ADR-0272).
+
 ## Solution tree
 
 ```text

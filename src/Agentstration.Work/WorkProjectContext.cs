@@ -9,7 +9,11 @@ public sealed record WorkProjectResolvedBinding(WorkProjectContextBinding Bindin
 public sealed record WorkProjectBindingAvailability(WorkProjectContextBinding Binding, bool Available, string Code);
 public sealed record WorkProjectContextView(WorkProjectId ProjectId, long ProjectVersion, IReadOnlyList<WorkProjectBindingAvailability> Bindings);
 public sealed record WorkProjectContextSnapshot(WorkProjectId ProjectId, long ProjectVersion, string Digest,
-    IReadOnlyList<WorkProjectResolvedBinding> Bindings, DateTimeOffset CapturedAt);
+    IReadOnlyList<WorkProjectResolvedBinding> Bindings, DateTimeOffset CapturedAt)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public WorkProjectSharingConnection? Sharing { get; init; }
+}
 
 public static class WorkProjectContextRules
 {

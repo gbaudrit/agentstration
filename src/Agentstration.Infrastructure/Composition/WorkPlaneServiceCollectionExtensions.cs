@@ -44,6 +44,8 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<IWorkProjectBindingResolver, WorkProjectBindingResolver>();
         services.AddSingleton<WorkPlanExecutionService>();
         services.AddSingleton<WorkTaskExecutionEvidenceService>();
+        services.AddSingleton<WorkUsageService>();
+        services.AddSingleton<IWorkUsageExecutionReader, WorkUsageExecutionReader>();
         services.AddSingleton<IWorkPlanFlowObserver, WorkPlanFlowObserver>();
         services.AddSingleton<WorkplaceService>();
         services.AddSingleton<IEntryDiscoveryAuthorization, EntryDiscoveryAuthorization>();

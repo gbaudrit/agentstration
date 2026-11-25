@@ -52,9 +52,12 @@ public sealed class WorkProjectContextService(IWorkProjectRepository projects, I
         if (project is null) return Result<WorkProjectContextSnapshot>.Failure("work_project_not_found");
         if (!project.Definition.PlanIds.Contains(planId)) return Result<WorkProjectContextSnapshot>.Failure("work_project_plan_not_associated");
         var resolved = await ValidateAsync(workspaceId, project.Definition, token);
-        return !resolved.IsSuccess ? Result<WorkProjectContextSnapshot>.Failure(resolved.ErrorCode!)
-            : Result<WorkProjectContextSnapshot>.Success(new(projectId, project.Version,
-                WorkPlanDefinition.Digest(new { project.Id, project.Version, Bindings = resolved.Value! }), resolved.Value!, clock.GetUtcNow()));
+        if (!resolved.IsSuccess) return Result<WorkProjectContextSnapshot>.Failure(resolved.ErrorCode!);
+        var digest = project.Definition.Sharing is null
+            ? WorkPlanDefinition.Digest(new { project.Id, project.Version, Bindings = resolved.Value! })
+            : WorkPlanDefinition.Digest(new { project.Id, project.Version, Bindings = resolved.Value!, project.Definition.Sharing });
+        return Result<WorkProjectContextSnapshot>.Success(new(projectId, project.Version, digest, resolved.Value!, clock.GetUtcNow())
+        { Sharing = project.Definition.Sharing });
     }
 
     private bool Owns(WorkspaceId workspaceId) => workspaceId.Value != Guid.Empty && workspaceId == context.WorkspaceId && context.PrincipalId != Guid.Empty;

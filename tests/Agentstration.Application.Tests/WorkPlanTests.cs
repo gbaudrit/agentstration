@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Resources;
@@ -438,6 +438,7 @@ public sealed partial class WorkPlanTests
         public IWorkPlanRepository Store => provider!.GetRequiredService<IWorkPlanRepository>();
         public IWorkProjectRepository Projects => provider!.GetRequiredService<IWorkProjectRepository>();
         public IWorkProjectSharingRepository Sharing => provider!.GetRequiredService<IWorkProjectSharingRepository>();
+        public IWorkUsageRepository Usage => provider!.GetRequiredService<IWorkUsageRepository>();
         public IWorkTaskOperationRepository Operations => provider!.GetRequiredService<IWorkTaskOperationRepository>();
         public IWorkplaceRepository Workplace => provider!.GetRequiredService<IWorkplaceRepository>();
         public Agentstration.Flows.Storage.Abstractions.IFlowRepository FlowStore => provider!.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>();

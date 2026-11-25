@@ -174,6 +174,14 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/management/workspaces/", StringComparison.OrdinalIgnoreCase)) return DashboardAdministration(method, path);
         if (!path.StartsWith("/api/workspaces/{workspaceName}", StringComparison.OrdinalIgnoreCase)) return null;
 
+        if (path.Contains("/projects/{projectId}/usage", StringComparison.OrdinalIgnoreCase))
+        {
+            if (path.EndsWith("/captures", StringComparison.OrdinalIgnoreCase)) return Json<WorkUsageCapture>(200, "Capture terminal Work usage from durable execution evidence");
+            if (path.EndsWith("/summary", StringComparison.OrdinalIgnoreCase)) return Json<WorkUsageSummary>(200, "Read canonical and quality-separated Work usage rollups");
+            if (path.EndsWith("/publication", StringComparison.OrdinalIgnoreCase)) return Json<WorkSharingOperationResponse>(202, "Publish or recover immutable Work usage");
+            if (path.TrimEnd('/').EndsWith("/usage", StringComparison.OrdinalIgnoreCase)) return Json<WorkUsagePage>(200, "List immutable Work usage history");
+            return Json<WorkUsageEntry>(200, "Read or append an immutable Work usage correction");
+        }
         if (path.Contains("/coding/", StringComparison.OrdinalIgnoreCase))
         {
             if (method == "POST" && path.EndsWith("/harness-configurations", StringComparison.OrdinalIgnoreCase)) return Json<HarnessNativeConfigurationResource>(201, "Publish an immutable native harness configuration");

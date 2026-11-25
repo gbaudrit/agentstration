@@ -32,7 +32,11 @@ public sealed record WorkSharingIssueReference(string Provider, string Repositor
 public sealed record WorkSharingProjectMetadata(string DisplayName, string? Description, IReadOnlyList<WorkParticipantId> Participants);
 public sealed record WorkSharingContribution(Guid Id, WorkPlanId? PlanId, WorkTaskId? TaskId, string Kind, string Evidence,
     IReadOnlyList<string> ArtifactReferences);
-public sealed record WorkSharingUsage(Guid Id, WorkPlanId? PlanId, WorkTaskId? TaskId, IReadOnlyDictionary<string, long> Counters);
+public sealed record WorkSharingUsage(Guid Id, WorkPlanId? PlanId, WorkTaskId? TaskId, IReadOnlyDictionary<string, long> Counters)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkUsageRecord? Accounting { get; init; }
+}
 public sealed record WorkSharingBootstrapResource(string ApiVersion, string Kind, string Name, string Namespace, JsonElement Definition);
 public sealed record WorkSharingBootstrapProfile(string Name, string Locale, IReadOnlyList<WorkSharingBootstrapResource> Resources);
 

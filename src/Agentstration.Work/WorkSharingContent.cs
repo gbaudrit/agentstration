@@ -74,7 +74,10 @@ public static class WorkSharingContent
         && value.Evidence is { Length: > 0 and <= 16_000 } && value.ArtifactReferences is { Count: <= 32 }
         && value.ArtifactReferences.All(reference => reference is { Length: > 0 and <= 2_000 } && !reference.Any(char.IsControl)) ? value : null;
     private static WorkSharingUsage? Usage(WorkSharingUsage? value) => value is not null && value.Id != Guid.Empty
-        && ValidOptionalIds(value.PlanId, value.TaskId) && value.Counters is { Count: > 0 and <= 32 }
+        && ValidOptionalIds(value.PlanId, value.TaskId) && value.Counters is { Count: <= 32 }
+        && (value.Accounting is null ? value.Counters.Count > 0 : value.Counters.Count == 0 && WorkUsageFormat.Valid(value.Accounting)
+            && value.Accounting.Id.Value == value.Id && value.Accounting.PlanId == value.PlanId && value.Accounting.TaskId == value.TaskId
+            && value.Accounting.ProjectId is not null && value.Accounting.ParticipantId is not null)
         && value.Counters.All(counter => WorkProjectDefinition.ValidName(counter.Key) && counter.Value >= 0)
         ? value with { Counters = value.Counters.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToDictionary(pair => pair.Key, pair => pair.Value) } : null;
     private static WorkSharingBootstrapProfile? Bootstrap(WorkSharingBootstrapProfile? value) => value is not null

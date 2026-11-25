@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -103,6 +103,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskAttempts(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
+        ConfigureWorkUsage(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
     }
 

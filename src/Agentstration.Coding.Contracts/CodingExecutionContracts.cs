@@ -46,7 +46,11 @@ public sealed record CodingExecutionMaterial(string Version, CodingInvocationCoo
 public enum CodingConsumptionAvailability { Known, Partial, Unavailable }
 public sealed record CodingConsumptionObservation(string ObservationId, CodingInvocationCoordinates Coordinates,
     CodingConsumptionAvailability Availability, long? InputTokens, long? CachedInputTokens, long? OutputTokens,
-    long? ReasoningOutputTokens, DateTimeOffset ObservedAt, string? Reason = null);
+    long? ReasoningOutputTokens, DateTimeOffset ObservedAt, string? Reason = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? ProviderTotalTokens { get; init; }
+}
 public sealed record CodingCheckEvidence(string Name, int? ExitCode, bool Completed, string? Diagnostic = null);
 public sealed record CodingNativeResult(CodingInvocationCoordinates Coordinates, string BaseRevision, string? Patch,
     string? PatchDigest, string Summary, int? CliExitCode, IReadOnlyList<CodingCheckEvidence> Checks,
