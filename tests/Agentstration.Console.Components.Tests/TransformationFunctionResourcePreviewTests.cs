@@ -5,6 +5,7 @@ using Agentstration.Functions.Contracts;
 
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
+using Agentstration.Schemas.Contracts;
 using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
@@ -164,6 +165,37 @@ public sealed class TransformationFunctionResourcePreviewTests
         var cut = Render(context, Target("transformation-function-a"));
         Assert.AreEqual(ResourceLoadStatus.Forbidden, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
         Assert.IsEmpty(cut.FindComponents<TransformationFunctionResourceSummary>());
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Accepted transformation contracts")]
+    [DataRow("fr-FR", "Contrats de transformation acceptés")]
+    public async Task PreviewPreservesAcceptedTransformationContractsFromTheSharedSummary(string locale, string title)
+    {
+        using var culture = new TestCultureScope(locale);
+        var resource = Resource("transformation-function-a");
+        var version = resource.Definition.Versions[0] with
+        {
+            TransformationSnapshot = new(
+                new SchemaBindingSnapshot("declaration", "transformation/v1", null,
+                    JsonSerializer.SerializeToElement(new { rules = "saved-rules" }), "declaration-hash"),
+                new SchemaBindingSnapshot("input", "xml/xsd", null,
+                    JsonSerializer.SerializeToElement("<schema />"), "input-hash"),
+                new SchemaBindingSnapshot("output", "json-schema", null,
+                    JsonSerializer.SerializeToElement(new { type = "object" }), "output-hash"),
+                new("xml.to_json", "1.0.0", ResourceScopeRef.Instance), "saved-engine-contract")
+        };
+        resource = resource with { Definition = resource.Definition with { Versions = [version] } };
+        using var handler = new Handler((_, _) => Task.FromResult(Response(resource)));
+        using var context = await ContextAsync(handler);
+        var cut = Render(context, Target(resource.Name));
+        var evidence = cut.Find("[data-testid=function-transformation-evidence]");
+        Assert.AreEqual(title, evidence.QuerySelector("h2")!.TextContent);
+        Assert.AreEqual("1.0.0", evidence.QuerySelector("summary")!.TextContent);
+        foreach (var acceptedFact in new[] { "declaration-hash", "input-hash", "output-hash", "saved-engine-contract" })
+            Assert.Contains(acceptedFact, evidence.QuerySelector("pre")!.TextContent);
+        Assert.IsEmpty(evidence.QuerySelectorAll("input, select, textarea, button"));
+        Assert.AreEqual(1, handler.Reads);
     }
 
     private static ScopedResourceAddress Target(string name) => ScopedResourceAddress.Create(Scope, ResourceNamespace.Default, FunctionResourceKinds.TransformationFunction, name);
