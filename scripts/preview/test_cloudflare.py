@@ -178,6 +178,45 @@ class AccessAuditTests(unittest.TestCase):
                 self.cloud.policies[0]['include'][0]['azureAD'] = rule
                 self.audit()
 
+    def test_legacy_connection_id_is_checked_as_an_identity_provider_reference(self):
+        self.cloud.policies[0]['include'][0]['azureAD'] = {'id': GROUP, 'connection_id': IDP}
+        result = self.audit()
+        self.assertEqual('application-and-rule', result['checks']['humanProviderBinding'])
+        self.assertEqual(['connection_id'], result['checks']['humanProviderFields'])
+        self.assertNotIn(IDP, json.dumps(result))
+
+    def test_both_provider_aliases_must_match_the_verified_application(self):
+        self.cloud.policies[0]['include'][0]['azureAD'] = {
+            'id': GROUP, 'connection_id': IDP, 'identity_provider_id': IDP.upper()}
+        result = self.audit()
+        self.assertEqual(['identity_provider_id', 'connection_id'], result['checks']['humanProviderFields'])
+        for modern, legacy in ((IDP, APP), (APP, IDP)):
+            with self.subTest(modern=modern, legacy=legacy), self.assertRaisesRegex(ValueError, 'another identity provider'):
+                self.cloud.policies[0]['include'][0]['azureAD'] = {
+                    'id': GROUP, 'identity_provider_id': modern, 'connection_id': legacy}
+                self.audit()
+
+    def test_invalid_legacy_reference_is_not_ignored_even_with_a_matching_modern_reference(self):
+        for value in ('private-legacy-fixture', False, [], {}):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'invalid connection_id') as error:
+                self.cloud.policies[0]['include'][0]['azureAD'] = {
+                    'id': GROUP, 'identity_provider_id': IDP, 'connection_id': value}
+                self.audit()
+            self.assertNotIn('private-legacy-fixture', str(error.exception))
+
+    def test_empty_legacy_references_still_use_only_the_verified_application_provider(self):
+        for value in (None, ''):
+            with self.subTest(value=value):
+                self.cloud.policies[0]['include'][0]['azureAD'] = {'id': GROUP, 'connection_id': value}
+                self.assertEqual('application-only', self.audit()['checks']['humanProviderBinding'])
+
+    def test_unknown_selector_shape_diagnostic_never_prints_keys_or_values_outside_fixed_protocol_names(self):
+        self.cloud.policies[0]['include'][0]['azureAD'] = {
+            'id': GROUP, 'name': 'private-group-display-fixture', 'private-key-fixture': 'private-value-fixture'}
+        with self.assertRaisesRegex(ValueError, 'known fields present: id,name') as error:
+            self.audit()
+        self.assertNotIn('private-', str(error.exception))
+
     def test_selector_shape_and_explicit_provider_mismatch_have_safe_distinct_diagnostics(self):
         for rule, message in (({'id': GROUP, 'unknown': 'private-selector-fixture'}, 'unexpected selector'),
                               ({'id': GROUP, 'identity_provider_id': 'private-provider-fixture'}, 'invalid identity_provider_id'),
