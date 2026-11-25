@@ -62,6 +62,7 @@ public static partial class WorkplaceEndpoints
         workspaces.MapGet("/interactions/{interactionId:guid}/pending-actions", GetPendingActionsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/interactions/{interactionId:guid}/pending-actions/{pendingActionId:guid}/responses", RespondPendingActionAsync).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         workspaces.MapGet("/tasks", ListTasksAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        MapTaskExecutionEvidence(workspaces);
         workspaces.MapPost("/work-plans", CreateWorkPlanAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(256 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
         MapWorkProjectSharing(workspaces);

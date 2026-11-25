@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -100,6 +100,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskResultDocument>(), "WorkTaskResults");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
         ConfigureWorkPlans(modelBuilder);
+        ConfigureTaskAttempts(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);

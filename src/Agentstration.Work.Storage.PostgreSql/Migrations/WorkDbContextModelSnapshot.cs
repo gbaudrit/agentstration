@@ -637,6 +637,47 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.ToTable("WorkTaskArtifacts", "work");
                 });
 
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkTaskAttemptDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<long>("AdmittedAtTicks")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PlanId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("TaskId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.HasKey("WorkspaceId", "Id");
+
+                    b.HasIndex("WorkspaceId", "PlanId");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "TaskId", "AdmittedAtTicks", "Id");
+
+                    b.ToTable("WorkTaskAttempts", "work");
+                });
+
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkTaskOperationDocument", b =>
                 {
                     b.Property<string>("WorkspaceId")
@@ -771,6 +812,15 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                 });
 
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkPlanRevisionDocument", b =>
+                {
+                    b.HasOne("Agentstration.Work.Storage.PostgreSql.WorkPlanDocument", null)
+                        .WithMany()
+                        .HasForeignKey("WorkspaceId", "PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkTaskAttemptDocument", b =>
                 {
                     b.HasOne("Agentstration.Work.Storage.PostgreSql.WorkPlanDocument", null)
                         .WithMany()

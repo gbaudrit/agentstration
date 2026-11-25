@@ -232,3 +232,5 @@ for explicit operator reconciliation. These contracts introduce no automatic ret
 Concrete repository and PR operations use [Coding GitHub connections](coding-github.md).
 An exact published Tool relay may also be selected for a TaskOperations binding;
 its immutable capability declaration and source pins are checked before dispatch.
+
+Task attempts also expose [revision-pinned execution evidence and paginated output history](task-execution-evidence.md). Retaining evidence never accepts a task automatically.

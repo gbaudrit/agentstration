@@ -39,6 +39,7 @@ public sealed class PostgreSqlStorageProfileTests
         Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkSharingOperationDocument"));
         Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkSharingStateDocument"));
         Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkSharingPlanMappingDocument"));
+        Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkTaskAttemptDocument"));
     }
 
     [TestMethod]

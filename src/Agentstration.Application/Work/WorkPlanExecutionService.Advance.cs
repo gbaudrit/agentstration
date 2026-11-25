@@ -149,6 +149,7 @@ public sealed partial class WorkPlanExecutionService
                 WorkPlanAttemptStatus.Cancelled => WorkItemStatus.Cancelled,
                 _ => WorkItemStatus.Failed
             }, result, error, now);
+            changed = changed with { Result = result, Error = error };
             if (task.Version != version) updates.Add(new(task, version));
         }
         return await SaveObservedAsync(view, view.Plan with { Attempts = view.Plan.Attempts.Select(item => item.Id == attempt.Id ? changed : item).ToArray() },

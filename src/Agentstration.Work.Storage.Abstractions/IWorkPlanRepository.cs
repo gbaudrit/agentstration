@@ -21,6 +21,8 @@ public interface IWorkPlanRepository
     Task<WorkPlanCommandReceipt?> GetReceiptAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkPlanId id, Guid commandId,
         CancellationToken cancellationToken);
     Task<WorkPlanSaveStatus> TrySaveAsync(WorkPlanChange change, CancellationToken cancellationToken);
+    Task<WorkTaskExecutionPage> ListTaskAttemptsAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkTaskId taskId,
+        int skip, int take, CancellationToken cancellationToken);
     // Trusted scheduler enumeration. User-facing access always requires Workspace and Principal.
     Task<IReadOnlyList<WorkPlanSnapshot>> ListExecutionsAsync(int skip, int take, CancellationToken cancellationToken);
 }

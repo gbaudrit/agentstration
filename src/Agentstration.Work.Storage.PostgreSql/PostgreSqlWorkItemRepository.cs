@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -101,6 +101,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskResultDocument>(), "WorkTaskResults");
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
         ConfigureWorkPlans(modelBuilder);
+        ConfigureTaskAttempts(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
@@ -614,7 +615,7 @@ public sealed class PostgreSqlWorkItemRepository(IDbContextFactory<WorkDbContext
     private static string ETag(long version) => $"\"{version}\"";
 }
 
-public sealed class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkplaceRepository
+public sealed partial class PostgreSqlWorkplaceRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkplaceRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

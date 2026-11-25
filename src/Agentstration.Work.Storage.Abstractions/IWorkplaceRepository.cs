@@ -41,8 +41,11 @@ public interface IWorkplaceRepository
     Task<IReadOnlyList<WorkTaskActivity>> ListActivitiesAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken);
     Task AddResultAsync(WorkTaskResult result, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkTaskResult>> ListResultsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken);
+    Task<WorkTaskResult?> GetResultAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskResultId resultId, CancellationToken cancellationToken);
+    Task<WorkTaskHistoryPage<WorkTaskResult>> ListResultPageAsync(WorkspaceId workspaceId, WorkTaskId taskId, int skip, int take, CancellationToken cancellationToken);
     Task AddArtifactAsync(WorkTaskArtifact artifact, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkTaskArtifact>> ListArtifactsAsync(WorkspaceId workspaceId, WorkTaskId taskId, CancellationToken cancellationToken);
+    Task<WorkTaskHistoryPage<WorkTaskArtifact>> ListArtifactPageAsync(WorkspaceId workspaceId, WorkTaskId taskId, int skip, int take, CancellationToken cancellationToken);
     Task<WorkTaskArtifact?> GetArtifactAsync(WorkspaceId workspaceId, WorkTaskId taskId, WorkTaskArtifactId artifactId, CancellationToken cancellationToken);
     Task CreateNotificationAsync(WorkNotification notification, CancellationToken cancellationToken);
     Task<IReadOnlyList<WorkNotification>> ListNotificationsAsync(WorkspaceId workspaceId, bool? unreadOnly, CancellationToken cancellationToken);

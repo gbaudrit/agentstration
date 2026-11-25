@@ -5,7 +5,7 @@ using Agentstration.Resources;
 namespace Agentstration.Work;
 
 public enum WorkPlanStatus { Draft, Validated, Active, Inactive }
-public enum WorkPlanAction { Create, Revise, Validate, Activate, Deactivate, StartExecution, AdvanceExecution, CancelExecution, RetryTask }
+public enum WorkPlanAction { Create, Revise, Validate, Activate, Deactivate, StartExecution, AdvanceExecution, CancelExecution, RetryTask, RecordExecutionEvidence }
 public enum WorkPlanTaskReadiness { Ready, Blocked, Accepted }
 public sealed record WorkTaskDependency(WorkTaskId TaskId, WorkTaskId DependsOnTaskId);
 public sealed record WorkPlanTaskReference(WorkTaskId TaskId, string CreationDigest);

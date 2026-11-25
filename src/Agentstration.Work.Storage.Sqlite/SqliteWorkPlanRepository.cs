@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Agentstration.Work.Storage.Sqlite;
 
-public sealed class SqliteWorkPlanRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkPlanRepository
+public sealed partial class SqliteWorkPlanRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkPlanRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -25,7 +25,15 @@ public sealed class SqliteWorkPlanRepository(IDbContextFactory<WorkDbContext> co
             CREATE TABLE IF NOT EXISTS WorkPlanCommands (
                 WorkspaceId TEXT NOT NULL, PlanId TEXT NOT NULL, OwnerPrincipalId TEXT NOT NULL, CommandId TEXT NOT NULL, Payload TEXT NOT NULL,
                 PRIMARY KEY (WorkspaceId, PlanId, CommandId), FOREIGN KEY (WorkspaceId, PlanId) REFERENCES WorkPlans (WorkspaceId, Id) ON DELETE RESTRICT);
+            CREATE TABLE IF NOT EXISTS WorkTaskAttempts (
+                WorkspaceId TEXT NOT NULL, Id TEXT NOT NULL, OwnerPrincipalId TEXT NOT NULL, TaskId TEXT NOT NULL,
+                PlanId TEXT NOT NULL, AdmittedAtTicks INTEGER NOT NULL, Payload TEXT NOT NULL,
+                PRIMARY KEY (WorkspaceId, Id), FOREIGN KEY (WorkspaceId, PlanId) REFERENCES WorkPlans (WorkspaceId, Id) ON DELETE RESTRICT);
+            CREATE INDEX IF NOT EXISTS IX_WorkTaskAttempts_WorkspaceId_OwnerPrincipalId_TaskId_AdmittedAtTicks_Id
+                ON WorkTaskAttempts (WorkspaceId, OwnerPrincipalId, TaskId, AdmittedAtTicks, Id);
+            CREATE INDEX IF NOT EXISTS IX_WorkTaskAttempts_WorkspaceId_PlanId ON WorkTaskAttempts (WorkspaceId, PlanId);
             """, cancellationToken);
+        await BackfillAttemptsAsync(context, cancellationToken);
     }
 
     public async Task<WorkPlanSnapshot?> GetAsync(WorkspaceId workspaceId, Guid ownerPrincipalId, WorkPlanId id, CancellationToken cancellationToken)
@@ -168,6 +176,7 @@ public sealed class SqliteWorkPlanRepository(IDbContextFactory<WorkDbContext> co
             });
             try
             {
+                await ProjectAttemptsAsync(context, change.Plan, cancellationToken);
                 await context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return WorkPlanSaveStatus.Saved;

@@ -84,6 +84,28 @@ public sealed class WorkPlanExecutionApiTests
                 Assert.HasCount(1, plan.Attempts);
                 Assert.AreEqual(1, plan.Attempts[0].ProjectContext!.ProjectVersion);
                 var node = plan.Tasks.Single(task => task.TaskId == first);
+                var historyUrl = $"/api/workspaces/default/tasks/{first}/execution-history?skip=0&take=1";
+                var history = (await client.GetFromJsonAsync<WorkTaskExecutionPage>(historyUrl))!;
+                Assert.AreEqual(1, history.TotalCount);
+                var attempt = history.Items.Single().Attempt;
+                Assert.AreEqual(plan.Attempts[0].Id, attempt.Id);
+                Assert.AreEqual(fail ? WorkPlanAttemptStatus.Failed : WorkPlanAttemptStatus.Completed, attempt.Status);
+                var evidenceUrl = prefix + $"/tasks/{first}/attempts/{attempt.Id}/evidence";
+                var evidence = new RecordWorkTaskExecutionEvidenceRequest(Guid.NewGuid(), plan.Version, node.Version,
+                    attempt.TaskVersion, attempt.TaskDigest, "Retained execution evidence, independently of acceptance", [], []);
+                using var staleEvidence = await client.PostAsJsonAsync(evidenceUrl, evidence with { AdmittedTaskVersion = attempt.TaskVersion + 1 });
+                Assert.AreEqual(HttpStatusCode.Conflict, staleEvidence.StatusCode);
+                using var recordedEvidence = await client.PostAsJsonAsync(evidenceUrl, evidence);
+                Assert.AreEqual(HttpStatusCode.OK, recordedEvidence.StatusCode, await recordedEvidence.Content.ReadAsStringAsync());
+                using var replayedEvidence = await client.PostAsJsonAsync(evidenceUrl, evidence);
+                Assert.AreEqual(HttpStatusCode.OK, replayedEvidence.StatusCode);
+                var retained = (await client.GetFromJsonAsync<WorkTaskExecutionPage>(historyUrl))!;
+                Assert.AreEqual(evidence.EventId, retained.Items.Single().Attempt.Evidence!.EventId);
+                using var resultPage = await client.GetAsync($"/api/workspaces/default/tasks/{first}/results/page?skip=0&take=1");
+                using var artifactPage = await client.GetAsync($"/api/workspaces/default/tasks/{first}/artifacts/page?skip=0&take=1");
+                Assert.AreEqual(HttpStatusCode.OK, resultPage.StatusCode); Assert.AreEqual(HttpStatusCode.OK, artifactPage.StatusCode);
+                using var foreignHistory = await client.GetAsync($"/api/workspaces/{Guid.NewGuid()}/tasks/{first}/execution-history");
+                Assert.AreEqual(HttpStatusCode.Forbidden, foreignHistory.StatusCode);
                 using var reviewed = await client.PostAsJsonAsync($"/api/workspaces/default/tasks/{first}/outcome",
                     new RecordWorkTaskOutcomeRequest(Guid.NewGuid(), node.Version, fail ? WorkTaskOutcome.Failed : WorkTaskOutcome.Accepted, "Reviewed deterministic evidence"));
                 Assert.AreEqual(HttpStatusCode.OK, reviewed.StatusCode, await reviewed.Content.ReadAsStringAsync());

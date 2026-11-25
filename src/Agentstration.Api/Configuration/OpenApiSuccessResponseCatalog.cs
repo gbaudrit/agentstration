@@ -162,6 +162,10 @@ internal static class OpenApiSuccessResponseCatalog
 
     private static OpenApiSuccessResponse? Workplace(string method, string path)
     {
+        if (path.EndsWith("/execution-history", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskExecutionPage>(200, "List exact Task attempts and execution evidence");
+        if (path.Contains("/attempts/{attemptId}/evidence", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskExecutionReceipt>(200, "Record revision-pinned execution evidence");
+        if (path.EndsWith("/results/page", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskHistoryPage<WorkTaskResult>>(200, "List Task result history");
+        if (path.EndsWith("/artifacts/page", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskHistoryPage<WorkTaskArtifactResponse>>(200, "List Task artifact history");
         if (path == "/api/workplace/workspaces") return Json<IReadOnlyList<WorkplaceWorkspaceResponse>>(200, "List Workplace workspaces");
         if (path.StartsWith("/api/entries", StringComparison.OrdinalIgnoreCase)
             || path.Contains("/entries", StringComparison.OrdinalIgnoreCase)

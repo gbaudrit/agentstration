@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Agentstration.Work.Storage.PostgreSql;
 
-public sealed class PostgreSqlWorkPlanRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkPlanRepository
+public sealed partial class PostgreSqlWorkPlanRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkPlanRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -156,6 +156,7 @@ public sealed class PostgreSqlWorkPlanRepository(IDbContextFactory<WorkDbContext
             });
             try
             {
+                await ProjectAttemptsAsync(context, change.Plan, cancellationToken);
                 await context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return WorkPlanSaveStatus.Saved;

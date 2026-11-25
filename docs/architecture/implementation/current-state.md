@@ -721,3 +721,12 @@ The standalone native fixture is verified against a real API ZIP, committed and 
 the offline integration scenario. A separate dependency-free process verifies native inventory with
 the authority stopped; publishing v2 leaves v1 unchanged, and native edits retain normal Git merge
 conflicts. This fixture does not emulate vendor inference or install an automatic update mechanism.
+
+## Task execution evidence
+
+WorkPlan attempts retain terminal result/error snapshots and immutable explicitly attached evidence.
+The Work stores transactionally project attempts into an owned task index for paginated retrieval,
+with SQLite/PostgreSQL backfill. Existing result/artifact tables provide exact task-filtered pages.
+Evidence validates admission pins, current task/plan versions and same-run output references without
+changing functional acceptance. See [Task execution evidence](../../reference/task-execution-evidence.md)
+and [ADR-0269](../../decisions/0269-task-execution-evidence-projects-canonical-plan-attempts.md).

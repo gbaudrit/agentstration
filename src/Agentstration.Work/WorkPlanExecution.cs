@@ -21,6 +21,9 @@ public sealed record WorkPlanAttempt(Guid Id, WorkTaskId TaskId, long PlanRevisi
 {
     public IReadOnlyList<WorkPlanAdmissionEvidence> AdmissionEvidence { get; init; } = [];
     public WorkProjectContextSnapshot? ProjectContext { get; init; }
+    public WorkTaskExecutionEvidence? Evidence { get; init; }
+    public WorkResult? Result { get; init; }
+    public WorkError? Error { get; init; }
 }
 
 public sealed record WorkPlanAdmissionEvidence(string Kind, string Reference, string Revision, DateTimeOffset ObservedAt);

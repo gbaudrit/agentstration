@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Agentstration.Application.Work;
 using Agentstration.Flows.Storage.Sqlite;
 using Agentstration.Resources;
@@ -418,6 +418,7 @@ public sealed partial class WorkPlanTests
     private sealed class HookedPlans(IWorkPlanRepository inner, Func<WorkPlanChange, Task> beforeSave) : IWorkPlanRepository
     {
         public Task InitializeAsync(CancellationToken token) => inner.InitializeAsync(token);
+        public Task<WorkTaskExecutionPage> ListTaskAttemptsAsync(WorkspaceId workspace, Guid owner, WorkTaskId task, int skip, int take, CancellationToken token) => inner.ListTaskAttemptsAsync(workspace, owner, task, skip, take, token);
         public Task<IReadOnlyList<WorkPlanSnapshot>> ListExecutionsAsync(int skip, int take, CancellationToken token) => inner.ListExecutionsAsync(skip, take, token);
         public Task<WorkPlanSnapshot?> GetAsync(WorkspaceId workspace, Guid owner, WorkPlanId id, CancellationToken token) => inner.GetAsync(workspace, owner, id, token);
         public Task<WorkPlanRevision?> GetRevisionAsync(WorkspaceId workspace, Guid owner, WorkPlanId id, long revision, CancellationToken token) => inner.GetRevisionAsync(workspace, owner, id, revision, token);
@@ -438,6 +439,7 @@ public sealed partial class WorkPlanTests
         public IWorkProjectRepository Projects => provider!.GetRequiredService<IWorkProjectRepository>();
         public IWorkProjectSharingRepository Sharing => provider!.GetRequiredService<IWorkProjectSharingRepository>();
         public IWorkTaskOperationRepository Operations => provider!.GetRequiredService<IWorkTaskOperationRepository>();
+        public IWorkplaceRepository Workplace => provider!.GetRequiredService<IWorkplaceRepository>();
         public Agentstration.Flows.Storage.Abstractions.IFlowRepository FlowStore => provider!.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>();
         public static async Task<Fixture> CreateAsync()
         {

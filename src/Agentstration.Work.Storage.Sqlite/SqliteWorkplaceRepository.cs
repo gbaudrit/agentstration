@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Agentstration.Resources;
 using Agentstration.Work;
 using Agentstration.Work.Storage.Abstractions;
@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Agentstration.Work.Storage.Sqlite;
 
-public sealed class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkplaceRepository
+public sealed partial class SqliteWorkplaceRepository(IDbContextFactory<WorkDbContext> contextFactory) : IWorkplaceRepository
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

@@ -330,3 +330,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 267. [ADR-0267 — Repository issue authority gates shared-plan intake and dispatch](0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md)
 
 268. [ADR-0268 — HarnessProfiles publish pinned standalone native configuration](0268-harness-profiles-publish-pinned-standalone-native-configuration.md)
+
+269. [ADR-0269 — Task execution evidence projects canonical plan attempts](0269-task-execution-evidence-projects-canonical-plan-attempts.md)
