@@ -139,6 +139,23 @@ public sealed partial class GitHubProviderTests
         Assert.AreEqual(1, fixture.Native.IssuePosts);
     }
 
+    [TestMethod]
+    public async Task GitHubIssueObservationsDistinguishCompletedAbandonedAndUnknownClosure()
+    {
+        using var fixture = new Fixture(); fixture.Native.AddIssue("Prerequisite");
+        string? previous = null;
+        foreach (var reason in new[] { "completed", "not_planned", null })
+        {
+            fixture.Native.Issues[1].State = "closed"; fixture.Native.Issues[1].CompletionReason = reason;
+            var response = await fixture.Issues().InvokeAsync("execute", Key('a'), Key('b'), new("Read", Repository, "1"),
+                "https://api.github.com", Credential, Allowed, "agentstration:", default);
+            Assert.AreEqual("Succeeded", response.Status, response.ErrorCode);
+            Assert.AreEqual("closed", response.Task!.State); Assert.AreEqual(reason, response.Task.CompletionReason);
+            if (previous is not null) Assert.AreNotEqual(previous, response.Task.Revision);
+            previous = response.Task.Revision;
+        }
+    }
+
     private sealed class Fixture : IDisposable
     {
         public string Directory { get; } = Path.Combine(Path.GetTempPath(), "agentstration-github-tests-" + Guid.NewGuid().ToString("N"));
@@ -223,7 +240,7 @@ public sealed partial class GitHubProviderTests
         private JsonElement Issue(int number)
         {
             var issue = Issues[number];
-            return JsonSerializer.SerializeToElement(new { id = 100 + number, number, title = issue.Title, body = issue.Body, state = "open", html_url = $"https://github.com/{Repository}/issues/{number}",
+            return JsonSerializer.SerializeToElement(new { id = 100 + number, number, title = issue.Title, body = issue.Body, state = issue.State, state_reason = issue.CompletionReason, html_url = $"https://github.com/{Repository}/issues/{number}",
                 repository_url = "https://api.github.com/repos/" + Repository, labels = issue.Labels.Select(name => new { name }).ToArray(),
                 sub_issues_summary = new { total = Issues.Count(value => value.Value.Parent == number), completed = 0, percent_completed = 0 },
                 issue_dependencies_summary = new { blocked_by = issue.Dependencies.Count, blocking = 0, total_blocked_by = issue.Dependencies.Count, total_blocking = 0 } });
@@ -233,5 +250,7 @@ public sealed partial class GitHubProviderTests
     {
         public string Title { get; } = title; public string Body { get; } = body; public List<string> Labels { get; } = labels;
         public int? Parent { get; set; } public HashSet<int> Dependencies { get; } = [];
+        public string State { get; set; } = "open";
+        public string? CompletionReason { get; set; }
     }
 }

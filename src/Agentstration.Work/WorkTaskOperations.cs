@@ -38,7 +38,11 @@ public sealed record ExternalTaskOperationInput(ExternalTaskOperationKind Operat
 }
 
 public sealed record ExternalTaskSnapshot(string Repository, string TaskId, string Revision, string Title, string? Body, string State,
-    Uri? Url, IReadOnlyList<string> Labels, IReadOnlyList<ExternalTaskRelation> Relations);
+    Uri? Url, IReadOnlyList<string> Labels, IReadOnlyList<ExternalTaskRelation> Relations)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CompletionReason { get; init; }
+}
 public sealed record WorkTaskProviderCapabilities(string Version, IReadOnlyList<ExternalTaskOperationKind> Operations,
     bool IdempotentOperations, bool OperationRecovery);
 public sealed record WorkTaskProviderRoute(WorkProjectContextBinding Binding, WorkProjectResourceReference Tool,

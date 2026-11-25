@@ -537,6 +537,10 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
+                    b.Property<string>("OperationId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
                     b.Property<string>("ProjectId")
                         .IsRequired()
                         .HasMaxLength(36)

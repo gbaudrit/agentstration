@@ -170,6 +170,8 @@ internal static class OpenApiSuccessResponseCatalog
         if (path.StartsWith("/api/management/workspaces/", StringComparison.OrdinalIgnoreCase)) return DashboardAdministration(method, path);
         if (!path.StartsWith("/api/workspaces/{workspaceName}", StringComparison.OrdinalIgnoreCase)) return null;
 
+        if (method == "POST" && path.EndsWith("/coding/issues/acknowledge", StringComparison.OrdinalIgnoreCase)) return Json<CodingIssueIntakeResponse>(202, "Acknowledge a uniquely associated repository issue and shared plan");
+        if (method == "GET" && path.EndsWith("/issue-readiness", StringComparison.OrdinalIgnoreCase)) return Json<CodingIssueReadiness>(200, "Observe authoritative repository prerequisites before dispatch");
         if (method == "POST" && path.EndsWith("/coding/repositories/resolve", StringComparison.OrdinalIgnoreCase)) return Json<CodingRepositorySelection>(200, "Resolve authorized Coding repositories");
         if (method == "POST" && path.EndsWith("/coding/pull-requests", StringComparison.OrdinalIgnoreCase)) return Json<CodingPullRequestResponse>(202, "Invoke or recover a Coding pull request operation");
         if (path == "/api/workspaces/{workspaceName}") return Json<WorkplaceWorkspaceResponse>(200, "Get a Workplace workspace");

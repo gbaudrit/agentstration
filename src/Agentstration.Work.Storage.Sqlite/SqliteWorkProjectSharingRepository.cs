@@ -17,8 +17,15 @@ public sealed class SqliteWorkProjectSharingRepository(IDbContextFactory<WorkDbC
             CREATE TABLE IF NOT EXISTS WorkSharingStates (WorkspaceId TEXT NOT NULL, ProjectId TEXT NOT NULL, OwnerPrincipalId TEXT NOT NULL, Version INTEGER NOT NULL, Payload TEXT NOT NULL, PRIMARY KEY (WorkspaceId, ProjectId));
             CREATE TABLE IF NOT EXISTS WorkSharingOperations (WorkspaceId TEXT NOT NULL, Id TEXT NOT NULL, OwnerPrincipalId TEXT NOT NULL, ProjectId TEXT NOT NULL, Version INTEGER NOT NULL, CreatedAtTicks INTEGER NOT NULL, Payload TEXT NOT NULL, PRIMARY KEY (WorkspaceId, Id));
             CREATE INDEX IF NOT EXISTS IX_WorkSharingOperations_ProjectHistory ON WorkSharingOperations (WorkspaceId, OwnerPrincipalId, ProjectId, CreatedAtTicks, Id);
-            CREATE TABLE IF NOT EXISTS WorkSharingPlanMappings (WorkspaceId TEXT NOT NULL, OwnerPrincipalId TEXT NOT NULL, PlanId TEXT NOT NULL, ProjectId TEXT NOT NULL, PRIMARY KEY (WorkspaceId, OwnerPrincipalId, PlanId));
+            CREATE TABLE IF NOT EXISTS WorkSharingPlanMappings (WorkspaceId TEXT NOT NULL, OwnerPrincipalId TEXT NOT NULL, PlanId TEXT NOT NULL, ProjectId TEXT NOT NULL, OperationId TEXT NULL, PRIMARY KEY (WorkspaceId, OwnerPrincipalId, PlanId));
             """, token);
+        await db.Database.OpenConnectionAsync(token);
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "PRAGMA table_info(WorkSharingPlanMappings);";
+        var found = false;
+        await using (var reader = await command.ExecuteReaderAsync(token))
+            while (await reader.ReadAsync(token)) found |= reader.GetString(1) == "OperationId";
+        if (!found) await db.Database.ExecuteSqlRawAsync("ALTER TABLE WorkSharingPlanMappings ADD COLUMN OperationId TEXT NULL;", token);
     }
     public async Task<WorkProjectSharingState?> GetStateAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, CancellationToken token)
     {
@@ -113,6 +120,23 @@ public sealed class SqliteWorkProjectSharingRepository(IDbContextFactory<WorkDbC
         var workspace = workspaceId.ToString(); var owner = principalId.ToString("D"); var plan = planId.ToString();
         var row = await db.WorkSharingPlanMappings.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.PlanId == plan, token);
         return row is null ? null : new WorkProjectId(Guid.Parse(row.ProjectId));
+    }
+    public async Task<WorkTaskOperationId?> GetPlanOperationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, CancellationToken token)
+    {
+        await using var db = await factory.CreateDbContextAsync(token);
+        var workspace = workspaceId.ToString(); var owner = principalId.ToString("D"); var project = projectId.ToString(); var plan = planId.ToString();
+        var row = await db.WorkSharingPlanMappings.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.PlanId == plan, token);
+        return row?.OperationId is { } id ? new WorkTaskOperationId(Guid.Parse(id)) : null;
+    }
+    public async Task<bool> SetPlanOperationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, WorkTaskOperationId operationId, CancellationToken token)
+    {
+        await using var db = await factory.CreateDbContextAsync(token);
+        var workspace = workspaceId.ToString(); var owner = principalId.ToString("D"); var project = projectId.ToString(); var plan = planId.ToString(); var key = operationId.ToString();
+        var row = await db.WorkSharingPlanMappings.SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.PlanId == plan, token);
+        if (row is null) return false;
+        var document = await db.WorkTaskOperations.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.Id == key, token);
+        if (document is null || Decode<WorkTaskOperation>(document.Payload) is not { Status: WorkTaskOperationStatus.Succeeded } operation || operation.PlanId != planId) return false;
+        row.OperationId = key; await db.SaveChangesAsync(token); return true;
     }
     public async Task<bool> MapPlanAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, CancellationToken token)
     {

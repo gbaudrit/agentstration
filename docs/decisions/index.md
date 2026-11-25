@@ -326,3 +326,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 265. [ADR-0265 — Generic Git publication uses protected connections and native CAS](0265-generic-git-publication-uses-protected-connections-and-native-cas.md)
 
 266. [ADR-0266 — Project sharing preserves portable plans and local execution authority](0266-project-sharing-preserves-portable-plans-and-local-execution-authority.md)
+
+267. [ADR-0267 — Repository issue authority gates shared-plan intake and dispatch](0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md)

@@ -47,7 +47,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         {
             var portable = change.Content.Deserialize<WorkSharingPlan>(Json)!;
             if (!project.Definition.PlanIds.Contains(portable.PlanId)) return Failure("work_project_plan_not_associated");
-            var local = await ExportPlanAsync(workspaceId, portable.PlanId, portable.Allocation, token);
+            var local = await ExportPlanAsync(workspaceId, portable.PlanId, portable.Allocation, token, portable.Issue);
             if (!local.IsSuccess || WorkPlanDefinition.Digest(JsonSerializer.SerializeToElement(local.Value!.Plan, Json)) != WorkPlanDefinition.Digest(change.Content))
                 return Failure("sharing_local_plan_changed");
             observations.Add(new(portable.PlanId, local.Value!.Version));
@@ -168,6 +168,13 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         {
             entries.TryGetValue(change.Key, out var prior);
             var digest = WorkPlanDefinition.Digest(change.Content);
+            if (change.Key.Domain == WorkSharingDomain.Plan && prior is not null)
+            {
+                var previousPlan = snapshot.Records.Single(record => record.Key == change.Key).Content.Deserialize<WorkSharingPlan>(Json)!;
+                var proposedPlan = change.Content.Deserialize<WorkSharingPlan>(Json)!;
+                if (previousPlan.Issue is not null && previousPlan.Issue != proposedPlan.Issue)
+                    return Result<WorkSharingTransportAttempt>.Failure("sharing_issue_association_immutable");
+            }
             if (prior?.Digest == digest) continue;
             if ((prior?.Version ?? 0) != change.ExpectedVersion
                 || prior is not null && change.Key.Domain is WorkSharingDomain.Contribution or WorkSharingDomain.Usage)
@@ -175,6 +182,13 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
             var record = new WorkSharingRecord(change.Key, change.ExpectedVersion + 1, change.Content, digest, operation.Connection.ParticipantId, operation.CreatedAt);
             records.Add(record); entries[record.Key] = new(record.Key, record.Version, record.Digest, JsonSerializer.SerializeToUtf8Bytes(record, Json).Length);
         }
+        var merged = snapshot.Records.ToDictionary(record => record.Key);
+        foreach (var record in records) merged[record.Key] = record;
+        var issuePlans = merged.Values.Where(record => record.Key.Domain == WorkSharingDomain.Plan)
+            .Select(record => record.Content.Deserialize<WorkSharingPlan>(Json)!).Where(plan => plan.Issue is not null);
+        if (issuePlans.GroupBy(plan => (plan.Issue!.Provider, Repository: plan.Issue.Repository.ToUpperInvariant(), plan.Issue.TaskId))
+            .Any(group => group.Select(plan => plan.PlanId).Distinct().Count() > 1))
+            return Result<WorkSharingTransportAttempt>.Failure("sharing_issue_plan_conflict");
         var space = snapshot.Space with { Records = entries.Values.OrderBy(value => value.Key.Domain).ThenBy(value => value.Key.Name, StringComparer.Ordinal).ToArray() };
         if (!WorkSharingFormat.Validate(space).IsSuccess || entries.Values.Sum(entry => (long)entry.SizeBytes) > WorkSharingFormat.MaximumSnapshotBytes - 64 * 1024)
             return Result<WorkSharingTransportAttempt>.Failure("sharing_space_limit");

@@ -17,5 +17,8 @@ public interface IWorkProjectSharingRepository
     Task<IReadOnlyList<WorkSharingOperation>> ListOperationsAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId,
         int skip, int take, CancellationToken cancellationToken);
     Task<WorkProjectId?> FindPlanProjectAsync(WorkspaceId workspaceId, Guid principalId, WorkPlanId planId, CancellationToken cancellationToken);
+    Task<WorkTaskOperationId?> GetPlanOperationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, CancellationToken cancellationToken);
+    Task<bool> SetPlanOperationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId,
+        WorkTaskOperationId operationId, CancellationToken cancellationToken);
     Task<bool> MapPlanAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, CancellationToken cancellationToken);
 }

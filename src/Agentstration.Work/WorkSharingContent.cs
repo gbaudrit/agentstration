@@ -38,7 +38,7 @@ public static class WorkSharingContent
 
     private static WorkSharingPlan? Plan(WorkSharingPlan? plan)
     {
-        if (plan is null || plan.PlanId.Value == Guid.Empty || plan.Definition is null || plan.Trees is not { Count: > 0 and <= 100 }
+        if (plan is null || !ValidIssue(plan.Issue) || plan.PlanId.Value == Guid.Empty || plan.Definition is null || plan.Trees is not { Count: > 0 and <= 100 }
             || plan.Allocation is null || plan.Allocation.Count > 100) return null;
         var definition = plan.Definition.Validate();
         if (!definition.IsSuccess || plan.Trees.Any(tree => tree is null || !tree.Validate().IsSuccess)) return null;
@@ -56,6 +56,14 @@ public static class WorkSharingContent
         if (WorkPlanDefinition.HasCycle(definition.Value.TaskIds.ToHashSet(), [.. definition.Value.Dependencies, .. hierarchyEdges])) return null;
         return plan with { Definition = definition.Value, Trees = trees, Allocation = plan.Allocation.OrderBy(value => value.TaskId.Value).ToArray() };
     }
+    public static bool ValidIssue(WorkSharingIssueReference? issue) => issue is null || WorkProjectDefinition.ValidName(issue.Provider)
+        && issue.Repository is { Length: > 0 and <= 512 } && !issue.Repository.Any(char.IsControl) && !issue.Repository.Contains('@', StringComparison.Ordinal)
+        && issue.TaskId is { Length: > 0 and <= 128 } && issue.TaskId[0] is >= '1' and <= '9' && issue.TaskId.All(char.IsAsciiDigit)
+        && Prefix(issue.PlanLabelPrefix) && Prefix(issue.ParticipantLabelPrefix)
+        && !issue.PlanLabelPrefix.StartsWith(issue.ParticipantLabelPrefix, StringComparison.OrdinalIgnoreCase)
+        && !issue.ParticipantLabelPrefix.StartsWith(issue.PlanLabelPrefix, StringComparison.OrdinalIgnoreCase);
+    private static bool Prefix(string? value) => value is { Length: > 0 and <= 64 }
+        && value.All(character => char.IsAsciiLetterOrDigit(character) || character is ':' or '-' or '_' or '.');
     private static WorkSharingProjectMetadata? Metadata(WorkSharingProjectMetadata? value) => value is not null
         && !string.IsNullOrWhiteSpace(value.DisplayName) && value.DisplayName.Length <= 200 && value.Description?.Length is not > 4_000
         && value.Participants is { Count: > 0 and <= 64 } && value.Participants.All(id => id.Value != Guid.Empty)

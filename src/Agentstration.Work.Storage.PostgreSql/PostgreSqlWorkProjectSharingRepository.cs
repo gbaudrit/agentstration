@@ -108,6 +108,23 @@ public sealed class PostgreSqlWorkProjectSharingRepository(IDbContextFactory<Wor
         var row = await db.WorkSharingPlanMappings.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.PlanId == plan, token);
         return row is null ? null : new WorkProjectId(Guid.Parse(row.ProjectId));
     }
+    public async Task<WorkTaskOperationId?> GetPlanOperationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, CancellationToken token)
+    {
+        await using var db = await factory.CreateDbContextAsync(token);
+        var workspace = workspaceId.ToString(); var owner = principalId.ToString("D"); var project = projectId.ToString(); var plan = planId.ToString();
+        var row = await db.WorkSharingPlanMappings.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.PlanId == plan, token);
+        return row?.OperationId is { } id ? new WorkTaskOperationId(Guid.Parse(id)) : null;
+    }
+    public async Task<bool> SetPlanOperationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, WorkTaskOperationId operationId, CancellationToken token)
+    {
+        await using var db = await factory.CreateDbContextAsync(token);
+        var workspace = workspaceId.ToString(); var owner = principalId.ToString("D"); var project = projectId.ToString(); var plan = planId.ToString(); var key = operationId.ToString();
+        var row = await db.WorkSharingPlanMappings.SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.PlanId == plan, token);
+        if (row is null) return false;
+        var document = await db.WorkTaskOperations.AsNoTracking().SingleOrDefaultAsync(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.Id == key, token);
+        if (document is null || Decode<WorkTaskOperation>(document.Payload) is not { Status: WorkTaskOperationStatus.Succeeded } operation || operation.PlanId != planId) return false;
+        row.OperationId = key; await db.SaveChangesAsync(token); return true;
+    }
     public async Task<bool> MapPlanAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkPlanId planId, CancellationToken token)
     {
         await using var db = await factory.CreateDbContextAsync(token);

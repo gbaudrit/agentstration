@@ -19,6 +19,13 @@ public static class CodingApiModule
             CodingRepositoryService service, ICurrentRequestContext current, CancellationToken token) =>
                 Response(await service.InvokePullRequestAsync(Workspace(current), new(projectId), request, token), true))
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(64 * 1024));
+        group.MapPost("/issues/acknowledge", async (Guid projectId, AcknowledgeCodingIssueRequest request,
+            CodingIssueCoordinationService service, ICurrentRequestContext current, CancellationToken token) =>
+                Response(await service.AcknowledgeAsync(Workspace(current), new(projectId), request, token), true))
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(32 * 1024));
+        group.MapGet("/plans/{planId:guid}/issue-readiness", async (Guid projectId, Guid planId,
+            CodingIssueCoordinationService service, ICurrentRequestContext current, CancellationToken token) =>
+                Response(await service.ReadinessAsync(Workspace(current), new(projectId), new(planId), token)));
         return endpoints;
     }
 
@@ -35,7 +42,10 @@ public static class CodingApiModule
 
     private static WorkspaceId Workspace(ICurrentRequestContext current) => new(current.Current.WorkspaceId);
     private static IResult Response<T>(Result<T> result, bool accepted = false) where T : class => result.IsSuccess
-        ? result.Value is CodingPullRequestResponse { Result.Status: CodingProviderStatus.Rejected } rejected
+        ? result.Value is CodingIssueIntakeResponse { Status: CodingIssueIntakeStatus.Conflict } conflict
+            ? Results.Problem(statusCode: 409, title: conflict.ErrorCode ?? "coding_issue_intake_conflict",
+                extensions: new Dictionary<string, object?> { ["intake"] = conflict })
+            : result.Value is CodingPullRequestResponse { Result.Status: CodingProviderStatus.Rejected } rejected
             ? Results.Problem(statusCode: 409, title: rejected.Result.ErrorCode ?? "coding_pull_request_rejected",
                 extensions: new Dictionary<string, object?> { ["operationId"] = rejected.Id })
             : Results.Json(result.Value, statusCode: accepted ? StatusCodes.Status202Accepted : StatusCodes.Status200OK)

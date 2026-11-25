@@ -20,6 +20,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Tools.Add(new("github.issue", "GitHub issue operations", new("github", "github_issue_operation"),
         Metadata: new Dictionary<string, JsonElement>
         {
+            ["agentstration.coding.issue-authority"] = JsonSerializer.SerializeToElement(new { version = "1.0", provider = "github", nativeHierarchy = true, nativeDependencies = true, completionReason = true, managedLabels = true, revisionObservation = true }),
             ["agentstration.work.task-provider"] = JsonSerializer.SerializeToElement(new { version = "1.0", operations = new[] { "Read", "Update", "Publish" }, idempotentOperations = true, operationRecovery = true })
         }));
     options.Tools.Add(new("github.coding", "GitHub repository and PR operations", new("github", "github_coding_operation"),

@@ -153,7 +153,7 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, durable asynchronous AEP health/model discovery with bounded retries and cached status reads, exact-model staged Bootstrap dependencies, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions |
 | Storages | Governed immutable types, independent StorageType and Storage Console administration, explicit version publication, discoverable references, scoped generic Discover/Use grant administration/evaluation, manual Connected Service export mappings, JSON Schema validation, ETag lifecycle/reconciliation, Bootstrap, protected neutral resolution | ASP/AEP/Artifact adapters (#1040), dataset/Snapshot consumers (#1041/#1042), new user-permission work (#1077), UsePolicy administration (#1078), gated administration scenario (#1065) |
 | Connected Services | Governed service and operation types (Core-, user-, Bootstrap- or extension-owned), exact type/Flow pins, Instance-/Tenant-/Workspace-owned remote-service definitions, durable Flow-backed operation discovery, schema-validated read-only operation materialization, typed Literal and late-bound Parameter/Secret inputs, scoped CRUD and reconciliation | invocation dispatch and explicit consumer export bindings, including Storage/OpenDAL adapters |
-| Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API; atomic functional task trees, bounded subtree reads, evidence-based required-child acceptance; immutable WorkPlan revisions, graph validation, activation and readiness; explicit execution configuration, transactional admission intents, canonical root Flow dispatch, restart-safe completion projection, cancellation and explicit technical retry | Repository dependency admission; automatic functional acceptance or recovery of a lost AWP Worker |
+| Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API; atomic functional task trees, bounded subtree reads, evidence-based required-child acceptance; immutable WorkPlan revisions, graph validation, activation and readiness; explicit execution configuration, transactional admission intents, canonical root Flow dispatch, restart-safe completion projection, cancellation and explicit technical retry | Automatic functional acceptance or recovery of a lost AWP Worker |
 | Work storage | independent SQLite/PostgreSQL snapshots, WorkPlan/Project/sharing tables, indexed query fields, optimistic version concurrency, SQLite upgrades and PostgreSQL migrations; private Projects group existing owned plans/tasks and retain exact authorized context references with per-attempt snapshots | richer projections |
 | Flows | Instance-, Tenant-, and Workspace-owned typed graph drafts, immutable exact-scope versions, Workspace-owned durable Runs, opaque SQLite/PostgreSQL runtime state, interactive input suspension/recovery, visual editors and SignalR replay | distributed dispatch, arbitrary graph waits, HumanApproval nodes, and provider-level effect idempotency |
 | Flow storage | independent readable JSON documents, ETags, active/current definition separation | migrations, indirect reference projections |
@@ -697,3 +697,13 @@ CAS merges disjoint additions and surfaces stale plan/allocation conflicts. Expl
 local draft Work. Fresh shared allocation evidence gates new attempts; synchronization never applies
 Bootstrap configuration or replaces local execution state. See [Project sharing](../../reference/project-sharing.md)
 and [ADR-0266](../../decisions/0266-project-sharing-preserves-portable-plans-and-local-execution-authority.md).
+
+## Repository issue authority
+
+Coding intake associates one qualified issue with one shared realization plan through shared CAS,
+then publishes native plan/participant labels with canonical durable receipts. The Work mapping
+retains the confirmed operation reference. Fresh native hierarchy and blocked-by observations gate
+new attempts; only confirmed completed upstream issues satisfy cross-plan waits. Native parentage
+does not create a sequencing edge, and active local attempts retain captured authority. See
+[Repository issue coordination](../../reference/repository-issue-coordination.md) and
+[ADR-0267](../../decisions/0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md).

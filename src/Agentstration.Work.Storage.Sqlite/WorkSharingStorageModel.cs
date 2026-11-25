@@ -25,7 +25,7 @@ public sealed partial class WorkDbContext
         var mapping = builder.Entity<WorkSharingPlanMappingDocument>();
         mapping.ToTable("WorkSharingPlanMappings"); mapping.HasKey(value => new { value.WorkspaceId, value.OwnerPrincipalId, value.PlanId });
         mapping.Property(value => value.WorkspaceId).HasMaxLength(36); mapping.Property(value => value.OwnerPrincipalId).HasMaxLength(36);
-        mapping.Property(value => value.PlanId).HasMaxLength(36); mapping.Property(value => value.ProjectId).HasMaxLength(36).IsRequired();
+        mapping.Property(value => value.PlanId).HasMaxLength(36); mapping.Property(value => value.OperationId).HasMaxLength(36); mapping.Property(value => value.ProjectId).HasMaxLength(36).IsRequired();
     }
 }
 internal sealed class WorkSharingStateDocument
@@ -52,4 +52,5 @@ internal sealed class WorkSharingPlanMappingDocument
     public required string OwnerPrincipalId { get; set; }
     public required string ProjectId { get; set; }
     public required string PlanId { get; set; }
+    public string? OperationId { get; set; }
 }

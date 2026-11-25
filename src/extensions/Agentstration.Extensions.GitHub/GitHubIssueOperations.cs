@@ -110,7 +110,10 @@ public sealed class GitHubIssueOperations(GitHubConnection connections, GitHubOp
         // Revision is an observation token, not a claim of GitHub's unsupported unsafe-method CAS.
         var revision = GitHubConnection.Digest(JsonSerializer.SerializeToElement(new { issue, Relations = relations }));
         return new(repository, number, revision, GitHubConnection.Text(issue, "title"), issue.GetProperty("body").GetString(),
-            GitHubConnection.Text(issue, "state"), new(GitHubConnection.Text(issue, "html_url")), labels, relations);
+            GitHubConnection.Text(issue, "state"), new(GitHubConnection.Text(issue, "html_url")), labels, relations)
+        {
+            CompletionReason = issue.TryGetProperty("state_reason", out var reason) && reason.ValueKind == JsonValueKind.String ? reason.GetString() : null
+        };
     }
 
     private static GitHubRelation Relation(string kind, JsonElement issue)

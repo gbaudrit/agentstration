@@ -164,7 +164,7 @@ public sealed partial class GitHubProviderTests
             {
                 ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition, Metadata = new() { Name = name }, ScopeRef = scope,
                 Definition = new RelayToolDefinitionProperties { DisplayName = name, Publish = true, Version = "1.0.0", Bindings = bindings,
-                    Metadata = new Dictionary<string, JsonElement> { [capability] = source.Definition.Metadata[capability] },
+                    Metadata = source.Definition.Metadata.Where(pair => pair.Key == capability || pair.Key == CodingIssueProtocol.MetadataKey).ToDictionary(pair => pair.Key, pair => pair.Value),
                     Target = new() { Name = source.Name, Namespace = source.Namespace, ScopeRef = scope, Uid = source.Uid, Generation = source.Generation } }
             }, null, true, default);
             result.Add((await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(scope, default, ToolResourceKinds.Tool, "agentstration." + name + ".v1.0.0"), default))!.Value);

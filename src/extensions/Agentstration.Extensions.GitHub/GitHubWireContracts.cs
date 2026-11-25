@@ -8,7 +8,11 @@ public sealed record GitHubTaskInput(string Operation, string Repository, string
     string? Body = null, string? State = null, IReadOnlyList<string>? Labels = null, IReadOnlyList<GitHubRelation>? Relations = null, string? ExpectedRevision = null);
 public sealed record GitHubRelation(string Kind, string Repository, string TaskId);
 public sealed record GitHubTaskSnapshot(string Repository, string TaskId, string Revision, string Title, string? Body, string State,
-    Uri Url, IReadOnlyList<string> Labels, IReadOnlyList<GitHubRelation> Relations);
+    Uri Url, IReadOnlyList<string> Labels, IReadOnlyList<GitHubRelation> Relations)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? CompletionReason { get; init; }
+}
 public sealed record GitHubTaskResponse(string OperationKey, string IntentDigest, string Status, GitHubTaskSnapshot? Task = null, string? ErrorCode = null);
 public sealed record GitHubRepositoryIdentity(string Provider, string Repository, string NativeId, Uri CloneUrl, Uri WebUrl,
     string DefaultBranch, string Revision, IReadOnlyList<string> Capabilities);

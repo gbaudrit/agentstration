@@ -166,6 +166,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
         && task.Repository == input.Repository && (input.Operation == ExternalTaskOperationKind.Publish || task.TaskId == input.TaskId)
         && task.TaskId is { Length: > 0 and <= 256 } && task.Revision is { Length: > 0 and <= 256 }
         && task.Title is { Length: > 0 and <= 512 } && task.Body?.Length is not > 32_768 && task.State is { Length: > 0 and <= 64 }
+        && task.CompletionReason?.Length is not > 64 && task.CompletionReason?.Any(char.IsControl) != true
         && task.Labels is { Count: <= 32 } && task.Labels.All(value => value is { Length: > 0 and <= 128 })
         && task.Relations is { Count: <= 100 } && task.Relations.All(value => value is not null && value.Kind is { Length: > 0 and <= 64 }
             && value.Repository is { Length: > 0 and <= 512 } && value.TaskId is { Length: > 0 and <= 256 })

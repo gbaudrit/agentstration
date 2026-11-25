@@ -22,7 +22,13 @@ public sealed record WorkSharingSpace(WorkSharingProjectId ProjectId, IReadOnlyL
 public sealed record WorkSharingSnapshot(string? Revision, WorkSharingSpace Space, IReadOnlyList<WorkSharingRecord> Records);
 public sealed record WorkTaskAllocation(WorkTaskId TaskId, WorkParticipantId ParticipantId);
 public sealed record WorkSharingPlan(WorkPlanId PlanId, WorkPlanDefinition Definition,
-    IReadOnlyList<WorkTaskTreeDefinition> Trees, IReadOnlyList<WorkTaskAllocation> Allocation);
+    IReadOnlyList<WorkTaskTreeDefinition> Trees, IReadOnlyList<WorkTaskAllocation> Allocation)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkSharingIssueReference? Issue { get; init; }
+}
+public sealed record WorkSharingIssueReference(string Provider, string Repository, string TaskId,
+    string PlanLabelPrefix, string ParticipantLabelPrefix);
 public sealed record WorkSharingProjectMetadata(string DisplayName, string? Description, IReadOnlyList<WorkParticipantId> Participants);
 public sealed record WorkSharingContribution(Guid Id, WorkPlanId? PlanId, WorkTaskId? TaskId, string Kind, string Evidence,
     IReadOnlyList<string> ArtifactReferences);
@@ -81,3 +87,5 @@ public sealed record WorkSharingPlanObservation(WorkPlanId PlanId, long Version)
 public sealed record WorkProjectSharingState(WorkspaceId WorkspaceId, Guid PrincipalId, WorkProjectId ProjectId, long ProjectVersion,
     WorkProjectSharingConnection Connection, string? Revision, WorkSharingSpace Space, IReadOnlyList<WorkSharingRecord> Records,
     long Version, DateTimeOffset UpdatedAt);
+
+public sealed record WorkPlanExternalOperationReference(WorkPlanId PlanId, WorkTaskOperationId OperationId);

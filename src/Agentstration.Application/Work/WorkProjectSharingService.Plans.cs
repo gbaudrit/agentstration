@@ -11,7 +11,7 @@ public sealed record ExportedWorkSharingPlan(WorkSharingPlan Plan, long Version)
 public sealed partial class WorkProjectSharingService
 {
     public async Task<Result<ExportedWorkSharingPlan>> ExportPlanAsync(WorkspaceId workspaceId, WorkPlanId id,
-        IReadOnlyList<WorkTaskAllocation> allocation, CancellationToken token)
+        IReadOnlyList<WorkTaskAllocation> allocation, CancellationToken token, WorkSharingIssueReference? issue = null)
     {
         var loaded = await plans.GetAsync(workspaceId, id, token);
         if (!loaded.IsSuccess) return Result<ExportedWorkSharingPlan>.Failure(loaded.ErrorCode!);
@@ -33,7 +33,7 @@ public sealed partial class WorkProjectSharingService
                 anchor = parent;
             }
         }
-        var portable = new WorkSharingPlan(id, loaded.Value.Revision.Definition, roots.Values.ToArray(), allocation);
+        var portable = new WorkSharingPlan(id, loaded.Value.Revision.Definition, roots.Values.ToArray(), allocation) { Issue = issue };
         var normalized = WorkSharingContent.Normalize(new(new(WorkSharingDomain.Plan, id.ToString()), 0, JsonSerializer.SerializeToElement(portable, Json)));
         return normalized.IsSuccess ? Result<ExportedWorkSharingPlan>.Success(new(normalized.Value!.Content.Deserialize<WorkSharingPlan>(Json)!, loaded.Value.Plan.Version))
             : Result<ExportedWorkSharingPlan>.Failure("sharing_plan_not_portable");
@@ -85,6 +85,23 @@ public sealed partial class WorkProjectSharingService
         return local;
     }
 
+    public async Task<Result<WorkPlanExternalOperationReference>> GetPlanOperationAsync(WorkspaceId workspaceId, WorkProjectId projectId, WorkPlanId planId, CancellationToken token)
+    {
+        var project = await projects.GetAsync(workspaceId, projectId, token);
+        if (!project.IsSuccess) return Result<WorkPlanExternalOperationReference>.Failure(project.ErrorCode!);
+        var id = await repository.GetPlanOperationAsync(workspaceId, context.PrincipalId, projectId, planId, token);
+        return id is { } operationId ? Result<WorkPlanExternalOperationReference>.Success(new(planId, operationId))
+            : Result<WorkPlanExternalOperationReference>.Failure("work_project_plan_operation_not_found");
+    }
+    public async Task<Result<WorkPlanExternalOperationReference>> SetPlanOperationAsync(WorkspaceId workspaceId, WorkProjectId projectId, WorkPlanId planId, WorkTaskOperationId operationId, CancellationToken token)
+    {
+        var project = await projects.GetAsync(workspaceId, projectId, token);
+        if (!project.IsSuccess) return Result<WorkPlanExternalOperationReference>.Failure(project.ErrorCode!);
+        return await repository.SetPlanOperationAsync(workspaceId, context.PrincipalId, projectId, planId, operationId, token)
+            ? Result<WorkPlanExternalOperationReference>.Success(new(planId, operationId))
+            : Result<WorkPlanExternalOperationReference>.Failure("work_project_plan_operation_conflict");
+    }
+
     internal async Task<Result<IReadOnlyList<WorkPlanAdmissionEvidence>>> ObserveAllocationAsync(FlowRunScope scope, WorkPlanSnapshot plan,
         WorkPlanRevision revision, WorkTaskId taskId, CancellationToken token)
     {
@@ -105,7 +122,7 @@ public sealed partial class WorkProjectSharingService
         var shared = record.Content.Deserialize<WorkSharingPlan>(Json)!;
         var allocation = shared.Allocation.SingleOrDefault(value => value.TaskId == taskId);
         if (allocation?.ParticipantId != project.Value.Definition.Sharing.ParticipantId) return AdmissionFailure("sharing_task_not_allocated");
-        var local = await ExportPlanAsync(scope.WorkspaceId, plan.Id, shared.Allocation, token);
+        var local = await ExportPlanAsync(scope.WorkspaceId, plan.Id, shared.Allocation, token, shared.Issue);
         if (!local.IsSuccess || local.Value!.Version != plan.Version
             || WorkPlanDefinition.Digest(JsonSerializer.SerializeToElement(local.Value.Plan, Json)) != record.Digest
             || WorkPlanDefinition.Digest(local.Value.Plan.Definition) != WorkPlanDefinition.Digest(revision.Definition)) return AdmissionFailure("sharing_plan_stale");
