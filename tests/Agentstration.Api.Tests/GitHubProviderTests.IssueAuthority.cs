@@ -108,7 +108,7 @@ public sealed partial class GitHubProviderTests
         private WorkSharingSnapshot? snapshot;
         private readonly Dictionary<string, WorkSharingProviderResult> receipts = [];
         public Task<Result<WorkSharingProviderCapabilities>> DiscoverAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
-            WorkProjectSharingConnection connection, CancellationToken token) => Task.FromResult(Result<WorkSharingProviderCapabilities>.Success(new("1.0", true, true, true, true, true, true, true)));
+            WorkProjectSharingConnection connection, CancellationToken token) => Task.FromResult(Result<WorkSharingProviderCapabilities>.Success(new(WorkSharingFormat.Version, true, true, true, true, true, true, true)));
         public Task<Result<WorkSharingSnapshot>> ReadAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
             WorkProjectSharingConnection connection, string? revision, CancellationToken token) => Task.FromResult(Result<WorkSharingSnapshot>.Success(snapshot ?? new(null, new(connection.ProjectId, []), [])));
         public Task<WorkSharingProviderResult> PublishAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,

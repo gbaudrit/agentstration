@@ -94,7 +94,8 @@ public sealed partial class ProjectSharingApiTests
         Assert.HasCount(1, historical.Records);
         using var foreign = await right.Http.PostAsJsonAsync($"/api/workspaces/{Guid.NewGuid()}/projects/{rp.Id}/sharing/pull", new PullWorkSharingRequest());
         Assert.IsTrue(foreign.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound);
-        var raw = (await native.GitAsync(native.RepositoryPath, "show", "main:shared/index.json"));
+        var raw = (await native.GitAsync(native.RepositoryPath, "show", "main:shared/index.yaml"));
+        Assert.AreEqual("2.0", ResourceManifestSerializer.FromYamlStrict<WorkSharingSpace>(raw).FormatVersion);
         Assert.IsFalse(raw.Contains(left.Context.WorkspaceId.ToString(), StringComparison.Ordinal));
         Assert.IsFalse(raw.Contains(AuthenticatedGitFixture.Credential, StringComparison.Ordinal));
     }

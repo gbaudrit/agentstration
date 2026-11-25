@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentstration.Infrastructure.Work;
 using Agentstration.Application.Work;
 using Agentstration.Flows;
 using Agentstration.Resources;
@@ -227,7 +228,7 @@ public sealed partial class WorkPlanTests
     }
     private static WorkProjectSharingService SharingService(Fixture fixture, SharingProvider remote, Guid? principal = null) => new(
         fixture.Sharing, ProjectService(fixture, owner: principal), fixture.Plans(owner: principal), fixture.Trees(owner: principal), remote,
-        new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now));
+        new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now), new YamlWorkDocumentCodec());
     private static async Task<(WorkProjectSharingService Service, WorkProjectSnapshot Project)> SharingAsync(Fixture fixture, SharingProvider remote,
         WorkSharingProjectId portableProject, WorkParticipantId participant)
     {
@@ -247,7 +248,7 @@ public sealed partial class WorkPlanTests
         public bool LoseResponse { get; set; }
         public int Publications { get; private set; }
         public Task<Result<WorkSharingProviderCapabilities>> DiscoverAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding, WorkProjectSharingConnection connection, CancellationToken token)
-            => Task.FromResult(Result<WorkSharingProviderCapabilities>.Success(new("1.0", true, true, true, true, Supported, true, true)));
+            => Task.FromResult(Result<WorkSharingProviderCapabilities>.Success(new(WorkSharingFormat.Version, true, true, true, true, Supported, true, true)));
         public Task<Result<WorkSharingSnapshot>> ReadAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding, WorkProjectSharingConnection connection, string? revision, CancellationToken token)
         {
             lock (sync) return Task.FromResult(Result<WorkSharingSnapshot>.Success(revision is null ? latest ?? new(null, new(connection.ProjectId, []), []) : history[revision]));

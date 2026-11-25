@@ -13,7 +13,7 @@ Tool reference, not arbitrary native arguments or a caller-provided credential. 
 is checked again through the normal governed Tool pipeline for every operation.
 
 The Project definition's `sharing` property contains `projectId`, `participantId`, `bindingName`,
-`location` and `formatVersion: "1.0"`. Typed identifiers use the existing `{ "value": "<uuid>" }`
+`location` and `formatVersion: "2.0"`. Typed identifiers use the existing `{ "value": "<uuid>" }`
 wire representation. Both instances use the same portable Project ID and logical location; each
 participant has its own stable participant ID, private Workspace/Principal and local Tool identity.
 `bindings` contains the named `Sharing` binding with its exact scoped Tool UID/generation.
@@ -31,7 +31,7 @@ definition:
     value: 11111111-1111-4111-8111-111111111111
   participantId:
     value: 22222222-2222-4222-8222-222222222222
-  location: shared/coding
+  location: data
   toolName: agentstration.git-connection.v1.0.0
   toolNamespace: default
   displayName: Shared coding
@@ -90,3 +90,25 @@ attempts retain their captured evidence and local authority.
 No live Git host or model is required by the offline suite. Local fixtures exercise authenticated
 native Git, protected MCP/Secret calls, independent Work stores, concurrent publication, historical
 reads, reconnect/restart, stale assignments and denied scope access.
+
+## YAML representation (format 2.0)
+
+New spaces use UTF-8 YAML: `<location>/index.yaml` and immutable
+`<location>/records/<domain>/<identity>/<version>-<content-digest>.yaml`.
+Use `data` as the tracking repository location. Configuration and Flow definitions stay under
+`bootstrap/`; they are not copied into the work directory. API bodies and local databases retain
+their existing JSON contracts.
+
+The YAML reader accepts one bounded JSON-compatible document and rejects duplicate/unknown
+keys, aliases, anchors, explicit tags, invalid UTF-8 and excessive nesting. Typed normalization
+precedes content-digest validation. Integers and decimal values retain precision; quoted strings
+and multiline instructions retain their meaning. Record index sizes measure actual YAML bytes.
+Exact Git revisions and archive digests retain transport integrity independently of business IDs.
+
+Format 1.0 JSON spaces are not automatically converted. Both participants must upgrade together.
+Select a new reviewed format-2.0 location or explicitly convert and review the complete index and
+records while retaining the original Git history. A legacy `index.json` at the selected location
+returns `sharing_format_upgrade_required`; it is never treated as an empty new space. Never reset
+an existing index or replay an uncertain old operation into a different format/location.
+
+See [ADR-0274](../decisions/0274-tracking-documents-use-strict-versioned-yaml.md).

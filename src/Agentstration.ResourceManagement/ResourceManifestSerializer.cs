@@ -7,7 +7,7 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace Agentstration.ResourceManagement;
 
-public static class ResourceManifestSerializer
+public static partial class ResourceManifestSerializer
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -22,9 +22,11 @@ public static class ResourceManifestSerializer
     {
         JsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         StrictJsonOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        StrictYamlOptions = new(StrictJsonOptions) { PropertyNameCaseInsensitive = false, MaxDepth = 32 };
     }
 
     private static readonly ISerializer YamlSerializer = new SerializerBuilder()
+        .DisableAliases()
         .WithQuotingNecessaryStrings(true)
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .Build();
@@ -78,6 +80,7 @@ public static class ResourceManifestSerializer
         JsonValueKind.Array => element.EnumerateArray().Select(FromJsonElement).ToArray(),
         JsonValueKind.String => element.GetString(),
         JsonValueKind.Number when element.TryGetInt64(out var integer) => integer,
+        JsonValueKind.Number when element.TryGetDecimal(out var number) => number,
         JsonValueKind.Number => element.GetDouble(),
         JsonValueKind.True => true,
         JsonValueKind.False => false,

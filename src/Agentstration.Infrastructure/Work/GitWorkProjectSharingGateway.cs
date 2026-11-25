@@ -26,17 +26,25 @@ public sealed partial class GitWorkProjectSharingGateway
         if (resolved.Value!.Status == "Missing") return revision is null ? Empty(null) : Failure("sharing_revision_not_found");
         if (resolved.Value.Status != "Succeeded" || resolved.Value.Revision is null) return Failure(resolved.Value.ErrorCode ?? "sharing_read_unavailable");
         revision ??= resolved.Value.Revision;
-        var indexPath = connection.Location + "/index.json";
+        var indexPath = connection.Location + "/index.yaml";
         var index = await InvokeAsync(workspaceId, principalId, binding, connection, "read", "execute", key, digest, new { revision, paths = new[] { indexPath } }, token);
         if (!index.IsSuccess) return Failure(index.ErrorCode!);
-        if (index.Value!.Status == "Rejected" && index.Value.ErrorCode == "git_file_not_found") return Empty(revision);
+        if (index.Value!.Status == "Rejected" && index.Value.ErrorCode == "git_file_not_found")
+        {
+            var legacy = await InvokeAsync(workspaceId, principalId, binding, connection, "read", "execute", key, digest,
+                new { revision, paths = new[] { connection.Location + "/index.json" } }, token);
+            if (!legacy.IsSuccess) return Failure(legacy.ErrorCode!);
+            return legacy.Value!.Status == "Rejected" && legacy.Value.ErrorCode == "git_file_not_found"
+                ? Empty(revision) : Failure("sharing_format_upgrade_required");
+        }
         if (index.Value.Status != "Succeeded" || index.Value.Revision != revision || index.Value.Files is not { Count: 1 }
             || index.Value.Files[0].Path != indexPath || index.Value.Files[0].Executable) return Failure(index.Value.ErrorCode ?? "sharing_index_invalid");
         try
         {
             var indexBytes = Convert.FromBase64String(index.Value.Files[0].ContentBase64);
             if (indexBytes.Length > 32 * 1024) return Failure("sharing_index_invalid");
-            var space = JsonSerializer.Deserialize<WorkSharingSpace>(indexBytes, Json);
+            var parsedSpace = documents.Read<WorkSharingSpace>(indexBytes, 32 * 1024);
+            var space = parsedSpace.IsSuccess ? parsedSpace.Value : null;
             if (space is null || !WorkSharingFormat.Validate(space).IsSuccess || space.ProjectId != connection.ProjectId
                 || space.Records.Sum(entry => (long)entry.SizeBytes) > WorkSharingFormat.MaximumSnapshotBytes - 64 * 1024) return Failure("sharing_index_invalid");
             var records = new List<WorkSharingRecord>();
@@ -54,7 +62,14 @@ public sealed partial class GitWorkProjectSharingGateway
                     if (file is null || file.Executable || !Revision(file.Revision)) return Failure("sharing_records_invalid");
                     var bytes = Convert.FromBase64String(file.ContentBase64);
                     if (bytes.Length != entry.SizeBytes) return Failure("sharing_records_invalid");
-                    var record = JsonSerializer.Deserialize<WorkSharingRecord>(bytes, Json);
+                    var parsedRecord = documents.Read<WorkSharingRecord>(bytes, WorkSharingFormat.MaximumRecordBytes + 1024);
+                    var record = parsedRecord.IsSuccess ? parsedRecord.Value : null;
+                    if (record is not null)
+                    {
+                        var normalized = WorkSharingContent.Normalize(new(record.Key, record.Version - 1, record.Content));
+                        if (!normalized.IsSuccess) return Failure("sharing_records_invalid");
+                        record = record with { Content = normalized.Value!.Content };
+                    }
                     if (record is null || record.Key != entry.Key || record.Version != entry.Version || record.Digest != entry.Digest
                         || !WorkSharingFormat.Validate(record).IsSuccess) return Failure("sharing_records_invalid");
                     records.Add(record);
@@ -72,8 +87,8 @@ public sealed partial class GitWorkProjectSharingGateway
         var changes = attempt.Records.Select(record => new
         {
             path = Path(connection, record.Key, record.Version, record.Digest),
-            contentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(record, Json))
-        }).Append(new { path = connection.Location + "/index.json", contentBase64 = Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(attempt.Space, Json)) }).ToArray();
+            contentBase64 = Convert.ToBase64String(documents.Write(record))
+        }).Append(new { path = connection.Location + "/index.yaml", contentBase64 = Convert.ToBase64String(documents.Write(attempt.Space)) }).ToArray();
         var input = new { baseRevision = attempt.ExpectedRevision, expectedRefRevision = attempt.ExpectedRevision, changes, message = "Synchronize Project sharing records" };
         var result = await InvokeAsync(workspaceId, principalId, binding, connection, "publish", recover ? "recover" : "execute",
             attempt.OperationKey, attempt.IntentDigest, input, token);
@@ -81,5 +96,5 @@ public sealed partial class GitWorkProjectSharingGateway
         return new(Enum.Parse<WorkSharingProviderStatus>(result.Value!.Status), attempt.OperationKey, attempt.IntentDigest, result.Value.Revision, result.Value.ErrorCode);
     }
     private static string Path(WorkProjectSharingConnection connection, WorkSharingRecordKey key, long version, string digest) =>
-        $"{connection.Location}/records/{key.Domain}/{key.Name}/{version:D10}-{digest}.json";
+        $"{connection.Location}/records/{key.Domain}/{key.Name}/{version:D10}-{digest}.yaml";
 }

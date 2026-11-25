@@ -14,7 +14,7 @@ using ModelContextProtocol;
 
 namespace Agentstration.Infrastructure.Work;
 
-public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
+public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingResolver bindings, IResourceStore resources, IWorkDocumentCodec documents,
     IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : IWorkProjectSharingGateway, ICodingCodePublicationGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)

@@ -22,6 +22,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkTaskTreeService>();
         services.AddSingleton<WorkPlanService>();
         services.AddSingleton<WorkProjectService>();
+        services.AddSingleton<IWorkDocumentCodec, YamlWorkDocumentCodec>();
         services.AddSingleton<WorkProjectSharingService>();
         services.AddSingleton<IWorkPlanAdmissionGate, WorkProjectSharingAdmissionGate>();
         services.AddSingleton<GitWorkProjectSharingGateway>();

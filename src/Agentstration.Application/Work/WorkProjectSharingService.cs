@@ -8,7 +8,7 @@ namespace Agentstration.Application.Work;
 public sealed record PublishWorkSharingCommand(WorkSharingOperationId Id, long ExpectedProjectVersion, IReadOnlyList<WorkSharingChange> Changes);
 
 public sealed partial class WorkProjectSharingService(IWorkProjectSharingRepository repository, WorkProjectService projects,
-    WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingGateway gateway, IWorkplaceContext context, TimeProvider clock)
+    WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingGateway gateway, IWorkplaceContext context, TimeProvider clock, IWorkDocumentCodec documents)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public Task InitializeAsync(CancellationToken token) => repository.InitializeAsync(token);
@@ -199,7 +199,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
                 || prior is not null && change.Key.Domain is WorkSharingDomain.Contribution or WorkSharingDomain.Usage)
                 return Result<WorkSharingTransportAttempt>.Failure("sharing_record_conflict");
             var record = new WorkSharingRecord(change.Key, change.ExpectedVersion + 1, change.Content, digest, operation.Connection.ParticipantId, operation.CreatedAt);
-            records.Add(record); entries[record.Key] = new(record.Key, record.Version, record.Digest, JsonSerializer.SerializeToUtf8Bytes(record, Json).Length);
+            records.Add(record); entries[record.Key] = new(record.Key, record.Version, record.Digest, documents.Write(record).Length);
         }
         var merged = snapshot.Records.ToDictionary(record => record.Key);
         foreach (var record in records) merged[record.Key] = record;

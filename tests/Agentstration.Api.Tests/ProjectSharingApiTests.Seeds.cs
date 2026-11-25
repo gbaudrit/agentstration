@@ -260,11 +260,11 @@ public sealed partial class ProjectSharingApiTests
         var content = WorkSharingContent.Normalize(new(new(WorkSharingDomain.Plan, plan.ToString()), 0, JsonSerializer.SerializeToElement(value, Json)));
         Assert.IsTrue(content.IsSuccess, content.ErrorCode);
         var record = new WorkSharingRecord(content.Value!.Key, 1, content.Value.Content, WorkPlanDefinition.Digest(content.Value.Content), new(participant), DateTimeOffset.UnixEpoch);
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(record, Json);
+        var bytes = System.Text.Encoding.UTF8.GetBytes(ResourceManifestSerializer.ToYaml(record));
         var space = new WorkSharingSpace(new(Guid.Parse("04bf923e-0c0a-4c30-a013-43a9b6ed90a0")), [new(record.Key, record.Version, record.Digest, bytes.Length)]);
         var directory = Path.Combine(native.Work, "shared", "records", record.Key.Domain.ToString(), record.Key.Name); Directory.CreateDirectory(directory);
-        await File.WriteAllBytesAsync(Path.Combine(directory, $"{record.Version:D10}-{record.Digest}.json"), bytes);
-        await File.WriteAllBytesAsync(Path.Combine(native.Work, "shared", "index.json"), JsonSerializer.SerializeToUtf8Bytes(space, Json));
+        await File.WriteAllBytesAsync(Path.Combine(directory, $"{record.Version:D10}-{record.Digest}.yaml"), bytes);
+        await File.WriteAllBytesAsync(Path.Combine(native.Work, "shared", "index.yaml"), System.Text.Encoding.UTF8.GetBytes(ResourceManifestSerializer.ToYaml(space)));
         await native.GitAsync(native.Work, "add", "shared"); await native.GitAsync(native.Work, "commit", "-m", "Seed portable plan fixture");
         await native.GitAsync(native.Work, "push", native.RepositoryPath, "HEAD:refs/heads/main");
         return new(plan.Value, record.Digest);

@@ -340,3 +340,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 272. [ADR-0272 — Terminal Work usage retains immutable corrections and portable accounting](0272-terminal-work-usage-retains-immutable-corrections-and-portable-accounting.md)
 
 273. [ADR-0273 — Coding delivery retains frozen intents and recovers native effects](0273-coding-delivery-retains-frozen-intents-and-recovers-native-effects.md)
+
+274. [ADR-0274 — Tracking documents use strict versioned YAML](0274-tracking-documents-use-strict-versioned-yaml.md)

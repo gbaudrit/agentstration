@@ -42,7 +42,7 @@ public sealed record WorkSharingBootstrapProfile(string Name, string Locale, IRe
 
 public static class WorkSharingFormat
 {
-    public const string Version = "1.0";
+    public const string Version = "2.0";
     public const int MaximumRecords = 64;
     public const int MaximumRecordBytes = 16 * 1024;
     public const int MaximumSnapshotBytes = 1024 * 1024;
