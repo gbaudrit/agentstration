@@ -1,10 +1,12 @@
 """Offline route ownership, interruption recovery and fail-closed publication boundaries."""
 import copy
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -193,15 +195,49 @@ class ProbeTests(unittest.TestCase):
         self.values = cloudflare.configuration(environment())
         self.url = 'https://dev-pr-17.agentstration.cloud'
 
+    def test_real_http_requests_identify_all_probe_phases_before_service_authentication(self):
+        observed = []
+        client_id = self.values['ACCESS_CLIENT_ID']
+        client_secret = self.values['ACCESS_CLIENT_SECRET']
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                identity = (self.headers.get('CF-Access-Client-Id'), self.headers.get('CF-Access-Client-Secret'))
+                observed.append((self.path, self.headers.get('User-Agent'), identity))
+                # Model the observed edge block before Access evaluates credentials.
+                code = 403
+                if self.headers.get('User-Agent') == 'Agentstration-Preview-Probe/1.0':
+                    code = 200 if identity == (client_id, client_secret) else 401
+                self.send_response(code)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        response = access.response
+        with ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            local_url = 'http://127.0.0.1:' + str(server.server_port)
+            try:
+                # Keep production URL validation; redirect only the transport to a local fixture.
+                with patch.object(access, 'response', side_effect=lambda url, headers: response(local_url, headers)):
+                    access.probe(self.url, self.values, attempts=1)
+            finally:
+                server.shutdown()
+                thread.join(timeout=5)
+        self.assertEqual([('/health/ready', 'Agentstration-Preview-Probe/1.0', identity) for identity in
+                          ((None, None), ('invalid.access', 'invalid'), (client_id, client_secret))], observed)
+
     def test_expected_denials_then_service_auth_success_publish_no_response_content(self):
-        with patch.object(access, 'response', side_effect=[(302, 'https://agentstration.cloudflareaccess.com/cdn-cgi/access/login/x'),
-                                                          (403, ''), (200, '')]) as request:
+        with patch.object(access, 'response', side_effect=[(302, 'https://agentstration.cloudflareaccess.com/cdn-cgi/access/login/x', False),
+                                                          (403, '', False), (200, '', False)]) as request:
             access.probe(self.url, self.values, attempts=1)
         self.assertEqual({}, request.call_args_list[0].args[1])
         self.assertEqual('private-service-fixture', request.call_args_list[-1].args[1]['CF-Access-Client-Secret'])
 
     def test_origin_response_wrong_redirect_or_invalid_ci_token_cannot_pass(self):
-        for responses in ([(200, '')], [(302, 'https://evil.example/')], [(403, ''), (403, ''), (401, '')]):
+        for responses in ([(200, '', False)], [(302, 'https://evil.example/', False)], [(403, '', False), (403, '', False), (401, '', False)]):
             with self.subTest(responses=responses), patch.object(access, 'response', side_effect=responses), self.assertRaises(ValueError):
                 access.probe(self.url, self.values, attempts=1)
 
@@ -209,8 +245,43 @@ class ProbeTests(unittest.TestCase):
         error = urllib.error.HTTPError(self.url, 302, 'private-body', {'Location': 'https://evil.example/'}, io.BytesIO(b'private-body'))
         opener = access.urllib.request.build_opener(access.NoProbeRedirect())
         with patch.object(access.urllib.request, 'build_opener', return_value=opener), patch.object(opener, 'open', side_effect=error):
-            self.assertEqual((302, 'https://evil.example/'), access.response(self.url, {}))
+            self.assertEqual((302, 'https://evil.example/', False), access.response(self.url, {}))
         self.assertIsNone(access.NoProbeRedirect().redirect_request(None, None, 302, None, {}, 'https://evil.example/'))
+
+    def test_ci_failure_reports_http_status_without_provider_body_headers_or_credentials(self):
+        for status in (302, 400, 401, 403, 502, 503, 530):
+            responses = [urllib.error.HTTPError(self.url, code, 'private-provider-message',
+                         {'Location': 'https://private.example/path?nonce=private-value',
+                          'Set-Cookie': 'private-cookie'}, io.BytesIO(b'private-provider-body'))
+                         for code in (403, 403, status)]
+            opener = access.urllib.request.build_opener(access.NoProbeRedirect())
+            with self.subTest(status=status), patch.object(access.urllib.request, 'build_opener', return_value=opener), \
+                    patch.object(opener, 'open', side_effect=responses), self.assertRaises(ValueError) as error:
+                access.probe(self.url, self.values, attempts=1)
+            message = str(error.exception)
+            self.assertIn('dedicated CI token', message)
+            self.assertIn('HTTP ' + str(status), message)
+            self.assertNotIn('private-', message)
+            self.assertNotIn(self.values['ACCESS_CLIENT_ID'], message)
+            self.assertNotIn(self.values['ACCESS_CLIENT_SECRET'], message)
+
+    def test_denial_failures_identify_anonymous_or_invalid_token_phase_and_status(self):
+        for phase, responses in (('Anonymous', [(200, '', False)]), ('Invalid-token', [(403, '', False), (200, '', False)])):
+            with self.subTest(phase=phase), patch.object(access, 'response', side_effect=responses), self.assertRaises(ValueError) as error:
+                access.probe(self.url, self.values, attempts=1)
+            self.assertIn(phase + ' probe', str(error.exception))
+            self.assertIn('HTTP 200', str(error.exception))
+
+    def test_only_the_known_challenge_header_marker_is_reported(self):
+        for marker, expected in (('challenge', True), ('private-provider-value', False)):
+            responses = [urllib.error.HTTPError(self.url, 403, 'private-provider-message',
+                         {'CF-Mitigated': marker}, io.BytesIO(b'private-provider-body')) for _ in range(3)]
+            opener = access.urllib.request.build_opener(access.NoProbeRedirect())
+            with self.subTest(marker=marker), patch.object(access.urllib.request, 'build_opener', return_value=opener), \
+                    patch.object(opener, 'open', side_effect=responses), self.assertRaises(ValueError) as error:
+                access.probe(self.url, self.values, attempts=1)
+            self.assertEqual(expected, 'Cloudflare challenge header present' in str(error.exception))
+            self.assertNotIn('private-', str(error.exception))
 
     def test_probe_target_cannot_leak_credentials_to_another_host(self):
         for url in ('http://dev-pr-17.agentstration.cloud', self.url + '@evil.example', self.url + '/private', 'https://evil.example'):
