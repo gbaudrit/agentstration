@@ -390,13 +390,15 @@ public sealed class McpToolInvoker(
     Lazy<IToolDefinitionExecutor>? internalTools = null,
     Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null,
     ICurrentRequestContext? requestContext = null,
-    Lazy<ISecretInputResolver>? secretInputs = null) : IToolInvoker
+    Lazy<ISecretInputResolver>? secretInputs = null,
+    AepMcpTransport? aepTransport = null) : IToolInvoker
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
         (await InvokeDetailedAsync(context, cancellationToken)).Output;
 
     public async ValueTask ValidateAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
+        using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken, joinExisting: true);
         var (tool, provider) = await ResolveAsync(context, cancellationToken);
         using var resolved = await ResolveInputsAsync(context, cancellationToken);
         ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
@@ -415,6 +417,7 @@ public sealed class McpToolInvoker(
 
     public async ValueTask<ToolInvocationResult> InvokeDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
     {
+        using var discovery = aepTransport?.BeginDiscoveryOperation(cancellationToken, joinExisting: true);
         try { return await InvokeCoreAsync(context, cancellationToken); }
         catch (Exception exception) when (exception is not OperationCanceledException && context.SecretInputs.Count > 0)
         {

@@ -283,6 +283,24 @@ and source content are omitted. Schema length errors refer to their declared
 schema constraints rather than suggesting a server setting can override them.
 Old recorded errors without measurements remain readable. See [ADR-0259](../decisions/0259-xml-processing-uses-operator-content-settings.md).
 
+## AEP descriptor discovery
+
+Finite REST requests and individual MCP calls share AEP descriptor discovery for
+their operation. The same applies to a Tool invocation or a background recovery
+pass. Repeated and concurrent requests for the same registration, generation,
+configuration, expected identity, credentials source and caller context use one
+pending discovery. A new operation discovers again; there is no cross-request TTL
+or credential-value cache. Streaming HTTP sessions do not own a long-lived cache;
+each MCP call owns its operation instead.
+
+Only discovery descriptors are shared. Schema resolution, authorization,
+definition/instance validation, provider selection and ambiguity rules remain
+unchanged. An individual caller can cancel its wait without cancelling another
+waiter; operation cancellation cancels the shared discovery. Each operation retains
+at most 256 discovery identities, then performs additional discoveries normally.
+This reduces repeated AEP HTTP requests while inspecting transformation contracts;
+it does not make Data Source history a metadata-only read or remove content I/O.
+
 ## Diagnosing rejected XML
 
 `transformation_input_invalid` is a contract failure, not a generic worker failure.

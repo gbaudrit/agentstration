@@ -212,6 +212,7 @@ internal static class StandaloneHostCompositionExtensions
         app.UseAuthentication();
         app.UseMiddleware<PrincipalResolutionMiddleware>();
         app.UseMiddleware<RequestContextMiddleware>();
+        app.UseMiddleware<AepDiscoveryOperationMiddleware>();
         app.UseMiddleware<BootstrapStartupAdmissionMiddleware>();
         app.UseWhen(context => context.RequestServices.GetRequiredService<BootstrapStartupState>().IsReady
             && !context.Request.Path.StartsWithSegments("/api/bootstrap/startup")
