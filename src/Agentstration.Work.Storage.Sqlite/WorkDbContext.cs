@@ -104,6 +104,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureWorkProjects(modelBuilder);
         ConfigureWorkSharing(modelBuilder);
         ConfigureWorkUsage(modelBuilder);
+        ConfigureWorkTaskDeliveries(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
     }
 

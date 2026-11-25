@@ -40,6 +40,8 @@ public static class CodingExecutionValidation
         && repository.CloneUrl.Fragment.Length == 0 && repository.CloneUrl.Query.Length == 0;
 
     public static bool Commit(string? value) => value is { Length: 40 or 64 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
+    public static string AdmissionDigest(CodingExecutionConfiguration configuration, CodingTaskInput input, CodingRepositoryIdentity repository) =>
+        WorkPlanDefinition.Digest(new { Configuration = configuration, Input = input, Repository = RepositoryDigest(repository) });
     public static string RepositoryDigest(CodingRepositoryIdentity identity) => WorkPlanDefinition.Digest(new
     { identity.Provider, identity.Repository, identity.NativeId, identity.CloneUrl });
 }

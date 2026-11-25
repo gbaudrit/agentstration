@@ -184,6 +184,12 @@ internal static class OpenApiSuccessResponseCatalog
         }
         if (path.Contains("/coding/", StringComparison.OrdinalIgnoreCase))
         {
+            if (path.Contains("/coding/deliveries", StringComparison.OrdinalIgnoreCase))
+            {
+                if (method == "POST") return Json<WorkTaskDeliveryOperation>(202, "Accept or recover exact Coding delivery effects");
+                if (path.TrimEnd('/').EndsWith("/deliveries", StringComparison.OrdinalIgnoreCase)) return Json<WorkTaskDeliveryPage>(200, "List private Coding delivery receipts");
+                return Json<WorkTaskDeliveryOperation>(200, "Read a private Coding delivery receipt");
+            }
             if (method == "POST" && path.EndsWith("/harness-configurations", StringComparison.OrdinalIgnoreCase)) return Json<HarnessNativeConfigurationResource>(201, "Publish an immutable native harness configuration");
             if (method == "GET" && path.Contains("/harness-configurations/", StringComparison.OrdinalIgnoreCase)) return Json<HarnessNativeConfigurationResource>(200, "Get an exact native harness configuration");
             if (method == "POST" && path.EndsWith("/harness-profiles", StringComparison.OrdinalIgnoreCase)) return Json<HarnessProfileResource>(201, "Create a Workspace HarnessProfile draft");

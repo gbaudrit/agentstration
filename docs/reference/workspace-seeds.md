@@ -53,6 +53,8 @@ embedded in the package. Existing publication contents cannot be silently replac
 `repositoryToolNamespace` and `taskOperationsToolName` / `taskOperationsToolNamespace` bind the
 corresponding local protected publications, such as `agentstration.repository.v1.0.0`. Use the proper
 GitHub repository and task-operation contracts for Coding; a Git sharing Tool alone is insufficient.
+Optional `codePublicationToolName` / `codePublicationToolNamespace` adds a distinct protected Git
+connection with purpose `CodePublication` for [issue delivery](coding-delivery.md).
 The sharing `projectId.value` is portable. Its `participantId.value` must identify this participant;
 use an explicit ordinary configured input to avoid copying another instance's identity:
 

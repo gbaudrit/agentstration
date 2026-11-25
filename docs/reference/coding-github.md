@@ -53,7 +53,8 @@ consumers retain its pins and reauthorize before effects.
 
 Repository capability metadata version `1.0` declares operations `repository.resolve`,
 `pull-request.create` and `pull-request.read`. Pull-request input contains repository,
-optional native number, title/body, head/base, expected head revision and draft flag.
+optional native number, title/body, head/base, expected head revision, optional expected base revision
+and draft flag. Delivery freezes both expected SHAs.
 Creation requires an atomic task, observed Project/task versions and the exact
 connection returned by resolution. Reuse the same ID, input, versions and connection
 with `recover: true` after response loss. Recovery may inspect an older task intent;
@@ -80,7 +81,8 @@ provider rejections return Problem Details with HTTP 409 and the operation ID.
 - Native permission denial, changed repository identity, unsupported capabilities,
   rate limits, stale observations and partial outcomes use bounded technical error
   codes. Credentials and native response bodies are excluded from diagnostics.
-- PR creation checks the requested head SHA before and after the call. A branch race
+- PR creation checks the requested head SHA before and after the call, and the optional expected
+  base SHA before creation and against the returned snapshot. A branch race
   remains Uncertain; callers need exclusive branch ownership/CAS for stronger claims.
 
 Provider calls have a 30-second host deadline, a 25-second native HTTP timeout, bounded

@@ -1,6 +1,7 @@
 extern alias GitHubExtension;
 
 using System.Net;
+using Agentstration.Testing;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
@@ -12,7 +13,7 @@ namespace Agentstration.Web.Tests;
 public sealed partial class GitHubProviderTests
 {
     private const string Repository = "fixture/repository";
-    private const string Credential = "public-disposable-synthetic-github-fixture";
+    internal const string Credential = "public-disposable-synthetic-github-fixture";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly GitHub.AllowedGitHubRepository[] Allowed = [new(Repository, "42"), new("fixture/second", "43")];
     private static readonly string HeadRevision = new('a', 40);
@@ -98,6 +99,22 @@ public sealed partial class GitHubProviderTests
     }
 
     [TestMethod]
+    public async Task GitHubPullRequestExactBaseRejectsStaleCreationAndRecoversTheOriginalReceipt()
+    {
+        using var fixture = new Fixture();
+        var input = new GitHub.GitHubPullRequestInput(Repository, Title: "Deliver reviewed issue", Head: "agentstration/task", Base: "main", ExpectedHeadRevision: HeadRevision)
+        { ExpectedBaseRevision = fixture.Native.BaseRevision };
+        var request = JsonSerializer.SerializeToElement(input, Json);
+        var created = await fixture.Coding().InvokeAsync("pull-request.create", "execute", Key('a'), Key('b'), request, "https://api.github.com", Credential, Allowed, default);
+        Assert.AreEqual("Succeeded", created.Status, created.ErrorCode); Assert.AreEqual(input.ExpectedBaseRevision, created.PullRequest!.BaseRevision);
+        fixture.Native.BaseRevision = new string('c', 40);
+        var rejected = await fixture.Coding().InvokeAsync("pull-request.create", "execute", Key('c'), Key('d'), request, "https://api.github.com", Credential, Allowed, default);
+        Assert.AreEqual("Rejected", rejected.Status); Assert.AreEqual("github_base_revision_changed", rejected.ErrorCode); Assert.AreEqual(1, fixture.Native.PullPosts);
+        var recovered = await fixture.Coding().InvokeAsync("pull-request.create", "recover", Key('a'), Key('b'), request, "https://api.github.com", Credential, Allowed, default);
+        Assert.AreEqual("Succeeded", recovered.Status); Assert.AreEqual(created.PullRequest.NativeId, recovered.PullRequest!.NativeId); Assert.AreEqual(1, fixture.Native.PullPosts);
+    }
+
+    [TestMethod]
     public async Task GitHubConcurrentPublicationAndCancellationAfterEffectAreRetrySafe()
     {
         using var fixture = new Fixture(); var input = new GitHub.GitHubTaskInput("Publish", Repository, Title: "One publication");
@@ -168,13 +185,14 @@ public sealed partial class GitHubProviderTests
         public void Dispose() { http.Dispose(); if (System.IO.Directory.Exists(Directory)) System.IO.Directory.Delete(Directory, true); }
     }
 
-    private sealed class NativeGitHub : HttpMessageHandler
+    internal sealed class NativeGitHub(AuthenticatedGitFixture? git = null) : HttpMessageHandler
     {
         public Dictionary<int, NativeIssue> Issues { get; } = [];
         private readonly Dictionary<int, JsonElement> pulls = [];
         public bool LoseIssueResponse { get; set; }
         public bool LosePullResponse { get; set; }
         public bool HidePulls { get; set; }
+        public string BaseRevision { get; set; } = HeadRevision;
         public bool IncompleteRelations { get; set; }
         public bool DenyIssueReads { get; set; }
         public CancellationTokenSource? CancelAfterIssue { get; set; }
@@ -189,8 +207,8 @@ public sealed partial class GitHubProviderTests
             var parts = request.RequestUri!.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
             var body = request.Content is null ? default : await request.Content.ReadFromJsonAsync<JsonElement>(token);
             object? output = null;
-            if (parts.Length == 3) output = new { id = parts[2] == "second" ? 43 : 42, full_name = parts[1] + "/" + parts[2], default_branch = "main", clone_url = "https://github.com/fixture/repository.git", html_url = "https://github.com/fixture/repository" };
-            else if (parts[3] == "commits") output = new { sha = HeadRevision };
+            if (parts.Length == 3) output = new { id = parts[2] == "second" ? 43 : 42, full_name = parts[1] + "/" + parts[2], default_branch = "main", clone_url = git?.Repository ?? "https://github.com/fixture/repository.git", html_url = "https://github.com/fixture/repository" };
+            else if (parts[3] == "commits") output = new { sha = await RevisionAsync(Uri.UnescapeDataString(parts[4]), token) };
             else if (parts[3] == "issues")
             {
                 if (DenyIssueReads && request.Method == HttpMethod.Get) return new(HttpStatusCode.Forbidden);
@@ -228,28 +246,57 @@ public sealed partial class GitHubProviderTests
                 if (request.Method == HttpMethod.Post)
                 {
                     PullPosts++; var number = 1000 + PullPosts;
-                    var pr = JsonSerializer.SerializeToElement(new { id = number + 100, number, html_url = $"https://github.com/{Repository}/pull/{number}",
-                        title = body.GetProperty("title").GetString(), body = body.GetProperty("body").GetString(), state = "open", draft = body.GetProperty("draft").GetBoolean(), merged = false,
-                        head = new { @ref = body.GetProperty("head").GetString(), sha = HeadRevision }, @base = new { @ref = body.GetProperty("base").GetString(), sha = new string('b', 40) }, updated_at = "2026-11-24T00:00:00Z" });
-                    pulls.Add(number, pr); if (LosePullResponse) { LosePullResponse = false; throw new HttpRequestException("Synthetic response loss"); } output = pr;
+                    var pr = JsonSerializer.SerializeToElement(new
+                    {
+                        id = number + 100,
+                        number,
+                        html_url = $"https://github.com/{Repository}/pull/{number}",
+                        title = body.GetProperty("title").GetString(),
+                        body = body.GetProperty("body").GetString(),
+                        state = "open",
+                        draft = body.GetProperty("draft").GetBoolean(),
+                        merged = false,
+                        head = new { @ref = body.GetProperty("head").GetString(), sha = await RevisionAsync(body.GetProperty("head").GetString()!, token) },
+                        @base = new { @ref = body.GetProperty("base").GetString(), sha = await RevisionAsync(body.GetProperty("base").GetString()!, token) },
+                        updated_at = "2026-11-24T00:00:00Z"
+                    });
+                    pulls.Add(number, pr); if (LosePullResponse) { LosePullResponse = false; throw new HttpRequestException("Synthetic response loss"); }
+                    output = pr;
                 }
                 else output = parts.Length == 4 ? (HidePulls ? Array.Empty<JsonElement>() : pulls.Values.ToArray()) : pulls[int.Parse(parts[4], System.Globalization.CultureInfo.InvariantCulture)];
             }
             return output is null ? new(HttpStatusCode.NotFound) : new(HttpStatusCode.OK) { Content = JsonContent.Create(output) };
         }
+        private async Task<string> RevisionAsync(string reference, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            return git is null ? reference == "main" ? BaseRevision : HeadRevision
+                : (await git.GitAsync(git.RepositoryPath, "rev-parse", "--verify", reference + "^{commit}")).Trim();
+        }
         private JsonElement Issue(int number)
         {
             var issue = Issues[number];
-            return JsonSerializer.SerializeToElement(new { id = 100 + number, number, title = issue.Title, body = issue.Body, state = issue.State, state_reason = issue.CompletionReason, html_url = $"https://github.com/{Repository}/issues/{number}",
-                repository_url = "https://api.github.com/repos/" + Repository, labels = issue.Labels.Select(name => new { name }).ToArray(),
+            return JsonSerializer.SerializeToElement(new
+            {
+                id = 100 + number,
+                number,
+                title = issue.Title,
+                body = issue.Body,
+                state = issue.State,
+                state_reason = issue.CompletionReason,
+                html_url = $"https://github.com/{Repository}/issues/{number}",
+                repository_url = "https://api.github.com/repos/" + Repository,
+                labels = issue.Labels.Select(name => new { name }).ToArray(),
                 sub_issues_summary = new { total = Issues.Count(value => value.Value.Parent == number), completed = 0, percent_completed = 0 },
-                issue_dependencies_summary = new { blocked_by = issue.Dependencies.Count, blocking = 0, total_blocked_by = issue.Dependencies.Count, total_blocking = 0 } });
+                issue_dependencies_summary = new { blocked_by = issue.Dependencies.Count, blocking = 0, total_blocked_by = issue.Dependencies.Count, total_blocking = 0 }
+            });
         }
     }
-    private sealed class NativeIssue(string title, string body, List<string> labels)
+    internal sealed class NativeIssue(string title, string body, List<string> labels)
     {
         public string Title { get; } = title; public string Body { get; } = body; public List<string> Labels { get; } = labels;
-        public int? Parent { get; set; } public HashSet<int> Dependencies { get; } = [];
+        public int? Parent { get; set; }
+        public HashSet<int> Dependencies { get; } = [];
         public string State { get; set; } = "open";
         public string? CompletionReason { get; set; }
     }

@@ -85,7 +85,7 @@ public sealed class CodingExecutionService(CodingFlowConfigurationService config
     }
 
     private static string AdmissionDigest(CodingExecutionConfiguration configuration, CodingTaskInput input, CodingRepositoryIdentity repository) =>
-        WorkPlanDefinition.Digest(new { Configuration = configuration, Input = input, Repository = CodingExecutionValidation.RepositoryDigest(repository) });
+        CodingExecutionValidation.AdmissionDigest(configuration, input, repository);
     private static Result<IReadOnlyList<WorkPlanAdmissionEvidence>> AdmissionFailure(string code) => Result<IReadOnlyList<WorkPlanAdmissionEvidence>>.Failure(code);
     private static RuntimeExecutionMaterialException Invalid(string code) => new(code, "The admitted Coding execution material is unavailable, stale or invalid.");
 }

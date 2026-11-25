@@ -14,6 +14,8 @@ public sealed record DeclarativeProjectSharingDefinition(WorkSharingProjectId Pr
 {
     public string? RepositoryToolName { get; init; }
     public string? RepositoryToolNamespace { get; init; }
+    public string? CodePublicationToolName { get; init; }
+    public string? CodePublicationToolNamespace { get; init; }
     public string? TaskOperationsToolName { get; init; }
     public string? TaskOperationsToolNamespace { get; init; }
 }
@@ -102,6 +104,7 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
     {
         yield return ("sharing", WorkProjectBindingPurpose.Sharing, value.ToolName, value.ToolNamespace);
         if (value.RepositoryToolName is not null) yield return ("repository", WorkProjectBindingPurpose.Repository, value.RepositoryToolName, value.RepositoryToolNamespace);
+        if (value.CodePublicationToolName is not null) yield return ("code-publication", WorkProjectBindingPurpose.CodePublication, value.CodePublicationToolName, value.CodePublicationToolNamespace);
         if (value.TaskOperationsToolName is not null) yield return ("task-operations", WorkProjectBindingPurpose.TaskOperations, value.TaskOperationsToolName, value.TaskOperationsToolNamespace);
     }
     private static bool Matches(WorkProjectSnapshot project, DeclarativeProjectSharingDefinition value) => (value.Id is null || project.Id.Value == value.Id)

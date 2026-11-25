@@ -16,6 +16,7 @@ internal static class CodingNativeHelper
         if (invocation is null || !CodingExecutionValidation.Material(invocation.Material)) return 78;
         var material = invocation.Material; var environment = invocation.Environment;
         var observations = new List<CodingConsumptionObservation>(); var checks = new List<CodingCheckEvidence>();
+        IReadOnlyList<CodingFileChange>? changes = null; string? changesDiagnostic = null;
         var secrets = new List<string>(); int? cliExit = null; string? patch = null; var summary = ""; string? diagnostic = null;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(material.Configuration.TimeoutSeconds), clock);
         using var stopping = CancellationTokenSource.CreateLinkedTokenSource(token, timeout.Token);
@@ -67,13 +68,20 @@ internal static class CodingNativeHelper
             await GitAsync(environment, "/work", ["add", "--intent-to-add", "--all"], 4096, stopping.Token);
             patch = (await GitAsync(environment, "/work", ["diff", "--binary", "--no-ext-diff", "--no-textconv", "--no-renames", "HEAD", "--"],
                 CodingExecutionProtocol.MaximumPatchBytes, stopping.Token)).Output;
+            if (diagnostic is null)
+            {
+                try { changes = await CodeChangesAsync(environment, secrets, stopping.Token); }
+                catch (CodingProcessException exception) when (exception.Code != "coding_native_credential_output_refused") { changesDiagnostic = exception.Code; }
+                catch (DecoderFallbackException) { changesDiagnostic = "coding_code_encoding_unsupported"; }
+            }
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested) { diagnostic = "coding_execution_timed_out"; }
         catch (CodingProcessException exception) { diagnostic = exception.Code; }
+        catch (DecoderFallbackException) { diagnostic = "coding_code_encoding_unsupported"; }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         { diagnostic = "coding_native_io_failed"; }
-        if (secrets.Any(value => summary.Contains(value, StringComparison.Ordinal) || patch?.Contains(value, StringComparison.Ordinal) == true))
-        { patch = null; summary = ""; diagnostic = "coding_native_credential_output_refused"; }
+        if (diagnostic == "coding_native_credential_output_refused" || secrets.Any(value => summary.Contains(value, StringComparison.Ordinal) || patch?.Contains(value, StringComparison.Ordinal) == true))
+        { patch = null; summary = ""; changes = null; diagnostic = "coding_native_credential_output_refused"; }
         if (observations.Count == 0)
         {
             var unavailable = new CodingConsumptionObservation(material.Coordinates.InvocationId.ToString("N") + ":unavailable", material.Coordinates,
@@ -81,8 +89,42 @@ internal static class CodingNativeHelper
             observations.Add(unavailable); await EmitAsync("consumption", unavailable, token);
         }
         var digest = patch is null ? null : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(patch)));
-        await EmitAsync("result", new CodingNativeResult(material.Coordinates, material.Input.BaseRevision, patch, digest, summary, cliExit, checks, observations, diagnostic), token);
+        await EmitAsync("result", new CodingNativeResult(material.Coordinates, material.Input.BaseRevision, patch, digest, summary, cliExit, checks, observations, diagnostic)
+        { CodeChanges = diagnostic is null ? changes : null, CodeChangesDiagnostic = changesDiagnostic }, token);
         return 0;
+    }
+
+    private static async Task<IReadOnlyList<CodingFileChange>> CodeChangesAsync(CodingNativeEnvironment environment, IReadOnlyList<string> secrets, CancellationToken token)
+    {
+        // Only the helper can write this index. Read sealed Git blobs, never follow produced filesystem links.
+        await GitAsync(environment, "/work", ["add", "--all"], 4096, token);
+        var paths = (await GitAsync(environment, "/work", ["diff", "--cached", "--name-only", "-z", "--no-renames", "HEAD", "--"], 32 * 1024, token))
+            .Output.Split('\0', StringSplitOptions.RemoveEmptyEntries).Where(path => !CodingCodeChanges.Reserved(path)).Order(StringComparer.Ordinal).ToArray();
+        if (paths.Length > CodingExecutionProtocol.MaximumCodeFiles || paths.Any(path => !CodingCodeChanges.Path(path)))
+            throw new CodingProcessException("coding_code_changes_invalid");
+        var changes = new List<CodingFileChange>();
+        foreach (var path in paths)
+        {
+            var entry = (await GitAsync(environment, "/work", ["ls-files", "--stage", "-z", "--", path], 2048, token)).Output;
+            if (entry.Length == 0) { changes.Add(new(path, null)); continue; }
+            if (!entry.EndsWith("\t" + path + "\0", StringComparison.Ordinal) || entry.Count(character => character == '\0') != 1
+                || !entry.StartsWith("100644 ", StringComparison.Ordinal) && !entry.StartsWith("100755 ", StringComparison.Ordinal))
+                throw new CodingProcessException("coding_code_file_type_unsupported");
+            var blob = (await GitAsync(environment, "/work", ["cat-file", "--batch"], 24 * 1024 + 128, token, ":" + path + "\n")).Output;
+            var separator = blob.IndexOf('\n');
+            if (separator < 0 || !blob.EndsWith('\n')) throw new CodingProcessException("coding_code_blob_invalid");
+            var header = blob[..separator].Split(' ');
+            var content = blob[(separator + 1)..^1];
+            if (header.Length != 3 || header[1] != "blob" || !int.TryParse(header[2], System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var length) || length > 24 * 1024 || Encoding.UTF8.GetByteCount(content) != length)
+                throw new CodingProcessException("coding_code_encoding_unsupported");
+            if (secrets.Any(value => content.Contains(value, StringComparison.Ordinal)))
+                throw new CodingProcessException("coding_native_credential_output_refused");
+            changes.Add(new(path, Convert.ToBase64String(Encoding.UTF8.GetBytes(content)), entry.StartsWith("100755 ", StringComparison.Ordinal)));
+            if (JsonSerializer.SerializeToUtf8Bytes(changes, CodingSandbox.Json).Length > CodingExecutionProtocol.MaximumCodeChangesBytes)
+                throw new CodingProcessException("coding_code_changes_limit");
+        }
+        return changes;
     }
 
     private static async Task MaterializeAsync(CodingExecutionMaterial material, CancellationToken token)
@@ -142,13 +184,13 @@ internal static class CodingNativeHelper
         if (OperatingSystem.IsLinux()) File.SetUnixFileMode(Path.Combine(directory, "auth.json"), UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
-    private static async Task<BoundedProcessResult> GitAsync(CodingNativeEnvironment environment, string directory, IReadOnlyList<string> arguments, int maximumBytes, CancellationToken token)
+    private static async Task<BoundedProcessResult> GitAsync(CodingNativeEnvironment environment, string directory, IReadOnlyList<string> arguments, int maximumBytes, CancellationToken token, string? input = null)
     {
-        var start = new ProcessStartInfo(environment.GitExecutable) { WorkingDirectory = directory };
+        var start = new ProcessStartInfo(environment.GitExecutable) { WorkingDirectory = directory, StandardOutputEncoding = new UTF8Encoding(false, true) };
         CodingSandbox.CleanEnvironment(start, environment.HomeDirectory);
         foreach (var value in new[] { "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "credential.helper=", "-c", "uploadpack.packObjectsHook=" }) start.ArgumentList.Add(value);
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
-        var result = await BoundedProcess.RunAsync(start, null, maximumBytes, null, token);
+        var result = await BoundedProcess.RunAsync(start, input, maximumBytes, null, token);
         if (result.ExitCode != 0) throw new CodingProcessException("coding_git_operation_failed");
         return result;
     }

@@ -34,6 +34,7 @@ public sealed class GitHubCodingOperations(GitHubConnection connections, GitHubO
             if (operation is not ("pull-request.create" or "pull-request.read")) return Result("Rejected", "github_operation_unsupported");
             var inputPr = request.Deserialize<GitHubPullRequestInput>(GitHubConnection.Json);
             if (inputPr is null || !GitHubConnection.RepositoryName(inputPr.Repository) || inputPr.Body?.Length > 32_768 || inputPr.Title?.Length > 512
+                || inputPr.ExpectedBaseRevision is not null && (inputPr.ExpectedBaseRevision.Length is not (40 or 64) || !inputPr.ExpectedBaseRevision.All(char.IsAsciiHexDigit))
                 || operation == "pull-request.read" && !GitHubConnection.Number(inputPr.Number)
                 || operation == "pull-request.create" && (string.IsNullOrWhiteSpace(inputPr.Title) || !Branch(inputPr.Head) || !Branch(inputPr.Base)
                     || inputPr.ExpectedHeadRevision is not { Length: 40 or 64 } || !inputPr.ExpectedHeadRevision.All(char.IsAsciiHexDigit) || inputPr.Number is not null))
@@ -59,19 +60,29 @@ public sealed class GitHubCodingOperations(GitHubConnection connections, GitHubO
                     {
                         var head = await session.SendAsync(HttpMethod.Get, $"repos/{inputPr.Repository}/commits/{Uri.EscapeDataString(inputPr.Head!)}", null, cancellation);
                         if (GitHubConnection.Text(head, "sha") != inputPr.ExpectedHeadRevision) return Result("Rejected", "github_head_revision_changed");
+                        if (inputPr.ExpectedBaseRevision is not null)
+                        {
+                            var baseline = await session.SendAsync(HttpMethod.Get, $"repos/{inputPr.Repository}/commits/{Uri.EscapeDataString(inputPr.Base!)}", null, cancellation);
+                            if (GitHubConnection.Text(baseline, "sha") != inputPr.ExpectedBaseRevision) return Result("Rejected", "github_base_revision_changed");
+                        }
                         native = await session.SendAsync(HttpMethod.Post, $"repos/{inputPr.Repository}/pulls",
                             new { title = inputPr.Title, body = (inputPr.Body ?? "") + "\n\n" + marker, head = inputPr.Head, @base = inputPr.Base, draft = inputPr.Draft }, cancellation);
                     }
                     var snapshot = Snapshot(inputPr.Repository, native);
                     return snapshot.Head == inputPr.Head && snapshot.Base == inputPr.Base && snapshot.HeadRevision == inputPr.ExpectedHeadRevision
-                        ? Result("Succeeded", pr: snapshot) : Result("Uncertain", "github_pull_request_head_changed", snapshot);
+                        && (inputPr.ExpectedBaseRevision is null || snapshot.BaseRevision == inputPr.ExpectedBaseRevision)
+                        ? Result("Succeeded", pr: snapshot) : Result("Uncertain", inputPr.ExpectedBaseRevision is not null && snapshot.BaseRevision != inputPr.ExpectedBaseRevision
+                            ? "github_pull_request_base_changed" : "github_pull_request_head_changed", snapshot);
                 }, async (receipt, cancellation) =>
                 {
                     if (receipt.PullRequest is { } pr) await session.SendAsync(HttpMethod.Get, $"repos/{inputPr.Repository}/pulls/{pr.Number}", null, cancellation);
                 }, status => Result(status), token);
         }
-        catch (GitHubProviderException error) { return Result(!admitted && error.Code is "github_credentials_denied" or "github_repository_denied" or "github_connection_invalid"
-            ? "Rejected" : "Uncertain", error.Code); }
+        catch (GitHubProviderException error)
+        {
+            return Result(!admitted && error.Code is "github_credentials_denied" or "github_repository_denied" or "github_connection_invalid"
+            ? "Rejected" : "Uncertain", error.Code);
+        }
         catch (HttpRequestException) { return Result("Uncertain", "github_transport_uncertain"); }
         catch (JsonException) { return Result(admitted ? "Uncertain" : "Rejected", "github_contract_invalid"); }
         catch (InvalidOperationException) { return Result("Uncertain", "github_response_invalid"); }

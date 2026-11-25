@@ -27,6 +27,7 @@ public static partial class CodingApiModule
             CodingIssueCoordinationService service, ICurrentRequestContext current, CancellationToken token) =>
                 Response(await service.ReadinessAsync(Workspace(current), new(projectId), new(planId), token)));
         MapHarnessProfiles(endpoints);
+        MapCodingDeliveries(endpoints);
         return endpoints;
     }
 

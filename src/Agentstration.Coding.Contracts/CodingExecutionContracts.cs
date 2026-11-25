@@ -11,6 +11,8 @@ public static class CodingExecutionProtocol
     public const string MaterialVersion = "1.0";
     public const string AdmissionKind = "coding.execution";
     public const int MaximumPatchBytes = 64 * 1024;
+    public const int MaximumCodeChangesBytes = 32 * 1024;
+    public const int MaximumCodeFiles = 32;
 }
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -54,4 +56,13 @@ public sealed record CodingConsumptionObservation(string ObservationId, CodingIn
 public sealed record CodingCheckEvidence(string Name, int? ExitCode, bool Completed, string? Diagnostic = null);
 public sealed record CodingNativeResult(CodingInvocationCoordinates Coordinates, string BaseRevision, string? Patch,
     string? PatchDigest, string Summary, int? CliExitCode, IReadOnlyList<CodingCheckEvidence> Checks,
-    IReadOnlyList<CodingConsumptionObservation> Consumption, string? Diagnostic = null);
+    IReadOnlyList<CodingConsumptionObservation> Consumption, string? Diagnostic = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<CodingFileChange>? CodeChanges { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? CodeChangesDiagnostic { get; init; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record CodingFileChange(string Path, string? ContentBase64, bool Executable = false);

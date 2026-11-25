@@ -42,10 +42,49 @@ public sealed class CodingSandboxTests
         Assert.AreEqual(fixture.Material.Input.BaseRevision, result.BaseRevision);
         Assert.AreEqual(fixture.Material.Coordinates, result.Coordinates);
         if (mode != "fail") { Assert.AreEqual(0, result.Checks.Single().ExitCode); Assert.IsTrue(result.Checks.Single().Completed); }
+        if (mode != "fail")
+        {
+            Assert.IsTrue(CodingCodeChanges.Valid(result.CodeChanges)); Assert.HasCount(1, result.CodeChanges!);
+            var change = result.CodeChanges!.Single(); Assert.AreEqual("answer.txt", change.Path);
+            Assert.AreEqual("42\n", System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(change.ContentBase64!)));
+        }
+        else Assert.IsNull(result.CodeChanges);
         Assert.IsFalse(process.Output.Contains(Fixture.CredentialValue, StringComparison.Ordinal));
         Assert.AreEqual(Fixture.CredentialValue, await File.ReadAllTextAsync(fixture.Credential));
         Assert.AreEqual(fixture.Material.Input.BaseRevision, (await fixture.GitAsync(fixture.Bare, "rev-parse", "main")).Trim());
         Assert.IsFalse(File.Exists(Path.Combine(fixture.Repository, "answer.txt")));
+    }
+
+    [TestMethod]
+    [DataRow("delete", null)]
+    [DataRow("utf8-bom", null)]
+    [DataRow("executable", null)]
+    [DataRow("symlink", "coding_code_file_type_unsupported")]
+    [DataRow("large-code", "coding_process_output_limit")]
+    public async Task NativeProducedCodeRetainsExactBytesModesAndDeletionsAndRejectsUnsafeFiles(string mode, string? diagnostic)
+    {
+        if (!OperatingSystem.IsLinux()) Assert.Inconclusive("The optional native Coding worker requires Linux Bubblewrap.");
+        await using var fixture = await Fixture.CreateAsync(mode); var result = await fixture.RunAsync();
+        Assert.IsNull(result.Diagnostic); Assert.AreEqual(diagnostic, result.CodeChangesDiagnostic);
+        if (diagnostic is not null) { Assert.IsNull(result.CodeChanges); return; }
+        Assert.IsTrue(CodingCodeChanges.Valid(result.CodeChanges));
+        Assert.IsFalse(result.CodeChanges!.Any(change => CodingCodeChanges.Reserved(change.Path)));
+        var answer = result.CodeChanges!.Single(change => change.Path == "answer.txt");
+        var bytes = Convert.FromBase64String(answer.ContentBase64!);
+        CollectionAssert.AreEqual(mode == "utf8-bom" ? new byte[] { 0xef, 0xbb, 0xbf, 0x34, 0x32, 0x0a } : new byte[] { 0x34, 0x32, 0x0a }, bytes);
+        Assert.AreEqual(mode == "executable", answer.Executable);
+        if (mode == "delete") Assert.IsNull(result.CodeChanges!.Single(change => change.Path == "README.md").ContentBase64);
+    }
+
+    [TestMethod]
+    public void NativeProducedCodeContractRejectsEscapesReservedPathsDuplicatesAndOversizedPayloads()
+    {
+        foreach (var path in new[] { "../secret", "/absolute", "src/.git/config", ".codex/auth.json", "AGENTS.md", "src\\file.cs", "src/./file.cs" })
+            Assert.IsFalse(CodingCodeChanges.Valid([new(path, "NDI=")]));
+        Assert.IsFalse(CodingCodeChanges.Valid([new("code.cs", "NDI="), new("CODE.cs", "NDI=")]));
+        Assert.IsFalse(CodingCodeChanges.Valid([new("code.cs", "not-base64")]));
+        Assert.IsFalse(CodingCodeChanges.Valid([new("code.cs", Convert.ToBase64String(new byte[25_000]))]));
+        Assert.IsTrue(CodingCodeChanges.Valid([new("src/code.cs", "NDI="), new("obsolete.cs", null)]));
     }
 
     [TestMethod]

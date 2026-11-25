@@ -24,7 +24,10 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkProjectService>();
         services.AddSingleton<WorkProjectSharingService>();
         services.AddSingleton<IWorkPlanAdmissionGate, WorkProjectSharingAdmissionGate>();
-        services.AddSingleton<IWorkProjectSharingGateway, GitWorkProjectSharingGateway>();
+        services.AddSingleton<GitWorkProjectSharingGateway>();
+        services.AddSingleton<IWorkProjectSharingGateway>(provider => provider.GetRequiredService<GitWorkProjectSharingGateway>());
+        services.AddSingleton<ICodingCodePublicationGateway>(provider => provider.GetRequiredService<GitWorkProjectSharingGateway>());
+        services.AddSingleton<ICodingDeliveryExecutionReader, CodingDeliveryExecutionReader>();
         services.AddSingleton<WorkTaskProviderService>();
         services.AddSingleton<CodexHarnessMaterializer>();
         services.AddSingleton<HarnessProfileService>();
@@ -35,6 +38,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<IWorkPlanAdmissionGate>(provider => provider.GetRequiredService<CodingExecutionService>());
         services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeCapabilityMaterialProvider>(provider => provider.GetRequiredService<CodingExecutionService>());
         services.AddSingleton<CodingRepositoryService>();
+        services.AddSingleton<CodingDeliveryService>();
         services.AddSingleton<CodingIssueCoordinationService>();
         services.AddSingleton<ICodingIssueBindingPolicy, CodingIssueBindingPolicy>();
         services.AddSingleton<IWorkPlanAdmissionGate, CodingIssueAdmissionGate>();

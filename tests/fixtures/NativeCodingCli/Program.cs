@@ -24,6 +24,11 @@ if (mode != "no-usage") Console.WriteLine(mode == "partial" || mode == "cancel"
 await Console.Out.FlushAsync();
 if (mode == "cancel") { await Task.Delay(Timeout.InfiniteTimeSpan); return 0; }
 await File.WriteAllTextAsync("/work/answer.txt", "42\n");
+if (mode == "delete") File.Delete("/work/README.md");
+if (mode == "utf8-bom") await File.WriteAllBytesAsync("/work/answer.txt", [0xef, 0xbb, 0xbf, 0x34, 0x32, 0x0a]);
+if (mode == "executable" && OperatingSystem.IsLinux()) File.SetUnixFileMode("/work/answer.txt", UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+if (mode == "symlink") { File.Delete("/work/answer.txt"); File.CreateSymbolicLink("/work/answer.txt", "README.md"); }
+if (mode == "large-code") await File.WriteAllTextAsync("/work/answer.txt", new string('a', 25_000));
 var last = Array.IndexOf(args, "--output-last-message");
 if (last < 0 || last + 1 >= args.Length) return 3;
 var summary = "Completed deterministic fixture change.";

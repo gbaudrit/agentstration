@@ -21,7 +21,11 @@ public sealed record CodingRepositorySelection(Guid ProjectId, long ProjectVersi
 public sealed record ResolveCodingRepositoriesRequest(Guid TaskId, IReadOnlyList<string> Repositories, long? ExpectedTaskVersion = null);
 
 public sealed record CodingPullRequestInput(string Repository, string? Number = null, string? Title = null, string? Body = null,
-    string? Head = null, string? Base = null, string? ExpectedHeadRevision = null, bool Draft = true);
+    string? Head = null, string? Base = null, string? ExpectedHeadRevision = null, bool Draft = true)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpectedBaseRevision { get; init; }
+}
 public sealed record CodingPullRequestSnapshot(string Provider, string Repository, string NativeId, string Number, Uri Url,
     string State, bool Draft, bool Merged, string Head, string HeadRevision, string Base, string BaseRevision, string Revision);
 public sealed record InvokeCodingPullRequestRequest(Guid Id, Guid TaskId, long ExpectedTaskVersion, string Operation,

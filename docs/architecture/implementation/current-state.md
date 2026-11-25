@@ -10,6 +10,13 @@ Flow totals, deduplicates native observations, retains immutable corrections and
 estimated and unknown rollups. Portable producer attribution is captured at admission; physical
 Workspace/private Project ownership remains local (ADR-0272).
 
+Recoverable [Coding delivery](../../reference/coding-delivery.md) composes issue/shared-plan authority,
+retained isolated CLI/check output, protected Git and draft-PR recovery, functional evidence and shared
+usage. Work stores one frozen intent and CAS stage receipt per owned attempt; Coding coordinates the
+existing boundaries. An explicit CodePublication binding constrains derived branches and code paths.
+Response loss never authorizes execution replay, and delivery never accepts/merges/closes work
+(ADR-0273).
+
 ## Solution tree
 
 ```text

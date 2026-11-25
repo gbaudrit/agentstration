@@ -439,6 +439,7 @@ public sealed partial class WorkPlanTests
         public IWorkProjectRepository Projects => provider!.GetRequiredService<IWorkProjectRepository>();
         public IWorkProjectSharingRepository Sharing => provider!.GetRequiredService<IWorkProjectSharingRepository>();
         public IWorkUsageRepository Usage => provider!.GetRequiredService<IWorkUsageRepository>();
+        public IWorkTaskDeliveryRepository Deliveries => provider!.GetRequiredService<IWorkTaskDeliveryRepository>();
         public IWorkTaskOperationRepository Operations => provider!.GetRequiredService<IWorkTaskOperationRepository>();
         public IWorkplaceRepository Workplace => provider!.GetRequiredService<IWorkplaceRepository>();
         public Agentstration.Flows.Storage.Abstractions.IFlowRepository FlowStore => provider!.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>();

@@ -17,7 +17,11 @@ public sealed record GitHubTaskResponse(string OperationKey, string IntentDigest
 public sealed record GitHubRepositoryIdentity(string Provider, string Repository, string NativeId, Uri CloneUrl, Uri WebUrl,
     string DefaultBranch, string Revision, IReadOnlyList<string> Capabilities);
 public sealed record GitHubPullRequestInput(string Repository, string? Number = null, string? Title = null, string? Body = null,
-    string? Head = null, string? Base = null, string? ExpectedHeadRevision = null, bool Draft = true);
+    string? Head = null, string? Base = null, string? ExpectedHeadRevision = null, bool Draft = true)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExpectedBaseRevision { get; init; }
+}
 public sealed record GitHubPullRequestSnapshot(string Provider, string Repository, string NativeId, string Number, Uri Url,
     string State, bool Draft, bool Merged, string Head, string HeadRevision, string Base, string BaseRevision, string Revision);
 public sealed record GitHubCodingResponse(string OperationKey, string IntentDigest, string Status,

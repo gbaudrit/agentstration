@@ -51,6 +51,39 @@ public sealed class CodingUsageAccountingTests
         Assert.AreEqual("usage_source_expired", CodingUsageAccounting.Read(fixture.Scope, fixture.Coordinates.ProjectId, fixture.Coordinates.PlanId, fixture.Attempt,
             fixture.Assignment with { TransientPayloadsAvailable = false }).ErrorCode);
     }
+    [TestMethod]
+    public void DeliverySourceRequiresExactTerminalAttemptConfiguredChecksAndIdenticalFinalReceipts()
+    {
+        var fixture = Create(); var baseline = new string('f', 40);
+        var attempt = fixture.Attempt with
+        {
+            Status = WorkPlanAttemptStatus.Completed,
+            Input = JsonSerializer.SerializeToElement(new CodingTaskInput(baseline, new Dictionary<string, string>()), Json)
+        };
+        var configuration = new CodingExecutionConfiguration(new("coding", default) { Uid = Guid.NewGuid(), Generation = 1 },
+            new("coder", default, "1.0.0", new string('a', 64)) { Uid = Guid.NewGuid(), Generation = 1 }, "fixture/repository")
+        { Checks = [new("check", "fixture-check", [])] };
+        var observation = Observation(fixture, "turn-1", 13, 7, 23);
+        var result = new CodingNativeResult(fixture.Coordinates, baseline, null, null, "Fixture", 0, [new("check", 0, true)], [observation])
+        { CodeChanges = [new("answer.txt", "NDIK")] };
+        var assignment = fixture.Assignment with
+        {
+            State = RuntimeAssignmentState.Succeeded,
+            ExecutionEvents = [Event(new { codingConsumption = observation }), Event(new { codingResult = result }), Event(new { output = result })]
+        };
+        var read = CodingDeliveryResultReader.Read(fixture.Scope, fixture.Coordinates.ProjectId, fixture.Coordinates.PlanId, attempt, assignment, configuration);
+        Assert.IsTrue(read.IsSuccess, read.ErrorCode); Assert.AreEqual(WorkPlanDefinition.Digest(result), read.Value!.Digest);
+        var conflict = assignment with { ExecutionEvents = [Event(new { codingResult = result }), Event(new { codingResult = result with { Summary = "Changed" } })] };
+        Assert.AreEqual("coding_delivery_result_conflict", CodingDeliveryResultReader.Read(fixture.Scope, fixture.Coordinates.ProjectId, fixture.Coordinates.PlanId, attempt, conflict, configuration).ErrorCode);
+        foreach (var rejected in new[] { result with { Checks = [] }, result with { CodeChanges = null }, result with { CliExitCode = 17 }, result with { Checks = [new("check", 9, true)] } })
+        {
+            var invalid = assignment with { ExecutionEvents = [Event(new { codingResult = rejected })] };
+            Assert.AreEqual("coding_delivery_checks_or_code_required", CodingDeliveryResultReader.Read(fixture.Scope, fixture.Coordinates.ProjectId, fixture.Coordinates.PlanId, attempt, invalid, configuration).ErrorCode);
+        }
+        Assert.AreEqual("coding_delivery_attempt_invalid", CodingDeliveryResultReader.Read(fixture.Scope, fixture.Coordinates.ProjectId, fixture.Coordinates.PlanId,
+            attempt, assignment with { State = RuntimeAssignmentState.Failed }, configuration).ErrorCode);
+    }
+
     private sealed record Fixture(FlowRunScope Scope, WorkPlanAttempt Attempt, CodingInvocationCoordinates Coordinates, RuntimeWorkerAssignment Assignment);
     private static Fixture Create()
     {

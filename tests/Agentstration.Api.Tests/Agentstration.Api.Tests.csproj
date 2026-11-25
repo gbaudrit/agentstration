@@ -1,5 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../src/Agentstration.Runtime.Worker.Coding/Agentstration.Runtime.Worker.Coding.csproj" Aliases="codingworker" />
+    <ProjectReference Include="../fixtures/NativeCodingCli/NativeCodingCli.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../fixtures/NativeHarnessProbe/NativeHarnessProbe.csproj" ReferenceOutputAssembly="false" />
     <Compile Include="../fixtures/Git/AuthenticatedGitFixture.cs" Link="Fixtures/AuthenticatedGitFixture.cs" />
     <ProjectReference Include="../../src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" Aliases="GitExtension" />

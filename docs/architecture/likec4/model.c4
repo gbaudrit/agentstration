@@ -142,7 +142,7 @@ model {
       }
 
       coding = component 'Coding application' {
-        description 'Private Project/task repository selection and native PR intent through protected published Tool connections'
+        description 'Private Project/task repository selection and recoverable delivery from frozen native evidence through protected Git and draft PR connections to shared progress and usage'
       }
 
       work = component 'Work and Workplace application' {
@@ -175,7 +175,7 @@ model {
     }
 
     codingWorker = container 'Native Coding AWP worker' {
-      description 'Optional single-assignment coding-cli worker and Bubblewrap-isolated native helper; pinned local bare cache, bounded patch/check/usage evidence, no server storage'
+      description 'Optional single-assignment coding-cli worker and Bubblewrap-isolated native helper; pinned local bare cache, bounded patch/check/usage and optional staged UTF-8 file evidence, no server storage'
     }
 
     console = container 'Operations Console host' {
@@ -195,7 +195,7 @@ model {
     }
 
     workData = container 'Work data' {
-      description 'Functional Work Items, interactions, notifications, events, results, indexed task attempt receipts and immutable usage ledger, and private Project sharing intents/projections'
+      description 'Functional Work Items, interactions, notifications, events, results, indexed task attempt receipts, frozen delivery intents/CAS receipts and immutable usage ledger, and private Project sharing intents/projections'
     }
 
     flowData = container 'Flow data' {

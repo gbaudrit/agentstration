@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Agentstration.Application.Work;
+using Agentstration.Coding;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -14,7 +15,7 @@ using ModelContextProtocol;
 namespace Agentstration.Infrastructure.Work;
 
 public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
-    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : IWorkProjectSharingGateway
+    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : IWorkProjectSharingGateway, ICodingCodePublicationGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, MaxDepth = 32 };
@@ -22,15 +23,22 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
     private sealed record GitResponse(string OperationKey, string IntentDigest, string Status, string RefName,
         string? Revision = null, string? BaseRevision = null, string? CurrentRevision = null,
         IReadOnlyList<GitFile>? Files = null, string? DiffBase64 = null, string? ErrorCode = null);
-    private sealed record Route(ToolResource Tool, ToolProviderResource Provider, string RefName);
+    private sealed record Route(ToolResource Tool, ToolProviderResource Provider, string RefName, string Repository);
     private async Task<Result<Route>> ResolveAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
         WorkProjectSharingConnection connection, CancellationToken token)
+    {
+        if (!ValidLocation(connection.Location)) return Result<Route>.Failure("sharing_protected_relay_required");
+        return await ResolveGitAsync(workspaceId, principalId, binding, WorkProjectBindingPurpose.Sharing, null, [connection.Location], token);
+    }
+    private async Task<Result<Route>> ResolveGitAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
+        WorkProjectBindingPurpose purpose, string? requestedRef, IReadOnlyList<string> requestedPaths, CancellationToken token)
     {
         Result<Route> Failure(string code) => Result<Route>.Failure(code);
         var trusted = current.Current;
         if (trusted.WorkspaceId != workspaceId.Value || trusted.PrincipalId != principalId
             || !await authorization.HasPermissionAsync(trusted, AuthorizationPermissions.RunsExecute, token)) return Failure("sharing_provider_denied");
-        if (binding.Purpose != WorkProjectBindingPurpose.Sharing || binding.Target.Address.Kind != ToolResourceKinds.Tool)
+        if (binding.Purpose != purpose || purpose is not (WorkProjectBindingPurpose.Sharing or WorkProjectBindingPurpose.CodePublication)
+            || binding.Target.Address.Kind != ToolResourceKinds.Tool)
             return Failure("sharing_repository_connection_required");
         var access = await bindings.ResolveAsync(workspaceId, principalId, binding, token);
         if (!access.IsSuccess) return Failure(access.ErrorCode!);
@@ -49,15 +57,18 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
             ("/credential" or "/repository" or "/authentication" or "/username" or "/allowedRefPrefixes" or "/allowedPathPrefixes" or "/request/refName")))
             return Failure("sharing_protected_relay_required");
         var literals = relay.Bindings.OfType<LiteralToolArgumentBinding>().ToDictionary(value => value.Path, value => value.Value);
-        if (!literals.TryGetValue("/repository", out var repository) || repository.ValueKind != JsonValueKind.String
+        if (!literals.TryGetValue("/repository", out var repository) || repository.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(repository.GetString())
             || !literals.TryGetValue("/authentication", out var authentication) || authentication.ValueKind != JsonValueKind.String || authentication.GetString() is not ("Basic" or "Bearer")
-            || !literals.TryGetValue("/request/refName", out var reference) || reference.ValueKind != JsonValueKind.String
-            || reference.GetString() is not { } refName || !refName.StartsWith("refs/heads/", StringComparison.Ordinal)
             || !literals.TryGetValue("/allowedRefPrefixes", out var refs) || refs.ValueKind != JsonValueKind.Array
-            || !refs.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String && refName.StartsWith(value.GetString()!, StringComparison.Ordinal))
-            || !literals.TryGetValue("/allowedPathPrefixes", out var paths) || paths.ValueKind != JsonValueKind.Array
-            || !ValidLocation(connection.Location) || !paths.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String
-                && (connection.Location == value.GetString() || connection.Location.StartsWith(value.GetString() + "/", StringComparison.Ordinal))))
+            || !literals.TryGetValue("/allowedPathPrefixes", out var paths) || paths.ValueKind != JsonValueKind.Array)
+            return Failure("sharing_protected_relay_required");
+        var boundRef = literals.TryGetValue("/request/refName", out var reference) && reference.ValueKind == JsonValueKind.String ? reference.GetString() : null;
+        var refName = requestedRef ?? boundRef;
+        if (refName is not { Length: > 0 and <= 256 } || !refName.StartsWith("refs/heads/", StringComparison.Ordinal)
+            || boundRef is not null && boundRef != refName
+            || !refs.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String && value.GetString() is { Length: > 0 } prefix && refName.StartsWith(prefix, StringComparison.Ordinal))
+            || requestedPaths.Count is < 1 or > 32 || requestedPaths.Any(path => !paths.EnumerateArray().Any(value => value.ValueKind == JsonValueKind.String
+                && value.GetString() is { Length: > 0 } prefix && (path == prefix || path.StartsWith(prefix + "/", StringComparison.Ordinal)))))
             return Failure("sharing_protected_relay_required");
         if (tool.Definition.Provider is not { } providerReference) return Failure("sharing_provider_unavailable");
         var providerScope = providerReference.ScopeRef ?? scope;
@@ -65,9 +76,9 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         var provider = (await resources.GetExactAsync<ToolProviderResource>(providerAddress, token))?.Value;
         if (provider is null || !provider.Definition.Enabled || provider.Definition.Mcp?.Internal != true) return Failure("sharing_provider_unavailable");
         var providerAccess = await bindings.ResolveAsync(workspaceId, principalId,
-            binding with { Target = new(providerAddress, provider.Uid, provider.Generation) }, token);
+            binding with { Purpose = WorkProjectBindingPurpose.Context, Target = new(providerAddress, provider.Uid, provider.Generation) }, token);
         if (!providerAccess.IsSuccess) return Failure(providerAccess.ErrorCode!);
-        return Result<Route>.Success(new(tool, provider, refName));
+        return Result<Route>.Success(new(tool, provider, refName, repository.GetString()!));
     }
     private async Task<Result<GitResponse>> InvokeAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
         WorkProjectSharingConnection connection, string operation, string mode, string key, string digest, object input, CancellationToken token)
@@ -75,7 +86,13 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         Result<GitResponse> Failure(string code) => Result<GitResponse>.Failure(code);
         var resolved = await ResolveAsync(workspaceId, principalId, binding, connection, token);
         if (!resolved.IsSuccess) return Failure(resolved.ErrorCode!);
-        var route = resolved.Value!; var tool = route.Tool; var provider = route.Provider;
+        return await ExecuteGitAsync(workspaceId, principalId, resolved.Value!, operation, mode, key, digest, input, token);
+    }
+    private async Task<Result<GitResponse>> ExecuteGitAsync(WorkspaceId workspaceId, Guid principalId, Route route,
+        string operation, string mode, string key, string digest, object input, CancellationToken token)
+    {
+        Result<GitResponse> Failure(string code) => Result<GitResponse>.Failure(code);
+        var tool = route.Tool; var provider = route.Provider;
         var trusted = current.Current; var scope = tool.ScopeRef!.Value; var externalId = tool.Definition.ExternalId!;
         var providerScope = provider.ScopeRef!.Value;
         var arguments = JsonSerializer.SerializeToElement(new { operation, mode, operationKey = key, intentDigest = digest, request = input }, Json);

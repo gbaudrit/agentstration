@@ -8,6 +8,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Agentstration.Runtime.Tests" />
     <InternalsVisibleTo Include="Agentstration.Api.Execution.Tests" />
+    <InternalsVisibleTo Include="Agentstration.Api.Tests" />
     <Using Include="Agentstration.Runtime.Worker.Core" />
   </ItemGroup>
 </Project>

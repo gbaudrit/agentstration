@@ -125,7 +125,11 @@ invalid/inconsistent counters do not become zero. Cached and reasoning counters 
 additional totals. Cost, currency and provider duration are not invented.
 
 The final receipt contains a bounded 64 KiB binary Git patch and SHA-256, an 8 KiB summary, CLI exit,
-actual configured check exits and explicit unavailable checks/usage. Timeout is bounded to 1–600
+actual configured check exits and explicit unavailable checks/usage. After checks, optional
+`codeChanges` retain bounded regular UTF-8 staged blobs/modes/deletions for
+[delivery](coding-delivery.md), excluding materialized harness files. Unsupported encoding/file type/size
+sets a separate `codeChangesDiagnostic` without rewriting the generic CLI/check outcome. Credential
+exposure is refused before encoding, and no server-side patch application is used. Timeout is bounded to 1–600
 seconds. AWP cancellation kills the isolated process tree; partial observations already accepted
 under the lease remain durable. Failure/cancellation retain their receipt reference and do not
 accept the functional task. Lease expiry cannot authorize late events or terminal mutations.

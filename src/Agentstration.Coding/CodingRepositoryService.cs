@@ -82,7 +82,8 @@ public sealed class CodingRepositoryService(WorkProjectService projects, WorkTas
             || command.Operation is not (CodingProviderProtocol.CreatePullRequest or CodingProviderProtocol.ReadPullRequest)
             || !ValidRepositories([command.Input.Repository]) || command.Input.Title?.Length is > 512 || command.Input.Body?.Length is > 32_768
             || command.Input.Number?.Length is > 32 || command.Input.Head?.Length is > 256 || command.Input.Base?.Length is > 256
-            || command.Input.ExpectedHeadRevision?.Length is > 128)
+            || command.Input.ExpectedHeadRevision?.Length is > 128
+            || command.Input.ExpectedBaseRevision is not null && !CodingExecutionValidation.Commit(command.Input.ExpectedBaseRevision))
             return Result<CodingPullRequestResponse>.Failure("coding_pull_request_invalid");
         var authorized = await AuthorizeAsync(workspaceId, projectId, new(command.TaskId), command.Recover ? null : command.ExpectedTaskVersion, token);
         if (!authorized.IsSuccess) return Result<CodingPullRequestResponse>.Failure(authorized.ErrorCode!);
@@ -103,7 +104,8 @@ public sealed class CodingRepositoryService(WorkProjectService projects, WorkTas
         var result = response.Value!;
         if (result.Status == CodingProviderStatus.Succeeded && (result.PullRequest is not { } pr || pr.Repository != command.Input.Repository
             || !ValidPullRequest(pr)
-            || command.Operation == CodingProviderProtocol.CreatePullRequest && (pr.Head != command.Input.Head || pr.Base != command.Input.Base || pr.Draft != command.Input.Draft || pr.HeadRevision != command.Input.ExpectedHeadRevision)))
+            || command.Operation == CodingProviderProtocol.CreatePullRequest && (pr.Head != command.Input.Head || pr.Base != command.Input.Base || pr.Draft != command.Input.Draft || pr.HeadRevision != command.Input.ExpectedHeadRevision
+                || command.Input.ExpectedBaseRevision is not null && pr.BaseRevision != command.Input.ExpectedBaseRevision)))
             return Result<CodingPullRequestResponse>.Failure("coding_pull_request_response_invalid");
         return Result<CodingPullRequestResponse>.Success(new(command.Id, projectId.Value, command.TaskId, command.ExpectedTaskVersion, selected.Binding.Target, result));
     }

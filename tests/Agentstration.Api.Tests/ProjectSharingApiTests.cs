@@ -1,4 +1,5 @@
 extern alias GitExtension;
+extern alias GitHubExtension;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
@@ -158,7 +159,7 @@ public sealed partial class ProjectSharingApiTests
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<WorkSharingStateResponse>())!;
     }
-    private static async Task<SharingHost> ConnectedHostAsync(AuthenticatedGitFixture native, string name, bool publishRelay = true)
+    private static async Task<SharingHost> ConnectedHostAsync(AuthenticatedGitFixture native, string name, bool publishRelay = true, WebApplicationFactory<GitHubExtension::Program>? github = null, bool coding = false)
     {
         var extension = new WebApplicationFactory<GitExtension::Program>().WithWebHostBuilder(builder =>
         {
@@ -167,13 +168,14 @@ public sealed partial class ProjectSharingApiTests
             builder.UseSetting("GitSourceProvider:TemporaryDirectory", Path.Combine(native.Root, name, "extension-work"));
         });
         _ = extension.CreateClient();
-        var handlers = new HandlerFactory(extension);
+        var handlers = new HandlerFactory(extension, github);
         Func<WebApplicationFactory<global::Program>> hostFactory = () => new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development"); builder.UseSetting("Data:Directory", Path.Combine(native.Root, name, "host"));
             builder.UseSetting("Agentstration:Authentication:Mode", "Development"); builder.UseSetting("AI:Provider", "Deterministic");
             builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", (!publishRelay).ToString());
             builder.UseSetting("Agentstration:Extensions:DiscoverOnStartup", "false"); builder.UseSetting("Logging:LogLevel:Default", "Warning");
+            if (coding) AwpTestWorker.Configure(builder);
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IHttpMessageHandlerFactory>(handlers);
@@ -262,11 +264,11 @@ public sealed partial class ProjectSharingApiTests
 
     }
     private static LiteralToolArgumentBinding Literal<T>(string path, T value) => new() { Path = path, Value = JsonSerializer.SerializeToElement(value) };
-    private sealed class HandlerFactory(WebApplicationFactory<GitExtension::Program> extension) : IHttpMessageHandlerFactory
+    private sealed class HandlerFactory(WebApplicationFactory<GitExtension::Program> extension, WebApplicationFactory<GitHubExtension::Program>? github = null) : IHttpMessageHandlerFactory
     {
         internal byte[]? SeedContent { get; set; }
         public HttpMessageHandler CreateHandler(string name) => name == "workspace-seed-ingestion" && SeedContent is { } seed
-            ? new SeedContentHandler(seed) : extension.Server.CreateHandler();
+            ? new SeedContentHandler(seed) : github is null ? extension.Server.CreateHandler() : new CombinedExtensionHandler(extension.Server.CreateHandler(), github.Server.CreateHandler());
     }
     private sealed class SeedContentHandler(byte[] bytes) : HttpMessageHandler
     {

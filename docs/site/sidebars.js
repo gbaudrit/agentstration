@@ -142,6 +142,7 @@ const sidebars = {
         'reference/http-diagnostics',
         'reference/identity-and-authorization',
         'reference/coding-worker',
+        'reference/coding-delivery',
         'reference/work-usage',
         'reference/workspace-seeds',
         'reference/current-capabilities',

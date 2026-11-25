@@ -180,6 +180,7 @@ public sealed partial class ProjectSharingApiTests
             Kind = RuntimeProfileResourceKinds.RuntimeProfile,
             ScopeRef = ResourceScopeRef.Instance,
             Metadata = new() { Name = "seed-runtime" },
+            Generation = 1,
             Definition = new() { DisplayName = "Seed native runtime", RuntimeType = "coding-cli" }
         }, null, true, default)).Value;
         await resources.PutExactAsync(ResourceScopeRef.Instance, new ExtensionRegistrationResource
