@@ -71,9 +71,12 @@ public sealed class DataSourceDatasetCompositionService(
         var flow = await flows.ResolveOperationAsync(operation.ScopeRef!.Value, adapter.Flow, cancellationToken);
         if (definition.Orchestration is null && definition.Transformations.Count == 0 && definition.Compositions.Count == 0 && accepted?.Composition is null)
             return new(definition, operation, type, input, output, partition, flow)
-            { OperationOutputSchema = rawOutput, OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot,
+            {
+                OperationOutputSchema = rawOutput,
+                OutputSchemaSnapshot = finalSnapshot ?? definition.Acquisition.OutputSchemaSnapshot,
                 InvocationParameters = accepted?.InvocationParameters is { ValueKind: not JsonValueKind.Undefined } pinnedParameters ? pinnedParameters : prepared.Parameters,
-                SecretInputs = prepared.Secrets };
+                SecretInputs = prepared.Secrets
+            };
         if (sequences is null || definition.Compositions.ContainsKey("acquisition"))
             throw Invalid("data_source_composition_invalid", "The acquisition point is owned by the Data Source.");
         var bindings = definition.Compositions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);

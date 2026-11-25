@@ -12,10 +12,10 @@ using Agentstration.Infrastructure;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Knowledge;
 using Agentstration.Infrastructure.Storage;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
-using Agentstration.Parameters;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Storage.Contracts;
@@ -224,20 +224,36 @@ public sealed partial class ConnectedServiceApiTests
             using var request = scopes.PushInstance(context);
             var parameter = await factory.Services.GetRequiredService<ParameterManagementService>().CreateAsync(new()
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter,
-                Metadata = new() { Name = "acquisition-query" }, ScopeRef = consumer,
-                Definition = new() { DisplayName = "Query", ValueType = ParameterValueType.Text,
-                    Value = JsonSerializer.SerializeToElement("Rennes when:1d & été+news") }
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ParameterResourceKinds.Parameter,
+                Metadata = new() { Name = "acquisition-query" },
+                ScopeRef = consumer,
+                Definition = new()
+                {
+                    DisplayName = "Query",
+                    ValueType = ParameterValueType.Text,
+                    Value = JsonSerializer.SerializeToElement("Rennes when:1d & été+news")
+                }
             }, timeout.Token);
             parameterBindings = [new("q", Parameter: new(parameter.Value.Address, consumer))];
             var secrets = factory.Services.GetRequiredService<SecretManagementService>();
-            await secrets.CreateVaultAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault,
-                Metadata = new() { Name = "acquisition-vault" }, ScopeRef = consumer,
-                Definition = new() { DisplayName = "Acquisition vault", ProviderType = "local" } }, timeout.Token);
+            await secrets.CreateVaultAsync(new()
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Vault,
+                Metadata = new() { Name = "acquisition-vault" },
+                ScopeRef = consumer,
+                Definition = new() { DisplayName = "Acquisition vault", ProviderType = "local" }
+            }, timeout.Token);
             await secrets.InitializeVaultExactAsync(consumer, "acquisition-vault", timeout.Token);
-            var secret = await secrets.CreateSecretAsync(new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
-                Metadata = new() { Name = "acquisition-secret" }, ScopeRef = consumer,
-                Definition = new() { DisplayName = "Query", Vault = new("acquisition-vault", consumer), Key = "query" } }, timeout.Token);
+            var secret = await secrets.CreateSecretAsync(new()
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
+                Metadata = new() { Name = "acquisition-secret" },
+                ScopeRef = consumer,
+                Definition = new() { DisplayName = "Query", Vault = new("acquisition-vault", consumer), Key = "query" }
+            }, timeout.Token);
             using var value = new SecretValue(Encoding.UTF8.GetBytes("Brest"));
             await secrets.SetValueExactAsync(consumer, secret.Value.Name, value, timeout.Token);
             secretBindings = [new("q", Secret: new(secret.Value.Address, consumer))];

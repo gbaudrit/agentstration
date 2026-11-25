@@ -83,15 +83,19 @@ public sealed class DataSourceAcquisitionValueTests : ResourceManagementApiTestB
         var secrets = factory.Services.GetRequiredService<SecretManagementService>();
         await secrets.CreateVaultAsync(new VaultResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault,
-            Metadata = new() { Name = "input-vault" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
+            Metadata = new() { Name = "input-vault" },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "Input vault", ProviderType = "local" }
         }, default);
         await secrets.InitializeVaultExactAsync(scope, "input-vault", default);
         var secret = await secrets.CreateSecretAsync(new SecretResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret,
-            Metadata = new() { Name = "operation-input" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
+            Metadata = new() { Name = "operation-input" },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "Operation input", Vault = new("input-vault", scope), Key = "fixture" }
         }, default);
         using (var value = new SecretValue(Encoding.UTF8.GetBytes("synthetic-first-input")))
@@ -132,25 +136,44 @@ public sealed class DataSourceAcquisitionValueTests : ResourceManagementApiTestB
         var values = factory.Services.GetRequiredService<DataSourceAcquisitionValues>();
         await Assert.ThrowsAsync<DataSourceValidationException>(() => values.PrepareAsync(Source(scope, binding), Schema, default));
         var source = Source(scope, binding);
-        source = source with { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
-        { Acquisition = source.Definition.Dataset.Acquisition with { Parameters = JsonSerializer.SerializeToElement(new { dataset = "collision" }) } } } };
+        source = source with
+        {
+            Definition = source.Definition with
+            {
+                Dataset = source.Definition.Dataset! with
+                { Acquisition = source.Definition.Dataset.Acquisition with { Parameters = JsonSerializer.SerializeToElement(new { dataset = "collision" }) } }
+            }
+        };
         await Assert.ThrowsAsync<DataSourceValidationException>(() => values.PrepareAsync(source, Schema, default));
     }
 
     private static ParameterResource Parameter(ResourceScopeRef scope, string name, string value) => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter,
-        Metadata = new() { Name = name }, ScopeRef = scope,
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = ParameterResourceKinds.Parameter,
+        Metadata = new() { Name = name },
+        ScopeRef = scope,
         Definition = new() { DisplayName = name, ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement(value) }
     };
     private static DataSourceResource Source(ResourceScopeRef scope, DataSourceParameterBinding binding) => new()
     {
-        ApiVersion = ResourceApiVersions.CoreV1, Kind = DataSourceResourceKinds.DataSource,
-        Metadata = new() { Name = "bound-input" }, ScopeRef = scope,
-        Definition = new() { DisplayName = "Bound input", Dataset = new(null, new(Write: true), new(null!, Empty)
-        { ParameterBindings = [binding] }) }
+        ApiVersion = ResourceApiVersions.CoreV1,
+        Kind = DataSourceResourceKinds.DataSource,
+        Metadata = new() { Name = "bound-input" },
+        ScopeRef = scope,
+        Definition = new()
+        {
+            DisplayName = "Bound input",
+            Dataset = new(null, new(Write: true), new(null!, Empty)
+            { ParameterBindings = [binding] })
+        }
     };
     private static async Task<DataSourceResource> PinAsync(DataSourceAcquisitionValues values, DataSourceResource source) => source with
-    { Definition = source.Definition with { Dataset = source.Definition.Dataset! with
-        { Acquisition = source.Definition.Dataset.Acquisition with { ParameterBindings = await values.PinAsync(source, default) } } } };
+    {
+        Definition = source.Definition with
+        {
+            Dataset = source.Definition.Dataset! with
+            { Acquisition = source.Definition.Dataset.Acquisition with { ParameterBindings = await values.PinAsync(source, default) } }
+        }
+    };
 }

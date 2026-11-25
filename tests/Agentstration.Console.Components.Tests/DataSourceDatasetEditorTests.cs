@@ -4,8 +4,8 @@ using System.Text.Json;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources.Contracts;
 using Agentstration.Identity.Contracts;
-using Agentstration.Resources;
 using Agentstration.Parameters;
+using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Contracts;
 using Agentstration.Storage.Contracts;
@@ -719,12 +719,18 @@ public sealed partial class DataSourceDatasetEditorTests
         {
             var path = request.RequestUri!.AbsolutePath;
             if (path == "/api/schemas") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new { value = Array.Empty<object>() }) };
-            if (path == "/api/parameters") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { new ParameterResource
+            if (path == "/api/parameters") return new(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new[] { new ParameterResource
                 { ApiVersion = ResourceApiVersions.CoreV1, Kind = ParameterResourceKinds.Parameter, Metadata = new() { Name = "query-value" }, ScopeRef = ResourceScopeRef.Instance,
-                    Definition = new() { DisplayName = "Query", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("synthetic-parameter-value") } } }) };
-            if (path == "/api/secrets") return new(HttpStatusCode.OK) { Content = JsonContent.Create(new[] { new SecretResponse(new SecretResource
+                    Definition = new() { DisplayName = "Query", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement("synthetic-parameter-value") } } })
+            };
+            if (path == "/api/secrets") return new(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new[] { new SecretResponse(new SecretResource
                 { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret, Metadata = new() { Name = "query-value" }, ScopeRef = ResourceScopeRef.Instance,
-                    Definition = new() { DisplayName = "Query", Vault = new("fixture", ResourceScopeRef.Instance), Key = "query" } }, "configured", true) }) };
+                    Definition = new() { DisplayName = "Query", Vault = new("fixture", ResourceScopeRef.Instance), Key = "query" } }, "configured", true) })
+            };
             object body;
             if (request.Method == HttpMethod.Post && path == "/api/datasources")
             {

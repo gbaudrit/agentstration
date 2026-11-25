@@ -166,7 +166,7 @@ internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver res
         // Redirects cannot change the selected service authority. Reuse the existing public-network,
         // timeout, media-type and bounded-body transport rather than introducing another HTTP client.
         var response = await fetcher.FetchAsync(new(url, (options ?? new()).MaximumHttpResponseBytes, 0, TimeSpan.FromSeconds(20), AllowedMediaTypes)
-            { SensitivePayload = sensitivePayload }, cancellationToken);
+        { SensitivePayload = sensitivePayload }, cancellationToken);
         string content;
         try { content = new UTF8Encoding(false, true).GetString(response.Content); }
         catch (DecoderFallbackException)
