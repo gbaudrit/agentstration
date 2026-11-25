@@ -189,7 +189,7 @@ def response(url, headers):
     with result:
         # No body, Set-Cookie or Location is logged or returned.
         result.read(4096)
-        return result.code, result.headers.get('Location', '')
+        return result.code, result.headers.get('Location', ''), result.headers.get('CF-Mitigated') == 'challenge'
 
 
 def probe(url, values, attempts=12, pause=time.sleep):
@@ -197,14 +197,17 @@ def probe(url, values, attempts=12, pause=time.sleep):
                     'Invalid protected preview URL.')
     for attempt in range(attempts):
         try:
-            for headers in ({}, {'CF-Access-Client-Id': 'invalid.access', 'CF-Access-Client-Secret': 'invalid'}):
-                code, location = response(url, headers)
+            for phase, headers in (('Anonymous', {}), ('Invalid-token', {
+                    'CF-Access-Client-Id': 'invalid.access', 'CF-Access-Client-Secret': 'invalid'})):
+                code, location, challenge = response(url, headers)
                 preview.require(code in (401, 403) or (code in (302, 303, 307)
                                 and location.startswith('https://' + values['TEAM_DOMAIN'] + '/cdn-cgi/access/login')),
-                                'Unauthenticated or invalid-token probe did not confirm Access denial.')
-            code, _ = response(url, {'CF-Access-Client-Id': values['ACCESS_CLIENT_ID'],
+                                phase + ' probe did not confirm Access denial (HTTP ' + str(code)
+                                + ('; Cloudflare challenge header present' if challenge else '') + ').')
+            code, _, challenge = response(url, {'CF-Access-Client-Id': values['ACCESS_CLIENT_ID'],
                                      'CF-Access-Client-Secret': values['ACCESS_CLIENT_SECRET']})
-            preview.require(code == 200, 'The dedicated CI token did not reach a ready protected preview.')
+            preview.require(code == 200, 'The dedicated CI token did not reach a ready protected preview (HTTP ' + str(code)
+                            + ('; Cloudflare challenge header present' if challenge else '') + ').')
             return
         except (ValueError, RuntimeError):
             if attempt + 1 == attempts:
