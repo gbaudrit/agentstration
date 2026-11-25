@@ -1520,12 +1520,18 @@ public sealed class DependencyTests
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests"
                         or "Agentstration.Management.Models.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
 
+                // Declarative fixtures are shared only by these bounded Bootstrap modules.
+                if (include.Replace('\\', '/') == "../BootstrapDeclarativeTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
+                        or "Agentstration.Management.Bootstrap.Startup.Tests") continue;
+
                 // This fixture belongs to the test root and is compiled into
                 // independently bounded Bootstrap test processes.
                 if (include.Replace('\\', '/') == "../BootstrapApiOnlyWebApplicationFactory.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
                         or "Agentstration.Management.Bootstrap.Scenarios.Tests"
-                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Plans.Tests"
+                        or "Agentstration.Management.Bootstrap.Startup.Tests") continue;
 
                 if (include.Replace('\\', '/') == "../BootstrapApplicationTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Scenarios.Tests"
