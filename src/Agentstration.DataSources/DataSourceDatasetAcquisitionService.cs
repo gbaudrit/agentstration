@@ -172,12 +172,19 @@ public sealed partial class DataSourceDatasetAcquisitionService(
     {
         if (stored.Value.Dataset?.DurablePublication == true)
         {
-            var observed = await ObserveAsync(stored, cancellationToken);
+            var observed = await ObserveCoreAsync(stored, true, cancellationToken);
             if (observed.Value.State == stored.Value.State) return stored;
             var observedValue = observed.Value with
             {
                 Generation = checked(stored.Value.Generation + 1),
-                CompletedAt = Terminal(observed.Value.State) ? stored.Value.CompletedAt ?? clock.GetUtcNow() : null
+                CompletedAt = Terminal(observed.Value.State) ? stored.Value.CompletedAt ?? clock.GetUtcNow() : null,
+                Progress = observed.Value.Progress is { } progress
+                    ? progress with { State = observed.Value.State.ToString(), ErrorCode = observed.Value.ErrorCode } : null,
+                Status = new()
+                {
+                    ProvisioningState = observed.Value.State == DataSourceAcquisitionState.Succeeded ? ProvisioningState.Succeeded
+                        : Terminal(observed.Value.State) ? ProvisioningState.Failed : ProvisioningState.Accepted
+                }
             };
             try { return await execution.InWorkspaceAsync(() => store.PutExactAsync(observedValue.ScopeRef!.Value, observedValue, stored.ETag, false, cancellationToken)); }
             catch (ResourceConcurrencyException) { return stored; }

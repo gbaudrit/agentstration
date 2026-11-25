@@ -12,16 +12,19 @@ namespace Agentstration.DataSources;
 public sealed partial class DataSourceDatasetAcquisitionService
 {
     /// <summary>Read durable execution evidence without running or repairing any operation.</summary>
-    public async Task<StoredResource<DataSourceAcquisitionResource>> ObserveAsync(
-        StoredResource<DataSourceAcquisitionResource> stored, CancellationToken token)
+    public Task<StoredResource<DataSourceAcquisitionResource>> ObserveAsync(
+        StoredResource<DataSourceAcquisitionResource> stored, CancellationToken token) => ObserveCoreAsync(stored, false, token);
+
+    private async Task<StoredResource<DataSourceAcquisitionResource>> ObserveCoreAsync(
+        StoredResource<DataSourceAcquisitionResource> stored, bool includeTerminalOutcome, CancellationToken token)
     {
         var value = stored.Value;
         if (value.Dataset?.DurablePublication != true || Terminal(value.State)) return stored;
         var run = await flows.ObserveAsync(value.WorkspaceId, value.FlowRunId, value.TenantId, value.CreatedBy, token);
         if (run is null) return stored;
-        // Historical native completion remains controlled by its original recovery path.
-        var state = value.Dataset?.DurablePublication == true ? run.State : value.State;
-        if (value.Dataset?.DurablePublication == true && state == DataSourceAcquisitionState.Succeeded && (value.Manifest is null || value.PublicationSealedAt is null))
+        // Only execution/recovery records the terminal acquisition outcome; readers cannot race that commit.
+        var state = Terminal(run.State) && !includeTerminalOutcome ? value.State : run.State;
+        if (state == DataSourceAcquisitionState.Succeeded && (value.Manifest is null || value.PublicationSealedAt is null))
             state = DataSourceAcquisitionState.Failed;
         return stored with
         {
