@@ -1,23 +1,22 @@
 extern alias GitExtension;
-
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Testing;
 using Agentstration.Application.Work;
-using Agentstration.Infrastructure.Bootstrap;
-using Agentstration.Work;
-using Agentstration.Work.Contracts;
-using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Testing;
 using Agentstration.Tools;
 using Agentstration.Tools.Contracts;
+using Agentstration.Work;
+using Agentstration.Work.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -26,7 +25,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Web.Tests;
 
 [TestClass]
-public sealed class ProjectSharingApiTests
+public sealed partial class ProjectSharingApiTests
 {
     [TestMethod]
     public async Task TwoIndependentHostsSharePlansContributionsUsageAndResumeWithProtectedNativeGit()
@@ -104,14 +103,19 @@ public sealed class ProjectSharingApiTests
     {
         await using var native = await AuthenticatedGitFixture.CreateAsync(); await using var host = await ConnectedHostAsync(native, "bootstrap");
         using var scope = host.Scope();
-        var definition = new DeclarativeProjectSharingDefinition(new(Guid.NewGuid()), new(Guid.NewGuid()), "shared", host.Tool.Name);
+        var definition = new DeclarativeProjectSharingDefinition(new(Guid.NewGuid()), new(Guid.NewGuid()), "shared", host.Tool.Name)
+        { RepositoryToolName = host.Tool.Name, TaskOperationsToolName = host.Tool.Name };
         var document = JsonSerializer.Deserialize<BootstrapResourceDocument>(JsonSerializer.Serialize(new
         {
-            apiVersion = "agentstration.io/v1", kind = "ProjectSharing", metadata = new { name = "bootstrap-sharing", @namespace = "default" }, definition
+            apiVersion = "agentstration.io/v1",
+            kind = "ProjectSharing",
+            metadata = new { name = "bootstrap-sharing", @namespace = "default" },
+            definition
         }, Json), Json)!;
         var handler = ActivatorUtilities.CreateInstance<ProjectSharingBootstrapResourceHandler>(host.Host.Services);
         var operation = new BootstrapResourceOperationContext("fixture", native.Root, BootstrapProfileScope.Workspace,
-            new(host.Context.TenantId, host.Context.WorkspaceId)) { ActorPrincipalId = host.Context.PrincipalId };
+            new(host.Context.TenantId, host.Context.WorkspaceId))
+        { ActorPrincipalId = host.Context.PrincipalId };
         var initial = (await native.GitAsync(native.RepositoryPath, "rev-parse", "main")).Trim();
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await handler.PlanAsync(document, operation, new(), default)).Disposition);
         Assert.AreEqual(BootstrapResourceApplyResult.Created, await handler.ApplyAsync(document, operation, default));
@@ -119,6 +123,8 @@ public sealed class ProjectSharingApiTests
         Assert.AreEqual(initial, (await native.GitAsync(native.RepositoryPath, "rev-parse", "main")).Trim());
         var projects = host.Host.Services.GetRequiredService<WorkProjectService>();
         var project = (await projects.FindAsync(new(host.Context.WorkspaceId), default, "bootstrap-sharing", default)).Value!;
+        CollectionAssert.AreEquivalent(new[] { WorkProjectBindingPurpose.Sharing, WorkProjectBindingPurpose.Repository, WorkProjectBindingPurpose.TaskOperations }, project.Definition.Bindings.Select(binding => binding.Purpose).ToArray());
+        Assert.IsTrue(project.Definition.Bindings.All(binding => binding.Target.Uid == host.Tool.Uid && binding.Target.Generation == host.Tool.Generation));
         var sharing = host.Host.Services.GetRequiredService<WorkProjectSharingService>();
         var pull = await sharing.PullAsync(new(host.Context.WorkspaceId), project.Id, null, default);
         Assert.IsTrue(pull.IsSuccess, pull.ErrorCode); Assert.HasCount(0, pull.Value!.Records);
@@ -152,7 +158,7 @@ public sealed class ProjectSharingApiTests
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
         return (await response.Content.ReadFromJsonAsync<WorkSharingStateResponse>())!;
     }
-    private static async Task<SharingHost> ConnectedHostAsync(AuthenticatedGitFixture native, string name)
+    private static async Task<SharingHost> ConnectedHostAsync(AuthenticatedGitFixture native, string name, bool publishRelay = true)
     {
         var extension = new WebApplicationFactory<GitExtension::Program>().WithWebHostBuilder(builder =>
         {
@@ -161,12 +167,18 @@ public sealed class ProjectSharingApiTests
             builder.UseSetting("GitSourceProvider:TemporaryDirectory", Path.Combine(native.Root, name, "extension-work"));
         });
         _ = extension.CreateClient();
+        var handlers = new HandlerFactory(extension);
         Func<WebApplicationFactory<global::Program>> hostFactory = () => new WebApplicationFactory<global::Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Development"); builder.UseSetting("Data:Directory", Path.Combine(native.Root, name, "host"));
             builder.UseSetting("Agentstration:Authentication:Mode", "Development"); builder.UseSetting("AI:Provider", "Deterministic");
+            builder.UseSetting("Agentstration:Authentication:DevelopmentGrantPlatformAdministrator", (!publishRelay).ToString());
             builder.UseSetting("Agentstration:Extensions:DiscoverOnStartup", "false"); builder.UseSetting("Logging:LogLevel:Default", "Warning");
-            builder.ConfigureTestServices(services => services.AddSingleton<IHttpMessageHandlerFactory>(new HandlerFactory(extension)));
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IHttpMessageHandlerFactory>(handlers);
+                services.AddHttpClient("workspace-seed-ingestion").ConfigurePrimaryHttpMessageHandler(() => handlers.CreateHandler("workspace-seed-ingestion"));
+            });
         });
         var host = hostFactory();
         var http = host.CreateClient();
@@ -175,14 +187,27 @@ public sealed class ProjectSharingApiTests
         var owner = ResourceScopeRef.Workspace(context.WorkspaceId); var store = host.Services.GetRequiredService<IResourceStore>();
         await store.PutExactAsync(owner, new ExtensionRegistrationResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration, Metadata = new() { Name = "git-fixture" }, ScopeRef = owner,
-            Definition = new() { DisplayName = "Git fixture", Endpoint = new("http://git-fixture/"), ExpectedExtensionId = "Agentstration.Extensions.Git", Enabled = true,
-                AuthenticationMode = AepTransportAuthenticationMode.None, EnrollmentMode = AepEnrollmentMode.PairingCode }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.ExtensionRegistration,
+            Metadata = new() { Name = "git-fixture" },
+            ScopeRef = owner,
+            Definition = new()
+            {
+                DisplayName = "Git fixture",
+                Endpoint = new("http://git-fixture/"),
+                ExpectedExtensionId = "Agentstration.Extensions.Git",
+                Enabled = true,
+                AuthenticationMode = AepTransportAuthenticationMode.None,
+                EnrollmentMode = AepEnrollmentMode.PairingCode
+            }
         }, null, true, default);
         var tools = host.Services.GetRequiredService<ToolManagementService>();
         await tools.PutProviderAsync(new ToolProviderResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, Metadata = new() { Name = "git-fixture" }, ScopeRef = owner,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new() { Name = "git-fixture" },
+            ScopeRef = owner,
             Definition = new() { DisplayName = "Git fixture", ProviderType = ToolProviderType.Aep, Aep = new() { Extension = new("git-fixture", owner, default) } }
         }, null, true, default);
         await tools.RefreshDiscoveryExactAsync(owner, "git-fixture", default, default);
@@ -190,20 +215,38 @@ public sealed class ProjectSharingApiTests
         await tools.SetToolEnabledAsync(discovered.Value.Name, true, discovered.ETag, default);
         var source = (await tools.ListVisibleToolsAsync(owner, default)).Single(value => value.Value.Definition.ExternalId == "git.repository").Value;
         var secrets = host.Services.GetRequiredService<SecretManagementService>();
-        await secrets.CreateVaultAsync(new VaultResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault, Metadata = new() { Name = "git-vault" }, ScopeRef = owner,
-            Definition = new() { DisplayName = "Git vault", ProviderType = "local" } }, default);
+        await secrets.CreateVaultAsync(new VaultResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
+            Metadata = new() { Name = "git-vault" },
+            ScopeRef = owner,
+            Definition = new() { DisplayName = "Git vault", ProviderType = "local" }
+        }, default);
         await secrets.InitializeVaultExactAsync(owner, "git-vault", default);
-        var secret = await secrets.CreateSecretAsync(new SecretResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret, Metadata = new() { Name = "git-credential" }, ScopeRef = owner,
-            Definition = new() { DisplayName = "Git fixture credential", Vault = new("git-vault", owner), Key = "credential" } }, default);
+        var secret = await secrets.CreateSecretAsync(new SecretResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
+            Metadata = new() { Name = "git-credential" },
+            ScopeRef = owner,
+            Definition = new() { DisplayName = "Git fixture credential", Vault = new("git-vault", owner), Key = "credential" }
+        }, default);
         using (var value = new SecretValue(Encoding.UTF8.GetBytes(AuthenticatedGitFixture.Credential))) await secrets.SetValueExactAsync(owner, secret.Value.Name, value, default);
+        if (!publishRelay) return new(host, extension, http, context, source, hostFactory);
         const string capability = "agentstration.git.repository";
         var definitions = host.Services.GetRequiredService<ToolDefinitionService>();
         await definitions.PutAsync(new ToolDefinitionResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition, Metadata = new() { Name = "git-connection" }, ScopeRef = owner,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolDefinition,
+            Metadata = new() { Name = "git-connection" },
+            ScopeRef = owner,
             Definition = new RelayToolDefinitionProperties
             {
-                DisplayName = "Git connection", Version = "1.0.0", Publish = true,
+                DisplayName = "Git connection",
+                Version = "1.0.0",
+                Publish = true,
                 Target = new() { Name = source.Name, Namespace = source.Namespace, ScopeRef = owner, Uid = source.Uid, Generation = source.Generation },
                 Metadata = new Dictionary<string, JsonElement> { [capability] = source.Definition.Metadata[capability] },
                 Bindings = [new SecretToolArgumentBinding { Path = "/credential", Secret = new(secret.Value.Address, owner) },
@@ -220,7 +263,21 @@ public sealed class ProjectSharingApiTests
     }
     private static LiteralToolArgumentBinding Literal<T>(string path, T value) => new() { Path = path, Value = JsonSerializer.SerializeToElement(value) };
     private sealed class HandlerFactory(WebApplicationFactory<GitExtension::Program> extension) : IHttpMessageHandlerFactory
-    { public HttpMessageHandler CreateHandler(string name) => extension.Server.CreateHandler(); }
+    {
+        internal byte[]? SeedContent { get; set; }
+        public HttpMessageHandler CreateHandler(string name) => name == "workspace-seed-ingestion" && SeedContent is { } seed
+            ? new SeedContentHandler(seed) : extension.Server.CreateHandler();
+    }
+    private sealed class SeedContentHandler(byte[] bytes) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.AreEqual("https://seed.example/content.zip", request.RequestUri!.AbsoluteUri);
+            var content = new ByteArrayContent(bytes); content.Headers.ContentType = new("application/zip");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+        }
+    }
     private sealed class SharingHost(WebApplicationFactory<global::Program> host, WebApplicationFactory<GitExtension::Program> extension,
         HttpClient http, RequestContext context, ToolResource tool, Func<WebApplicationFactory<global::Program>> hostFactory) : IAsyncDisposable
     {

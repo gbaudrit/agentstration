@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using Agentstration.Application.Work;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.DataSources.Contracts;
@@ -37,15 +38,27 @@ public sealed partial class BootstrapProfileManagementService(
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     BootstrapApplicationLock applicationLock,
-    ILogger<BootstrapProfileManagementService>? logger = null) : IBootstrapProfileApiService
+    ILogger<BootstrapProfileManagementService>? logger = null,
+    WorkspaceSeedService? workspaceSeeds = null,
+    WorkProjectService? workProjects = null,
+    WorkProjectSharingService? projectSharing = null) : IBootstrapProfileApiService
 {
+    public Task<WorkspaceSeedReceipt> IngestWorkspaceSeedAsync(IngestWorkspaceSeedRequest request, Guid actorPrincipalId, CancellationToken cancellationToken) =>
+        (workspaceSeeds ?? throw new DeclarativeBootstrapException("seed_not_configured")).IngestAsync(request, actorPrincipalId, cancellationToken);
+
+    public Task<WorkspaceSeedReceipt> GetWorkspaceSeedAsync(Guid id, BootstrapApplicationTarget target, Guid actorPrincipalId, CancellationToken cancellationToken) =>
+        (workspaceSeeds ?? throw new DeclarativeBootstrapException("seed_not_configured")).GetAsync(id, target, actorPrincipalId, cancellationToken);
+
     public async Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request,
         Guid actorPrincipalId, CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
-        await using var loaded = request.Source is null
-            ? new LoadedBootstrapSelection(await catalog.LoadAsync([request.Profile], cancellationToken))
-            : await sourceProfiles.LoadAsync(request.Source, cancellationToken);
+        if (request.Seed is not null && request.Source is not null) throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
+        using var targetScope = request.Seed is not null ? PushTargetScope(await ResolveTargetContextAsync(request.Target, actorPrincipalId, cancellationToken)) : null;
+        await using var loaded = request.Seed is { } seed
+            ? await (workspaceSeeds ?? throw new DeclarativeBootstrapException("seed_not_configured")).LoadSelectionAsync(seed, request.Target, cancellationToken)
+            : request.Source is null ? new LoadedBootstrapSelection(await catalog.LoadAsync([request.Profile], cancellationToken))
+                : await sourceProfiles.LoadAsync(request.Source, cancellationToken);
         var profile = loaded.Profiles.Single();
         if (profile.Summary.Name != request.Profile
             || request.ExpectedDigest is not null && request.ExpectedDigest != profile.Summary.Digest)
@@ -81,8 +94,12 @@ public sealed partial class BootstrapProfileManagementService(
                 .Select(tenant => new BootstrapTargetTenant(tenant.Id, tenant.Name, tenant.DisplayName))
                 .ToArray(),
             workspaces,
-            applications);
+            applications.Where(value => CanViewSeedApplication(value, actorPrincipalId)).ToArray());
     }
+
+    private static bool CanViewSeedApplication(BootstrapApplicationResource application, Guid actor) =>
+        application.Definition.Selection?.Seed is null && application.Definition.SeedProvenance is null
+        || application.Definition.ActorPrincipalId == actor;
 
     public async Task<BootstrapCompositionPreview> PreviewAsync(
         BootstrapProfileSelection selection,
@@ -112,7 +129,7 @@ public sealed partial class BootstrapProfileManagementService(
         IReadOnlyList<string> profiles,
         Guid actorPrincipalId,
         CancellationToken cancellationToken,
-        BootstrapSourceProfileSelection? source = null)
+        BootstrapSourceProfileSelection? source = null, WorkspaceSeedSelection? seed = null)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (target?.TenantId is null || target.WorkspaceId is null)
@@ -167,9 +184,11 @@ public sealed partial class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.Secret => SecretResourceKinds.Secret,
             _ => throw new DeclarativeBootstrapException($"Unsupported bootstrap binding target kind '{targetKind}'.")
         };
-        await using var loadedSelection = source is null
-            ? new LoadedBootstrapSelection(await catalog.LoadAsync(profiles, cancellationToken))
-            : await sourceProfiles.LoadAsync(source, cancellationToken);
+        if (seed is not null && (source is not null || profiles.Count > 0)) throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
+        await using var loadedSelection = seed is not null
+            ? await (workspaceSeeds ?? throw new DeclarativeBootstrapException("seed_not_configured")).LoadSelectionAsync(seed, target, cancellationToken)
+            : source is null ? new LoadedBootstrapSelection(await catalog.LoadAsync(profiles, cancellationToken))
+                : await sourceProfiles.LoadAsync(source, cancellationToken);
         var planned = loadedSelection.Profiles
             .SelectMany(profile => profile.Resources)
             .Where(source => string.Equals(source.Resource.Kind, resourceKind, StringComparison.Ordinal))
@@ -200,7 +219,7 @@ public sealed partial class BootstrapProfileManagementService(
         using var systemScope = scopes.PushSystem();
         var application = (await store.GetAsync<BootstrapApplicationResource>(
             new(BootstrapKinds.BootstrapApplication, applicationId), cancellationToken))?.Value;
-        return await RecoverAsync(application, cancellationToken);
+        return application is not null && !CanViewSeedApplication(application, actorPrincipalId) ? null : await RecoverAsync(application, cancellationToken);
     }
 
     public async Task<BootstrapApplicationResource?> CancelAsync(string applicationId, Guid actorPrincipalId, CancellationToken cancellationToken)
@@ -211,6 +230,7 @@ public sealed partial class BootstrapProfileManagementService(
         {
             using var systemScope = scopes.PushSystem();
             var application = (await store.GetAsync<BootstrapApplicationResource>(new(BootstrapKinds.BootstrapApplication, applicationId), cancellationToken))?.Value;
+            if (application is not null && !CanViewSeedApplication(application, actorPrincipalId)) return null;
             if (application?.Definition.Status != BootstrapApplicationStatus.Running || application.Definition.CancellationRequested) return application;
             return await SaveApplicationAsync(application with
             {
@@ -229,7 +249,7 @@ public sealed partial class BootstrapProfileManagementService(
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
         if (string.IsNullOrWhiteSpace(request.ExpectedDigest) || request.RequestId == Guid.Empty)
             throw new DeclarativeBootstrapException("bootstrap_request_identity_required");
-        var selection = new BootstrapProfileSelection(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications, request.Inputs);
+        var selection = new BootstrapProfileSelection(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications, request.Inputs) { Seed = request.Seed };
         BootstrapInputSelectionValidation.Validate(selection.Inputs);
         // Validate authored input declarations before persisting any application-local selections.
         if (selection.Inputs is { Count: > 0 })
@@ -247,7 +267,8 @@ public sealed partial class BootstrapProfileManagementService(
         }
         else
         {
-            if ((selection.Profiles.Count == 0) == (request.Source is null) || selection.Profiles.Count > catalog.MaximumSelectedProfiles)
+            if ((selection.Profiles.Count > 0 ? 1 : 0) + (selection.Source is not null ? 1 : 0) + (selection.Seed is not null ? 1 : 0) != 1
+                || selection.Profiles.Count > catalog.MaximumSelectedProfiles)
                 throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
             _ = await ResolveTargetContextAsync(request.Target, actorPrincipalId, cancellationToken);
         }
@@ -393,6 +414,8 @@ public sealed partial class BootstrapProfileManagementService(
                                 Profiles = progress.Preview.Profiles.Select(profile => profile.Name).ToArray(),
                                 Bindings = progress.Preview.Bindings,
                                 SourceProvenance = progress.Preview.SourceProvenance,
+                                SeedProvenance = progress.Preview.SeedProvenance,
+                                SeedPrerequisites = progress.Preview.SeedPrerequisites,
                                 Resources = progress.Resources,
                                 CurrentResource = progress.CurrentResource,
                                 Operation = progress.Operation
@@ -406,6 +429,21 @@ public sealed partial class BootstrapProfileManagementService(
                 ? await ExecutePlanAsync(selection, application.Definition.ActorPrincipalId.Value, application.Definition.Digest, report, cancellationToken)
                 : await bootstrap.ExecuteAsync(selection, cancellationToken, application.Definition.Digest, report,
                     actorPrincipalId: application.Definition.ActorPrincipalId);
+            if (execution.Error is null && selection.Seed is { } seed)
+            {
+                if (workspaceSeeds is null || workProjects is null || projectSharing is null)
+                    throw new DeclarativeBootstrapException("seed_not_configured");
+                _ = await workspaceSeeds.HandoverAsync(seed, selection.Target!, application.Definition.ActorPrincipalId.Value,
+                    workProjects, projectSharing, async (handover, token) =>
+                    {
+                        application = await SaveTerminalAsync(application.Metadata.Name, latest => latest with
+                        {
+                            Generation = checked(latest.Generation + 1),
+                            Definition = latest.Definition with { Resources = execution.Resources, CurrentResource = null, Operation = null, SeedHandover = handover }
+                        });
+                        if (handover.Status == WorkspaceSeedHandoverStatus.Pending && application.Definition.CancellationRequested) throw new OperationCanceledException();
+                    }, cancellationToken);
+            }
             await applicationLock.State.WaitAsync(CancellationToken.None);
             try
             {
@@ -442,6 +480,7 @@ public sealed partial class BootstrapProfileManagementService(
                 Definition = current.Definition with
                 {
                     Status = current.Definition.Resources.Any(value => value.Disposition == BootstrapResourceDisposition.Create)
+                        || current.Definition.SeedHandover?.ImportedPlans.Count > 0
                         ? BootstrapApplicationStatus.PartiallyApplied : BootstrapApplicationStatus.Failed,
                     CompletedAt = timeProvider.GetUtcNow(),
                     CurrentResource = null,
@@ -499,6 +538,8 @@ public sealed partial class BootstrapProfileManagementService(
                 Target = preview.Target,
                 Bindings = preview.Bindings,
                 SourceProvenance = preview.SourceProvenance,
+                SeedProvenance = preview.SeedProvenance,
+                SeedPrerequisites = preview.SeedPrerequisites,
                 Digest = preview.Digest,
                 StartedAt = timeProvider.GetUtcNow(),
                 TotalResources = preview.Resources.Count,
@@ -529,7 +570,7 @@ public sealed partial class BootstrapProfileManagementService(
                 ? BootstrapApplicationStatus.PartiallyApplied
                 : BootstrapApplicationStatus.Failed;
         var diagnostic = execution.Resources.LastOrDefault(row => row.Failure is not null)?.Failure
-            ?? (execution.Error is not null ? new BootstrapFailure("validation", "bootstrap_application_invalid", Guid.NewGuid().ToString("N")) : null);
+            ?? (execution.Error is not null ? new BootstrapFailure("validation", execution.Error == "seed_prerequisites_missing" ? "seed_prerequisites_missing" : "bootstrap_application_invalid", Guid.NewGuid().ToString("N")) : null);
         if (diagnostic is not null)
             logger?.LogWarning("Bootstrap application {ApplicationId} stopped ({ReasonCode}, diagnostic {DiagnosticId}).", application.Metadata.Name, diagnostic.Code, diagnostic.DiagnosticId);
         return application with
@@ -553,7 +594,9 @@ public sealed partial class BootstrapProfileManagementService(
                 Applications = execution.Preview.Applications,
                 ResourcePlan = ResourcePlan(execution.Preview),
                 CurrentResource = null,
-                SourceProvenance = execution.Preview.SourceProvenance
+                SourceProvenance = execution.Preview.SourceProvenance,
+                SeedProvenance = execution.Preview.SeedProvenance,
+                SeedPrerequisites = execution.Preview.SeedPrerequisites
             }
         };
     }

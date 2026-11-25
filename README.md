@@ -24,6 +24,7 @@ It is built on the Microsoft .NET AI stack and currently executes agents through
 
 - editable Flow drafts, immutable published versions and observable Flow Runs;
 - structured Direct, Routing and Workflow Flows with typed steps and transitions;
+- explicit [Workspace seed initialization](docs/reference/workspace-seeds.md) with pinned Bootstrap review, installed prerequisites and Project connector handover;
 - optional [local native Coding execution](docs/reference/coding-worker.md) through an isolated, compatible AWP worker with pinned harness/repository inputs and retained result/usage evidence;
 - Microsoft Agent Framework orchestration modes, including Sequential, Concurrent, Handoff, Group Chat and Magentic;
 - durable interactive execution for text, choice, confirmation and tool-approval requests;

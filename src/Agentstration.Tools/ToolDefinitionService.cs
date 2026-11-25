@@ -68,9 +68,7 @@ public sealed partial class ToolDefinitionService(
         bool fromAcquisition,
         CancellationToken cancellationToken)
     {
-        Validate(resource);
-        if ((internalTools ?? []).Any(value => string.Equals(value.Definition.Name, resource.Name, StringComparison.Ordinal)))
-            throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
+        ValidateForWrite(resource);
         var scopeRef = resource.ScopeRef!.Value;
         if (resource.Definition is RelayToolDefinitionProperties relay)
         {
@@ -239,6 +237,13 @@ public sealed partial class ToolDefinitionService(
             return right is null || right.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined;
         if (right is null || right.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return false;
         return JsonNode.DeepEquals(JsonNode.Parse(left.Value.GetRawText()), JsonNode.Parse(right.Value.GetRawText()));
+    }
+
+    private void ValidateForWrite(ToolDefinitionResource resource)
+    {
+        Validate(resource);
+        if ((internalTools ?? []).Any(value => string.Equals(value.Definition.Name, resource.Name, StringComparison.Ordinal)))
+            throw new ToolDefinitionValidationException("tool_definition_name_reserved", $"ToolDefinition name '{resource.Name}' is reserved by an internal Agentstration MCP Tool.");
     }
 
     private static void Validate(ToolDefinitionResource resource)

@@ -743,3 +743,14 @@ Diagnostics retain bounded patch/test/result and stable known/partial/unavailabl
 including failures and cancellation. No implicit code publication, acceptance, worker recovery or
 remote fetch is added. See [worker prerequisites and contracts](../../reference/coding-worker.md) and
 [ADR-0270](../../decisions/0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).
+
+### Workspace seed initialization
+
+A bounded ZIP or raw HTTPS JSON pointer is ingested into private Workspace/actor-pinned Source artifact
+receipts. Existing Bootstrap parsing, materialization, preview/digests, configured inputs, family handlers
+and the durable manual worker perform Workspace-only initialization. Installed extension/model/runtime
+capabilities and current grants are prerequisites. Protected relay publications and Project sharing
+bindings are created through their owning services; explicit first-sync/draft-import receipts remain in
+application history. Restart still interrupts manual applications; explicit new reviewed applications
+retry create-only configuration without replacing operator edits. Sharing never auto-applies Bootstrap.
+See [Workspace seeds](../../reference/workspace-seeds.md) and ADR-0271.

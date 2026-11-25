@@ -3,6 +3,10 @@ using Agentstration.Extensions.Aep;
 using Agentstration.Identity;
 using Agentstration.Infrastructure.Bootstrap;
 using Agentstration.Infrastructure.Packs;
+using Agentstration.Infrastructure.Sources;
+using Agentstration.Sources;
+using Agentstration.Tools.Bootstrap;
+using Agentstration.Web.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -13,6 +17,12 @@ internal static class BootstrapServiceCollectionExtensions
     internal static IServiceCollection AddAgentstrationBootstrapHandlers(this IServiceCollection services)
     {
         services.AddScoped<Agentstration.Bootstrap.Contracts.IBootstrapStartupModelCorrections, BootstrapStartupModelCorrectionService>();
+        services.AddHttpClient(WorkspaceSeedService.HttpClientName, client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Agentstration-Workspace-Seed/1.0");
+        }).ConfigurePrimaryHttpMessageHandler(() => HttpSourceRegistryDocumentRetriever.CreatePrimaryHandler(
+            new SourceRegistryTransportOptions { ConnectTimeoutSeconds = 5 }));
         services.TryAddSingleton<AepEnrollmentPolicyOptions>();
         services.AddSingleton<ExtensionEnrollmentPolicyService>();
         services.AddSingleton<IBootstrapExtensionReferenceResolver, BootstrapExtensionReferenceResolver>();
@@ -52,6 +62,7 @@ internal static class BootstrapServiceCollectionExtensions
         services.AddScoped<IBootstrapResourceHandler, EntryBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ProjectBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, ProjectSharingBootstrapResourceHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ToolDefinitionBootstrapHandler>();
         services.AddScoped<IBootstrapResourceHandler, HarnessNativeConfigurationBootstrapHandler>();
         services.AddScoped<IBootstrapResourceHandler, HarnessProfileBootstrapHandler>();
         return services;

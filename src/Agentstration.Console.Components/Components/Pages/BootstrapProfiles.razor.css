@@ -51,3 +51,5 @@
 .bootstrap-scope-group .bootstrap-order li { padding: var(--space-3); gap: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); }
 .bootstrap-scope-group .bootstrap-order li + li { margin-top: var(--space-2); }
 .bootstrap-scope-group .bootstrap-order ::deep .bootstrap-target { max-width: none; }
+
+.bootstrap-resource-diagnostic { display: block; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }

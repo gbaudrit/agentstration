@@ -25,7 +25,7 @@ public sealed partial class DeclarativeBootstrapService(
     IBootstrapExtensionReferenceResolver? extensionReferences = null,
     BootstrapStartupState? startup = null,
     BootstrapResourcePreparation? resourcePreparation = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null, WorkspaceSeedService? workspaceSeeds = null)
 {
     private readonly BootstrapExtensionReferencePreparation extensionPreparation = new(extensionReferences);
     private const string ConfigurationSection = "Agentstration:Bootstrap";
@@ -58,10 +58,8 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapInputSelectionValidation.Validate(selection.Inputs);
         if (selection.Bindings?.Any(binding => binding.TargetProfile is not null) == true)
             throw new DeclarativeBootstrapException("Profile-relative bindings require a Bootstrap plan.");
-        if (selection.Source is null && selection.Profiles.Count == 0)
-            throw new DeclarativeBootstrapException("At least one bootstrap profile must be selected.");
-        if (selection.Source is not null && selection.Profiles.Count != 0)
-            throw new DeclarativeBootstrapException("Local and Source Bootstrap profiles cannot be composed in one application.");
+        if ((selection.Profiles.Count > 0 ? 1 : 0) + (selection.Source is not null ? 1 : 0) + (selection.Seed is not null ? 1 : 0) != 1)
+            throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
         await using var loadedSelection = await LoadAsync(selection, cancellationToken, phase);
         var profiles = loadedSelection.Profiles;
         var scope = profiles[0].Summary.Scope;
@@ -93,7 +91,7 @@ public sealed partial class DeclarativeBootstrapService(
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, source.Resource.Kind, source.Resource.Metadata.Name,
-                        BootstrapResourceDisposition.Invalid, exception.Message));
+                        BootstrapResourceDisposition.Invalid, loadedSelection.Seed is null ? exception.Message : BootstrapFailureDiagnostics.Describe(exception).Code));
                     continue;
                 }
                 if (!handlers.TryGetValue(resource.Kind, out var handler))
@@ -124,7 +122,7 @@ public sealed partial class DeclarativeBootstrapService(
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     resources.Add(new(profile.Summary.Name, source.Location, resource.Kind, resource.Metadata.Name,
-                        BootstrapResourceDisposition.Invalid, exception.Message));
+                        BootstrapResourceDisposition.Invalid, loadedSelection.Seed is null ? exception.Message : BootstrapFailureDiagnostics.Describe(exception).Code));
                 }
             }
         }
@@ -138,10 +136,10 @@ public sealed partial class DeclarativeBootstrapService(
             scope,
             selection.Target,
             bindings,
-            ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints),
+            ComputeDigest(profiles, scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints, loadedSelection.Seed),
             resources,
             loadedSelection.SourceProvenance)
-        { Inputs = inputs.Distinct().ToArray() };
+        { Inputs = inputs.Distinct().ToArray(), SeedProvenance = loadedSelection.Seed?.Provenance, SeedPrerequisites = loadedSelection.Seed?.Prerequisites ?? [] };
     }
 
     public Task<BootstrapExecutionResult> ExecuteAsync(
@@ -166,6 +164,7 @@ public sealed partial class DeclarativeBootstrapService(
         if (expectedDigest is not null && !string.Equals(preview.Digest, expectedDigest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog or target changed after preview. Preview the application again.");
         var invalid = preview.Resources.FirstOrDefault(resource => resource.Disposition == BootstrapResourceDisposition.Invalid);
+        if (preview.SeedPrerequisites.Any(item => !item.Available)) return new(preview, [], "seed_prerequisites_missing");
         if (invalid is null && !preview.CanApply) return new(preview, [], "bootstrap_configuration_required");
         if (actorPrincipalId is null && preview.Resources.FirstOrDefault(resource => resource.Kind == "ConnectedServiceOperationDiscovery") is { } discovery)
         {
@@ -211,7 +210,7 @@ public sealed partial class DeclarativeBootstrapService(
                 preparationPlanning.Register(resolved.Kind, resolved.Metadata.Name, resolved.Metadata.Namespace.Value, resolved);
             }
         }
-        var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints);
+        var executionDigest = ComputeDigest(loaded, preview.Scope, selection.Target, bindings, loadedSelection.SourceProvenance, fingerprints, loadedSelection.Seed);
         if (!string.Equals(executionDigest, preview.Digest, StringComparison.Ordinal))
             return new(preview, [], "The bootstrap catalog changed while the application was being prepared. Preview the application again.");
         var resources = new List<BootstrapAppliedResource>();
@@ -324,7 +323,7 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapApplicationTarget? target,
         IReadOnlyList<BootstrapBindingSelection> bindings,
         BootstrapSourceProvenance? source,
-        IReadOnlyList<string>? fingerprints = null)
+        IReadOnlyList<string>? fingerprints = null, WorkspaceSeedResolution? seed = null)
     {
         var lines = new List<string>
         {
@@ -332,6 +331,7 @@ public sealed partial class DeclarativeBootstrapService(
             target?.TenantId?.ToString("D") ?? string.Empty,
             target?.WorkspaceId?.ToString("D") ?? string.Empty
         };
+        if (seed is not null) lines.Add(JsonSerializer.Serialize(new { seed.Provenance, seed.PrerequisiteDigest }, JsonOptions));
         if (fingerprints is not null) lines.AddRange(fingerprints.Select(value => $"resolved:{value}"));
         lines.AddRange(profiles.Select(profile => $"{profile.Summary.Name}:{profile.Summary.Digest}"));
         lines.AddRange(bindings.Select(binding =>
@@ -360,8 +360,11 @@ public sealed partial class DeclarativeBootstrapService(
         BootstrapProfileSelection selection, CancellationToken cancellationToken,
         BootstrapStartupPhase phase = BootstrapStartupPhase.All)
     {
-        if (phase != BootstrapStartupPhase.All && selection.Source is not null)
+        if (phase != BootstrapStartupPhase.All && (selection.Source is not null || selection.Seed is not null))
             throw new DeclarativeBootstrapException("Phased initial Bootstrap uses local catalog profiles.");
+        if (selection.Seed is { } seed)
+            return await (workspaceSeeds ?? throw new DeclarativeBootstrapException("seed_not_configured"))
+                .LoadSelectionAsync(seed, selection.Target, cancellationToken);
         if (selection.Source is { } source)
             return await (sourceProfiles ?? throw new DeclarativeBootstrapException("Source Bootstrap profiles are not configured."))
                 .LoadAsync(source, cancellationToken);

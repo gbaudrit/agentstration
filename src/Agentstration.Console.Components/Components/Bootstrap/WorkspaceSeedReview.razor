@@ -1,0 +1,46 @@
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+@if (Provenance is { } seed)
+{
+    <FormSection Title="@Localizer["Seed.Review"]" TestId="workspace-seed-review"><ChildContent>
+        <p>@Localizer["Seed.Pinned", seed.Version, seed.ProviderRevision]</p>
+        <dl class="resource-details"><dt>@Localizer["Seed.ArchiveDigest"]</dt><dd><code style="overflow-wrap:anywhere">@seed.ArchiveDigest</code></dd>
+            <dt>@Localizer["ContentPath"]</dt><dd><code>@seed.Path</code></dd></dl>
+        <h3>@Localizer["Seed.Prerequisites"]</h3>
+        <ul>@foreach (var prerequisite in Prerequisites)
+        {
+            <li><span>@PrerequisiteLabel(prerequisite.Kind) · @prerequisite.Name</span>
+                <StatusBadge Text="@Localizer[prerequisite.Available ? "Seed.Available" : "Seed.Missing"]" Status="@(prerequisite.Available ? UiStatus.Success : UiStatus.Warning)" />
+                @if (!prerequisite.Available) { <span>@Localizer["Seed.PrerequisiteHelp"] <code>@prerequisite.ReasonCode</code></span> }
+            </li>
+        }</ul>
+        @if (seed.ImportPlans.Count > 0)
+        {
+            <details><summary>@Localizer["Seed.PlannedImports", seed.ImportPlans.Count]</summary><ul>
+                @foreach (var import in seed.ImportPlans) { <li><code>@import.PlanId</code> · <code style="overflow-wrap:anywhere">@import.ExpectedDigest</code></li> }
+            </ul></details>
+        }
+        @if (Handover is { } handover)
+        {
+            <h3>@Localizer["Seed.Handover"]</h3>
+            <StatusBadge Text="@Localizer["Seed.Handover." + handover.Status]" Status="@(handover.Status == WorkspaceSeedHandoverStatus.Succeeded ? UiStatus.Success : UiStatus.Warning)" />
+            <p><a href="@($"/api/workspaces/{seed.Target.WorkspaceId:D}/projects/{handover.ProjectId:D}")" target="_blank" rel="noopener">@Localizer["Seed.ProjectRecord", handover.Namespace, handover.ProjectName]</a></p>
+            @if (handover.Revision is { } revision) { <p>@Localizer["Seed.Revision"] <code style="overflow-wrap:anywhere">@revision</code></p> }
+            <p>@Localizer["Seed.ImportedPlans", handover.ImportedPlans.Count]</p>
+            @if (handover.ErrorCode is not null) { <p role="alert">@Localizer["Seed.HandoverHelp"] <code>@handover.ErrorCode</code></p> }
+        }
+    </ChildContent></FormSection>
+}
+
+@code {
+    private string PrerequisiteLabel(string kind)
+    {
+        var text = Localizer["Seed.Kind." + kind];
+        return text.ResourceNotFound ? Localizer["Seed.Kind.Extension"].Value : text.Value;
+    }
+    [Parameter] public WorkspaceSeedProvenance? Provenance { get; set; }
+    [Parameter] public IReadOnlyList<WorkspaceSeedPrerequisite> Prerequisites { get; set; } = [];
+    [Parameter] public WorkspaceSeedHandover? Handover { get; set; }
+}

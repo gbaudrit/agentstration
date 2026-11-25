@@ -3,13 +3,17 @@ using Agentstration.Sources;
 
 namespace Agentstration.Web.Hosting;
 
+internal sealed record WorkspaceSeedResolution(WorkspaceSeedProvenance Provenance,
+    IReadOnlyList<WorkspaceSeedPrerequisite> Prerequisites, string PrerequisiteDigest);
+
 internal sealed class LoadedBootstrapSelection(
     IReadOnlyList<LoadedBootstrapProfile> profiles,
     BootstrapSourceProvenance? sourceProvenance = null,
-    string? temporaryRoot = null) : IAsyncDisposable
+    string? temporaryRoot = null, WorkspaceSeedResolution? seed = null) : IAsyncDisposable
 {
     public IReadOnlyList<LoadedBootstrapProfile> Profiles { get; } = profiles;
     public BootstrapSourceProvenance? SourceProvenance { get; } = sourceProvenance;
+    public WorkspaceSeedResolution? Seed { get; } = seed;
 
     public ValueTask DisposeAsync()
     {
@@ -108,26 +112,28 @@ public sealed class SourceBootstrapProfileLoader(
         }
     }
 
-    private async Task<LoadedBootstrapSelection> MaterializeAsync(
-        SourceSnapshotArtifactReference artifact,
-        SourceBootstrapEntryView entry,
-        BootstrapSourceProvenance provenance,
+    private Task<LoadedBootstrapSelection> MaterializeAsync(SourceSnapshotArtifactReference artifact,
+        SourceBootstrapEntryView entry, BootstrapSourceProvenance provenance, CancellationToken cancellationToken) =>
+        MaterializeSnapshotAsync(artifact, entry.Name, entry.ResolvedPath, provenance, null, cancellationToken);
+
+    internal async Task<LoadedBootstrapSelection> MaterializeSnapshotAsync(SourceSnapshotArtifactReference artifact,
+        string profile, string profilePath, BootstrapSourceProvenance? provenance, WorkspaceSeedResolution? seed,
         CancellationToken cancellationToken)
     {
-        BootstrapProfileCatalog.ValidateProfileName(entry.Name);
+        BootstrapProfileCatalog.ValidateProfileName(profile);
         var temporaryRoot = Path.Combine(Path.GetTempPath(), $"agentstration-source-bootstrap-{Guid.NewGuid():N}");
-        var profileRoot = Path.Combine(temporaryRoot, entry.Name);
+        var profileRoot = Path.Combine(temporaryRoot, profile);
         try
         {
             Directory.CreateDirectory(profileRoot);
             await using var content = await contentReader.OpenAsync(artifact, cancellationToken);
-            var prefix = $"{entry.ResolvedPath}/";
+            var prefix = $"{profilePath}/";
             var paths = content.Paths
                 .Where(path => path.StartsWith(prefix, StringComparison.Ordinal))
                 .OrderBy(path => path, StringComparer.Ordinal)
                 .ToArray();
             if (paths.Length == 0)
-                throw Invalid($"Pinned Bootstrap variant '{entry.ResolvedPath}' contains no files.");
+                throw Invalid($"Pinned Bootstrap variant '{profilePath}' contains no files.");
 
             long totalBytes = 0;
             foreach (var path in paths)
@@ -136,7 +142,7 @@ public sealed class SourceBootstrapProfileLoader(
                 _ = SourceDescendantPath.Normalize(relativePath, $"Bootstrap variant file '{path}'");
                 var remaining = MaximumProfileBytes - totalBytes;
                 if (remaining <= 0)
-                    throw Invalid($"Pinned Bootstrap variant '{entry.ResolvedPath}' exceeds {MaximumProfileBytes} bytes.");
+                    throw Invalid($"Pinned Bootstrap variant '{profilePath}' exceeds {MaximumProfileBytes} bytes.");
                 var bytes = await content.ReadBytesAsync(path, checked((int)remaining), cancellationToken);
                 totalBytes = checked(totalBytes + bytes.Length);
                 var destination = Path.GetFullPath(Path.Combine(profileRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
@@ -146,8 +152,8 @@ public sealed class SourceBootstrapProfileLoader(
                 await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
             }
 
-            var loaded = await bootstrapCatalog.LoadFromRootAsync(temporaryRoot, entry.Name, cancellationToken);
-            return new([loaded], provenance, temporaryRoot);
+            var loaded = await bootstrapCatalog.LoadFromRootAsync(temporaryRoot, profile, cancellationToken);
+            return new([loaded], provenance, temporaryRoot, seed);
         }
         catch
         {

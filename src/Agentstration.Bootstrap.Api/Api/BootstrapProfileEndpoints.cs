@@ -56,6 +56,25 @@ public static class BootstrapProfileEndpoints
             .Produces<BootstrapStartupModelChangeAccepted>(StatusCodes.Status202Accepted).ProducesProblem(400).ProducesProblem(403).ProducesProblem(409)
             .WithSummary("Accept a versioned provider and model substitution for a pending Bootstrap profile");
         var group = endpoints.MapGroup("/api/bootstrap").RequireAuthorization(AgentstrationPolicies.PlatformAdmin);
+        group.MapPost("/workspace-seeds", async (IngestWorkspaceSeedRequest request, IBootstrapProfileApiService service,
+            HttpContext context, CancellationToken token) => await ExecuteAsync(async () =>
+            {
+                var receipt = await service.IngestWorkspaceSeedAsync(request,
+                    context.Features.Get<ResolvedPrincipalFeature>()?.PrincipalId ?? Guid.Empty, token);
+                var target = receipt.Provenance.Target;
+                return Results.Created($"/api/bootstrap/workspaces/{target.WorkspaceId:D}/seeds/{receipt.Provenance.Id:D}?tenantId={target.TenantId:D}", receipt);
+            })).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024))
+            .Produces<WorkspaceSeedReceipt>(StatusCodes.Status201Created).ProducesProblem(400).ProducesProblem(403)
+            .WithSummary("Ingest a bounded Workspace Bootstrap archive or integrity-pinned seed document");
+        group.MapGet("/workspaces/{workspaceId:guid}/seeds/{seedId:guid}", async (Guid workspaceId, Guid seedId, Guid tenantId,
+            IBootstrapProfileApiService service, HttpContext context, CancellationToken token) =>
+            await ExecuteAsync(async () =>
+            {
+                context.Response.Headers.CacheControl = "no-store";
+                return Results.Ok(await service.GetWorkspaceSeedAsync(seedId, new(tenantId, workspaceId),
+                    context.Features.Get<ResolvedPrincipalFeature>()?.PrincipalId ?? Guid.Empty, token));
+            })).Produces<WorkspaceSeedReceipt>().ProducesProblem(400).ProducesProblem(403)
+            .WithSummary("Read one actor-owned seed receipt in its exact Workspace");
         group.MapGet("/profiles", GetAsync);
         group.MapPost("/profiles/files", async (BootstrapProfileFilesRequest request, IBootstrapProfileApiService service,
             ICurrentRequestContext requestContext, HttpContext context, CancellationToken token) =>
@@ -94,7 +113,7 @@ public static class BootstrapProfileEndpoints
             request.Profiles ?? [],
             requestContext.Current.PrincipalId,
             cancellationToken,
-            request.Source)));
+            request.Source, request.Seed)));
 
     private static async Task<IResult> GetAsync(
         IBootstrapProfileApiService service,
@@ -108,7 +127,7 @@ public static class BootstrapProfileEndpoints
         ICurrentRequestContext requestContext,
         CancellationToken cancellationToken) =>
         await ExecuteAsync(async () => Results.Ok(await service.PreviewAsync(
-            new(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications, request.Inputs),
+            new(request.Profiles ?? [], request.Target, request.Bindings, request.Source, request.Applications, request.Inputs) { Seed = request.Seed },
             requestContext.Current.PrincipalId,
             cancellationToken)));
 

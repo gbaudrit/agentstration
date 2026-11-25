@@ -6,6 +6,8 @@ namespace Agentstration.Web.Console;
 
 public interface IBootstrapProfilesApiClient
 {
+    Task<WorkspaceSeedReceipt> IngestSeedAsync(IngestWorkspaceSeedRequest request, CancellationToken cancellationToken);
+    Task<WorkspaceSeedReceipt> GetSeedAsync(Guid id, BootstrapApplicationTarget target, CancellationToken cancellationToken);
     Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, CancellationToken cancellationToken);
     Task<BootstrapManagementView> GetAsync(CancellationToken cancellationToken);
     Task<BootstrapProfileSummary> GetSourceProfileAsync(BootstrapSourceProfileSelection selection, CancellationToken cancellationToken);
@@ -18,6 +20,15 @@ public interface IBootstrapProfilesApiClient
 
 public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstrapProfilesApiClient
 {
+    public async Task<WorkspaceSeedReceipt> IngestSeedAsync(IngestWorkspaceSeedRequest request, CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsJsonAsync("api/bootstrap/workspace-seeds", request, cancellationToken);
+        return await ReadAsync<WorkspaceSeedReceipt>(response, "Workspace seed", cancellationToken);
+    }
+
+    public Task<WorkspaceSeedReceipt> GetSeedAsync(Guid id, BootstrapApplicationTarget target, CancellationToken cancellationToken) =>
+        ApiResponse.ReadAsync<WorkspaceSeedReceipt>(httpClient, $"api/bootstrap/workspaces/{target.WorkspaceId:D}/seeds/{id:D}?tenantId={target.TenantId:D}", cancellationToken);
+
     public async Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, CancellationToken cancellationToken)
     {
         using var response = await httpClient.PostAsJsonAsync("api/bootstrap/profiles/files", request, cancellationToken);
@@ -43,7 +54,7 @@ public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstr
     {
         using var response = await httpClient.PostAsJsonAsync(
             "api/bootstrap/profiles/preview",
-            new BootstrapProfilePreviewRequest(selection.Profiles, selection.Target, selection.Bindings, selection.Source, selection.Applications, selection.Inputs),
+            new BootstrapProfilePreviewRequest(selection.Profiles, selection.Target, selection.Bindings, selection.Source, selection.Applications, selection.Inputs) { Seed = selection.Seed },
             cancellationToken);
         return await ReadAsync<BootstrapCompositionPreview>(response, "Bootstrap preview", cancellationToken);
     }
@@ -52,7 +63,7 @@ public sealed class BootstrapProfilesApiClient(HttpClient httpClient) : IBootstr
     {
         using var response = await httpClient.PostAsJsonAsync(
             "api/bootstrap/applications",
-            new ApplyBootstrapProfilesRequest(selection.Profiles, expectedDigest, selection.Target, selection.Bindings, selection.Source, requestId, selection.Applications, selection.Inputs),
+            new ApplyBootstrapProfilesRequest(selection.Profiles, expectedDigest, selection.Target, selection.Bindings, selection.Source, requestId, selection.Applications, selection.Inputs) { Seed = selection.Seed },
             cancellationToken);
         return await ReadAsync<BootstrapApplicationResource>(response, "Bootstrap application", cancellationToken);
     }

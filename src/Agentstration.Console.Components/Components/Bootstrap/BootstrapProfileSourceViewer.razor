@@ -34,9 +34,11 @@
 @code {
     [Parameter, EditorRequired] public string Profile { get; set; } = string.Empty;
     [Parameter] public BootstrapSourceProfileSelection? Source { get; set; }
+    [Parameter] public WorkspaceSeedSelection? Seed { get; set; }
+    [Parameter] public BootstrapApplicationTarget? Target { get; set; }
     [Parameter] public string? ExpectedDigest { get; set; }
     private readonly CancellationTokenSource lifetime = new();
-    private (string, BootstrapSourceProfileSelection?, string?) identity;
+    private (string, BootstrapSourceProfileSelection?, string?, WorkspaceSeedSelection?, BootstrapApplicationTarget?) identity;
     private BootstrapProfileFiles? files;
     private string selected = string.Empty;
     private bool opened, loading, failed;
@@ -44,7 +46,7 @@
 
     protected override void OnParametersSet()
     {
-        var next = (Profile, Source, ExpectedDigest);
+        var next = (Profile, Source, ExpectedDigest, Seed, Target);
         if (identity == next) return;
         identity = next; revision++; opened = loading = failed = false; files = null; selected = string.Empty;
     }
@@ -59,7 +61,7 @@
         loading = true; failed = false; files = null;
         try
         {
-            var result = await Client.GetFilesAsync(new(Profile, Source: Source, ExpectedDigest: ExpectedDigest), lifetime.Token);
+            var result = await Client.GetFilesAsync(new BootstrapProfileFilesRequest(Profile, Source: Source, ExpectedDigest: ExpectedDigest) { Seed = Seed, Target = Target }, lifetime.Token);
             if (current != revision || lifetime.IsCancellationRequested) return;
             files = result;
             selected = result.Files.Contains(selected, StringComparer.Ordinal) ? selected : result.Files.FirstOrDefault() ?? string.Empty;
@@ -77,7 +79,7 @@
         selected = file; files = files with { File = null, Yaml = null }; loading = true; failed = false;
         try
         {
-            var result = await Client.GetFilesAsync(new(Profile, file, Source, digest), lifetime.Token);
+            var result = await Client.GetFilesAsync(new BootstrapProfileFilesRequest(Profile, file, Source, digest) { Seed = Seed, Target = Target }, lifetime.Token);
             if (current == revision && !lifetime.IsCancellationRequested) files = result;
         }
         catch (Exception exception) when (exception is HttpRequestException or AgentstrationApiException or OperationCanceledException)

@@ -310,6 +310,43 @@ public sealed class BootstrapProgressComponentTests
         Assert.HasCount(3, cut.FindAll("input[data-profile-name]:checked"));
     }
 
+    [TestMethod]
+    [DataRow("en-US", "Installed prerequisites", "Missing or unavailable", "Synchronized")]
+    [DataRow("fr-FR", "Prérequis installés", "Absent ou indisponible", "Synchronisé")]
+    public void SeedReviewLocalizesPrerequisitesAndRetainsExactProjectAndRevisionLinks(string cultureName, string title, string missing, string synchronized)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = Context(new StubClient(), application: false);
+        var target = new BootstrapApplicationTarget(StubClient.TenantId, StubClient.WorkspaceId);
+        var provenance = new WorkspaceSeedProvenance(Guid.NewGuid(), target, Guid.NewGuid(), "1.0.0", "release-one", new string('a', 64), "seed", "bootstrap", null, null, null, DateTimeOffset.UnixEpoch)
+        { ImportPlans = [new(Guid.NewGuid(), new string('b', 64))] };
+        var project = Guid.NewGuid();
+        var handover = new WorkspaceSeedHandover(provenance.Id, WorkspaceSeedHandoverStatus.Succeeded, project, "fixture", default, "revision-1", [], DateTimeOffset.UnixEpoch);
+        var cut = context.Render<WorkspaceSeedReview>(p => p.Add(x => x.Provenance, provenance).Add(x => x.Handover, handover)
+            .Add(x => x.Prerequisites, [new("Worker", "coding-cli", false, "seed_native_worker_missing")]));
+        Assert.Contains(title, cut.Markup); Assert.Contains(missing, cut.Markup); Assert.Contains(synchronized, cut.Markup);
+        Assert.Contains("seed_native_worker_missing", cut.Markup); Assert.Contains("revision-1", cut.Markup);
+        Assert.Contains(provenance.ImportPlans[0].PlanId.ToString(), cut.Markup);
+        Assert.Contains(provenance.ImportPlans[0].ExpectedDigest, cut.Markup);
+        var labels = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings>>();
+        Assert.AreEqual(cultureName == "fr-FR" ? "Invalide" : "Invalid", labels["Disposition.Invalid"].Value);
+        Assert.AreEqual($"/api/workspaces/{target.WorkspaceId:D}/projects/{project:D}", cut.Find("a").GetAttribute("href"));
+    }
+
+    [TestMethod]
+    public void SeedSourceViewerCarriesTheExactTargetAndPinAndDropsPreviousFilesWhenThePinChanges()
+    {
+        var api = new StubClient(); using var context = Context(api, application: false);
+        var pin = new WorkspaceSeedSelection(Guid.NewGuid(), new string('a', 64));
+        var target = new BootstrapApplicationTarget(StubClient.TenantId, StubClient.WorkspaceId);
+        var cut = context.Render<BootstrapProfileSourceViewer>(p => p.Add(x => x.Profile, "seed").Add(x => x.Seed, pin).Add(x => x.Target, target));
+        cut.Find("button").Click(); cut.WaitForAssertion(() => Assert.IsNotNull(api.LastFileRequest?.File));
+        Assert.AreEqual(pin, api.LastFileRequest!.Seed); Assert.AreEqual(target, api.LastFileRequest.Target);
+        cut.Render(p => p.Add(x => x.Seed, pin with { Id = Guid.NewGuid() }));
+        Assert.IsFalse(cut.FindAll("textarea").Any());
+        Assert.AreEqual("false", cut.Find("button").GetAttribute("aria-expanded"));
+    }
+
     private static BunitContext Context(StubClient client, bool application = true)
     {
         var context = new BunitContext();
@@ -324,11 +361,14 @@ public sealed class BootstrapProgressComponentTests
 
     private sealed class StubClient : IBootstrapProfilesApiClient
     {
+        public Task<WorkspaceSeedReceipt> IngestSeedAsync(IngestWorkspaceSeedRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<WorkspaceSeedReceipt> GetSeedAsync(Guid id, BootstrapApplicationTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public BootstrapProfileFilesRequest? LastFileRequest { get; private set; }
         public int FileReads { get; private set; }
         public bool FailFiles { get; set; }
         public Task<BootstrapProfileFiles> GetFilesAsync(BootstrapProfileFilesRequest request, CancellationToken cancellationToken)
         {
-            FileReads++;
+            FileReads++; LastFileRequest = request;
             if (FailFiles) throw new HttpRequestException("private-transport-sentinel");
             return Task.FromResult(new BootstrapProfileFiles(request.Profile, "digest", ["profile.yaml"], request.File,
                 request.File is null ? null : "kind: BootstrapProfile"));

@@ -10,7 +10,13 @@ using Agentstration.Work;
 namespace Agentstration.Infrastructure.Bootstrap;
 
 public sealed record DeclarativeProjectSharingDefinition(WorkSharingProjectId ProjectId, WorkParticipantId ParticipantId,
-    string Location, string ToolName, string? ToolNamespace = null, string? DisplayName = null, Guid? Id = null);
+    string Location, string ToolName, string? ToolNamespace = null, string? DisplayName = null, Guid? Id = null)
+{
+    public string? RepositoryToolName { get; init; }
+    public string? RepositoryToolNamespace { get; init; }
+    public string? TaskOperationsToolName { get; init; }
+    public string? TaskOperationsToolNamespace { get; init; }
+}
 
 /// <summary>Connects a private Project to a pre-provisioned local protected Tool. It never synchronizes or applies remote configuration.</summary>
 public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService projects, IWorkplaceContext context, IResourceStore resources) : IBootstrapResourceHandler
@@ -23,10 +29,14 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
         var value = Parse(resource, operation);
         var workspace = WorkspaceBootstrapResource.Workspace(operation);
         var existing = await projects.FindAsync(workspace, value.Metadata.Namespace, value.Metadata.Name, token);
-        if (existing.IsSuccess) return new(Matches(existing.Value!, value.Definition) ? BootstrapResourceDisposition.Skip : BootstrapResourceDisposition.Conflict);
-        var definition = await DefinitionAsync(workspace, value.Definition, token);
-        var valid = await projects.ValidateAsync(workspace, definition, token);
-        if (!valid.IsSuccess) throw Invalid(valid.ErrorCode!);
+        if (existing.IsSuccess) return new(await ReusableAsync(workspace, existing.Value!, value.Definition, token)
+            ? BootstrapResourceDisposition.Skip : BootstrapResourceDisposition.Conflict);
+        var definition = await DefinitionAsync(workspace, value.Definition, token, planning);
+        if (definition is not null)
+        {
+            var valid = await projects.ValidateAsync(workspace, definition, token);
+            if (!valid.IsSuccess) throw Invalid(valid.ErrorCode!);
+        }
         return WorkspaceBootstrapResource.Created(planning, Kind, value.Metadata.Name, value.Metadata.Namespace, resource);
     }
     public async Task<BootstrapResourceApplyResult> ApplyAsync(BootstrapResourceDocument resource, BootstrapResourceOperationContext operation, CancellationToken token)
@@ -34,39 +44,69 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
         var value = Parse(resource, operation);
         var workspace = WorkspaceBootstrapResource.Workspace(operation);
         var existing = await projects.FindAsync(workspace, value.Metadata.Namespace, value.Metadata.Name, token);
-        if (existing.IsSuccess) return Matches(existing.Value!, value.Definition) ? BootstrapResourceApplyResult.Skipped : BootstrapResourceApplyResult.Conflict;
+        if (existing.IsSuccess) return await ReusableAsync(workspace, existing.Value!, value.Definition, token)
+            ? BootstrapResourceApplyResult.Skipped : BootstrapResourceApplyResult.Conflict;
         var definition = await DefinitionAsync(workspace, value.Definition, token);
         var id = new WorkProjectId(value.Definition.Id ?? new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(
             $"{workspace}:{context.PrincipalId:D}:{value.Metadata.Namespace}:{value.Metadata.Name}")).AsSpan(0, 16)));
-        var result = await projects.CreateAsync(workspace, id, value.Metadata.Name, value.Metadata.Namespace, new(id.Value, 0, definition), token);
+        var result = await projects.CreateAsync(workspace, id, value.Metadata.Name, value.Metadata.Namespace, new(id.Value, 0, definition!), token);
         if (!result.IsSuccess) throw Invalid(result.ErrorCode!);
         return BootstrapResourceApplyResult.Created;
     }
     private DeclarativeResourceEnvelope<DeclarativeProjectSharingDefinition> Parse(BootstrapResourceDocument resource, BootstrapResourceOperationContext operation)
     {
-        if (operation.ProfileScope != BootstrapProfileScope.Workspace || operation.ActorPrincipalId != context.PrincipalId
+        if (operation.ProfileScope != BootstrapProfileScope.Workspace || operation.ActorPrincipalId is { } actor && actor != context.PrincipalId
             || WorkspaceBootstrapResource.Workspace(operation) != context.WorkspaceId) throw Invalid("work_project_not_found");
         var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeProjectSharingDefinition>>(resource);
         if (!WorkProjectDefinition.ValidName(value.Metadata.Name) || value.Definition is null || value.Definition.Id == Guid.Empty)
             throw Invalid("sharing_connection_invalid");
         return value;
     }
-    private async Task<WorkProjectDefinition> DefinitionAsync(WorkspaceId workspace, DeclarativeProjectSharingDefinition value, CancellationToken token)
+    private async Task<bool> ReusableAsync(WorkspaceId workspace, WorkProjectSnapshot project, DeclarativeProjectSharingDefinition value, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(value.ToolName)) throw Invalid("sharing_connection_invalid");
-        var address = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(workspace.Value),
-            ResourceNamespace.Parse(value.ToolNamespace ?? "default"), ToolResourceKinds.Tool, value.ToolName);
-        var tool = (await resources.GetExactAsync<ToolResource>(address, token))?.Value ?? throw Invalid("sharing_tool_not_found");
-        if (!tool.Definition.Metadata.ContainsKey("agentstration.toolPublicationUid")) throw Invalid("sharing_protected_relay_required");
+        if (!Matches(project, value)) return false;
+        var expected = (await DefinitionAsync(workspace, value, token))!;
+        if (expected.Bindings.Any(binding => !project.Definition.Bindings.Contains(binding))) return false;
+        var valid = await projects.ValidateAsync(workspace, project.Definition, token);
+        if (!valid.IsSuccess) throw Invalid(valid.ErrorCode!);
+        return true;
+    }
+    private async Task<WorkProjectDefinition?> DefinitionAsync(WorkspaceId workspace, DeclarativeProjectSharingDefinition value,
+        CancellationToken token, BootstrapPlanningContext? planning = null)
+    {
+        var bindings = new List<WorkProjectContextBinding>();
+        var deferred = false;
+        foreach (var (name, purpose, toolName, toolNamespace) in Targets(value))
+        {
+            if (string.IsNullOrWhiteSpace(toolName)) throw Invalid("sharing_connection_invalid");
+            var address = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(workspace.Value),
+                ResourceNamespace.Parse(toolNamespace ?? "default"), ToolResourceKinds.Tool, toolName);
+            var tool = (await resources.GetExactAsync<ToolResource>(address, token))?.Value;
+            if (tool is null && planning?.Contains(ToolResourceKinds.Tool, toolName, address.Namespace.Value) == true)
+            {
+                deferred = true;
+                continue;
+            }
+            if (tool is null) throw Invalid("sharing_tool_not_found");
+            if (!tool.Definition.Metadata.ContainsKey("agentstration.toolPublicationUid")) throw Invalid("sharing_protected_relay_required");
+            bindings.Add(new(name, purpose, new(address, tool.Uid, tool.Generation)));
+        }
+        if (deferred) return null; // Resolve and authorize the real publication identities at application time.
         return new(value.DisplayName ?? value.ProjectId.ToString(), null, [], [])
         {
-            Bindings = [new("sharing", WorkProjectBindingPurpose.Sharing, new(address, tool.Uid, tool.Generation))],
+            Bindings = bindings,
             Sharing = new(value.ProjectId, value.ParticipantId, "sharing", value.Location)
         };
     }
+    private static IEnumerable<(string Name, WorkProjectBindingPurpose Purpose, string Tool, string? Namespace)> Targets(DeclarativeProjectSharingDefinition value)
+    {
+        yield return ("sharing", WorkProjectBindingPurpose.Sharing, value.ToolName, value.ToolNamespace);
+        if (value.RepositoryToolName is not null) yield return ("repository", WorkProjectBindingPurpose.Repository, value.RepositoryToolName, value.RepositoryToolNamespace);
+        if (value.TaskOperationsToolName is not null) yield return ("task-operations", WorkProjectBindingPurpose.TaskOperations, value.TaskOperationsToolName, value.TaskOperationsToolNamespace);
+    }
     private static bool Matches(WorkProjectSnapshot project, DeclarativeProjectSharingDefinition value) => (value.Id is null || project.Id.Value == value.Id)
         && project.Definition.Sharing is { } connection && connection.ProjectId == value.ProjectId && connection.ParticipantId == value.ParticipantId && connection.Location == value.Location
-        && project.Definition.Bindings.Any(binding => binding.Name == connection.BindingName && binding.Target.Address.Name == value.ToolName
-            && binding.Target.Address.Namespace.Value == (value.ToolNamespace ?? "default"));
+        && Targets(value).All(target => project.Definition.Bindings.Any(binding => binding.Name == target.Name && binding.Purpose == target.Purpose
+            && binding.Target.Address.Name == target.Tool && binding.Target.Address.Namespace.Value == (target.Namespace ?? "default")));
     private static WorkValidationException Invalid(string code) => new(code, "The Project sharing connection could not be planned or applied.");
 }

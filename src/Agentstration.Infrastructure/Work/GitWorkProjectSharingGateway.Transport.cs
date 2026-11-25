@@ -44,7 +44,7 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
             ToolResourceKinds.ToolDefinitionVersion, externalId), token))?.Value;
         if (publication?.Uid != uid || publication.Definition is not RelayToolDefinitionProperties relay || publication.Source is not { } source
             || !relay.Bindings.OfType<SecretToolArgumentBinding>().Any(value => value.Path == "/credential")) return Failure("sharing_protected_relay_required");
-        if (!Capabilities(tool) || !Capabilities(source.Tool)) return Failure("sharing_capability_missing");
+        if (!HasRequiredCapabilities(tool) || !HasRequiredCapabilities(source.Tool)) return Failure("sharing_capability_missing");
         if (relay.InputEnvelope is not null || relay.Bindings.Any(value => value.Path is not
             ("/credential" or "/repository" or "/authentication" or "/username" or "/allowedRefPrefixes" or "/allowedPathPrefixes" or "/request/refName")))
             return Failure("sharing_protected_relay_required");
@@ -86,14 +86,26 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         {
             var output = await pipeline.ExecuteAsync(new ToolExecutionContext
             {
-                OwnerKind = ToolExecutionOwnerKind.WorkOperation, ToolCallId = key,
+                OwnerKind = ToolExecutionOwnerKind.WorkOperation,
+                ToolCallId = key,
                 InvocationId = $"sharing:{key}:{mode}",
-                ToolId = tool.Name, ToolName = externalId, ToolNamespace = tool.Namespace, ToolScopeRef = scope,
-                ToolUid = tool.Uid, ToolGeneration = tool.Generation, ExternalToolId = externalId,
-                ToolProviderId = provider.Name, ToolProviderScopeRef = providerScope, ToolProviderNamespace = provider.Namespace,
-                ToolProviderUid = provider.Uid, ToolProviderGeneration = provider.Generation,
-                TenantId = trusted.TenantId, WorkspaceId = workspaceId, PrincipalId = principalId,
-                CorrelationId = $"sharing:{key}", PersistArguments = false,
+                ToolId = tool.Name,
+                ToolName = externalId,
+                ToolNamespace = tool.Namespace,
+                ToolScopeRef = scope,
+                ToolUid = tool.Uid,
+                ToolGeneration = tool.Generation,
+                ExternalToolId = externalId,
+                ToolProviderId = provider.Name,
+                ToolProviderScopeRef = providerScope,
+                ToolProviderNamespace = provider.Namespace,
+                ToolProviderUid = provider.Uid,
+                ToolProviderGeneration = provider.Generation,
+                TenantId = trusted.TenantId,
+                WorkspaceId = workspaceId,
+                PrincipalId = principalId,
+                CorrelationId = $"sharing:{key}",
+                PersistArguments = false,
                 Arguments = arguments
             }, linked.Token);
             if (output is null || Encoding.UTF8.GetByteCount(output.Value.GetRawText()) > 2 * 1024 * 1024 || output.Value.ValueKind != JsonValueKind.Object
@@ -116,7 +128,7 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         catch (JsonException) { return Failure("sharing_provider_response_invalid"); }
     }
 
-    private static bool Capabilities(ToolResource tool)
+    internal static bool HasRequiredCapabilities(ToolResource tool)
     {
         if (!tool.Definition.Metadata.TryGetValue("agentstration.git.repository", out var value) || value.ValueKind != JsonValueKind.Object) return false;
         return value.TryGetProperty("version", out var version) && version.ValueKind == JsonValueKind.String && version.GetString() == "1.0"

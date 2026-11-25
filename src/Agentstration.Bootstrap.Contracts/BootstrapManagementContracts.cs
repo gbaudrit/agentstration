@@ -41,7 +41,10 @@ public sealed record BootstrapProfileSelection(
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
     BootstrapSourceProfileSelection? Source = null,
     IReadOnlyList<BootstrapProfileApplication>? Applications = null,
-    IReadOnlyList<BootstrapInputSelection>? Inputs = null);
+    IReadOnlyList<BootstrapInputSelection>? Inputs = null)
+{
+    public WorkspaceSeedSelection? Seed { get; init; }
+}
 
 public sealed record BootstrapResourcePreview(
     string Profile,
@@ -67,7 +70,11 @@ public sealed record BootstrapCompositionPreview(
 {
     public IReadOnlyList<BootstrapConfigurationInput> Inputs { get; init; } = [];
     public IReadOnlyList<BootstrapProfileApplicationPreview> Applications { get; init; } = [];
-    public bool CanApply => Inputs.All(input => input.Configured) && Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid);
+    public WorkspaceSeedProvenance? SeedProvenance { get; init; }
+    public IReadOnlyList<WorkspaceSeedPrerequisite> SeedPrerequisites { get; init; } = [];
+    public bool CanApply => Inputs.All(input => input.Configured) && SeedPrerequisites.All(item => item.Available)
+        && Resources.All(resource => resource.Disposition != BootstrapResourceDisposition.Invalid
+            && (SeedProvenance is null || resource.Disposition != BootstrapResourceDisposition.Conflict));
 }
 
 public sealed record BootstrapConfigurationInput(string Profile, string Resource, string Configuration,
@@ -112,7 +119,10 @@ public sealed record BootstrapProfilePreviewRequest(
     IReadOnlyList<BootstrapBindingSelection>? Bindings = null,
     BootstrapSourceProfileSelection? Source = null,
     IReadOnlyList<BootstrapProfileApplication>? Applications = null,
-    IReadOnlyList<BootstrapInputSelection>? Inputs = null);
+    IReadOnlyList<BootstrapInputSelection>? Inputs = null)
+{
+    public WorkspaceSeedSelection? Seed { get; init; }
+}
 
 public sealed record ApplyBootstrapProfilesRequest(
     IReadOnlyList<string> Profiles,
@@ -122,7 +132,10 @@ public sealed record ApplyBootstrapProfilesRequest(
     BootstrapSourceProfileSelection? Source = null,
     Guid? RequestId = null,
     IReadOnlyList<BootstrapProfileApplication>? Applications = null,
-    IReadOnlyList<BootstrapInputSelection>? Inputs = null);
+    IReadOnlyList<BootstrapInputSelection>? Inputs = null)
+{
+    public WorkspaceSeedSelection? Seed { get; init; }
+}
 
 public sealed record BootstrapExecutionProgress(
     BootstrapCompositionPreview Preview,
@@ -140,7 +153,10 @@ public sealed record BootstrapBindingTargetsRequest(
     IReadOnlyList<string> Profiles,
     BootstrapSourceProfileSelection? Source = null,
     IReadOnlyList<BootstrapProfileApplication>? Applications = null,
-    string? ConsumerProfile = null);
+    string? ConsumerProfile = null)
+{
+    public WorkspaceSeedSelection? Seed { get; init; }
+}
 
 public sealed record BootstrapTopologyResource(string Kind, string Name, string? TenantName = null);
 public sealed record BootstrapPlannedTarget(string TenantName, string? WorkspaceName = null);

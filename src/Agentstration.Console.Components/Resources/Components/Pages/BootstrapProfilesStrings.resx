@@ -103,4 +103,37 @@
   <data name="ReloadSourceFiles" xml:space="preserve"><value>Reload files</value></data>
   <data name="LoadingSourceFiles" xml:space="preserve"><value>Loading profile files…</value></data>
   <data name="SourceFile" xml:space="preserve"><value>Profile file</value></data>
+  <data name="Seed.Title" xml:space="preserve"><value>Initialize a Workspace from a seed</value></data>
+  <data name="Seed.Help" xml:space="preserve"><value>Select an existing Workspace and supply exactly one input: a ZIP package (up to 4 MiB), a raw JSON pointer document, or its public HTTPS URL. Installed capabilities and access grants must already be available.</value></data>
+  <data name="Seed.Workspace" xml:space="preserve"><value>Target Workspace</value></data>
+  <data name="Seed.Document" xml:space="preserve"><value>Raw seed document (JSON)</value></data>
+  <data name="Seed.Url" xml:space="preserve"><value>Seed document URL (HTTPS .json)</value></data>
+  <data name="Seed.Archive" xml:space="preserve"><value>Complete seed package (.zip)</value></data>
+  <data name="Seed.Ingest" xml:space="preserve"><value>Inspect seed</value></data>
+  <data name="Seed.Clear" xml:space="preserve"><value>Change seed</value></data>
+  <data name="Seed.Pinned" xml:space="preserve"><value>Version {0} · provider revision {1}</value></data>
+  <data name="Seed.InputInvalid" xml:space="preserve"><value>Select a Workspace and supply one valid input within the documented size limit.</value></data>
+  <data name="Seed.Failed" xml:space="preserve"><value>The seed could not be inspected or applied. Check its content, target and prerequisites, then retry.</value></data>
+  <data name="Seed.Review" xml:space="preserve"><value>Seed provenance and synchronization</value></data>
+  <data name="Seed.ArchiveDigest" xml:space="preserve"><value>Archive SHA-256</value></data>
+  <data name="Seed.Prerequisites" xml:space="preserve"><value>Installed prerequisites</value></data>
+  <data name="Seed.Available" xml:space="preserve"><value>Available</value></data>
+  <data name="Seed.Missing" xml:space="preserve"><value>Missing or unavailable</value></data>
+  <data name="Seed.PrerequisiteHelp" xml:space="preserve"><value>An administrator must configure this capability and its Workspace access before applying.</value></data>
+  <data name="Seed.Kind.Tool" xml:space="preserve"><value>Extension Tool</value></data>
+  <data name="Seed.Kind.ModelProvider" xml:space="preserve"><value>Instance Model Provider</value></data>
+  <data name="Seed.Kind.RuntimeProfile" xml:space="preserve"><value>Instance Runtime Profile</value></data>
+  <data name="Seed.Kind.Worker" xml:space="preserve"><value>Compatible local worker</value></data>
+  <data name="Seed.Handover" xml:space="preserve"><value>First Project synchronization</value></data>
+  <data name="Seed.Handover.Pending" xml:space="preserve"><value>Synchronization in progress</value></data>
+  <data name="Seed.Handover.Succeeded" xml:space="preserve"><value>Synchronized</value></data>
+  <data name="Seed.Handover.Failed" xml:space="preserve"><value>Synchronization incomplete</value></data>
+  <data name="Seed.ProjectRecord" xml:space="preserve"><value>Inspect Project {0}/{1} (JSON)</value></data>
+  <data name="Seed.Revision" xml:space="preserve"><value>Sharing revision</value></data>
+  <data name="Seed.ImportedPlans" xml:space="preserve"><value>{0} plans explicitly imported as drafts</value></data>
+  <data name="Seed.HandoverHelp" xml:space="preserve"><value>Created resources are retained. Review the connection and submit a new preview/application to retry; existing local changes are preserved.</value></data>
+  <data name="Seed.Kind.Extension" xml:space="preserve"><value>Extension capability</value></data>
+  <data name="Seed.PlannedImports" xml:space="preserve"><value>{0} plans to import as drafts (identities and SHA-256)</value></data>
+  <data name="Seed.ResourceInvalid" xml:space="preserve"><value>Check the resource declaration, installed source, access grants and protected bindings.</value></data>
+  <data name="Disposition.Invalid" xml:space="preserve"><value>Invalid</value></data>
 </root>

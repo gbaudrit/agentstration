@@ -138,7 +138,7 @@ model {
       }
 
       distribution = component 'Distribution and bootstrap' {
-        description 'API-driven Bootstrap profiles, Pack and Source distribution, plus bounded startup initialization'
+        description 'API-driven Bootstrap profiles, Pack and Source distribution, pinned Workspace seed acquisition and explicit Project-sharing handover, plus bounded startup initialization'
       }
 
       coding = component 'Coding application' {

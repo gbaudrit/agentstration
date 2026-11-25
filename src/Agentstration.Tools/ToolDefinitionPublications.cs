@@ -105,61 +105,7 @@ public sealed partial class ToolDefinitionService
         if (draft.Value.Definition.Version != version)
             throw new ToolDefinitionValidationException("tool_definition_version_mismatch", "Publish the version selected in the draft.");
         var scope = draft.Value.ScopeRef!.Value;
-        ToolRelaySource? source = null;
-        var properties = draft.Value.Definition with { Publish = false, Enabled = true };
-        if (properties is RelayToolDefinitionProperties relay)
-        {
-            source = await ResolveRelaySourceAsync(relay.Target, scope, cancellationToken);
-            properties = relay with
-            {
-                Publish = false,
-                Enabled = true,
-                InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings, relay.InputEnvelope),
-                OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
-                RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
-            };
-        }
-        var identities = new List<ToolBindingIdentity>();
-        var relayDepth = source is null ? 0 : 1;
-        if (source?.Tool.Definition.Metadata.TryGetValue("agentstration.relayDepth", out var depth) == true)
-        {
-            if (depth.ValueKind != JsonValueKind.Number || !depth.TryGetInt32(out var sourceDepth) || sourceDepth is < 0 or > 8)
-                throw new ToolDefinitionValidationException("tool_definition_relay_depth", "The source has an invalid relay depth.");
-            relayDepth += sourceDepth;
-        }
-        if (relayDepth is < 0 or > 8)
-            throw new ToolDefinitionValidationException("tool_definition_relay_depth", "Relay composition is limited to eight levels.");
-        foreach (var binding in properties.Bindings)
-        {
-            switch (binding)
-            {
-                case ParameterToolArgumentBinding parameter:
-                    if (parameter.Parameter.Address.Kind != ParameterResourceKinds.Parameter || parameters is null)
-                        throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Parameter resolution requires a Parameter reference.");
-                    var value = await parameters.ResolveAsync(parameter.Parameter, new(scope, draft.Value.Address), cancellationToken)
-                        ?? throw new ToolDefinitionValidationException("tool_definition_binding_unavailable", "The bound Parameter is unavailable.");
-                    try { ToolInputSchemaValidator.Validate(ToolRelayArguments.PropertySchema(source!.Tool.Definition.Schema!.Input, binding.Path), value.Value); }
-                    catch (ToolInputValidationException) { throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "A Parameter value does not satisfy the source contract."); }
-                    break;
-                case SecretToolArgumentBinding secret:
-                    if (secret.Secret.Address.Kind != "Secret" || secretAccess is null
-                        || await secretAccess.GetAuthorizedStatusAsync(secret.Secret, new(scope, draft.Value.Address), cancellationToken) != SecretValueStatus.Configured)
-                        throw new ToolDefinitionValidationException("tool_definition_binding_unavailable", "The Secret reference is not authorized and configured.");
-                    break;
-            }
-            var address = binding switch
-            {
-                ParameterToolArgumentBinding parameter => ScopedResourceAddress.Create(parameter.Parameter.ScopeRef,
-                    parameter.Parameter.Address.Namespace, parameter.Parameter.Address.Kind, parameter.Parameter.Address.Name),
-                SecretToolArgumentBinding secret when secret.Secret.ScopeRef is { } owner => ScopedResourceAddress.Create(owner,
-                    secret.Secret.Address.Namespace, secret.Secret.Address.Kind, secret.Secret.Address.Name),
-                LiteralToolArgumentBinding or OmittedToolArgumentBinding => (ScopedResourceAddress?)null,
-                _ => throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Bindings require an exact scoped resource reference.")
-            };
-            if (address is null) continue;
-            var identity = await BindingIdentityAsync(address.Value, cancellationToken);
-            identities.Add(new(binding.Path, identity));
-        }
+        var (properties, source, identities, relayDepth) = await PreparePublicationAsync(draft.Value, cancellationToken);
         var existing = await GetPublicationAsync(VersionName(name, version), @namespace, scope, cancellationToken);
         ToolDefinitionVersionResource publication;
         if (existing is not null)
@@ -204,6 +150,78 @@ public sealed partial class ToolDefinitionService
                 Definition = publication.Definition
             }, cancellationToken, publication.DefinitionUid, publication.RelayDepth);
         return publication;
+    }
+
+    /// <summary>Validates a proposed publication without creating its draft, provider, version or public Tool.</summary>
+    public async Task<ToolDefinitionProperties> ValidateRelayPublicationAsync(ToolDefinitionResource resource, CancellationToken cancellationToken)
+    {
+        ValidateForWrite(resource);
+        if (resource.Definition is not RelayToolDefinitionProperties)
+            throw new ToolDefinitionValidationException("tool_definition_relay_required", "This validation path requires a relay ToolDefinition.");
+        return (await PreparePublicationAsync(resource, cancellationToken)).Properties;
+    }
+
+    private async Task<(ToolDefinitionProperties Properties, ToolRelaySource? Source,
+        IReadOnlyList<ToolBindingIdentity> Identities, int RelayDepth)> PreparePublicationAsync(
+        ToolDefinitionResource resource, CancellationToken cancellationToken)
+    {
+        var scope = resource.ScopeRef!.Value;
+        ToolRelaySource? source = null;
+        var properties = resource.Definition with { Publish = false, Enabled = true };
+        if (properties is RelayToolDefinitionProperties relay)
+        {
+            source = await ResolveRelaySourceAsync(relay.Target, scope, cancellationToken);
+            properties = relay with
+            {
+                Publish = false,
+                Enabled = true,
+                InputSchema = ToolRelayArguments.PublicSchema(source.Tool.Definition.Schema!.Input, relay.Bindings, relay.InputEnvelope),
+                OutputSchema = source.Tool.Definition.Schema.Output?.Clone(),
+                RequiresApproval = relay.RequiresApproval || source.Tool.Definition.RequiresApproval
+            };
+        }
+        var identities = new List<ToolBindingIdentity>();
+        var relayDepth = source is null ? 0 : 1;
+        if (source?.Tool.Definition.Metadata.TryGetValue("agentstration.relayDepth", out var depth) == true)
+        {
+            if (depth.ValueKind != JsonValueKind.Number || !depth.TryGetInt32(out var sourceDepth) || sourceDepth is < 0 or > 8)
+                throw new ToolDefinitionValidationException("tool_definition_relay_depth", "The source has an invalid relay depth.");
+            relayDepth += sourceDepth;
+        }
+        if (relayDepth is < 0 or > 8)
+            throw new ToolDefinitionValidationException("tool_definition_relay_depth", "Relay composition is limited to eight levels.");
+        foreach (var binding in properties.Bindings)
+        {
+            switch (binding)
+            {
+                case ParameterToolArgumentBinding parameter:
+                    if (parameter.Parameter.Address.Kind != ParameterResourceKinds.Parameter || parameters is null)
+                        throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Parameter resolution requires a Parameter reference.");
+                    var value = await parameters.ResolveAsync(parameter.Parameter, new(scope, resource.Address), cancellationToken)
+                        ?? throw new ToolDefinitionValidationException("tool_definition_binding_unavailable", "The bound Parameter is unavailable.");
+                    try { ToolInputSchemaValidator.Validate(ToolRelayArguments.PropertySchema(source!.Tool.Definition.Schema!.Input, binding.Path), value.Value); }
+                    catch (ToolInputValidationException) { throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "A Parameter value does not satisfy the source contract."); }
+                    break;
+                case SecretToolArgumentBinding secret:
+                    if (secret.Secret.Address.Kind != "Secret" || secretAccess is null
+                        || await secretAccess.GetAuthorizedStatusAsync(secret.Secret, new(scope, resource.Address), cancellationToken) != SecretValueStatus.Configured)
+                        throw new ToolDefinitionValidationException("tool_definition_binding_unavailable", "The Secret reference is not authorized and configured.");
+                    break;
+            }
+            var address = binding switch
+            {
+                ParameterToolArgumentBinding parameter => ScopedResourceAddress.Create(parameter.Parameter.ScopeRef,
+                    parameter.Parameter.Address.Namespace, parameter.Parameter.Address.Kind, parameter.Parameter.Address.Name),
+                SecretToolArgumentBinding secret when secret.Secret.ScopeRef is { } owner => ScopedResourceAddress.Create(owner,
+                    secret.Secret.Address.Namespace, secret.Secret.Address.Kind, secret.Secret.Address.Name),
+                LiteralToolArgumentBinding or OmittedToolArgumentBinding => (ScopedResourceAddress?)null,
+                _ => throw new ToolDefinitionValidationException("tool_definition_binding_invalid", "Bindings require an exact scoped resource reference.")
+            };
+            if (address is null) continue;
+            var identity = await BindingIdentityAsync(address.Value, cancellationToken);
+            identities.Add(new(binding.Path, identity));
+        }
+        return (properties, source, identities, relayDepth);
     }
 
     public async Task<Guid> BindingIdentityAsync(ScopedResourceAddress address, CancellationToken cancellationToken)

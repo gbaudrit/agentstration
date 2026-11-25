@@ -1058,3 +1058,9 @@ the existing discovery boundary. Stable instruction keys reconnect to unfinished
 runs or reuse completed evidence. Process restarts retain existing Interrupted
 semantics; there is no automatic replay, rollback, consumer repinning or operation
 reactivation.
+
+## Workspace seed entry
+
+[Workspace seeds](workspace-seeds.md) reuse this preview/application journey to configure a new Project
+connector from bounded acquired content. They require an existing explicit Workspace and installed
+capabilities; they never apply Instance/Tenant profiles or automatically replay Bootstrap on sharing pulls.

@@ -334,3 +334,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 269. [ADR-0269 — Task execution evidence projects canonical plan attempts](0269-task-execution-evidence-projects-canonical-plan-attempts.md)
 
 270. [ADR-0270 — Coding CLI Runs use AWP and an isolated native helper](0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md)
+
+271. [ADR-0271 — Workspace seeds reuse pinned Bootstrap and explicit sharing handover](0271-workspace-seeds-reuse-pinned-bootstrap-and-explicit-sharing-handover.md)

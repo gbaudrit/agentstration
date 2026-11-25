@@ -17,7 +17,7 @@ public sealed partial class BootstrapProfileManagementService
     {
         var applications = selection.Applications ?? [];
         if (applications.Count is 0 || applications.Count > catalog.MaximumSelectedProfiles
-            || selection.Profiles.Count != 0 || selection.Target is not null || selection.Source is not null || selection.Bindings is { Count: > 0 }
+            || selection.Profiles.Count != 0 || selection.Target is not null || selection.Source is not null || selection.Seed is not null || selection.Bindings is { Count: > 0 }
             || applications.Any(item => item is null)
             || applications.Select(item => item.Profile).Distinct(StringComparer.Ordinal).Count() != applications.Count)
             throw new DeclarativeBootstrapException("bootstrap_selection_invalid");
@@ -235,7 +235,7 @@ public sealed partial class BootstrapProfileManagementService
         BootstrapBindingTargetsRequest request, Guid actorPrincipalId, CancellationToken cancellationToken)
     {
         await EnsurePlatformAdministratorAsync(actorPrincipalId, cancellationToken);
-        if (request.Target is not null || request.Source is not null || request.Profiles is { Count: > 0 } || !Enum.IsDefined(request.TargetKind))
+        if (request.Target is not null || request.Source is not null || request.Seed is not null || request.Profiles is { Count: > 0 } || !Enum.IsDefined(request.TargetKind))
             throw new DeclarativeBootstrapException("bootstrap_bindings_invalid");
         var plan = await LoadPlanAsync(new([], Applications: request.Applications), actorPrincipalId, cancellationToken, requireBindings: false);
         var consumerIndex = plan.ToList().FindIndex(item => item.Application.Profile == request.ConsumerProfile);

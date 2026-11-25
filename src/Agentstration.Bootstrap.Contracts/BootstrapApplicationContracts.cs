@@ -75,6 +75,9 @@ public sealed record BootstrapApplicationProperties
     public BootstrapApplicationTarget? Target { get; init; }
     public IReadOnlyList<BootstrapBindingSelection> Bindings { get; init; } = [];
     public BootstrapSourceProvenance? SourceProvenance { get; init; }
+    public WorkspaceSeedProvenance? SeedProvenance { get; init; }
+    public IReadOnlyList<WorkspaceSeedPrerequisite> SeedPrerequisites { get; init; } = [];
+    public WorkspaceSeedHandover? SeedHandover { get; init; }
     public string Digest { get; init; } = string.Empty;
     public DateTimeOffset StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }

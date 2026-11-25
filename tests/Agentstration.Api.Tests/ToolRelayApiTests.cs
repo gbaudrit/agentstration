@@ -24,7 +24,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Agentstration.Management.Tests;
 
 [TestClass]
-public sealed class ToolRelayApiTests : ModelManagementApiTestBase
+public sealed partial class ToolRelayApiTests : ModelManagementApiTestBase
 {
     [TestMethod]
     [DataRow("Instance")]

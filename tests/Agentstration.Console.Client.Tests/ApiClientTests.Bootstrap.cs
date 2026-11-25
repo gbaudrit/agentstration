@@ -69,6 +69,32 @@ public sealed partial class ApiClientTests
         Assert.AreEqual("bootstrap_invalid", error.ProblemTitle);
     }
 
+    [TestMethod]
+    public async Task SeedClientPreservesTheExactPinAndTargetInPreviewAndApplication()
+    {
+        var target = new BootstrapApplicationTarget(Guid.NewGuid(), Guid.NewGuid());
+        var pin = new WorkspaceSeedSelection(Guid.NewGuid(), new string('a', 64));
+        var calls = 0;
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            calls++;
+            if (request.RequestUri!.AbsolutePath.EndsWith("preview", StringComparison.Ordinal))
+            {
+                var value = request.Content!.ReadFromJsonAsync<BootstrapProfilePreviewRequest>().GetAwaiter().GetResult()!;
+                Assert.AreEqual(pin, value.Seed); Assert.AreEqual(target, value.Target); Assert.HasCount(0, value.Profiles);
+                return new(HttpStatusCode.OK) { Content = JsonContent.Create(new BootstrapCompositionPreview([], BootstrapProfileScope.Workspace, target, [], "digest", [])) };
+            }
+            var application = request.Content!.ReadFromJsonAsync<ApplyBootstrapProfilesRequest>().GetAwaiter().GetResult()!;
+            Assert.AreEqual(pin, application.Seed); Assert.AreEqual(target, application.Target);
+            return new(HttpStatusCode.Accepted) { Content = JsonContent.Create(BootstrapApplication("seed-application")) };
+        }))
+        { BaseAddress = new("http://localhost/") };
+        var client = new BootstrapProfilesApiClient(http); var selection = new BootstrapProfileSelection([], target) { Seed = pin };
+        _ = await client.PreviewAsync(selection, default);
+        _ = await client.ApplyAsync(selection, "digest", default, Guid.NewGuid());
+        Assert.AreEqual(2, calls);
+    }
+
     private static BootstrapApplicationResource BootstrapApplication(string name) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,

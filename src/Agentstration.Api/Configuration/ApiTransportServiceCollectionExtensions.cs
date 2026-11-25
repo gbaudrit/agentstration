@@ -71,6 +71,7 @@ public static class ApiTransportServiceCollectionExtensions
     {
         services.AddSingleton<BootstrapProfileCatalog>();
         services.AddSingleton<SourceBootstrapProfileLoader>();
+        services.AddScoped<WorkspaceSeedService>();
         services.AddSingleton<BootstrapApplicationLock>();
         services.AddHostedService<BootstrapApplicationWorker>();
         services.AddScoped<BootstrapProfileManagementService>();

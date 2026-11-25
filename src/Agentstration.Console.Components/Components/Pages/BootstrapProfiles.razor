@@ -44,6 +44,27 @@ else
     <div class="bootstrap-workflow">
     @if (screen == BootstrapScreen.Prepare)
     {
+        <FormSection Title="@T("Seed.Title")" TestId="workspace-seed-input"><ChildContent>
+            <p>@T("Seed.Help")</p>
+            <FormField Label="@T("Seed.Workspace")"><ClearableSelect TValue="string" @bind-Value="seedWorkspace" disabled="@(busy || seedReceipt is not null)">
+                <option value="">@T("SelectWorkspace")</option>
+                @foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId.ToString()">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName</option> }
+            </ClearableSelect></FormField>
+            @if (seedReceipt is null)
+            {
+                <FormField Label="@T("Seed.Document")" Id="workspace-seed-document"><ClearableText Multiline rows="5" @bind-Value="seedDocument" @bind-Value:after="ResetSeedRequest" maxlength="65536" Disabled="@busy" data-testid="workspace-seed-document" /></FormField>
+                <FormField Label="@T("Seed.Url")" Id="workspace-seed-url"><ClearableText Type="url" @bind-Value="seedUrl" @bind-Value:after="ResetSeedRequest" maxlength="2048" Disabled="@busy" data-testid="workspace-seed-url" /></FormField>
+                <FormField Label="@T("Seed.Archive")" Id="workspace-seed-archive"><InputFile id="workspace-seed-archive" OnChange="ReadSeedArchiveAsync" accept=".zip,application/zip" disabled="@busy" /></FormField>
+                @if (seedArchiveName is not null) { <p>@seedArchiveName</p> }
+                <FormActions><button type="button" class="button-secondary" disabled="@(busy || string.IsNullOrEmpty(seedWorkspace))" @onclick="IngestSeedAsync">@T("Seed.Ingest")</button></FormActions>
+            }
+            else
+            {
+                <p>@T("Seed.Pinned", seedReceipt.Provenance.Version, seedReceipt.Provenance.ProviderRevision)</p>
+                <code style="overflow-wrap:anywhere">@seedReceipt.Provenance.ArchiveDigest</code>
+                <FormActions><button type="button" class="button-secondary" disabled="@busy" @onclick="ClearSeed">@T("Seed.Clear")</button></FormActions>
+            }
+        </ChildContent></FormSection>
         @if (selectedProfiles.Count > 0)
         {
             <FormSection Title="@T("SelectProfiles")" Class="bootstrap-preparation"><ChildContent><div class="bootstrap-preparation-content">
@@ -63,7 +84,7 @@ else
                             else
                             {
                                 <FormField Label="@T("TargetForProfile", profile.DisplayName)" Class="bootstrap-target">
-                                    <ClearableSelect TValue="string" Value="@targetChoices.GetValueOrDefault(name, string.Empty)" ValueChanged="value => SelectProfileTargetAsync(name, value)" disabled="@busy" data-target-profile="@name">
+                                    <ClearableSelect TValue="string" Value="@targetChoices.GetValueOrDefault(name, string.Empty)" ValueChanged="value => SelectProfileTargetAsync(name, value)" disabled="@(busy || seedReceipt is not null)" data-target-profile="@name">
                                         <option value="">@(profile.Scope == BootstrapProfileScope.Tenant ? T("SelectTenant") : T("SelectWorkspace"))</option>
                                         @foreach (var target in TargetOptions(name)) { <option value="@target.Value">@target.Label</option> }
                                     </ClearableSelect>
@@ -73,7 +94,7 @@ else
                                 <button type="button" class="text-button" disabled="@(busy || !CanMove(index, -1))" @onclick="() => Move(index, -1)">@T("Up")</button>
                                 <button type="button" class="text-button" disabled="@(busy || !CanMove(index, 1))" @onclick="() => Move(index, 1)">@T("Down")</button>
                             </span>
-                            <div class="bootstrap-profile-source"><BootstrapProfileSourceViewer Profile="@name" Source="@sourceSelection" ExpectedDigest="@profile.Digest" /></div>
+                            <div class="bootstrap-profile-source"><BootstrapProfileSourceViewer Profile="@name" Source="@sourceSelection" Seed="@SeedPin" Target="@seedReceipt?.Provenance.Target" ExpectedDigest="@profile.Digest" /></div>
                         </li>
                     }
                     </ol></div>
@@ -129,10 +150,11 @@ else
     }
     else if (screen == BootstrapScreen.Preview && preview is not null)
     {
+        <WorkspaceSeedReview Provenance="@preview.SeedProvenance" Prerequisites="@preview.SeedPrerequisites" />
         <FormSection Title="@T("ViewSourceFiles")"><ChildContent>
             @foreach (var profile in preview.Profiles)
             {
-                <div><strong>@profile.DisplayName</strong><BootstrapProfileSourceViewer @key="profile.Name" Profile="@profile.Name" Source="@sourceSelection" ExpectedDigest="@profile.Digest" /></div>
+                <div><strong>@profile.DisplayName</strong><BootstrapProfileSourceViewer @key="profile.Name" Profile="@profile.Name" Source="@sourceSelection" Seed="@SeedPin" Target="@seedReceipt?.Provenance.Target" ExpectedDigest="@profile.Digest" /></div>
             }
         </ChildContent></FormSection>
         @if (preview.Inputs.Count > 0)
@@ -154,7 +176,7 @@ else
         <Information Context="item">
             <CollectionValue Label="@T("Profile")"><code>@item.Profile</code></CollectionValue>
             <CollectionValue Label="@T("Target")">@item.TargetLabel</CollectionValue>
-            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <StatusBadge Text="@PreviewMessage(item.Message)" Status="UiStatus.Warning" /> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@(detail.Description is null ? null : PreviewMessage(detail.Description))</small></li> }</ul> }</CollectionValue>
+            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <span class="bootstrap-resource-diagnostic">@PreviewMessage(item.Message)</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@(detail.Description is null ? null : PreviewMessage(detail.Description))</small></li> }</ul> }</CollectionValue>
         </Information>
     </CollectionView>
             <CollectionPager Page="@previewPage" Total="@preview.Resources.Count" PageSize="25" HasMore="@(previewPage * 25 < preview.Resources.Count)" SupportsDirectNavigation="true" PageChanged="value => previewPage = value" />
@@ -176,6 +198,7 @@ else
                 @if (observationInterrupted) { <p class="inline-warning" role="status">@T("ObservationInterrupted")</p> }
                 @if (selectedApplication.Definition.Error is not null && selectedApplication.Definition.Status is not BootstrapApplicationStatus.Failed and not BootstrapApplicationStatus.PartiallyApplied) { <p class="error-panel" role="alert">@ApplicationError(selectedApplication.Definition.Error)</p> }
                 <BootstrapApplicationProgress Application="@selectedApplication" TargetLabel="@ApplicationTargetLabel(selectedApplication)" />
+                <WorkspaceSeedReview Provenance="@selectedApplication.Definition.SeedProvenance" Prerequisites="@selectedApplication.Definition.SeedPrerequisites" Handover="@selectedApplication.Definition.SeedHandover" />
                 <details class="bootstrap-application-audit"><summary>@T("ApplicationDetail")</summary>
             <dl class="resource-details">
                 <dt>@T("ApplicationDetail")</dt><dd><code>@selectedApplication.Metadata.Name</code></dd>
@@ -230,6 +253,61 @@ else
     {
         inputSelections = inputSelections.Where(item => item.Profile != input.Profile || item.Configuration != input.Configuration).Append(input).ToArray();
         inputsChanged = true;
+    }
+    [SupplyParameterFromQuery(Name = "seedId")] public Guid? SeedId { get; set; }
+    [SupplyParameterFromQuery(Name = "seedTenantId")] public Guid? SeedTenantId { get; set; }
+    [SupplyParameterFromQuery(Name = "seedWorkspaceId")] public Guid? SeedWorkspaceId { get; set; }
+    private WorkspaceSeedReceipt? seedReceipt;
+    private WorkspaceSeedSelection? SeedPin => seedReceipt is { } receipt ? new(receipt.Provenance.Id, receipt.Provenance.ArchiveDigest) : null;
+    private string seedWorkspace = string.Empty;
+    private string? seedDocument = string.Empty, seedUrl = string.Empty;
+    private string? seedArchive, seedArchiveName;
+    private Guid seedRequest = Guid.NewGuid();
+    private void ResetSeedRequest() => seedRequest = Guid.NewGuid();
+    private async Task ReadSeedArchiveAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            await using var stream = args.File.OpenReadStream(WorkspaceSeedFormat.MaximumArchiveBytes, lifetime.Token);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory, lifetime.Token);
+            seedArchive = Convert.ToBase64String(memory.ToArray()); seedArchiveName = args.File.Name;
+            seedRequest = Guid.NewGuid();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { seedArchive = null; seedArchiveName = null; error = T("Seed.InputInvalid"); }
+    }
+    private async Task IngestSeedAsync()
+    {
+        var target = view?.Workspaces.SingleOrDefault(item => item.WorkspaceId.ToString() == seedWorkspace);
+        if (target is null) { error = T("Seed.InputInvalid"); return; }
+        var document = string.IsNullOrWhiteSpace(seedDocument) ? null : seedDocument.Trim();
+        var url = string.IsNullOrWhiteSpace(seedUrl) ? null : Uri.TryCreate(seedUrl.Trim(), UriKind.Absolute, out var parsed) ? parsed : null;
+        if (!string.IsNullOrWhiteSpace(seedUrl) && url is null || new[] { document is not null, url is not null, seedArchive is not null }.Count(value => value) != 1)
+        { error = T("Seed.InputInvalid"); return; }
+        busy = true; error = null;
+        try
+        {
+            var receipt = await Client.IngestSeedAsync(new(seedRequest, new(target.TenantId, target.WorkspaceId), seedArchive, document, url), lifetime.Token);
+            SelectSeed(receipt); seedDocument = seedUrl = string.Empty; seedArchive = null;
+            Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["seedId"] = receipt.Provenance.Id,
+                ["seedTenantId"] = target.TenantId, ["seedWorkspaceId"] = target.WorkspaceId, ["stage"] = null, ["applicationId"] = null }), replace: true);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
+        finally { busy = false; }
+    }
+    private void SelectSeed(WorkspaceSeedReceipt receipt)
+    {
+        seedReceipt = receipt; sourceSelection = null; sourceProfile = receipt.Profile;
+        seedWorkspace = receipt.Provenance.Target.WorkspaceId!.Value.ToString();
+        selectedProfiles.Clear(); selectedProfiles.Add(receipt.Profile.Name); targetChoices.Clear();
+        targetChoices[receipt.Profile.Name] = seedWorkspace; bindingOptions.Clear(); inputSelections = [];
+        preview = null; previewSelection = null; SyncBindings();
+    }
+    private void ClearSeed()
+    {
+        seedReceipt = null; sourceProfile = null; selectedProfiles.Clear(); targetChoices.Clear(); bindingTargets.Clear();
+        preview = null; previewSelection = null; seedRequest = Guid.NewGuid(); seedArchiveName = null; inputSelections = [];
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["seedId"] = null, ["seedTenantId"] = null, ["seedWorkspaceId"] = null, ["stage"] = null }), replace: true);
     }
     [SupplyParameterFromQuery(Name = "stage")] public string? Stage { get; set; }
     [SupplyParameterFromQuery(Name = "applicationId")] public string? ApplicationId { get; set; }
@@ -337,7 +415,9 @@ else
                 selectedApplication ??= lastApplication;
             }
             observation ??= ObserveApplicationsAsync();
-            if (TrySourceSelection() is { } selection)
+            if (SeedId is { } seed && SeedTenantId is { } tenant && SeedWorkspaceId is { } workspace)
+                SelectSeed(await Client.GetSeedAsync(seed, new(tenant, workspace), lifetime.Token));
+            else if (TrySourceSelection() is { } selection)
             {
                 sourceSelection = selection;
                 sourceProfile = await Client.GetSourceProfileAsync(selection, lifetime.Token);
@@ -353,11 +433,11 @@ else
 
     private void Deny()
     {
-        denied = true; view = null; selectedApplication = lastApplication = null; sourceProfile = null; sourceSelection = null; preview = null;
+        denied = true; view = null; selectedApplication = lastApplication = null; sourceProfile = null; sourceSelection = null; seedReceipt = null; preview = null;
         selectedProfiles.Clear(); targetChoices.Clear(); bindingTargets.Clear(); bindingOptions.Clear(); confirmApply = configurationOpen = false; screen = BootstrapScreen.Prepare;
     }
 
-    private bool CanSelect(BootstrapProfileSummary profile) => sourceSelection is null && profile.Valid && (selectedProfiles.Contains(profile.Name) || selectedProfiles.Count < 16);
+    private bool CanSelect(BootstrapProfileSummary profile) => seedReceipt is null && sourceSelection is null && profile.Valid && (selectedProfiles.Contains(profile.Name) || selectedProfiles.Count < 16);
     private void ToggleProfile(BootstrapProfileSummary profile, ChangeEventArgs args)
     {
         if (args.Value is true && !selectedProfiles.Contains(profile.Name)) selectedProfiles.Add(profile.Name);
@@ -420,7 +500,7 @@ else
                 var target = SelectedTarget(item.Profile)?.Target;
                 var request = sourceSelection is null && selectedProfiles.Count > 1
                     ? new BootstrapBindingTargetsRequest(null, item.TargetKind, [], Applications: Applications(), ConsumerProfile: item.Profile)
-                    : new(target, item.TargetKind, sourceSelection is null ? [item.Profile] : [], sourceSelection);
+                    : new(target, item.TargetKind, sourceSelection is null && seedReceipt is null ? [item.Profile] : [], sourceSelection) { Seed = SeedPin };
                 if (request.Applications is not null || target?.WorkspaceId is not null)
                     bindingOptions[item.Profile + "\n" + item.TargetKind] = await Client.GetBindingTargetsAsync(request, lifetime.Token);
             }
@@ -573,13 +653,13 @@ else
         if (message == "bootstrap_validation_after_dependencies") return T("ValidationDeferredLabel");
         var parts = message.Split(':', 2);
         var value = Localizer["Diagnostic." + parts[0]];
-        return value.ResourceNotFound ? message : value.Value + (parts.Length == 2 ? ":" + parts[1] : string.Empty);
+        return value.ResourceNotFound ? SeedPin is not null || message.StartsWith("bootstrap_tool_", StringComparison.Ordinal) ? T("Seed.ResourceInvalid") + " (" + message + ")" : message : value.Value + (parts.Length == 2 ? ":" + parts[1] : string.Empty);
     }
     private BootstrapProfileSelection Selection()
     {
         if (sourceSelection is not null || selectedProfiles.Count == 1)
-            return new(sourceSelection is null ? selectedProfiles.ToArray() : [], SelectedTarget(selectedProfiles[0])?.Target, Bindings(), sourceSelection,
-                Inputs: inputSelections.Where(input => selectedProfiles.Contains(input.Profile)).ToArray());
+            return new(sourceSelection is null && seedReceipt is null ? selectedProfiles.ToArray() : [], seedReceipt?.Provenance.Target ?? SelectedTarget(selectedProfiles[0])?.Target, Bindings(), sourceSelection,
+                Inputs: inputSelections.Where(input => selectedProfiles.Contains(input.Profile)).ToArray()) { Seed = SeedPin };
         return new([], Applications: Applications(), Inputs: inputSelections.Where(input => selectedProfiles.Contains(input.Profile)).ToArray());
     }
     private IReadOnlyList<BootstrapProfileApplication> Applications() => selectedProfiles.Select(name => new BootstrapProfileApplication(name,
@@ -606,6 +686,7 @@ else
         "bootstrap_application_invalid" or "bootstrap_request_identity_required" or "bootstrap_selection_invalid" => T("ApplicationInvalid"),
         "bootstrap_request_identity_conflict" => T("RequestIdentityConflict"),
         "bootstrap_request_identity_limit" or "bootstrap_application_queue_full" => T("ApplicationQueueFull"),
+        _ when code.StartsWith("seed_", StringComparison.Ordinal) => T("Seed.Failed") + " (" + code + ")",
         _ => code
     };
     private string ScopeLabel(BootstrapProfileScope scope) => T($"Scope.{scope}");

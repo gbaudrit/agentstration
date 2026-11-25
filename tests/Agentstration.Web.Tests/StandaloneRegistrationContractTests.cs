@@ -130,7 +130,7 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(Agentstration.Application.Work.IWorkPlanAdmissionGate)] = 3,
             [typeof(Agentstration.Flows.Application.IFlowRuntimeDefinitionResolver)] = 1,
             [typeof(Agentstration.Runtime.Abstractions.IRuntimeCapabilityMaterialProvider)] = 1,
-            [typeof(IBootstrapResourceHandler)] = 34,
+            [typeof(IBootstrapResourceHandler)] = 35,
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = 6,
             [typeof(IPackResourceHandler)] = 11,
             [typeof(IAepEnrollmentResourceProvisioner)] = 5,

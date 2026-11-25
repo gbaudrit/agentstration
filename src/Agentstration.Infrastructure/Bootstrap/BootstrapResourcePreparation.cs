@@ -12,6 +12,7 @@ using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
+using Agentstration.Tools;
 using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.Infrastructure.Bootstrap;
@@ -56,7 +57,7 @@ public sealed class BootstrapResourcePreparation(
             var configured = status == SecretValueStatus.Configured;
             _ = await InputAsync(initializer, secured: true, configured, null);
         }
-        else if (resource.Kind is "Parameter" or "DataSource")
+        else if (resource.Kind is "Parameter" or "DataSource" or "ProjectSharing")
             await InitializeAsync(root);
 
         if (resource.Kind is "ConnectedService" or "Storage")
@@ -97,7 +98,7 @@ public sealed class BootstrapResourcePreparation(
                 fingerprints.Add(root["type"]!.ToJsonString());
             }
         }
-        if (resource.Kind == "ConnectedService" && root["bindings"] is JsonArray bindings)
+        if (resource.Kind is "ConnectedService" or "ToolDefinition" && root["bindings"] is JsonArray bindings)
             foreach (var binding in bindings.OfType<JsonObject>())
                 if (Selector(binding["secret"]) is { } secretSelector)
                 {
@@ -231,6 +232,9 @@ public sealed class BootstrapResourcePreparation(
             if (selectedExports is not null)
                 StorageManagementService.ValidateExportBindings(version, root["bindings"]?.Deserialize<StorageExportBinding[]>(Json) ?? [], selectedExports);
         }
+        if (deferred && resource.Kind == ToolResourceKinds.ToolDefinition)
+            planning.Register(ToolResourceKinds.Tool, AgentstrationToolProvider.ToolResourceName(
+                ToolDefinitionService.VersionName(resource.Metadata.Name, root["version"]?.GetValue<string>() ?? "1.0.0")), resource.Metadata.Namespace.Value, resource);
         return (result, deferred);
 
         void ResolveExports(IReadOnlyList<ConnectedServiceExportDescriptor> exports)
