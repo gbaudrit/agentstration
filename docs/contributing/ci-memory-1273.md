@@ -90,3 +90,28 @@ Moving only the 16 lightweight cases was insufficient; retain that rejected meas
 [Retained measurements and source/inventory proofs](/test-diagnostics/ci-1273-resync.json) use Release, SDK 10.0.404, child runtime **10.0.15** and Debian 13. The collector runtime field belongs to PowerShell, not the child. Concurrent browser hosts and format verification affect aggregate dotnet memory; compare the per-process peaks above. Warning budgets remain visible. No product allocation fix or Windows baseline is claimed.
 
 Release restore/build and changed-source formatting pass. Existing schema-contract browser regression maintenance also passes nine repeated checks; [native screenshots and reproduction](../ux/evidence/1257/ci-schema-contract-bindings/README.md) document the independent shell-readiness race. Full local functional coverage and final hosted CI were pending when this evidence was committed; PR #1273 Validation records their final results. Earlier results in this page remain historical to their stated revisions.
+
+## Main e052dadf and the next hosted memory breaches
+
+The [subsequent hosted run on a93b6fd7](https://github.com/gbaudrit/agentstration/actions/runs/45665894414) passes all 13 Bootstrap scenario cases at **741.0 MiB** (ceiling 700), and all 49 AEP cases at **1030.9 MiB** (ceiling 1024). Functional success does not waive either failure. Keep the already separated framework/startup workloads and additionally separate durable progress from scenarios, and automatic AEP enrollment from the core AEP process.
+
+After integrating `main` at `e052dadf`, the Data Sources process includes three new RSS transformation publication cases and passes 85 cases with five optional provider skips at **2407.6 MiB**, only 24.4 MiB below its unchanged 2432 MiB ceiling. Separate the three RSS rows into `Agentstration.Api.DataSources.Rss.Tests`, preserving the remaining 87 cases and the existing 2048/2432 MiB budgets on both modules. This removes a measured lack of margin without waiting for another hosted breach.
+
+Candidate product/test code: `171b792a74902bf2ad78bba01e62c06000aafc5e`. The new process boundaries preserve exact sorted discovery, including data rows: **13 = 6 scenarios + 7 progress**, **49 = 38 core AEP + 11 automatic enrollment**, **90 = 87 core Data Sources + 3 RSS**. Moved source Git blobs and LF-normalized method/helper extraction proofs are retained in [the report](/test-diagnostics/ci-1273-main-e052.json). The extracted shared fixtures are explicitly allowlisted by path; unrelated cross-project source compilation stays prohibited.
+
+| Uninstrumented local module | Passed | Optional skipped | Peak working set (MiB) | Failure ceiling (MiB) |
+| --- | ---: | ---: | ---: | ---: |
+| Agentstration.Management.Bootstrap.Tests | 34 | 0 | 569.5 | 700 |
+| Agentstration.Management.Bootstrap.Startup.Tests | 27 | 0 | 491.8 | 700 |
+| Agentstration.Management.Bootstrap.Scenarios.Tests | 6 | 0 | 458.4 | 700 |
+| Agentstration.Management.Bootstrap.Progress.Tests | 7 | 0 | 517.1 | 700 |
+| Agentstration.Management.Aep.Tests | 38 | 0 | 874.6 | 1024 |
+| Agentstration.Management.Aep.Automatic.Tests | 11 | 0 | 398.3 | 1024 |
+| Agentstration.Api.DataSources.Rss.Tests | 3 | 0 | 556.8 | 2432 |
+| Agentstration.Api.DataSources.Tests | 82 | 5 | 2078.8 | 2432 |
+
+Root solution, Integration, coverage shard A (Progress/RSS), coverage shard B (automatic AEP), internals access and the existing sequential hosted diagnostics include the new processes. Keep one class worker, every original assertion, unchanged budgets and lane concurrency. Warnings remain visible. These are process workload bounds, not a product allocation fix or a Windows baseline.
+
+Release solution build and changed-source formatting pass. The diagnostic-classification regression passes. All 14 final browser checks pass on the frozen candidate, including eight grid variants. The newly reproduced Data Source stale-load exception has its own deterministic product regression and [before/after evidence](../ux/evidence/1257/data-source-loading/README.md). New `main-e052dadf` grid screenshots and observations replace the prior validation as current evidence; the earlier statements about unchanged rendering apply only to the historical remediation sections above.
+
+Full serialized functional coverage is running when this evidence is committed; PR #1273 Validation records the completed result and final hosted checks. Browser hosts and uninstrumented diagnostics finished before coverage instrumentation started.

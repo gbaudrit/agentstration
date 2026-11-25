@@ -1,51 +1,50 @@
 {
-  "testedCommit": "1e52fb3e06c303b4ad32e10398edef214c1f780b",
-  "testCommand": "npm run test:smoke -- collection-layout.spec.ts --config=/tmp/1257-layout-evidence.config.mts",
-  "runtime": "Linux; Chromium 154; Playwright 1.63.0; frozen Release hosts; disposable local inventory fixture",
-  "sourceProofEncoding": "SHA-256 of UTF-8 text with LF line endings",
+  "testedCommit": "171b792a74902bf2ad78bba01e62c06000aafc5e",
+  "testCommand": "AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm exec playwright test -- collection-layout.spec.ts schema-contract-bindings.spec.ts schema-driven-flow-inputs.spec.ts schema-driven-sources.spec.ts --config=/tmp/1273-ux.config.mts",
+  "runtime": "Debian 13; Chromium 154; Playwright 1.63.0; SDK 10.0.404; child runtime .NET 10.0.15; frozen Release hosts; disposable native API inventory",
+  "sourceProofEncoding": "SHA-256 of source bytes with CRLF normalized to LF; paths relative to repository root",
   "sourceProof": {
+    "automation/playwright/fixtures/GovernedInventoryHost/CollectionLayoutSeeds.cs": "8709cf84e1dd1282e91493d872e33496ecba2787631fbe8bce94feb2df7ca557",
+    "automation/playwright/fixtures/GovernedInventoryHost/FixtureHost.cs": "0bcf6296e38c1ed843e9f9ca92053e7537b4d4f353feba426d89d8ba442258ba",
+    "automation/playwright/src/fixtures/product-hosts.ts": "43dc5d44e67a6cfdbb69d24d10503c7370970d6f6ca8a6ec7618c48fef3c44af",
+    "automation/playwright/src/fixtures/source-lifecycle.ts": "0e59e5f335e09177f46b5a641d3ae5a8f7701b83a6d39698d0386b111785a934",
+    "automation/playwright/src/pages/collection-layout.page.ts": "db8c2436617e461a363ff8119caf75c29b625237930cdbea65809994c1cb5a6a",
+    "automation/playwright/src/pages/transformation-function-collection.page.ts": "d31fd66f3c2c5e3391dd7daf7446d0c619abd95787bd8ac72b0be182f7f9e13e",
+    "automation/playwright/tests/collection-layout.spec.ts": "d291051360863a19ecc3bfbc758d6f7c3d65ed59841d385ef8bfaaf95f4b6209",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor": "e95d612b9b692c974b6721f2ac703d37825a122026bd7ec31bf38017a666ee89",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor.css": "fdef898f88c876434b6a2e87e53fd21907d0bb537fa52f5733d5f7e2d2b238ab",
     "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor": "7e5772785107d89531b8ce2fa58e0b7f0cb2117448ca4c77e63e704ef977b72d",
     "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor.css": "c67713a9f447a86e47b81bdb8a2db6a49f61ff474959f161df209e9e4d161a45",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "57431e2aa5cd9fa38e902bfc8603bcaddc4f966dc288e6a6f7d6bb33518bc696",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor": "9709fddb1e2deb2c4955e72628397f43647702db7c5914294f12b65b6922e714",
     "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor": "bf0db25d8e2a39fbe7173e4ce5f09f5755b3585a381ee1cf5bef04448d9d6289",
     "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor.css": "0191c518a013af334bfc8c259f9497abcd7e92792e8a7de14ac20648eba5c671",
-    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "7d60e68a32eb640079eeadb189f1f5103590a83d48822af35a4cddc31c86c551",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor": "ad0918ecd9300feb7da5e81d8f46fb39a6fc19c204ee0f20b157bb231c1aa88a",
     "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor": "43a7e2f4a34b081341d2acfae0d4ee43d25b9c020e3a905c7b09166a029ec06c",
     "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.css": "16a9512496ae965350afa9190a45122f584c2ea08bc5fd44f614a352d3edb9b0",
+    "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor": "dd984bf194b4ea2bd70d25dfa816fad08f6d23170ef2495df8c9b58e6a70980d",
+    "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor.css": "560ee17f6084eef271d043b30f8c69e5ed2d9dcf21747bc273c92eb20bd7861d",
     "src/Agentstration.Web.Components/CollectionIdentity.razor": "4f7abca6d18618884a3d152b5b0fa47f0ddace2624f18ebef35eae80ef123e69",
-    "src/Agentstration.Web.Components/ResourceScopeBadge.razor": "2975159d4d0dd11d6ba7cb1d65a919b0700551d4cb30c2407f1f584b878b0204",
-    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "8fe4f3f12ba17306e9b3506e9560f2a9695e1c152e1629659b0080e1ac4046f5",
-    "src/Agentstration.Web.Components/wwwroot/management.css": "f07a2850a20ae0f6c20e58863594b69caa4a8eb99cc5709e18d75ae7739bb815",
-    "src/Agentstration.Web.Components/wwwroot/collection-ui.js": "463ca21a209abd9fbe987d5852fa12dccfc1ca7c58110fe37f7c69cbe9829be6",
-    "src/Agentstration.Web.Components/wwwroot/dialog.js": "8c9d75ec30d717f861a698cc680f058e8df21b997a1090acb989f513e6a83699",
-    "src/Agentstration.Web.Components/wwwroot/agentstration.css": "a79eb40f961f6c2aa327dbd4944cbf09a7e65c1b23698ca1d87011f9f0367cc2",
     "src/Agentstration.Web.Components/CollectionView.razor": "93e933abd6791e5a3661d21baac1ee0463127f30198a81afceaa9ba9fc792cef",
     "src/Agentstration.Web.Components/DataGrid.razor": "a0bc6ca6f37c8e5450bf421a5db8b90c3047eccad830a25df5f37a988a774041",
     "src/Agentstration.Web.Components/ModalFrame.razor": "2f41cd1f5928c31e8c53b4c4e2be0ad69f0c0da255ac747864cd65ede039fdea",
-    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor": "fa41b7cb259961b1993f34531140dc3982cf3a3700a825cb1c7cb6fd591005e5",
-    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor.css": "c478cfc0eb44b9dcfced3b1c8815cad66bee88116f7e44f9e4dd495258b1da13",
+    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "8fe4f3f12ba17306e9b3506e9560f2a9695e1c152e1629659b0080e1ac4046f5",
     "src/Agentstration.Web.Components/ResourceNavigation.razor": "56ba15b89dc694e1d5df308746330f80bbe82a7c6282784d9b7176f78aa46025",
     "src/Agentstration.Web.Components/ResourceNavigation.razor.css": "d6248979605bbefe2b9371d10e61ae7d10f384d2bc231c0ce659c94d23fb0b8a",
-    "automation/playwright/src/pages/collection-layout.page.ts": "1d46b7592d2af133d34051659f30a477cf4a1480dbe849ac8d93bcef26f547f1",
-    "automation/playwright/src/pages/transformation-function-collection.page.ts": "d31fd66f3c2c5e3391dd7daf7446d0c619abd95787bd8ac72b0be182f7f9e13e",
-    "automation/playwright/tests/collection-layout.spec.ts": "d291051360863a19ecc3bfbc758d6f7c3d65ed59841d385ef8bfaaf95f4b6209",
-    "automation/playwright/fixtures/GovernedInventoryHost/CollectionLayoutSeeds.cs": "8709cf84e1dd1282e91493d872e33496ecba2787631fbe8bce94feb2df7ca557",
-    "automation/playwright/fixtures/GovernedInventoryHost/FixtureHost.cs": "0bcf6296e38c1ed843e9f9ca92053e7537b4d4f353feba426d89d8ba442258ba",
-    "automation/playwright/src/fixtures/source-lifecycle.ts": "0e59e5f335e09177f46b5a641d3ae5a8f7701b83a6d39698d0386b111785a934",
-    "automation/playwright/src/fixtures/product-hosts.ts": "fb5e5554d816bbb176c08e4bfacf8858fb072585d1464474aa96df589843f461",
-    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor": "e95d612b9b692c974b6721f2ac703d37825a122026bd7ec31bf38017a666ee89",
-    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor.css": "fdef898f88c876434b6a2e87e53fd21907d0bb537fa52f5733d5f7e2d2b238ab"
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor": "fa41b7cb259961b1993f34531140dc3982cf3a3700a825cb1c7cb6fd591005e5",
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor.css": "c478cfc0eb44b9dcfced3b1c8815cad66bee88116f7e44f9e4dd495258b1da13",
+    "src/Agentstration.Web.Components/ResourceScopeBadge.razor": "2975159d4d0dd11d6ba7cb1d65a919b0700551d4cb30c2407f1f584b878b0204",
+    "src/Agentstration.Web.Components/wwwroot/agentstration.css": "a79eb40f961f6c2aa327dbd4944cbf09a7e65c1b23698ca1d87011f9f0367cc2",
+    "src/Agentstration.Web.Components/wwwroot/collection-ui.js": "463ca21a209abd9fbe987d5852fa12dccfc1ca7c58110fe37f7c69cbe9829be6",
+    "src/Agentstration.Web.Components/wwwroot/dialog.js": "8c9d75ec30d717f861a698cc680f058e8df21b997a1090acb989f513e6a83699",
+    "src/Agentstration.Web.Components/wwwroot/management.css": "f07a2850a20ae0f6c20e58863594b69caa4a8eb99cc5709e18d75ae7739bb815"
   },
   "causeAndCorrection": "Les Actions hors de la vue déplacent horizontalement le tableau ; le Preview conserve ensuite ce décalage. La première colonne est désormais fixe pendant le défilement. Les colonnes durables ont des largeurs explicites pour conserver des en-têtes et dates lisibles.",
   "cases": [
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -360,38 +359,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-light-1440-closed.png",
-          "sha256": "68e72200ba6e1e0460a7f8db4f89d2464fcd829a01ed04dfa446775a1bf600ce",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-light-1440-actions.png",
-          "sha256": "5f36869fe340d756ca6b245d50514ad1167be65b18ce45e110b5aae65a7d34fd",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-light-1440-preview.png",
-          "sha256": "135dd35e5d1dd4a71255c1feb8b8af72fafc31c9788af54b5f4ee5a4d7d592fb",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-light-1440-after-close.png",
-          "sha256": "0c171fdd8c4733513f76e313e2a18684aedb2f59fd1c2894b3f27df09c590fe1",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-light/table-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-light/table-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-light/table-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-light/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -542,38 +525,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-light-1440-closed.png",
-          "sha256": "a9982cb4f5ad9d41495eba6b0e2386aee9d0b9e4fd55357e8ed485eeb9928a0e",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-light-1440-actions.png",
-          "sha256": "01c1d1e70b0d6d0b7ba4c128baefc922edc9708547ea1b8da9dd1873d5472ea3",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-light-1440-preview.png",
-          "sha256": "8ae0aa7069042a3fb94cf09f7fa60b8dba54ee5802d25a441992876babccce17",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-light-1440-after-close.png",
-          "sha256": "589a06fdaec92e3ea89375b84388ec2c41677d22baa6844a24d19eeac0bd04da",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-light/cards-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-light/cards-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-light/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-light/cards-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -888,38 +855,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-dark-1440-closed.png",
-          "sha256": "92dbc3626a4980a1d8485c55c75f1a196c50bfc7ec97ca06d8c6d9300c52c398",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-dark-1440-actions.png",
-          "sha256": "b7591f595baa8b7086fda808233d45e5cd516afb0597d549f0eaf257f4f6dbc6",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-dark-1440-preview.png",
-          "sha256": "3fbaf289161cc64668ea54f57ffd61376d8a25e26ad8d7ddbbe9cb2fe3d00a0c",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-dark-1440-after-close.png",
-          "sha256": "0f694559302e29614bf0f0af968b9474db07fccce9eb72e878d1fd0934b64892",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-dark/table-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-dark/table-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-dark/table-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-dark/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1070,38 +1021,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-dark-1440-closed.png",
-          "sha256": "6dce9d9a87b33771cb8e94d4a9a5d16c67a701d132e04bb8f3fe1320596e94b3",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-dark-1440-actions.png",
-          "sha256": "b2f9d7ee982e7cdd51496a3c53b7c674276c39e2c44c847d5ef78cabd16ee609",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-dark-1440-preview.png",
-          "sha256": "7e503cb4281cc5c227847ee6095240c5086af79f9c52d6b51030a49643f7d9f2",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-dark-1440-after-close.png",
-          "sha256": "c18ff2593034a24d380a6fc62b39ca6f23bbf7716fb9ec3dcc199896d64d981d",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-dark/cards-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-dark/cards-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-dark/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-dark/cards-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1416,38 +1351,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-light-390-closed.png",
-          "sha256": "ceb3a9a765828cf4c1fae166759c96aceae10932ae09ba08be4544b69238a961",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-light-390-actions.png",
-          "sha256": "2523f8a9ed8b882dd24bb9530d5b8078ecf733204848f4f1e53bc42fe593576a",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-light-390-preview.png",
-          "sha256": "65afa9dfb8e7cf24eb13d8b02e127c4bdc29b28e5daaa5aa6e9691850f99e9ac",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-light-390-after-close.png",
-          "sha256": "3e2cd372d482a9abee9962c77731ab1e98883c6aa94f41139f9da258bbfc14d5",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-light/table-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-light/table-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-light/table-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-light/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1598,38 +1517,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-light-390-closed.png",
-          "sha256": "c0e5f1421e625d3708c532d1d5a377820711c3e2164d86912fed76de1ecf1960",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-light-390-actions.png",
-          "sha256": "9c28591f1a768c83fc5a1dfdcb28a5497b89324c5755b0450782e8e178ec0833",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-light-390-preview.png",
-          "sha256": "e7bcf1b45b705522f1ae8b33c1b7c187648e661378c4b4c20cb4bbfb334f7db6",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-light-390-after-close.png",
-          "sha256": "ad87ca291b81be5efc73edf90ce298ab8504f65c6c5fd0f7ca7f91fd32bf0cb2",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-light/cards-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-light/cards-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-light/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-light/cards-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1944,38 +1847,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-dark-390-closed.png",
-          "sha256": "200fd579e139b7259b2d2098230f29067f1628529c09d9691e67dd318bece2f8",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-dark-390-actions.png",
-          "sha256": "81fb8ab75f271c0a51904e047b17bcaa1df5e86bc44d55372e0e6ff734150a43",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-dark-390-preview.png",
-          "sha256": "39bd717886edf01d973379c7fa569f1a46953f3295e3f2f62989ceb83bd878d3",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-dark-390-after-close.png",
-          "sha256": "e77733892655bc6a36180302cc8012191c3b62ed9e78dd76f2414a1d24a71c9f",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-dark/table-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-dark/table-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-dark/table-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-dark/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -2126,38 +2013,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-dark-390-closed.png",
-          "sha256": "ac18037bce5ca168c54ccd36b8c155ecdc5c74deae144183bcffeddaf387d532",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-dark-390-actions.png",
-          "sha256": "6aad0dcc0037f8cf4a6802ae3d380bd5dc65e382d62ed28a23196acc4af732ac",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-dark-390-preview.png",
-          "sha256": "39bd717886edf01d973379c7fa569f1a46953f3295e3f2f62989ceb83bd878d3",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-dark-390-after-close.png",
-          "sha256": "0165a682b291ce609c68eff87beb43f52ee16b528576c16868c948e205f87ed7",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-dark/cards-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-dark/cards-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-dark/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-dark/cards-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -2472,38 +2343,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-light-390-closed.png",
-          "sha256": "43b5b70cb5edbe8208e6230d1fabcfe9f4745df0ee6c8baaa2a35431d1f86ca7",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-fr-FR-light-390-actions.png",
-          "sha256": "a9cf469a72357394743caceea694898bcb8d5bd5418f8245fd44d074fec0319c",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-fr-FR-light-390-preview.png",
-          "sha256": "9a74e4adb4abc0b59b87def7a6df19adc51d3ca26cef8e916b2c253cbaa15797",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-fr-FR-light-390-after-close.png",
-          "sha256": "6b906a1d418d68570a65b590cf80ff46b05013e4e2baf0a167bb7d68c0e76e7e",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-light/table-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-light/table-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-light/table-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-light/table-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -2654,38 +2509,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-light-390-closed.png",
-          "sha256": "6e3f6fadd4ca1dea107f6b02b6cc54dd49eef7a57fb4090dae63f545e2be5bd2",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-light-390-actions.png",
-          "sha256": "fbdf5d628c1da5a31f76db43de1b353ad0163580ab3d7171c81ef13f577dba08",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-light-390-preview.png",
-          "sha256": "9a74e4adb4abc0b59b87def7a6df19adc51d3ca26cef8e916b2c253cbaa15797",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-light-390-after-close.png",
-          "sha256": "70ad6161601cacab47956fcf1304fc227f7dd0a94fbf793caad59b479dee21c3",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-light/cards-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-light/cards-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-light/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-light/cards-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "dark",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -3000,748 +2839,188 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-dark-390-closed.png",
-          "sha256": "94bd20d45e3133c5707f4c2c2d8e7c27df3a2c42a4152c9f8942d91421ec173c",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-fr-FR-dark-390-actions.png",
-          "sha256": "4349b3ca0bb5442defee1f6b1c79190fcac163dae6caf80e68338508ba561b8a",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-fr-FR-dark-390-preview.png",
-          "sha256": "6fc6dd438d7749003746da145bbfdc8f28cf03523ccd30d9b8ca4d988ae89437",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-fr-FR-dark-390-after-close.png",
-          "sha256": "db17b1cbd490a2f406f91f21d1e8f33ef9163dbfa161211ab1549ff040d5e915",
-          "visuallyInspected": true
-        }
-      }
-    },
-    {
-      "locale": "fr-FR",
-      "theme": "dark",
       "viewport": {
         "width": 390,
         "height": 844
       },
-      "view": "cards",
       "status": "passed",
-      "geometry": {
-        "before": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "actions": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "opened": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "closed": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 27,
-              "textLeft": 65.390625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        }
-      },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-dark-390-closed.png",
-          "sha256": "11f784f5182078e8b003ef8ff2bcab4a916853d98b752195e137fd0344283a2a",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-dark-390-actions.png",
-          "sha256": "44c5d398c9a3fccc045b707465230067cac227d293f62785c4b4f633fa43d89d",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-dark-390-preview.png",
-          "sha256": "aa0a592a3e51c8dc930229d6bd2fde4d2578f269ffe20cc5a2cc5902a0e98954",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-dark-390-after-close.png",
-          "sha256": "91eb2672afa081f8c454521c6a22f57483e43fbedb54e8c451035179f99e7058",
-          "visuallyInspected": true
-        }
-      }
-    },
-    {
-      "locale": "fr-FR",
-      "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
-      "view": "table",
-      "status": "passed",
-      "geometry": {
-        "before": {
-          "scrollLeft": 0,
-          "scrollWidth": 1072,
-          "clientWidth": 1072,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.46875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 243.546875,
-              "right": 567.734375,
-              "textRight": 405.234375
-            },
-            {
-              "width": 162.359375,
-              "right": 730.09375,
-              "textRight": 649.390625
-            },
-            {
-              "width": 113.65625,
-              "right": 843.75,
-              "textRight": 831.75
-            },
-            {
-              "width": 113.65625,
-              "right": 957.40625,
-              "textRight": 928.328125
-            },
-            {
-              "width": 97.40625,
-              "right": 1054.8125,
-              "textRight": 1025.984375
-            },
-            {
-              "width": 81.171875,
-              "right": 1135.984375,
-              "textRight": 1113.171875
-            },
-            {
-              "width": 129.890625,
-              "right": 1265.875,
-              "textRight": 1185.765625
-            },
-            {
-              "width": 129.9375,
-              "right": 1395.8125,
-              "textRight": 1336.9375
-            }
-          ]
-        },
-        "actions": {
-          "scrollLeft": 0,
-          "scrollWidth": 1072,
-          "clientWidth": 1072,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.46875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 243.546875,
-              "right": 567.734375,
-              "textRight": 405.234375
-            },
-            {
-              "width": 162.359375,
-              "right": 730.09375,
-              "textRight": 649.390625
-            },
-            {
-              "width": 113.65625,
-              "right": 843.75,
-              "textRight": 831.75
-            },
-            {
-              "width": 113.65625,
-              "right": 957.40625,
-              "textRight": 928.328125
-            },
-            {
-              "width": 97.40625,
-              "right": 1054.8125,
-              "textRight": 1025.984375
-            },
-            {
-              "width": 81.171875,
-              "right": 1135.984375,
-              "textRight": 1113.171875
-            },
-            {
-              "width": 129.890625,
-              "right": 1265.875,
-              "textRight": 1185.765625
-            },
-            {
-              "width": 129.9375,
-              "right": 1395.8125,
-              "textRight": 1336.9375
-            }
-          ]
-        },
-        "opened": {
-          "scrollLeft": 0,
-          "scrollWidth": 1072,
-          "clientWidth": 1072,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.46875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 243.546875,
-              "right": 567.734375,
-              "textRight": 405.234375
-            },
-            {
-              "width": 162.359375,
-              "right": 730.09375,
-              "textRight": 649.390625
-            },
-            {
-              "width": 113.65625,
-              "right": 843.75,
-              "textRight": 831.75
-            },
-            {
-              "width": 113.65625,
-              "right": 957.40625,
-              "textRight": 928.328125
-            },
-            {
-              "width": 97.40625,
-              "right": 1054.8125,
-              "textRight": 1025.984375
-            },
-            {
-              "width": 81.171875,
-              "right": 1135.984375,
-              "textRight": 1113.171875
-            },
-            {
-              "width": 129.890625,
-              "right": 1265.875,
-              "textRight": 1185.765625
-            },
-            {
-              "width": 129.9375,
-              "right": 1395.8125,
-              "textRight": 1336.9375
-            }
-          ]
-        },
-        "closed": {
-          "scrollLeft": 0,
-          "scrollWidth": 1072,
-          "clientWidth": 1072,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.96875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 55.46875,
-              "iconLeft": 340.1875,
-              "textLeft": 378.578125,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 243.546875,
-              "right": 567.734375,
-              "textRight": 405.234375
-            },
-            {
-              "width": 162.359375,
-              "right": 730.09375,
-              "textRight": 649.390625
-            },
-            {
-              "width": 113.65625,
-              "right": 843.75,
-              "textRight": 831.75
-            },
-            {
-              "width": 113.65625,
-              "right": 957.40625,
-              "textRight": 928.328125
-            },
-            {
-              "width": 97.40625,
-              "right": 1054.8125,
-              "textRight": 1025.984375
-            },
-            {
-              "width": 81.171875,
-              "right": 1135.984375,
-              "textRight": 1113.171875
-            },
-            {
-              "width": 129.890625,
-              "right": 1265.875,
-              "textRight": 1185.765625
-            },
-            {
-              "width": 129.9375,
-              "right": 1395.8125,
-              "textRight": 1336.9375
-            }
-          ]
-        }
-      },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-light-1440-closed.png",
-          "sha256": "3277a2707586a3019f23bd35a10b67576d791c5bcd55f9c2b0ac0b123efa006d",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-fr-FR-light-1440-actions.png",
-          "sha256": "532bbbc14c6db6a908cc9df8803807f2dac9e4257c355bf12d316b457bb94e28",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-fr-FR-light-1440-preview.png",
-          "sha256": "dcd6e0211b8966719ca728dd842511dfbe32cb5173ab45f1136c1aafce4a7ad3",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-fr-FR-light-1440-after-close.png",
-          "sha256": "e286f39b5a8c8e3bb5fe0ae4d1e872233f885d31c47d66f7ab2be8417bd9f884",
-          "visuallyInspected": true
-        }
-      }
-    },
-    {
-      "locale": "fr-FR",
-      "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
-      "view": "cards",
-      "status": "passed",
-      "geometry": {
-        "before": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 879.796875,
-              "textLeft": 918.1875,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "actions": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 879.796875,
-              "textLeft": 918.1875,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "opened": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 879.796875,
-              "textLeft": 918.1875,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "closed": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 879.796875,
-              "textLeft": 918.1875,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 309.71875,
-              "iconLeft": 336.1875,
-              "textLeft": 374.578125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        }
-      },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-light-1440-closed.png",
-          "sha256": "936cefcc5a3da7d121adee3cd08cfcb4ed5395bcf99a05e8b80ea1da8bcd136a",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-light-1440-actions.png",
-          "sha256": "ed0ca722dff0d1d90a6c5824d44e752c1b14f89b00e3380d0f80bf37dbe38db2",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-light-1440-preview.png",
-          "sha256": "f605f15750abf8f68f76eecdc39f1e57219857ee8cdba41736e5b6d01dbec835",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-light-1440-after-close.png",
-          "sha256": "fcb139d0db48c8a8ad176382427e4f0cda10f662e8c4e996dbb481008b47fe84",
-          "visuallyInspected": true
-        }
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-dark/table-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-dark/table-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-dark/table-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-dark/table-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "dark",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
+      "view": "cards",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
       },
-      "view": "table",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
       "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-dark/cards-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-dark/cards-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-dark/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-dark/cards-after-close.png"
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "view": "table",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -4056,38 +3335,518 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-dark-1440-closed.png",
-          "sha256": "7ea2107c1d699793c26e74f0ea290e803e885bbccd0cd772d3b20d766a1bcb5c",
-          "visuallyInspected": true
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-light/table-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-light/table-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-light/table-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-light/table-after-close.png"
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "view": "cards",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         },
         "actions": {
-          "path": "grids/table-fr-FR-dark-1440-actions.png",
-          "sha256": "a36dd58ca399f42badb783a1825a9de02a3b0bd61218e43423a78fe8c2b39148",
-          "visuallyInspected": true
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         },
-        "preview": {
-          "path": "grids/table-fr-FR-dark-1440-preview.png",
-          "sha256": "15dcb6919485029a3de39887698b7da156093da4aed457a8f5dd1e367ac45c16",
-          "visuallyInspected": true
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         },
-        "after-close": {
-          "path": "grids/table-fr-FR-dark-1440-after-close.png",
-          "sha256": "6bb27a38ed896f730bc2b2cdcae1d5379d8ef2201d63f9439a047fa402a54468",
-          "visuallyInspected": true
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         }
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-light/cards-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-light/cards-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-light/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-light/cards-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "dark",
+      "view": "table",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.46875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 243.546875,
+              "right": 567.734375,
+              "textRight": 405.234375
+            },
+            {
+              "width": 162.359375,
+              "right": 730.09375,
+              "textRight": 649.390625
+            },
+            {
+              "width": 113.65625,
+              "right": 843.75,
+              "textRight": 831.75
+            },
+            {
+              "width": 113.65625,
+              "right": 957.40625,
+              "textRight": 928.328125
+            },
+            {
+              "width": 97.40625,
+              "right": 1054.8125,
+              "textRight": 1025.984375
+            },
+            {
+              "width": 81.171875,
+              "right": 1135.984375,
+              "textRight": 1113.171875
+            },
+            {
+              "width": 129.890625,
+              "right": 1265.875,
+              "textRight": 1185.765625
+            },
+            {
+              "width": 129.9375,
+              "right": 1395.8125,
+              "textRight": 1336.9375
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.46875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 243.546875,
+              "right": 567.734375,
+              "textRight": 405.234375
+            },
+            {
+              "width": 162.359375,
+              "right": 730.09375,
+              "textRight": 649.390625
+            },
+            {
+              "width": 113.65625,
+              "right": 843.75,
+              "textRight": 831.75
+            },
+            {
+              "width": 113.65625,
+              "right": 957.40625,
+              "textRight": 928.328125
+            },
+            {
+              "width": 97.40625,
+              "right": 1054.8125,
+              "textRight": 1025.984375
+            },
+            {
+              "width": 81.171875,
+              "right": 1135.984375,
+              "textRight": 1113.171875
+            },
+            {
+              "width": 129.890625,
+              "right": 1265.875,
+              "textRight": 1185.765625
+            },
+            {
+              "width": 129.9375,
+              "right": 1395.8125,
+              "textRight": 1336.9375
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.46875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 243.546875,
+              "right": 567.734375,
+              "textRight": 405.234375
+            },
+            {
+              "width": 162.359375,
+              "right": 730.09375,
+              "textRight": 649.390625
+            },
+            {
+              "width": 113.65625,
+              "right": 843.75,
+              "textRight": 831.75
+            },
+            {
+              "width": 113.65625,
+              "right": 957.40625,
+              "textRight": 928.328125
+            },
+            {
+              "width": 97.40625,
+              "right": 1054.8125,
+              "textRight": 1025.984375
+            },
+            {
+              "width": 81.171875,
+              "right": 1135.984375,
+              "textRight": 1113.171875
+            },
+            {
+              "width": 129.890625,
+              "right": 1265.875,
+              "textRight": 1185.765625
+            },
+            {
+              "width": 129.9375,
+              "right": 1395.8125,
+              "textRight": 1336.9375
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.96875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 55.46875,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 243.546875,
+              "right": 567.734375,
+              "textRight": 405.234375
+            },
+            {
+              "width": 162.359375,
+              "right": 730.09375,
+              "textRight": 649.390625
+            },
+            {
+              "width": 113.65625,
+              "right": 843.75,
+              "textRight": 831.75
+            },
+            {
+              "width": 113.65625,
+              "right": 957.40625,
+              "textRight": 928.328125
+            },
+            {
+              "width": 97.40625,
+              "right": 1054.8125,
+              "textRight": 1025.984375
+            },
+            {
+              "width": 81.171875,
+              "right": 1135.984375,
+              "textRight": 1113.171875
+            },
+            {
+              "width": 129.890625,
+              "right": 1265.875,
+              "textRight": 1185.765625
+            },
+            {
+              "width": 129.9375,
+              "right": 1395.8125,
+              "textRight": 1336.9375
+            }
+          ]
+        }
+      },
       "viewport": {
         "width": 1440,
         "height": 1000
       },
-      "view": "cards",
       "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-dark/table-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-dark/table-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-dark/table-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-dark/table-after-close.png"
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "dark",
+      "view": "cards",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -4238,27 +3997,16 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-dark-1440-closed.png",
-          "sha256": "175975941607f37abbf1437fe1ae01ad2650a286e729ab4e0e3222a113358f46",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-dark-1440-actions.png",
-          "sha256": "aabd359fd5ab97486b9ae81f11807c22e5955e776d5677eb17c5afc0ba305092",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-dark-1440-preview.png",
-          "sha256": "a69bc53dc87ffadc724be7a0ecc02a1b3560238850ae7472cc14f9b58146aa0e",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-dark-1440-after-close.png",
-          "sha256": "56f11c0f3d6e77625b5dc472ca0294d40305ffa584e101220f049296d3ab64dc",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-dark/cards-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-dark/cards-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-dark/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-dark/cards-after-close.png"
       }
     }
   ],
@@ -4276,17 +4024,672 @@
   "visualInspection": {
     "status": "completed",
     "method": "view_image of every new viewport PNG at original readable size; no thumbnail-only inspection",
-    "date": "2026-11-22",
+    "date": "2026-11-25",
     "inspectedPngCount": 64,
     "totalAcrossThreeFamilies": 198,
-    "findings": "Les huit en-têtes tiennent à 1440 px. Icône et début du nom restent visibles, ellipse en fin de texte. À 390 px, la première colonne reste fixe pendant le défilement vers Actions. Les menus et le Preview sont lisibles ; la fermeture conserve le décalage horizontal.",
+    "findings": "Les huit en-têtes tiennent à 1440 px. Icône et début du nom restent visibles ; l’ellipse porte sur la fin du texte. À 390 px, la première colonne reste fixe pendant le défilement vers Actions. Menus et Preview lisibles, décalage horizontal conservé après fermeture.",
     "outstandingTargetedDefects": [],
-    "scope": "Original viewport PNGs, individually inspected at native readable size; visible grid regions, menu bounds, modal identity and close control. Automatic geometry also checks offscreen rows and horizontal offsets. No claim of full-page or every Preview section inspection.",
-    "scrollLimit": "Only horizontal position preservation is asserted; some native close navigation resets vertical position."
+    "scope": "Visible grid regions, menu, Preview identity and close button. Automatic geometry checks offscreen rows; only horizontal scroll preservation is asserted. All additional widths inspected.",
+    "scrollLimit": "Only horizontal position preservation is asserted; some native close navigation resets vertical position.",
+    "images": [
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "5a9776da8e786173d931e52f272671d9791d7f12f5024ebc2ad4acd67d5879de",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "e7bdf3146194b891fdcff3e69b5f5aa1a5933906b836aee90f529151be97216d",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "1e30d97c3a96b1d186fa47815db5943ff6fe2612acfed180e3f240c26a9c6676",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "89dcc3c60510058416f4c9e3fd4e0a42a5d5f53139315dfb782487643754af90",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "0fdea2dfd048cba55800d7e155be68bc471b7a49dbec826ebeeef7d9b309a6f5",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "78d1bcb82bfcd0937ee16ae3fd8a5b71e878c265fe49bfae1980ed8bfdc1e7ea",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "ae4b34b2efb31839752053c85f3f8585c23b5a630348be0fbf5b4c79dbea5176",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-dark",
+        "name": "artifacts-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "c5215b90221c2ccbeea22a539c0e1dbc6d5d683412dfe8208b1bc8a197b17a6e",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "8fecd708b7752e96c8081ee09f1117e40f9b551de835b13bff629ab7831c9e7f",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "7d9de2426abb2f1bd5b0ca93b222c9bde1d6d5101a3bfa5bbc16ba9d4a7f5c81",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "7071be62e15b029e352af019f2d6e39ceb2404ec5c660df5e9b5c57282f81d0c",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "4e4cc3808ec3737128801501049a5a4224128f5efef043843593db9428c741bd",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "2a3388bb6a2358b31303072f3e961b634e1ae98564f702c98ee0907f5f337988",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "65cd5afff43f1054657982dcbd490569b49057c7aaeaafcbd4d4bf77e0187862",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "db49b5417e8bd4846c8ee55d0f8e842f6a4a3fdc1a3afb498e16559f514feeb8",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-en-US-light",
+        "name": "artifacts-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "c426e823e66abceeb9052aaf9caff1f15abcc77d6ce5e44fc4a4cfef19bf05bd",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "ca376c166c07e6f575110c4bb31432c03d6a76fa4b0f85cbbad043cec76e2126",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "292d9121e890cb69ce0c4eb1127eb10a33a7c703008a6d2d414feba225ad48ae",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "fdf2c19df5de9b7bdc637c2aa3fee5d9aa8ddd2b5815401571980946d91364d4",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "4d4fe52dc02d8331d76b60142802d6070fd499b229de2939c6ddeb93a5d2f452",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "3d30860babf238bf302ad76442996118ec20fa417a14da974e0e504938ee4763",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "37fa931d34393433741bc228b1436ebb24c9a8c5de5e142d027a6c348182ee88",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "1817de7a223f707e75aa7f5b2efb5763f669c53ac1b547d2f23762e2a2711fc5",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-dark",
+        "name": "artifacts-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "aa2fffceaab12d62cf15b17182a8da000a16fd20fa410b9b56cdfee6eb322ada",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "956fff0ea48607b24149205892f28b050bc3d90eea750b0639d8cf245c78802b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "d55068a31117b966cdfdec18a97240af1f5b889160c385f1d70ecc02a7fd4b35",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "a0a25f24cab033b39105d8f5f4fa285005b6a042fe5879a6993477e05a5c4c8b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "2b2e39f5aea1d6055690288ff483f2a8c8b17baca16cefe0812530410aacb8ac",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-actions.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "5be5f2ecf36cc2fae1462b99aec8487b44c3d396551538f1024b2dfc4c85c58d",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-after-close.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "b66f8890840e00bb2f7c32246590338ae9ad82cf440f1515b44b27f4cb54b956",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-closed.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "7a09d046731b2e42fd6baa04fd6c23fe0e53c9f03a5a7d393652e34942cc8499",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-preview.png",
+        "family": "artifacts",
+        "variant": "desktop-fr-FR-light",
+        "name": "artifacts-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "042e66360d0667378fc83099b7f041cdc680db73972cafcc43659534403f16c4",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "f2694bc311b9511db8b89d772703ffe7f356bdef09b4c553af03e713d81aedc3",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "5238b5ee5e7db90704f43196503c82929c78848b5ad53735a7e17f29fb3f5c8b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "b1e698f59d148e1e21fc93b564331717a69726d0c57030c5e9fec4859dc1665d",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "be25e45aaa66b067a84ef1235fd41d24aa31bf23cba67307c98187dea6d06047",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "5fc7a3edb2fe4511bbbeea7dccf238e6123a44a8985c4a8c71c45bf0cacc5f3c",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "4e5c92a837edf4aed06572fcacda82ac8701c43648ccde809796696d241e95d8",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "266516ac45c6a784d50613c9c4a4e6f1f657aceb21f96fb09491a6e7e18ebec9",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-dark",
+        "name": "artifacts-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "be25e45aaa66b067a84ef1235fd41d24aa31bf23cba67307c98187dea6d06047",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "caae4e7e70812be5fcb618fca22f8babde1fc5173bd797e1888ea093a271a98e",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "adcd85d61827c226155e095e38c511f013c108b33bb9521f801d54fb505a7499",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "ea85ff6b10e2ca6854595f8a6a81fc69a443004fdcbc4c9a425f2d8ada198e34",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "cacb951ba87df0b043fb3240a038bdb6518bb6b6a261761e88de1853cd205644",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "daba9b04a9bfe8a43c86c24cce162928e535d3e4e353a9760be09cc4da1f3935",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "2e282a28444648c050654ff1d10d8b88ffcb1ead2d39f1fcb7cf10cd5b18db24",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "801b2bf4dbcb0db79a6936d17af5259e2e71114dc0ff11e728cb488577b59d82",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-en-US-light",
+        "name": "artifacts-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "a8309d8f9da431284d0e097682754649007ce967eedc66cff9eed9288662714b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "bf6671abe7eb18d07f5bd71f26474c1f4ca858f549fd23da7d15aa761c16ae26",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "29a0456eb253db6b45502d0a4218fe1855d3a356f0158c2efaea78432fd16b78",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "9b62f93d8bf486f944327de3b21cfa61a2f5d9bf1a602ffcc92dd280525609c9",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "29b023b0bf7c6e4c27cf95c5000c359d5473498f35881be96258d312d5d6b102",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "3ddd3912553979fca03fb85ae7caf9ed830ee38f9e2e40ad1e43b06ca9914481",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "e6a5c0e982c20a3c41492aa83c9dc7a561af3ec941941c8e3653f6214bbf0d9f",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "0e5279d6e86d7b476e33c42703b3411d287582246049254e4ba4f466d372eab3",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-dark",
+        "name": "artifacts-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "29b023b0bf7c6e4c27cf95c5000c359d5473498f35881be96258d312d5d6b102",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "6ec8549bb4a9df3455b740dbe6561821d886552ad076ab7cf8aeeda89c6562e6",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "3daae63cfade5f9a92b6d956bf8c5bc1d7c36e12ea0483aa9d558dfdae208cb3",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "83e8e95a63666883a1b0b77b031fd1f0846050ac8cfea393815373c967181ab8",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "418ca29944b11687b0b9e93f3a1c7dafe02f92f062fa924fa095de608d97c16d",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-actions.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "b1de48441584bc4e75b16662b9c05850ac4af2fc1a24ea23cfb15fea8d75d265",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-after-close.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "a8f2d7473676072a87dd717c75723a2278e120491f4852e8f7014b47ee1840d5",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-closed.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "db0663f052932e9c6dbba328e580fd345df4ae72c2d3bd5a05b18c4f26865097",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-preview.png",
+        "family": "artifacts",
+        "variant": "mobile-fr-FR-light",
+        "name": "artifacts-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "e16a08a98892ba81e9a168fbddbda01bbab726228b850b75872673ed2a4daabc",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      }
+    ]
   },
   "limitations": [
     "La coupure historique exacte à 1440 px n’a pas été reproduite avec les premières nouvelles données avant correction : scrollLeft restait à 0. Le même mécanisme a été reproduit dans le tableau à 390 px : 0 → 648 px.",
     "Le contrat des artefacts ne possède pas de Description enregistrée ; les noms de fichiers longs et métadonnées natives sont testés.",
-    "Les captures staged-artifact sont conservées dans les archives historiques ; cette revalidation porte sur les artefacts durables."
-  ]
+    "Les captures staged-artifact sont conservées dans les archives historiques ; cette revalidation porte sur les artefacts durables.",
+    "Les captures sont des vues de fenêtre natives, pas des pages entières ni toutes les sections du Preview. Les mesures couvrent aussi les lignes hors écran.",
+    "Seule la conservation du défilement horizontal est assertée ; certaines fermetures réinitialisent la position verticale.",
+    "La campagne locale utilise Chromium système sans vidéo ; les jobs hébergés restent nécessaires pour leur environnement propre."
+  ],
+  "integratedMain": "e052dadfe511b97985a040fefb76a4b37d544797",
+  "campaignResult": {
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "duration": "7.2 minutes",
+    "collectionVariants": 8
+  },
+  "historicalEvidence": "history/observations-original-1e52fb3e.json and original PNGs retained unchanged; original before-correction captures remain under history/before-visual-revalidation (and catalog-layout for functions)."
 }

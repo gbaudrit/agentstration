@@ -1,51 +1,50 @@
 {
-  "testedCommit": "1e52fb3e06c303b4ad32e10398edef214c1f780b",
-  "testCommand": "npm run test:smoke -- collection-layout.spec.ts --config=/tmp/1257-layout-evidence.config.mts",
-  "runtime": "Linux; Chromium 154; Playwright 1.63.0; frozen Release hosts; disposable local inventory fixture",
-  "sourceProofEncoding": "SHA-256 of UTF-8 text with LF line endings",
+  "testedCommit": "171b792a74902bf2ad78bba01e62c06000aafc5e",
+  "testCommand": "AGENTSTRATION_PLAYWRIGHT_NO_BUILD=true npm exec playwright test -- collection-layout.spec.ts schema-contract-bindings.spec.ts schema-driven-flow-inputs.spec.ts schema-driven-sources.spec.ts --config=/tmp/1273-ux.config.mts",
+  "runtime": "Debian 13; Chromium 154; Playwright 1.63.0; SDK 10.0.404; child runtime .NET 10.0.15; frozen Release hosts; disposable native API inventory",
+  "sourceProofEncoding": "SHA-256 of source bytes with CRLF normalized to LF; paths relative to repository root",
   "sourceProof": {
+    "automation/playwright/fixtures/GovernedInventoryHost/CollectionLayoutSeeds.cs": "8709cf84e1dd1282e91493d872e33496ecba2787631fbe8bce94feb2df7ca557",
+    "automation/playwright/fixtures/GovernedInventoryHost/FixtureHost.cs": "0bcf6296e38c1ed843e9f9ca92053e7537b4d4f353feba426d89d8ba442258ba",
+    "automation/playwright/src/fixtures/product-hosts.ts": "43dc5d44e67a6cfdbb69d24d10503c7370970d6f6ca8a6ec7618c48fef3c44af",
+    "automation/playwright/src/fixtures/source-lifecycle.ts": "0e59e5f335e09177f46b5a641d3ae5a8f7701b83a6d39698d0386b111785a934",
+    "automation/playwright/src/pages/collection-layout.page.ts": "db8c2436617e461a363ff8119caf75c29b625237930cdbea65809994c1cb5a6a",
+    "automation/playwright/src/pages/transformation-function-collection.page.ts": "d31fd66f3c2c5e3391dd7daf7446d0c619abd95787bd8ac72b0be182f7f9e13e",
+    "automation/playwright/tests/collection-layout.spec.ts": "d291051360863a19ecc3bfbc758d6f7c3d65ed59841d385ef8bfaaf95f4b6209",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor": "e95d612b9b692c974b6721f2ac703d37825a122026bd7ec31bf38017a666ee89",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor.css": "fdef898f88c876434b6a2e87e53fd21907d0bb537fa52f5733d5f7e2d2b238ab",
     "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor": "7e5772785107d89531b8ce2fa58e0b7f0cb2117448ca4c77e63e704ef977b72d",
     "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor.css": "c67713a9f447a86e47b81bdb8a2db6a49f61ff474959f161df209e9e4d161a45",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "57431e2aa5cd9fa38e902bfc8603bcaddc4f966dc288e6a6f7d6bb33518bc696",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceEditor.razor": "9709fddb1e2deb2c4955e72628397f43647702db7c5914294f12b65b6922e714",
     "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor": "bf0db25d8e2a39fbe7173e4ce5f09f5755b3585a381ee1cf5bef04448d9d6289",
     "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor.css": "0191c518a013af334bfc8c259f9497abcd7e92792e8a7de14ac20648eba5c671",
-    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "7d60e68a32eb640079eeadb189f1f5103590a83d48822af35a4cddc31c86c551",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctionEditor.razor": "ad0918ecd9300feb7da5e81d8f46fb39a6fc19c204ee0f20b157bb231c1aa88a",
     "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor": "43a7e2f4a34b081341d2acfae0d4ee43d25b9c020e3a905c7b09166a029ec06c",
     "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.css": "16a9512496ae965350afa9190a45122f584c2ea08bc5fd44f614a352d3edb9b0",
+    "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor": "dd984bf194b4ea2bd70d25dfa816fad08f6d23170ef2495df8c9b58e6a70980d",
+    "src/Agentstration.Console.Components/Components/TransformationFunctionResourceSummary.razor.css": "560ee17f6084eef271d043b30f8c69e5ed2d9dcf21747bc273c92eb20bd7861d",
     "src/Agentstration.Web.Components/CollectionIdentity.razor": "4f7abca6d18618884a3d152b5b0fa47f0ddace2624f18ebef35eae80ef123e69",
-    "src/Agentstration.Web.Components/ResourceScopeBadge.razor": "2975159d4d0dd11d6ba7cb1d65a919b0700551d4cb30c2407f1f584b878b0204",
-    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "8fe4f3f12ba17306e9b3506e9560f2a9695e1c152e1629659b0080e1ac4046f5",
-    "src/Agentstration.Web.Components/wwwroot/management.css": "f07a2850a20ae0f6c20e58863594b69caa4a8eb99cc5709e18d75ae7739bb815",
-    "src/Agentstration.Web.Components/wwwroot/collection-ui.js": "463ca21a209abd9fbe987d5852fa12dccfc1ca7c58110fe37f7c69cbe9829be6",
-    "src/Agentstration.Web.Components/wwwroot/dialog.js": "8c9d75ec30d717f861a698cc680f058e8df21b997a1090acb989f513e6a83699",
-    "src/Agentstration.Web.Components/wwwroot/agentstration.css": "a79eb40f961f6c2aa327dbd4944cbf09a7e65c1b23698ca1d87011f9f0367cc2",
     "src/Agentstration.Web.Components/CollectionView.razor": "93e933abd6791e5a3661d21baac1ee0463127f30198a81afceaa9ba9fc792cef",
     "src/Agentstration.Web.Components/DataGrid.razor": "a0bc6ca6f37c8e5450bf421a5db8b90c3047eccad830a25df5f37a988a774041",
     "src/Agentstration.Web.Components/ModalFrame.razor": "2f41cd1f5928c31e8c53b4c4e2be0ad69f0c0da255ac747864cd65ede039fdea",
-    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor": "fa41b7cb259961b1993f34531140dc3982cf3a3700a825cb1c7cb6fd591005e5",
-    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor.css": "c478cfc0eb44b9dcfced3b1c8815cad66bee88116f7e44f9e4dd495258b1da13",
+    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "8fe4f3f12ba17306e9b3506e9560f2a9695e1c152e1629659b0080e1ac4046f5",
     "src/Agentstration.Web.Components/ResourceNavigation.razor": "56ba15b89dc694e1d5df308746330f80bbe82a7c6282784d9b7176f78aa46025",
     "src/Agentstration.Web.Components/ResourceNavigation.razor.css": "d6248979605bbefe2b9371d10e61ae7d10f384d2bc231c0ce659c94d23fb0b8a",
-    "automation/playwright/src/pages/collection-layout.page.ts": "1d46b7592d2af133d34051659f30a477cf4a1480dbe849ac8d93bcef26f547f1",
-    "automation/playwright/src/pages/transformation-function-collection.page.ts": "d31fd66f3c2c5e3391dd7daf7446d0c619abd95787bd8ac72b0be182f7f9e13e",
-    "automation/playwright/tests/collection-layout.spec.ts": "d291051360863a19ecc3bfbc758d6f7c3d65ed59841d385ef8bfaaf95f4b6209",
-    "automation/playwright/fixtures/GovernedInventoryHost/CollectionLayoutSeeds.cs": "8709cf84e1dd1282e91493d872e33496ecba2787631fbe8bce94feb2df7ca557",
-    "automation/playwright/fixtures/GovernedInventoryHost/FixtureHost.cs": "0bcf6296e38c1ed843e9f9ca92053e7537b4d4f353feba426d89d8ba442258ba",
-    "automation/playwright/src/fixtures/source-lifecycle.ts": "0e59e5f335e09177f46b5a641d3ae5a8f7701b83a6d39698d0386b111785a934",
-    "automation/playwright/src/fixtures/product-hosts.ts": "fb5e5554d816bbb176c08e4bfacf8858fb072585d1464474aa96df589843f461",
-    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor": "e95d612b9b692c974b6721f2ac703d37825a122026bd7ec31bf38017a666ee89",
-    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor.css": "fdef898f88c876434b6a2e87e53fd21907d0bb537fa52f5733d5f7e2d2b238ab"
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor": "fa41b7cb259961b1993f34531140dc3982cf3a3700a825cb1c7cb6fd591005e5",
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor.css": "c478cfc0eb44b9dcfced3b1c8815cad66bee88116f7e44f9e4dd495258b1da13",
+    "src/Agentstration.Web.Components/ResourceScopeBadge.razor": "2975159d4d0dd11d6ba7cb1d65a919b0700551d4cb30c2407f1f584b878b0204",
+    "src/Agentstration.Web.Components/wwwroot/agentstration.css": "a79eb40f961f6c2aa327dbd4944cbf09a7e65c1b23698ca1d87011f9f0367cc2",
+    "src/Agentstration.Web.Components/wwwroot/collection-ui.js": "463ca21a209abd9fbe987d5852fa12dccfc1ca7c58110fe37f7c69cbe9829be6",
+    "src/Agentstration.Web.Components/wwwroot/dialog.js": "8c9d75ec30d717f861a698cc680f058e8df21b997a1090acb989f513e6a83699",
+    "src/Agentstration.Web.Components/wwwroot/management.css": "f07a2850a20ae0f6c20e58863594b69caa4a8eb99cc5709e18d75ae7739bb815"
   },
   "causeAndCorrection": "Le badge de périmètre textuel occupait la couche absolue IconBadges. Il utilise désormais Indicators, dans le flux normal, entre l’icône et le texte. Le conteneur imbriqué nécessite aussi min-width:0. Le tableau à deux colonnes réserve la place des Actions et borne l’identité longue ; les boutons ne peuvent plus être comprimés verticalement. La fermeture du Preview restaure le fragment natif #queries.",
   "cases": [
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -240,38 +239,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-light-1440-closed.png",
-          "sha256": "359b7cbdf361af80e6b0b2e25b51dd648d1d3ca85ec53e9e8e7e0416314401a2",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-light-1440-actions.png",
-          "sha256": "5ba24abd42a63d31346549e039d9d41a2029aba25ebdfb8ff522d739efeb62ee",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-light-1440-preview.png",
-          "sha256": "a60f9d5da14ced2ded87570a124b50805bdcc12440d7f9d6eaecd568a0f58ba8",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-light-1440-after-close.png",
-          "sha256": "7ccf7251816a36e1f94d37adc8f52d2ab6c9a1eeaa110b4419d3d3a32cafe23e",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-light/table-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-light/table-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-light/table-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-light/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -422,38 +405,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-light-1440-closed.png",
-          "sha256": "46f97cfc33526add844eab6a5fb45b134b525afba05ae7f1fc102997e1204da2",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-light-1440-actions.png",
-          "sha256": "f1640e9e6b041f45fcf01ece6c85389367119abd41b22793cb9ccf1dd4b59883",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-light-1440-preview.png",
-          "sha256": "92863791ed549fad07beea198a6be767de41c6d54d5d09725a34fa08dcd4df16",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-light-1440-after-close.png",
-          "sha256": "d509e521ed543323a938db683c087db8be82ee192d499d1bf443c650ee10d572",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-light/cards-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-light/cards-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-light/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-light/cards-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -648,38 +615,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-dark-1440-closed.png",
-          "sha256": "f2f73519e4ebc0d43efb5046d289db7ec2e22354cae87c8dcdc27be7ee9808f5",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-dark-1440-actions.png",
-          "sha256": "bb3899adfb7dd81114cf4967b663a59c38a4e59bfe6ca5eed5fa351390db6635",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-dark-1440-preview.png",
-          "sha256": "5e7a7ab3a0630ea2bd87cbea3b9aa04e74e3b0d253a321a636a174b78f5086d4",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-dark-1440-after-close.png",
-          "sha256": "2d9aede3a4b38df3e64fda27356fe375bda8bcb7b49a91b0810cf3b58a1b9e9a",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-dark/table-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-dark/table-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-dark/table-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-dark/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -830,38 +781,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-dark-1440-closed.png",
-          "sha256": "8a7dfc46bf8444f62b1bec77b8d8fb13d2850c5a6cf37751b8c46e411a45bea7",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-dark-1440-actions.png",
-          "sha256": "676b80e58bf376e197bbb66c9055004cc25d94ea34d4331818761e8fc318baeb",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-dark-1440-preview.png",
-          "sha256": "6595fb5016f1597afda36bd3abf33f9cc104b8426b1243bf56e2ef3d54cdb1c5",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-dark-1440-after-close.png",
-          "sha256": "994b126383f6bd5ef9cb85c737122985728064429a1e9b864f15c1b07fdc4057",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-en-US-dark/cards-closed.png",
+        "actions": "main-e052dadf/desktop-en-US-dark/cards-actions.png",
+        "preview": "main-e052dadf/desktop-en-US-dark/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-en-US-dark/cards-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1056,38 +991,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-light-390-closed.png",
-          "sha256": "f9588bc5b3a0bd2da651ab3ed01589b72d9e082d7b65d14ff237e4b1ae12a4af",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-light-390-actions.png",
-          "sha256": "45d0934a087e0c5bddeba30c8cf1274da9f3996521ff93e401834eb174647c18",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-light-390-preview.png",
-          "sha256": "dfc328eb981d27cbe15ddff61827ac281ab0f67f527ae34d9a3008b7e1c149cb",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-light-390-after-close.png",
-          "sha256": "8f7d904054822f6913c6accac2ef76f1511c3dd42ed6b9a8eb4aef78d6b0631f",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-light/table-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-light/table-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-light/table-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-light/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1238,38 +1157,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-light-390-closed.png",
-          "sha256": "6d09248d122a692bcc411441adb194d41937f6badc3a80157664a8a190711922",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-light-390-actions.png",
-          "sha256": "fd89717920aa8810c38b141a30f6ff51d028b7f0979b7319101032632deb30ae",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-light-390-preview.png",
-          "sha256": "dfc328eb981d27cbe15ddff61827ac281ab0f67f527ae34d9a3008b7e1c149cb",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-light-390-after-close.png",
-          "sha256": "b9df25ddb75bfece5302fa39cf0c492ad27b5fc452192f25df0975dbeebd78b8",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-light/cards-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-light/cards-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-light/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-light/cards-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1464,38 +1367,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-en-US-dark-390-closed.png",
-          "sha256": "87a22c63e7cf938537a3ea5f74ce2968cefa9db5fea236ae018b80e200ca1217",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-en-US-dark-390-actions.png",
-          "sha256": "b811ea9b1858d951b5499b1ab7e676bf439835b016cf3ef27b1fe822b891a24a",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-en-US-dark-390-preview.png",
-          "sha256": "300d546978ec4beefa216994f4086eff1cc0f4522b4145a8bc1df0b1f264f138",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-en-US-dark-390-after-close.png",
-          "sha256": "9df8f36e5821c8c4cbc1d1952a0cccb0e4ffc7c7fbc6a9bd57fbf38da93f51a8",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-dark/table-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-dark/table-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-dark/table-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-dark/table-after-close.png"
       }
     },
     {
       "locale": "en-US",
       "theme": "dark",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1646,38 +1533,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-en-US-dark-390-closed.png",
-          "sha256": "53f8e76ba09adb494934ffeeca07100f2ef4a3a69bec30c30d0ea2439ee2e348",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-en-US-dark-390-actions.png",
-          "sha256": "74e1806e44ac771bce39f2a4763704bd31b44ac8584b49b18b0e1a6dd6e0a8e4",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-en-US-dark-390-preview.png",
-          "sha256": "300d546978ec4beefa216994f4086eff1cc0f4522b4145a8bc1df0b1f264f138",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-en-US-dark-390-after-close.png",
-          "sha256": "c257fb00649f5df85ab9c34f737e56f10f17e41947549d76d8e0b1e6c1718ea8",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-en-US-dark/cards-closed.png",
+        "actions": "main-e052dadf/mobile-en-US-dark/cards-actions.png",
+        "preview": "main-e052dadf/mobile-en-US-dark/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-en-US-dark/cards-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -1872,38 +1743,22 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-light-390-closed.png",
-          "sha256": "29fdf509a64ecd272506d8ae73f803c32d083175f01d7a088327e8c55fbb94d2",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-fr-FR-light-390-actions.png",
-          "sha256": "0eda3bd70a3b94b9c1ebe827670611248231fb6940b4d03e3321dea187fb1e2f",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-fr-FR-light-390-preview.png",
-          "sha256": "36e1359d45f9c949b6da10c184b4bbf9f645fd5a7c994560e0c361f554e0d632",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-fr-FR-light-390-after-close.png",
-          "sha256": "d10e13803cb259d178a40892ef1ad1366d4f0b25307e7c5f4b05cd6fe6e67dd9",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-light/table-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-light/table-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-light/table-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-light/table-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "light",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "cards",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -2054,38 +1909,22 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-light-390-closed.png",
-          "sha256": "91f3e57fa42870a918528d10eb4127544480b359f903adbbd20dfd71974d7fa1",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-light-390-actions.png",
-          "sha256": "7b2f2058ca388eda3f8d2b3ad4d17cb1eb08fb74d84cdc3a7b04ea3679ba5b0a",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-light-390-preview.png",
-          "sha256": "36e1359d45f9c949b6da10c184b4bbf9f645fd5a7c994560e0c361f554e0d632",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-light-390-after-close.png",
-          "sha256": "b0a123de70706f284626270b5bdcb7b432a3d1c776ccfd6939429b0bae4c6e54",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-light/cards-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-light/cards-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-light/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-light/cards-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "dark",
-      "viewport": {
-        "width": 390,
-        "height": 844
-      },
       "view": "table",
-      "status": "passed",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -2280,628 +2119,188 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-dark-390-closed.png",
-          "sha256": "7d55b4cf45fe39bb70802d2103e4962e0e9b9ddbbbbc17d100650c2d87c2de32",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-fr-FR-dark-390-actions.png",
-          "sha256": "5340386296b89a9892a1072461d5b2e0ae2b974d412066c5ebc4c3dd52c132b4",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-fr-FR-dark-390-preview.png",
-          "sha256": "f1641d3f8765f5c15ec3f355820014362a11f8b9e8479c804d774bdb37299d2a",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-fr-FR-dark-390-after-close.png",
-          "sha256": "37a7e49a64a619c428e34a323805317414f325b11d4f786f8c7b4da32c394038",
-          "visuallyInspected": true
-        }
-      }
-    },
-    {
-      "locale": "fr-FR",
-      "theme": "dark",
       "viewport": {
         "width": 390,
         "height": 844
       },
-      "view": "cards",
       "status": "passed",
-      "geometry": {
-        "before": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "actions": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "opened": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "closed": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 54.390625,
-              "textLeft": 164.828125,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        }
-      },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-dark-390-closed.png",
-          "sha256": "e969892293f67157cb1c0c03010aa0b9dace3698443b84ada38f58ef92c35fa1",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-dark-390-actions.png",
-          "sha256": "4fd10f38121f8eafabb56752261033157723ac4de804b06723748c1a1c02ee76",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-dark-390-preview.png",
-          "sha256": "f1641d3f8765f5c15ec3f355820014362a11f8b9e8479c804d774bdb37299d2a",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-dark-390-after-close.png",
-          "sha256": "284cc4a8bc1b62b907f57b1492617470560350e0566b9de621374eee4dee8a15",
-          "visuallyInspected": true
-        }
-      }
-    },
-    {
-      "locale": "fr-FR",
-      "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
-      "view": "table",
-      "status": "passed",
-      "geometry": {
-        "before": {
-          "scrollLeft": 0,
-          "scrollWidth": 766,
-          "clientWidth": 766,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.0625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 637.625,
-              "right": 982.8125,
-              "textRight": 416.25
-            },
-            {
-              "width": 128,
-              "right": 1110.8125,
-              "textRight": 1053.875
-            }
-          ]
-        },
-        "actions": {
-          "scrollLeft": 0,
-          "scrollWidth": 766,
-          "clientWidth": 766,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.0625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 637.625,
-              "right": 982.8125,
-              "textRight": 416.25
-            },
-            {
-              "width": 128,
-              "right": 1110.8125,
-              "textRight": 1053.875
-            }
-          ]
-        },
-        "opened": {
-          "scrollLeft": 0,
-          "scrollWidth": 766,
-          "clientWidth": 766,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.0625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 637.625,
-              "right": 982.8125,
-              "textRight": 416.25
-            },
-            {
-              "width": 128,
-              "right": 1110.8125,
-              "textRight": 1053.875
-            }
-          ]
-        },
-        "closed": {
-          "scrollLeft": 0,
-          "scrollWidth": 766,
-          "clientWidth": 766,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.5625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 58.0625,
-              "iconLeft": 367.578125,
-              "textLeft": 478.015625,
-              "actionHeight": 35.453125,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": [
-            {
-              "width": 637.625,
-              "right": 982.8125,
-              "textRight": 416.25
-            },
-            {
-              "width": 128,
-              "right": 1110.8125,
-              "textRight": 1053.875
-            }
-          ]
-        }
-      },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-light-1440-closed.png",
-          "sha256": "d6fdd646fc3d3ed0db69612d05f36b57987f0ec199f3fd7d871a58cd9b782a8a",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/table-fr-FR-light-1440-actions.png",
-          "sha256": "9f9f641614fd3a90dfc4ba61ebfb5f6697f7be9bbe96f8df2c03fc6f93396414",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/table-fr-FR-light-1440-preview.png",
-          "sha256": "7e905d41a4e1275f05c811f69279bba6b46996d1b60488e82ec008945ea511c7",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/table-fr-FR-light-1440-after-close.png",
-          "sha256": "9cec66dd50b69672fa086d908b723a3b09410dfe9baeb7c8eda40c777b485390",
-          "visuallyInspected": true
-        }
-      }
-    },
-    {
-      "locale": "fr-FR",
-      "theme": "light",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
-      },
-      "view": "cards",
-      "status": "passed",
-      "geometry": {
-        "before": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "actions": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "opened": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        },
-        "closed": {
-          "scrollLeft": 0,
-          "scrollWidth": 0,
-          "clientWidth": 0,
-          "documentOverflow": 0,
-          "identityVisible": true,
-          "rows": [
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            },
-            {
-              "height": 125.578125,
-              "iconLeft": 363.578125,
-              "textLeft": 474.015625,
-              "actionHeight": 38.390625,
-              "descriptionWidth": null,
-              "iconTextOverlap": false,
-              "badgeIconOverlap": false
-            }
-          ],
-          "headers": []
-        }
-      },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-light-1440-closed.png",
-          "sha256": "0d76be96c7ee3b767d67acc94960ada757d453a7eac9c00080104718b12c975b",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-light-1440-actions.png",
-          "sha256": "ccef503aedf67d8b20cfe7d2b3e700595bfc7e1a1dfd0b9362c2ce3262f0e739",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-light-1440-preview.png",
-          "sha256": "0f95cc3477847672adcafcad7cf0d1cd105bedcad71e6f3e0f92fadc115aa057",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-light-1440-after-close.png",
-          "sha256": "675294cac1300ab47d6709d039d6b970c9932926d6ff22fab872567b9ac703de",
-          "visuallyInspected": true
-        }
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-dark/table-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-dark/table-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-dark/table-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-dark/table-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "dark",
-      "viewport": {
-        "width": 1440,
-        "height": 1000
+      "view": "cards",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
       },
-      "view": "table",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
       "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/mobile-fr-FR-dark/cards-closed.png",
+        "actions": "main-e052dadf/mobile-fr-FR-dark/cards-actions.png",
+        "preview": "main-e052dadf/mobile-fr-FR-dark/cards-preview.png",
+        "after-close": "main-e052dadf/mobile-fr-FR-dark/cards-after-close.png"
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "view": "table",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -3096,38 +2495,398 @@
           ]
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/table-fr-FR-dark-1440-closed.png",
-          "sha256": "010f8873b7958da91c892e3ce878c716bfad55caf352dcc3ed79d4bd3ede0a89",
-          "visuallyInspected": true
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-light/table-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-light/table-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-light/table-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-light/table-after-close.png"
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "view": "cards",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         },
         "actions": {
-          "path": "grids/table-fr-FR-dark-1440-actions.png",
-          "sha256": "4cfe3203b4c1025b5209311c7708859a2eb1c2082c4980635a01697c7663cf7b",
-          "visuallyInspected": true
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         },
-        "preview": {
-          "path": "grids/table-fr-FR-dark-1440-preview.png",
-          "sha256": "e29c184b1814be99d960d58ce9a674206db628243742c7402871a67bd49dc45c",
-          "visuallyInspected": true
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         },
-        "after-close": {
-          "path": "grids/table-fr-FR-dark-1440-after-close.png",
-          "sha256": "6d81b4b78863241b56756fa622f2d61f964370be6e0303d3118527f798f61f06",
-          "visuallyInspected": true
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
         }
+      },
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-light/cards-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-light/cards-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-light/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-light/cards-after-close.png"
       }
     },
     {
       "locale": "fr-FR",
       "theme": "dark",
+      "view": "table",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        }
+      },
       "viewport": {
         "width": 1440,
         "height": 1000
       },
-      "view": "cards",
       "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-dark/table-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-dark/table-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-dark/table-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-dark/table-after-close.png"
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "dark",
+      "view": "cards",
       "geometry": {
         "before": {
           "scrollLeft": 0,
@@ -3278,27 +3037,16 @@
           "headers": []
         }
       },
-      "screenshots": {
-        "closed": {
-          "path": "grids/cards-fr-FR-dark-1440-closed.png",
-          "sha256": "1e201fca994bcfb6a60be9f74c0623b37cb68aa7453dbfea35acfb6d35722727",
-          "visuallyInspected": true
-        },
-        "actions": {
-          "path": "grids/cards-fr-FR-dark-1440-actions.png",
-          "sha256": "afc8d3f817d18c1610607d311bea35574887c3c0397329fc26ca4f36ba9d15d3",
-          "visuallyInspected": true
-        },
-        "preview": {
-          "path": "grids/cards-fr-FR-dark-1440-preview.png",
-          "sha256": "0c34ccde03383274aa226424c7511ada50063ca3fb9b33dbb751344250dd618d",
-          "visuallyInspected": true
-        },
-        "after-close": {
-          "path": "grids/cards-fr-FR-dark-1440-after-close.png",
-          "sha256": "cb629bc5262b1afca98b65902ecd9ac8a445d55898cd6546c09d515e85476cc8",
-          "visuallyInspected": true
-        }
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "status": "passed",
+      "captures": {
+        "closed": "main-e052dadf/desktop-fr-FR-dark/cards-closed.png",
+        "actions": "main-e052dadf/desktop-fr-FR-dark/cards-actions.png",
+        "preview": "main-e052dadf/desktop-fr-FR-dark/cards-preview.png",
+        "after-close": "main-e052dadf/desktop-fr-FR-dark/cards-after-close.png"
       }
     }
   ],
@@ -3316,16 +3064,672 @@
   "visualInspection": {
     "status": "completed",
     "method": "view_image of every new viewport PNG at original readable size; no thumbnail-only inspection",
-    "date": "2026-11-22",
+    "date": "2026-11-25",
     "inspectedPngCount": 64,
     "totalAcrossThreeFamilies": 198,
-    "findings": "Icône, badge Instance et texte occupent des places distinctes en tableau et cartes. Les Actions restent horizontales. À 1440 px, les deux colonnes tiennent dans la section sans déplacer l’identité. À 390 px, le tableau forcé défile normalement : l’identité peut sortir de la fenêtre en allant vers Actions ; les cartes gardent toute la composition visible. Le retour du Preview conserve la section Queries.",
+    "findings": "Le badge Instance occupe un emplacement distinct de l’icône, de son indicateur d’état et du texte, en tableau et en cartes. Les menus et le Preview tiennent dans la fenêtre. Le tableau forcé mobile défile vers Actions et conserve ce décalage après fermeture.",
     "outstandingTargetedDefects": [],
-    "scope": "Original viewport PNGs, individually inspected at native readable size; visible grid regions, menu bounds, modal identity and close control. Automatic geometry also checks offscreen rows and horizontal offsets. No claim of full-page or every Preview section inspection.",
-    "scrollLimit": "Only horizontal position preservation is asserted; some native close navigation resets vertical position."
+    "scope": "Visible grid regions, menu, Preview identity and close button. Automatic geometry checks offscreen rows; only horizontal scroll preservation is asserted. All additional widths inspected.",
+    "scrollLimit": "Only horizontal position preservation is asserted; some native close navigation resets vertical position.",
+    "images": [
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "61b5d26c617b3871d803fdfc60226a503ff6db2e8df31bd25eb8b0b0eabb9da0",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "862f441dc1bb0493179725fdd3f869dbdf2dcb320f27c77dab471d0c741817b7",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "008f2a0ea4a3293ff2c85c5eed2752af09cba09e207f5c3c5da9099680bf1e34",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "399c8b8b0ddc0a8927efe02817f24b0e9e66c4361d848c15b38815419d0cac98",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "a2b3019d864b890afbccb00eac0aeb5c9a7d283a1483c39eb598d17b7f8428de",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "7ba91032383f37ffa6258df6b78710215d4bbafdc867b12bfdfef53e6419346b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "cd0225b4566dcc2aca1261da222d3bab64f711002bfb393dcbe5ad5b81ce94f5",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-dark/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-dark",
+        "name": "queries-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "49ca114faec7df87611a0c0770cf45fa0f37bcf303bb9005fd4d6ed56d166b3c",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "95f86086f2d5263139ab0606f7c13498156b381fa5fa68302a1f2c557d3b9cb1",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "7f55f7ce9243ad8f95c2da80573a3b2ec63bee804376557ed1917894f3eb19e6",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "a5d6b818c8b7a0125b10acfbf93504b1ab1e904b2f63cf483c7f144d56100bd7",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "730704fb4cdeee28f3857724ade74ee033a1ec6fe474f3f7928c3ef7e15c4962",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "d598b524b9b00430829572e5ee558e3e556db43a36cf5bcc824a37042ac2da7b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "3431e66fe7d6681a9c87e98bb24905e00d65c56b5826b08e5efa04d83f3512ba",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "0da99f312f6ed62dc1a68817fa03f08ede6ae6563f5c1704c6c83daab651966b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-en-US-light/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-en-US-light",
+        "name": "queries-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "14eb988203a523892fe2a565027d7ea1ed0148217bcb3b73e0a9f26cb723b913",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "9f5aa11723873abdab472fb5f5a1d40555a2c620d18f0d4e05f7d7770a5a1c16",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "5cfc6f08ff802572f0bb46a7191a68602a8a763f59f4e2dfb77ccf6d265f3081",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "bdbfcb1393b747bb079cb9238e46dcc4fa3dd68969d708335b53d9612c29d56d",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "9439b83a8ed9bbe89aeadce622ecbc8854a20c229347a688e18dbafe563efd0e",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "cbb0ed169f6336d0eee1fad100ae40137da10e3fc3fee2707ad758306d3f8b1c",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "5633d5fe89ae1fc68f67866eaa797210e3157979a199cf9a2053596e06da600e",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "c28e887f141191643b0a12d0347f54626bf57f3850eea0cbba9837050fc0a671",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-dark/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-dark",
+        "name": "queries-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "bdcbf374ed908be08ffb70e4d995f1d6e6b2a48a78847a357716fee41e26938a",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-cards-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "ccef503aedf67d8b20cfe7d2b3e700595bfc7e1a1dfd0b9362c2ce3262f0e739",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-cards-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "675294cac1300ab47d6709d039d6b970c9932926d6ff22fab872567b9ac703de",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-cards-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "0d76be96c7ee3b767d67acc94960ada757d453a7eac9c00080104718b12c975b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-cards-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "b34722fb3909cbb5058d1eed9f82f2b8c9713dcbb5d96bbabfab26ec77d2e14a",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-table-actions",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "205fa3275bae9de20ae9b4542be8b8acbdb9c790389801ad67552923ccf9d1cd",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-table-after-close",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "0bfc67f87228953e1bed63261a42b1b2e65418e2657f400fbc552b817fe3a03d",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-table-closed",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "dcd10abd4af7ec58dbcf2b0d2cf6300755313e18708109064319e5741d8fb99c",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/desktop-fr-FR-light/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "desktop-fr-FR-light",
+        "name": "queries-table-preview",
+        "width": 1440,
+        "height": 1000,
+        "sha256": "6b711e25d7c4be850436ca1c029bc9b275b1699d0aa5089da8a156ed851203f6",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "d8c2cc7d7128c1763cf9a73a604e2b2cc8053c1aa50dd35b588c49a81606d3e8",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "efab0a4867f553d250610ba0f580c36bd66427a9dbf7bf2bee66d7fabfe9060e",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "3d1a45c2de95566ea46d3a9c01f4df89ffdf38e3fa7e038d94d26079514917d2",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "331f0bb0ca01d7b0673582a746b58a060ec69f0bac2ec608252f630ecba1cd6b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "c8ba16765edbbe0393fade913107571edead5821945e3711743864b36303733f",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "96ad25d8c37839f8f9cedb350a90ffd3b6710dc60e6068a8af9f19b15f2cc6a6",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "37878653d3a5a70928d44ad4e23550a3f297c9fcce7d61a3e90afaedf438e799",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-dark/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-dark",
+        "name": "queries-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "331f0bb0ca01d7b0673582a746b58a060ec69f0bac2ec608252f630ecba1cd6b",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "cf879f60247a7b655d62794426061de1b9c6dbe5415d24b3067392810e15e130",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "6f02f268f0a61ab0801f52cccb312a03b0500baf0006bb118f07c94a56b861db",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "6d09248d122a692bcc411441adb194d41937f6badc3a80157664a8a190711922",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "f73323f14662a12a7828c61ff86c88e105482b501deb5d402e1e5ea39508b6ae",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "71b3e921d7286336ee29b0cc376c6d6b7118d35ae8c3cf0b007e895973191029",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "8f7d904054822f6913c6accac2ef76f1511c3dd42ed6b9a8eb4aef78d6b0631f",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "f9588bc5b3a0bd2da651ab3ed01589b72d9e082d7b65d14ff237e4b1ae12a4af",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-en-US-light/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-en-US-light",
+        "name": "queries-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "f73323f14662a12a7828c61ff86c88e105482b501deb5d402e1e5ea39508b6ae",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "7ee0f5f1f0993823fea05de5b575884c403d6337684f911d9f194c1dd2061a1a",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "b4fb3710a09f0af0ce72f82380d38a2097f29ada40125b58591f05bb08664df5",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "e969892293f67157cb1c0c03010aa0b9dace3698443b84ada38f58ef92c35fa1",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "64c8b5290e33433d253dc1436cc011009976159dbb0d1e8bca90fe36cef44a17",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "91cd673a8f6f8dca1198ce81258d88cd9e33206d4c3bbd4b62cf7b2d808ab9aa",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "37a7e49a64a619c428e34a323805317414f325b11d4f786f8c7b4da32c394038",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "db6b99aadb88f98d5a3365c39d3c9364608eb17f5178f405d6024c9aaf6f1447",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-dark/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-dark",
+        "name": "queries-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "64c8b5290e33433d253dc1436cc011009976159dbb0d1e8bca90fe36cef44a17",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-cards-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "29c17d3dfbe04368e73bd8f61fdaa7cd42408f6fd62d82a8ae04f85a50ab0c25",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-cards-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "4f2b41d3149ac784d32d84abf7d1dea8ded354dd6e25c38a41b3fcaa835e522a",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-cards-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "91f3e57fa42870a918528d10eb4127544480b359f903adbbd20dfd71974d7fa1",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/cards-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-cards-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "b5828d17e1efff6d070e126084cf15c1c70e29e12472894faf9a04ba62475266",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-actions.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-table-actions",
+        "width": 390,
+        "height": 844,
+        "sha256": "8bca9c0f9c9235efc586ca2aeb15af944334cd1c817340d63b43c6551861f8d9",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-after-close.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-table-after-close",
+        "width": 390,
+        "height": 844,
+        "sha256": "d10e13803cb259d178a40892ef1ad1366d4f0b25307e7c5f4b05cd6fe6e67dd9",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-closed.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-table-closed",
+        "width": 390,
+        "height": 844,
+        "sha256": "a08625933036f794656fac76852d406abb57e73be3198b29a6e1153d2cf45cc2",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      },
+      {
+        "file": "main-e052dadf/mobile-fr-FR-light/table-preview.png",
+        "family": "data-source-queries",
+        "variant": "mobile-fr-FR-light",
+        "name": "queries-table-preview",
+        "width": 390,
+        "height": 844,
+        "sha256": "b5828d17e1efff6d070e126084cf15c1c70e29e12472894faf9a04ba62475266",
+        "sourceRevision": "171b792a74902bf2ad78bba01e62c06000aafc5e"
+      }
+    ]
   },
   "limitations": [
     "Les trois requêtes désactivées et le dataset désactivé sont des métadonnées synthétiques persistées dans le hôte jetable, avec des pins inertes. Aucune acquisition, création de collection documentaire, exécution ou publication de requête n’est validée.",
-    "Le contrat Query ne possède pas de Description ; les noms d’affichage et techniques longs sont testés."
-  ]
+    "Le contrat Query ne possède pas de Description ; les noms d’affichage et techniques longs sont testés.",
+    "Les captures sont des vues de fenêtre natives, pas des pages entières ni toutes les sections du Preview. Les mesures couvrent aussi les lignes hors écran.",
+    "Seule la conservation du défilement horizontal est assertée ; certaines fermetures réinitialisent la position verticale.",
+    "La campagne locale utilise Chromium système sans vidéo ; les jobs hébergés restent nécessaires pour leur environnement propre.",
+    "En tableau forcé sur mobile, les captures Actions et après fermeture sont prises à droite : l’identité est volontairement hors champ dans ce tableau non épinglé. Le badge est inspecté dans closed et dans toutes les cartes. Les Queries ne stockent pas de description ; leurs noms techniques et affichés longs sont testés."
+  ],
+  "integratedMain": "e052dadfe511b97985a040fefb76a4b37d544797",
+  "campaignResult": {
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "retries": 0,
+    "duration": "7.2 minutes",
+    "collectionVariants": 8
+  },
+  "historicalEvidence": "history/observations-original-1e52fb3e.json and original PNGs retained unchanged; original before-correction captures remain under history/before-visual-revalidation (and catalog-layout for functions)."
 }

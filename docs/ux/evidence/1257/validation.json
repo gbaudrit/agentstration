@@ -626,5 +626,42 @@
     "details": "../../../contributing/ci-memory-1273.md",
     "report": "../../../site/static/test-diagnostics/ci-1273-local.json",
     "fullFunctionalAndCoverage": "See current PR checks; local complete coverage campaign running at evidence recording."
+  },
+  "mainE052Followup": {
+    "date": "2026-11-25",
+    "testedCommit": "171b792a74902bf2ad78bba01e62c06000aafc5e",
+    "main": "e052dadf",
+    "build": "Full Release solution build passes, zero warnings/errors; outputs frozen for browser campaign.",
+    "format": "All changed .NET source against e052dadf passes verify-dotnet-format.",
+    "typescript": "passed",
+    "browser": {
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "retries": 0,
+      "matrix": "8 collection variants desktop/mobile x EN/FR x light/dark, tables/cards; Actions/Preview/close and six extra Function widths.",
+      "nativePngsInspected": 198,
+      "actualImageSourceCommit": "171b792a74902bf2ad78bba01e62c06000aafc5e",
+      "observations": [
+        "artifacts/observations.json",
+        "data-source-queries/observations.json",
+        "transformation-functions/observations.json"
+      ]
+    },
+    "sourceRace": {
+      "fix": "1dff056b",
+      "regression": "APreviousLoadCannotMarkAStillPendingReplacementAsReady",
+      "before": "Deterministically fails with pending-resource/Ready invariant exception on old implementation; same exception reproduced in mobile browser.",
+      "after": "54 component cases and final browser campaign pass.",
+      "evidence": "data-source-loading/observations.json"
+    },
+    "functionalCoverage": "Running serialized after browser hosts and uninstrumented diagnostics finished; completed result is recorded in PR Validation.",
+    "memoryEvidence": "../../../../site/static/test-diagnostics/ci-1273-main-e052.json",
+    "limits": [
+      "Historical fields above retain their original source/date; they are not claims about the synchronized candidate.",
+      "Native captures cover visible viewport regions, not every Preview section.",
+      "Live provider integrations and Windows baseline not run locally.",
+      "Local browser video disabled; hosted checks remain required."
+    ]
   }
 }
