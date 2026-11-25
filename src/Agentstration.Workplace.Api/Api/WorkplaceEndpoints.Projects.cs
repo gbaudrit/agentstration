@@ -41,7 +41,7 @@ public static partial class WorkplaceEndpoints
 
     private static WorkProjectDefinition ToProjectDefinition(WorkProjectDefinitionRequest? request) => request is null ? null!
         : new(request.DisplayName, request.Description, request.PlanIds?.Select(id => new WorkPlanId(id)).ToArray() ?? [], request.TaskIds?.Select(id => new WorkTaskId(id)).ToArray() ?? [])
-        { Bindings = request.Bindings?.ToArray() ?? [] };
+        { Bindings = request.Bindings?.ToArray() ?? [], Sharing = request.Sharing };
     private static IResult WorkProjectProblem(string code) => Results.Problem(title: code, statusCode: code switch
     {
         "work_project_not_found" or "work_project_work_not_found" => StatusCodes.Status404NotFound,

@@ -64,6 +64,7 @@ public static partial class WorkplaceEndpoints
         workspaces.MapGet("/tasks", ListTasksAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapPost("/work-plans", CreateWorkPlanAsync)
             .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(256 * 1024)).RequireAuthorization(AgentstrationPolicies.CanRunFlows);
+        MapWorkProjectSharing(workspaces);
         workspaces.MapGet("/projects", ListWorkProjectsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapGet("/projects/{projectId:guid}", GetWorkProjectAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         workspaces.MapGet("/projects/{projectId:guid}/task-provider", DiscoverTaskProviderAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);

@@ -1,4 +1,5 @@
 using Agentstration.Resources;
+using System.Text.Json.Serialization;
 
 namespace Agentstration.Work;
 
@@ -12,6 +13,8 @@ public sealed record WorkProjectDefinition(string DisplayName, string? Descripti
     IReadOnlyList<WorkPlanId> PlanIds, IReadOnlyList<WorkTaskId> TaskIds)
 {
     public IReadOnlyList<WorkProjectContextBinding> Bindings { get; init; } = [];
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkProjectSharingConnection? Sharing { get; init; }
     public const int MaximumMembers = 100;
     public const int MaximumCommands = 256;
 
@@ -21,7 +24,7 @@ public sealed record WorkProjectDefinition(string DisplayName, string? Descripti
             || PlanIds is null || TaskIds is null || PlanIds.Count > MaximumMembers || TaskIds.Count > MaximumMembers
             || PlanIds.Any(id => id.Value == Guid.Empty) || TaskIds.Any(id => id.Value == Guid.Empty)
             || PlanIds.Distinct().Count() != PlanIds.Count || TaskIds.Distinct().Count() != TaskIds.Count
-            || !WorkProjectContextRules.Valid(Bindings))
+            || !WorkProjectContextRules.Valid(Bindings) || !WorkSharingFormat.ValidConnection(Sharing, Bindings))
             return Result<WorkProjectDefinition>.Failure("work_project_definition_invalid");
         return Result<WorkProjectDefinition>.Success(this with { DisplayName = DisplayName.Trim(), Description = Description?.Trim(),
             PlanIds = PlanIds.OrderBy(id => id.Value).ToArray(), TaskIds = TaskIds.OrderBy(id => id.Value).ToArray(),

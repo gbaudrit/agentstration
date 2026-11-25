@@ -32,6 +32,16 @@ public sealed class PostgreSqlStorageProfileTests
     }
 
     [TestMethod]
+    public void WorkSharingMigrationsMatchCurrentModel()
+    {
+        using var context = new Agentstration.Work.Storage.PostgreSql.PostgreSqlDesignTimeFactory().CreateDbContext([]);
+        Assert.IsFalse(context.Database.HasPendingModelChanges());
+        Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkSharingOperationDocument"));
+        Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkSharingStateDocument"));
+        Assert.IsNotNull(context.Model.FindEntityType("Agentstration.Work.Storage.PostgreSql.WorkSharingPlanMappingDocument"));
+    }
+
+    [TestMethod]
     public void FlowMigrationsMatchCurrentModel()
     {
         using var context = new PostgreSqlDesignTimeFactory().CreateDbContext([]);

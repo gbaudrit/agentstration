@@ -173,6 +173,14 @@ internal static class OpenApiSuccessResponseCatalog
         if (method == "POST" && path.EndsWith("/coding/repositories/resolve", StringComparison.OrdinalIgnoreCase)) return Json<CodingRepositorySelection>(200, "Resolve authorized Coding repositories");
         if (method == "POST" && path.EndsWith("/coding/pull-requests", StringComparison.OrdinalIgnoreCase)) return Json<CodingPullRequestResponse>(202, "Invoke or recover a Coding pull request operation");
         if (path == "/api/workspaces/{workspaceName}") return Json<WorkplaceWorkspaceResponse>(200, "Get a Workplace workspace");
+        if (path.Contains("/sharing/", StringComparison.OrdinalIgnoreCase))
+        {
+            if (method == "POST" && path.EndsWith("/pull", StringComparison.OrdinalIgnoreCase)) return Json<WorkSharingStateResponse>(200, "Synchronize an authorized Project sharing projection");
+            if (method == "POST" && path.EndsWith("/import", StringComparison.OrdinalIgnoreCase)) return Json<WorkPlanResponse>(200, "Explicitly import a shared plan as local draft Work");
+            if (method == "POST") return Json<WorkSharingOperationResponse>(202, "Accept or resume a durable sharing publication");
+            if (method == "GET" && path.EndsWith("/operations", StringComparison.OrdinalIgnoreCase)) return Json<WorkSharingOperationPageResponse>(200, "List private sharing publication receipts");
+            if (method == "GET") return Json<WorkSharingOperationResponse>(200, "Get a private sharing publication receipt");
+        }
         if (method == "GET" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectPageResponse>(200, "List private Workspace Projects");
         if (method == "POST" && path.EndsWith("/projects", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(201, "Create a private Workspace Project");
         if (path.EndsWith("/projects/{projectId}", StringComparison.OrdinalIgnoreCase)) return Json<WorkProjectResponse>(200, method == "PUT" ? "Update Project work associations" : "Get a Workspace Project");

@@ -101,6 +101,7 @@ public sealed partial class WorkDbContext(DbContextOptions<WorkDbContext> option
         ConfigureTaskEntity(modelBuilder.Entity<WorkTaskArtifactDocument>(), "WorkTaskArtifacts");
         ConfigureWorkPlans(modelBuilder);
         ConfigureWorkProjects(modelBuilder);
+        ConfigureWorkSharing(modelBuilder);
         ConfigureWorkTaskOperations(modelBuilder);
     }
 

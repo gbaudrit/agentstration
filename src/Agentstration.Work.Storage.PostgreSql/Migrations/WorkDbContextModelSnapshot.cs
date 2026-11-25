@@ -484,6 +484,97 @@ namespace Agentstration.Work.Storage.PostgreSql.Migrations
                     b.ToTable("WorkProjects", "work");
                 });
 
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkSharingOperationDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<long>("CreatedAtTicks")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("WorkspaceId", "Id");
+
+                    b.HasIndex("WorkspaceId", "OwnerPrincipalId", "ProjectId", "CreatedAtTicks", "Id")
+                        .HasDatabaseName("IX_WorkSharingOperations_ProjectHistory");
+
+                    b.ToTable("WorkSharingOperations", "work");
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkSharingPlanMappingDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("PlanId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("ProjectId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.HasKey("WorkspaceId", "OwnerPrincipalId", "PlanId");
+
+                    b.ToTable("WorkSharingPlanMappings", "work");
+                });
+
+            modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkSharingStateDocument", b =>
+                {
+                    b.Property<string>("WorkspaceId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("ProjectId")
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("OwnerPrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("character varying(36)");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("WorkspaceId", "ProjectId");
+
+                    b.ToTable("WorkSharingStates", "work");
+                });
+
             modelBuilder.Entity("Agentstration.Work.Storage.PostgreSql.WorkTaskActivityDocument", b =>
                 {
                     b.Property<string>("Id")

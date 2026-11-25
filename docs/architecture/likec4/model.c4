@@ -124,7 +124,7 @@ model {
           }
 
           workplaceApi = component 'Workplace.Api' {
-            description 'Workplace administration, task operations, notifications, and realtime transport'
+            description 'Workplace administration, task operations, Project sharing, notifications, and realtime transport'
           }
         }
       }
@@ -146,7 +146,7 @@ model {
       }
 
       work = component 'Work and Workplace application' {
-        description 'Functional Work Item lifecycle, interactions, notifications, projections, and execution submission'
+        description 'Functional Work Item lifecycle, interactions, notifications, projections, portable Project sharing, allocation admission, and execution submission'
       }
 
       flow = component 'Flow engine' {
@@ -187,7 +187,7 @@ model {
     }
 
     workData = container 'Work data' {
-      description 'Functional Work Items, interactions, notifications, events, and results'
+      description 'Functional Work Items, interactions, notifications, events, results, and private Project sharing intents/projections'
     }
 
     flowData = container 'Flow data' {
@@ -204,7 +204,7 @@ model {
   }
 
   aepExtensions = softwareSystem 'AEP extensions' {
-    description 'Independently deployable provider and utility adapters enrolled with Agentstration, including optional PostgreSQL JSONB ASP storage and generic authenticated Git reads/CAS publication'
+    description 'Independently deployable provider and utility adapters enrolled with Agentstration, including optional PostgreSQL JSONB ASP storage and generic authenticated Git reads/CAS publication used by the Project sharing adapter'
   }
 
   providerServices = softwareSystem 'Optional provider services' {
