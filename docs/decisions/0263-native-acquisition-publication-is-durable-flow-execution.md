@@ -93,6 +93,8 @@ or processed count is inferred from a batch call. Terminal assignment projection
 records the acquisition outcome; periodic recovery reconciles a lost final projection.
 Readers expose persisted step evidence but wait for that terminal acquisition commit;
 they never synthesize acquisition success ahead of its lifecycle completion evidence.
+Completion retains the Flow timestamp, bounded below by accepted creation/sealing
+evidence. Repair cannot renew lifecycle freshness or the direct-handoff expiry.
 GET/list/render/refresh never prepare, seal, register or repair native acquisitions.
 
 ## Interfaces shared with #1373

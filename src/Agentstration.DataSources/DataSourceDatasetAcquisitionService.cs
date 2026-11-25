@@ -177,7 +177,8 @@ public sealed partial class DataSourceDatasetAcquisitionService(
             var observedValue = observed.Value with
             {
                 Generation = checked(stored.Value.Generation + 1),
-                CompletedAt = Terminal(observed.Value.State) ? stored.Value.CompletedAt ?? clock.GetUtcNow() : null,
+                CompletedAt = Terminal(observed.Value.State)
+                    ? stored.Value.CompletedAt ?? DataSourceFlowOutcomeService.ResolveCompletedAt(stored.Value, observed.Value.CompletedAt) : null,
                 Progress = observed.Value.Progress is { } progress
                     ? progress with { State = observed.Value.State.ToString(), ErrorCode = observed.Value.ErrorCode } : null,
                 Status = new()

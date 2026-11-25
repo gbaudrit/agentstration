@@ -53,7 +53,10 @@ public sealed partial class DataSourceDatasetTests
             var stored = (await resources.GetExactAsync<DataSourceAcquisitionResource>(address, default))!;
             interrupted = await resources.PutExactAsync(address.ScopeRef, stored.Value with
             {
-                Generation = stored.Value.Generation + 1, State = DataSourceAcquisitionState.Running, CompletedAt = null, Progress = null,
+                Generation = stored.Value.Generation + 1,
+                State = DataSourceAcquisitionState.Running,
+                CompletedAt = null,
+                Progress = null,
                 Status = new() { ProvisioningState = ProvisioningState.Accepted }
             }, stored.ETag, false, default);
         }
@@ -67,7 +70,8 @@ public sealed partial class DataSourceDatasetTests
         var recovered = (await acquisitions.GetAsync(completed.Namespace, completed.Name, default)).Value;
         Assert.AreEqual(DataSourceAcquisitionState.Succeeded, recovered.State);
         Assert.AreEqual(ProvisioningState.Succeeded, recovered.Status.ProvisioningState);
-        Assert.AreEqual(clock.Now, recovered.CompletedAt!.Value);
+        Assert.AreEqual(completed.CompletedAt, recovered.CompletedAt);
+        Assert.AreEqual(completed.Progress!.CompletedAt, recovered.Progress!.CompletedAt);
         Assert.AreEqual(completed.FlowRunId, recovered.FlowRunId);
         Assert.AreEqual(completed.Manifest!.Artifacts.Single().ArtifactId, recovered.Manifest!.Artifacts.Single().ArtifactId);
         Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(completed.Publication), JsonSerializer.SerializeToElement(recovered.Publication)));

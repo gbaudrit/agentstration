@@ -27,7 +27,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
             for (var retry = 0; ; retry++)
             {
                 var value = stored.Value;
-                var completionTime = value.CompletedAt ?? clock.GetUtcNow();
+                var completionTime = value.CompletedAt ?? ResolveCompletedAt(value, completedAt);
                 var finalState = state;
                 var errorCode = code;
                 if (state == DataSourceAcquisitionState.Succeeded && value.Dataset is { Definition.Storage: null } direct)
@@ -46,7 +46,7 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                         else DataSourceDatasetCompositionService.ValidateOutput(direct.OutputSchema, valueToValidate, (contentOptions ?? new()).MaximumValueBytes);
                         projection ??= JsonRecordProjection.Normalize(directOutput, DataSourceDatasetCompositionService.Contract(direct, value.Name));
                         var bytes = StorageRecordSets.Encode(projection.Value.EnumerateArray().ToArray());
-                        value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), value.DirectResult?.ExpiresAt ?? completionTime.AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
+                        value = value with { DirectResult = new(bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), value.DirectResult?.ExpiresAt ?? clock.GetUtcNow().AddMinutes(5), value.IdempotencyKey ?? value.Name), RecordContract = projection.RecordContract };
                     }
                     catch (Exception exception) when (exception is ArgumentException or DataContractException or DataSourceValidationException or DataSourceAcquisitionException)
                     {
@@ -97,5 +97,12 @@ public sealed class DataSourceFlowOutcomeService(IResourceStore store, IRequestC
                 }
             }
         }
+    }
+
+    internal static DateTimeOffset ResolveCompletedAt(DataSourceAcquisitionResource value, DateTimeOffset? completedAt)
+    {
+        var boundary = value.CreatedAt;
+        if (value.PublicationSealedAt is { } sealedAt && sealedAt > boundary) boundary = sealedAt;
+        return completedAt is { } finished && finished > boundary ? finished : boundary;
     }
 }
