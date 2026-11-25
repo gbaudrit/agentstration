@@ -155,13 +155,18 @@ def audit(values, api):
     preview.require(isinstance(group, dict) and 'id' in group,
                     'Azure Groups must contain an Entra group object ID, not a display name.')
     provider_fields = ('identity_provider_id', 'connection_id')
-    extra_fields = len(set(group) - {'id', *provider_fields})
+    extra_fields = len(set(group) - {'id', *provider_fields, 'name'})
     # Only fixed protocol names are reported, never arbitrary keys or values.
     known_shape = ','.join(key for key in ('id', *provider_fields, 'name', 'display_name') if key in group)
     preview.require(extra_fields == 0, 'Azure Groups returned ' + str(extra_fields)
                     + ' unexpected selector field(s); known fields present: ' + known_shape
-                    + '. Accepted fields: id, identity_provider_id, connection_id. Values are withheld.')
+                    + '. Accepted fields: id, identity_provider_id, connection_id, name. Values are withheld.')
     identifier(group['id'], 'The human Azure Group must contain its Entra object ID.')
+    # Cloudflare decorates the selector with a display name (observed in the live
+    # audit). It is not an entitlement or a substitute for the required object ID.
+    label = group.get('name')
+    preview.require(label is None or (isinstance(label, str) and len(label) <= 256),
+                    'Azure Groups returned invalid display-name metadata; its value is withheld.')
     # The application has already been restricted to one verified Entra provider.
     # Manual group selectors can therefore inherit that source without requiring SCIM.
     binding = 'application-only'
@@ -181,9 +186,13 @@ def audit(values, api):
                         'Only the selected Entra login method is supported as an additional Require rule.')
     tokens = policy_rules(machine[0], 'include')
     preview.require(len(tokens) == 1 and set(tokens[0]) == {'service_token'}
-                    and isinstance(tokens[0]['service_token'], dict) and set(tokens[0]['service_token']) == {'token_id'},
+                    and isinstance(tokens[0]['service_token'], dict) and 'token_id' in tokens[0]['service_token']
+                    and set(tokens[0]['service_token']) <= {'token_id', 'name'},
                     'Service Auth must Include only the dedicated CI service token.')
     identifier(tokens[0]['service_token']['token_id'], 'Invalid CI service token ID in the Access policy.')
+    token_label = tokens[0]['service_token'].get('name')
+    preview.require(token_label is None or (isinstance(token_label, str) and len(token_label) <= 256),
+                    'Service Auth returned invalid display-name metadata; its value is withheld.')
     preview.require(not policy_rules(machine[0], 'require'), 'The CI Service Auth policy must not require an interactive login.')
     preview.require(not policy_rules(human[0], 'exclude') and not policy_rules(machine[0], 'exclude'),
                     'The initial shared policies must not contain Exclude rules; review them before extending the audit.')
@@ -215,7 +224,9 @@ def audit(values, api):
             'teamDomain': values['TEAM_DOMAIN'], 'accessAppId': app['id'],
             'checks': {'humanPolicy': 'entra-group', 'humanProviderBinding': binding,
                        'humanProviderFields': [field for field in provider_fields if field in group],
+                       'humanGroupLabelPresent': 'name' in group,
                        'automationPolicy': 'dedicated-service-token',
+                       'automationTokenLabelPresent': 'name' in tokens[0]['service_token'],
                        'overlappingApplications': False, 'tunnelInventoryReadable': True, 'dnsInventoryReadable': True},
             'automationCredentials': 'configured-not-exercised',
             'deployment': 'not-created', 'url': None}

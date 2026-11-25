@@ -40,8 +40,8 @@ class Cloud:
         self.provider = {'type': 'azureAD', 'config': {'support_groups': True,
                          'client_id': APP, 'directory_id': IDP, 'client_secret': 'private-entra-fixture'}}
         self.policies = [
-            {'decision': 'allow', 'include': [{'azureAD': {'id': GROUP, 'identity_provider_id': IDP}}]},
-            {'decision': 'non_identity', 'include': [{'service_token': {'token_id': TOKEN}}]}]
+            {'decision': 'allow', 'include': [{'azureAD': {'id': GROUP, 'identity_provider_id': IDP, 'name': None}}]},
+            {'decision': 'non_identity', 'include': [{'service_token': {'token_id': TOKEN, 'name': None}}]}]
         self.apps = [self.app]
 
     def get(self, path):
@@ -178,6 +178,36 @@ class AccessAuditTests(unittest.TestCase):
                 self.cloud.policies[0]['include'][0]['azureAD'] = rule
                 self.audit()
 
+    def test_cloudflare_group_label_is_optional_metadata_and_never_exported(self):
+        for label in ('private-group-label-fixture', '', None):
+            with self.subTest(label=label):
+                self.cloud.policies[0]['include'][0]['azureAD']['name'] = label
+                result = self.audit()
+                self.assertEqual('configuration-validated', result['state'])
+                self.assertTrue(result['checks']['humanGroupLabelPresent'])
+                self.assertEqual('application-and-rule', result['checks']['humanProviderBinding'])
+                self.assertNotIn('private-group-label-fixture', json.dumps(result))
+
+    def test_a_display_name_never_replaces_the_required_group_object_id(self):
+        for rule in ({'name': 'Agentstration-Preview-Users', 'identity_provider_id': IDP},
+                     {'id': 'Agentstration-Preview-Users', 'name': GROUP, 'identity_provider_id': IDP}):
+            with self.subTest(rule=rule), self.assertRaisesRegex(ValueError, 'object ID'):
+                self.cloud.policies[0]['include'][0]['azureAD'] = rule
+                self.audit()
+
+    def test_invalid_group_label_metadata_fails_without_disclosing_its_value(self):
+        for label in (['private-label-fixture'], {'private-label-fixture': True}, True, 42, 'x' * 257):
+            with self.subTest(label_type=type(label).__name__), self.assertRaisesRegex(ValueError, 'display-name metadata') as error:
+                self.cloud.policies[0]['include'][0]['azureAD']['name'] = label
+                self.audit()
+            self.assertNotIn('private-label-fixture', str(error.exception))
+
+    def test_a_valid_label_does_not_hide_a_foreign_provider_in_either_alias(self):
+        for field in ('identity_provider_id', 'connection_id'):
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'another identity provider'):
+                self.cloud.policies[0]['include'][0]['azureAD'] = {'id': GROUP, 'name': 'Valid display label', field: APP}
+                self.audit()
+
     def test_legacy_connection_id_is_checked_as_an_identity_provider_reference(self):
         self.cloud.policies[0]['include'][0]['azureAD'] = {'id': GROUP, 'connection_id': IDP}
         result = self.audit()
@@ -244,6 +274,29 @@ class AccessAuditTests(unittest.TestCase):
                 self.cloud = Cloud()
                 self.cloud.policies[1].update(change)
                 self.audit()
+
+    def test_service_token_display_label_is_metadata_and_never_exported(self):
+        for label in ('private-service-label-fixture', '', None):
+            with self.subTest(label=label):
+                self.cloud.policies[1]['include'][0]['service_token']['name'] = label
+                result = self.audit()
+                self.assertEqual('dedicated-service-token', result['checks']['automationPolicy'])
+                self.assertTrue(result['checks']['automationTokenLabelPresent'])
+                self.assertNotIn('private-service-label-fixture', json.dumps(result))
+
+    def test_service_token_label_never_replaces_its_required_id_or_allows_unknown_fields(self):
+        for rule in ({'name': TOKEN}, {'token_id': 'Token display name', 'name': TOKEN},
+                     {'token_id': TOKEN, 'name': 'Label', 'unknown': 'private-value-fixture'}):
+            with self.subTest(rule=rule), self.assertRaises(ValueError):
+                self.cloud.policies[1]['include'][0]['service_token'] = rule
+                self.audit()
+
+    def test_invalid_service_token_label_metadata_fails_without_disclosing_its_value(self):
+        for label in (['private-label-fixture'], {'private-label-fixture': True}, False, 42, 'x' * 257):
+            with self.subTest(label_type=type(label).__name__), self.assertRaisesRegex(ValueError, 'display-name metadata') as error:
+                self.cloud.policies[1]['include'][0]['service_token']['name'] = label
+                self.audit()
+            self.assertNotIn('private-label-fixture', str(error.exception))
 
     def test_additional_policies_including_bypass_or_block_everyone_require_review(self):
         for decision in ('bypass', 'deny', 'allow', 'non_identity'):
