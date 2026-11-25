@@ -127,6 +127,18 @@ to one hosted GitHub runner, whose address can change. Track and renew token
 expirations. An API token is separate from the CI service token: one manages
 infrastructure, while the other authenticates bounded application probes.
 
+Both trusted-main callers (`preview-on-demand.yml` and
+`preview-azure-environment.yml`) explicitly use `secrets: inherit` when calling
+`preview-environment.yml`. This opt-in is required for secrets to resolve in the
+called job's protected environment, even though its public environment variables
+are already available. The callee retains `environment: preview-deployment` and
+the main-only execution boundary. Keep the secrets at environment scope; no copy
+to repository variables or request JSON is needed. Inheritance can also expose
+repository/organization secrets to the trusted callee; never add it to the
+credential-free PR validation caller. See the
+[GitHub workflow reuse guidance](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
+and [upstream runner report](https://github.com/actions/runner/issues/4453).
+
 ## Run the read-only audit
 
 After this workflow is merged to `main`, open **Actions → Preview deployment
