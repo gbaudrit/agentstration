@@ -83,9 +83,10 @@
         JsonValueKind.Array => Localizer["Preview.Items", value.GetArrayLength()],
         _ => value.GetRawText().Length > 512 ? value.GetRawText()[..512] + "…" : value.GetRawText()
     };
-    private static string Source(JsonElement value)
+    private string Source(JsonElement value)
     {
-        var json = value.ValueKind == JsonValueKind.String ? value.GetString()! : JsonSerializer.Serialize(value, Pretty);
+        var json = value.ValueKind == JsonValueKind.String && MediaType is ("application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain")
+            ? value.GetString()! : JsonSerializer.Serialize(value, Pretty);
         return json.Length > MaximumSourceCharacters ? json[..MaximumSourceCharacters] : json;
     }
 }

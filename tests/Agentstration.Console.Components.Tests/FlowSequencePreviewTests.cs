@@ -34,6 +34,7 @@ public sealed partial class KnowledgeSourceEditorTests
             .Add(c => c.ValueChanged, next => calls = next));
         rendered.Find("[data-testid=source-preview-recalculate]").Click();
         rendered.WaitForAssertion(() => Assert.AreEqual(1, authoring.Replays));
+        Assert.AreEqual("current", rendered.Find("[data-testid=flow-sequence-editor]").GetAttribute("data-preview-state"));
         rendered.FindAll("[data-testid=source-sequence-select]")[1].Click();
         var preview = rendered.Find("[data-testid=source-sequence-preview]");
         Assert.Contains("/b", preview.TextContent);
@@ -44,6 +45,7 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.AreEqual("/b", calls[0].Parameters.GetProperty("path").GetString());
         Assert.Contains("1", rendered.Find("[data-testid=source-sequence-preview] h3").TextContent);
         Assert.HasCount(1, rendered.FindAll("[data-testid=source-preview-stale]"));
+        Assert.AreEqual("stale", rendered.Find("[data-testid=flow-sequence-editor]").GetAttribute("data-preview-state"));
         Assert.AreEqual(1, authoring.Replays);
         rendered.Find("[data-testid=source-preview-recalculate]").Click();
         rendered.WaitForAssertion(() => Assert.AreEqual(2, authoring.Replays));

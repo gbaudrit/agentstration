@@ -102,13 +102,40 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.DoesNotContain(hint, rendered.Find("[data-testid=function-sequence-text-input-help]").TextContent);
     }
 
-    private sealed class FunctionClientStub(bool textInput = false) : ITransformationFunctionsClient
+    [TestMethod]
+    public async Task OrdinaryEditsKeepDerivedProvenanceAndChangingTheCollectionRequiresDerivationAgain()
+    {
+        using var context = CreateContext(new KnowledgeClientStub());
+        context.ComponentFactories.AddStub<Agentstration.Web.Components.ReusableSchemaBindingEditor>();
+        var owner = new ConsoleContextState(new TransformationContextProvider());
+        await owner.EnsureLoadedAsync(default);
+        context.Services.AddSingleton(owner);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new KnowledgeNavigationContext("/instance"));
+        context.Services.AddSingleton<ITransformationFunctionsClient>(new FunctionClientStub(explodeInput: true));
+        IReadOnlyList<FlowCompositionCall> calls = [new()
+        {
+            Function = new("select", "1.0.0", ResourceScopeRef.Instance),
+            Parameters = JsonSerializer.Deserialize<JsonElement>("""{"path":"/rows","limit":2,"itemSchema":{"reference":{"name":"records","version":"1.0.0","scopeRef":"/instance"}}}"""),
+            DerivedItemSchemaParentHash = "exact-parent"
+        }];
+        var rendered = context.Render<FlowSequenceEditor>(p => p.Add(c => c.Value, calls).Add(c => c.ValueChanged, next => calls = next));
+        rendered.Find("[data-schema-path='$.limit'] input").Input("3");
+        Assert.AreEqual("exact-parent", calls[0].DerivedItemSchemaParentHash);
+        Assert.IsTrue(calls[0].Parameters.TryGetProperty("itemSchema", out _));
+        rendered.Render(p => p.Add(c => c.Value, calls));
+        rendered.Find("[data-schema-path='$.path'] input").Input("/other");
+        Assert.IsNull(calls[0].DerivedItemSchemaParentHash);
+        Assert.IsFalse(calls[0].Parameters.TryGetProperty("itemSchema", out _));
+    }
+
+    private sealed class FunctionClientStub(bool textInput = false, bool explodeInput = false) : ITransformationFunctionsClient
     {
         public Task<IReadOnlyList<FunctionChoice>> ChoicesAsync(ResourceScopeRef scope, CancellationToken ct)
         {
             var descriptor = new NativeFunctionDescriptor("json.select", "1.0.0",
                 JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{},"path":{"type":"string","maxLength":1024}},"required":["value","path"],"additionalProperties":false}"""),
                 JsonSerializer.Deserialize<JsonElement>("{}"));
+            if (explodeInput) descriptor = descriptor with { Id = "json.explode", InputSchema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{},"path":{"type":"string"},"limit":{"type":"integer"},"itemSchema":{"type":"object","x-agentstration-schema-binding":true}},"required":["value","path"],"additionalProperties":false}""") };
             if (textInput) descriptor = descriptor with { Id = "example.text", InputSchema = FunctionInvocationSchemas.XmlContent };
             return Task.FromResult<IReadOnlyList<FunctionChoice>>([new("Select · 1.0.0", new(new("select", "1.0.0", scope, ResourceNamespace.Default), new("native", "1.0.0", scope),
                 descriptor.Id, descriptor.Version, descriptor.InputSchema, descriptor.OutputSchema)) { IsBuiltIn = true }]);

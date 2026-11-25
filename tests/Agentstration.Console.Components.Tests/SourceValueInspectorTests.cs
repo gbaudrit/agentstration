@@ -45,5 +45,21 @@ public sealed class SourceValueInspectorTests
         Assert.HasCount(1, rendered.FindAll("tbody tr"));
         Assert.HasCount(3, rendered.FindAll("tbody td"));
         Assert.Contains("$", rendered.Find("tbody").TextContent);
+        rendered.FindAll(".form-actions button")[1].Click();
+        using var source = JsonDocument.Parse(rendered.Find("[data-testid=preview-json-source]").TextContent);
+        Assert.IsTrue(JsonElement.DeepEquals(JsonSerializer.Deserialize<JsonElement>(json), source.RootElement));
+    }
+
+    [TestMethod]
+    [DataRow("application/xml")]
+    [DataRow("application/rss+xml")]
+    [DataRow("application/atom+xml")]
+    public void NativeXmlSourceDoesNotDisplayJsonStringEscapes(string mediaType)
+    {
+        using var context = new BunitContext();
+        context.Services.AddLocalization(o => o.ResourcesPath = "Resources");
+        var rendered = context.Render<SourceValueInspector>(p => p.Add(c => c.Value, JsonSerializer.SerializeToElement("<root/>"))
+            .Add(c => c.MediaType, mediaType));
+        Assert.AreEqual("<root/>", rendered.Find("[data-testid=preview-json-source]").TextContent);
     }
 }

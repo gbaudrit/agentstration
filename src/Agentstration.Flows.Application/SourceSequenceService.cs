@@ -181,10 +181,11 @@ public sealed class SourceSequenceService(FlowService flows, TransformationFunct
         BuiltinJsonSchemaFormatHandler.Draft202012, schema.Clone(), JsonSchemaSelection.DefinitionHash(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema));
     public static SequenceCompatibility Compatibility(JsonElement? producer, JsonElement? consumer)
     {
-        if (producer is not { ValueKind: JsonValueKind.Object } actual || consumer is not { ValueKind: JsonValueKind.Object } expected
-            || !actual.TryGetProperty("type", out var sourceType) || !expected.TryGetProperty("type", out var targetType)) return SequenceCompatibility.Undetermined;
-        if (FlowCompositionSchema.IsSupported(actual) && FlowCompositionSchema.IsSupported(expected)
-            && FlowCompositionSchema.IsAssignable(actual, expected)) return SequenceCompatibility.Verified;
+        if (producer is not { ValueKind: JsonValueKind.Object } actual || consumer is not { ValueKind: JsonValueKind.Object } expected)
+            return SequenceCompatibility.Undetermined;
+        if (FlowCompositionSchema.IsAssignable(actual, expected)) return SequenceCompatibility.Verified;
+        if (FlowCompositionSchema.IsSupported(actual) && FlowCompositionSchema.IsSupported(expected)) return SequenceCompatibility.Incompatible;
+        if (!actual.TryGetProperty("type", out var sourceType) || !expected.TryGetProperty("type", out var targetType)) return SequenceCompatibility.Undetermined;
         if (sourceType.ValueKind == JsonValueKind.String && targetType.ValueKind == JsonValueKind.String
             && sourceType.GetString() != targetType.GetString() && !(sourceType.GetString() == "integer" && targetType.GetString() == "number")) return SequenceCompatibility.Incompatible;
         return SequenceCompatibility.Undetermined;
