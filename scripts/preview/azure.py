@@ -16,6 +16,7 @@ import uuid
 import contract
 import lifecycle
 import preview
+import access
 
 OWNER = 'agentstration.preview.owner'
 ENVIRONMENT = 'agentstration.preview.environment'
@@ -151,11 +152,14 @@ def inspect_owned(request, metadata, resources):
 
 
 def validate_record(request, record, action):
-    contract.fields(record, ('schemaVersion', 'ownerId', 'createdAt', 'expiresAt', 'request', 'destroyed', 'initialized'))
+    contract.fields(record, ('schemaVersion', 'ownerId', 'createdAt', 'expiresAt', 'request', 'destroyed', 'initialized',
+                             *(['access'] if 'access' in record else [])))
     preview.require(record['schemaVersion'] == 1 and type(record['destroyed']) is bool and type(record['initialized']) is bool, 'Invalid Azure ownership metadata.')
     uuid.UUID(record['ownerId'])
     datetime.fromisoformat(record['createdAt'])
     datetime.fromisoformat(record['expiresAt'])
+    if 'access' in record:
+        access.validate(request, record)
     previous = contract.validate(record['request'])
     previous_target, target = contract.azure_target(previous), contract.azure_target(request)
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
@@ -275,7 +279,7 @@ class Azure:
             # Azure Monitor can lag a newly provisioned VM; never fabricate a capacity result.
             return {'azureMetricsState': 'unavailable'}
 
-    def transfer(self, expect_existing=False):
+    def transfer(self, expect_existing=False, connector=None):
         bundle, checksum = bundle_images(self.request, self.directory)
         name = 'transfer/' + prefix(self.request) + '/' + uuid.uuid4().hex + '.tar.gz'
         try:
@@ -283,14 +287,20 @@ class Azure:
             expires = (datetime.now(timezone.utc) + timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%MZ')
             url = self.storage('blob', 'generate-sas', '--name', name, '--permissions', 'r', '--expiry', expires,
                                '--https-only', '--as-user', '--full-uri')
-            return self.run_guest('deploy', url=url, checksum=checksum, expect_existing=expect_existing)
+            return self.run_guest('deploy', url=url, checksum=checksum, expect_existing=expect_existing, connector=connector)
         finally:
             # Staged application bytes are private, temporary, and never become Actions artifacts.
             self.storage('blob', 'delete', '--name', name, '--delete-snapshots', 'include')
 
-    def run_guest(self, action, *, url=None, checksum=None, expect_existing=False):
+    def run_guest(self, action, *, url=None, checksum=None, expect_existing=False, connector=None):
+        record = self.read()
+        protected = [{'name': 'BUNDLE_URL', 'value': url}] if url else []
+        if connector:
+            protected.append({'name': 'ACCESS_CONNECTOR', 'value': json.dumps(connector)})
         properties = {'source': {'script': guest_script(action, self.request, checksum, expect_existing)}, 'timeoutInSeconds': 1800, 'asyncExecution': False,
-                      'parameters': [], 'protectedParameters': [{'name': 'BUNDLE_URL', 'value': url}] if url else []}
+                      'parameters': [], 'protectedParameters': protected}
+        if 'access' in record:
+            properties['source']['script'] = properties['source']['script'].replace(' --request ', ' --access-owner ' + record['ownerId'] + ' --request ')
         path = self.directory / 'run-command.json'
         preview.private_write(path, json.dumps({'location': self.request['target']['region'],
                                               'tags': tags(self.request, self.read()), 'properties': properties}))
@@ -330,6 +340,23 @@ class Azure:
             preview.require(time.monotonic() < deadline, 'Reset deletions submitted but Azure inventory has not converged; run status, then retry explicit reset if needed.')
             time.sleep(5)
 
+    def closed_ingress(self):
+        ids = resource_ids(self.request)
+        vm = self.az('vm', 'show', '--ids', ids['virtualMachine'])
+        verify_vm(self.request, vm)
+        preview.require([item['id'].lower() for item in vm['networkProfile']['networkInterfaces']] == [ids['networkInterface'].lower()],
+                        'The preview VM has an unexpected network interface.')
+        nic = self.az('network', 'nic', 'show', '--ids', ids['networkInterface'])
+        preview.require(nic.get('networkSecurityGroup', {}).get('id', '').lower() == ids['networkSecurityGroup'].lower(),
+                        'The preview NIC has no verified ingress security group.')
+        group = self.az('network', 'nsg', 'show', '--ids', ids['networkSecurityGroup'])
+        inbound = [rule for rule in group.get('securityRules', []) if rule.get('direction') == 'Inbound']
+        preview.require(any(all(rule.get(key) == value for key, value in {
+            'priority': 100, 'access': 'Deny', 'protocol': '*', 'sourcePortRange': '*', 'destinationPortRange': '*',
+            'sourceAddressPrefix': '*', 'destinationAddressPrefix': '*'}.items()) for rule in inbound)
+                        and not any(rule.get('access') == 'Allow' and rule.get('priority', 0) <= 100 for rule in inbound),
+                        'Observed Azure ingress does not deny all application and administration ports.')
+
 
 def bundle_images(request, directory):
     """CI exports the exact registry index + attestations. No rebuild or credentials in the bundle."""
@@ -346,7 +373,7 @@ def bundle_images(request, directory):
         for file in sorted(path.iterdir()):
             archive.add(file, arcname='incoming/' + file.name)
         for relative in ('scripts/packaging/images.py', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml',
-                         'deploy/preview/postgresql.json', 'deploy/preview/azure/transport.json'):
+                         'deploy/preview/postgresql.json', 'deploy/preview/azure/transport.json', 'deploy/preview/access.json'):
             archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
         for file in sorted((preview.ROOT / 'scripts/preview').glob('*.py')):
             if not file.name.startswith('test_'):
@@ -402,7 +429,7 @@ unset BUNDLE_URL
     return script
 
 
-def execute(action, request, client_factory=Azure, now=None):
+def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes):
     contract.operation(action, request)
     preview.require(request['provider'] == 'azure-vm' and request['registry'] == 'ghcr.io', 'Azure consumes private GHCR deliveries only.')
     if action == 'validate':
@@ -428,20 +455,41 @@ def execute(action, request, client_factory=Azure, now=None):
                     preview.require(not resources, 'A reset preview still has resources; finish reset before deploying.')
                     created = now or datetime.now(timezone.utc)
                     record.update(ownerId=str(uuid.uuid4()), createdAt=created.isoformat(), destroyed=False, initialized=False)
+                    preview.require(not record.get('access', {}).get('tunnelId') and not record.get('access', {}).get('dnsId'),
+                                    'Finish owned route teardown before resetting its owner.')
+                    record.pop('access', None)
                 record['request'] = request
                 record['expiresAt'] = (datetime.fromisoformat(record['createdAt']) + timedelta(hours=request['ttlHours'])).isoformat()
                 client.write(record)
-                client.provision(record)
-                guest = client.transfer(expect_existing=record['initialized'])
-                preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
-                record['initialized'] = True
-                client.write(record)
+                routes = route_factory(request, record, client.write, os.environ)
+                try:
+                    connector = routes.prepare() if routes else None
+                    client.provision(record)
+                    guest = client.transfer(expect_existing=record['initialized'], **({'connector': connector} if connector else {}))
+                    preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
+                    record['initialized'] = True
+                    client.write(record)
+                    url = None
+                    if routes:
+                        preview.require(guest.get('accessReady') is True, 'The guest did not confirm its protected connector.')
+                        client.closed_ingress()
+                        url = routes.publish()
+                except Exception:
+                    if routes:
+                        routes.withdraw()
+                    raise
                 value = azure_result(request, 'running', client.resources(record), record, guest)
+                value['url'] = url
                 value['metrics'].update(client.metrics())
                 value['metrics']['provisionAndDeploySeconds'] = round(time.monotonic() - started, 1)
                 return value
+            routes = route_factory(request, record, client.write, os.environ) if 'access' in record else None
+            if action == 'destroy' and routes:
+                routes.withdraw()
             if action == 'destroy' and request['dataMode'] == 'reset':
                 client.reset(record)
+                if routes:
+                    routes.destroy()
                 record['destroyed'] = True
                 record['initialized'] = False
                 client.write(record)
@@ -449,6 +497,8 @@ def execute(action, request, client_factory=Azure, now=None):
             vm = resource_ids(request)['virtualMachine']
             present = any(r['id'].lower() == vm.lower() for r in resources)
             if not present:
+                if action == 'destroy' and routes:
+                    routes.destroy()
                 return azure_result(request, 'stopped' if resources else 'absent', resources, record)
             power = client.power()
             guest = {}
@@ -456,8 +506,14 @@ def execute(action, request, client_factory=Azure, now=None):
                 guest = client.run_guest(action)
             if action == 'destroy':
                 client.az('vm', 'deallocate', '--ids', vm, timeout=900)
+                if routes:
+                    routes.destroy()
                 return azure_result(request, 'destroyed', resources, record, guest)
-            return azure_result(request, guest.get('state', 'stopped' if power == 'PowerState/deallocated' else 'provisioning'), resources, record, guest)
+            value = azure_result(request, guest.get('state', 'stopped' if power == 'PowerState/deallocated' else 'provisioning'), resources, record, guest)
+            if routes and record['access']['verified'] and value['state'] == 'running' and guest.get('accessReady'):
+                client.closed_ingress()
+                value['url'] = routes.verify()
+            return value
 
 
 def azure_result(request, state, resources, record=None, guest=None):
@@ -467,5 +523,7 @@ def azure_result(request, state, resources, record=None, guest=None):
                  providerResourceIds={'subscription': request['target']['subscriptionId'], 'resourceGroup': request['target']['resourceGroup'],
                                       'resources': [r['id'] for r in resources]},
                  metrics={k: guest[k] for k in ('guestOperationSeconds', 'memoryAvailableKiB') if k in guest})
-    # No public URL before #1285 verifies protection. Application still binds guest loopback only.
+    if record and 'access' in record:
+        value['providerResourceIds']['cloudflare'] = {key: record['access'][key] for key in ('accountId', 'zoneId', 'tunnelId', 'dnsId')}
+    # Only the caller that completed fresh protection checks may set a public URL.
     return value
