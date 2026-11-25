@@ -346,3 +346,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 275. [ADR-0275 — YAML seeds select explicit Bootstrap compositions](0275-yaml-seeds-select-explicit-bootstrap-compositions.md)
 
 276. [ADR-0276 — YAML Work imports prepare reviewed drafts](0276-yaml-work-imports-prepare-reviewed-drafts.md)
+
+277. [ADR-0277 — Epics organize plans without execution authority](0277-epics-organize-plans-without-execution-authority.md)

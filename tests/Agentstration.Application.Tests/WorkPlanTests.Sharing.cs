@@ -228,7 +228,7 @@ public sealed partial class WorkPlanTests
     }
     private static WorkProjectSharingService SharingService(Fixture fixture, SharingProvider remote, Guid? principal = null) => new(
         fixture.Sharing, ProjectService(fixture, owner: principal), fixture.Plans(owner: principal), fixture.Trees(owner: principal), remote,
-        new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now), new YamlWorkDocumentCodec());
+        new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now), new YamlWorkDocumentCodec(), fixture.Data);
     private static async Task<(WorkProjectSharingService Service, WorkProjectSnapshot Project)> SharingAsync(Fixture fixture, SharingProvider remote,
         WorkSharingProjectId portableProject, WorkParticipantId participant)
     {

@@ -100,3 +100,60 @@ No import activates, allocates, dispatches, accepts outcomes, publishes code or 
 
 See [Project sharing](project-sharing.md), [WorkPlans](work-plans.md) and
 [ADR-0276](../decisions/0276-yaml-work-imports-prepare-reviewed-drafts.md).
+
+## Optional logical epics
+
+The repository is already project-scoped. An optional layout is:
+
+```text
+bootstrap/
+  profile.yaml
+  flows/coding.yaml
+data/
+  catalog.yaml
+  epics/library/
+    epic.yaml
+    plans/search/plan.yaml
+    plans/search/taches/implementation.yaml
+  plans/independent/plan.yaml
+```
+
+Add `definition.epics: [epics/library/epic.yaml]` to the catalog. Its WorkEpic document is:
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: WorkEpic
+metadata:
+  name: library
+definition:
+  id:
+    value: 49ef965e-1fae-463a-8741-eef7e7217fd7
+  displayName: Library improvements
+  description: Optional logical grouping
+  planIds:
+    - value: 28cc0c95-249a-4412-8309-334247df0c3e
+```
+
+Membership is declared once in the epic, by plan identity. Folder placement alone never changes it.
+Each plan belongs to at most one epic. An epic needs no GitHub issue and adds no dependency,
+allocation, acceptance or execution semantics. Removing it ungroups its plans without deleting them.
+
+Catalog omission or `epics: null` preserves existing grouping. An explicit `epics: []` clears it;
+otherwise the reviewed list is the complete desired organization. A pure grouping import can use
+`plans: []`. Grouping changes have their own revision, independent of Project/plan/task versions.
+Matching normalized content is a no-op even with a new command ID; receipts remain replay-safe.
+
+Organization APIs are under `/api/workspaces/{workspace}/projects/{projectId}/organization`:
+
+| Route | Behavior |
+| --- | --- |
+| `GET` | Current organization definition and its own revision. |
+| `PUT` | `{ id, expectedVersion, definition: { epics: [...] } }` explicitly replaces organization. |
+| `POST /publication` | `{ id, expectedOrganizationVersion, expectedRecordVersion }` publishes the current definition through the protected sharing connector. |
+| `POST /import` | `{ id, expectedVersion, expectedDigest }` explicitly adopts the retained remote organization after pulling; referenced plans must already be associated locally. |
+
+Publish shared plans before an organization referring to them. The separate `Organization/epics`
+record never modifies their digests, allocation or usage. An uncertain publication is recovered at
+the returned ordinary sharing-operation location; do not create another publication ID to bypass
+an uncertain effect. Local grouping edits and normal pulls never write GitHub hierarchy/dependencies.
+See [ADR-0277](../decisions/0277-epics-organize-plans-without-execution-authority.md).

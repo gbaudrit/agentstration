@@ -777,3 +777,8 @@ canonical draft creation. Private Work operation documents retain frozen intent,
 per-plan progress and explicit partial/resume state in SQLite/PostgreSQL. Import never activates,
 allocates, dispatches or acknowledges repository issues. See [Work data](../../reference/work-data.md)
 and ADR-0276.
+
+Optional Work epics are logical plan membership with independent organization revisions and command
+receipts in the Work tracking store. YAML import explicitly preserves/replaces organization, and
+sharing uses a separate Organization record. Group edits do not save functional Projects/plans/tasks,
+retarget active Work, write GitHub hierarchy or recount usage. See ADR-0277.

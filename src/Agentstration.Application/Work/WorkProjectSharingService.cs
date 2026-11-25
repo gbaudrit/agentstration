@@ -8,7 +8,7 @@ namespace Agentstration.Application.Work;
 public sealed record PublishWorkSharingCommand(WorkSharingOperationId Id, long ExpectedProjectVersion, IReadOnlyList<WorkSharingChange> Changes);
 
 public sealed partial class WorkProjectSharingService(IWorkProjectSharingRepository repository, WorkProjectService projects,
-    WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingGateway gateway, IWorkplaceContext context, TimeProvider clock, IWorkDocumentCodec documents)
+    WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingGateway gateway, IWorkplaceContext context, TimeProvider clock, IWorkDocumentCodec documents, IWorkDataRepository data)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public Task InitializeAsync(CancellationToken token) => repository.InitializeAsync(token);
@@ -48,6 +48,14 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
             if (usage.Accounting is { } accounting && (accounting.ProjectId != project.Definition.Sharing!.ProjectId
                 || accounting.ParticipantId != project.Definition.Sharing.ParticipantId)) return Failure("usage_identity_invalid");
         }
+        long? organizationStorageVersion = null;
+        foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.Organization))
+        {
+            var organization = await data.GetOrganizationAsync(workspaceId, context.PrincipalId, projectId, token);
+            if (organization is null || WorkPlanDefinition.Digest(JsonSerializer.SerializeToElement(organization.Definition, Json)) != WorkPlanDefinition.Digest(change.Content))
+                return Failure("work_organization_local_conflict");
+            organizationStorageVersion = organization.StorageVersion;
+        }
         var observations = new List<WorkSharingPlanObservation>();
         foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.Plan))
         {
@@ -61,7 +69,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         var now = clock.GetUtcNow();
         var operation = new WorkSharingOperation(command.Id, workspaceId, context.PrincipalId, projectId, project.Version,
             project.Definition.Sharing!, Binding(project), changes, digest, WorkSharingOperationStatus.Pending, 1, now, now, [])
-        { Plans = observations };
+        { Plans = observations, OrganizationStorageVersion = organizationStorageVersion };
         var saved = await repository.AdmitAsync(operation, token);
         if (saved != WorkSharingSaveStatus.Saved)
         {
@@ -174,6 +182,11 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
             || JsonSerializer.SerializeToUtf8Bytes(snapshot, Json).Length > WorkSharingFormat.MaximumSnapshotBytes
             || snapshot.Revision?.Length is > 256 || revision is not null && snapshot.Revision != revision)
             return Result<WorkSharingSnapshot>.Failure("sharing_snapshot_invalid");
+        var knownPlans = snapshot.Records.Where(record => record.Key.Domain == WorkSharingDomain.Plan)
+            .Select(record => record.Content.Deserialize<WorkSharingPlan>(Json)!.PlanId).ToHashSet();
+        if (snapshot.Records.Where(record => record.Key.Domain == WorkSharingDomain.Organization)
+            .SelectMany(record => record.Content.Deserialize<WorkOrganizationDefinition>(Json)!.Epics).SelectMany(epic => epic.PlanIds).Any(id => !knownPlans.Contains(id)))
+            return Result<WorkSharingSnapshot>.Failure("sharing_organization_plan_missing");
         var prior = await repository.GetStateAsync(project.WorkspaceId, context.PrincipalId, project.Id, token);
         if (revision is null && prior?.Connection == project.Definition.Sharing && prior.Records.Count > 0 && snapshot.Records.Count == 0)
             return Result<WorkSharingSnapshot>.Failure("sharing_space_reset");
@@ -208,6 +221,11 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         if (issuePlans.GroupBy(plan => (plan.Issue!.Provider, Repository: plan.Issue.Repository.ToUpperInvariant(), plan.Issue.TaskId))
             .Any(group => group.Select(plan => plan.PlanId).Distinct().Count() > 1))
             return Result<WorkSharingTransportAttempt>.Failure("sharing_issue_plan_conflict");
+        var portablePlans = merged.Values.Where(record => record.Key.Domain == WorkSharingDomain.Plan)
+            .Select(record => record.Content.Deserialize<WorkSharingPlan>(Json)!.PlanId).ToHashSet();
+        if (merged.Values.Where(record => record.Key.Domain == WorkSharingDomain.Organization)
+            .SelectMany(record => record.Content.Deserialize<WorkOrganizationDefinition>(Json)!.Epics).SelectMany(epic => epic.PlanIds).Any(id => !portablePlans.Contains(id)))
+            return Result<WorkSharingTransportAttempt>.Failure("sharing_organization_plan_missing");
         var space = snapshot.Space with { Records = entries.Values.OrderBy(value => value.Key.Domain).ThenBy(value => value.Key.Name, StringComparer.Ordinal).ToArray() };
         if (!WorkSharingFormat.Validate(space).IsSuccess || entries.Values.Sum(entry => (long)entry.SizeBytes) > WorkSharingFormat.MaximumSnapshotBytes - 64 * 1024)
             return Result<WorkSharingTransportAttempt>.Failure("sharing_space_limit");

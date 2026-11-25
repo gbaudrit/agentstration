@@ -11,7 +11,7 @@ public sealed record ImportWorkDataCommand(WorkDataImportId Id, WorkDataSource S
 /// <summary>Reviewed, durable preparation of draft Work. Execution and configuration remain separate.</summary>
 public sealed class WorkDataImportService(IWorkDataRepository repository, WorkProjectService projects,
     WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingRepository mappings,
-    IWorkProjectDataGateway source, WorkDataReader reader, IWorkplaceContext context, TimeProvider clock)
+    IWorkProjectDataGateway source, WorkDataReader reader, WorkProjectOrganizationService organization, IWorkplaceContext context, TimeProvider clock)
 {
     private static readonly ActivitySource Activity = new("Agentstration.Work.Data");
 
@@ -127,12 +127,22 @@ public sealed class WorkDataImportService(IWorkDataRepository repository, WorkPr
         }
         var sourceDigest = parsed.Selection is null ? null : WorkPlanDefinition.Digest(package.Files.OrderBy(value => value.Path, StringComparer.Ordinal).ToArray());
         var resolved = parsed.Selection is null ? null : parsed.Selection with { Plans = selected };
+        if (resolved?.Organization is { } proposedOrganization)
+        {
+            var currentOrganization = await organization.GetAsync(project.WorkspaceId, project.Id, token);
+            if (!currentOrganization.IsSuccess) errors.Add(new(WorkDataFormat.CatalogPath, currentOrganization.ErrorCode!));
+            else resolved = resolved with { OrganizationVersion = currentOrganization.Value!.Version };
+            var members = project.Definition.PlanIds.Union(selected.Select(value => value.Plan.PlanId)).ToHashSet();
+            if (proposedOrganization.Epics.SelectMany(epic => epic.PlanIds).Any(id => !members.Contains(id)))
+                errors.Add(new(WorkDataFormat.CatalogPath, "work_organization_plan_not_associated"));
+        }
         var digest = errors.Count != 0 ? null : WorkPlanDefinition.Digest(new
         {
             project.WorkspaceId, project.OwnerPrincipalId, Project = project.Id, project.Version,
             Context = ContextDigest(project), package.Revision, Source = sourceDigest, Selection = resolved, Tasks = observed
         });
-        return new(new(errors.Count == 0, project.Version, package.Revision, sourceDigest, digest, selected, errors), resolved, observed);
+        return new(new WorkDataPreview(errors.Count == 0, project.Version, package.Revision, sourceDigest, digest, selected, errors)
+        { Organization = resolved?.Organization, OrganizationVersion = resolved?.OrganizationVersion ?? 0 }, resolved, observed);
     }
 
     private async Task<Result<WorkDataImport>> RunAsync(WorkDataImport operation, CancellationToken token)
@@ -167,6 +177,9 @@ public sealed class WorkDataImportService(IWorkDataRepository repository, WorkPr
                 if (selected.LocalVersion == 0)
                     local = await plans.CreateAsync(operation.WorkspaceId, planId, new(command, 0, selected.Plan.Definition), token);
                 if (!local.IsSuccess) return await PartialAsync(operation, local.ErrorCode!, token);
+                // A replay returns the current plan, which may have changed after creation but before progress was saved.
+                if (WorkPlanDefinition.Digest(local.Value!.Revision.Definition) != WorkPlanDefinition.Digest(selected.Plan.Definition))
+                    return await PartialAsync(operation, "sharing_local_plan_conflict", token);
                 current = await projects.GetAsync(operation.WorkspaceId, operation.ProjectId, token);
                 if (!current.IsSuccess || ContextDigest(current.Value!) != operation.ProjectContextDigest)
                     return await PartialAsync(operation, "work_data_project_changed", token);
@@ -181,6 +194,13 @@ public sealed class WorkDataImportService(IWorkDataRepository repository, WorkPr
                     Status = WorkDataImportStatus.Pending, UpdatedAt = clock.GetUtcNow(), ErrorCode = null };
                 if (!await repository.SaveImportAsync(next, operation.Version, token)) return Failure("work_data_operation_conflict");
                 operation = next;
+            }
+            if (operation.Selection.Organization is { } proposedOrganization)
+            {
+                var grouping = await organization.UpdateAsync(operation.WorkspaceId, operation.ProjectId,
+                    new(new Guid(Convert.FromHexString(WorkPlanDefinition.Digest(new { operation.Id, Organization = true })).AsSpan(0, 16)),
+                        operation.Selection.OrganizationVersion, proposedOrganization), token);
+                if (!grouping.IsSuccess) return await PartialAsync(operation, grouping.ErrorCode!, token);
             }
             var completed = operation with { Status = WorkDataImportStatus.Succeeded, Version = operation.Version + 1,
                 UpdatedAt = clock.GetUtcNow(), ErrorCode = null };

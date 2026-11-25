@@ -20,6 +20,7 @@ public static class WorkSharingContent
             object? normalized = change.Key.Domain switch
             {
                 WorkSharingDomain.Plan => Plan(change.Content.Deserialize<WorkSharingPlan>(Json)),
+                WorkSharingDomain.Organization => change.Content.Deserialize<WorkOrganizationDefinition>(Json)?.Validate().Value,
                 WorkSharingDomain.ProjectMetadata => Metadata(change.Content.Deserialize<WorkSharingProjectMetadata>(Json)),
                 WorkSharingDomain.Contribution => Contribution(change.Content.Deserialize<WorkSharingContribution>(Json)),
                 WorkSharingDomain.Usage => Usage(change.Content.Deserialize<WorkSharingUsage>(Json)),
@@ -27,7 +28,8 @@ public static class WorkSharingContent
                 _ => null
             };
             if (normalized is null) return Failure();
-            if (normalized is WorkSharingPlan plan && change.Key.Name != plan.PlanId.ToString()
+            if (normalized is WorkOrganizationDefinition && change.Key.Name != "epics"
+                || normalized is WorkSharingPlan plan && change.Key.Name != plan.PlanId.ToString()
                 || normalized is WorkSharingContribution contribution && change.Key.Name != contribution.Id.ToString("D")
                 || normalized is WorkSharingUsage usage && change.Key.Name != usage.Id.ToString("D")
                 || normalized is WorkSharingBootstrapProfile profile && change.Key.Name != profile.Name) return Failure();

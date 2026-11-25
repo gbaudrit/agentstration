@@ -23,7 +23,7 @@ public sealed partial class GitWorkProjectSharingGateway
             var error = await ReadFilesAsync([WorkDataFormat.CatalogPath]);
             if (error is not null) return Failure(error);
             var catalog = documents.Read<WorkDataManifest<WorkDataCatalogDefinition>>(Encoding.UTF8.GetBytes(files[WorkDataFormat.CatalogPath].Content), WorkDataFormat.MaximumFileBytes);
-            if (!catalog.IsSuccess || catalog.Value!.Definition?.Plans is not { Count: > 0 and <= WorkDataFormat.MaximumPlans } paths
+            if (!catalog.IsSuccess || catalog.Value!.Definition?.Plans is not { Count: <= WorkDataFormat.MaximumPlans } paths
                 || paths.Any(path => !WorkDataFormat.PlanPath(path))) return Failure("work_data_catalog_invalid");
             error = await ReadFilesAsync(paths);
             if (error is not null) return Failure(error);
@@ -36,6 +36,9 @@ public sealed partial class GitWorkProjectSharingGateway
                 treePaths.UnionWith(references);
             }
             error = await ReadFilesAsync(treePaths);
+            if (error is null && catalog.Value!.Definition.Epics is { } epics)
+                error = epics.Count > 64 || epics.Any(path => !WorkDataFormat.ValidPath(path) || !path.StartsWith("epics/", StringComparison.Ordinal) || !path.EndsWith("/epic.yaml", StringComparison.Ordinal))
+                    ? "work_data_epic_path_invalid" : await ReadFilesAsync(epics);
             return error is null ? Result<WorkDataPackage>.Success(new(revision, files.Values.OrderBy(file => file.Path, StringComparer.Ordinal).ToArray())) : Failure(error);
         }
         catch (Exception exception) when (exception is FormatException or DecoderFallbackException)

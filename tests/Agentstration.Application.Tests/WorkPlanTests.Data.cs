@@ -80,6 +80,29 @@ public sealed partial class WorkPlanTests
     }
 
     [TestMethod]
+    public async Task YamlDataResumeRefusesPlanEditedAfterCreationBeforeProgressCheckpoint()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var (service, project) = await DataFixtureAsync(fixture);
+        var id = WorkPlanId.New(); var task = new WorkTaskId(Guid.NewGuid());
+        var package = DataPackage(new(Guid.NewGuid()), [(id, task)]);
+        var preview = (await service.PreviewAsync(fixture.Workspace, project.Id, new(package), default)).Value!;
+        var command = new ImportWorkDataCommand(new(Guid.NewGuid()), new(package), preview.Digest!);
+        var interrupted = DataService(fixture, new LoseFirstImportProgress(fixture.Data));
+        Assert.AreEqual("work_data_operation_conflict", (await interrupted.ImportAsync(fixture.Workspace, project.Id, command, default)).ErrorCode);
+        var local = (await fixture.Plans().GetAsync(fixture.Workspace, id, default)).Value!;
+        var edited = await fixture.Plans().ReviseAsync(fixture.Workspace, id,
+            new(Guid.NewGuid(), local.Plan.Version, local.Revision.Definition with { Intent = "Edited after interrupted creation" }), default);
+        Assert.IsTrue(edited.IsSuccess, edited.ErrorCode);
+        await fixture.ReopenAsync(); (service, _) = await DataFixtureAsync(fixture, project.Id);
+        var resumed = await service.ResumeAsync(fixture.Workspace, project.Id, command.Id, default);
+        Assert.AreEqual(WorkDataImportStatus.Partial, resumed.Value!.Status);
+        Assert.AreEqual("sharing_local_plan_conflict", resumed.Value.ErrorCode);
+        Assert.HasCount(0, resumed.Value.ImportedPlans);
+        Assert.AreEqual(edited.Value!.Plan.Version, (await fixture.Plans().GetAsync(fixture.Workspace, id, default)).Value!.Plan.Version);
+    }
+
+    [TestMethod]
     [DataRow("../outside.yaml")]
     [DataRow("/outside.yaml")]
     [DataRow("flows/coding.yaml")]
@@ -112,7 +135,7 @@ public sealed partial class WorkPlanTests
 
     private static WorkDataImportService DataService(Fixture fixture, IWorkDataRepository? store = null, Guid? principal = null) =>
         new(store ?? fixture.Data, ProjectService(fixture, owner: principal), fixture.Plans(owner: principal), fixture.Trees(owner: principal), fixture.Sharing,
-            new NoDataProvider(), new(new YamlWorkDocumentCodec()), new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now));
+            new NoDataProvider(), new(new YamlWorkDocumentCodec()), OrganizationService(fixture, principal), new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now));
 
     private static async Task<(WorkDataImportService Service, WorkProjectSnapshot Project)> DataFixtureAsync(Fixture fixture, WorkProjectId? id = null)
     {
@@ -130,9 +153,25 @@ public sealed partial class WorkPlanTests
             throw new InvalidOperationException("Uploaded/local work must not require a provider.");
     }
 
+    private sealed class LoseFirstImportProgress(IWorkDataRepository inner) : IWorkDataRepository
+    {
+        private bool lost;
+        public Task InitializeAsync(CancellationToken token) => inner.InitializeAsync(token);
+        public Task<WorkOrganizationSnapshot?> GetOrganizationAsync(WorkspaceId workspace, Guid owner, WorkProjectId project, CancellationToken token) => inner.GetOrganizationAsync(workspace, owner, project, token);
+        public Task<bool> SaveOrganizationAsync(WorkOrganizationSnapshot value, long storageVersion, long projectVersion, CancellationToken token) => inner.SaveOrganizationAsync(value, storageVersion, projectVersion, token);
+        public Task<WorkDataImport?> GetImportAsync(WorkspaceId workspace, Guid owner, WorkProjectId project, WorkDataImportId id, CancellationToken token) => inner.GetImportAsync(workspace, owner, project, id, token);
+        public Task<bool> SaveImportAsync(WorkDataImport operation, long version, CancellationToken token)
+        {
+            if (!lost && operation.ImportedPlans.Count == 1) { lost = true; return Task.FromResult(false); }
+            return inner.SaveImportAsync(operation, version, token);
+        }
+    }
+
     private sealed class CancelAfterFirstImport(IWorkDataRepository inner, CancellationTokenSource cancellation) : IWorkDataRepository
     {
         public Task InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
+        public Task<WorkOrganizationSnapshot?> GetOrganizationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, CancellationToken cancellationToken) => inner.GetOrganizationAsync(workspaceId, principalId, projectId, cancellationToken);
+        public Task<bool> SaveOrganizationAsync(WorkOrganizationSnapshot value, long expectedStorageVersion, long expectedProjectVersion, CancellationToken cancellationToken) => inner.SaveOrganizationAsync(value, expectedStorageVersion, expectedProjectVersion, cancellationToken);
         public Task<WorkDataImport?> GetImportAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, WorkDataImportId id, CancellationToken cancellationToken) =>
             inner.GetImportAsync(workspaceId, principalId, projectId, id, cancellationToken);
         public async Task<bool> SaveImportAsync(WorkDataImport operation, long expectedVersion, CancellationToken cancellationToken)

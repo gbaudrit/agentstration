@@ -31,7 +31,7 @@ public sealed class WorkDataReader(IWorkDocumentCodec documents)
         var catalog = ReadDocument<WorkDataCatalogDefinition>(WorkDataFormat.CatalogPath, "WorkCatalog");
         if (catalog is null) return new(null, errors);
         if (catalog.FormatVersion != WorkDataFormat.Version || catalog.ProjectId.Value == Guid.Empty
-            || catalog.Plans is not { Count: > 0 and <= WorkDataFormat.MaximumPlans }
+            || catalog.Plans is not { Count: <= WorkDataFormat.MaximumPlans }
             || catalog.Plans.Distinct(StringComparer.Ordinal).Count() != catalog.Plans.Count)
             return new(null, [new(WorkDataFormat.CatalogPath, "work_data_catalog_invalid")]);
         var plans = new List<WorkDataPlanSelection>();
@@ -62,7 +62,27 @@ public sealed class WorkDataReader(IWorkDocumentCodec documents)
             plans.Add(new(path, normalized.Value, 0));
         }
         if (taskIds.Count > 100) errors.Add(new(WorkDataFormat.CatalogPath, "work_data_tasks_limit"));
-        return new(errors.Count == 0 ? new(catalog.ProjectId, plans) : null, errors);
+        WorkOrganizationDefinition? organization = null;
+        if (catalog.Epics is { } epicPaths)
+        {
+            if (epicPaths.Count > 64 || epicPaths.Distinct(StringComparer.Ordinal).Count() != epicPaths.Count)
+                errors.Add(new(WorkDataFormat.CatalogPath, "work_organization_invalid"));
+            else
+            {
+                var epics = new List<WorkEpicDefinition>();
+                foreach (var path in epicPaths)
+                {
+                    if (!WorkDataFormat.ValidPath(path) || !path.StartsWith("epics/", StringComparison.Ordinal) || !path.EndsWith("/epic.yaml", StringComparison.Ordinal))
+                    { errors.Add(new(WorkDataFormat.CatalogPath, "work_data_epic_path_invalid")); continue; }
+                    var epic = ReadDocument<WorkEpicDefinition>(path, "WorkEpic");
+                    if (epic is not null) epics.Add(epic);
+                }
+                var normalized = new WorkOrganizationDefinition(epics).Validate();
+                if (!normalized.IsSuccess) errors.Add(new(WorkDataFormat.CatalogPath, normalized.ErrorCode!));
+                else organization = normalized.Value;
+            }
+        }
+        return new(errors.Count == 0 ? new WorkDataSelection(catalog.ProjectId, plans) { Organization = organization } : null, errors);
 
         T? ReadDocument<T>(string path, string kind) where T : class
         {

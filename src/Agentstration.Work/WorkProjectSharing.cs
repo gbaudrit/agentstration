@@ -12,7 +12,7 @@ public sealed record WorkProjectSharingConnection(WorkSharingProjectId ProjectId
     string BindingName, string Location, string FormatVersion = WorkSharingFormat.Version);
 
 [JsonConverter(typeof(JsonStringEnumConverter<WorkSharingDomain>))]
-public enum WorkSharingDomain { BootstrapProfile, ProjectMetadata, Plan, Contribution, Usage }
+public enum WorkSharingDomain { BootstrapProfile, ProjectMetadata, Plan, Contribution, Usage, Organization }
 public sealed record WorkSharingRecordKey(WorkSharingDomain Domain, string Name);
 public sealed record WorkSharingRecord(WorkSharingRecordKey Key, long Version, JsonElement Content, string Digest,
     WorkParticipantId ParticipantId, DateTimeOffset CreatedAt);
@@ -86,6 +86,7 @@ public sealed record WorkSharingOperation(WorkSharingOperationId Id, WorkspaceId
     string? RemoteRevision = null, string? ErrorCode = null)
 {
     public IReadOnlyList<WorkSharingPlanObservation> Plans { get; init; } = [];
+    public long? OrganizationStorageVersion { get; init; }
 }
 public sealed record WorkSharingPlanObservation(WorkPlanId PlanId, long Version);
 public sealed record WorkProjectSharingState(WorkspaceId WorkspaceId, Guid PrincipalId, WorkProjectId ProjectId, long ProjectVersion,

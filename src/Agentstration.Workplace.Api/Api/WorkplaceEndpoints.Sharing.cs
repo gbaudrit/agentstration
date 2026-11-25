@@ -63,6 +63,7 @@ public static partial class WorkplaceEndpoints
     }
     private static IResult SharingProblem(string code) => code.StartsWith("work_project_", StringComparison.Ordinal) ? WorkProjectProblem(code)
         : code.StartsWith("work_plan_", StringComparison.Ordinal) ? WorkPlanProblem(code)
+        : code.StartsWith("work_organization_", StringComparison.Ordinal) ? OrganizationProblem(code)
         : Results.Problem(title: code, statusCode: code switch
         {
             "sharing_operation_not_found" => 404,

@@ -10,7 +10,10 @@ public sealed record WorkDataFile(string Path, string Content);
 public sealed record WorkDataPackage(string? Revision, IReadOnlyList<WorkDataFile> Files);
 public sealed record WorkDataMetadata(string Name);
 public sealed record WorkDataManifest<T>(string ApiVersion, string Kind, WorkDataMetadata Metadata, T Definition);
-public sealed record WorkDataCatalogDefinition(string FormatVersion, WorkSharingProjectId ProjectId, IReadOnlyList<string> Plans);
+public sealed record WorkDataCatalogDefinition(string FormatVersion, WorkSharingProjectId ProjectId, IReadOnlyList<string> Plans)
+{
+    public IReadOnlyList<string>? Epics { get; init; }
+}
 public sealed record WorkDataPlanDefinition(WorkPlanId Id, WorkPlanDefinition Plan, IReadOnlyList<string> TaskTrees)
 {
     public WorkSharingIssueReference? Issue { get; init; }
@@ -19,9 +22,17 @@ public sealed record WorkDataPlanDefinition(WorkPlanId Id, WorkPlanDefinition Pl
 public sealed record WorkDataDiagnostic(string Path, string Code);
 public sealed record WorkDataPlanSelection(string Path, WorkSharingPlan Plan, long LocalVersion);
 public sealed record WorkDataTaskObservation(WorkTaskId Id, long Version);
-public sealed record WorkDataSelection(WorkSharingProjectId ProjectId, IReadOnlyList<WorkDataPlanSelection> Plans);
+public sealed record WorkDataSelection(WorkSharingProjectId ProjectId, IReadOnlyList<WorkDataPlanSelection> Plans)
+{
+    public WorkOrganizationDefinition? Organization { get; init; }
+    public long OrganizationVersion { get; init; }
+}
 public sealed record WorkDataPreview(bool CanImport, long ProjectVersion, string? Revision, string? SourceDigest,
-    string? Digest, IReadOnlyList<WorkDataPlanSelection> Plans, IReadOnlyList<WorkDataDiagnostic> Diagnostics);
+    string? Digest, IReadOnlyList<WorkDataPlanSelection> Plans, IReadOnlyList<WorkDataDiagnostic> Diagnostics)
+{
+    public WorkOrganizationDefinition? Organization { get; init; }
+    public long OrganizationVersion { get; init; }
+}
 
 public enum WorkDataImportStatus { Pending, Partial, Succeeded }
 public sealed record WorkDataImport(WorkDataImportId Id, WorkspaceId WorkspaceId, Guid PrincipalId, WorkProjectId ProjectId,

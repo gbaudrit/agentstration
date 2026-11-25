@@ -45,9 +45,13 @@ public sealed class PostgreSqlWorkDataRepository(IDbContextFactory<WorkDbContext
             if (row is null ? expectedVersion != 0 : row.Version != expectedVersion) return false;
             if (expectedVersion == 0)
             {
-                if (await db.WorkProjects.Where(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner
-                    && value.Id == project && value.Version == operation.ProjectVersion)
-                    .ExecuteUpdateAsync(set => set.SetProperty(value => value.Version, value => value.Version), token) != 1) return false;
+                foreach (var task in operation.Tasks.Where(value => value.Version > 0))
+                {
+                    var id = task.Id.ToString();
+                    if (await db.WorkItems.Where(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner
+                        && value.Id == id && value.Version == task.Version)
+                        .ExecuteUpdateAsync(set => set.SetProperty(value => value.Version, value => value.Version), token) != 1) return false;
+                }
                 foreach (var plan in operation.Selection.Plans)
                 {
                     var id = plan.Plan.PlanId.ToString();
@@ -59,12 +63,15 @@ public sealed class PostgreSqlWorkDataRepository(IDbContextFactory<WorkDbContext
                         && value.Id == id && value.Version == plan.LocalVersion)
                         .ExecuteUpdateAsync(set => set.SetProperty(value => value.Version, value => value.Version), token) != 1) return false;
                 }
-                foreach (var task in operation.Tasks.Where(value => value.Version > 0))
+                if (await db.WorkProjects.Where(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner
+                    && value.Id == project && value.Version == operation.ProjectVersion)
+                    .ExecuteUpdateAsync(set => set.SetProperty(value => value.Version, value => value.Version), token) != 1) return false;
+                if (operation.Selection.Organization is not null)
                 {
-                    var id = task.Id.ToString();
-                    if (await db.WorkItems.Where(value => value.WorkspaceId == workspace && value.OwnerPrincipalId == owner
-                        && value.Id == id && value.Version == task.Version)
-                        .ExecuteUpdateAsync(set => set.SetProperty(value => value.Version, value => value.Version), token) != 1) return false;
+                    var organization = await db.WorkTrackingDocuments.AsNoTracking().Where(value => value.WorkspaceId == workspace
+                        && value.OwnerPrincipalId == owner && value.ProjectId == project && value.Key == "organization").Select(value => value.Payload).SingleOrDefaultAsync(token);
+                    var version = organization is null ? 0 : JsonSerializer.Deserialize<WorkOrganizationSnapshot>(organization, Json)!.Version;
+                    if (version != operation.Selection.OrganizationVersion) return false;
                 }
             }
             var payload = JsonSerializer.Serialize(operation, Json);
@@ -76,4 +83,43 @@ public sealed class PostgreSqlWorkDataRepository(IDbContextFactory<WorkDbContext
             catch (DbUpdateException exception) when (exception.InnerException is Npgsql.PostgresException { SqlState: "23505" }) { return false; }
         });
     }
+    public async Task<WorkOrganizationSnapshot?> GetOrganizationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, CancellationToken token)
+    {
+        await using var db = await factory.CreateDbContextAsync(token);
+        var workspace = workspaceId.ToString(); var owner = principalId.ToString("D"); var project = projectId.ToString();
+        var payload = await db.WorkTrackingDocuments.AsNoTracking().Where(value => value.WorkspaceId == workspace
+            && value.OwnerPrincipalId == owner && value.ProjectId == project && value.Key == "organization")
+            .Select(value => value.Payload).SingleOrDefaultAsync(token);
+        return payload is null ? null : JsonSerializer.Deserialize<WorkOrganizationSnapshot>(payload, Json)
+            ?? throw new InvalidOperationException("The persisted Work organization is invalid.");
+    }
+
+    public async Task<bool> SaveOrganizationAsync(WorkOrganizationSnapshot value, long expectedStorageVersion, long expectedProjectVersion, CancellationToken token)
+    {
+        if (value.WorkspaceId.Value == Guid.Empty || value.PrincipalId == Guid.Empty || value.ProjectId.Value == Guid.Empty
+            || value.StorageVersion != expectedStorageVersion + 1 || value.Version < 0 || value.Commands.Count > 256
+            || !value.Definition.Validate().IsSuccess)
+            throw new ArgumentException("A bounded owned organization change is required.", nameof(value));
+        await using var strategy = await factory.CreateDbContextAsync(token);
+        return await strategy.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var db = await factory.CreateDbContextAsync(token);
+            await using var tx = await db.Database.BeginTransactionAsync(token);
+            var workspace = value.WorkspaceId.ToString(); var owner = value.PrincipalId.ToString("D"); var project = value.ProjectId.ToString();
+            if (await db.WorkProjects.Where(row => row.WorkspaceId == workspace && row.OwnerPrincipalId == owner
+                && row.Id == project && row.Version == expectedProjectVersion)
+                .ExecuteUpdateAsync(set => set.SetProperty(row => row.Version, row => row.Version), token) != 1) return false;
+            var row = await db.WorkTrackingDocuments.SingleOrDefaultAsync(row => row.WorkspaceId == workspace
+                && row.OwnerPrincipalId == owner && row.ProjectId == project && row.Key == "organization", token);
+            if (row is null ? expectedStorageVersion != 0 : row.Version != expectedStorageVersion) return false;
+            var payload = JsonSerializer.Serialize(value, Json);
+            if (row is null) db.WorkTrackingDocuments.Add(new() { WorkspaceId = workspace, OwnerPrincipalId = owner,
+                ProjectId = project, Key = "organization", Version = value.StorageVersion, Payload = payload });
+            else { row.Version = value.StorageVersion; row.Payload = payload; }
+            try { await db.SaveChangesAsync(token); await tx.CommitAsync(token); return true; }
+            catch (DbUpdateConcurrencyException) { return false; }
+            catch (DbUpdateException exception) when (exception.InnerException is Npgsql.PostgresException { SqlState: "23505" }) { return false; }
+        });
+    }
+
 }

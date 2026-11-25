@@ -5,6 +5,8 @@ namespace Agentstration.Work.Storage.Abstractions;
 
 public interface IWorkDataRepository
 {
+    Task<WorkOrganizationSnapshot?> GetOrganizationAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId, CancellationToken cancellationToken);
+    Task<bool> SaveOrganizationAsync(WorkOrganizationSnapshot value, long expectedStorageVersion, long expectedProjectVersion, CancellationToken cancellationToken);
     Task InitializeAsync(CancellationToken cancellationToken);
     Task<WorkDataImport?> GetImportAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectId projectId,
         WorkDataImportId id, CancellationToken cancellationToken);

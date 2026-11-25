@@ -71,6 +71,9 @@ public sealed class PostgreSqlWorkProjectSharingRepository(IDbContextFactory<Wor
             }
             if (await db.WorkProjects.Where(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.Id == project && x.Version == operation.ProjectVersion)
                 .ExecuteUpdateAsync(set => set.SetProperty(x => x.Version, x => x.Version), token) != 1) return WorkSharingSaveStatus.WorkChanged;
+            if (operation.OrganizationStorageVersion is { } organizationVersion && await db.WorkTrackingDocuments
+                .Where(x => x.WorkspaceId == workspace && x.OwnerPrincipalId == owner && x.ProjectId == project && x.Key == "organization" && x.Version == organizationVersion)
+                .ExecuteUpdateAsync(set => set.SetProperty(x => x.Version, x => x.Version), token) != 1) return WorkSharingSaveStatus.WorkChanged;
             db.WorkSharingOperations.Add(new() { WorkspaceId = workspace, OwnerPrincipalId = owner, ProjectId = project, Id = id,
                 Version = operation.Version, CreatedAtTicks = operation.CreatedAt.UtcTicks, Payload = Encode(operation) });
             try { await db.SaveChangesAsync(token); await tx.CommitAsync(token); return WorkSharingSaveStatus.Saved; }

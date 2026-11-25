@@ -51,6 +51,13 @@ public sealed partial class ProjectSharingApiTests
         Assert.AreEqual(imported.Version, (await replay.Content.ReadFromJsonAsync<WorkDataImportResponse>())!.Version);
         var receipt = await host.Http.GetFromJsonAsync<WorkDataImportResponse>(host.Root(project.Id) + $"/data/imports/{request.Id}");
         Assert.AreEqual(imported.SourceDigest, receipt!.SourceDigest);
+        var projectBeforeGrouping = (await host.Http.GetFromJsonAsync<WorkProjectResponse>(host.Root(project.Id)))!;
+        var organization = (await host.Http.GetFromJsonAsync<WorkOrganizationResponse>(host.Root(project.Id) + "/organization"))!;
+        Assert.AreEqual(1, organization.Version); Assert.HasCount(1, organization.Definition.Epics);
+        using var ungrouped = await host.Http.PutAsJsonAsync(host.Root(project.Id) + "/organization", new UpdateWorkOrganizationRequest(Guid.NewGuid(), organization.Version, new([])));
+        Assert.AreEqual(HttpStatusCode.OK, ungrouped.StatusCode, await ungrouped.Content.ReadAsStringAsync());
+        Assert.HasCount(0, (await ungrouped.Content.ReadFromJsonAsync<WorkOrganizationResponse>())!.Definition.Epics);
+        Assert.AreEqual(projectBeforeGrouping.Version, (await host.Http.GetFromJsonAsync<WorkProjectResponse>(host.Root(project.Id)))!.Version);
         using var stale = await host.Http.PostAsJsonAsync(host.Root(project.Id) + "/data/imports", request with { Id = Guid.NewGuid() });
         Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode);
         using var foreign = await host.Http.GetAsync($"/api/workspaces/{Guid.NewGuid()}/projects/{project.Id}/data/imports/{request.Id}");
@@ -61,10 +68,12 @@ public sealed partial class ProjectSharingApiTests
     private static WorkDataPackage ApiDataPackage(WorkSharingProjectId project, WorkPlanId plan, WorkTaskId task) => new(null,
     [
         new("catalog.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkDataCatalogDefinition>(ResourceApiVersions.CoreV1,
-            "WorkCatalog", new("fixture"), new(WorkDataFormat.Version, project, ["plans/feature/plan.yaml"])))),
-        new("plans/feature/plan.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkDataPlanDefinition>(ResourceApiVersions.CoreV1,
-            "WorkPlan", new("feature"), new(plan, new("Implement fixture", [task], []), ["plans/feature/taches/tree.yaml"])))),
-        new("plans/feature/taches/tree.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkTaskTreeDefinition>(ResourceApiVersions.CoreV1,
+            "WorkCatalog", new("fixture"), new(WorkDataFormat.Version, project, ["epics/library/plans/feature/plan.yaml"]) { Epics = ["epics/library/epic.yaml"] }))),
+        new("epics/library/plans/feature/plan.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkDataPlanDefinition>(ResourceApiVersions.CoreV1,
+            "WorkPlan", new("feature"), new(plan, new("Implement fixture", [task], []), ["epics/library/plans/feature/taches/tree.yaml"])))),
+        new("epics/library/epic.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkEpicDefinition>(ResourceApiVersions.CoreV1,
+            "WorkEpic", new("library"), new(new(Guid.NewGuid()), "Library", null, [plan])))),
+        new("epics/library/plans/feature/taches/tree.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkTaskTreeDefinition>(ResourceApiVersions.CoreV1,
             "WorkTaskTree", new("tree"), new(task, [new(task, WorkTaskKind.Atomic, "Implement fixture", "Produce deterministic evidence")]))))
     ]);
 }

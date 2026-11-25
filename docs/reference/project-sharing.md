@@ -58,7 +58,7 @@ and current binding Discover/Use authorization.
 
 A change is `{ "key": { "domain": "Contribution", "name": "<uuid>" }, "expectedVersion": 0,
 "content": { ... } }`. Domains are `BootstrapProfile`, `ProjectMetadata`, `Plan`, `Contribution` and
-`Usage`. Product contracts define each payload; unknown typed fields are rejected. Plan content
+`Usage`, plus `Organization` for independent logical epic membership. Product contracts define each payload; unknown typed fields are rejected. Plan content
 must match an associated, authorized local plan and its immutable task declarations. Allocation
 covers each atomic plan member once. A shared plan may include complete task trees while selecting
 only some members, preserving the ordinary WorkPlan hierarchy rules.
