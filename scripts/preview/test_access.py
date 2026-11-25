@@ -368,3 +368,6 @@ class GuestAccessTests(unittest.TestCase):
                 current['connector'][section][key] = original
             current['connector']['Mounts'][0]['RW'] = True
             self.assertFalse(access_host.ready(str(uuid.uuid4())))
+            current['connector']['Mounts'][0]['RW'] = False
+            current['connector']['Mounts'][0]['Type'] = 'volume'
+            self.assertFalse(access_host.ready(str(uuid.uuid4())))

@@ -105,8 +105,8 @@ def ready(owner):
            or not item['HostConfig'].get('ReadonlyRootfs')
            or len(item.get('Mounts', [])) != 1
            or set(item['HostConfig'].get('Tmpfs') or {}) != ({'/data', '/config'} if role == 'proxy' else set())
-           or any(mount.get('Type') == 'bind' and (mount.get('RW') or mount.get('Destination') !=
-                  ('/etc/caddy/Caddyfile' if role == 'proxy' else '/run/secrets/tunnel-token')) for mount in item.get('Mounts', []))
+           or any(mount.get('Type') != 'bind' or mount.get('RW') or mount.get('Destination') !=
+                  ('/etc/caddy/Caddyfile' if role == 'proxy' else '/run/secrets/tunnel-token') for mount in item.get('Mounts', []))
            for role, item in current.items()):
         return False
     try:
