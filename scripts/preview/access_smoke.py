@@ -112,7 +112,8 @@ def smoke():
 def check(headers):
     values = {key.lower(): value for key, value in headers.items()}
     preview.require(not any(key.startswith('cf-access-') for key in values)
-                    and 'cf_authorization=' not in values.get('cookie', '').lower()
+                    and all(cookie.partition('=')[0].strip().lower() != 'cf_authorization'
+                            for cookie in values.get('cookie', '').split(';'))
                     and 'App=one' in values.get('cookie', '')
                     and values.get('authorization') == 'Bearer application-fixture'
                     and values.get('host') == 'dev-smoke.agentstration.cloud'
