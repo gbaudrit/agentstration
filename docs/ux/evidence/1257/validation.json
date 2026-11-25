@@ -656,7 +656,7 @@
       "evidence": "data-source-loading/observations.json"
     },
     "functionalCoverage": "Running serialized after browser hosts and uninstrumented diagnostics finished; completed result is recorded in PR Validation.",
-    "memoryEvidence": "../../../../site/static/test-diagnostics/ci-1273-main-e052.json",
+    "memoryEvidence": "../../../site/static/test-diagnostics/ci-1273-main-e052.json",
     "limits": [
       "Historical fields above retain their original source/date; they are not claims about the synchronized candidate.",
       "Native captures cover visible viewport regions, not every Preview section.",
