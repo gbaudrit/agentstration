@@ -319,3 +319,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 257. [ADR-0257 — Azure previews use OIDC and credential-free OCI transfer](0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
 258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
 259. [ADR-0259 — Preview routes use owned tunnels and an isolated Access proxy](0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)
+
+264. [ADR-0264 — Source authoring keeps contracts and raw samples separate](0264-source-authoring-keeps-contracts-and-raw-samples-separate.md)

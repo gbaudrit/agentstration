@@ -349,6 +349,34 @@ else
         transformationFlows = options.Where(value => value.Contract == KnowledgeFlowContracts.ArtifactTransformation).ToArray();
     }
     private string? InheritedDescription(KnowledgeSourceBindingModel binding) => dataSources.FirstOrDefault(source => DataSourceKey(source) == binding.DataSourceKey)?.Definition.Description;
+    private ResourceNamespace AuthoringNamespace => model.NamespaceValid ? ResourceNamespace.Parse(model.Namespace) : ResourceNamespace.Default;
+    private readonly Dictionary<KnowledgeSourceBindingModel, SourceSample> bindingPreviewSamples = [];
+    private SourceSample? globalPreviewSample;
+    private string globalPreviewContext = "";
+    private bool globalPreviewFailed;
+    private IReadOnlyList<KnowledgePreviewInputIssue> globalPreviewIssues = [];
+    private string KnowledgePreviewKey => Agentstration.Functions.Contracts.FunctionDigests.Compute(new { model, samples = bindingPreviewSamples.Select(p => new { p.Key.Name, p.Value.Id }).ToArray() });
+    private ResourceReference? PreviewDataSource(KnowledgeSourceBindingModel binding) => dataSources.FirstOrDefault(source => DataSourceKey(source) == binding.DataSourceKey) is { } source ? new(source.Name, source.ScopeRef, source.Namespace) : binding.Original?.DataSource;
+    private void SetBindingSample(KnowledgeSourceBindingModel binding, SourceSample? sample) { if (sample is null) bindingPreviewSamples.Remove(binding); else bindingPreviewSamples[binding] = sample; }
+    private async Task PrepareGlobalPreviewAsync()
+    {
+        if (Services.GetService(typeof(ISourceAuthoringClient)) is not ISourceAuthoringClient client) return;
+        globalPreviewFailed = false;
+        try
+        {
+            var definition = new KnowledgeSourceProperties
+            {
+                DisplayName = model.DisplayName, ProjectionFlow = OriginalFlow(model.ProjectionFlowKey, savedSource?.Definition.ProjectionFlow),
+                DataSources = bindings.Select(ToBinding).ToArray(), Orchestration = model.Orchestration,
+                Compositions = model.CompositionPoints
+            };
+            var key = KnowledgePreviewKey;
+            var prepared = await client.PrepareKnowledgeAsync(new(ResourceNamespace.Parse(model.Namespace), definition,
+                bindings.Where(bindingPreviewSamples.ContainsKey).ToDictionary(b => b.Name, b => bindingPreviewSamples[b].Id)), cancellation.Token);
+            globalPreviewSample = prepared.Sample; globalPreviewIssues = prepared.Issues; globalPreviewContext = key;
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { globalPreviewFailed = true; }
+    }
     private void AddBinding() => bindings.Add(new() { Name = $"input-{bindings.Count + 1}" });
     private void RemoveBinding(KnowledgeSourceBindingModel binding) => bindings.Remove(binding);
     private KnowledgeDataSourceBinding ToBinding(KnowledgeSourceBindingModel value)
@@ -464,7 +492,10 @@ else
             <div class="form-span-2"><SourceLifecycleEditor Title="@T("LifecycleTitle")" @bind-Enabled="model.LifecycleEnabled" @bind-TimeToLiveText="model.ProjectionTtl" @bind-KeepHistory="model.KeepHistory" @bind-HistoryRetentionText="model.HistoryRetention" />
                 @if (model.LifecycleEnabled) { <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="model.AllowExpiredFallback" data-testid="knowledge-expired-fallback" /><span>@T("AllowExpiredFallback")</span></label> }
             </div>
-            <div class="form-span-2"><SourceFlowCompositionEditor Boundary="projection" StandardPoint="postAggregate" @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="busy" /></div>
+            <div class="form-span-2"><FormActions><button type="button" class="button-secondary" disabled="@busy" @onclick="PrepareGlobalPreviewAsync">@T("Preview.PrepareAggregate")</button></FormActions>
+            @if (globalPreviewFailed) { <p role="alert">@T("Preview.AggregateUnavailable")</p> }
+            @foreach (var issue in globalPreviewIssues) { <p role="status">@issue.BindingName · <code>@issue.Code</code></p> }
+            <SourceFlowCompositionEditor PreparedSample="globalPreviewSample" PreparedInputStale="@(globalPreviewSample is not null && globalPreviewContext != KnowledgePreviewKey)" OwnerNamespace="AuthoringNamespace" Boundary="projection" StandardPoint="postAggregate" @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="busy" /></div>
             <section class="form-span-2 panel form-section" data-testid="knowledge-source-data-source-bindings">
                 <div class="panel-header"><div><p class="eyebrow">@T("ProjectionInputs")</p><h2>@T("DataSourceBindings")</h2><p>@T("DataSourceBindingsHelp")</p></div><button class="button-secondary" type="button" @onclick="AddBinding">@T("AddDataSource")</button></div>
                 @if (bindings.Count == 0) { <p class="muted">@T("NoDataSourceBindings")</p> }
@@ -476,7 +507,7 @@ else
                         <FormField Label="@T("DataSource")" Required="true"><ClearableSelect TValue="string" Value="@binding.DataSourceKey" ValueExpression="@(() => binding.DataSourceKey)" ValueChanged="value => ChangeDataSourceAsync(binding, new ChangeEventArgs { Value = value })" required data-testid="knowledge-source-binding-data-source"><option value="">@T("SelectDataSource")</option>@foreach (var dataSource in dataSources) { <option value="@DataSourceKey(dataSource)">@DataSourceLabel(dataSource)</option> }</ClearableSelect></FormField>
                         @if (TargetOptions(binding).Count > 0) { <FormField Label="@T("AcquisitionTarget")" Required="true"><ClearableSelect TValue="string" @bind-Value="binding.AcquisitionTargetName" required data-testid="knowledge-source-binding-acquisition-target"><option value="">@T("SelectAcquisitionTarget")</option>@foreach (var target in TargetOptions(binding).Where(value => value.Target.Enabled && !value.Stale)) { <option value="@target.Target.Name">@target.Target.DisplayName · @target.Target.ChoiceDisplayName</option> }</ClearableSelect></FormField> }
                         <FormField Label="@T("TransformationFlowOptional")"><ClearableSelect TValue="string" @bind-Value="binding.TransformationFlowKey" data-testid="knowledge-source-binding-transformation-flow"><option value="">@T("IdentityTransformation")</option>@foreach (var flow in transformationFlows) { <option value="@FlowKey(flow)">@FlowLabel(flow)</option> }</ClearableSelect></FormField>
-                        <div class="form-span-2"><FlowSequenceEditor Title="@T("BindingTransformations")" @bind-Value="binding.Transformations" TemplateFlow="TransformationSequence" ReadOnly="@(busy || !string.IsNullOrEmpty(binding.TransformationFlowKey))" /></div>
+                        <div class="form-span-2"><FlowSequenceEditor ConsumedSource="@PreviewDataSource(binding)" SampleChanged="sample => SetBindingSample(binding, sample)" OwnerNamespace="AuthoringNamespace" Title="@($"{T("BindingTransformations")} · {binding.Name}")" @bind-Value="binding.Transformations" TemplateFlow="TransformationSequence" ReadOnly="@(busy || !string.IsNullOrEmpty(binding.TransformationFlowKey))" /></div>
                         <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="binding.Required" /><span class="knowledge-choice-icon"><UiIcon Name="check" /></span><span><strong>@T("RequiredInput")</strong><small>@T("RequiredInputHelp")</small></span></label>
                         <label class="resource-enabled-toggle"><FormCheckbox role="switch" @bind-Value="binding.AllowStaleOnRefreshFailure" disabled="@IsDirectBinding(binding)" data-testid="knowledge-binding-fallback" /><span>@T("AllowInputFallback")</span></label>
                         @if (binding.AllowStaleOnRefreshFailure) { <FormField Label="@T("InputFallbackAge")" Help="@T("InputFallbackAgeHelp")"><ClearableText UpdateOnInput="false" @bind-Value="binding.MaximumFallbackAgeText" placeholder="hh:mm:ss" data-testid="knowledge-binding-fallback-age" /></FormField> }

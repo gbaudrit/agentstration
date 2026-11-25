@@ -183,6 +183,7 @@ public sealed record FlowCallReference(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public JsonElement? InputSchema { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public JsonElement? OutputSchema { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string? OutputMediaType { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Agentstration.Schemas.Contracts.SchemaBindingSnapshot? OutputSchemaSnapshot { get; init; }
     public FlowId Resolve(ResourceNamespace ownerNamespace) => new(ResourceId, Namespace ?? ownerNamespace);
 }
 

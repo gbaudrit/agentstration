@@ -2,13 +2,22 @@
 @implements IDisposable
 @inject IJSRuntime JSRuntime
 @inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SchemaDocumentEditorStrings> Localizer
 
 <div class="schema-source-monaco" data-testid="schema-source-editor">
-    <StandaloneCodeEditor @ref="editor" Id="@editorId" ConstructionOptions="Options" OnDidInit="EditorInitialized" OnDidChangeModelContent="Changed" />
+    @if (monacoReady)
+    {
+        <StandaloneCodeEditor @ref="editor" Id="@editorId" OnDidInit="EditorInitialized" ConstructionOptions="Options" OnDidChangeModelContent="Changed" />
+    }
+    else
+    {
+        <p role="status">@Localizer["LoadingEditor"]</p>
+    }
 </div>
 
 @code {
     [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Language { get; set; } = "json";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public bool ReadOnly { get; set; }
     private readonly string editorId = $"schema-document-source-{Guid.NewGuid():N}";
@@ -17,6 +26,7 @@
     private string editorValue = string.Empty;
     private bool disposed, initialized;
     private string? appliedTheme;
+    private bool monacoReady;
     private string Theme => preferences?.IsDarkTheme == true ? "vs-dark" : "vs";
 
     protected override void OnInitialized()
@@ -37,6 +47,14 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!monacoReady)
+        {
+            await JSRuntime.InvokeVoidAsync("agentstrationMonaco.ready");
+            if (disposed) return;
+            monacoReady = true;
+            StateHasChanged();
+            return;
+        }
         if (initialized && editor is not null) await editor.UpdateOptions(new EditorUpdateOptions { ReadOnly = ReadOnly });
         if (editor is null || appliedTheme == Theme) return;
         await Global.SetTheme(JSRuntime, Theme);
@@ -51,7 +69,7 @@
     private StandaloneEditorConstructionOptions Options(StandaloneCodeEditor _) => new()
     {
         AutomaticLayout = true,
-        Language = "json",
+        Language = Language,
         Value = Value,
         Theme = Theme,
         ReadOnly = ReadOnly,

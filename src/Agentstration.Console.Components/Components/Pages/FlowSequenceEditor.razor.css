@@ -4,3 +4,10 @@
 .flow-sequence-selection ::deep select, .flow-sequence-selection ::deep input { width: 100%; max-width: 100%; min-width: 0; }
 .flow-sequence-selection a { grid-column: 1 / -1; overflow-wrap: anywhere; }
 @media(max-width:600px) { .flow-sequence-selection { grid-template-columns: minmax(0, 1fr); } }
+
+.source-sequence-workbench { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.2fr); gap:1rem; align-items:start; }
+.source-sequence-cards { min-width:0; max-height:75vh; overflow:auto; padding:.25rem; }
+.source-sequence-preview { min-width:0; position:sticky; top:1rem; border:1px solid var(--border); border-radius:.5rem; padding:.75rem; }
+.source-sequence-selected { outline:2px solid var(--primary); outline-offset:-2px; }
+.source-input-card { width:100%; text-align:start; }
+@media(max-width:900px) { .source-sequence-workbench { grid-template-columns:minmax(0,1fr); } .source-sequence-preview { position:static; } .source-sequence-cards { max-height:55vh; } }

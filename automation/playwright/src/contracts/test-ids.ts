@@ -1,4 +1,12 @@
 export const TestIds = {
+  sourceAuthoring: {
+    acquire: 'source-sample-acquire', recalculate: 'source-preview-recalculate',
+    input: 'source-sequence-input', select: 'source-sequence-select', preview: 'source-sequence-preview',
+    stale: 'source-preview-stale', value: 'source-value-inspector', jsonSource: 'preview-json-source',
+    compatibility: 'sequence-compatibility', contract: 'sequence-contract-details',
+    operationContract: 'operation-content-contract', adopt: 'operation-content-adopt',
+    effectiveContracts: 'source-effective-contracts',
+  },
   creationWizard: {
     source: 'data-source-creation-wizard', namespace: 'dataset-namespace', review: 'data-source-creation-review',
     next: 'creation-wizard-next', previous: 'creation-wizard-previous', finish: 'creation-wizard-finish',

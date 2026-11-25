@@ -13,8 +13,39 @@ public sealed class ConnectedServiceOperationService(
     DescendantResourceUseAuthorizer hierarchy,
     ConnectedServiceManagementService services,
     ConnectedServiceOperationTypeManagementService types,
-    IRequestContextScopeFactory? requestContexts = null)
+    IRequestContextScopeFactory? requestContexts = null,
+    Agentstration.Schemas.Contracts.ISchemaBindingResolver? schemaBindings = null)
 {
+    public async Task<StoredResource<ConnectedServiceOperationResource>> AdoptContentAsync(
+        ScopedResourceAddress address, AdoptOperationContentContractRequest request, string? etag, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(etag)) throw Error("operation_etag_required", "An exact current ETag is required.");
+        var stored = await store.GetExactAsync<ConnectedServiceOperationResource>(address, ct)
+            ?? throw Error("operation_not_found", "The operation is unavailable.");
+        if (request.Schema is null || request.ContentPointer is not ("" or "/content")
+            || request.MediaType is not ("application/json" or "application/xml" or "text/xml")
+            || schemaBindings is null) throw Error("operation_content_contract_invalid", "Select an exact published contract and a supported response content boundary.");
+        return await scopes.WriteAsync(stored.Value, address.ScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            var format = request.MediaType == "application/json" ? Agentstration.Schemas.SchemaFormatIds.JsonSchema
+                : Agentstration.Schemas.BuiltinXmlSchemaFormatHandler.Format;
+            if (format != Agentstration.Schemas.SchemaFormatIds.JsonSchema && request.ContentPointer != "/content")
+                throw Error("operation_content_contract_invalid", "XML contracts apply to the envelope content string.");
+            var snapshot = await schemaBindings.ResolveAsync("$.operation.content", new() { Reference = request.Schema },
+                new(address.ScopeRef, address.Namespace, format), token);
+            if (stored.Value.Definition.ContentContractRevisions?.Count >= 64)
+                throw Error("operation_content_revision_limit", "The operation content revision retention limit has been reached.");
+            var revision = new OperationContentContractRevision(stored.Value.Generation, stored.Value.Definition.DefinitionDigest,
+                stored.Value.Definition.Service, stored.Value.Definition.Type, stored.Value.Definition.AdoptedContentContract);
+            var updated = stored.Value with
+            {
+                Generation = checked(stored.Value.Generation + 1),
+                Definition = stored.Value.Definition with { AdoptedContentContract = new(request.MediaType, request.ContentPointer, snapshot) { ProducerDefinitionDigest = stored.Value.Definition.DefinitionDigest }, ContentContractRevisions = [.. stored.Value.Definition.ContentContractRevisions ?? [], revision] }
+            };
+            return await store.PutExactAsync(address.ScopeRef, updated, etag, false, token);
+        }, ct);
+    }
+
     public async Task<IReadOnlyList<ConnectedServiceOperationResource>> ListAsync(CancellationToken cancellationToken) =>
         (await store.ListAllAsync<ConnectedServiceOperationResource>(ConnectedServiceResourceKinds.ConnectedServiceOperation, cancellationToken))
             .Select(item => item.Value).ToArray();
@@ -50,6 +81,17 @@ public sealed class ConnectedServiceOperationService(
         if (operation.ScopeRef != operation.Definition.Service.Service.ScopeRef
             || operation.Namespace != operation.Definition.Service.Service.Address.Namespace)
             throw Error("operation_access_denied", "The operation does not match its owning service.");
+        if (operation.Generation != reference.Generation
+            && operation.Definition.ContentContractRevisions?.SingleOrDefault(r => r.Generation == reference.Generation && r.DefinitionDigest == reference.DefinitionDigest) is { } prior)
+        {
+            // Administrative content adoption keeps old consumer pins; current access/availability still wins.
+            operation = operation with
+            {
+                Generation = prior.Generation,
+                Definition = operation.Definition with
+                { Service = prior.Service, Type = prior.Type, AdoptedContentContract = prior.Content }
+            };
+        }
         if (operation.Uid != reference.OperationUid || operation.Generation != reference.Generation
             || operation.Definition.DefinitionDigest != reference.DefinitionDigest)
             throw Error("operation_revision_stale", "The exact operation revision is unavailable. Reconcile explicitly.");
@@ -63,6 +105,17 @@ public sealed class ConnectedServiceOperationService(
         if (!(await access.EvaluateAsync(new(type.Uid, type.ScopeRef!.Value, type.Namespace,
                 type.Kind, type.Generation), address.ScopeRef, ResourceAccessAction.Use, cancellationToken)).Allowed)
             throw Error("operation_type_access_denied", "The operation type does not authorize this consumer.");
+        if (operation.Definition.AdoptedContentContract is { } adopted)
+        {
+            if (adopted.ProducerDefinitionDigest is { } producer && producer != operation.Definition.DefinitionDigest)
+                throw Error("operation_content_producer_changed", "The discovered producer contract changed. Review content adoption explicitly.");
+            if (schemaBindings is null || adopted.Schema.Source is null) throw Error("operation_content_contract_unavailable", "The adopted content contract is unavailable.");
+            var checkedSchema = await schemaBindings.ResolveAsync(adopted.Schema.Path, new() { Reference = adopted.Schema.Source },
+                new(consumer, operation.Namespace, adopted.Schema.Format), cancellationToken);
+            if (checkedSchema.SchemaUid != adopted.Schema.SchemaUid || checkedSchema.DefinitionHash != adopted.Schema.DefinitionHash
+                || checkedSchema.ParentDefinitionHash != adopted.Schema.ParentDefinitionHash)
+                throw Error("operation_content_contract_changed", "The exact adopted content contract changed. Adopt explicitly.");
+        }
         return (operation, version);
     }
 

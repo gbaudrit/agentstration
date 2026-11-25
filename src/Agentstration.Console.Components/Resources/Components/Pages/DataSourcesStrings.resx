@@ -287,4 +287,73 @@
   <data name="SourceDiscard" xml:space="preserve"><value>Discard</value></data>
   <data name="SourceSettingValue" xml:space="preserve"><value>Value</value></data>
   <data name="SourceNamespaceInvalid" xml:space="preserve"><value>Enter a valid namespace.</value></data>
+  <data name="Preview.Tree" xml:space="preserve"><value>Tree</value></data>
+  <data name="Preview.JsonSource" xml:space="preserve"><value>JSON source</value></data>
+  <data name="Preview.Property" xml:space="preserve"><value>Property</value></data>
+  <data name="Preview.Type" xml:space="preserve"><value>Type</value></data>
+  <data name="Preview.Value" xml:space="preserve"><value>Value</value></data>
+  <data name="Preview.Excerpt" xml:space="preserve"><value>Excerpt: the displayed value is bounded.</value></data>
+  <data name="Preview.DisplayBounds" xml:space="preserve"><value>Display: up to 100 children per container, 12 levels and 512 characters per scalar. Execution retains the complete value.</value></data>
+  <data name="Preview.More" xml:space="preserve"><value>Show more</value></data>
+  <data name="Preview.Properties" xml:space="preserve"><value>{0} properties</value></data>
+  <data name="Preview.Items" xml:space="preserve"><value>{0} items</value></data>
+  <data name="Preview.Acquire" xml:space="preserve"><value>Acquire a sample</value></data>
+  <data name="Preview.Recalculate" xml:space="preserve"><value>Recalculate preview</value></data>
+  <data name="Preview.DeleteSample" xml:space="preserve"><value>Delete sample</value></data>
+  <data name="Preview.Unavailable" xml:space="preserve"><value>This authorized sample or preview is unavailable. Review the operation, permissions and configured limits.</value></data>
+  <data name="Preview.Input" xml:space="preserve"><value>Input</value></data>
+  <data name="Preview.Output" xml:space="preserve"><value>Output</value></data>
+  <data name="Preview.Title" xml:space="preserve"><value>Preview</value></data>
+  <data name="Preview.Stale" xml:space="preserve"><value>This preview is stale. Recalculate it for the current draft.</value></data>
+  <data name="Preview.NoSample" xml:space="preserve"><value>Acquire a sample to preview the transformations.</value></data>
+  <data name="Preview.NoStepResult" xml:space="preserve"><value>Recalculate the preview to inspect this step. A failed or unsupported step stops dependent results.</value></data>
+  <data name="Preview.Partial" xml:space="preserve"><value>Preview stopped. Earlier results remain inspectable.</value></data>
+  <data name="Preview.Collection" xml:space="preserve"><value>Collection to extract</value></data>
+  <data name="Preview.SelectCollection" xml:space="preserve"><value>Select a declared collection</value></data>
+  <data name="Preview.ObjectArray" xml:space="preserve"><value>array of objects</value></data>
+  <data name="Preview.DerivedHelp" xml:space="preserve"><value>The item contract comes from the exact preceding Schema. Data and Schema paths remain distinct.</value></data>
+  <data name="Preview.ManualRequired" xml:space="preserve"><value>No unambiguous supported collection is known. Configure a deliberate manual path and item contract below.</value></data>
+  <data name="Preview.UnsupportedFlow" xml:space="preserve"><value>This Flow has no governed preview boundary. Preview stops here without executing it.</value></data>
+  <data name="Preview.Undetermined" xml:space="preserve"><value>Undetermined</value></data>
+  <data name="Preview.Origin" xml:space="preserve"><value>Origin</value></data>
+  <data name="Preview.ParentHash" xml:space="preserve"><value>Parent Schema hash</value></data>
+  <data name="Preview.Compatibility.Verified" xml:space="preserve"><value>Verified compatibility</value></data>
+  <data name="Preview.Compatibility.Incompatible" xml:space="preserve"><value>Incompatible contracts</value></data>
+  <data name="Preview.Compatibility.Undetermined" xml:space="preserve"><value>Compatibility undetermined; runtime validation remains required</value></data>
+  <data name="Preview.State.Pending" xml:space="preserve"><value>Sample queued</value></data>
+  <data name="Preview.State.Running" xml:space="preserve"><value>Acquiring raw sample</value></data>
+  <data name="Preview.State.Ready" xml:space="preserve"><value>Sample available until</value></data>
+  <data name="Preview.State.Invalid" xml:space="preserve"><value>Sample captured; contract validation failed</value></data>
+  <data name="Preview.State.Failed" xml:space="preserve"><value>Sample acquisition failed</value></data>
+  <data name="Preview.State.Cancelled" xml:space="preserve"><value>Sample cancelled</value></data>
+  <data name="Preview.Type.Object" xml:space="preserve"><value>object</value></data>
+  <data name="Preview.Type.Array" xml:space="preserve"><value>array</value></data>
+  <data name="Preview.Type.String" xml:space="preserve"><value>string</value></data>
+  <data name="Preview.Type.Number" xml:space="preserve"><value>number</value></data>
+  <data name="Preview.Type.True" xml:space="preserve"><value>boolean</value></data>
+  <data name="Preview.Type.False" xml:space="preserve"><value>boolean</value></data>
+  <data name="Preview.Type.Null" xml:space="preserve"><value>null</value></data>
+  <data name="Preview.Type.Undefined" xml:space="preserve"><value>unavailable</value></data>
+  <data name="Preview.FindConsumed" xml:space="preserve"><value>Find compatible acquisitions</value></data>
+  <data name="Preview.NoConsumed" xml:space="preserve"><value>No compatible retained input is available. Prepare the underlying Data Source explicitly. A published final result is a consumed input, never a raw operation sample.</value></data>
+  <data name="Preview.ConsumedAcquisition" xml:space="preserve"><value>Exact consumed acquisition</value></data>
+  <data name="Preview.SelectAcquisition" xml:space="preserve"><value>Select an acquisition</value></data>
+  <data name="Preview.PrepareConsumed" xml:space="preserve"><value>Prepare this consumed input</value></data>
+  <data name="Preview.PreparedStale" xml:space="preserve"><value>The prepared input is stale. Prepare it again after changing bindings, policies or composition.</value></data>
+  <data name="Preview.PrepareAggregate" xml:space="preserve"><value>Prepare aggregate preview input</value></data>
+  <data name="Preview.AggregateUnavailable" xml:space="preserve"><value>Aggregate preview unavailable. Required compatible inputs must be prepared. Custom projections and composition points without a governed preview boundary are unavailable.</value></data>
+  <data name="Preview.Content" xml:space="preserve"><value>Native content</value></data>
+  <data name="Preview.EffectiveContracts" xml:space="preserve"><value>Effective contracts</value></data>
+  <data name="Preview.Precedence" xml:space="preserve"><value>The operation and selected Function/Flow versions contribute effective contracts. Additional authored contracts are validated at their own boundaries; a sample never defines an authoritative Schema.</value></data>
+  <data name="Preview.Expired" xml:space="preserve"><value>Sample expired. Acquire or prepare another sample.</value></data>
+  <data name="Preview.Advanced" xml:space="preserve"><value>Advanced / manual configuration</value></data>
+  <data name="Preview.DerivedStale" xml:space="preserve"><value>The derived item contract belongs to a different upstream contract. Select the collection again or deliberately edit the manual binding.</value></data>
+  <data name="Preview.Source" xml:space="preserve"><value>Source</value></data>
+  <data name="Preview.Transport" xml:space="preserve"><value>Raw transport response</value></data>
+  <data name="Preview.Focus" xml:space="preserve"><value>Focus selected preview</value></data>
+  <data name="Preview.NoPreparedSample" xml:space="preserve"><value>Prepare a compatible sample input to preview this sequence.</value></data>
+  <data name="Preview.CancelSample" xml:space="preserve"><value>Cancel sample acquisition</value></data>
+  <data name="Preview.RawSampleId" xml:space="preserve"><value>Raw Data Source sample ID</value></data>
+  <data name="Preview.PrepareSourceHelp" xml:space="preserve"><value>Acquire a raw sample explicitly on the Data Source, then paste its ID here. Preparation applies that saved Data Source sequence once without publishing production content.</value></data>
+  <data name="Preview.PrepareSource" xml:space="preserve"><value>Prepare the Data Source result</value></data>
 </root>

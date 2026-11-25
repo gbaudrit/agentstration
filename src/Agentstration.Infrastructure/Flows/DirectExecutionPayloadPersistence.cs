@@ -104,6 +104,17 @@ public sealed class DirectExecutionPayloadPersistence(TimeProvider clock)
     internal T? GetProcessing<T>(ResourceScopeRef scope, string id) where T : class =>
         Find<T>(scope, "artifact-processing", id, "current");
 
+    internal void PurgeExpired()
+    {
+        lock (gate)
+            foreach (var key in values.Where(pair => pair.Value.Expires <= clock.GetUtcNow()).Select(pair => pair.Key).ToArray()) values.Remove(key);
+    }
+
+    internal void DeleteProcessing(ResourceScopeRef scope, string id)
+    {
+        lock (gate) values.Remove(Key(scope, "artifact-processing", id, "current"));
+    }
+
     private string Save<T>(ResourceScopeRef scope, string family, string id, T value, DateTimeOffset expires) where T : class
     {
         var size = JsonSerializer.SerializeToUtf8Bytes(value, Json).LongLength;

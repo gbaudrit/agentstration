@@ -1,0 +1,4 @@
+.source-value-scroll { overflow: auto; max-height: 65vh; }
+table { width: 100%; border-collapse: collapse; }
+th,td { text-align: start; vertical-align: top; padding: .4rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 65vh; overflow: auto; }

@@ -62,6 +62,11 @@
     [Parameter] public string? Namespace { get; set; }
     [Parameter] public string? ScopeRef { get; set; }
 
+    private ResourceNamespace AuthoringNamespace => model.NamespaceValid ? ResourceNamespace.Parse(model.Namespace) : ResourceNamespace.Default;
+    private DataSourceOperationAcquisitionBinding? PreviewAcquisition => SelectedOperation is { } operation ? new(new(new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest), model.Parameters) { OutputSchemaBinding = model.AcquisitionOutputBinding }
+        : HasSavedOperationPin && source?.Definition.Dataset?.Acquisition is { } savedAcquisition ? savedAcquisition with { Parameters = model.Parameters, OutputSchemaBinding = model.AcquisitionOutputBinding } : null;
+    private SchemaBindingSnapshot? PreviewContract => SelectedType?.Acquisition is { } adapter && DefinitionSchema(adapter.OutputSchemaProperty) is { } schema
+        ? new("operation", SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema, JsonSchemaSelection.DefinitionHash(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema)) : null;
     private readonly CancellationTokenSource cancellation = new();
     private DataSourceResource? source;
     private DataSourceReadiness? readiness;
@@ -358,10 +363,11 @@
     </div>;
 
     private RenderFragment TreatmentsContent => @<div class="dataset-step-fields">
-<SourceFlowCompositionEditor @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
+<SourceFlowCompositionEditor InputBinding="model.AcquisitionOutputBinding" SampleAcquisition="@PreviewAcquisition" InputContract="@PreviewContract" ContentInput="@SelectedOperation?.Definition.AdoptedContentContract?.Schema" OwnerNamespace="AuthoringNamespace" @bind-Orchestration="model.Orchestration" @bind-Value="model.CompositionPoints" ReadOnly="@(busy || !CanManage || !interactive)" />
     </div>;
 
     private RenderFragment ContractsContent => @<div class="dataset-step-fields">
+<SourceContractsSummary InputBinding="model.AcquisitionOutputBinding" Input="PreviewContract" Content="@SelectedOperation?.Definition.AdoptedContentContract?.Schema" Calls="@(model.CompositionPoints.GetValueOrDefault("transformations") ?? [])" OwnerNamespace="AuthoringNamespace" />
 <ReusableSchemaBindingEditor Title="@T("AcquisitionOutputSchema")" TestId="dataset-acquisition-schema"
                     Binding="@model.AcquisitionOutputBinding" ReadOnly="@(busy || !CanManage || !interactive)"
                     ValueChanged="value => model.AcquisitionOutputBinding = value.Binding" />

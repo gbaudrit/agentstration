@@ -96,6 +96,7 @@ public static class ConsoleHostServiceCollectionExtensions
         AddClient<ParametersApiClient, IParametersClient>(services, configured.ManagementApi, resilient: false);
         AddClient<ConnectedServicesApiClient, IConnectedServicesClient>(services, configured.ManagementApi);
         AddClient<ConnectedServiceOperationsApiClient, IConnectedServiceOperationsClient>(services, configured.ManagementApi);
+        AddClient<SourceAuthoringApiClient, ISourceAuthoringClient>(services, configured.ManagementApi);
         AddClient<StoragesApiClient, IStoragesClient>(services, configured.ManagementApi);
         AddClient<TransformationFunctionsApiClient, ITransformationFunctionsClient>(services, configured.ManagementApi);
         AddClient<StoragesApiClient, IStorageTypesClient>(services, configured.ManagementApi);

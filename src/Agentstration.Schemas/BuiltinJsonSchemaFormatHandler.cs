@@ -372,9 +372,9 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         ICollection<SchemaFormatValidationIssue> issues)
     {
         if (minimum is { } min && value < min)
-            Add(issues, path, code, $"The value must contain at least {min} {unit}.");
+            Add(issues, path, code, $"The value must contain at least {min} {unit}.", new(unit, value, minimum, maximum));
         if (maximum is { } max && value > max)
-            Add(issues, path, code, $"The value must contain at most {max} {unit}.");
+            Add(issues, path, code, $"The value must contain at most {max} {unit}.", new(unit, value, minimum, maximum));
     }
 
     private static bool Matches(JsonElement value, string type) => type switch
@@ -397,8 +397,8 @@ public sealed partial class BuiltinJsonSchemaFormatHandler : ISchemaFormatHandle
         && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     private static string PropertyPath(string path, string property) => $"{path}.{property}";
     private static string Invariant(decimal value) => value.ToString(CultureInfo.InvariantCulture);
-    private static void Add(ICollection<SchemaFormatValidationIssue> issues, string path, string code, string message)
+    private static void Add(ICollection<SchemaFormatValidationIssue> issues, string path, string code, string message, DataContractLimit? limit = null)
     {
-        if (issues.Count < MaximumIssues) issues.Add(new(path, code, message));
+        if (issues.Count < MaximumIssues) issues.Add(new(path, code, message) { Limit = limit });
     }
 }

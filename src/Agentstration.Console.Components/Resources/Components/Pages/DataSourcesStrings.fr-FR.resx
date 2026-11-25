@@ -287,4 +287,73 @@
   <data name="SourceDiscard" xml:space="preserve"><value>Abandonner</value></data>
   <data name="SourceSettingValue" xml:space="preserve"><value>Valeur</value></data>
   <data name="SourceNamespaceInvalid" xml:space="preserve"><value>Saisissez un espace de noms valide.</value></data>
+  <data name="Preview.Tree" xml:space="preserve"><value>Arbre</value></data>
+  <data name="Preview.JsonSource" xml:space="preserve"><value>JSON source</value></data>
+  <data name="Preview.Property" xml:space="preserve"><value>Propriété</value></data>
+  <data name="Preview.Type" xml:space="preserve"><value>Type</value></data>
+  <data name="Preview.Value" xml:space="preserve"><value>Valeur</value></data>
+  <data name="Preview.Excerpt" xml:space="preserve"><value>Extrait : la valeur affichée est bornée.</value></data>
+  <data name="Preview.DisplayBounds" xml:space="preserve"><value>Affichage : au plus 100 enfants par conteneur, 12 niveaux et 512 caractères par scalaire. L’exécution conserve la valeur complète.</value></data>
+  <data name="Preview.More" xml:space="preserve"><value>Afficher la suite</value></data>
+  <data name="Preview.Properties" xml:space="preserve"><value>{0} propriétés</value></data>
+  <data name="Preview.Items" xml:space="preserve"><value>{0} éléments</value></data>
+  <data name="Preview.Acquire" xml:space="preserve"><value>Acquérir un échantillon</value></data>
+  <data name="Preview.Recalculate" xml:space="preserve"><value>Recalculer l’aperçu</value></data>
+  <data name="Preview.DeleteSample" xml:space="preserve"><value>Supprimer l’échantillon</value></data>
+  <data name="Preview.Unavailable" xml:space="preserve"><value>Cet échantillon ou aperçu autorisé est indisponible. Vérifiez l’opération, les permissions et les limites configurées.</value></data>
+  <data name="Preview.Input" xml:space="preserve"><value>Entrée</value></data>
+  <data name="Preview.Output" xml:space="preserve"><value>Sortie</value></data>
+  <data name="Preview.Title" xml:space="preserve"><value>Aperçu</value></data>
+  <data name="Preview.Stale" xml:space="preserve"><value>Cet aperçu est périmé. Recalculez-le pour le brouillon courant.</value></data>
+  <data name="Preview.NoSample" xml:space="preserve"><value>Acquérez un échantillon pour prévisualiser les transformations.</value></data>
+  <data name="Preview.NoStepResult" xml:space="preserve"><value>Recalculez l’aperçu pour inspecter cette étape. Une étape en échec ou non prise en charge arrête les résultats suivants.</value></data>
+  <data name="Preview.Partial" xml:space="preserve"><value>Aperçu arrêté. Les résultats précédents restent consultables.</value></data>
+  <data name="Preview.Collection" xml:space="preserve"><value>Collection à extraire</value></data>
+  <data name="Preview.SelectCollection" xml:space="preserve"><value>Sélectionner une collection déclarée</value></data>
+  <data name="Preview.ObjectArray" xml:space="preserve"><value>tableau d’objets</value></data>
+  <data name="Preview.DerivedHelp" xml:space="preserve"><value>Le contrat des éléments provient du schéma précédent exact. Les chemins des données et du schéma restent distincts.</value></data>
+  <data name="Preview.ManualRequired" xml:space="preserve"><value>Aucune collection prise en charge non ambiguë n’est connue. Configurez explicitement le chemin et le contrat des éléments ci-dessous.</value></data>
+  <data name="Preview.UnsupportedFlow" xml:space="preserve"><value>Ce Flow ne dispose pas d’une frontière d’aperçu gouvernée. L’aperçu s’arrête ici sans l’exécuter.</value></data>
+  <data name="Preview.Undetermined" xml:space="preserve"><value>Non déterminé</value></data>
+  <data name="Preview.Origin" xml:space="preserve"><value>Origine</value></data>
+  <data name="Preview.ParentHash" xml:space="preserve"><value>Empreinte du schéma parent</value></data>
+  <data name="Preview.Compatibility.Verified" xml:space="preserve"><value>Compatibilité vérifiée</value></data>
+  <data name="Preview.Compatibility.Incompatible" xml:space="preserve"><value>Contrats incompatibles</value></data>
+  <data name="Preview.Compatibility.Undetermined" xml:space="preserve"><value>Compatibilité non déterminée ; la validation à l’exécution reste requise</value></data>
+  <data name="Preview.State.Pending" xml:space="preserve"><value>Échantillon en attente</value></data>
+  <data name="Preview.State.Running" xml:space="preserve"><value>Acquisition de l’échantillon brut</value></data>
+  <data name="Preview.State.Ready" xml:space="preserve"><value>Échantillon disponible jusqu’au</value></data>
+  <data name="Preview.State.Invalid" xml:space="preserve"><value>Échantillon capturé ; validation du contrat en échec</value></data>
+  <data name="Preview.State.Failed" xml:space="preserve"><value>Acquisition de l’échantillon en échec</value></data>
+  <data name="Preview.State.Cancelled" xml:space="preserve"><value>Échantillon annulé</value></data>
+  <data name="Preview.Type.Object" xml:space="preserve"><value>objet</value></data>
+  <data name="Preview.Type.Array" xml:space="preserve"><value>tableau</value></data>
+  <data name="Preview.Type.String" xml:space="preserve"><value>chaîne</value></data>
+  <data name="Preview.Type.Number" xml:space="preserve"><value>nombre</value></data>
+  <data name="Preview.Type.True" xml:space="preserve"><value>booléen</value></data>
+  <data name="Preview.Type.False" xml:space="preserve"><value>booléen</value></data>
+  <data name="Preview.Type.Null" xml:space="preserve"><value>null</value></data>
+  <data name="Preview.Type.Undefined" xml:space="preserve"><value>indisponible</value></data>
+  <data name="Preview.FindConsumed" xml:space="preserve"><value>Rechercher les acquisitions compatibles</value></data>
+  <data name="Preview.NoConsumed" xml:space="preserve"><value>Aucune entrée conservée compatible n’est disponible. Préparez explicitement la Data Source en amont. Un résultat final publié est une entrée consommée, jamais un échantillon brut de l’opération.</value></data>
+  <data name="Preview.ConsumedAcquisition" xml:space="preserve"><value>Acquisition consommée exacte</value></data>
+  <data name="Preview.SelectAcquisition" xml:space="preserve"><value>Sélectionner une acquisition</value></data>
+  <data name="Preview.PrepareConsumed" xml:space="preserve"><value>Préparer cette entrée consommée</value></data>
+  <data name="Preview.PreparedStale" xml:space="preserve"><value>L’entrée préparée est périmée. Préparez-la à nouveau après modification des liaisons, règles ou compositions.</value></data>
+  <data name="Preview.PrepareAggregate" xml:space="preserve"><value>Préparer l’entrée agrégée de l’aperçu</value></data>
+  <data name="Preview.AggregateUnavailable" xml:space="preserve"><value>Aperçu agrégé indisponible. Les entrées compatibles obligatoires doivent être préparées. Les projections et points de composition personnalisés sans frontière d’aperçu gouvernée sont indisponibles.</value></data>
+  <data name="Preview.Content" xml:space="preserve"><value>Contenu natif</value></data>
+  <data name="Preview.EffectiveContracts" xml:space="preserve"><value>Contrats effectifs</value></data>
+  <data name="Preview.Precedence" xml:space="preserve"><value>L’opération et les versions de Function/Flow sélectionnées contribuent aux contrats effectifs. Les contrats supplémentaires rédigés sont validés à leur propre frontière ; un échantillon ne définit jamais un schéma faisant autorité.</value></data>
+  <data name="Preview.Expired" xml:space="preserve"><value>Échantillon expiré. Acquérez ou préparez un autre échantillon.</value></data>
+  <data name="Preview.Advanced" xml:space="preserve"><value>Configuration avancée / manuelle</value></data>
+  <data name="Preview.DerivedStale" xml:space="preserve"><value>Le contrat déduit des éléments appartient à un autre contrat amont. Sélectionnez à nouveau la collection ou modifiez explicitement la liaison manuelle.</value></data>
+  <data name="Preview.Source" xml:space="preserve"><value>Source</value></data>
+  <data name="Preview.Transport" xml:space="preserve"><value>Réponse brute du transport</value></data>
+  <data name="Preview.Focus" xml:space="preserve"><value>Accéder à l’aperçu sélectionné</value></data>
+  <data name="Preview.NoPreparedSample" xml:space="preserve"><value>Préparez un échantillon d’entrée compatible pour prévisualiser cette séquence.</value></data>
+  <data name="Preview.CancelSample" xml:space="preserve"><value>Annuler l’acquisition de l’échantillon</value></data>
+  <data name="Preview.RawSampleId" xml:space="preserve"><value>Identifiant de l’échantillon brut Data Source</value></data>
+  <data name="Preview.PrepareSourceHelp" xml:space="preserve"><value>Acquérez explicitement un échantillon brut sur la Data Source, puis collez son identifiant ici. La préparation applique une seule fois la séquence enregistrée de cette Data Source sans publier de contenu de production.</value></data>
+  <data name="Preview.PrepareSource" xml:space="preserve"><value>Préparer le résultat de la Data Source</value></data>
 </root>

@@ -6,6 +6,7 @@ namespace Agentstration.Web.Console;
 
 public interface IConnectedServiceOperationsClient
 {
+    Task<ResourceSnapshot<ConnectedServiceOperationResource>> AdoptContentAsync(ConnectedServiceOperationResource operation, AdoptOperationContentContractRequest request, CancellationToken ct) => throw new NotSupportedException();
     Task<ConnectedServiceOperationContract> GetContractAsync(ConnectedServiceOperationResource operation, CancellationToken token) =>
         throw new NotSupportedException("This client does not support operation contract inspection.");
     Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token);
@@ -18,6 +19,21 @@ public interface IConnectedServiceOperationsClient
 
 public sealed class ConnectedServiceOperationsApiClient(HttpClient http) : IConnectedServiceOperationsClient
 {
+    public async Task<ResourceSnapshot<ConnectedServiceOperationResource>> AdoptContentAsync(ConnectedServiceOperationResource operation, AdoptOperationContentContractRequest body, CancellationToken ct)
+    {
+        var path = $"api/connected-service-operations/{Uri.EscapeDataString(operation.Name)}?scopeRef={Uri.EscapeDataString(operation.ScopeRef!.Value.Value)}&namespace={Uri.EscapeDataString(operation.Namespace.Value)}";
+        using var existing = await http.GetAsync(path, ct);
+        await ApiResponse.EnsureSuccessAsync(existing, ct);
+        var current = await existing.Content.ReadFromJsonAsync<ConnectedServiceOperationResource>(ct);
+        if (current?.Uid != operation.Uid || current.Generation != operation.Generation)
+            throw new AgentstrationApiException("The reviewed operation revision changed.", Guid.NewGuid().ToString("N"));
+        using var request = new HttpRequestMessage(HttpMethod.Put, path.Replace("?", "/content-contract?", StringComparison.Ordinal)) { Content = JsonContent.Create(body) };
+        request.Headers.TryAddWithoutValidation("If-Match", existing.Headers.ETag?.ToString());
+        using var response = await http.SendAsync(request, ct);
+        await ApiResponse.EnsureSuccessAsync(response, ct);
+        return new((await response.Content.ReadFromJsonAsync<ConnectedServiceOperationResource>(ct))!, response.Headers.ETag!.ToString());
+    }
+
     public async Task<ConnectedServiceOperationContract> GetContractAsync(ConnectedServiceOperationResource operation, CancellationToken token)
     {
         using var response = await http.PostAsJsonAsync("api/connected-service-operations/contract", new ConnectedServiceOperationRevisionReference(

@@ -171,4 +171,19 @@
   <data name="OperationAccess" xml:space="preserve"><value>Accès aux opérations découvertes</value></data>
   <data name="ExposeOperationsToDescendants" xml:space="preserve"><value>Exposer toutes les opérations découvertes selon les règles d’accès du service</value></data>
   <data name="ExposeOperationsToDescendantsHelp" xml:space="preserve"><value>Gérez les périmètres descendants et les actions autorisées dans la section Accès du service. Les descendants autorisés peuvent découvrir et utiliser toutes les opérations selon les règles d’accès actuelles du service. Les opérations doivent toujours être activées et leurs références au service et au type doivent être valides.</value></data>
+  <data name="ContentContract.Title" xml:space="preserve"><value>Contrat de contenu de l’opération</value></data>
+  <data name="ContentContract.BoundaryHelp" xml:space="preserve"><value>Le contrat de transport JSON découvert et le contrat de contenu adopté sont validés séparément. L’adoption XML valide la chaîne content et préserve l’enveloppe JSON. Une nouvelle adoption crée une révision que les consommateurs doivent adopter explicitement.</value></data>
+  <data name="ContentContract.Discovered" xml:space="preserve"><value>Transport découvert</value></data>
+  <data name="ContentContract.Adopted" xml:space="preserve"><value>Contenu adopté</value></data>
+  <data name="ContentContract.EffectiveDiscovered" xml:space="preserve"><value>Effectif : transport découvert ; aucune adoption supplémentaire de contenu.</value></data>
+  <data name="ContentContract.EffectiveAdopted" xml:space="preserve"><value>Effectif : transport découvert et contrat de contenu adopté exact.</value></data>
+  <data name="ContentContract.Schema" xml:space="preserve"><value>Schéma de contenu publié</value></data>
+  <data name="ContentContract.Select" xml:space="preserve"><value>Sélectionner une version publiée exacte du schéma</value></data>
+  <data name="ContentContract.Boundary" xml:space="preserve"><value>Frontière de validation</value></data>
+  <data name="ContentContract.Content" xml:space="preserve"><value>Contenu de l’enveloppe (/content)</value></data>
+  <data name="ContentContract.Response" xml:space="preserve"><value>Réponse JSON complète</value></data>
+  <data name="ContentContract.Adopt" xml:space="preserve"><value>Adopter explicitement cette version</value></data>
+  <data name="ContentContract.Failed" xml:space="preserve"><value>Adoption indisponible. Vérifiez la révision exacte, la permission, le format du schéma et la frontière de contenu.</value></data>
+  <data name="ContentContract.EffectiveStale" xml:space="preserve"><value>Le contrat découvert du producteur a changé. Vérifiez et adoptez explicitement son contrat de contenu avant d’utiliser cette révision.</value></data>
+  <data name="ContentContract.MediaType" xml:space="preserve"><value>Type de média du contenu</value></data>
 </root>

@@ -1,0 +1,61 @@
+@using Agentstration.Schemas
+@using Agentstration.Schemas.Contracts
+@inject ISchemasClient Schemas
+@inject IConnectedServiceOperationsClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ConnectedServiceStrings> Localizer
+
+<details data-testid="operation-content-contract">
+    <summary>@Localizer["ContentContract.Title"]</summary>
+    <p>@Localizer["ContentContract.BoundaryHelp"]</p>
+    @if (Operation.Definition.Definition.TryGetProperty("outputSchema", out var transport))
+    { <SequenceContractDetails Label="@Localizer["ContentContract.Discovered"]" Contract="@Transport(transport)" /> }
+    <SequenceContractDetails Label="@Localizer["ContentContract.Adopted"]" Contract="@Operation.Definition.AdoptedContentContract?.Schema" />
+    <p>@Localizer[Operation.Definition.AdoptedContentContract?.ProducerDefinitionDigest is { } producer && producer != Operation.Definition.DefinitionDigest ? "ContentContract.EffectiveStale" : Operation.Definition.AdoptedContentContract is null ? "ContentContract.EffectiveDiscovered" : "ContentContract.EffectiveAdopted"]</p>
+    @if (CanManage)
+    {
+        <FormField Label="@Localizer["ContentContract.Schema"]"><ClearableSelect TValue="string" @bind-Value="selected" @bind-Value:after="SelectSchema" disabled="@busy">
+            <option value="">@Localizer["ContentContract.Select"]</option>
+            @foreach (var choice in choices) { <option value="@choice.Key">@choice.Label</option> }
+        </ClearableSelect></FormField>
+        <FormField Label="@Localizer["ContentContract.MediaType"]"><ClearableSelect TValue="string" AllowClear="false" @bind-Value="mediaType" disabled="@busy"><option value="application/xml">application/xml</option><option value="text/xml">text/xml</option><option value="application/json">application/json</option></ClearableSelect></FormField>
+        <FormField Label="@Localizer["ContentContract.Boundary"]"><ClearableSelect TValue="string" AllowClear="false" @bind-Value="boundary" disabled="@busy"><option value="/content">@Localizer["ContentContract.Content"]</option><option value="">@Localizer["ContentContract.Response"]</option></ClearableSelect></FormField>
+        <button type="button" class="button-secondary" disabled="@(busy || string.IsNullOrEmpty(selected))" @onclick="AdoptAsync" data-testid="operation-content-adopt">@Localizer["ContentContract.Adopt"]</button>
+    }
+    @if (failed) { <p role="alert">@Localizer["ContentContract.Failed"]</p> }
+</details>
+@code {
+    [Parameter, EditorRequired] public ConnectedServiceOperationResource Operation { get; set; } = null!;
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public EventCallback<ConnectedServiceOperationResource> Changed { get; set; }
+    private readonly List<Choice> choices = [];
+    private string selected = "", boundary = "/content", mediaType = "application/xml";
+    private void SelectSchema() { var xml = choices.SingleOrDefault(c => c.Key == selected)?.Format == BuiltinXmlSchemaFormatHandler.Format; mediaType = xml ? "application/xml" : "application/json"; boundary = xml ? "/content" : ""; }
+    private bool busy, failed;
+    private sealed record Choice(string Key, string Label, SchemaVersionReference Reference, string Format);
+    private static SchemaBindingSnapshot Transport(JsonElement schema) => new("operation.discovered.transport", SchemaFormatIds.JsonSchema, null, schema, JsonSchemaSelection.DefinitionHash(SchemaFormatIds.JsonSchema, null, schema));
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            foreach (var schema in (await Schemas.GetSchemasAsync()).Where(s => s.ScopeRef is not null).Take(200))
+                foreach (var version in await Schemas.GetVersionsAsync(schema.ScopeRef!.Value, schema.Namespace, schema.Name))
+                    if (version.Format is SchemaFormatIds.JsonSchema or BuiltinXmlSchemaFormatHandler.Format)
+                        choices.Add(new($"{schema.Uid}:{version.Version}", $"{schema.Definition.DisplayName} · {version.Version} · {version.Format}",
+                            new() { Name = schema.Name, Version = version.Version, ScopeRef = schema.ScopeRef, Namespace = schema.Namespace }, version.Format));
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { failed = true; }
+    }
+    private async Task AdoptAsync()
+    {
+        var choice = choices.SingleOrDefault(c => c.Key == selected);
+        if (choice is null || !CanManage) return;
+        busy = true; failed = false;
+        try
+        {
+            var updated = await Client.AdoptContentAsync(Operation, new(mediaType, boundary, choice.Reference), CancellationToken.None);
+            await Changed.InvokeAsync(updated.Value);
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { failed = true; }
+        finally { busy = false; }
+    }
+}

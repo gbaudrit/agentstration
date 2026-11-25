@@ -17,6 +17,7 @@ internal static class FunctionsServiceCollectionExtensions
         services.AddSingleton<INativeTransformationFunction, CollectionDistinctFunction>();
         services.AddSingleton<INativeTransformationFunction, Agentstration.Infrastructure.Functions.ArtifactExplodeFunction>();
         services.AddSingleton<INativeTransformationFunction, Agentstration.Infrastructure.Functions.JsonExplodeFunction>();
+        services.AddSingleton<INativeTransformationFunction, XmlToJsonFunction>();
         services.AddSingleton<NativeFunctionRegistry>();
         services.AddSingleton<NativeFunctionExecutionContext>();
         services.AddSingleton<INativeFunctionExecutionContext>(provider => provider.GetRequiredService<NativeFunctionExecutionContext>());

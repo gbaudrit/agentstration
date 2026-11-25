@@ -1,0 +1,27 @@
+@using Agentstration.Functions.Contracts
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+<section class="form-section" data-testid="source-effective-contracts">
+    <h3>@Localizer["Preview.EffectiveContracts"]</h3>
+    <p>@Localizer["Preview.Precedence"]</p>
+    <SequenceContractDetails Label="@Localizer["Preview.Input"]" Contract="@(analysis?.Input ?? Input)" />
+    <SequenceContractDetails Label="@Localizer["Preview.Content"]" Contract="Content" />
+    <SequenceContractDetails Label="@Localizer["Preview.Output"]" Contract="@(analysis?.Steps.LastOrDefault()?.Output ?? (Calls.Count == 0 ? analysis?.Input ?? Input : null))" />
+</section>
+@code {
+    [Parameter] public SchemaBinding? InputBinding { get; set; }
+    [Parameter] public SchemaBindingSnapshot? Input { get; set; }
+    [Parameter] public SchemaBindingSnapshot? Content { get; set; }
+    [Parameter] public IReadOnlyList<FlowCompositionCall> Calls { get; set; } = [];
+    [Parameter] public ResourceNamespace OwnerNamespace { get; set; } = ResourceNamespace.Default;
+    private string key = "";
+    private SourceSequenceAnalysis? analysis;
+    protected override async Task OnParametersSetAsync()
+    {
+        var next = FunctionDigests.Compute(new { Input, InputBinding, Content, Calls, OwnerNamespace });
+        if (next == key || Services.GetService(typeof(ISourceAuthoringClient)) is not ISourceAuthoringClient client || ResourceOwnershipContext.TryGetCurrent(Services) is not { } owner) return;
+        key = next;
+        try { analysis = await client.AnalyzeAsync(new(owner, OwnerNamespace, Calls, Input, true, Content, InputBinding), CancellationToken.None); }
+        catch (Exception error) when (error is not OperationCanceledException) { analysis = null; }
+    }
+}
