@@ -110,7 +110,7 @@ public sealed partial class KnowledgeSourceEditorTests
                 JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{},"path":{"type":"string","maxLength":1024}},"required":["value","path"],"additionalProperties":false}"""),
                 JsonSerializer.Deserialize<JsonElement>("{}"));
             if (textInput) descriptor = descriptor with { Id = "example.text", InputSchema = FunctionInvocationSchemas.XmlContent };
-            return Task.FromResult<IReadOnlyList<FunctionChoice>>([new("Select · 1.0.0", new(new("select", "1.0.0", scope), new("native", "1.0.0", scope),
+            return Task.FromResult<IReadOnlyList<FunctionChoice>>([new("Select · 1.0.0", new(new("select", "1.0.0", scope, ResourceNamespace.Default), new("native", "1.0.0", scope),
                 descriptor.Id, descriptor.Version, descriptor.InputSchema, descriptor.OutputSchema)) { IsBuiltIn = true }]);
         }
         public Task<IReadOnlyList<TransformationFunctionResource>> ListAsync(ResourceScopeRef? scope, CancellationToken ct) => throw new NotSupportedException();

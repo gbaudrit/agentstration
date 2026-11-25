@@ -3,7 +3,7 @@
 @if (Value is { } value)
 {
     <div class="source-value-inspector" data-testid="source-value-inspector">
-        <div class="form-actions"><button type="button" class="@(source ? "button-secondary" : "button-primary")" aria-pressed="@(!source)" @onclick="() => source = false">@Localizer["Preview.Tree"]</button><button type="button" class="@(source ? "button-primary" : "button-secondary")" aria-pressed="@source" @onclick="() => source = true">@Localizer[MediaType is "application/xml" or "text/xml" or "text/plain" ? "Preview.Source" : "Preview.JsonSource"]</button></div>
+        <div class="form-actions"><button type="button" class="@(source ? "button-secondary" : "button-primary")" aria-pressed="@(!source)" @onclick="() => source = false">@Localizer["Preview.Tree"]</button><button type="button" class="@(source ? "button-primary" : "button-secondary")" aria-pressed="@source" @onclick="() => source = true">@Localizer[MediaType is "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain" ? "Preview.Source" : "Preview.JsonSource"]</button></div>
         @if (source)
         {
             <pre data-testid="preview-json-source">@Source(value)</pre>
@@ -44,7 +44,7 @@
     private readonly HashSet<string> expanded = [];
     private readonly Dictionary<string, int> pages = [];
     public const int MaximumSourceCharacters = 65536;
-    protected override void OnParametersSet() { if (Value?.GetRawText() != previous) { previous = Value?.GetRawText(); expanded.Clear(); pages.Clear(); source = MediaType is "application/xml" or "text/xml" or "text/plain"; } }
+    protected override void OnParametersSet() { if (Value?.GetRawText() != previous) { previous = Value?.GetRawText(); expanded.Clear(); pages.Clear(); source = MediaType is "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain"; } }
     private void Toggle(string path) { if (!expanded.Add(path)) expanded.Remove(path); }
     private sealed record Row(string Path, string Name, JsonElement Value, int Depth, bool More = false);
     private IReadOnlyList<Row> Rows(JsonElement root)

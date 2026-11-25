@@ -16,12 +16,14 @@ namespace Agentstration.Management.Tests;
 public sealed partial class DataSourceDatasetTests
 {
     [TestMethod]
-    public async Task GuidedXmlSequenceDerivesExactItemEvidenceAndUsesTheExistingEngines()
+    [DataRow("application/xml")]
+    [DataRow("application/rss+xml")]
+    public async Task GuidedXmlSequenceDerivesExactItemEvidenceAndUsesTheExistingEngines(string mediaType)
     {
         await using var factory = Factory();
         await using var worker = await AwpTestWorker.StartAsync(factory);
         var transport = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"mediaType":{"type":"string"},"content":{"type":"string"}},"required":["mediaType","content"],"additionalProperties":false}""");
-        var raw = JsonSerializer.SerializeToElement(new { mediaType = "application/xml", content = "<root><item id=\"one\"/><item id=\"two\"/></root>" });
+        var raw = JsonSerializer.SerializeToElement(new { mediaType, content = "<root><item id=\"one\"/><item id=\"two\"/></root>" });
         var fixture = await PrepareAsync(factory.Services, emptyInput: true, operationResult: raw, declareAcquisitionOutput: false, operationOutputSchema: transport);
         using var scope = factory.Services.GetRequiredService<IRequestContextScopeFactory>().PushInstance(fixture.Context);
         var schemas = factory.Services.GetRequiredService<SchemaManagementService>();
@@ -47,7 +49,7 @@ public sealed partial class DataSourceDatasetTests
         var operations = factory.Services.GetRequiredService<ConnectedServiceOperationService>();
         var discoveries = factory.Services.GetRequiredService<ConnectedServiceOperationDiscoveryService>();
         var stored = (await discoveries.GetOperationAsync(Owner, ResourceNamespace.Default, fixture.Operation.Name, default))!;
-        var adopted = await operations.AdoptContentAsync(fixture.OperationReference.Operation, new("application/xml", "/content", input), stored.ETag, default);
+        var adopted = await operations.AdoptContentAsync(fixture.OperationReference.Operation, new(mediaType, "/content", input), stored.ETag, default);
         Assert.IsNull((await operations.ResolveAsync(fixture.OperationReference, Owner, true, default)).Operation.Definition.AdoptedContentContract);
         var acceptedOperation = new ConnectedServiceOperationRevisionReference(fixture.OperationReference.Operation, adopted.Value.Uid, adopted.Value.Generation, adopted.Value.Definition.DefinitionDigest);
         var currentFixture = fixture with { Operation = adopted.Value, OperationReference = acceptedOperation };
@@ -83,8 +85,19 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(candidate.Item.ParentDefinitionHash, call.FunctionSchemaSnapshots["itemSchema"].ParentDefinitionHash);
         _ = await schemas.PublishAsync(Owner, ResourceNamespace.Default, input.Name, "2.0.0", default);
         Assert.AreEqual("1.0.0", (await operations.ResolveAsync(acceptedOperation, Owner, true, default)).Operation.Definition.AdoptedContentContract!.Schema.Source!.Version);
-        var next = await operations.AdoptContentAsync(acceptedOperation.Operation, new("application/xml", "/content", input with { Version = "2.0.0" }), adopted.ETag, default);
+        var next = await operations.AdoptContentAsync(acceptedOperation.Operation, new(mediaType, "/content", input with { Version = "2.0.0" }), adopted.ETag, default);
         Assert.AreEqual("2.0.0", next.Value.Definition.AdoptedContentContract!.Schema.Source!.Version);
+        var discovery = await discoveries.StartAsync(Owner, fixture.Operation.Definition.Service.Service.Address.Name, null, null, default);
+        for (var attempt = 0; attempt < 1000 && discovery.Value.CompletedAt is null; attempt++)
+        {
+            await Task.Delay(20);
+            discovery = await discoveries.GetAsync(ResourceNamespace.Default, discovery.Value.Name, default);
+        }
+        Assert.AreEqual(ConnectedServiceOperationDiscoveryState.Succeeded, discovery.Value.State, discovery.Value.ErrorMessage);
+        var rediscovered = (await discoveries.GetOperationAsync(Owner, ResourceNamespace.Default, fixture.Operation.Name, default))!;
+        Assert.AreEqual(next.Value.Generation, rediscovered.Value.Generation);
+        Assert.AreEqual(next.Value.Definition.AdoptedContentContract!.Schema.DefinitionHash, rediscovered.Value.Definition.AdoptedContentContract!.Schema.DefinitionHash);
+        Assert.AreEqual("2.0.0", rediscovered.Value.Definition.AdoptedContentContract!.Schema.Source!.Version);
         Assert.AreEqual("1.0.0", (await operations.ResolveAsync(acceptedOperation, Owner, true, default)).Operation.Definition.AdoptedContentContract!.Schema.Source!.Version);
     }
 }

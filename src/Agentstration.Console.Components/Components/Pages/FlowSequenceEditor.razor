@@ -218,19 +218,22 @@
     private void ToggleAdvanced(int position) { if (!advanced.Add(position)) advanced.Remove(position); }
     private readonly Dictionary<int, string?> collectionSearches = [];
     private ISourceAuthoringClient? Authoring => Services.GetService(typeof(ISourceAuthoringClient)) as ISourceAuthoringClient;
-    private string DraftKey => FunctionDigests.Compute(new { Value, SampleAcquisition, InputContract, ContentInput, InputBinding, preparedSampleId = PreparedSample?.Id, sampleId = sample?.Id, ConsumedSource, PreparedInputStale, PrivacyKey });
+    private SchemaBindingSnapshot? DeclaredInputContract => InputSchema is { } schema
+        ? new("composition-point.input", SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema,
+            JsonSchemaSelection.DefinitionHash(SchemaFormatIds.JsonSchema, BuiltinJsonSchemaFormatHandler.Draft202012, schema)) : null;
+    private string DraftKey => FunctionDigests.Compute(new { Value, SampleAcquisition, InputContract, InputSchema, ContentInput, InputBinding, preparedSampleId = PreparedSample?.Id, sampleId = sample?.Id, ConsumedSource, PreparedInputStale, PrivacyKey });
     private string PrivacyKey => Services.GetService(typeof(ConsoleContextState)) is ConsoleContextState state && state.Current is { } context
         ? $"{context.UserId}:{context.SelectedScopeRef}:{context.WorkspaceId}" : "";
     private string privacyKey = "";
     private string? InputMediaType => sample is { IsRawOperationResponse: true, Value: { ValueKind: JsonValueKind.Object } value }
         && value.TryGetProperty("mediaType", out var media) && media.ValueKind == JsonValueKind.String
         && value.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String
-        && media.GetString()?.Split(';')[0].Trim() is "application/xml" or "text/xml" or "text/plain" ? media.GetString()!.Split(';')[0].Trim() : null;
+        && media.GetString()?.Split(';')[0].Trim() is "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml" or "text/plain" ? media.GetString()!.Split(';')[0].Trim() : null;
     private bool SampleExpired => sample is { } stored && stored.ExpiresAt <= (Services.GetService(typeof(TimeProvider)) as TimeProvider ?? TimeProvider.System).GetUtcNow();
     private bool SampleParametersStale => SampleAcquisition is { } authored && sample is { IsRawOperationResponse: true } captured
         && (!JsonElement.DeepEquals(authored.Parameters, captured.Acquisition.Parameters) || authored.Operation != captured.Acquisition.Operation);
     private bool PreviewStale => replay is not null && DraftKey != replayDraft;
-    private JsonElement? SelectedPreview => selectedPosition == 0 ? !SampleExpired ? InputMediaType is not null ? sample?.Value?.GetProperty("content") : sample?.Value : null : !PreviewStale ? replay?.Values.ElementAtOrDefault(selectedPosition) is { ValueKind: not JsonValueKind.Undefined } value ? value : null : null;
+    private JsonElement? SelectedPreview => SampleExpired ? null : selectedPosition == 0 ? !SampleExpired ? InputMediaType is not null ? sample?.Value?.GetProperty("content") : sample?.Value : null : !PreviewStale ? replay?.Values.ElementAtOrDefault(selectedPosition) is { ValueKind: not JsonValueKind.Undefined } value ? value : null : null;
     protected override async Task OnParametersSetAsync()
     {
         if (privacyKey != PrivacyKey) { privacyKey = PrivacyKey; sample = null; replay = null; analysis = null; analyzed = ""; consumedCandidates = []; consumedLoaded = false; }
@@ -245,7 +248,7 @@
         if (Authoring is not { } client || ResourceOwnershipContext.TryGetCurrent(Services) is not { } owner || analyzed == DraftKey) return;
         var key = DraftKey;
         analysis = null;
-        try { var result = await client.AnalyzeAsync(new(owner, OwnerNamespace, Value, sample?.Contract ?? InputContract, SampleAcquisition is not null, ContentInput ?? sample?.ContentContract, InputBinding), cancellation.Token); if (key == DraftKey) { analysis = result; analyzed = key; } }
+        try { var result = await client.AnalyzeAsync(new(owner, OwnerNamespace, Value, sample?.Contract ?? InputContract ?? DeclaredInputContract, SampleAcquisition is not null, ContentInput ?? sample?.ContentContract, InputBinding), cancellation.Token); if (key == DraftKey) { analysis = result; analyzed = key; } }
         catch (Exception error) when (error is not OperationCanceledException) { authoringFailed = true; }
     }
     private async Task AcquireSampleAsync()
@@ -360,7 +363,7 @@
     private Task AddFunctionAsync() => CanAddFunction
         ? ValueChanged.InvokeAsync([.. Value, new FlowCompositionCall { Function = functionOptions[0].Function.Reference }])
         : Task.CompletedTask;
-    private static string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef}|{reference.Namespace}|{reference.Name}|{reference.Version}";
+    private string FunctionKey(FunctionReference reference) => $"{reference.ScopeRef ?? ResourceOwnershipContext.TryGetCurrent(Services)}|{reference.Namespace ?? ResourceNamespace.Default}|{reference.Name}|{reference.Version}";
     private Task SelectFunctionAsync(int position, string? key) => ValueChanged.InvokeAsync(Value.Select((value, index) => index == position
         ? new FlowCompositionCall { Function = functionOptions.Single(choice => FunctionKey(choice.Function.Reference) == key).Function.Reference } : value).ToArray());
     private static JsonElement FunctionParameters(JsonElement schema) => FunctionInvocationSchemas.WithoutSchemaParameters(FunctionInvocationSchemas.Parameters(schema));

@@ -45,6 +45,12 @@ public sealed partial class KnowledgeSourceEditorTests
         Assert.Contains("1", rendered.Find("[data-testid=source-sequence-preview] h3").TextContent);
         Assert.HasCount(1, rendered.FindAll("[data-testid=source-preview-stale]"));
         Assert.AreEqual(1, authoring.Replays);
+        rendered.Find("[data-testid=source-preview-recalculate]").Click();
+        rendered.WaitForAssertion(() => Assert.AreEqual(2, authoring.Replays));
+        Assert.HasCount(1, rendered.FindAll("[data-testid=source-sequence-preview] [data-testid=source-value-inspector]"));
+        rendered.Render(p => p.Add(c => c.PreparedSample, sample with { Id = "expired", ExpiresAt = DateTimeOffset.MinValue }));
+        Assert.IsEmpty(rendered.FindAll("[data-testid=source-sequence-preview] [data-testid=source-value-inspector]"));
+        Assert.IsTrue(rendered.Find("[data-testid=source-preview-recalculate]").HasAttribute("disabled"));
 
         static FlowCompositionCall Call(string path) => new() { Function = new("select", "1.0.0", ResourceScopeRef.Instance), Parameters = JsonSerializer.SerializeToElement(new { path }) };
     }

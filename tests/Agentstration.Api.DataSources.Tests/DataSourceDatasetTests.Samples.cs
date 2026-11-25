@@ -106,6 +106,14 @@ public sealed partial class DataSourceDatasetTests
         Assert.AreEqual(0, operation.Calls);
         var missing = await Assert.ThrowsExactlyAsync<DataSourceAcquisitionException>(() => samples.GetAsync(sample.Id, default));
         Assert.AreEqual("source_sample_unavailable", missing.Code);
+        var cancelled = await samples.AcquireAsync(new(sample.Acquisition), default);
+        await samples.CancelAsync(cancelled.Id, default);
+        await samples.ProcessNextAsync(default);
+        Assert.AreEqual(0, operation.Calls);
+        Assert.AreEqual(SourceSampleState.Cancelled, (await samples.GetAsync(cancelled.Id, default)).State);
+        var cancelledReplay = await Assert.ThrowsExactlyAsync<DataSourceAcquisitionException>(() => samples.ReplayAsync(cancelled.Id,
+            new(ResourceNamespace.Default, []), default));
+        Assert.AreEqual("source_sample_not_conformant", cancelledReplay.Code);
     }
 
     [TestMethod]

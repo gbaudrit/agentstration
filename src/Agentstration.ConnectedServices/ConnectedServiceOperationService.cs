@@ -23,7 +23,7 @@ public sealed class ConnectedServiceOperationService(
         var stored = await store.GetExactAsync<ConnectedServiceOperationResource>(address, ct)
             ?? throw Error("operation_not_found", "The operation is unavailable.");
         if (request.Schema is null || request.ContentPointer is not ("" or "/content")
-            || request.MediaType is not ("application/json" or "application/xml" or "text/xml")
+            || request.MediaType is not ("application/json" or "application/xml" or "text/xml" or "application/rss+xml" or "application/atom+xml")
             || schemaBindings is null) throw Error("operation_content_contract_invalid", "Select an exact published contract and a supported response content boundary.");
         return await scopes.WriteAsync(stored.Value, address.ScopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
         {
