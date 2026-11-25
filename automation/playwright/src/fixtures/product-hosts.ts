@@ -200,6 +200,8 @@ async function startProductHostsOnPorts(
     ...(governedInventoryFixture ? { GOVERNED_INVENTORY_READY_FILE: fixtureReadyFile } : {}),
     ...(sourcePolicyFixture ? { SOURCE_POLICY_FIXTURE_KEY: sourcePolicyKey } : {}),
     ASPNETCORE_ENVIRONMENT: 'Development',
+    // Keep circuit exceptions actionable in the browser health guard on CI.
+    DetailedErrors: 'true',
     ASPNETCORE_URLS: consoleUrl,
     Logging__EventLog__LogLevel__Default: 'None',
     Data__Directory: dataDirectory,
