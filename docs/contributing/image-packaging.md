@@ -318,7 +318,14 @@ successful smoke evidence; no private publication, live API compatibility or oth
 platform is implied by a catalogue entry. Generic smokes cover health, authenticated
 discovery, invalid bearer/signature rejection, SharedKeyFile enrollment, recreation
 and persisted identities. The offline OpenAPI tests cover provider behavior with
-HTTP fixtures. Preview extension selection remains a separate workstream.
+HTTP fixtures. The catalogue ID `openapi` also derives the selectable label
+`preview:extension:openapi` through the #1389 mechanism. After this catalogue entry
+reaches `main`, `.github/workflows/preview-extension-labels.yml` synchronizes that
+label using `scripts/github/apply-issue-labels.ps1 -PreviewExtensionsOnly`.
+The label selects the extension only when applied to a preview request through
+the existing preview workflow; packaging does not assign it or trigger deployment.
+A dry run with `-DryRun -PreviewExtensionsOnly` verifies the derived name without
+changing repository labels.
 
 Related to #1290; keep it open until private qualification is recorded. Docker Hub
 is deferred to #1384, preserving official release tag/version and trusted-main
