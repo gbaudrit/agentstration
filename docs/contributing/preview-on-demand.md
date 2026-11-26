@@ -94,10 +94,10 @@ source SHA, original GHCR digests, database, lifecycle state, expiry and owned
 resource IDs. A protected HTTPS URL is included after live protection checks. Provider
 errors retain safe error codes rather than exporting logs or credentials.
 
-## Request a preview from an issue
+## Request a preview from an issue or PR
 
-After the issue-command workflows are merged to `main`, a repository maintainer
-can post one plain-text command in an ordinary issue:
+A repository maintainer can post one plain-text command in an ordinary issue
+or a same-repository PR after the command workflows are merged to `main`:
 
 ```text
 /preview deploy
@@ -108,7 +108,13 @@ can post one plain-text command in an ordinary issue:
 /preview destroy
 ```
 
-Without `ref`, discovery uses GitHub's native linked **open** PRs that close the
+On a PR, `/preview deploy` selects **that PR's own head commit** and its
+`preview:extension:*` labels. No `ref` is needed. Use `database=postgresql` only
+when that database profile is wanted; SQLite remains the default. Another PR,
+branch or SHA cannot be selected from a PR comment: use an ordinary issue or the
+manual form for that purpose. Fork PR deployment is refused.
+
+On an ordinary issue, without `ref`, discovery uses GitHub's native linked **open** PRs that close the
 issue (the Development relationship), through `closedByPullRequestsReferences`.
 A plain mention in an issue body/comment does not select code. Exactly one linked
 same-repository PR selects its current head SHA. Multiple linked PRs produce a
@@ -126,9 +132,14 @@ published Worker are the defaults. Other combinations remain available in the
 manual form. `status` and `destroy` accept no arguments and reuse the recorded
 selection, even when refs or environment defaults have changed.
 
-The stable environment is `issue-N`, with protected hostname
-`dev-issue-N.agentstration.cloud`. Repeated deploy commands update that environment
-with data preservation. Changing database requires a full destroy first.
+The stable environment is `pr-N` for PR comments, with protected hostname
+`dev-pr-N.agentstration.cloud`; ordinary issues retain `issue-N` and
+`dev-issue-N.agentstration.cloud`. These are distinct environments even when an
+issue links to that PR. Repeated deploy commands update that environment
+with data preservation. After pushing to a PR, publish its exact server image
+and post a **new** `/preview deploy` comment to update the same environment; pushes
+and label changes alone do not deploy. A command already admitted keeps its original
+SHA even if the branch moves. Changing database requires a full destroy first.
 **`/preview destroy` fully resets owned infrastructure and application data**,
 including disks and public IP. The manual form still offers explicit preserve
 mode for recovery/maintenance.
@@ -137,27 +148,47 @@ The admission workflow runs only default-branch tooling, checks the author's
 current repository write/maintain/admin permission and ignores untrusted users
 and bot comments. GitHub association labels alone do not grant permission.
 Commands edited after creation are refused; post a new comment. Deployment
-requires an open issue; status/destroy also work on a closed issue. Permissions
+requires an open issue or PR; status/destroy also work after closure or merge,
+including after deletion of the PR head branch/repository. Permissions
 and the original command are checked again in the receiving manual workflow and
 immediately before its selection announcement. Deleted/edited commands and revoked
 permissions stop execution; maintainers can still use the manual form for cleanup.
 
-Admission dispatches **Preview issue deployment** on `main`, which reuses
+Admission dispatches **Preview command deployment** on `main`, which reuses
 **Preview on demand**. Its single JSON input avoids changing the existing ten-input
 manual form. Admission has GitHub dispatch/comment permissions, no protected
 environment, Azure OIDC or cloud credentials. The receiving workflow resolves
 private published image digests and protected defaults using the existing selector,
-then posts the source SHA, digests and run link in the issue. Infrastructure
-execution proceeds automatically only after that announcement succeeds. A final
-comment contains the verified protected URL/state or a bounded failure and run
-link. Failure output never republishes provider responses or an unverified URL.
+then updates **one bot-owned comment per command**, created before dispatch.
+Infrastructure execution proceeds only after that verified-selection update
+succeeds. Later updates replace this card's state rather than posting metadata
+in several comments. Ownership and a selection marker prevent overwriting human
+comments, another bot's comment or another command's card.
+
+The card shows the requested/checked/ready or failed state, linked server commit,
+database, selected extensions, known VM/region and workflow link. Full image
+versions/digests are collapsed. A successful readiness check adds the protected
+application URL and recorded expiry; the card explicitly says **automatic expiry
+cleanup is not implemented** and offers `/preview destroy`. An active VM without
+confirmed protected access does not get an access link.
+
+Failures explain the stage and next action. For example, a missing server image
+asks for **OCI images**, `extension=server`, `publish_preview=true` on the requested
+revision; publishing only an extension is insufficient. Inaccessible private
+packages point to package visibility and Actions access. Failures before execution
+state that Azure deployment was not started; execution failures recommend status
+and cleanup because partial resources may remain. Provider responses, private
+extension configuration, credentials and unverified URLs are never copied into
+comments. If labels select an extension whose packaging is not yet in `main`,
+merge that catalogue and publish the image before retrying.
 
 These workflows use the ephemeral `GITHUB_TOKEN`; no new PAT or Azure/Cloudflare
 secret is required. Repository policy must permit the requested Actions dispatch
 and issue-comment write permissions. Caller secret inheritance remains explicit
 through both reusable workflows; cloud credentials stay in the existing protected
 executor. The main-only provider event boundary remains unchanged. See
-[ADR-0263](../decisions/0263-issue-preview-commands-dispatch-trusted-manual-workflows.md).
+[ADR-0263](../decisions/0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
+and [ADR-0266](../decisions/0266-pr-preview-commands-use-frozen-heads-and-owned-feedback.md).
 
 TTL is still **recorded only**. This slice does not implement automatic expiry,
 PR close/label events, global quotas or orphan reconciliation; remove test previews
@@ -166,7 +197,7 @@ environment serialization, provider lease and ownership checks.
 
 ### Choose optional AEP extensions with issue labels
 
-Add `preview:extension:foundry` to the issue, then post `/preview deploy`. The
+Add `preview:extension:foundry` to the issue or PR, then post `/preview deploy`. The
 live label list is frozen with the command and rechecked before the image digests
 are announced. A label change while the run is queued requires a new command.
 Removing a label and posting `/preview deploy` stops that extension. Labels alone
@@ -313,3 +344,28 @@ also offers an optional `published_revision` dispatch input to check the real
 private GHCR selector. That opt-in job uses only repository/package read access,
 uploads public selection metadata and has neither OIDC permission nor an Azure
 environment. Its target is a contract fixture, not a deployable operator request.
+
+
+### Qualify PR commands and feedback after merge
+
+1. Publish a private server image for an open same-repository PR's exact head SHA.
+   If extensions are wanted, first merge their catalogue/packaging and publish
+   their private images; apply the desired `preview:extension:*` labels to the PR.
+2. As a human maintainer, post `/preview deploy` on that PR. Confirm admission is
+   not skipped, dispatch runs on `main`, one feedback card advances through checks
+   to readiness, and the protected `dev-pr-N.agentstration.cloud` URL works.
+3. Check the card's commit, database, selected extensions, expiry warning and
+   collapsed image details against the public request/result artifacts.
+4. Push a new commit, publish its server image, then post a new deploy command.
+   Confirm the same `pr-N` environment updates without resetting data. The older
+   command's card must retain its own revision.
+5. Post `/preview status`, including after PR closure. Confirm it reads saved
+   state. Post `/preview destroy` and confirm removal of owned VM, disks, IP and
+   application data; the shared services remain. Do not leave billable resources.
+6. Qualify a missing exact server image: no Azure execution should start, and the
+   card must explain which image to publish. Check a refused fork or revoked
+   requester without granting extra permissions. Never publish fake human commands
+   using an automation identity to simulate this event qualification.
+
+These actual GitHub/Azure checks are pending until trusted-main merge; offline
+unit tests do not establish event delivery or cloud readiness.

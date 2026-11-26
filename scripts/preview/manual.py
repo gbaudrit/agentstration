@@ -22,6 +22,13 @@ class Unavailable(ValueError):
     """A registry/API read failed; its potentially sensitive output is withheld."""
 
 
+class SelectionError(ValueError):
+    """Controlled diagnosis suitable for a public operator comment."""
+    def __init__(self, code, component, message):
+        super().__init__(message)
+        self.public = {'code': code, 'component': component}
+
+
 def command(arguments):
     # Bound memory before decoding external metadata; commands also have a deadline.
     import tempfile
@@ -109,12 +116,18 @@ class PublishedImages:
 
     def select(self, component, ref):
         trusted = catalogue(component)
-        package = self.private_package(trusted['imageName'])
+        try:
+            package = self.private_package(trusted['imageName'])
+        except Unavailable as error:
+            raise SelectionError('registry-access', component, 'Private GHCR package metadata is unavailable.') from error
         image = f'ghcr.io/{self.owner}/{self.name}-{trusted["imageName"]}'
         sha = None
         if ref == 'published':
             preview.require(trusted.get('kind', 'aep-extension') in ('awp-worker', 'aep-extension'), 'Only independently versioned Workers and extensions accept published.')
-            digest = self.latest_tagged(package)
+            try:
+                digest = self.latest_tagged(package)
+            except ValueError as error:
+                raise SelectionError('image-unavailable', component, 'No tagged component image found. Publish the component or select its explicit published revision.') from error
         else:
             sha = self.revision(ref)
             entry = self.entry(component, sha)
@@ -125,7 +138,7 @@ class PublishedImages:
                 try:
                     manifest = self.raw(image + ':' + entry['version'])
                 except Unavailable as error:
-                    raise ValueError('No published image for the selected revision. Publish this component with OCI images, then retry; deployment never builds images.') from error
+                    raise SelectionError('image-unavailable', component, 'No published image for the selected revision. Publish this component with OCI images, then retry; deployment never builds images.') from error
             digest = 'sha256:' + hashlib.sha256(manifest).hexdigest()
         preview.require(isinstance(digest, str) and DIGEST.fullmatch(digest), 'Package version is not an exact OCI digest.')
         reference = image + '@' + digest
@@ -134,8 +147,8 @@ class PublishedImages:
         config = self.inspect(reference)
         labels = config.get('config', {}).get('Labels') or {}
         actual_sha = labels.get('org.opencontainers.image.revision', '')
-        preview.require(preview.SHA.fullmatch(actual_sha) and (sha is None or sha == actual_sha),
-                        'Published image source SHA differs from the requested revision; publish that exact revision.')
+        if not preview.SHA.fullmatch(actual_sha) or sha is not None and sha != actual_sha:
+            raise SelectionError('image-unavailable', component, 'Published image source SHA differs from the requested revision; publish that exact revision.')
         entry = self.entry(component, actual_sha) if sha is None else entry
         preview.require(config.get('os') == 'linux' and config.get('architecture') == 'amd64'
                         and labels.get('org.opencontainers.image.source', '').lower() == 'https://github.com/' + self.repository
@@ -216,6 +229,9 @@ def main():
                 summary.write('- ' + name + ': `' + value['reference'] + '`\n')
             summary.write('\nURL is returned only after protected readiness checks. TTL is recorded; automatic expiry is #1286.\n')
     except (ValueError, KeyError, TypeError, RuntimeError, ET.ParseError) as error:
+        if isinstance(error, SelectionError):
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                output.write('failure=' + json.dumps(error.public) + '\n')
         # Only controlled validation messages may be shown; remote JSON/key/parser errors are not echoed.
         print(str(error) if isinstance(error, (ValueError, RuntimeError)) and not isinstance(error, (json.JSONDecodeError, ET.ParseError, UnicodeError))
               else 'Invalid published metadata or manual selection; check the supported catalogue and form inputs.', file=sys.stderr)

@@ -55,7 +55,7 @@ on:
   workflow_call:
     inputs:
       selection:
-        description: Canonical form options and optional issue tracking (public metadata only)
+        description: Canonical form options and optional issue/PR tracking (public metadata only)
         type: string
         required: true
 
@@ -74,6 +74,7 @@ jobs:
     permissions:
       contents: read
       issues: read
+      pull-requests: read
     outputs:
       issue-number: ${{ steps.tracking.outputs.issue-number }}
       selection: ${{ steps.tracking.outputs.selection }}
@@ -98,7 +99,7 @@ jobs:
           import contract, manual
           manual.validate_options(contract.parse(os.environ['SELECTION_JSON']))
           PY
-      - name: Recheck issue command ownership and current requester permission
+      - name: Recheck issue or PR command ownership and current requester permission
         id: tracking
         env:
           GH_TOKEN: ${{ github.token }}
@@ -116,6 +117,7 @@ jobs:
       packages: read
     outputs:
       request: ${{ steps.select.outputs.request }}
+      failure: ${{ steps.select.outputs.failure }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -196,6 +198,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -225,21 +228,26 @@ jobs:
 
   report:
     needs: [boundary, select, recorded, announce, execute]
-    if: ${{ always() && needs.boundary.outputs.issue-number != '' }}
+    if: ${{ always() && (needs.boundary.outputs.issue-number != '' || (inputs.selection != '' && fromJSON(inputs.selection).tracking_feedback != '')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
       issues: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Report verified result or bounded failure to the originating issue
+      - name: Report verified result or bounded failure to the originating issue or PR
         env:
           GH_TOKEN: ${{ github.token }}
-          TRACKING_ISSUE: ${{ needs.boundary.outputs.issue-number }}
-          OPERATION: ${{ needs.boundary.outputs.operation }}
+          TRACKING_ISSUE: ${{ needs.boundary.outputs.issue-number || fromJSON(inputs.selection).tracking_issue }}
+          OPERATION: ${{ needs.boundary.outputs.operation || fromJSON(inputs.selection).operation }}
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection || inputs.selection }}
+          REQUEST_JSON: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
+          STAGE_RESULTS: ${{ toJSON(needs) }}
+          SELECTION_FAILURE: ${{ needs.select.outputs.failure }}
           EXECUTION_RESULT: ${{ needs.execute.result }}
           RESULT_JSON: ${{ needs.execute.outputs.result }}
         run: python3 scripts/preview/issue_commands.py report
