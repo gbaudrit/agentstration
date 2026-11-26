@@ -7,7 +7,7 @@ on:
       - 'samples/OpenDalSmoke/**'
       - 'scripts/opendal/**'
       - 'deploy/opendal/**'
-      - 'asp/**'
+      - 'asc/**'
       - 'aep/**'
       - 'Directory.*.props'
       - 'global.json'

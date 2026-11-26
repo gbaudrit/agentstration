@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.OData;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.OData;
 
 namespace Agentstration.Extensions.PostgreSql;
 
@@ -39,7 +39,8 @@ public static class PostgreSqlStorageTypes
         [new(Version, AepSchemaDigest.Compute(ConfigurationSchema), ConfigurationSchema,
             AepSchemaDigest.Compute(EnvelopeSchema), EnvelopeSchema, true, Requirements,
             new(false, false, false, false), new(100, 65536, 65536),
-            new(AspDocuments.Profile, "documents", "aspdoc", "postgresql-jsonb", Version))
+            new(AscDocuments.Profile, "documents", "ascdoc", "postgresql-jsonb", Version)
+            { Contract = AscContract.Identity, Revision = AscContract.Version, McpProtocolVersion = AepStorageProtocol.McpProtocolVersion })
         { Documents = new(true, true, true, true, true, [new(ODataDocumentProfile.Id, ODataDocumentProfile.Version, ODataDocumentProfile.Encoding)]) { DocumentSelection = true } }])];
 }
 
@@ -56,6 +57,6 @@ public sealed record PostgreSqlDocumentEnvelope(bool Get = true, bool Put = fals
     bool Query = true, bool Publish = false, int MaximumPageSize = 50, int MaximumDocumentBytes = 65536,
     int MaximumResultBytes = 196608, IReadOnlyList<string>? QueryProfiles = null)
 {
-    public AspDocumentPolicy For(string collection) => new(collection, Get, Put, Delete, Query, Publish,
+    public AscDocumentPolicy For(string collection) => new(collection, Get, Put, Delete, Query, Publish,
         MaximumPageSize, MaximumDocumentBytes, MaximumResultBytes, QueryProfiles ?? [ODataDocumentProfile.Id]);
 }

@@ -70,7 +70,7 @@ public sealed class StorageContentConfigurationTests
         Assert.AreEqual(storage.MaximumReadBytes, storage.DefaultPolicy().MaximumReadBytes);
         Assert.AreEqual(int.MaxValue, new StorageContentPolicy().MaximumWriteBytes,
             "An omitted consumer limit must inherit the server budget rather than add a hidden 10 MiB ceiling.");
-        CollectionAssert.AreEqual(new byte[] { 42 }, Agentstration.Asp.Abstractions.AspValidation.Content("Kg==", int.MaxValue));
+        CollectionAssert.AreEqual(new byte[] { 42 }, Agentstration.Asc.Abstractions.AscValidation.Content("Kg==", int.MaxValue));
     }
 
     [TestMethod]

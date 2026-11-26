@@ -30,7 +30,7 @@ Definitions containing composition or reference constructs such as `$ref`, `$def
 
 The standalone product registers a native `json-schema` provider and does not require AEP. The supported dialect is `https://json-schema.org/draft/2020-12/schema`.
 
-The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the asserted `uri` and `date-time` formats. Date-time validation reuses JsonSchema.Net, as does the ASP document profile. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
+The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the asserted `uri` and `date-time` formats. Date-time validation reuses JsonSchema.Net, as does the ASC document profile. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
 
 Format resolution is capability-based. A provider has a stable identity and version, lists its dialects and capabilities, and reports availability. Multiple capable providers require one explicit default or an exact caller pin; registration order is never used as an implicit selection policy.
 

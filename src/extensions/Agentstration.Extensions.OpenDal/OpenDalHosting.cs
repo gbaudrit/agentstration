@@ -1,7 +1,7 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
-using Agentstration.Asp.Aep;
-using Agentstration.Asp.Server;
+using Agentstration.Asc.Aep;
+using Agentstration.Asc.Server;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.AspNetCore;
 
@@ -18,7 +18,7 @@ public static class OpenDalHosting
         services.AddHttpClient("opendal-secret-access", client => client.Timeout = TimeSpan.FromSeconds(10))
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         services.AddHttpContextAccessor();
-        services.AddSingleton<IAspAepBindingFactory, OpenDalBindingFactory>();
+        services.AddSingleton<IAscAepBindingFactory, OpenDalBindingFactory>();
         services.AddAgentstrationAep(options =>
         {
             options.Extension = new(OpenDalStorageTypes.ExtensionId, "OpenDAL Storage", OpenDalStorageTypes.Version);
@@ -28,15 +28,15 @@ public static class OpenDalHosting
             foreach (var contribution in OpenDalStorageTypes.Contributions) options.StorageTypes.Add(contribution);
         });
         services.AddAepEnrollmentAuthentication(configuration);
-        services.AddSingleton(services => new AspAepBindings(
-            services.GetRequiredService<IAspAepBindingFactory>(), services.GetRequiredService<IHttpContextAccessor>(),
+        services.AddSingleton(services => new AscAepBindings(
+            services.GetRequiredService<IAscAepBindingFactory>(), services.GetRequiredService<IHttpContextAccessor>(),
             caller => services.GetRequiredService<IOptionsMonitor<OpenDalOptions>>().CurrentValue.Authorizes(caller),
             services.GetRequiredService<TimeProvider>()));
-        services.AddSingleton(services => new AspMcpServer(services.GetRequiredService<AspAepBindings>().ResolveAsync,
+        services.AddSingleton(services => new AscMcpServer(services.GetRequiredService<AscAepBindings>().ResolveAsync,
             services.GetRequiredService<TimeProvider>(), sessionLimits: new(MaximumSessions: 32)));
         services.AddMcpServer().WithHttpTransport(options => options.SessionMode = HttpServerSessionMode.Stateless)
-            .WithListToolsHandler((request, ct) => request.Services!.GetRequiredService<AspMcpServer>().ListToolsAsync(request, ct))
-            .WithCallToolHandler((request, ct) => request.Services!.GetRequiredService<AspMcpServer>().CallToolAsync(request, ct));
+            .WithListToolsHandler((request, ct) => request.Services!.GetRequiredService<AscMcpServer>().ListToolsAsync(request, ct))
+            .WithCallToolHandler((request, ct) => request.Services!.GetRequiredService<AscMcpServer>().CallToolAsync(request, ct));
         return services;
     }
 
@@ -45,7 +45,7 @@ public static class OpenDalHosting
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapAgentstrationAep();
-        app.MapAspAepBindings();
+        app.MapAscAepBindings();
         app.MapMcp("/mcp").RequireAuthorization(AepAuthenticationDefaults.Policy);
         return app;
     }

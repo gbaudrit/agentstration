@@ -4,6 +4,8 @@
 
 Proposed
 
+Naming and unreleased wire identities superseded by [ADR-0264](0264-storage-contract-identity-and-mcp-exposure.md); behavioral decisions below remain the baseline.
+
 ## Context
 
 [#1151](https://github.com/gbaudrit/agentstration/issues/1151) extends ASP beyond byte content. Existing content sessions, transfers and StoreRefs must remain compatible. Generic contracts must not depend on PostgreSQL, an OData parser tree or a mandatory query syntax.

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.Resources;
 using Agentstration.Security.Contracts;
@@ -11,7 +11,7 @@ namespace Agentstration.Infrastructure.Storage;
 
 /// <summary>The same governed boundary serves API, Flow, Agent Tools and Knowledge publication.</summary>
 public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRequestContext current,
-    IAuthorizationService authorization, StorageAspRemoteAdapter remote, ISecurityAuditWriter? audit = null) : IStorageDocumentGateway
+    IAuthorizationService authorization, StorageAscRemoteAdapter remote, ISecurityAuditWriter? audit = null) : IStorageDocumentGateway
 {
     private static readonly ActivitySource Activities = new("Agentstration.Storage.Documents");
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow };
@@ -19,7 +19,7 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
     {
         var (context, collection, policy) = await ResolveAsync(target, "describe", ct);
         var capabilities = context.Documents!;
-        var model = AspDocumentValidation.Digest(collection.Schema);
+        var model = AscDocumentValidation.Digest(collection.Schema);
         return new(capabilities, From(policy), capabilities.QueryProfiles.Where(p => policy.QueryProfiles!.Contains(p.Id, StringComparer.Ordinal))
             .Select(p => new StorageQueryProfilePin(p.Id, p.Version, p.Encoding, model)).ToArray(), collection.Schema, model)
         { SchemaSnapshot = collection.SchemaSnapshot };
@@ -38,7 +38,7 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         ExecuteAsync(target, "query", async (client, token) =>
         {
             var result = await client.QueryAsync(new(request.RequestId, Profile(request.Profile), request.Query, request.PageSize, request.Cursor), token);
-            AspValidation.Require(target.DocumentIds is null || result.Documents.All(d => target.DocumentIds.Contains(d.Id, StringComparer.Ordinal)),
+            AscValidation.Require(target.DocumentIds is null || result.Documents.All(d => target.DocumentIds.Contains(d.Id, StringComparer.Ordinal)),
                 "invalid_result", "The provider returned a document outside the authorized subset.");
             return new StorageDocumentPage(result.Documents.Select(Value).ToArray(), result.Groups, result.Cursor);
         }, ct);
@@ -46,9 +46,9 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         IReadOnlyList<StorageDocumentValue> documents, string requestId, DateTimeOffset notAfter, CancellationToken ct) =>
         ExecuteAsync(target, "prepare", async (client, token) =>
         {
-            var publication = await client.PrepareAsync(new(requestId, notAfter, publicationId, documents.Select(d => new AspDocumentInput(d.Id, d.Value)).ToArray()), token);
+            var publication = await client.PrepareAsync(new(requestId, notAfter, publicationId, documents.Select(d => new AscDocumentInput(d.Id, d.Value)).ToArray()), token);
             var profile = client.Description.QueryProfiles.FirstOrDefault()
-                ?? throw new AspException("unsupported_capability", "Structured publication needs an implemented query profile.");
+                ?? throw new AscException("unsupported_capability", "Structured publication needs an implemented query profile.");
             return new StorageDocumentPublicationReference(target with { Publication = publication.Id }, new(publication.Id, publication.Digest, publication.Count, publication.SchemaDigest),
                 new(profile.Reference.Id, profile.Reference.Version, profile.Reference.Encoding, profile.Reference.ModelDigest))
             { SchemaSnapshot = (await DescribeAsync(target, token)).SchemaSnapshot };
@@ -59,20 +59,20 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
     private Task<bool> PublicationAsync(StorageDocumentPublicationReference reference, string operation, CancellationToken ct) =>
         ExecuteAsync(reference.Target, operation, async (client, token) =>
         {
-            var request = new AspDocumentPublicationRequest(Guid.NewGuid().ToString("N"), reference.Publication.Id, reference.Publication.Digest);
+            var request = new AscDocumentPublicationRequest(Guid.NewGuid().ToString("N"), reference.Publication.Id, reference.Publication.Digest);
             var result = operation switch
             {
                 "seal" => await client.SealAsync(request, token),
                 "retire" => await client.RetireAsync(request, token),
                 _ => await client.InspectAsync(request, token)
             };
-            AspValidation.Require(result.Id == reference.Publication.Id && result.Digest == reference.Publication.Digest
+            AscValidation.Require(result.Id == reference.Publication.Id && result.Digest == reference.Publication.Digest
                 && (operation == "retire" || result.SchemaDigest == reference.Publication.SchemaDigest && result.Count == reference.Publication.Count), "integrity_mismatch", "The publication evidence differs.");
             return true;
         }, ct);
 
     private async Task<T> ExecuteAsync<T>(StorageDocumentTarget target, string operation,
-        Func<Agentstration.Asp.Client.AspDocumentClient, CancellationToken, Task<T>> execute, CancellationToken ct)
+        Func<Agentstration.Asc.Client.AscDocumentClient, CancellationToken, Task<T>> execute, CancellationToken ct)
     {
         using var activity = Activities.StartActivity("storage.documents." + operation);
         activity?.SetTag("storage.uid", target.Storage.StorageUid.ToString("N"));
@@ -85,20 +85,20 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
             if (target.DocumentIds is not null)
             {
                 if (context.Documents?.DocumentSelection != true || target.Publication is null || operation is not ("query" or "get" or "inspect"))
-                    throw new AspException("forbidden", "Document subsets require an exact read-only publication.");
+                    throw new AscException("forbidden", "Document subsets require an exact read-only publication.");
                 policy = policy with { DocumentIds = target.DocumentIds, Put = false, Delete = false, Publish = false };
             }
-            var subject = current.ActorPrincipalId?.ToString("N") ?? (current.AccessMode == ControlPlaneAccessMode.System ? "system" : throw new AspException("forbidden", "Authentication is required."));
-            var effective = new AspDocumentContext(new(context.Reference.StorageUid.ToString("N"), context.Type.TypeUid.ToString("N"), context.Reference.BindingDigest),
+            var subject = current.ActorPrincipalId?.ToString("N") ?? (current.AccessMode == ControlPlaneAccessMode.System ? "system" : throw new AscException("forbidden", "Authentication is required."));
+            var effective = new AscDocumentContext(new(context.Reference.StorageUid.ToString("N"), context.Type.TypeUid.ToString("N"), context.Reference.BindingDigest),
                 new(target.CollectionUid.ToString("N"), target.Publication), subject,
-                AspDocumentValidation.Digest(JsonSerializer.SerializeToElement(new { context.Reference, target.Consumer, policy }, AspProtocol.JsonOptions)), policy);
-            AspDocumentValidation.Demand(effective, operation);
+                AscDocumentValidation.Digest(JsonSerializer.SerializeToElement(new { context.Reference, target.Consumer, policy }, AscContract.JsonOptions)), policy);
+            AscDocumentValidation.Demand(effective, operation);
             var result = await remote.ExecuteDocumentsAsync(context, target, effective, execute, timeout.Token);
             if (audit is not null) await audit.WriteAsync(new(SecurityAuditActions.StorageDocumentAccessed,
                 WorkspaceId: current.IsInitialized ? current.Current.WorkspaceId : null, ReasonCode: operation), timeout.Token);
             return result;
         }
-        catch (AspException ex)
+        catch (AscException ex)
         {
             throw new StorageException("storage_documents_" + ex.Code, "The governed document operation was refused or could not complete.", ex.Code switch
             {
@@ -112,7 +112,7 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         catch (Exception ex) when (ex is IOException or HttpRequestException or JsonException)
         { throw new StorageException("storage_documents_unavailable", "The exact document provider is unavailable.", 503); }
     }
-    private async Task<(ProtectedStorageContext Context, StorageDocumentCollection Collection, AspDocumentPolicy Policy)> ResolveAsync(
+    private async Task<(ProtectedStorageContext Context, StorageDocumentCollection Collection, AscDocumentPolicy Policy)> ResolveAsync(
         StorageDocumentTarget target, string operation, CancellationToken ct)
     {
         var context = await resolver.ResolveAsync(target.Storage, target.Consumer, ct);
@@ -129,8 +129,8 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         var envelope = context.Envelope.Deserialize<StorageDocumentPolicy>(Json)
             ?? throw new StorageException("storage_document_envelope_invalid", "The document profile envelope is invalid.");
         envelope = envelope with { QueryProfiles = envelope.QueryProfiles ?? capability.QueryProfiles.Select(p => p.Id).ToArray() };
-        var policy = AspDocumentValidation.Intersect(Map(envelope, id),
-            AspDocumentValidation.Intersect(Map(collection.Policy, id), Map(target.Policy with { QueryProfiles = target.Policy.QueryProfiles ?? capability.QueryProfiles.Select(p => p.Id).ToArray() }, id)));
+        var policy = AscDocumentValidation.Intersect(Map(envelope, id),
+            AscDocumentValidation.Intersect(Map(collection.Policy, id), Map(target.Policy with { QueryProfiles = target.Policy.QueryProfiles ?? capability.QueryProfiles.Select(p => p.Id).ToArray() }, id)));
         policy = policy with
         {
             Get = policy.Get && capability.Get,
@@ -150,10 +150,10 @@ public sealed class StorageDocumentGateway(IStorageResolver resolver, ICurrentRe
         };
         return (context, collection, policy);
     }
-    internal static AspDocumentPolicy Map(StorageDocumentPolicy p, string id) => new(id, p.Get, p.Put, p.Delete, p.Query, p.Publish,
+    internal static AscDocumentPolicy Map(StorageDocumentPolicy p, string id) => new(id, p.Get, p.Put, p.Delete, p.Query, p.Publish,
         p.MaximumPageSize, p.MaximumDocumentBytes, p.MaximumResultBytes, p.QueryProfiles ?? []);
-    internal static StorageDocumentPolicy From(AspDocumentPolicy p) => new(p.Get, p.Put, p.Delete, p.Query, p.Publish,
+    internal static StorageDocumentPolicy From(AscDocumentPolicy p) => new(p.Get, p.Put, p.Delete, p.Query, p.Publish,
         p.MaximumPageSize, p.MaximumDocumentBytes, p.MaximumResultBytes, p.QueryProfiles);
-    private static StorageDocumentValue Value(AspDocument d) => new(d.Id, d.Revision, d.Value);
-    private static AspQueryProfileReference Profile(StorageQueryProfilePin p) => new(p.Id, p.Version, p.Encoding, p.ModelDigest);
+    private static StorageDocumentValue Value(AscDocument d) => new(d.Id, d.Revision, d.Value);
+    private static AscQueryProfileReference Profile(StorageQueryProfilePin p) => new(p.Id, p.Version, p.Encoding, p.ModelDigest);
 }

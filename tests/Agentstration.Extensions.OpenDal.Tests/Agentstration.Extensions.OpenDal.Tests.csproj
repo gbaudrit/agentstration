@@ -1,7 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
     <ProjectReference Include="../../src/extensions/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
-    <ProjectReference Include="../../asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
+    <ProjectReference Include="../../asc/src/Agentstration.Asc.Client/Agentstration.Asc.Client.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
   </ItemGroup>
 </Project>

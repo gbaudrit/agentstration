@@ -8,7 +8,7 @@ using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Infrastructure.Storage;
 
-/// <summary>Local metadata only; ASP/AEP adapters own runtime provider observations in #1040.</summary>
+/// <summary>Local metadata only; ASC/AEP adapters own runtime provider observations in #1040.</summary>
 public sealed class StorageTypeAvailabilityProvider(IResourceStore store, IRequestContextScopeFactory requestScopes) : IStorageTypeAvailabilityProvider
 {
     public async Task<bool> IsAvailableAsync(StorageTypeResource type, StorageTypeVersionDescriptor version,
