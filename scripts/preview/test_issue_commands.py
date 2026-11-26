@@ -489,6 +489,15 @@ class PullRequestTests(unittest.TestCase):
         del selected['tracking_kind'], selected['tracking_feedback']
         self.assertEqual('17', commands.tracking(selected, REPOSITORY, github))
 
+    def test_removing_the_card_cannot_bypass_pr_source_binding(self):
+        github = self.github()
+        github.admit()
+        selected = github.selection()
+        del selected['tracking_feedback']
+        selected['revision'] = 'b' * 40
+        with self.assertRaisesRegex(ValueError, 'admitted feedback card'):
+            commands.tracking(selected, REPOSITORY, github)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -229,6 +229,8 @@ def tracking(options, repository, call=api):
     tracked = {'tracking_issue', 'tracking_comment'} & set(options)
     preview.require(not tracked or tracked == {'tracking_issue', 'tracking_comment'}, 'Incomplete command tracking.')
     preview.require(not ({'tracking_kind', 'tracking_feedback'} & set(options)) or tracked, 'Feedback requires command tracking.')
+    preview.require(('tracking_kind' in options) == ('tracking_feedback' in options),
+                    'New command contexts require their admitted feedback card; legacy issue contexts omit both fields.')
     manual.validate_options(options)
     issue, comment_id = options.get('tracking_issue', ''), options.get('tracking_comment', '')
     if issue == '' and comment_id == '':
