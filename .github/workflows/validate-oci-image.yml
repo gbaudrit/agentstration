@@ -96,6 +96,9 @@ jobs:
           delivery = json.load(open('artifacts/extension/delivery.json'))
           subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', 'artifacts/extension/delivery.json', '--image', 'localhost:5000/extension@' + delivery['digest']], check=True)
           PY
+      - name: Verify Git materialization in the exact delivered image
+        if: steps.select.outputs.extension == 'git'
+        run: python3 scripts/packaging/git_smoke.py
       - name: Build the SQLite authority fixture from the same source and pinned bases
         if: steps.select.outputs.kind != 'server'
         run: |
