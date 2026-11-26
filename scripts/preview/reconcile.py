@@ -116,7 +116,8 @@ def eligible_change(record, approval, selected):
             return changed_intent  # TTL/manual removal stays removed until a new head or explicit re-opt-in.
         deleted = (record.get('deletion') or {}).get('completedAt')
         return bool(deleted and datetime.fromisoformat(approval['optInAt']) > datetime.fromisoformat(deleted))
-    return changed_intent or not record['initialized'] or list(record['request'].get('extensions', {})) != selected
+    return (changed_intent or not record['initialized'] or record.get('access') and not record['access']['verified']
+            or list(record['request'].get('extensions', {})) != selected)
 
 
 def inventory(variables):
@@ -225,7 +226,16 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
             if previous and (removal_reason(previous, github, now) or previous.get('deletion', {}).get('completedAt', True) is None):
                 continue
             if not eligible_change(previous, approval, selected):
-                continue
+                if not apply or previous['destroyed']:
+                    continue
+                try:
+                    observed = execute('status', previous['request'])
+                except (ValueError, RuntimeError, KeyError, TypeError, OSError):
+                    observed = {'state': 'unhealthy'}
+                if observed['state'] == 'running' and (not previous.get('access') or observed.get('url')):
+                    report(environment, feedback.completed(observed, 'status', github.repository, run_url, previous['request']))
+                    continue
+                # Restore an owned opted-in preview through ordinary deploy, never through implicit reset.
             stage = 'selection'
             options = {**commands.parse('/preview deploy'), 'environment_id': environment,
                        'revision': approval['sourceSha'], 'extensions': selected}

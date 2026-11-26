@@ -63,11 +63,15 @@ class DeletionTests(unittest.TestCase):
         self.assertNotIn(preview_feedback.expiry(status['expiresAt']), text)
 
     def test_fresh_deployment_clears_the_prior_deleted_state_and_uses_new_owner(self):
+        self.request['environmentId'] = 'pr-1'
+        self.cloud = Cloud()
+        self.execute('deploy', automation_context={'pullRequest': 1, 'optInEvent': 77, 'optInAt': NOW.isoformat(), 'sourceSha': 'a' * 40})
         self.execute('destroy')
         owner = self.cloud.record['ownerId']
         self.execute('deploy')
         self.assertNotEqual(owner, self.cloud.record['ownerId'])
         self.assertNotIn('deletion', self.cloud.record)
+        self.assertNotIn('automation', self.cloud.record)
         self.assertEqual('running', self.execute('status')['state'])
 
     def test_reconciliation_guard_prevents_deleting_a_new_or_extended_lifecycle(self):

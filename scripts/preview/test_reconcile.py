@@ -101,7 +101,26 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(1, len(self.api.comments))
         self.registry.calls = []
         self.assertEqual([], self.execute()['actions'])
-        self.assertEqual([], self.registry.calls)
+        self.assertEqual(['status'], [call[0] for call in self.registry.calls])
+
+    def test_unchanged_opted_in_preview_retries_failed_health_without_reset(self):
+        cloud = self.registry.create(self.github, automatic=True)
+        original = self.registry.execute
+        def unhealthy(action, request, **kwargs):
+            if action == 'status':
+                return {'state': 'unhealthy'}
+            return original(action, request, **kwargs)
+        self.registry.execute = unhealthy
+        value = self.execute()
+        self.assertEqual([], value['failures'])
+        self.assertEqual('deploy', value['actions'][0]['operation'])
+        self.assertNotIn('reset', cloud.effects)
+
+    def test_failed_route_publication_is_retried_even_after_guest_initialization(self):
+        cloud = self.registry.create(self.github, automatic=True)
+        approval = self.github.approval(self.github.pull(1))
+        cloud.record['access'] = {'verified': False}
+        self.assertTrue(reconcile.eligible_change(cloud.record, approval, []))
 
     def test_published_new_head_updates_preserving_owner_database_target_and_expiry(self):
         cloud = self.registry.create(self.github, age=1, automatic=True)

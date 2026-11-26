@@ -619,6 +619,7 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                                         'Finish owned route teardown before resetting its owner.')
                         record.pop('access', None)
                         record.pop('deletion', None)
+                        record.pop('automation', None)
                     if automation_context is not None:
                         record['automation'] = automation_context
                     record['request'] = request

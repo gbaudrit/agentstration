@@ -31,6 +31,12 @@ An unavailable image or full capacity produces a **waiting** card/result. No
 fallback image, hidden rebuild, automatic reset or expiry renewal occurs. A new
 head or changed extension labels are applied after the exact images are available.
 Unchanged intent is not redeployed on every poll or independent image release.
+Active automatic previews receive a live status/protection check. Failed health,
+missing access or a publication that failed after guest startup is retried through
+ordinary data-preserving deploy. No recovery path silently resets application data.
+The opt-in declares running desired state; preserve-only maintenance belongs to
+manual previews without automatic opt-in. After opt-out cleanup, an explicit new
+manual deployment clears the old automatic association.
 
 ## Cleanup and deletion status
 
