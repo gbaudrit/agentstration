@@ -8,6 +8,7 @@ import re
 import tempfile
 
 import contract
+import extensions
 import manual
 import preview
 
@@ -142,6 +143,7 @@ def admit(event, repository, call=api, selector=None):
         preview.require(options['operation'] != 'deploy' or current.get('state') == 'open', 'Reopen the issue before deploying its preview.')
         source = ''
         if options['operation'] == 'deploy':
+            options['extensions'] = extensions.from_labels(current.get('labels', []))
             source = options['revision'] or linked_ref(repository, issue, call)
             selector = selector or manual.PublishedImages(repository)
             # Resolve once. Moving refs cannot change the source after admission.
@@ -165,7 +167,8 @@ def tracking(options, repository, call=api):
     repository = repository_name(repository)
     expected = {'operation', 'environment_id', 'revision', 'provider', 'database', 'vm_size_profile',
                 'ttl_hours', 'data_mode', 'test_profile', 'worker_revision'}
-    preview.require(isinstance(options, dict) and set(options) in (expected, expected | {'tracking_issue', 'tracking_comment'}),
+    preview.require(isinstance(options, dict) and set(options) in (expected, expected | {'extensions'}, expected | {'tracking_issue', 'tracking_comment'},
+                                                                  expected | {'extensions', 'tracking_issue', 'tracking_comment'}),
                     'Unexpected form or issue tracking fields.')
     manual.validate_options(options)
     issue, comment_id = options.get('tracking_issue', ''), options.get('tracking_comment', '')
@@ -184,6 +187,9 @@ def tracking(options, repository, call=api):
     current = call(f'repos/{repository}/issues/{issue}')
     preview.require('pull_request' not in current and current.get('number') == int(issue)
                     and (options['operation'] != 'deploy' or current.get('state') == 'open'), 'The issue is no longer eligible for deployment.')
+    if options["operation"] == "deploy":
+        preview.require(options.get("extensions", []) == extensions.from_labels(current.get("labels", [])),
+                        "Extension labels changed after admission; post a new /preview deploy command.")
     return issue
 
 
@@ -237,6 +243,9 @@ def main():
                 preview.require(request['dataMode'] == options['data_mode']
                                 and (operation != 'deploy' or request['sourceSha'] == options['revision']
                                      and request['database'] == options['database']), 'Frozen request differs from the issue command.')
+                if operation == 'deploy':
+                    preview.require(list(request.get('extensions', {})) == options.get('extensions', []),
+                                    'Frozen extension deliveries differ from the issue labels.')
                 message = plan_message(request, operation, run_url)
             elif os.environ['EXECUTION_RESULT'] == 'success':
                 result = contract.parse(os.environ['RESULT_JSON'])

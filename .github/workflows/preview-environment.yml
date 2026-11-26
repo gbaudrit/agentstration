@@ -10,7 +10,7 @@ on:
         default: validate
         required: true
       request:
-        description: Version 1 deployment request JSON (public metadata only, no credentials)
+        description: Versioned deployment request JSON (public metadata only, no credentials)
         type: string
         required: true
   workflow_call:
@@ -70,7 +70,7 @@ jobs:
           contract.operation(operation, request)
           preview.require(request['registry'] == 'ghcr.io', 'Actions deployments require private GHCR deliveries.')
           preview.require(all(item['repository'].lower() == os.environ['SOURCE_REPOSITORY'].lower()
-                              for item in request['deliveries'].values()), 'Actions deliveries must belong to this repository.')
+                              for item in [*request['deliveries'].values(), *request.get('extensions', {}).values()]), 'Actions deliveries must belong to this repository.')
           labels = json.loads(os.environ['RUNNER_LABELS']) if request['provider'] == 'docker' else ['ubuntu-24.04']
           preview.require(isinstance(labels, list) and 1 <= len(labels) <= 8
                           and all(isinstance(label, str) and 1 <= len(label) <= 64 for label in labels), 'Invalid trusted runner labels.')
@@ -84,7 +84,7 @@ jobs:
                               'Configure persistent self-hosted Linux runner labels pinned to the requested Docker host.')
           path = Path(os.environ['RUNNER_TEMP']) / 'preview-request.json'
           preview.private_write(path, json.dumps(request) + '\n')
-          result = lifecycle.execute('validate', request, None)
+          result = lifecycle.result(request, 'validated')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write('provider=' + request['provider'] + '\n')
               output.write('environment-id=' + request['environmentId'] + '\n')
@@ -137,6 +137,7 @@ jobs:
         id: lifecycle
         env:
           OPERATION: ${{ inputs.operation }}
+          PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}
           STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
           BOOTSTRAP_CONFIG: ${{ vars.PREVIEW_BOOTSTRAP_CONFIG }}
         run: |
@@ -233,6 +234,7 @@ jobs:
         id: lifecycle
         env:
           OPERATION: ${{ inputs.operation }}
+          PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
