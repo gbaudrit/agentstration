@@ -50,6 +50,17 @@ def run(server_path, worker_path, extension_path, output):
                     preview.require(error.code == 401, 'Unexpected anonymous/invalid-key response.')
                 else:
                     raise ValueError('Unauthenticated extension discovery was accepted.')
+            manifest = extensions.request('http://' + port + '/.well-known/aep',
+                                          headers={'Authorization': 'Bearer ' + original_key.decode()})
+            announcement = {'instanceId': instance,
+                'extension': {field: manifest['extension'].get(field) for field in ('id', 'name', 'version', 'description')},
+                'endpoint': 'http://' + name + ':8080', 'pairingUri': None, 'method': 'sharedKeyFile'}
+            try:
+                extensions.confirm_enrollment(preview.server_address(directory), announcement, 'public-disposable-invalid-key', timeout=0)
+            except urllib.error.HTTPError as error:
+                preview.require(error.code == 401, 'Unexpected invalid enrollment proof response.')
+            else:
+                raise ValueError('The authority accepted an invalid enrollment proof.')
             with urllib.request.urlopen(preview.server_address(directory) + '/bootstrap', timeout=10) as response:
                 preview.require(response.status == 200, 'Manual bootstrap must remain available.')
             preview.require(preview.read_json(directory / 'server-configuration.json')['Agentstration']['Bootstrap']['InitialBootstrapEnabled'] is False,
@@ -80,8 +91,8 @@ def run(server_path, worker_path, extension_path, output):
             lifecycle.execute('destroy', {**local, 'dataMode': 'reset'}, root / 'state')
             preview.require(not any(lifecycle.inventory(project).values()), 'Reset retained owned containers, volumes or networks.')
             preview.private_write(output, json.dumps({'passed': True, 'extension': identifier,
-                'image': contract.images(selected)[name], 'exactDigestGuestTransport': True,
-                'enrolledBeforeManualBootstrap': True, 'anonymousAndWrongKeyRejected': True,
+                'image': contract.images(local)[name], 'exactDigestGuestTransport': True,
+                'enrolledBeforeManualBootstrap': True, 'anonymousAndWrongKeyRejected': True, 'invalidEnrollmentProofRejected': True,
                 'recreationAndReactivationPreserveIdentity': True, 'deselectionRetainsState': True,
                 'expiryPreserved': True, 'fullResetRemovedResources': True}, indent=2) + '\n')
         except Exception:
@@ -92,7 +103,11 @@ def run(server_path, worker_path, extension_path, output):
                 preview.private_write(output, json.dumps({'passed': False, 'diagnostics': diagnostic}, indent=2) + '\n')
             raise
         finally:
-            lifecycle.execute('destroy', {**azure_host.local_request(active), 'dataMode': 'reset'}, root / 'state')
+            # A failed transfer may precede the intended selection's metadata write.
+            # Clean the actual recorded selection, retaining the normal ownership checks.
+            metadata = root / 'state' / environment / 'lifecycle.json'
+            cleanup = preview.read_json(metadata)['request'] if metadata.exists() else azure_host.local_request(active)
+            lifecycle.execute('destroy', {**cleanup, 'dataMode': 'reset'}, root / 'state')
 
 
 if __name__ == '__main__':

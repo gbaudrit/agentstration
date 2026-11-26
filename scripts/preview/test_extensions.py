@@ -11,6 +11,7 @@ from unittest.mock import patch
 import contract
 import extensions
 import issue_commands
+import lifecycle
 import manual
 import preview
 from images import catalogue
@@ -207,6 +208,20 @@ class ExtensionLifecycleTests(unittest.TestCase):
         self.execute('deploy', value)
         self.assertEqual(key, (directory / 'extension-foundry.key').read_bytes())
         self.assertEqual('running', self.execute('status', value)['state'])
+
+
+    def test_deselection_retry_after_interruption_uses_retained_managed_identity(self):
+        self.execute('deploy', selected())
+        original = self.host.docker
+        def interrupted(*arguments):
+            if arguments[0] == 'stop' and arguments[-1] == 'example-extension-foundry':
+                raise RuntimeError('public-disposable-interruption')
+            return original(*arguments)
+        with patch.object(lifecycle, 'docker', side_effect=interrupted):
+            with self.assertRaises(RuntimeError):
+                self.execute('deploy', request())
+        self.assertEqual('running', self.execute('deploy', request())['state'])
+        self.assertIn(('rm', 'example-extension-foundry'), self.host.mutations)
 
 
 class ExtensionTransferTests(unittest.TestCase):
