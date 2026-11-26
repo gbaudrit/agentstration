@@ -93,8 +93,10 @@ def push_empty(package, tag, linked, context, env):
     docker([*command, str(context)], env)
     image = json.loads(docker(["image", "inspect", reference], env))[0]
     config = image.get("Config") or {}
-    if image["RootFS"].get("Layers") or any(config.get(k) for k in ("Env", "Cmd", "Entrypoint")):
-        raise InitializationError("Refusing upload: the image must have no filesystem layer, environment or executable.")
+    default_path = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    if (image["RootFS"].get("Layers") or any(config.get(k) for k in ("Cmd", "Entrypoint"))
+            or any(value != default_path for value in (config.get("Env") or []))):
+        raise InitializationError("Refusing upload: only a layer-free, executable-free image with Docker's default PATH is allowed.")
     docker(["push", reference], env)
     return {"tag": tag, "repositoryLinkedLabel": linked, "reference": reference, "imageId": image["Id"]}
 
@@ -124,7 +126,7 @@ def main():
             try:
                 for package in PACKAGES:
                     status, record = statuses[package]
-                    item = {"name": package, "created": status == 404, "emptyImages": []}
+                    item = {"name": package, "wasMissing": status == 404, "initialized": False, "emptyImages": []}
                     report["packages"].append(item)
                     if status == 404:
                         item["emptyImages"].append(push_empty(package, prefix, False, context, env))
@@ -137,7 +139,7 @@ def main():
                     if association != REPOSITORY:
                         item["emptyImages"].append(push_empty(package, prefix + "-linked", True, context, env))
                     record = wait_private(token, package, linked=True)
-                    item.update(visibility=record["visibility"], repository=record["repository"]["full_name"],
+                    item.update(initialized=True, visibility=record["visibility"], repository=record["repository"]["full_name"],
                                 settingsUrl=f"https://github.com/users/{OWNER}/packages/container/{package}/settings")
                     print(json.dumps(item))
             finally:
