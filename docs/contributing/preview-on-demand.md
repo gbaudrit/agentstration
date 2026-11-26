@@ -173,6 +173,13 @@ application URL and recorded expiry; the card explicitly says **automatic expiry
 cleanup is not implemented** and offers `/preview destroy`. An active VM without
 confirmed protected access does not get an access link.
 
+Result reporting downloads the existing public lifecycle-result artifact from
+the same workflow run and attempt, then checks its environment, frozen images,
+revision and protected URL before updating the card. It does not depend on the
+full JSON job output: Azure login masks subscription IDs, and GitHub can suppress
+an output containing those IDs even after a successful deployment. Private
+extension settings and credentials never enter this artifact or reporting job.
+
 Failures explain the stage and next action. For example, a missing server image
 asks for **OCI images**, `extension=server`, `publish_preview=true` on the requested
 revision; publishing only an extension is insufficient. Inaccessible private

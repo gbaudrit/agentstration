@@ -118,7 +118,14 @@ class WorkflowSecretTests(unittest.TestCase):
         report = source.split('\n  report:\n', 1)[1]
         self.assertIn('always()', report)
         self.assertIn('EXECUTION_RESULT: ${{ needs.execute.result }}', report)
-        self.assertIn('RESULT_JSON: ${{ needs.execute.outputs.result }}', report)
+        self.assertNotIn('RESULT_JSON: ${{ needs.execute.outputs.result }}', report)
+        self.assertIn('RESULT_FILE: ${{ runner.temp }}/preview-feedback/preview-result.json', report)
+        download = report.split('uses: actions/download-artifact@v8', 1)
+        self.assertIn("if: needs.execute.result == 'success'", download[0])
+        self.assertIn('name: preview-result-${{ fromJSON(needs.boundary.outputs.selection || inputs.selection).environment_id }}-${{ github.run_id }}-${{ github.run_attempt }}', download[1])
+        self.assertNotIn('run-id:', download[1])
+        self.assertNotIn('environment:', report)
+        self.assertNotIn('id-token:', report)
 
 
 if __name__ == '__main__':

@@ -431,9 +431,61 @@ class PullRequestTests(unittest.TestCase):
             self.assertIn(text, card)
         # A later status/failure summary is allowed even if the PR closes or labels change during execution.
         github.issue.update(state='closed', labels=[])
-        self.assertEqual(0, self.run_mode('report', {**variables, 'EXECUTION_RESULT': 'failure', 'RESULT_JSON': 'PRIVATE RESPONSE'}, github)[0])
+        self.assertEqual(0, self.run_mode('report', {**variables, 'EXECUTION_RESULT': 'failure',
+            'RESULT_JSON': 'PRIVATE RESPONSE', 'RESULT_FILE': '/missing/preview-result.json'}, github)[0])
         self.assertNotIn('PRIVATE RESPONSE', github.card['body'])
         self.assertNotIn('Open Agentstration', github.card['body'])
+
+    def test_result_artifact_reports_success_when_azure_masks_the_json_job_output(self):
+        import azure
+        github = self.github()
+        self.assertTrue(github.admit())
+        request = {**azure_request(), 'environmentId': 'pr-17'}
+        result = azure.azure_result(request, 'running', [], {'expiresAt': '2026-11-26T18:30:00+00:00'})
+        result['url'] = 'https://dev-pr-17.agentstration.cloud'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'preview-result.json'
+            path.write_text(json.dumps(result))
+            status, output = self.run_mode('report', {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy',
+                'SELECTION_JSON': json.dumps(github.selection()), 'REQUEST_JSON': json.dumps(request),
+                'EXECUTION_RESULT': 'success', 'RESULT_JSON': '', 'RESULT_FILE': str(path)}, github)
+        self.assertEqual(0, status, output)
+        for text in ('Preview ready', result['url'], '2026-11-26 18:30 UTC', SHA[:12]):
+            self.assertIn(text, github.card['body'])
+        self.assertNotIn(request['target']['subscriptionId'], github.card['body'])
+
+    def test_result_artifact_is_required_bounded_and_checked_against_the_frozen_request(self):
+        import azure
+        for fault in ('missing', 'empty', 'malformed', 'duplicate', 'oversized', 'environment', 'sha', 'images', 'url', 'state'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as directory:
+                github = self.github()
+                self.assertTrue(github.admit())
+                selected = github.selection()
+                github.calls = []
+                request = {**azure_request(), 'environmentId': 'pr-17'}
+                result = azure.azure_result(request, 'running', [])
+                result['url'] = 'https://dev-pr-17.agentstration.cloud'
+                if fault == 'environment':
+                    result['environmentId'] = 'pr-18'
+                elif fault == 'sha':
+                    result['sourceSha'] = 'b' * 40
+                elif fault == 'images':
+                    result['images']['server']['reference'] = 'ghcr.io/foreign/server@sha256:' + 'b' * 64
+                elif fault == 'url':
+                    result['url'] = 'https://foreign.example'
+                elif fault == 'state':
+                    result['state'] = 'unhealthy'
+                text = {'empty': '', 'malformed': 'PRIVATE PROVIDER RESPONSE',
+                        'duplicate': '{"state":"running","state":"unhealthy"}', 'oversized': ' ' * 65537}.get(fault, json.dumps(result))
+                path = Path(directory) / 'preview-result.json'
+                if fault != 'missing':
+                    path.write_text(text)
+                status, output = self.run_mode('report', {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy',
+                    'SELECTION_JSON': json.dumps(selected), 'REQUEST_JSON': json.dumps(request),
+                    'EXECUTION_RESULT': 'success', 'RESULT_JSON': json.dumps(result), 'RESULT_FILE': str(path)}, github)
+                self.assertEqual(1, status)
+                self.assertEqual([], github.mutations())
+                self.assertNotIn('PRIVATE PROVIDER RESPONSE', output)
 
     def test_card_ownership_context_and_entire_frozen_selection_are_verified(self):
         for change in ('user', 'other-bot', 'other-issue', 'marker', 'source', 'feedback-id', 'extension'):
