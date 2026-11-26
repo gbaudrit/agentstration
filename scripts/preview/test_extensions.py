@@ -117,6 +117,18 @@ class ExtensionContractTests(unittest.TestCase):
         value['extensions']['foundry']['component']['extensionId'] = 'different.valid.identity'
         with self.assertRaises(ValueError): contract.operation('deploy', value)
 
+    def test_authority_configuration_cannot_alias_two_extension_identities_by_case(self):
+        first = contract.delivery(receipt())
+        second = copy.deepcopy(first)
+        second['component'].update(id='another', imageName='extension-another',
+                                   extensionId=first['component']['extensionId'].lower())
+        with self.assertRaisesRegex(ValueError, 'Duplicate AEP'):
+            request(extension_deliveries={'another': second, 'foundry': first})
+        entries = {'foundry': first['component'], 'another': second['component']}
+        with patch.object(extensions, 'entry', side_effect=lambda identifier: entries[identifier]):
+            with self.assertRaisesRegex(ValueError, 'Duplicate AEP'):
+                extensions.trusted({'another': second, 'foundry': first})
+
     def test_private_state_keys_are_isolated_retained_and_never_silently_replaced(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary) / 'example'

@@ -59,8 +59,8 @@ def trusted(receipts):
         expected = entry(identifier)
         preview.require(all(component.get(key) == expected.get(key) for key in METADATA),
                         'Extension delivery differs from the trusted deployment catalogue.')
-        preview.require(component['extensionId'] not in identities, 'Duplicate AEP extension identity.')
-        identities.add(component['extensionId'])
+        preview.require(component['extensionId'].casefold() not in identities, 'Duplicate AEP extension identity.')
+        identities.add(component['extensionId'].casefold())
 
 
 def service(identifier):
@@ -182,7 +182,7 @@ def verify(directory, state):
             announcement = {'instanceId': instance, 'extension': {field: identity.get(field) for field in ('id', 'name', 'version', 'description')},
                             'endpoint': 'http://' + name + ':8080', 'pairingUri': None, 'method': 'sharedKeyFile'}
             confirm_enrollment(preview.server_address(directory), announcement, key)
-        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError):
             # No response body, key, URL, or subprocess output in CI/ARM logs.
             raise ValueError('Authenticated AEP enrollment verification failed for ' + identifier + '.') from None
         verified.append(identifier)

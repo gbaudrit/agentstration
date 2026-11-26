@@ -92,7 +92,7 @@ def _validate(request):
     identities = []
     for identifier, receipt in optional.items():
         preview.require(receipt["component"]["id"] == identifier, "Extension key differs from delivery ID.")
-        identities.append(receipt["component"]["extensionId"])
+        identities.append(receipt["component"]["extensionId"].casefold())
     preview.require(len(identities) == len(set(identities)), "Duplicate AEP identities.")
     try:
         for receipt in [*request["deliveries"].values(), *optional.values()]:
