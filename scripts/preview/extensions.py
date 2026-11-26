@@ -19,6 +19,50 @@ ID = re.compile(r'[a-z][a-z0-9-]{0,31}')
 METADATA = ('id', 'imageName', 'platform', 'extensionId', 'aepVersion', 'contributionKind', 'contributionId')
 
 
+def configuration(value, selected):
+    """Private .NET settings, separate from public receipts and managed AEP trust."""
+    try:
+        if isinstance(value, str):
+            preview.require(len(value.encode()) <= 16384, "Private extension configuration is limited to 16 KiB.")
+            import contract
+            value = contract.parse(value)
+        preview.require(isinstance(value, dict), 'Extension configuration must be a JSON object keyed by catalogue ID.')
+        text = json.dumps(value, sort_keys=True, allow_nan=False)
+        preview.require(len(text.encode()) <= 16384, 'Private extension configuration is limited to 16 KiB.')
+        for identifier, settings in value.items():
+            preview.require(isinstance(identifier, str) and ID.fullmatch(identifier) and isinstance(settings, dict),
+                            'Extension configuration requires catalogue IDs and JSON settings objects.')
+            preview.require(all(isinstance(key, str) and key.split(':')[0].casefold() != 'aep' for key in settings),
+                            'AEP enrollment configuration is managed by the deployment tool.')
+        return {identifier: value[identifier] for identifier in sorted(selected) if value.get(identifier)}
+    except (json.JSONDecodeError, TypeError, OverflowError) as error:
+        raise ValueError('Invalid private extension JSON configuration.') from None
+
+
+def configuration_path(directory, identifier, version):
+    validate_ids([identifier])
+    return Path(directory).resolve() / ('extension-' + identifier + '-' + str(uuid.UUID(version)) + '.json')
+
+
+def prepare_configuration(directory, state, settings):
+    versions = state.setdefault('extensionConfigurations', {}) if settings or 'extensionConfigurations' in state else {}
+    obsolete = []
+    for identifier in list(versions):
+        previous = configuration_path(directory, identifier, versions[identifier])
+        preview.require(previous.is_file() and not previous.is_symlink(), 'Restore the recorded private extension configuration.')
+        previous.chmod(0o600)
+        text = json.dumps(settings[identifier], sort_keys=True, allow_nan=False) if identifier in settings else None
+        if text != previous.read_text():
+            obsolete.append(previous)
+            del versions[identifier]
+    for identifier, value in settings.items():
+        if identifier not in versions:
+            version = str(uuid.uuid4())
+            preview.private_write(configuration_path(directory, identifier, version), json.dumps(value, sort_keys=True, allow_nan=False))
+            versions[identifier] = version
+    return obsolete
+
+
 def validate_ids(values):
     preview.require(isinstance(values, list) and len(values) <= 16
                     and all(isinstance(value, str) and ID.fullmatch(value) for value in values)
@@ -122,8 +166,15 @@ def overlay(directory, state):
             'healthcheck': {'test': ['CMD', 'bash', '-ec',
                 "exec 3<>/dev/tcp/127.0.0.1/8080; printf 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; IFS= read -r status <&3; [[ \"$$status\" == *' 200 '* ]]"],
                 'interval': '2s', 'timeout': '5s', 'retries': 60, 'start_period': '20s'}}
+        version = state.get('extensionConfigurations', {}).get(identifier)
+        if version:
+            # Changing the secret reference recreates the container without exposing a settings hash.
+            config = 'aep-config-' + identifier + '-' + version
+            keys[config] = {'file': str(configuration_path(directory, identifier, version))}
+            services[name]['secrets'].append({'source': config, 'target': '/app/appsettings.Preview.json'})
     if keys:
-        services['server'] = {'secrets': [{'source': key, 'target': '/run/secrets/' + key} for key in keys]}
+        services['server'] = {'secrets': [{'source': 'aep-' + name, 'target': '/run/secrets/aep-' + name}
+                                        for name in state.get('extensionKeys', {}) if service(name) in state['images']]}
     return {'services': services, 'volumes': volumes, 'secrets': keys}
 
 

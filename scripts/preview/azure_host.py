@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Root-only Azure guest transport; reuse the existing owned Docker lifecycle."""
 import argparse
+import base64
 import copy
 import json
 import os
@@ -9,6 +10,7 @@ import subprocess
 import time
 
 import contract
+import extensions
 import lifecycle
 import preview
 import access_host
@@ -26,9 +28,10 @@ def local_request(request):
     return contract.validate(value)
 
 
-def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=None, access_owner=None):
+def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=None, access_owner=None, extension_configuration=None):
     contract.operation(action, request)
     preview.require(request['provider'] == 'azure-vm', 'The guest accepts Azure requests only.')
+    settings = extensions.configuration(extension_configuration or {}, request.get('extensions', {})) if action == 'deploy' else {}
     saved = root / 'azure-request.json'
     if saved.exists():
         previous = contract.loads(saved.read_text())
@@ -75,7 +78,7 @@ def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=Non
                                 '--dest-tls-verify=false', 'oci-archive:' + str(root / 'incoming' / (name + '.oci.tar')),
                                 'docker://' + reference.split('@')[0] + ':delivery'], check=True, capture_output=True, timeout=600)
             preview.private_write(saved, json.dumps(request) + '\n')
-            result = lifecycle.execute(action, selected, root / 'state')
+            result = lifecycle.execute(action, selected, root / 'state', extension_configuration=settings)
             if access_config:
                 preview.private_write(route_file, json.dumps(route) + '\n')
                 access_host.start(root, access_config)
@@ -115,8 +118,10 @@ def main():
     # any Docker/Compose subprocess; management and probe credentials never arrive.
     protected = os.environ.pop('ACCESS_CONNECTOR', None)
     connector = json.loads(protected) if protected else None
+    encoded_settings = os.environ.pop('EXTENSION_CONFIGURATION', None)
+    settings = base64.b64decode(encoded_settings, validate=True).decode() if encoded_settings else '{}'
     result = run(args.operation, contract.loads(args.request.read_text()), args.registry_image,
-                 access_config=connector, access_owner=args.access_owner)
+                 access_config=connector, access_owner=args.access_owner, extension_configuration=settings)
     print('AGENTSTRATION_RESULT=' + json.dumps(result, separators=(',', ':')))
 
 

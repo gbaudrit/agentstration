@@ -14,6 +14,7 @@ import time
 import uuid
 
 import contract
+import extensions
 import lifecycle
 import preview
 import access
@@ -279,7 +280,7 @@ class Azure:
             # Azure Monitor can lag a newly provisioned VM; never fabricate a capacity result.
             return {'azureMetricsState': 'unavailable'}
 
-    def transfer(self, expect_existing=False, connector=None):
+    def transfer(self, expect_existing=False, connector=None, extension_configuration=None):
         bundle, checksum = bundle_images(self.request, self.directory)
         name = 'transfer/' + prefix(self.request) + '/' + uuid.uuid4().hex + '.tar.gz'
         try:
@@ -287,16 +288,20 @@ class Azure:
             expires = (datetime.now(timezone.utc) + timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%MZ')
             url = self.storage('blob', 'generate-sas', '--name', name, '--permissions', 'r', '--expiry', expires,
                                '--https-only', '--as-user', '--full-uri')
-            return self.run_guest('deploy', url=url, checksum=checksum, expect_existing=expect_existing, connector=connector)
+            return self.run_guest('deploy', url=url, checksum=checksum, expect_existing=expect_existing, connector=connector,
+                                  **({'extension_configuration': extension_configuration} if extension_configuration else {}))
         finally:
             # Staged application bytes are private, temporary, and never become Actions artifacts.
             self.storage('blob', 'delete', '--name', name, '--delete-snapshots', 'include')
 
-    def run_guest(self, action, *, url=None, checksum=None, expect_existing=False, connector=None):
+    def run_guest(self, action, *, url=None, checksum=None, expect_existing=False, connector=None, extension_configuration=None):
         record = self.read()
         protected = [{'name': 'BUNDLE_URL', 'value': url}] if url else []
         if connector:
             protected.append({'name': 'ACCESS_CONNECTOR', 'value': json.dumps(connector)})
+        if extension_configuration:
+            protected.append({'name': 'EXTENSION_CONFIGURATION',
+                              'value': base64.b64encode(json.dumps(extension_configuration).encode()).decode()})
         properties = {'source': {'script': guest_script(action, self.request, checksum, expect_existing)}, 'timeoutInSeconds': 1800, 'asyncExecution': False,
                       'parameters': [], 'protectedParameters': protected}
         if 'access' in record:
@@ -434,8 +439,11 @@ unset BUNDLE_URL
     return script
 
 
-def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes):
+def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes, extension_configuration=None):
+    raw_configuration = os.environ.pop("PREVIEW_EXTENSION_CONFIGURATION", "") or "{}"
     contract.operation(action, request)
+    settings = extensions.configuration(extension_configuration if extension_configuration is not None else raw_configuration,
+                                        request.get("extensions", {})) if action == "deploy" else {}
     preview.require(request['provider'] == 'azure-vm' and request['registry'] == 'ghcr.io', 'Azure consumes private GHCR deliveries only.')
     if action == 'validate':
         return lifecycle.result(request, 'validated')
@@ -470,7 +478,8 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                 try:
                     connector = routes.prepare() if routes else None
                     client.provision(record)
-                    guest = client.transfer(expect_existing=record['initialized'], **({'connector': connector} if connector else {}))
+                    guest = client.transfer(expect_existing=record['initialized'], **({'connector': connector} if connector else {}),
+                                            **({'extension_configuration': settings} if settings else {}))
                     preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
                     if request.get('extensions'):
                         preview.require(guest.get('extensionsVerified') == list(request['extensions']),

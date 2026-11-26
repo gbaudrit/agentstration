@@ -137,6 +137,7 @@ jobs:
         id: lifecycle
         env:
           OPERATION: ${{ inputs.operation }}
+          PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}
           STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
           BOOTSTRAP_CONFIG: ${{ vars.PREVIEW_BOOTSTRAP_CONFIG }}
         run: |
@@ -233,6 +234,7 @@ jobs:
         id: lifecycle
         env:
           OPERATION: ${{ inputs.operation }}
+          PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}

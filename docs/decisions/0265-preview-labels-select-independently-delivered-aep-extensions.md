@@ -47,6 +47,17 @@ or inspect the application's database. Keep Azure Run Command output bounded by
 returning only the verified extension IDs alongside core observations; canonical
 requests/results still retain the complete digest selection.
 
+Provide optional private startup settings through the existing host-side
+configuration pattern: a selected-ID JSON map in a protected environment secret
+or a private Docker CLI file. Bound it to 16 KiB and reserve managed AEP settings.
+Azure sends selected settings through protected Run Command parameters, never in
+OCI archives or public requests/results. Remove the input environment variable
+before invoking Docker. Mount each extension's own JSON file read-only and keep
+it separate from authority/Worker credentials. A private random reference forces
+container recreation when settings change, without publishing hashes of secrets
+or resetting enrollment identity. This supports static options such as the
+current Ollama process's `Ollama:Endpoint`; image packaging remains independent.
+
 Redeploy under the existing ownership lock. Deselect only previously recorded,
 inspected owned extension containers; preserve their keys and volumes for later
 reactivation. Remove managed trust for deselected extensions. Do not delete
@@ -60,7 +71,8 @@ recipe and label synchronization script without editing deployment workflows.
 Selecting an extension exposes its contributions; it does not create a configured
 model, supply downstream credentials, provision an inference server, or download
 models. A PostgreSQL AEP extension is independent of the control-plane database
-profile. Such services remain explicit operator choices.
+profile. Such services remain explicit operator choices; their startup settings use the
+private configuration input where the image requires them.
 
 The host owns one secret/state volume per extension. They survive deselection and
 remain subject to explicit reset and the existing TTL limitations. No selection

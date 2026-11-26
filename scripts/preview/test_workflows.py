@@ -27,6 +27,12 @@ class WorkflowSecretTests(unittest.TestCase):
     def workflows(self):
         return {path.name: path.read_text() for path in (preview.ROOT / '.github/workflows').glob('preview*.yml')}
 
+    def test_private_extension_configuration_is_only_available_in_protected_executors(self):
+        source = self.workflows()['preview-environment.yml']
+        validation = source.split('\n  execute:')[0]
+        self.assertNotIn('secrets.PREVIEW_EXTENSION_CONFIGURATION', validation)
+        self.assertEqual(2, source.count('PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}'))
+
     def test_extension_label_sync_is_main_only_and_has_no_cloud_or_dispatch_permission(self):
         source = self.workflows()['preview-extension-labels.yml']
         self.assertIn("github.ref == 'refs/heads/main'", source)

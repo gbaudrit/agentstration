@@ -93,12 +93,17 @@ def validate_state(state):
         image = state["images"][name]
         require(re.fullmatch(r"(?:ghcr\.io|localhost:[0-9]{1,5})/[a-z0-9_.-]+/[a-z0-9_.-]+@sha256:[0-9a-f]{64}", image["reference"])
                 and SHA.fullmatch(image["sourceSha"]) and valid_version(image["version"]), "Invalid pinned preview image.")
+    for identifier, version in state.get("extensionConfigurations", {}).items():
+        extensions.validate_ids([identifier])
+        uuid.UUID(version)
     require(state["sourceSha"] == state["images"]["server"]["sourceSha"], "Preview revision differs from its server image.")
     return state
 
 
 def prepare(directory, server_delivery, worker_delivery, environment_id, port=5080, registry="ghcr.io", bootstrap=None,
-            database=None, postgres_image=None, extension_deliveries=None):
+            database=None, postgres_image=None, extension_deliveries=None, extension_configuration=None):
+    import extensions
+    settings = extensions.configuration(extension_configuration if extension_configuration is not None else {}, extension_deliveries or {})
     require(ENVIRONMENT_ID.fullmatch(environment_id), "Environment ID must use 1–40 lowercase letters, digits or hyphens, starting with a letter.")
     require(bootstrap is None or isinstance(bootstrap, dict), "Bootstrap configuration must be a JSON object.")
     images = {"server": image_record(server_delivery, "server", registry),
@@ -148,6 +153,7 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
             private_write(directory / "postgres.password", secrets.token_urlsafe(48))
     import extensions
     extensions.prepare(directory, state, configuration, extension_deliveries or {})
+    obsolete_settings = extensions.prepare_configuration(directory, state, settings)
     if state["database"] == "postgresql":
         password = (directory / "postgres.password").read_text()
         require(re.fullmatch(r"[A-Za-z0-9_-]{64}", password), "Restore the original generated PostgreSQL password file.")
@@ -156,6 +162,8 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
             "Host=postgres;Port=5432;Database=agentstration;Username=agentstration;Password=" + password}
     private_write(directory / "server-configuration.json", json.dumps(configuration, indent=2) + "\n")
     private_write(state_path, json.dumps(state, indent=2) + "\n")
+    for path in obsolete_settings:
+        path.unlink()
     return state
 
 
@@ -221,10 +229,17 @@ def verify(directory):
             require(set(bindings) == {"8080/tcp"} and len(bindings["8080/tcp"]) == 1
                     and bindings["8080/tcp"][0]["HostIp"] == "127.0.0.1", "Extension ports must bind only guest loopback.")
             mounts = {mount["Destination"]: mount for mount in container["Mounts"] if mount["Type"] != "tmpfs"}
-            require(set(mounts) == {"/run/secrets/aep-key", "/var/lib/aep"}
+            version = state.get("extensionConfigurations", {}).get(service[len("extension-"):])
+            expected_mounts = {"/run/secrets/aep-key", "/var/lib/aep"} | ({"/app/appsettings.Preview.json"} if version else set())
+            if version:
+                import extensions
+                require(not mounts.get("/app/appsettings.Preview.json", {}).get("RW", True)
+                        and mounts["/app/appsettings.Preview.json"]["Source"] == str(extensions.configuration_path(directory, service[len("extension-"):], version)),
+                        "Extension configuration differs from its recorded private file.")
+            require(set(mounts) == expected_mounts
                     and not mounts["/run/secrets/aep-key"]["RW"] and mounts["/var/lib/aep"]["RW"]
                     and not any(value.lower().startswith("connectionstrings") for value in container["Config"]["Env"]),
-                    "Extensions may receive only their own enrollment key and state volume.")
+                    "Extensions may receive only their own enrollment key, private settings and state volume.")
         if service == "worker":
             require({mount["Destination"] for mount in container["Mounts"]} == {"/run/secrets/awp_key"}
                     and all(not mount["RW"] for mount in container["Mounts"])

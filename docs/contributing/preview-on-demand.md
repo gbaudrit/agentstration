@@ -203,8 +203,42 @@ including before manual Agentstration initialization. Selecting Foundry makes it
 provider contribution available; configure connections/models through the normal
 product paths afterwards. Selecting the PostgreSQL AEP extension does not change
 `database=sqlite` into PostgreSQL. Selecting Ollama does not provision an inference
-backend or download a model; supply an endpoint explicitly through normal provider
-configuration. Extension-specific services/secrets remain separate configuration.
+backend or download a model. Its current image reads `Ollama:Endpoint` at startup;
+supply that setting through the private configuration below. Other extension
+settings follow their image documentation.
+
+#### Private startup configuration
+
+Optional settings belong in the **`preview-deployment` environment secret**
+`PREVIEW_EXTENSION_CONFIGURATION`, as a JSON object keyed by catalogue ID. For
+example, an already-running Ollama endpoint can be selected without provisioning
+local inference:
+
+```json
+{
+  "ollama": {
+    "Ollama": { "Endpoint": "https://ollama.example.com/" }
+  }
+}
+```
+
+The map is limited to 16 KiB. Only selected entries are sent to the guest. Each
+extension receives its own mode-0600, read-only `/app/appsettings.Preview.json`;
+the authority and Worker do not receive those settings. Use the option names
+supported by the image. Managed `Aep` enrollment settings cannot be overridden.
+The input is removed from the process environment before Docker is invoked.
+Azure carries it through ARM protected parameters, outside OCI bundles, public
+requests, issue feedback and artifacts. Deployment credentials are never copied
+into extension configuration automatically. Foundry needs no new startup secret
+for health/enrollment; downstream connections/models remain product configuration.
+
+Change the secret and post a new deploy command to apply new settings. A private
+configuration reference changes to recreate the affected container, retaining its
+key and persisted instance. Status/destroy use the recorded host configuration
+without reading the current secret. Deselection removes the private settings file
+and retains the enrollment key/data; reactivation receives the selected settings
+again. The existing Docker CLI also accepts a private JSON file through
+`lifecycle.py deploy --extension-configuration /path/to/settings.json`.
 
 Redeploy/recreation preserves the enrollment key and instance. Deselection retains
 that state for reactivation; existing registrations and user definitions remain

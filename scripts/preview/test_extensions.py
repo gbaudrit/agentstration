@@ -294,3 +294,106 @@ class EnrollmentDeadlineTests(unittest.TestCase):
             request.return_value = {'requestId': announcement['instanceId'], 'state': 'pending'}
             with self.assertRaisesRegex(ValueError, 'deadline'):
                 extensions.confirm_enrollment('http://127.0.0.1:5080', announcement, 'public-disposable-key', timeout=0)
+
+
+class PrivateConfigurationTests(unittest.TestCase):
+    def test_settings_are_private_selected_json_and_cannot_override_enrollment(self):
+        values = {'foundry': {'Foundry': {'Endpoint': 'https://provider.example/'}}, 'another': {'Token': 'public-disposable-ignored'}}
+        self.assertEqual({'foundry': values['foundry']}, extensions.configuration(json.dumps(values), ['foundry']))
+        for invalid in ('not-json', [], {'foundry': []}, {'foundry': {'AEP': {}}},
+                        {'foundry': {'aep:SharedKeyFile:Path': '/other'}}, {'foundry': {'Data': 'x' * 16384}}):
+            with self.subTest(invalid=type(invalid).__name__), self.assertRaises(ValueError):
+                extensions.configuration(invalid, ['foundry'])
+
+    def test_private_file_rotation_recreates_only_the_selected_service_and_retains_identity(self):
+        secret = 'public-disposable-backend-setting'
+        values = {'foundry': {'Backend': {'ApiKey': secret}}}
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / 'example'
+            args = (*receipts(), 'example')
+            first = preview.prepare(directory, *args, extension_deliveries={'foundry': receipt()}, extension_configuration=values)
+            identity = first['extensionConfigurations']['foundry']
+            path = extensions.configuration_path(directory, 'foundry', identity)
+            self.assertEqual(values['foundry'], json.loads(path.read_text()))
+            self.assertEqual(0o600, path.stat().st_mode & 0o777)
+            key = (directory / 'extension-foundry.key').read_bytes()
+            overlay = extensions.overlay(directory, first)
+            source = 'aep-config-foundry-' + identity
+            self.assertIn({'source': source, 'target': '/app/appsettings.Preview.json'}, overlay['services']['extension-foundry']['secrets'])
+            self.assertEqual([{'source': 'aep-foundry', 'target': '/run/secrets/aep-foundry'}], overlay['services']['server']['secrets'])
+            self.assertNotIn(secret, json.dumps(overlay))
+            self.assertNotIn(secret, json.dumps(first))
+            same = preview.prepare(directory, *args, extension_deliveries={'foundry': receipt()}, extension_configuration=values)
+            self.assertEqual(identity, same['extensionConfigurations']['foundry'])
+            changed = preview.prepare(directory, *args, extension_deliveries={'foundry': receipt()}, extension_configuration={'foundry': {'Backend': {'ApiKey': secret + '-rotated'}}})
+            self.assertNotEqual(identity, changed['extensionConfigurations']['foundry'])
+            self.assertFalse(path.exists())
+            self.assertEqual(key, (directory / 'extension-foundry.key').read_bytes())
+            cleared = preview.prepare(directory, *args, extension_deliveries={'foundry': receipt()})
+            self.assertEqual({}, cleared['extensionConfigurations'])
+            self.assertNotIn('/app/appsettings.Preview.json', json.dumps(extensions.overlay(directory, cleared)))
+
+    def test_azure_transports_settings_only_as_protected_parameters(self):
+        import azure
+        import test_azure
+        value = test_azure.azure_request(extension_deliveries={'foundry': receipt()})
+        secret = 'public-disposable-provider-credential'
+        settings = {'foundry': {'Backend': {'ApiKey': secret}}}
+        with tempfile.TemporaryDirectory() as temporary:
+            client = object.__new__(azure.Azure)
+            client.request, client.directory = value, Path(temporary)
+            client.read = lambda: {'ownerId': '00000000-0000-4000-8000-000000000001', 'createdAt': '2026-11-26T00:00:00Z', 'expiresAt': '2026-11-26T02:00:00Z'}
+            def invoke(*args, **kwargs):
+                if args[:3] == ('rest', '--method', 'put'):
+                    body = json.loads((client.directory / 'run-command.json').read_text())
+                    properties = body['properties']
+                    self.assertNotIn(secret, json.dumps(properties['source']))
+                    self.assertEqual([], properties['parameters'])
+                    self.assertEqual([{'name': 'EXTENSION_CONFIGURATION', 'value': base64.b64encode(json.dumps(settings).encode()).decode()}], properties['protectedParameters'])
+                    self.assertNotIn(secret, json.dumps(value))
+                if args[:3] == ('rest', '--method', 'get'):
+                    return {'properties': {'instanceView': {'executionState': 'Succeeded', 'exitCode': 0,
+                        'output': 'AGENTSTRATION_RESULT={"state":"running"}'}}}
+            client.az = invoke
+            client.run_guest('deploy', checksum='a' * 64, extension_configuration=settings)
+            self.assertFalse((client.directory / 'run-command.json').exists())
+
+    def test_invalid_configuration_fails_before_provider_mutation_and_input_is_removed(self):
+        import azure
+        from test_azure import azure_request
+        import os
+        with patch.dict(os.environ, {'PREVIEW_EXTENSION_CONFIGURATION': 'not-json'}), patch.object(azure, 'execute') as provider:
+            with self.assertRaises(ValueError):
+                lifecycle.execute('deploy', azure_request(), None)
+            provider.assert_not_called()
+            self.assertNotIn('PREVIEW_EXTENSION_CONFIGURATION', os.environ)
+
+
+    def test_absent_optional_environment_secret_needs_no_new_configuration(self):
+        import azure
+        import os
+        from test_azure import azure_request
+        value = azure_request()
+        with patch.dict(os.environ, {'PREVIEW_EXTENSION_CONFIGURATION': ''}), patch.object(azure, 'execute', return_value={'state': 'running'}) as provider:
+            self.assertEqual({'state': 'running'}, lifecycle.execute('deploy', value, None))
+            provider.assert_called_once_with('deploy', value)
+            self.assertNotIn('PREVIEW_EXTENSION_CONFIGURATION', os.environ)
+
+    def test_guest_removes_protected_settings_before_any_docker_invocation(self):
+        import azure_host
+        import os
+        from contextlib import redirect_stdout
+        import io
+        from test_azure import azure_request
+        settings = {'foundry': {'Backend': {'Token': 'public-disposable-fixture'}}}
+        encoded = base64.b64encode(json.dumps(settings).encode()).decode()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'request.json'
+            path.write_text(json.dumps(azure_request(extension_deliveries={'foundry': receipt()})))
+            def run(*arguments, **kwargs):
+                self.assertNotIn('EXTENSION_CONFIGURATION', os.environ)
+                self.assertNotIn('BUNDLE_URL', os.environ)
+                self.assertEqual(settings, json.loads(kwargs['extension_configuration']))
+                return {'state': 'running'}
+            with patch.dict(os.environ, {'EXTENSION_CONFIGURATION': encoded, 'BUNDLE_URL': 'public-disposable-fixture'}), patch('sys.argv', ['azure_host.py', 'deploy', '--request', str(path)]), patch.object(azure_host, 'run', side_effect=run), redirect_stdout(io.StringIO()):
+                azure_host.main()

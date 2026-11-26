@@ -74,6 +74,21 @@ def run(server_path, worker_path, extension_path, output):
             azure_host.run('deploy', selected, registry, root)
             preview.require(preview.compose(directory, 'exec', '-T', name, 'cat', '/var/lib/aep/instance', capture=True).strip() == instance,
                             'Recreation replaced the persisted extension instance.')
+            before_config = preview.compose(directory, 'ps', '--quiet', name, capture=True).strip()
+            for iteration in range(2):
+                private_value = 'public-disposable-configuration-' + uuid.uuid4().hex
+                settings = {identifier: {'PreviewProbe': {'Value': private_value}}}
+                configured = azure_host.run('deploy', selected, registry, root, extension_configuration=settings)
+                mounted = json.loads(preview.compose(directory, 'exec', '-T', name, 'cat', '/app/appsettings.Preview.json', capture=True))
+                preview.require(mounted == settings[identifier], 'The extension did not receive its own private settings file.')
+                after_config = preview.compose(directory, 'ps', '--quiet', name, capture=True).strip()
+                preview.require(after_config != before_config, 'Changed private configuration did not recreate the extension.')
+                before_config = after_config
+                preview.require(preview.compose(directory, 'exec', '-T', name, 'cat', '/var/lib/aep/instance', capture=True).strip() == instance,
+                                'Configuration update replaced the persisted extension identity.')
+                server_config = preview.compose(directory, 'exec', '-T', 'server', 'cat', '/app/appsettings.Preview.json', capture=True)
+                preview.require(private_value not in server_config and private_value not in json.dumps(configured),
+                                'Private extension settings escaped into the authority configuration or public result.')
             active = core
             azure_host.run('deploy', core, registry, root)
             resources = lifecycle.inventory(project)
@@ -93,6 +108,7 @@ def run(server_path, worker_path, extension_path, output):
             preview.private_write(output, json.dumps({'passed': True, 'extension': identifier,
                 'image': contract.images(local)[name], 'exactDigestGuestTransport': True,
                 'enrolledBeforeManualBootstrap': True, 'anonymousAndWrongKeyRejected': True, 'invalidEnrollmentProofRejected': True,
+                'privateConfigurationIsolated': True, 'configurationUpdatePreservesIdentity': True,
                 'recreationAndReactivationPreserveIdentity': True, 'deselectionRetainsState': True,
                 'expiryPreserved': True, 'fullResetRemovedResources': True}, indent=2) + '\n')
         except Exception:
@@ -100,6 +116,10 @@ def run(server_path, worker_path, extension_path, output):
             if (directory / 'deployment.json').exists():
                 keys = [path.read_text() for path in directory.glob('*.key')]
                 diagnostic = preview_smoke.failure_diagnostics(directory, keys)
+                # Backend settings can contain credentials; retain exception types only.
+                import re
+                diagnostic['exceptions'] = sorted(set(value for line in diagnostic.get('exceptions', [])
+                    for value in re.findall(r'\b(?:[A-Za-z0-9_]+\.)*[A-Za-z0-9_]+Exception\b', line)))
                 preview.private_write(output, json.dumps({'passed': False, 'diagnostics': diagnostic}, indent=2) + '\n')
             raise
         finally:
