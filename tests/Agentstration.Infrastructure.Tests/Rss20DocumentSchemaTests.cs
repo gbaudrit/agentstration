@@ -1,5 +1,5 @@
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.OData;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.OData;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 
@@ -9,7 +9,7 @@ namespace Agentstration.Infrastructure.Tests;
 public sealed class Rss20DocumentSchemaTests
 {
     [TestMethod]
-    public void PublishedRssItemProjectionCanBeAdmittedAndQueriedByTheAspDocumentProfile()
+    public void PublishedRssItemProjectionCanBeAdmittedAndQueriedByTheAscDocumentProfile()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Agentstration.slnx"))) directory = directory.Parent;

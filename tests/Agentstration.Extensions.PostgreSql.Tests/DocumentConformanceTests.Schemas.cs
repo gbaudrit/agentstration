@@ -1,4 +1,4 @@
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 
 namespace Agentstration.Extensions.PostgreSql.Tests;
 
@@ -30,7 +30,7 @@ public sealed partial class DocumentConformanceTests
     [DataRow("{\"type\":\"object\",\"properties\":{\"x\":{\"format\":\"unknown\"}}}", "unsupported_schema", "format")]
     public void UnsupportedSchemaConstructsCarryAnExactDiagnosticWithoutResolvingRemoteContent(string schema, string code, string keyword)
     {
-        var error = Assert.Throws<AspException>(() => DocumentModel.ValidateSchema(Json(schema)));
+        var error = Assert.Throws<AscException>(() => DocumentModel.ValidateSchema(Json(schema)));
         Assert.AreEqual(code, error.Code);
         Assert.AreEqual(keyword, error.SchemaKeyword);
         Assert.IsNotNull(error.SchemaPath);

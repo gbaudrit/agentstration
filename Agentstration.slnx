@@ -1,18 +1,18 @@
 <Solution>
   <Folder Name="/aep/src/" />
-  <Folder Name="/asp/">
-    <Project Path="asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
-    <Project Path="asp/src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
-    <Project Path="asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
-    <Project Path="asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
-    <Project Path="asp/samples/LocalStorage/LocalStorage.csproj" />
-    <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
+  <Folder Name="/asc/">
+    <Project Path="asc/src/Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
+    <Project Path="asc/src/Agentstration.Asc.Server/Agentstration.Asc.Server.csproj" />
+    <Project Path="asc/src/Agentstration.Asc.Aep/Agentstration.Asc.Aep.csproj" />
+    <Project Path="asc/src/Agentstration.Asc.Client/Agentstration.Asc.Client.csproj" />
+    <Project Path="asc/samples/LocalStorage/LocalStorage.csproj" />
+    <Project Path="asc/tests/Agentstration.Asc.Tests/Agentstration.Asc.Tests.csproj" />
   </Folder>
-  <Folder Name="/asp/samples/">
-    <Project Path="asp/samples/StructuredDocuments/StructuredDocuments.csproj" />
+  <Folder Name="/asc/samples/">
+    <Project Path="asc/samples/StructuredDocuments/StructuredDocuments.csproj" />
   </Folder>
-  <Folder Name="/asp/src/">
-    <Project Path="asp/src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
+  <Folder Name="/asc/src/">
+    <Project Path="asc/src/Agentstration.Asc.OData/Agentstration.Asc.OData.csproj" />
   </Folder>
   <Folder Name="/automation/">
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />

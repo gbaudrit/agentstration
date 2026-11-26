@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 
 namespace Agentstration.Extensions.OpenDal;
 
@@ -57,7 +57,8 @@ public static class OpenDalStorageTypes
         IReadOnlyList<AepStorageRequirement> requirements) =>
         new(Version, AepSchemaDigest.Compute(schema), schema, AepSchemaDigest.Compute(EnvelopeSchema), EnvelopeSchema,
             remote, requirements, new(true, true, true, true), new(100, 65536, 65536),
-            new(AspProtocol.Profile, "content", "asp", id, Version));
+            new(AscContract.Profile, "content", "asc", id, Version)
+            { Contract = AscContract.Identity, Revision = AscContract.Version, McpProtocolVersion = AepStorageProtocol.McpProtocolVersion });
 
     private static JsonElement RemoteSchema(string destination) => JsonSerializer.SerializeToElement(new
     {
@@ -76,6 +77,6 @@ public sealed record OpenDalEnvelope(string Prefix = "", bool List = true, bool 
     bool Write = false, int MaximumReadBytes = 65536, int MaximumWriteBytes = 65536, int MaximumPageSize = 100,
     string? KeyFrom = null, string? KeyBefore = null)
 {
-    public AspAccessPolicy ToPolicy() => new(List, Stat, Read, Write, Prefix, MaximumReadBytes, MaximumWriteBytes,
+    public AscAccessPolicy ToPolicy() => new(List, Stat, Read, Write, Prefix, MaximumReadBytes, MaximumWriteBytes,
         MaximumPageSize, KeyFrom, KeyBefore);
 }

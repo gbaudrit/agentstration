@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.Client;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.Client;
 using Agentstration.Extensions.PostgreSql;
-using Asp.Samples.StructuredDocuments;
+using Asc.Samples.StructuredDocuments;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,7 +20,7 @@ public sealed partial class DocumentConformanceTests
         "timestamp":{"type":"string"},"metrics":{"type":"object","properties":{"errorRate":{"type":"number"}}},
         "measurements":{"type":"array","items":{"type":"object","properties":{"value":{"type":"number"}}}}}}
         """);
-    private static async Task Error(string code, Func<Task> run) => Assert.AreEqual(code, (await Assert.ThrowsAsync<AspException>(run)).Code);
+    private static async Task Error(string code, Func<Task> run) => Assert.AreEqual(code, (await Assert.ThrowsAsync<AscException>(run)).Code);
 
     [TestMethod]
     [DataRow(false)]
@@ -37,7 +37,7 @@ public sealed partial class DocumentConformanceTests
         Assert.AreNotEqual(first.Revision, second.Revision);
         await Error("version_unavailable", () => host.Client.GetAsync(new("old", "doc", first.Revision)));
         await Error("schema_validation", () => host.Client.PutAsync(host.Put("wrong", """{"metrics":{"errorRate":"0.2"}}""")));
-        var delete = new AspDocumentDelete("delete", DateTimeOffset.UtcNow.AddMinutes(2), "doc", second.Revision);
+        var delete = new AscDocumentDelete("delete", DateTimeOffset.UtcNow.AddMinutes(2), "doc", second.Revision);
         Assert.AreEqual(second.Revision, (await host.Client.DeleteAsync(delete)).Revision);
         Assert.AreEqual(second.Revision, (await host.Client.DeleteAsync(delete)).Revision);
         await Error("not_found", () => host.Client.GetAsync(new("missing", "doc")));
@@ -105,14 +105,14 @@ public sealed partial class DocumentConformanceTests
     public async Task SealedHistoricalPublicationSurvivesNewPublicationAndRefusesAllMutation(bool postgres)
     {
         await using var host = await Host.StartAsync(postgres);
-        var prepare = new AspDocumentPrepare("prepare-a", DateTimeOffset.UtcNow.AddMinutes(2), "publication-a",
+        var prepare = new AscDocumentPrepare("prepare-a", DateTimeOffset.UtcNow.AddMinutes(2), "publication-a",
             [new("first", Json("""{"status":"degraded"}"""))]);
-        var a = await host.Client.PrepareAsync(prepare); var seal = new AspDocumentPublicationRequest("seal-a", a.Id, a.Digest);
-        var historical = await AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store, new("sample", a.Id));
+        var a = await host.Client.PrepareAsync(prepare); var seal = new AscDocumentPublicationRequest("seal-a", a.Id, a.Digest);
+        var historical = await AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store, new("sample", a.Id));
         await historical.SealAsync(seal); await historical.SealAsync(seal);
         await Error("forbidden", () => host.Client.SealAsync(seal));
         var b = await host.Client.PrepareAsync(prepare with { RequestId = "prepare-b", PublicationId = "publication-b", Documents = [new("second", Json("{}"))] });
-        var latest = await AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store, new("sample", b.Id));
+        var latest = await AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store, new("sample", b.Id));
         await latest.SealAsync(new("seal-b", b.Id, b.Digest));
         var result = await historical.QueryAsync(host.Query("{}")); Assert.AreEqual("first", result.Documents.Single().Id);
         await Error("forbidden", () => historical.PutAsync(host.Put("first", "{}")));
@@ -130,8 +130,8 @@ public sealed partial class DocumentConformanceTests
         await Error("unsupported_query", () => host.Client.QueryAsync(host.Query("""{"$expand":"anything"}""")));
         await Error("unsupported_value", () => host.Client.PutAsync(host.Put("tiny", """{"number":1e-29}""")));
         await Error("invalid_request", () => host.Client.PutAsync(host.Put("duplicate", """{"status":"a","status":"b"}""")));
-        await Error("forbidden", () => AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store, new("other")));
-        await Error("forbidden", () => AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store with { StoreId = "foreign" }, new("sample")));
+        await Error("forbidden", () => AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store, new("other")));
+        await Error("forbidden", () => AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store with { StoreId = "foreign" }, new("sample")));
     }
 
     private static async Task Seed(Host host)
@@ -145,46 +145,46 @@ public sealed partial class DocumentConformanceTests
     {
         public WebApplicationFactory<StructuredSampleAccess> Factory { get; private set; } = null!;
         public McpClient Mcp { get; private set; } = null!;
-        public AspDocumentClient Client { get; private set; } = null!;
+        public AscDocumentClient Client { get; private set; } = null!;
         public StructuredSampleAccess Access => Factory.Services.GetRequiredService<StructuredSampleAccess>();
-        public static async Task<Host> StartAsync(bool postgres, IAspDocumentProvider? fixture = null, string? profileId = null, JsonElement? schema = null)
+        public static async Task<Host> StartAsync(bool postgres, IAscDocumentProvider? fixture = null, string? profileId = null, JsonElement? schema = null)
         {
-            IAspDocumentProvider provider = fixture ?? new MemoryDocumentProvider(schema ?? Schema, TimeProvider.System);
+            IAscDocumentProvider provider = fixture ?? new MemoryDocumentProvider(schema ?? Schema, TimeProvider.System);
             if (postgres)
             {
-                var connection = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_ASP_POSTGRES");
-                if (string.IsNullOrWhiteSpace(connection)) Assert.Inconclusive("Set AGENTSTRATION_TEST_ASP_POSTGRES for the dedicated real PostgreSQL lane.");
+                var connection = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_ASC_POSTGRES");
+                if (string.IsNullOrWhiteSpace(connection)) Assert.Inconclusive("Set AGENTSTRATION_TEST_ASC_POSTGRES for the dedicated real PostgreSQL lane.");
                 var postgresProvider = new PostgreSqlDocumentProvider(connection, schema ?? Schema); await postgresProvider.InitializeAsync(CancellationToken.None);
                 // Each case gets a unique physical StoreId via a provider-only partition wrapper.
                 provider = new PartitionProvider(postgresProvider, Guid.NewGuid().ToString("N"));
             }
             var host = new Host();
             host.Factory = new WebApplicationFactory<StructuredSampleAccess>().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-            { services.RemoveAll<IAspDocumentProvider>(); services.AddSingleton(provider); }));
+            { services.RemoveAll<IAscDocumentProvider>(); services.AddSingleton(provider); }));
             var http = host.Factory.CreateClient();
             if (profileId is not null) host.Access.Policy = host.Access.Policy with { QueryProfiles = [profileId] };
             http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", host.Access.Token);
             host.Mcp = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new("http://localhost/mcp") }, http));
-            host.Client = await AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store, new("sample")); return host;
+            host.Client = await AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store, new("sample")); return host;
         }
-        public AspDocumentPut Put(string id, string value) => new(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddMinutes(2), id, Json(value));
-        public AspDocumentQuery Query(string query, int size = 50) => new(Guid.NewGuid().ToString("N"), Client.Description.QueryProfiles.Single().Reference, Json(query), size);
+        public AscDocumentPut Put(string id, string value) => new(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddMinutes(2), id, Json(value));
+        public AscDocumentQuery Query(string query, int size = 50) => new(Guid.NewGuid().ToString("N"), Client.Description.QueryProfiles.Single().Reference, Json(query), size);
         public async ValueTask DisposeAsync() { if (Mcp is not null) await Mcp.DisposeAsync(); if (Factory is not null) await Factory.DisposeAsync(); }
     }
 
-    private sealed class PartitionProvider(PostgreSqlDocumentProvider inner, string partition) : IAspDocumentProvider, IAspDocumentPublisher, IAspDocumentSubsetProvider
+    private sealed class PartitionProvider(PostgreSqlDocumentProvider inner, string partition) : IAscDocumentProvider, IAscDocumentPublisher, IAscDocumentSubsetProvider
     {
-        private AspDocumentContext Context(AspDocumentContext c) => c with { Store = c.Store with { StoreId = partition + c.Store.StoreId } };
+        private AscDocumentContext Context(AscDocumentContext c) => c with { Store = c.Store with { StoreId = partition + c.Store.StoreId } };
         public string ProviderId => inner.ProviderId; public string ProviderVersion => inner.ProviderVersion;
         public JsonElement ConfigurationSchema => inner.ConfigurationSchema; public JsonElement DocumentSchema => inner.DocumentSchema;
-        public IReadOnlyList<AspQueryProfileDescriptor> QueryProfiles => inner.QueryProfiles;
-        public ValueTask<AspDocument> GetAsync(AspDocumentContext c, AspDocumentGet r, CancellationToken ct) => inner.GetAsync(Context(c), r, ct);
-        public ValueTask<AspDocument> PutAsync(AspDocumentContext c, AspDocumentPut r, CancellationToken ct) => inner.PutAsync(Context(c), r, ct);
-        public ValueTask<AspDocumentDeleted> DeleteAsync(AspDocumentContext c, AspDocumentDelete r, CancellationToken ct) => inner.DeleteAsync(Context(c), r, ct);
-        public ValueTask<AspDocumentProviderPage> QueryAsync(AspDocumentContext c, AspDocumentQuery r, string? p, CancellationToken ct) => inner.QueryAsync(Context(c), r, p, ct);
-        public ValueTask<AspDocumentPublication> PrepareAsync(AspDocumentContext c, AspDocumentPrepare r, CancellationToken ct) => inner.PrepareAsync(Context(c), r, ct);
-        public ValueTask<AspDocumentPublication> SealAsync(AspDocumentContext c, AspDocumentPublicationRequest r, CancellationToken ct) => inner.SealAsync(Context(c), r, ct);
-        public ValueTask<AspDocumentPublication> InspectAsync(AspDocumentContext c, AspDocumentPublicationRequest r, CancellationToken ct) => inner.InspectAsync(Context(c), r, ct);
-        public ValueTask RetireAsync(AspDocumentContext c, AspDocumentPublicationRequest r, CancellationToken ct) => inner.RetireAsync(Context(c), r, ct);
+        public IReadOnlyList<AscQueryProfileDescriptor> QueryProfiles => inner.QueryProfiles;
+        public ValueTask<AscDocument> GetAsync(AscDocumentContext c, AscDocumentGet r, CancellationToken ct) => inner.GetAsync(Context(c), r, ct);
+        public ValueTask<AscDocument> PutAsync(AscDocumentContext c, AscDocumentPut r, CancellationToken ct) => inner.PutAsync(Context(c), r, ct);
+        public ValueTask<AscDocumentDeleted> DeleteAsync(AscDocumentContext c, AscDocumentDelete r, CancellationToken ct) => inner.DeleteAsync(Context(c), r, ct);
+        public ValueTask<AscDocumentProviderPage> QueryAsync(AscDocumentContext c, AscDocumentQuery r, string? p, CancellationToken ct) => inner.QueryAsync(Context(c), r, p, ct);
+        public ValueTask<AscDocumentPublication> PrepareAsync(AscDocumentContext c, AscDocumentPrepare r, CancellationToken ct) => inner.PrepareAsync(Context(c), r, ct);
+        public ValueTask<AscDocumentPublication> SealAsync(AscDocumentContext c, AscDocumentPublicationRequest r, CancellationToken ct) => inner.SealAsync(Context(c), r, ct);
+        public ValueTask<AscDocumentPublication> InspectAsync(AscDocumentContext c, AscDocumentPublicationRequest r, CancellationToken ct) => inner.InspectAsync(Context(c), r, ct);
+        public ValueTask RetireAsync(AscDocumentContext c, AscDocumentPublicationRequest r, CancellationToken ct) => inner.RetireAsync(Context(c), r, ct);
     }
 }
