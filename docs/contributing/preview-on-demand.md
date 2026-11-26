@@ -101,13 +101,19 @@ A repository maintainer can post one plain-text command in an ordinary issue
 or a same-repository PR after the command workflows are merged to `main`:
 
 ```text
+/preview
 /preview deploy
 /preview deploy database=postgresql
 /preview deploy ref=pr:123
 /preview deploy ref=main database=postgresql
+/preview redeploy
+/preview redeploy database=postgresql
 /preview status
 /preview destroy
 ```
+
+`/preview` alone is an exact shorthand for `/preview deploy`, including its
+data-preserving defaults. Arguments require an explicit `deploy` or `redeploy`.
 
 On a PR, `/preview deploy` selects **that PR's own head commit** and its
 `preview:extension:*` labels. No `ref` is needed. Use `database=postgresql` only
@@ -126,7 +132,7 @@ workflow. Fork PRs are refused. An image must already exist for the exact select
 SHA; this command does not build or publish one and never falls back to another
 revision. A moving branch/PR is frozen once at admission.
 
-Only `ref` and `database` are supported on `deploy`. Other arguments, duplicate
+Only `ref` and `database` are supported on `deploy` and `redeploy`. Other arguments, duplicate
 keys, multiple commands and shell/Markdown syntax are refused. SQLite, size
 profile 1, two recorded TTL hours, mandatory readiness and the independently
 published Worker are the defaults. Other combinations remain available in the
@@ -140,10 +146,24 @@ issue links to that PR. Repeated deploy commands update that environment
 with data preservation. After pushing to a PR, publish its exact server image
 and post a **new** `/preview deploy` comment to update the same environment; pushes
 and label changes alone do not deploy. A command already admitted keeps its original
-SHA even if the branch moves. Changing database requires a full destroy first.
+SHA even if the branch moves. Changing database requires a full reset first.
 **`/preview destroy` fully resets owned infrastructure and application data**,
 including disks and public IP. The manual form still offers explicit preserve
 mode for recovery/maintenance.
+
+**`/preview redeploy` deletes the previous preview and all its application data,
+then deploys a fresh environment.** It resolves the current PR head and labels
+using the same private image checks as deploy, before any deletion. It can select
+a new database after the reset; it never converts the previous data. Feedback
+explicitly describes the data deletion before execution. The reset and fresh
+deployment share one provider lease, ownership checks and environment queue.
+The old route is removed, owned VM/disks/IP are deleted, and a new owner, expiry
+and protected route are created. Shared resources remain. An absent preview is
+created normally. A failed or incomplete reset prevents deployment. If recreation
+fails after reset, the previous data is already gone: check `/preview status`,
+then use `/preview` to resume without another reset. This command requires an
+open issue/PR and is reauthorized just like deploy. See
+[ADR-0268](../decisions/0268-explicit-preview-redeployment-resets-owned-state.md).
 
 The admission workflow runs only default-branch tooling, checks the author's
 current repository write/maintain/admin permission and ignores untrusted users
@@ -172,6 +192,17 @@ versions/digests are collapsed. A successful readiness check adds the protected
 application URL and recorded expiry; the card explicitly says **automatic expiry
 cleanup is not implemented** and offers `/preview destroy`. An active VM without
 confirmed protected access does not get an access link.
+
+Completed checks show a table for server, Worker, selected extensions and the
+optional PostgreSQL service: container state, Docker health and restart count.
+The values are a live snapshot, not an availability history. A missing container
+is identified; duplicate/unknown states cannot claim health. When the VM is
+stopped and no container observations are available, the table says `not observed`.
+Status includes the current trusted collector in Run Command, so older running
+previews do not require a redeployment just to obtain this table. Only bounded
+enum/counter fields are collected; inspect configuration, health logs, error
+messages and private settings are never exported. Access remains verified before
+publishing a URL; the redundant provider-identification sentence is omitted.
 
 Result reporting downloads the existing public lifecycle-result artifact from
 the same workflow run and attempt, then checks its environment, frozen images,
@@ -352,7 +383,8 @@ Reset waits up to two minutes for Azure inventory convergence after deletion.
 If inventory remains stale, check status and retry reset. Shared storage, its
 ownership record, the resource group and bootstrap role assignments remain.
 Repeated reset is safe. A later deploy after reset creates a new data lifecycle;
-preserve/redeploy retains identities and the original expiry anchor.
+ordinary data-preserving deploy retains identities and the original expiry anchor.
+The explicit `/preview redeploy` command performs a reset and starts a new anchor.
 
 Actions queues operations by environment ID without cancelling an operation in
 progress. The provider's independent concurrency group and exclusive state-blob

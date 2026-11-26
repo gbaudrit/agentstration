@@ -54,8 +54,10 @@ def positive(value):
 def parse(body):
     preview.require(isinstance(body, str) and len(body) <= 512, 'Use one bounded /preview command.')
     text = body.strip()
-    preview.require(re.fullmatch(r'/preview (deploy|status|destroy)(?: [A-Za-z0-9_./:=+-]+)*', text),
-                    'Use /preview deploy [ref=PR_OR_REVISION] [database=sqlite|postgresql], /preview status or /preview destroy.')
+    if text == '/preview':
+        text = '/preview deploy'
+    preview.require(re.fullmatch(r'/preview (deploy|redeploy|status|destroy)(?: [A-Za-z0-9_./:=+-]+)*', text),
+                    'Use /preview, /preview deploy [ref=PR_OR_REVISION] [database=sqlite|postgresql], /preview redeploy, /preview status or /preview destroy.')
     words = text.split()
     values = {}
     for word in words[2:]:
@@ -63,7 +65,8 @@ def parse(body):
         preview.require(separator and key in ('ref', 'database') and key not in values and value,
                         'Only one ref and one database argument are supported.')
         values[key] = value
-    operation = words[1]
+    reset = words[1] == 'redeploy'
+    operation = 'deploy' if reset else words[1]
     preview.require(operation == 'deploy' or not values, 'Status/destroy use the recorded issue environment, without arguments.')
     ref = values.get('ref', '')
     if ref:
@@ -72,7 +75,8 @@ def parse(body):
                         'Use ref=pr:NUMBER, a branch, tag or full SHA.')
     database = values.get('database', 'sqlite')
     preview.require(database in ('sqlite', 'postgresql'), 'Database must be sqlite or postgresql.')
-    return {'operation': operation, 'revision': ref, 'database': database, 'provider': 'azure-vm',
+    return {**({'reset_before_deploy': True} if reset else {}),
+            'operation': operation, 'revision': ref, 'database': database, 'provider': 'azure-vm',
             'vm_size_profile': '1', 'ttl_hours': 2, 'data_mode': 'reset' if operation == 'destroy' else 'preserve',
             'test_profile': 'readiness', 'worker_revision': 'published'}
 
@@ -235,7 +239,7 @@ def tracking(options, repository, call=api):
     repository = repository_name(repository)
     expected = {'operation', 'environment_id', 'revision', 'provider', 'database', 'vm_size_profile',
                 'ttl_hours', 'data_mode', 'test_profile', 'worker_revision'}
-    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback'}
+    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy'}
     preview.require(isinstance(options, dict) and expected <= set(options) <= expected | optional,
                     'Unexpected form or issue tracking fields.')
     tracked = {'tracking_issue', 'tracking_comment'} & set(options)
@@ -255,6 +259,8 @@ def tracking(options, repository, call=api):
     comment = comment_context(repository, int(issue), int(comment_id), call)
     preview.require(authorized(comment, repository, call), 'The command author no longer has repository write access.')
     original = parse(comment.get('body'))
+    preview.require(options.get('reset_before_deploy', False) == original.get('reset_before_deploy', False),
+                    'Reset must match the original /preview redeploy command.')
     preview.require(all(options[key] == original[key] for key in ('operation', 'database', 'provider', 'vm_size_profile',
                         'data_mode', 'test_profile', 'worker_revision')) and str(options['ttl_hours']) == str(original['ttl_hours']),
                     'The dispatched options differ from the issue command.')
@@ -271,10 +277,10 @@ def tracking(options, repository, call=api):
     return issue
 
 
-def plan_message(request, operation, run_url, repository='gbaudrit/agentstration'):
+def plan_message(request, operation, run_url, repository='gbaudrit/agentstration', reset_before_deploy=False):
     request = contract.loads(json.dumps(request))
     contract.operation(operation, request)
-    return feedback.planned(request, operation, repository, run_url)
+    return feedback.planned(request, operation, repository, run_url, reset_before_deploy)
 
 
 def failure_stage():
@@ -342,7 +348,7 @@ def main():
                 if operation == 'deploy':
                     preview.require(list(request.get('extensions', {})) == options.get('extensions', []),
                                     'Frozen extension deliveries differ from the issue labels.')
-                message = plan_message(request, operation, run_url, repository)
+                message = plan_message(request, operation, run_url, repository, options.get('reset_before_deploy', False))
             elif os.environ['EXECUTION_RESULT'] == 'success':
                 result = report_result()
                 preview.require(result['environmentId'] == environment, 'Result targets another environment.')
@@ -362,7 +368,7 @@ def main():
                     # Report only canonical request metadata, not arbitrary provider fields.
                     preview.require(result.get('sourceSha') == request['sourceSha'] and result.get('database') == request['database']
                                     and result.get('images') == contract.images(request), 'Result differs from the frozen request.')
-                message = feedback.completed(result, operation, repository, run_url, request)
+                message = feedback.completed(result, operation, repository, run_url, request, options.get('reset_before_deploy', False))
             else:
                 failure = contract.parse(os.environ.get('SELECTION_FAILURE') or '{}')
                 message = feedback.failed(operation, repository, run_url, failure_stage(), options, failure)

@@ -339,3 +339,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 266. [ADR-0266 — PR preview commands use frozen heads and owned feedback](0266-pr-preview-commands-use-frozen-heads-and-owned-feedback.md)
 
 267. [ADR-0267 — Pre-merge AEP previews consume published catalogue data](0267-pre-merge-aep-previews-consume-published-catalogue-data.md)
+
+268. [ADR-0268 — Explicit preview redeployment resets owned state](0268-explicit-preview-redeployment-resets-owned-state.md)

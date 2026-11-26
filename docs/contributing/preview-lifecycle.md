@@ -48,6 +48,13 @@ the `destroyed` operation outcome. The reusable workflow reports `failed` for
 failed operations; it does not substitute a successful validation result for a
 failed deployment. Validation returns no provider resources.
 
+The public `health` snapshot maps selected components to normalized container
+state, Docker health and restart count. It contains no raw inspect/configuration
+or health-log content. Missing observations do not imply healthy containers.
+The Azure comment-level `/preview redeploy` command composes an owned full reset
+and fresh deploy under one provider lease; the portable request still uses
+`deploy` with `dataMode: preserve`, and ordinary deploy preserves data.
+
 ## Run against a trusted Docker host
 
 Requirements are Linux, Python 3 and Docker Compose v2. Use a trusted Docker CLI

@@ -225,6 +225,7 @@ jobs:
     with:
       operation: ${{ needs.boundary.outputs.operation }}
       request: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
+      reset_before_deploy: ${{ fromJSON(needs.boundary.outputs.selection).reset_before_deploy || false }}
 
   report:
     needs: [boundary, select, recorded, announce, execute]

@@ -90,6 +90,42 @@ class GitHub:
 
 
 class AdmissionTests(unittest.TestCase):
+    def test_bare_preview_is_a_deploy_alias_with_identical_defaults_and_source_freeze(self):
+        self.assertEqual(commands.parse('/preview deploy'), commands.parse('/preview'))
+        self.assertEqual(commands.parse('/preview deploy'), commands.parse('/preview\n'))
+        github = GitHub('/preview')
+        self.assertTrue(github.admit())
+        selected = github.selection()
+        self.assertEqual('deploy', selected['operation'])
+        self.assertEqual(SHA, selected['revision'])
+        self.assertNotIn('reset_before_deploy', selected)
+
+    def test_redeploy_selects_images_first_and_binds_reset_to_its_original_command(self):
+        github = GitHub('/preview redeploy database=postgresql')
+        self.assertTrue(github.admit())
+        selected = github.selection()
+        self.assertEqual(('deploy', True, 'preserve', 'postgresql'),
+                         (selected['operation'], selected['reset_before_deploy'], selected['data_mode'], selected['database']))
+        self.assertIn('delete the previous preview', github.card['body'])
+        self.assertEqual('17', commands.tracking(selected, REPOSITORY, github))
+        selected['reset_before_deploy'] = False
+        with self.assertRaisesRegex(ValueError, 'Reset must match'):
+            commands.tracking(selected, REPOSITORY, github)
+
+    def test_deploy_or_status_cannot_be_substituted_with_a_reset(self):
+        for body in ('/preview', '/preview deploy', '/preview status'):
+            github = GitHub(body)
+            self.assertTrue(github.admit())
+            selected = {**github.selection(), 'reset_before_deploy': True}
+            with self.subTest(body=body), self.assertRaises(ValueError):
+                commands.tracking(selected, REPOSITORY, github)
+
+    def test_redeploy_failure_feedback_explains_when_reset_or_deployment_should_be_retried(self):
+        text = commands.feedback.failed('deploy', REPOSITORY, 'https://github.com/' + REPOSITORY + '/actions/runs/1',
+            'execute', {**commands.parse('/preview redeploy'), 'environment_id': 'issue-17'})
+        self.assertIn('If removal failed, retry `/preview redeploy`', text)
+        self.assertIn('if only recreation failed, use `/preview`', text)
+
     def test_unique_native_link_freezes_head_and_dispatches_only_main_without_executing_source(self):
         github = GitHub()
         self.assertTrue(github.admit())
@@ -198,6 +234,9 @@ class AdmissionTests(unittest.TestCase):
 
     def test_closed_issue_refuses_deploy_but_allows_recorded_status_and_full_reset(self):
         github = GitHub()
+        github.issue['state'] = 'closed'
+        self.assertFalse(github.admit())
+        github = GitHub('/preview redeploy')
         github.issue['state'] = 'closed'
         self.assertFalse(github.admit())
         for operation in ('status', 'destroy'):
@@ -364,6 +403,22 @@ class PullRequestTests(unittest.TestCase):
         github = GitHub('/preview ' + operation)
         github.issue['pull_request'] = {'url': 'https://api.github.com/' + PREFIX + '/pulls/17'}
         return github
+
+    def test_redeploy_on_pr_freezes_its_own_head_and_labels_and_refuses_forks_or_closed_prs(self):
+        github = self.github('redeploy')
+        github.issue['labels'] = [{'name': 'preview:extension:foundry'}]
+        self.assertTrue(github.admit())
+        selected = github.selection()
+        self.assertEqual((SHA, ['foundry'], 'pr-17', True),
+            (selected['revision'], selected['extensions'], selected['environment_id'], selected['reset_before_deploy']))
+        for reason in ('fork', 'closed'):
+            github = self.github('redeploy')
+            if reason == 'fork':
+                github.fork = True
+            else:
+                github.issue['state'] = 'closed'
+            self.assertFalse(github.admit())
+            self.assertFalse(any(path.endswith('/dispatches') for path, _, _ in github.calls))
 
     def test_pr_uses_own_frozen_head_labels_and_environment_then_preserves_it_when_head_moves(self):
         github = self.github()

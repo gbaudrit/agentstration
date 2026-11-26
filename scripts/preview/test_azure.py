@@ -60,8 +60,10 @@ class Cloud:
 
     def provision(self, record):
         self.effects.append('provision')
-        self.items = [{'id': identifier, 'name': identifier.rsplit('/', 1)[1], 'tags': azure.tags(self.request, record)}
-                      for identifier in azure.resource_ids(self.request).values()]
+        identifiers = azure.resource_ids(self.request).values()
+        other = [item for item in self.items if item['id'] not in identifiers]
+        self.items = other + [{'id': identifier, 'name': identifier.rsplit('/', 1)[1], 'tags': azure.tags(self.request, record)}
+                             for identifier in identifiers]
         self.running = True
 
     def metrics(self):
@@ -97,8 +99,101 @@ class AzureTests(unittest.TestCase):
         self.cloud = Cloud()
         self.value = azure_request()
 
-    def execute(self, action, value=None, now=None):
-        return azure.execute(action, value or self.value, self.cloud.factory, now=now, route_factory=lambda *args: None)
+    def execute(self, action, value=None, now=None, **kwargs):
+        return azure.execute(action, value or self.value, self.cloud.factory, now=now, route_factory=lambda *args: None, **kwargs)
+
+    def test_explicit_redeploy_resets_before_provisioning_with_new_owner_and_expiry_under_one_lease(self):
+        self.execute('deploy', now=datetime(2026, 11, 24, tzinfo=timezone.utc))
+        original = copy.deepcopy(self.cloud.record)
+        other = {'id': '/other/resource', 'name': 'some-other-preview', 'tags': {}}
+        self.cloud.items.append(other)
+        self.cloud.effects = []
+        changed = azure_request(database='postgresql')
+        changed['target']['imageVersion'] = '24.04.202611170'
+        changed['sourceSha'] = changed['deliveries']['server']['sourceSha'] = 'b' * 40
+        reset = self.cloud.reset
+        def under_lease(record):
+            self.assertTrue(self.cloud.leased)
+            self.assertEqual(original['request'], record['request'])
+            reset(record)
+        with patch.object(self.cloud, 'reset', side_effect=under_lease):
+            value = self.execute('deploy', changed, now=datetime(2026, 11, 25, tzinfo=timezone.utc), reset_before_deploy=True)
+        self.assertEqual('running', value['state'])
+        self.assertEqual(['reset', 'provision', ('transfer', False)], self.cloud.effects)
+        self.assertNotEqual(original['ownerId'], self.cloud.record['ownerId'])
+        self.assertNotEqual(original['expiresAt'], self.cloud.record['expiresAt'])
+        self.assertEqual(changed, self.cloud.record['request'])
+        self.assertIn(other, self.cloud.items)
+        self.assertFalse(self.cloud.leased)
+
+    def test_redeploy_on_absent_preview_is_a_fresh_deployment(self):
+        self.assertEqual('running', self.execute('deploy', reset_before_deploy=True)['state'])
+        self.assertNotIn('reset', self.cloud.effects)
+
+    def test_reset_failure_or_remaining_resources_never_starts_replacement(self):
+        for failure in ('exception', 'remaining'):
+            with self.subTest(failure=failure):
+                self.execute('deploy')
+                original = copy.deepcopy(self.cloud.record)
+                self.cloud.effects = []
+                with patch.object(self.cloud, 'reset', side_effect=RuntimeError('reset failed') if failure == 'exception' else None):
+                    with self.assertRaises((ValueError, RuntimeError)):
+                        self.execute('deploy', reset_before_deploy=True)
+                self.assertEqual(original, self.cloud.record)
+                self.assertNotIn('provision', self.cloud.effects)
+                self.assertFalse(self.cloud.leased)
+
+    def test_redeploy_preflight_and_ownership_failures_leave_existing_preview_untouched(self):
+        self.execute('deploy')
+        before = copy.deepcopy(self.cloud.record)
+        self.cloud.effects = []
+        for settings in ('not-json', '{"foundry":{"Aep:Enrollment":"override"}}'):
+            with self.subTest(settings=settings), self.assertRaises(ValueError):
+                self.execute('deploy', reset_before_deploy=True, extension_configuration=settings)
+        self.cloud.items[0]['tags'][azure.OWNER] = 'foreign'
+        with self.assertRaises(ValueError):
+            self.execute('deploy', reset_before_deploy=True)
+        self.assertEqual(before, self.cloud.record)
+        self.assertEqual([], self.cloud.effects)
+
+    def test_redeploy_after_reset_and_failed_transfer_can_resume_without_another_reset(self):
+        self.execute('deploy')
+        self.cloud.fail_transfer = True
+        with self.assertRaises(RuntimeError):
+            self.execute('deploy', reset_before_deploy=True)
+        fresh = copy.deepcopy(self.cloud.record)
+        self.assertFalse(fresh['destroyed'])
+        self.cloud.effects = []
+        self.cloud.fail_transfer = False
+        self.assertEqual('running', self.execute('deploy')['state'])
+        self.assertNotIn('reset', self.cloud.effects)
+        self.assertEqual(fresh['ownerId'], self.cloud.record['ownerId'])
+
+    def test_reset_flag_is_not_accepted_for_other_operations_or_docker_hosts(self):
+        for action in ('status', 'destroy', 'validate'):
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                self.execute(action, reset_before_deploy=True)
+        from test_contract import request
+        with self.assertRaises(ValueError):
+            lifecycle.execute('deploy', request(), Path('/tmp/unused-host-state'), reset_before_deploy=True)
+        for invalid in ('true', 1, None):
+            with self.subTest(flag=invalid), self.assertRaises(ValueError):
+                self.execute('deploy', reset_before_deploy=invalid)
+        self.assertEqual([], self.cloud.effects)
+
+    def test_redeploy_cannot_change_recorded_ownership_scope_or_repository(self):
+        self.execute('deploy')
+        self.cloud.effects = []
+        for field, invalid in (('subscriptionId', '00000000-0000-4000-8000-000000000002'), ('resourceGroup', 'foreign')):
+            changed = copy.deepcopy(self.value)
+            changed['target'][field] = invalid
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                self.execute('deploy', changed, reset_before_deploy=True)
+        changed = copy.deepcopy(self.value)
+        changed['deliveries']['server']['repository'] = 'foreign/repo'
+        with self.assertRaises(ValueError):
+            self.execute('deploy', changed, reset_before_deploy=True)
+        self.assertEqual([], self.cloud.effects)
 
     def test_validation_never_initializes_azure_or_private_state(self):
         with patch.object(azure, 'Azure', side_effect=AssertionError('No cloud access')):
@@ -300,6 +395,21 @@ class AzureTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     client.transfer()
             self.assertEqual(set(), blobs)
+
+    def test_status_combines_legacy_guest_result_with_current_health_probe(self):
+        self.execute('deploy')
+        snapshot = {'server': {'state': 'running', 'health': 'healthy', 'restarts': 0}}
+        with tempfile.TemporaryDirectory() as temporary:
+            client = object.__new__(azure.Azure)
+            client.request, client.directory = self.value, Path(temporary)
+            client.read = self.cloud.read
+            def invoke(*args, **kwargs):
+                if args[:3] == ('rest', '--method', 'get'):
+                    output = 'AGENTSTRATION_RESULT={"state":"running","observedImages":{}}\nAGENTSTRATION_HEALTH=' + json.dumps(snapshot)
+                    return {'properties': {'instanceView': {'executionState': 'Succeeded', 'exitCode': 0, 'output': output}}}
+            client.az = invoke
+            self.assertEqual(snapshot, client.run_guest('status')['health'])
+            self.assertFalse((client.directory / 'run-command.json').exists())
 
     def test_provider_command_failure_never_echoes_credentials_or_raw_logs(self):
         secret = 'public-disposable-secret-fixture'

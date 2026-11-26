@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   admit:
-    if: github.ref == 'refs/heads/main' && startsWith(github.event.comment.body, '/preview ')
+    if: github.ref == 'refs/heads/main' && startsWith(github.event.comment.body, '/preview')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
