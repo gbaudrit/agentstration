@@ -149,3 +149,8 @@ foreach ($path in @('src/extensions/Agentstration.Extensions.OpenDal/Program.cs'
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'opendal' -and -not ($selection.dotnet -or $selection.aep -or $selection.container -or $selection.storage)) "Isolated opendal inputs must select only their image: $path"
 }
+
+foreach ($path in @('deploy/opendal/Dockerfile', 'scripts/opendal/smoke.py', 'samples/OpenDalSmoke/Program.cs', '.github/workflows/opendal.yml')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'opendal' -and -not ($selection.dotnet -or $selection.container -or $selection.storage)) "Native-only inputs must retain targeted OpenDAL validation: $path"
+}

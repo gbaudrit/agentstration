@@ -5,7 +5,7 @@ $shared = '^(global\.json$|Directory\.(Build|Packages)\.(props|targets)$|\.githu
 # Only implemented extension verticals may replace transverse product validation.
 # Unknown extensions, shared test fixtures and mixed product changes stay conservative.
 $foundry = '^(src/extensions/Agentstration\.Extensions\.Foundry/|tests/Agentstration\.ModelProviders\.Tests/Foundry(Provider|Live)Tests\.cs$)'
-$opendal = '^(deploy/opendal/|scripts/opendal/|samples/OpenDalSmoke/|src/extensions/Agentstration\.Extensions\.OpenDal/|tests/Agentstration\.Extensions\.OpenDal\.Tests/)'
+$opendal = '^(\.github/workflows/opendal\.yml$|deploy/opendal/|scripts/opendal/|samples/OpenDalSmoke/|src/extensions/Agentstration\.Extensions\.OpenDal/|tests/Agentstration\.Extensions\.OpenDal\.Tests/)'
 $imageTooling = '^(deploy/images/(extensions/(foundry|opendal)|workers/maf-worker|applications/server)\.json$|scripts/(packaging|preview)/|deploy/preview/|Dockerfile\.extension$|\.github/workflows/(oci-images|validate-oci-image|preview-environment|preview-azure-validation|preview-azure-environment|preview-on-demand)\.yml$)'
 $commonImages = '^(scripts/packaging/(images|test_images|smoke)\.py$|Dockerfile\.extension$|\.github/workflows/(oci-images|validate-oci-image)\.yml$|\.dockerignore$)'
 $foundryImages = "$foundry|^(deploy/images/extensions/foundry\.json$|scripts/packaging/(enrollment_smoke|test_enrollment_smoke)\.py$|scripts/packaging/aep-extension\.smoke\.compose\.yml$|aep/|tests/Agentstration\.ModelProviders\.Tests/)"
