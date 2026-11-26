@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "localai",
+  "extensionId": "Agentstration.Extensions.LocalAI",
+  "project": "src/extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj",
+  "entrypoint": "Agentstration.Extensions.LocalAI.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.LocalAI/version.txt",
+  "testProject": "tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj",
+  "testFilter": "FullyQualifiedName~LocalAi|FullyQualifiedName~LocalAI|FullyQualifiedName~InferenceTimeoutTests",
+  "imageName": "extension-localai",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "modelProviders",
+  "contributionId": "localai"
+}
