@@ -315,13 +315,11 @@ Use **Proposed** when implementation or repository evidence does not establish a
 254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
 
 255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)
-
 256. [ADR-0256 — Preview lifecycle binds provider-neutral requests to owned resources](0256-preview-lifecycle-binds-provider-neutral-requests-to-owned-resources.md)
 
 257. [ADR-0257 — Azure previews use OIDC and credential-free OCI transfer](0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
 
 258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
-
 259. [ADR-0259 — Preview routes use owned tunnels and an isolated Access proxy](0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)
 
 260. [ADR-0260 — Transformation Schemas have explicit function exposure](0260-transformation-schemas-have-explicit-function-exposure.md)
@@ -329,3 +327,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 261. [ADR-0261 — Acquisition text content is selected at admission](0261-acquisition-text-content-is-selected-at-admission.md)
 
 262. [ADR-0262 — XML processing uses operator content settings](0262-xml-processing-uses-operator-content-settings.md)
+263. [ADR-0263 — Dataset operation inputs use exact value bindings](0263-dataset-operation-inputs-use-exact-value-bindings.md)

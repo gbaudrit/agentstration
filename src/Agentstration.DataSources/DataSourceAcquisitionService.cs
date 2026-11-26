@@ -28,6 +28,7 @@ public sealed record DataSourceFlowRunRequest(
     Guid PrincipalId)
 {
     public bool TransientPayloads { get; init; }
+    public IReadOnlyList<Agentstration.Secrets.Abstractions.SecretInputReference> SecretInputs { get; init; } = [];
     public IReadOnlyDictionary<string, IReadOnlyList<FlowCompositionCall>> Compositions { get; init; } = new Dictionary<string, IReadOnlyList<FlowCompositionCall>>();
     public ResourceScopeRef? LogicalScopeRef { get; init; }
 }

@@ -1,0 +1,6 @@
+.operation-parameters-editor, .operation-parameter-fields, .operation-parameter { display: grid; min-width: 0; }
+.operation-parameters-editor { gap: var(--space-4); }
+.operation-parameter { padding-block: var(--space-3); }
+.operation-parameter + .operation-parameter { border-top: 1px solid var(--border); }
+.operation-parameters-advanced { min-width: 0; padding-top: var(--space-3); border-top: 1px solid var(--border); font-size: var(--font-size-sm); }
+.operation-parameters-advanced summary { color: var(--primary); cursor: pointer; margin-bottom: var(--space-3); }

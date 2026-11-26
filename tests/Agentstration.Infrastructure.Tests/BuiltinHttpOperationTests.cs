@@ -11,6 +11,37 @@ namespace Agentstration.Management.Tests;
 [TestClass]
 public sealed class BuiltinHttpOperationTests
 {
+    [TestMethod]
+    public async Task ProtectedProviderTransportPreservesTheRequestAndMarksItBeforeDiagnostics()
+    {
+        using var transport = new ProtectedTransport();
+        using var configured = new HttpClient(transport) { BaseAddress = new("https://extension.test/") };
+        using var client = new HttpClient(new ConnectedServiceAcquisitionExecutor.ProtectedRequestHandler(configured))
+        { BaseAddress = configured.BaseAddress };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "aep/acquire")
+        { Content = new StringContent("synthetic-protected-input") };
+        request.Headers.Add("X-Correlation-ID", "fixture-correlation");
+        using var response = await client.SendAsync(request);
+        Assert.AreEqual(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.IsTrue(transport.Protected);
+        Assert.AreEqual("synthetic-protected-input", transport.Body);
+        Assert.AreEqual("fixture-correlation", transport.Correlation);
+    }
+
+    private sealed class ProtectedTransport : HttpMessageHandler
+    {
+        public bool Protected { get; private set; }
+        public string? Body { get; private set; }
+        public string? Correlation { get; private set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Protected = request.Options.TryGetValue(new HttpRequestOptionsKey<bool>(Agentstration.Http.Diagnostics.HttpDiagnosticsExtensions.SensitivePayloadKey), out var value) && value;
+            Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Correlation = request.Headers.GetValues("X-Correlation-ID").Single();
+            return new(System.Net.HttpStatusCode.OK) { Content = new StringContent("{}") };
+        }
+    }
+
     private static ConnectedServiceOperationCandidate Discover(string url) => BuiltinHttpOperation.Discover(url, null!);
 
     [TestMethod]
@@ -160,6 +191,8 @@ public sealed class BuiltinHttpOperationTests
         var context = new ConnectedServiceResolutionContext(ResourceScopeRef.Instance, operation.Address);
         var result = await executor.AcquireAsync(service, operation, JsonSerializer.SerializeToElement(new { q = "configured" }), context, default);
         Assert.AreEqual("https://example.test/search?q=configured", fetcher.Request!.Url.AbsoluteUri);
+        _ = await executor.AcquireAsync(service, operation, JsonSerializer.SerializeToElement(new { q = "protected" }), context, default, sensitivePayload: true);
+        Assert.IsTrue(fetcher.Request!.SensitivePayload);
         Assert.AreEqual(0, fetcher.Request.MaximumRedirects);
         Assert.AreEqual(4096, fetcher.Request.MaximumBytes);
         Assert.AreEqual("application/rss+xml", result.GetProperty("mediaType").GetString());
@@ -173,7 +206,7 @@ public sealed class BuiltinHttpOperationTests
                 executor.AcquireAsync(service, operation, JsonSerializer.SerializeToElement(new { q = "configured" }), context, default));
             Assert.AreEqual("http_operation_changed", failure.Code);
         }
-        Assert.AreEqual(2, fetcher.Calls);
+        Assert.AreEqual(3, fetcher.Calls);
         resolver.Sample = "https://example.test/search?q=sample";
         var bounded = new BuiltinHttpOperationExecutor(resolver, fetcher, new() { MaximumValueBytes = 8 });
         await Assert.ThrowsAsync<DataSourceValidationException>(() => bounded.AcquireAsync(service, operation,

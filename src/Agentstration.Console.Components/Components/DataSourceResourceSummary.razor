@@ -47,7 +47,8 @@
     private sealed record DatasetSetting(string Label, string Value);
     private IReadOnlyList<DatasetSetting> DatasetSettings => Resource.Definition.Dataset is not { } saved ? [] :
     [new(T("DatasetService"), ServiceDisplayName ?? saved.Acquisition.Operation.Operation.ToString()), new(T("DatasetOperation"), OperationDisplayName ?? saved.Acquisition.Operation.Operation.ToString()),
-     new(T("Parameters"), saved.Acquisition.Parameters.GetRawText()), new(T("DatasetStorage"), StorageDisplayName ?? (saved.Storage is null ? T("DirectInput") : saved.Storage.Storage.ToString())), new(T("DatasetPrefix"), saved.Rule.Prefix),
+     new(T("Parameters"), saved.Acquisition.ParameterBindings.Count == 0 ? saved.Acquisition.Parameters.GetRawText()
+        : JsonSerializer.Serialize(new { saved.Acquisition.Parameters, saved.Acquisition.ParameterBindings })), new(T("DatasetStorage"), StorageDisplayName ?? (saved.Storage is null ? T("DirectInput") : saved.Storage.Storage.ToString())), new(T("DatasetPrefix"), saved.Rule.Prefix),
      new(T("AcquisitionOutputSchema"), ContractSummary(saved.Acquisition.OutputSchemaBinding)), new(T("ProjectedOutputSchema"), ContractSummary(saved.OutputSchemaBinding)),
      new(T("LifecycleTitle"), JsonSerializer.Serialize(saved.Lifecycle)), new(T("WizardTreatments"), JsonSerializer.Serialize(new { saved.Orchestration, saved.Compositions, saved.Transformations }))];
     [Parameter] public string ConfigurationTestId { get; set; } = "data-source-configuration-summary";

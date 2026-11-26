@@ -305,7 +305,7 @@ public sealed class ToolRelayApiTests : ModelManagementApiTestBase
         _ = await repository.CreateRunAsync(pending, default);
         using (var value = new SecretValue(Encoding.UTF8.GetBytes("synthetic-after-recovery")))
             await secrets.SetValueExactAsync(scope, secret.Value.Name, value, default);
-        var resolver = new ToolSecretInputResolver(definitions, factory.Services.GetRequiredService<ISecretResolver>(),
+        var resolver = new ToolSecretInputResolver(factory.Services.GetRequiredService<IResourceStore>(), factory.Services.GetRequiredService<ISecretResolver>(),
             factory.Services.GetRequiredService<ICurrentRequestContext>(), factory.Services.GetRequiredService<IResourceScopeResolver>());
         using (var recovered = await resolver.ResolveAsync(reloaded.Input, reloaded.SecretInputs, default))
             Assert.AreEqual("synthetic-after-recovery", recovered.Value.GetProperty("accessCode").GetString());

@@ -155,7 +155,7 @@ internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver res
 
     internal async Task<JsonElement> AcquireAsync(ConnectedServiceResource service,
         ConnectedServiceOperationResource operation, JsonElement parameters, ConnectedServiceResolutionContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool sensitivePayload = false)
     {
         using var connection = await ResolveAsync(service, context, cancellationToken);
         var expected = BuiltinHttpOperation.Discover(Sample(connection), operation.Definition.Type);
@@ -165,7 +165,8 @@ internal sealed class BuiltinHttpOperationExecutor(IConnectedServiceResolver res
         var url = BuiltinHttpOperation.RequestUri(expected.Definition, parameters);
         // Redirects cannot change the selected service authority. Reuse the existing public-network,
         // timeout, media-type and bounded-body transport rather than introducing another HTTP client.
-        var response = await fetcher.FetchAsync(new(url, (options ?? new()).MaximumHttpResponseBytes, 0, TimeSpan.FromSeconds(20), AllowedMediaTypes), cancellationToken);
+        var response = await fetcher.FetchAsync(new(url, (options ?? new()).MaximumHttpResponseBytes, 0, TimeSpan.FromSeconds(20), AllowedMediaTypes)
+        { SensitivePayload = sensitivePayload }, cancellationToken);
         string content;
         try { content = new UTF8Encoding(false, true).GetString(response.Content); }
         catch (DecoderFallbackException)

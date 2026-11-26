@@ -73,6 +73,7 @@ export const TestIds = {
   sourcePolicies: {
     pointName: 'composition-point-name', configureStep: 'configure-selected-step', datasetError: 'dataset-error-code', compositionError: 'dataset-composition-error-code',
     definitionFields: 'dataset-definition-fields', service: 'dataset-service', operation: 'dataset-operation',
+    datasetLiteral: 'dataset-parameter-dataset-binding-literal',
     storage: 'dataset-storage', direct: 'dataset-allow-direct', lifecycle: 'source-lifecycle-editor',
     enable: 'lifecycle-enable', ttl: 'lifecycle-ttl', history: 'lifecycle-history', retention: 'lifecycle-retention',
     directResult: 'dataset-direct-result', fallbackEvidence: 'knowledge-input-fallback', directEvidence: 'knowledge-input-direct', latestAcquisition: 'dataset-latest-acquisition',

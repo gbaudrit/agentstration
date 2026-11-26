@@ -53,9 +53,11 @@ public sealed class DataSourceResourcePreviewTests
     }
 
     [TestMethod]
-    [DataRow("en-US")]
-    [DataRow("fr-FR")]
-    public async Task DatasetPreviewRendersSavedPinsWithoutServiceStorageOrAcquisitionReads(string locale)
+    [DataRow("en-US", false)]
+    [DataRow("fr-FR", false)]
+    [DataRow("en-US", true)]
+    [DataRow("fr-FR", true)]
+    public async Task DatasetPreviewRendersSavedPinsWithoutServiceStorageOrAcquisitionReads(string locale, bool withValueReferences)
     {
         using var culture = new TestCultureScope(locale);
         var saved = Resource("data-source-a") with
@@ -64,7 +66,13 @@ public sealed class DataSourceResourcePreviewTests
             {
                 DisplayName = "Saved dataset",
                 Dataset = new(null, new(Write: true),
-                new(new(new(Scope, ResourceNamespace.Default, "ConnectedServiceOperation", "saved-operation"), Guid.NewGuid(), 7, "saved-digest"), JsonSerializer.SerializeToElement(new { savedParameter = "saved-parameter" })))
+                new(new(new(Scope, ResourceNamespace.Default, "ConnectedServiceOperation", "saved-operation"), Guid.NewGuid(), 7, "saved-digest"), JsonSerializer.SerializeToElement(new { savedParameter = "saved-parameter" }))
+                {
+                    ParameterBindings = withValueReferences
+                        ? [new("query", Parameter: new(new(ResourceNamespace.Default, "Parameter", "saved-parameter-reference"), Scope)),
+                           new("token", Secret: new(new(ResourceNamespace.Default, "Secret", "saved-secret-reference"), Scope))]
+                        : []
+                })
             }
         };
         using var handler = new Handler((_, _) => Task.FromResult(Response(saved)));
@@ -74,6 +82,11 @@ public sealed class DataSourceResourcePreviewTests
         var configuration = cut.Find("[data-testid=data-source-configuration-summary]").TextContent;
         Assert.Contains("saved-operation", configuration);
         Assert.Contains("saved-parameter", configuration);
+        if (withValueReferences)
+        {
+            Assert.Contains("saved-parameter-reference", configuration);
+            Assert.Contains("saved-secret-reference", configuration);
+        }
         Assert.IsEmpty(cut.FindAll("form, .collection-view-switch"));
     }
 

@@ -22,7 +22,7 @@
     }
     else if (analysis.Root is not null)
     {
-        <JsonSchemaField Schema="@(analysis.Root with { Title = analysis.Root.Title ?? ValueLabel ?? (AllowAnyRoot ? Localizer["JsonValue"].Value : null), Description = Compact ? null : analysis.Root.Description })" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" LockedPaths="lockedPaths" Issues="state.Issues" PreservePresence="AllowAnyRoot" IsPresent="valuePresent" ValueRemoved="RemoveDocumentAsync" Compact="IsCompactValue" />
+        <JsonSchemaField Schema="@(analysis.Root with { Title = analysis.Root.Title ?? ValueLabel ?? (AllowAnyRoot ? Localizer["JsonValue"].Value : null), Description = Compact ? null : analysis.Root.Description })" Value="document" ValueChanged="ChangeDocumentAsync" Disabled="@(Disabled || ReadOnly)" LockedPaths="lockedPaths" Issues="state.Issues" PreservePresence="AllowAnyRoot" IsPresent="valuePresent" ValueRemoved="RemoveDocumentAsync" Compact="IsCompactValue" SingleLineText="SingleLineText" />
     }
     @if (IsCompactValue)
     {
@@ -44,6 +44,7 @@
     [Parameter] public bool AllowAnyRoot { get; set; }
     [Parameter] public bool Required { get; set; } = true;
     [Parameter] public bool Compact { get; set; }
+    [Parameter] public bool SingleLineText { get; set; }
     [Parameter] public string? ValueLabel { get; set; }
     private bool IsCompactValue => Compact && AllowAnyRoot && analysis.CanRender && analysis.Root is { } root && IsSimple(root);
     private static bool IsSimple(JsonSchemaInputNode node) => node.Kind is JsonSchemaInputKind.Text or JsonSchemaInputKind.WholeNumber

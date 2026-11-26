@@ -164,6 +164,10 @@
         && operation.Definition.Definition.TryGetProperty(property, out var schema) && schema.ValueKind == JsonValueKind.Object ? schema : null;
     private JsonElement? InputSchema => SelectedType?.Acquisition is { } adapter ? DefinitionSchema(adapter.InputSchemaProperty)
         : HasSavedOperationPin ? readiness?.Dataset?.InputSchema : null;
+    private IReadOnlyCollection<string> SingleLineTextFields => SelectedOperation is { } operation
+        && operation.Definition.Definition.ValueKind == JsonValueKind.Object
+        && operation.Definition.Definition.TryGetProperty("queryParameters", out var names) && names.ValueKind == JsonValueKind.Array
+        ? names.EnumerateArray().Where(name => name.ValueKind == JsonValueKind.String).Select(name => name.GetString()!).ToArray() : [];
     private JsonElement? AcquisitionResponseSchema => model.AcquisitionOutputBinding is null
         ? SelectedType?.Acquisition is { } adapter ? DefinitionSchema(adapter.OutputSchemaProperty)
             : HasSavedOperationPin ? readiness?.Dataset?.OperationOutputSchema : null
@@ -277,11 +281,12 @@
     }
     private async Task ChangeScopeAsync(ResourceScopeRef? value) { if (!IsNew) return; scope = model.Scope = value; model.StorageKey = ""; model.DocumentCollectionUid = Guid.Empty; model.ServiceKey = ""; ResetOperation(); await RefreshAsync(); }
     private async Task ChangeServiceAsync(ChangeEventArgs value) { model.ServiceKey = value.Value?.ToString() ?? ""; ResetOperation(); await RefreshAsync(); }
-    private void ResetOperation() { ++contractVersion; operationContract = null; loadingOperationContract = false; model.OperationKey = ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); parametersValid = true; preview = null; }
+    private void ResetOperation() { ++contractVersion; operationContract = null; loadingOperationContract = false; model.OperationKey = ""; model.Parameters = JsonSerializer.SerializeToElement(new { }); model.ParameterBindings = []; parametersValid = true; preview = null; }
     private async Task ChangeOperation(ChangeEventArgs value)
     {
         model.OperationKey = value.Value?.ToString() ?? "";
         model.Parameters = JsonSerializer.SerializeToElement(new { });
+        model.ParameterBindings = [];
         parametersValid = true;
         await RefreshOperationContractAsync();
     }
@@ -314,33 +319,37 @@
     </ResourceIdentityEditor>;
 
     private RenderFragment AcquisitionContent => @<div class="dataset-step-fields">
-<section class="panel form-section"><h2>@T("DatasetSavedAcquisition")</h2><div class="form-grid">
-                <FormField Label="@T("DatasetService")" Class="form-field-wide" Help="@T("DatasetServiceHelp")" Required="@(!HasSavedOperationPin)"><ClearableSelect TValue="string" Value="@model.ServiceKey" ValueExpression="@(() => model.ServiceKey)" ValueChanged="value => ChangeServiceAsync(new ChangeEventArgs { Value = value })" data-testid="dataset-service" required="@(!HasSavedOperationPin)">
+<section class="panel form-section"><h2>@T("DatasetSavedAcquisition")</h2><div class="form-grid dataset-acquisition-fields">
+                <FormField Label="@T("DatasetService")" Help="@T("DatasetServiceHelp")" Required="@(!HasSavedOperationPin)"><ClearableSelect TValue="string" Value="@model.ServiceKey" ValueExpression="@(() => model.ServiceKey)" ValueChanged="value => ChangeServiceAsync(new ChangeEventArgs { Value = value })" data-testid="dataset-service" required="@(!HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var service in connectedServices) { <option value="@service.Uid.ToString()">@service.Definition.DisplayName · @service.ScopeRef · @service.Namespace/@service.Name</option> }
                     @if (!string.IsNullOrEmpty(model.ServiceKey) && SelectedService is null) { <option value="@model.ServiceKey">@T("DatasetPinnedUnavailable")</option> }
                 </ClearableSelect></FormField>
-                @if (SelectedService is { } selectedService)
-                {
-                    <p class="form-field-wide"><a class="text-button" href="@ServiceDiscoveryUrl(selectedService)" data-testid="dataset-service-discovery-link">@T("DatasetManageOperations")</a></p>
-                }
-                <FormField Label="@T("DatasetOperation")" Class="form-field-wide" Help="@T("DatasetOperationHelp")" Required="true"><ChildContent><ClearableSelect TValue="string" Value="@model.OperationKey" ValueExpression="@(() => model.OperationKey)" ValueChanged="value => ChangeOperation(new ChangeEventArgs { Value = value })" data-testid="dataset-operation" required Disabled="@(SelectedService is null && !HasSavedOperationPin)">
+                <FormField Label="@T("DatasetOperation")" Help="@T("DatasetOperationHelp")" Required="true"><ChildContent><ClearableSelect TValue="string" Value="@model.OperationKey" ValueExpression="@(() => model.OperationKey)" ValueChanged="value => ChangeOperation(new ChangeEventArgs { Value = value })" data-testid="dataset-operation" required Disabled="@(SelectedService is null && !HasSavedOperationPin)">
                     <option value="">@T("Select")</option>
                     @foreach (var operation in ServiceOperations) { <option value="@OperationKey(operation)">@operation.Definition.DisplayName · @operation.Generation · @T(operation.Enabled ? "Enabled" : "Disabled")</option> }
                     @if (HasSavedOperationPin && ServiceOperations.All(value => OperationKey(value) != model.OperationKey)) { <option value="@model.OperationKey">@source!.Definition.Dataset!.Acquisition.Operation.Operation · @T("DatasetPinnedUnavailable")</option> }
                 </ClearableSelect></ChildContent><Validation><ValidationMessage For="@(() => model.OperationKey)" /></Validation></FormField>
+                @if (SelectedService is { } selectedService)
+                {
+                    <div class="form-span-2 dataset-service-link"><a class="text-button" href="@ServiceDiscoveryUrl(selectedService)" data-testid="dataset-service-discovery-link"><UiIcon Name="external-link" />@T("DatasetManageOperations")</a></div>
+                }
                 @if (SelectedService is not null && !ServiceOperations.Any() && !HasSavedOperationPin) { <p class="form-field-wide" role="status">@T("DatasetNoServiceOperations")</p> }
                 @if (loadingOperationContract) { <p class="form-field-wide" role="status">@T("Loading")</p> }
                 else if (SelectedOperation is not null && AcquisitionIssue is { } issue)
                 { <p class="form-field-wide form-alert" role="status" data-testid="dataset-operation-ineligible">@T(issue)</p> }
-                <div class="form-field-wide" data-testid="dataset-parameters"><span>@T("Parameters")</span>
-                    @if (string.IsNullOrEmpty(model.OperationKey)) { <p>@T("DatasetSelectOperationFirst")</p> }
-                    else if (AcquisitionIssue is not null && SelectedOperation is not null) { <p>@T("DatasetParametersUnavailable")</p> }
-                    else if (NoConfiguration) { <p>@T("DatasetNoConfiguration")</p> }
-                    else { <JsonSchemaInputEditor Schema="InputSchema" Value="model.Parameters" ValueChanged="value => model.Parameters = value" ValidationChanged="ParametersValidated" Disabled="@(busy || !CanManage)" AllowAnyRoot="true" /> }
-                    <small>@T("DatasetParametersHelp")</small>
-                </div>
-                    </div></section>
+                    </div>
+                @if (HasOperationSelection && !loadingOperationContract)
+                {
+                    <div class="dataset-parameters" data-testid="dataset-parameters">
+                        <div class="dataset-parameters-heading"><h3>@T("DatasetParametersTitle")</h3><p>@T("DatasetBoundParametersHelp")</p></div>
+                        @if (AcquisitionIssue is not null && SelectedOperation is not null) { <p class="muted">@T("DatasetParametersUnavailable")</p> }
+                        else if (NoConfiguration) { <p class="muted">@T("DatasetNoConfiguration")</p> }
+                        else { <DataSourceOperationParametersEditor @key="model.OperationKey" Schema="InputSchema" SingleLineTextFields="SingleLineTextFields" @bind-Value="model.Parameters" @bind-Bindings="model.ParameterBindings"
+                            ValidationField="@FormContext.Field(nameof(model.Parameters))" ValidityChanged="valid => parametersValid = valid" Scope="model.Scope" Namespace="@(model.NamespaceValid ? ResourceNamespace.Parse(DraftNamespace) : (ResourceNamespace?)null)" Disabled="@(busy || !CanManage)" /> }
+                    </div>
+                }
+                </section>
     </div>;
 
     private RenderFragment StorageContent => @<div class="dataset-step-fields">@StorageDestinationContent @StoragePolicyContent</div>;
@@ -459,15 +468,49 @@
         ? $"{reference.Namespace?.Value ?? DraftNamespace}/{reference.Name} · {reference.Version}"
         : T(binding?.Inline is not null ? "WizardInlineContract" : "WizardNoContract");
 
-    private RenderFragment ReviewContent => @<section class="panel form-section dataset-review" data-testid="data-source-creation-review">
-        <h2>@T("WizardReviewTitle")</h2>
-        <p>@T("WizardReviewHelp")</p>
-        <div class="dataset-review-row"><h3>@T("WizardIdentity")</h3><div><strong>@(string.IsNullOrWhiteSpace(model.DisplayName) ? T("WizardNotEntered") : model.DisplayName)</strong>@if (!string.IsNullOrWhiteSpace(model.Name)) { <CopyableValue Value="@($"{DraftNamespace}/{model.Name}")" /> } else { <p>@T("WizardNotEntered")</p> }<ResourceScopeBadge ScopeRef="scope" /><p>@T(model.Enabled ? "Enabled" : "Disabled")</p>@if (!string.IsNullOrWhiteSpace(model.Description)) { <p>@model.Description</p> }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("identity")' aria-label="@T("WizardEditIdentity")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardAcquisition")</h3><div>@if (SelectedService is { } selectedService) { <strong>@selectedService.Definition.DisplayName</strong><code>@selectedService.Namespace/@selectedService.Name</code><ResourceScopeBadge ScopeRef="selectedService.ScopeRef" /> } else { <strong>@T("WizardNotSelected")</strong> }@if (SelectedOperation is { } selectedOperation) { <p>@selectedOperation.Definition.DisplayName · @T("Generation") @selectedOperation.Generation</p><code>@selectedOperation.Namespace/@selectedOperation.Name</code><details><summary>@T("Parameters")</summary><pre>@model.Parameters.GetRawText()</pre></details> } else { <p>@T("WizardNotSelected")</p> }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("acquisition")' aria-label="@T("WizardEditAcquisition")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardStorage")</h3><div><strong>@(SelectedStorage?.Definition.DisplayName ?? T(model.AllowDirect ? "DirectInput" : "WizardNotSelected"))</strong>@if (SelectedStorage is { } storage) { <code>@storage.Namespace/@storage.Name</code><ResourceScopeBadge ScopeRef="storage.ScopeRef" /><p>@T("Generation") @storage.Generation</p> }<p><code>@model.Prefix</code></p>@if (model.DocumentCollectionUid != Guid.Empty) { <p>@T("DatasetDocumentCollection") · @SelectedStorage?.Definition.Collections.FirstOrDefault(item => item.Uid == model.DocumentCollectionUid)?.DisplayName</p> }<p>@T(model.LifecycleEnabled ? "LifecycleEnable" : "WizardLifecycleOff")</p>@if (model.LifecycleEnabled) { <p>@T("LifecycleTtl"): @(string.IsNullOrWhiteSpace(model.AcquisitionTtl) ? T("WizardNoExpiry") : model.AcquisitionTtl)</p><p>@T(model.KeepHistory ? "LifecycleHistory" : "WizardNoHistory")</p>@if (model.KeepHistory) { <p>@T("LifecycleRetention"): @model.HistoryRetention</p> } }</div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("storage")' aria-label="@T("WizardEditStorage")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardTreatments")</h3><div><strong>@(model.Orchestration?.ResourceId ?? T("WizardStandardOrchestration"))</strong>@if (model.Orchestration is not null) { <p>@model.Orchestration.Namespace/@model.Orchestration.ResourceId · @model.Orchestration.Version</p> }<p>@Localizer["WizardTransformationCount", model.CompositionPoints.Values.Sum(calls => calls.Count)]</p></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("treatments")' aria-label="@T("WizardEditTreatments")">@T("WizardEdit")</button></div>
-        <div class="dataset-review-row"><h3>@T("WizardContracts")</h3><div><p>@T("AcquisitionOutputSchema"): @ContractSummary(model.AcquisitionOutputBinding)</p><p>@T("ProjectedOutputSchema"): @ContractSummary(model.OutputBinding)</p></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("contracts")' aria-label="@T("WizardEditContracts")">@T("WizardEdit")</button></div>
-    </section>;
+    private RenderFragment ReviewContent => @<FormSection Title="@T("WizardReviewTitle")" Description="@T("WizardReviewHelp")" Class="dataset-review" TestId="data-source-creation-review">
+        <ChildContent><div class="dataset-review-grid">
+            <section class="dataset-review-card dataset-review-identity">
+                <header><div><UiIcon Name="database" /><h3>@T("WizardIdentity")</h3></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("identity")' aria-label="@T("WizardEditIdentity")">@T("WizardEdit")</button></header>
+                <strong class="dataset-review-name">@(string.IsNullOrWhiteSpace(model.DisplayName) ? T("WizardNotEntered") : model.DisplayName)</strong>
+                @if (!string.IsNullOrWhiteSpace(model.Name)) { <CopyableValue Value="@($"{DraftNamespace}/{model.Name}")" /> }
+                <div class="dataset-review-badges"><ResourceScopeBadge ScopeRef="scope" /><StatusBadge Text="@T(model.Enabled ? "Enabled" : "Disabled")" Status="@(model.Enabled ? UiStatus.Success : UiStatus.Neutral)" /></div>
+                @if (!string.IsNullOrWhiteSpace(model.Description)) { <p class="muted">@model.Description</p> }
+            </section>
+            <section class="dataset-review-card">
+                <header><div><UiIcon Name="download" /><h3>@T("WizardAcquisition")</h3></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("acquisition")' aria-label="@T("WizardEditAcquisition")">@T("WizardEdit")</button></header>
+                <dl><dt>@T("DatasetService")</dt><dd>@if (SelectedService is { } selectedService) { <strong>@selectedService.Definition.DisplayName</strong><ResourceScopeBadge ScopeRef="selectedService.ScopeRef" /> } else { @T("WizardNotSelected") }</dd>
+                    <dt>@T("DatasetOperation")</dt><dd>@if (SelectedOperation is { } selectedOperation) { <strong>@selectedOperation.Definition.DisplayName</strong><small>@T("Generation") @selectedOperation.Generation</small> } else { @T("WizardNotSelected") }</dd></dl>
+                @if (SelectedOperation is not null && !NoConfiguration)
+                {
+                    <details class="dataset-review-parameters"><summary>@T("DatasetParametersTitle")</summary><pre>@JsonSerializer.Serialize(model.Parameters, new JsonSerializerOptions { WriteIndented = true })</pre>
+                        @foreach (var binding in model.ParameterBindings) { <div class="dataset-review-binding"><strong>@binding.Name</strong><span>@T(binding.Secret is null ? "DatasetParameterReference" : "DatasetSecretReference")</span><code>@(binding.Parameter?.Address.ToString() ?? binding.Secret?.Address.ToString())</code><ResourceScopeBadge ScopeRef="@(binding.Parameter?.ScopeRef ?? binding.Secret?.ScopeRef)" /></div> }
+                    </details>
+                }
+            </section>
+            <section class="dataset-review-card">
+                <header><div><UiIcon Name="layers" /><h3>@T("WizardStorage")</h3></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("storage")' aria-label="@T("WizardEditStorage")">@T("WizardEdit")</button></header>
+                <strong>@(SelectedStorage?.Definition.DisplayName ?? T(model.AllowDirect ? "DirectInput" : "WizardNotSelected"))</strong>
+                @if (SelectedStorage is { } storage) { <div class="dataset-review-badges"><ResourceScopeBadge ScopeRef="storage.ScopeRef" /><small>@T("Generation") @storage.Generation</small></div> }
+                <dl>@if (!string.IsNullOrEmpty(model.Prefix)) { <dt>@T("DatasetPrefix")</dt><dd><code>@model.Prefix</code></dd> }
+                    @if (model.DocumentCollectionUid != Guid.Empty) { <dt>@T("DatasetDocumentCollection")</dt><dd>@SelectedStorage?.Definition.Collections.FirstOrDefault(item => item.Uid == model.DocumentCollectionUid)?.DisplayName</dd> }
+                    <dt>@T("LifecycleTtl")</dt><dd>@(model.LifecycleEnabled && !string.IsNullOrWhiteSpace(model.AcquisitionTtl) ? model.AcquisitionTtl : T("WizardNoExpiry"))</dd>
+                    <dt>@T("WizardHistoryLabel")</dt><dd>@T(model.LifecycleEnabled && model.KeepHistory ? "LifecycleHistory" : "WizardNoHistory")</dd>
+                    @if (model.LifecycleEnabled && model.KeepHistory) { <dt>@T("LifecycleRetention")</dt><dd>@model.HistoryRetention</dd> }
+                </dl>
+            </section>
+            <section class="dataset-review-card">
+                <header><div><UiIcon Name="workflow" /><h3>@T("WizardTreatments")</h3></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("treatments")' aria-label="@T("WizardEditTreatments")">@T("WizardEdit")</button></header>
+                <strong>@(model.Orchestration?.ResourceId ?? T("WizardStandardOrchestration"))</strong>
+                <p class="muted">@Localizer["WizardTransformationCount", model.CompositionPoints.Values.Sum(calls => calls.Count)]</p>
+                @foreach (var call in model.CompositionPoints.Values.SelectMany(calls => calls)) { <div class="dataset-review-transformation"><UiIcon Name="arrow-right" /><span>@(call.Function?.Name ?? call.Flow?.ResourceId)<small>@(call.Function?.Version ?? call.Flow?.Version)</small></span></div> }
+            </section>
+            <section class="dataset-review-card">
+                <header><div><UiIcon Name="code" /><h3>@T("WizardContracts")</h3></div><button type="button" class="text-button" @onclick='() => ReviewEditAsync("contracts")' aria-label="@T("WizardEditContracts")">@T("WizardEdit")</button></header>
+                <dl><dt>@T("AcquisitionOutputSchema")</dt><dd>@ContractSummary(model.AcquisitionOutputBinding)</dd><dt>@T("ProjectedOutputSchema")</dt><dd>@ContractSummary(model.OutputBinding)</dd></dl>
+            </section>
+        </div></ChildContent>
+    </FormSection>;
 
     private async Task SaveAsync() => await RunAsync(async () =>
     {
@@ -481,7 +524,7 @@
             new(operation.ScopeRef!.Value, operation.Namespace, operation.Kind, operation.Name), operation.Uid, operation.Generation, operation.Definition.DefinitionDigest);
         var rule = (source?.Definition.Dataset?.Rule ?? new StorageContentPolicy(Write: true)) with { Prefix = model.Prefix };
         var definition = new DataSourceProperties { DisplayName = model.DisplayName.Trim(), Description = model.Description, Enabled = model.Enabled,
-            Dataset = new(storageReference, rule, new(operationReference, model.Parameters) { OutputSchemaBinding = model.AcquisitionOutputBinding }) { DocumentCollectionUid = model.DocumentCollectionUid == Guid.Empty ? null : model.DocumentCollectionUid, OutputSchemaBinding = model.OutputBinding, Orchestration = model.Orchestration, Compositions = model.CompositionPoints, Lifecycle = LifecycleSelection() } };
+            Dataset = new(storageReference, rule, new(operationReference, model.Parameters) { ParameterBindings = model.ParameterBindings, OutputSchemaBinding = model.AcquisitionOutputBinding }) { DocumentCollectionUid = model.DocumentCollectionUid == Guid.Empty ? null : model.DocumentCollectionUid, OutputSchemaBinding = model.OutputBinding, Orchestration = model.Orchestration, Compositions = model.CompositionPoints, Lifecycle = LifecycleSelection() } };
         var saved = IsNew ? await Client.CreateAsync(new(model.Name, definition, DraftNamespace, scope), cancellation.Token)
             : await Client.UpdateAsync(source!.Namespace, source.Name, scope!.Value, new(definition), etag!, cancellation.Token);
         if (disposed || version != loadVersion) return;
@@ -529,6 +572,7 @@
                 "data_source_operation_not_read_only" => "DatasetOperationNotReadOnly",
                 "data_source_operation_schema_missing" or "data_source_schema_unsupported" => "DatasetOperationSchemaMissing",
                 "data_source_parameters_invalid" => "DatasetParametersInvalid",
+                "data_source_parameter_binding_invalid" => "DatasetParameterBindingInvalid",
                 "data_source_retained_storage_required" => "LifecycleStorageRequired",
                 "data_source_lifecycle_invalid" => "LifecycleDurationInvalid",
                 "data_source_direct_permission_required" => "DirectPermission",

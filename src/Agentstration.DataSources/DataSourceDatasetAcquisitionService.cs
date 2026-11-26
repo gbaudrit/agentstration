@@ -118,7 +118,8 @@ public sealed class DataSourceDatasetAcquisitionService(
             CorrelationId = string.IsNullOrWhiteSpace(correlationId) ? id : correlationId,
             IdempotencyKey = idempotencyKey,
             RequestHash = hash,
-            Parameters = dataset.Definition.Acquisition.Parameters.Clone(),
+            Parameters = dataset.InvocationParameters.ValueKind == JsonValueKind.Undefined
+                ? dataset.Definition.Acquisition.Parameters.Clone() : dataset.InvocationParameters.Clone(),
             CreatedBy = context.PrincipalId,
             TenantId = context.TenantId,
             WorkspaceId = context.WorkspaceId,
@@ -140,6 +141,7 @@ public sealed class DataSourceDatasetAcquisitionService(
             acquisition.TenantId, acquisition.WorkspaceId, acquisition.CreatedBy)
         {
             LogicalScopeRef = acquisition.LogicalScopeRef,
+            SecretInputs = acquisition.Dataset.SecretInputs,
             TransientPayloads = acquisition.Dataset!.Definition.Storage is null,
             Compositions = acquisition.Dataset.Composition?.Receipt?.Bindings
             ?? new Dictionary<string, IReadOnlyList<Agentstration.Flows.FlowCompositionCall>>()

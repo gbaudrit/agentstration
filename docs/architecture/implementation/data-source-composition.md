@@ -40,6 +40,44 @@ Data Source. Discovery is not offered from the Data Source. A changed reference 
 explicitly; refresh does not rewrite saved pins. Existing profile resources,
 discoveries, targets, acquisitions, Tools and Knowledge consumers are retained.
 
+### Saved input references
+
+Acquisition inputs use `ValueBindingRequirementEditor`, including its existing
+Parameter/Secret pickers and contextual creation. The parameter region appears only
+after selecting an Operation. Service and Operation remain in the same desktop row;
+the service-discovery link does not displace either selector. Storage options reuse
+`FormCheckbox` with the shared switch styling. Data Source and Knowledge continue to
+share `SourceFlowCompositionEditor` and `FlowSequenceEditor` for ordered treatments.
+
+Literal inputs remain in `dataset.acquisition.parameters`. Declared top-level scalar
+inputs may instead appear in `parameterBindings`, for example:
+
+```yaml
+acquisition:
+  operation: # existing exact operation revision reference
+    # ...
+  parameters:
+    gl: FR
+  parameterBindings:
+    - name: q
+      parameter:
+        address: { kind: Parameter, namespace: default, name: news-query }
+        scopeRef: /instance
+    - name: ceid
+      secret:
+        address: { kind: Secret, namespace: default, name: feed-region }
+        scopeRef: /instance
+```
+
+The server adds each reference's `resourceUid`. It rejects duplicate inputs, a literal
+and reference for the same input, missing/replaced resources and unauthorized use.
+Parameters resolve at acquisition admission; accepted values remain stable while a
+new acquisition sees current Parameter values. Secrets remain symbolic in accepted
+acquisition/Flow inputs and resolve only at the server's operation boundary. Rotation
+is observed on the next attempt. The wizard review and YAML retain references only;
+protected output echoes are redacted and request/response body diagnostics are
+suppressed for protected calls. See [ADR-0263](../../decisions/0263-dataset-operation-inputs-use-exact-value-bindings.md).
+
 When transformations are configured, the governed acquisition boundary uses the
 selected Operation's validated output schema if its adapter Flow has no declared
 success schema (for example the dynamic OpenAPI adapter). The schema is pinned

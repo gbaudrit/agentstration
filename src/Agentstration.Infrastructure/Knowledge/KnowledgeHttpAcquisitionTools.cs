@@ -14,7 +14,10 @@ internal sealed record HttpFetchRequest(
     int MaximumBytes,
     int MaximumRedirects,
     TimeSpan Timeout,
-    IReadOnlySet<string> AllowedMediaTypes);
+    IReadOnlySet<string> AllowedMediaTypes)
+{
+    public bool SensitivePayload { get; init; }
+}
 
 internal sealed record HttpFetchResult(Uri FinalUrl, string FileName, string MediaType, byte[] Content);
 
@@ -36,6 +39,8 @@ internal sealed class SafeHttpContentFetcher(HttpClient client) : IHttpContentFe
         for (var redirect = 0; ; redirect++)
         {
             using var message = new HttpRequestMessage(HttpMethod.Get, current);
+            if (request.SensitivePayload) message.Options.Set(new HttpRequestOptionsKey<bool>(
+                Agentstration.Http.Diagnostics.HttpDiagnosticsExtensions.SensitivePayloadKey), true);
             message.Headers.ConnectionClose = true;
             using var response = await SendAsync(message, timeout.Token, cancellationToken);
             if (IsRedirect(response.StatusCode))

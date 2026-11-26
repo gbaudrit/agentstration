@@ -3,7 +3,16 @@
 @implements IDisposable
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ContextualValueCreatorStrings> Localizer
 
-<div class="panel binding-requirement" data-testid="@(TestIdPrefix + "-value-requirement")" data-requirement-id="@Requirement.Id">
+<div class="binding-requirement @(Compact ? "binding-requirement-compact" : "panel")" data-testid="@(TestIdPrefix + "-value-requirement")" data-requirement-id="@Requirement.Id">
+    @if (Compact)
+    {
+        <div class="binding-identity">
+            <div><strong>@Requirement.Id</strong>@if (Requirement.Required) { <span class="field-required" aria-label="@T("Binding.Required")"> *</span> }<HelpTooltip Text="@RequirementHelp" /></div>
+            <span class="binding-type">@Requirement.ValueType</span>
+        </div>
+    }
+    else
+    {
     <div class="panel-header">
         <div><strong>@Requirement.Id</strong>@if (!string.IsNullOrWhiteSpace(Requirement.Description)) { <p>@Requirement.Description</p> }</div>
         <div>
@@ -12,8 +21,9 @@
         </div>
     </div>
     <p><span>@T("Binding.ExpectedType"):</span> <code>@Requirement.ValueType</code>@if (!string.IsNullOrWhiteSpace(Requirement.Format)) { <span> · @T("Binding.ExpectedFormat"): <code>@Requirement.Format</code></span> }</p>
+    }
     <FormGrid>
-        <FormField Label="@T("Binding.ValueSource")" aria-invalid="@InvalidAria(!Sources.Contains(selection.Kind))"><ChildContent><ClearableSelect TValue="string" Value="@Convert.ToString(selection.Kind, System.Globalization.CultureInfo.InvariantCulture)" aria-invalid="@InvalidAria(!Sources.Contains(selection.Kind))" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-kind")" ValueChanged="changed => SourceChangedAsync(new ChangeEventArgs { Value = changed })">
+        <FormField Label="@T("Binding.ValueSource")" aria-invalid="@InvalidAria(!Sources.Contains(selection.Kind))"><ChildContent><ClearableSelect TValue="string" AllowClear="@(!Compact)" Value="@Convert.ToString(selection.Kind, System.Globalization.CultureInfo.InvariantCulture)" aria-invalid="@InvalidAria(!Sources.Contains(selection.Kind))" disabled="@Disabled" data-testid="@(TestIdPrefix + "-binding-kind")" ValueChanged="changed => SourceChangedAsync(new ChangeEventArgs { Value = changed })">
                 @if (!Sources.Contains(selection.Kind)) { <option value="@selection.Kind" disabled>@T("Binding.SourceUnavailable")</option> }
                 @foreach (var kind in Sources) { <option value="@kind">@T($"Binding.Source.{kind}")</option> }
             </ClearableSelect>
@@ -23,7 +33,7 @@
             @if (Requirement.LiteralSchema is { } schema)
             {
                 <div class="binding-value-editor" data-testid="@(TestIdPrefix + "-binding-literal")">
-                    <JsonSchemaInputEditor Schema="schema" Value="@(selection.Literal ?? default)" AllowAnyRoot="true" Required="Requirement.Required"
+                    <JsonSchemaInputEditor Schema="schema" Value="@(selection.Literal ?? default)" AllowAnyRoot="true" Required="Requirement.Required" SingleLineText="Requirement.SingleLineText"
                         ValueChanged="SchemaLiteralChangedAsync" ValidationChanged="SchemaValidationChanged" Disabled="Disabled" Compact="true" ValueLabel="@T("Value")" />
                 </div>
             }
@@ -88,6 +98,7 @@ else
     [Parameter] public ContextualValueCreationContext? CreationContext { get; set; }
     [Parameter] public EventCallback<ScopedResourceAddress> ResourceCreated { get; set; }
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Compact { get; set; }
     [Parameter] public string TestIdPrefix { get; set; } = "value-binding";
     [Parameter] public object? DialogSectionId { get; set; }
     [Parameter] public FieldIdentifier? ValidationField { get; set; }
@@ -113,6 +124,14 @@ else
         <ContextualSecretCreator IsOpen="@(creating && selection.Kind == ValueBindingSourceKind.Secret)" Context="creatorContext" OnCreated="ValueCreatedAsync" OnCancel="CloseCreatorAsync" />
     </div>;
     private string T(string key, params object[] args) => Localizer[key, args].Value;
+    private string RequirementHelp => string.Join(" · ", new[]
+    {
+        Requirement.Description,
+        T(Requirement.Required ? "Binding.Required" : "Binding.Optional"),
+        $"{T("Binding.ExpectedType")}: {Requirement.ValueType}",
+        string.IsNullOrWhiteSpace(Requirement.Format) ? null : $"{T("Binding.ExpectedFormat")}: {Requirement.Format}",
+        Requirement.Secured ? T("Binding.Protection.Secured") : null
+    }.Where(value => !string.IsNullOrWhiteSpace(value)));
     private IReadOnlyList<ValueBindingSourceKind> Sources => AllowedSources.Where(kind =>
         Enum.IsDefined(kind) && (!Requirement.Secured || kind == ValueBindingSourceKind.Secret)).Distinct().ToArray();
     private IEnumerable<ValueBindingOption> CurrentOptions => Options

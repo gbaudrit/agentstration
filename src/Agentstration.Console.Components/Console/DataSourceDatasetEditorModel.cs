@@ -22,6 +22,7 @@ public sealed class DataSourceDatasetEditorModel
     public string ServiceKey { get; set; } = "";
     public bool Enabled { get; set; } = true;
     public JsonElement Parameters { get; set; } = JsonSerializer.SerializeToElement(new { });
+    public IReadOnlyList<DataSourceParameterBinding> ParameterBindings { get; set; } = [];
     public Guid DocumentCollectionUid { get; set; }
     public bool LifecycleEnabled { get; set; } = true;
     public bool AllowDirect { get; set; }
@@ -91,6 +92,7 @@ public sealed class DataSourceDatasetEditorModel
             CompositionPoints = compositions,
             Prefix = saved.Rule.Prefix,
             Parameters = saved.Acquisition.Parameters.Clone(),
+            ParameterBindings = saved.Acquisition.ParameterBindings,
             DocumentCollectionUid = saved.DocumentCollectionUid ?? Guid.Empty,
             StorageKey = saved.Storage is { } storage ? $"{storage.StorageUid}:{storage.Generation}:{storage.BindingDigest}" : string.Empty,
             OperationKey = $"{saved.Acquisition.Operation.OperationUid}:{saved.Acquisition.Operation.Generation}:{saved.Acquisition.Operation.DefinitionDigest}",

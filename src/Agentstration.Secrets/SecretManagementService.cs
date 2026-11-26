@@ -19,7 +19,10 @@ public sealed class VaultAlreadyInitializedException(string name) : Exception($"
 public sealed class VaultInitializationNotSupportedException(string providerType) : Exception($"Vault provider '{providerType}' does not support Console initialization.");
 public sealed record SecretView(SecretResource Resource, SecretValueStatus ValueStatus);
 public sealed record VaultView(VaultResource Resource, string Status);
-public sealed record SecretUsage(string Kind, string Name, string DisplayName);
+public sealed record SecretUsage(string Kind, string Name, string DisplayName)
+{
+    public string? Url { get; init; }
+}
 
 public interface ISecretUsageProvider
 {

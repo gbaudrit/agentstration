@@ -10,6 +10,7 @@ export class SourcePoliciesPage {
   public constructor(private readonly page: Page) {}
   public get history(): Locator { return this.page.getByTestId(TestIds.sourceLifecycle.snapshots); }
   public get definition(): Locator { return this.page.getByTestId(TestIds.sourcePolicies.knowledgeDefinitionFields); }
+  private get datasetLiteral(): Locator { return this.page.getByTestId(TestIds.sourcePolicies.datasetLiteral).getByRole('textbox'); }
 
   public async exerciseLifecycle(base: string, control: SourcePolicyTestControl, locale: SupportedTestLocale, onCreationStep?: (step: string) => Promise<void>): Promise<void> {
     this.page.setDefaultTimeout(15_000);
@@ -127,7 +128,7 @@ export class SourcePoliciesPage {
     await this.wizardNext('acquisition');
     await this.page.getByTestId(TestIds.sourcePolicies.service).selectOption(fixture.service.uid);
     await this.page.getByTestId(TestIds.sourcePolicies.operation).selectOption(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
-    await this.page.locator('[data-schema-path="$.dataset"] input').fill('synthetic-direct');
+    await this.datasetLiteral.fill('synthetic-direct');
     await this.page.keyboard.press('Tab');
     await onStep?.('acquisition');
     await this.wizardNext('storage');
@@ -168,7 +169,7 @@ export class SourcePoliciesPage {
     await this.activate(this.page.getByRole('button', { name: text.wizardEditAcquisition, exact: true }));
     await this.assertWizardStep('acquisition');
     await expect(this.page.getByTestId(TestIds.sourcePolicies.operation)).toHaveValue(`${fixture.operation.uid}:${fixture.operation.generation}:${fixture.operation.definition.definitionDigest}`);
-    await expect(this.page.locator('[data-schema-path="$.dataset"] input')).toHaveValue('synthetic-direct');
+    await expect(this.datasetLiteral).toHaveValue('synthetic-direct');
     await this.wizardNext('storage');
     await expect(this.page.getByTestId(TestIds.sourcePolicies.direct)).toBeChecked();
     await this.wizardNext('treatments');
