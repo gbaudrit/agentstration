@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Independent AFC abstractions SDK.</Description>
+  </PropertyGroup>
+</Project>

@@ -70,6 +70,8 @@ Connected Services, their service types and their protocol-specific operation ty
 
 The standalone Agentstration Storage Contract SDK is staged in [`asc/`](asc/README.md): neutral bounded content and document contracts, MCP client/server adapters, offline samples and conformance tests. Its `ASC.mcp.v1` exposure integrates product Storage resources through explicit AEP mappings; it does not promise durable Snapshot retention.
 
+The independent [Forge Contract (AFC) SDK](afc/README.md) exposes repository resolution, change requests and revision-bound review/check observations over MCP. It supplies typed client/server adapters, optional AEP declarations and an authenticated offline fixture; Git transport, tracking authority and product delivery orchestration retain their separate owners.
+
 Read the [architecture overview](https://docs.agentstration.io/architecture/overview) and [current capabilities reference](https://docs.agentstration.io/reference/current-capabilities) for the detailed boundaries and guarantees.
 
 ## Quick start

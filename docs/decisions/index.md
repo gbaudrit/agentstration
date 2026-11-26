@@ -333,3 +333,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 263. [ADR-0263 — Issue preview commands dispatch trusted manual workflows](0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
 
 264. [ADR-0264 — Storage contract identity is independent of its MCP exposure](0264-storage-contract-identity-and-mcp-exposure.md)
+
+288. [ADR-0288 — Forge operations are an independent contract over MCP](0288-forge-operations-are-an-independent-contract-over-mcp.md)

@@ -1,4 +1,12 @@
 <Solution>
+  <Folder Name="/afc/">
+    <Project Path="afc/samples/LocalForge/LocalForge.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Abstractions/Agentstration.Afc.Abstractions.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Aep/Agentstration.Afc.Aep.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Client/Agentstration.Afc.Client.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Server/Agentstration.Afc.Server.csproj" />
+    <Project Path="afc/tests/Agentstration.Afc.Tests/Agentstration.Afc.Tests.csproj" />
+  </Folder>
   <Folder Name="/aep/src/" />
   <Folder Name="/asc/">
     <Project Path="asc/src/Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
