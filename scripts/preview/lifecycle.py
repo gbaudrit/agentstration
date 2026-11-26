@@ -144,7 +144,8 @@ def execute(action, request, state_root, bootstrap=None, now=None):
         if action == "deploy":
             state = preview.prepare(directory, request["deliveries"]["server"], request["deliveries"]["worker"],
                                     request["environmentId"], port=request["target"]["port"], registry=request["registry"],
-                                    bootstrap=bootstrap, database=request["database"], postgres_image=request.get("postgresImage"))
+                                    bootstrap=bootstrap, database=request["database"], postgres_image=request.get("postgresImage"),
+                                    extension_deliveries=request.get("extensions", {}))
             if metadata is None:
                 created = now or datetime.now(timezone.utc)
                 metadata = {"schemaVersion": 1, "environmentId": request["environmentId"], "dockerDaemon": daemon,
@@ -158,9 +159,18 @@ def execute(action, request, state_root, bootstrap=None, now=None):
             docker("volume", "create", "--label", PROJECT + "=" + project, "--label", OWNER + "=" + metadata["ownerId"],
                    "--label", ENVIRONMENT + "=" + request["environmentId"], project + "-owner")
             owned(inventory(project), metadata["ownerId"])
+            # Remove only inspected owned containers that were explicitly deselected. Retain their volumes/keys.
+            selected_services = set(contract.images(request))
+            for item in resources["containers"]:
+                name = item["Config"]["Labels"].get("com.docker.compose.service", "")
+                if name.startswith("extension-") and name not in selected_services:
+                    preview.require(name[len("extension-"):] in state.get("extensionKeys", {}),
+                                    "Unexpected extension container; inspect ownership before removal.")
+                    docker("stop", "--time", "20", item["Id"])
+                    docker("rm", item["Id"])
             preview.compose(directory, "pull", capture=True)
             preview.compose(directory, "up", "--detach", "--wait", "--wait-timeout", "180", capture=True)
-            if request["testProfile"] == "readiness":
+            if request["testProfile"] == "readiness" or request.get("extensions"):
                 preview.verify(directory)
             resources = inventory(project)
             owned(resources, metadata["ownerId"])

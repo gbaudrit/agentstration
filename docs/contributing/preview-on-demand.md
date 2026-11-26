@@ -164,6 +164,57 @@ PR close/label events, global quotas or orphan reconciliation; remove test previ
 with `/preview destroy` after use. Manual and issue operations share the same
 environment serialization, provider lease and ownership checks.
 
+### Choose optional AEP extensions with issue labels
+
+Add `preview:extension:foundry` to the issue, then post `/preview deploy`. The
+live label list is frozen with the command and rechecked before the image digests
+are announced. A label change while the run is queued requires a new command.
+Removing a label and posting `/preview deploy` stops that extension. Labels alone
+do not trigger deployment. No deployment label means server + MAF worker only.
+The `extension:*` backlog labels do not affect the deployed selection.
+
+Only implemented entries in `deploy/images/extensions/*.json` are selectable.
+Foundry is the first entry; OpenAPI, PostgreSQL and Ollama become selectable after
+their separate packaging changes and private GHCR publication. A missing catalogue,
+public/unreadable package or absent tagged image fails before provisioning. Each
+extension defaults to its own newest tagged published delivery, independently of
+the server PR, and is frozen by digest. There is no implicit local inference.
+The digest announcement is the reviewable selection for that run.
+
+To expose new packaged entries as selectable GitHub labels, run the existing
+label synchronization script after their catalogue changes merge:
+
+```powershell
+./scripts/github/apply-issue-labels.ps1 -Repository gbaudrit/agentstration -DryRun
+./scripts/github/apply-issue-labels.ps1 -Repository gbaudrit/agentstration
+```
+
+The script derives deployment labels from the catalogue. A new compatible AEP
+package needs no extra deployment workflow, arbitrary Compose file, or provider
+code. Its catalogue supplies `extensionId`, AEP version and expected contribution;
+its image implements the SDK SharedKeyFile settings and `/var/lib/aep/instance`
+persistence used by the existing packaging enrollment smoke. The common recipe
+provides internal authority/discovery URLs, a unique read-only key and a private
+state volume. It supports Linux amd64 images from `Dockerfile.extension`.
+
+The deployment verifies actual authenticated enrollment before reporting a URL,
+including before manual Agentstration initialization. Selecting Foundry makes its
+provider contribution available; configure connections/models through the normal
+product paths afterwards. Selecting the PostgreSQL AEP extension does not change
+`database=sqlite` into PostgreSQL. Selecting Ollama does not provision an inference
+backend or download a model; supply an endpoint explicitly through normal provider
+configuration. Extension-specific services/secrets remain separate configuration.
+
+Redeploy/recreation preserves the enrollment key and instance. Deselection retains
+that state for reactivation; existing registrations and user definitions remain
+in Agentstration and may be disconnected. Full `/preview destroy` removes owned
+volumes, disks and IP. Status/destroy use the recorded selection even if labels,
+tags or catalogue entries have subsequently changed. Legacy core-only version 1
+requests remain supported; selected extensions use version 2 public receipts.
+The original manual form remains unchanged and core-only. Advanced canonical
+requests can include an `extensions` map. See
+[ADR-0264](../decisions/0264-preview-labels-select-independently-delivered-aep-extensions.md).
+
 ### Qualify issue commands after merge
 
 The offline tests fake GitHub, registry and cloud APIs. After merge, use a

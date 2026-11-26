@@ -363,7 +363,9 @@ def bundle_images(request, directory):
     path = Path(directory) / 'bundle'
     path.mkdir(mode=0o700)
     preview.private_write(path / 'request.json', json.dumps(request) + '\n')
-    for name in ('server', 'worker'):
+    for name in contract.images(request):
+        if name == 'postgres':
+            continue
         auth = os.environ.get('DOCKER_CONFIG')
         credentials = ['--src-authfile', str(Path(auth) / 'config.json')] if auth else []
         command(['skopeo', 'copy', '--all', '--preserve-digests', '--retry-times', '5', *credentials,
@@ -374,6 +376,9 @@ def bundle_images(request, directory):
             archive.add(file, arcname='incoming/' + file.name)
         for relative in ('scripts/packaging/images.py', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml',
                          'deploy/preview/postgresql.json', 'deploy/preview/azure/transport.json', 'deploy/preview/access.json'):
+            archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
+        for identifier in request.get('extensions', {}):
+            relative = 'deploy/images/extensions/' + identifier + '.json'
             archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
         for file in sorted((preview.ROOT / 'scripts/preview').glob('*.py')):
             if not file.name.startswith('test_'):
@@ -467,6 +472,9 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                     client.provision(record)
                     guest = client.transfer(expect_existing=record['initialized'], **({'connector': connector} if connector else {}))
                     preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
+                    if request.get('extensions'):
+                        preview.require(guest.get('extensionsVerified') == list(request['extensions']),
+                                        'Azure guest did not confirm every selected AEP enrollment.')
                     record['initialized'] = True
                     client.write(record)
                     url = None

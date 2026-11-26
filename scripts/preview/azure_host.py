@@ -67,7 +67,9 @@ def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=Non
                          '--label', 'io.agentstration.preview.transfer=' + request['environmentId'],
                          '--publish', '127.0.0.1:5001:5000', registry_image)
         try:
-            for name in ('server', 'worker'):
+            for name in contract.images(selected):
+                if name == 'postgres':
+                    continue
                 reference = contract.images(selected)[name]['reference']
                 subprocess.run(['skopeo', 'copy', '--all', '--preserve-digests', '--retry-times', '5',
                                 '--dest-tls-verify=false', 'oci-archive:' + str(root / 'incoming' / (name + '.oci.tar')),
@@ -85,11 +87,15 @@ def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=Non
             lifecycle.docker('rm', '--force', resources[0]['Id'])
     else:
         result = lifecycle.execute(action, selected, root / 'state')
-    if route and action != 'destroy' and result['state'] == 'running':
+    verified = []
+    if action != 'destroy' and result['state'] == 'running' and (route or request.get('extensions')):
         # Protection checks cannot be disabled through the optional test profile.
-        preview.verify(root / 'state' / request['environmentId'])
+        verification = preview.verify(root / 'state' / request['environmentId'])
+        verified = verification.get('extensionsVerified', [])
     # Keep the Run Command response below its 4 KiB limit and exclude host secrets/configuration.
-    return {'state': result['state'], 'observedImages': result['observedImages'], 'expiresAt': result['expiresAt'],
+    return {'state': result['state'],
+            'observedImages': {key: value for key, value in result['observedImages'].items() if not key.startswith('extension-')},
+            'extensionsVerified': verified, 'expiresAt': result['expiresAt'],
             'accessReady': bool(route and action != 'destroy' and access_host.ready(route['ownerId'])),
             'guestOperationSeconds': round(time.monotonic() - started, 1),
             'memoryAvailableKiB': int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines()
