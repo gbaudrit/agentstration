@@ -52,19 +52,32 @@ on:
         description: Independent Worker revision, or published for its newest tagged image
         type: string
         default: published
+  workflow_call:
+    inputs:
+      selection:
+        description: Canonical form options and optional issue tracking (public metadata only)
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 # Distinct from the reusable provider's concurrency group to avoid caller/callee deadlock.
 concurrency:
-  group: manual-preview-${{ inputs.environment_id }}
+  group: manual-preview-${{ inputs.environment_id || fromJSON(inputs.selection || '{}').environment_id }}
   cancel-in-progress: false
 
 jobs:
   boundary:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      issue-number: ${{ steps.tracking.outputs.issue-number }}
+      selection: ${{ steps.tracking.outputs.selection }}
+      operation: ${{ steps.tracking.outputs.operation }}
     steps:
       - name: Require the trusted deployment workflow branch
         run: |
@@ -77,7 +90,7 @@ jobs:
           persist-credentials: false
       - name: Validate form choices before privileged jobs
         env:
-          SELECTION_JSON: ${{ toJSON(inputs) }}
+          SELECTION_JSON: ${{ inputs.selection || toJSON(inputs) }}
         run: |
           python3 - <<'PY'
           import os, sys
@@ -85,10 +98,16 @@ jobs:
           import contract, manual
           manual.validate_options(contract.parse(os.environ['SELECTION_JSON']))
           PY
+      - name: Recheck issue command ownership and current requester permission
+        id: tracking
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTION_JSON: ${{ inputs.selection || toJSON(inputs) }}
+        run: python3 scripts/preview/issue_commands.py tracking
 
   select:
     needs: boundary
-    if: github.ref == 'refs/heads/main' && (inputs.operation == 'validate' || inputs.operation == 'deploy')
+    if: github.ref == 'refs/heads/main' && (needs.boundary.outputs.operation == 'validate' || needs.boundary.outputs.operation == 'deploy')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: preview-deployment
@@ -114,7 +133,7 @@ jobs:
         id: select
         env:
           GH_TOKEN: ${{ github.token }}
-          SELECTION_JSON: ${{ toJSON(inputs) }}
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection }}
           AZURE_PREVIEW_SUBSCRIPTION_ID: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
           AZURE_PREVIEW_RESOURCE_GROUP: ${{ vars.AZURE_PREVIEW_RESOURCE_GROUP }}
           AZURE_PREVIEW_REGION: ${{ vars.AZURE_PREVIEW_REGION }}
@@ -135,7 +154,7 @@ jobs:
 
   recorded:
     needs: boundary
-    if: github.ref == 'refs/heads/main' && (inputs.operation == 'status' || inputs.operation == 'destroy')
+    if: github.ref == 'refs/heads/main' && (needs.boundary.outputs.operation == 'status' || needs.boundary.outputs.operation == 'destroy')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: preview-deployment
@@ -156,7 +175,7 @@ jobs:
       - name: Read the recorded selection without resolving image tags or new defaults
         id: recorded
         env:
-          SELECTION_JSON: ${{ toJSON(inputs) }}
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection }}
           AZURE_PREVIEW_SUBSCRIPTION_ID: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
           AZURE_PREVIEW_RESOURCE_GROUP: ${{ vars.AZURE_PREVIEW_RESOURCE_GROUP }}
           AZURE_PREVIEW_STORAGE_ACCOUNT: ${{ vars.AZURE_PREVIEW_STORAGE_ACCOUNT }}
@@ -169,9 +188,30 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  announce:
+    needs: [boundary, select, recorded]
+    if: ${{ !cancelled() && needs.boundary.outputs.issue-number != '' && (needs.select.result == 'success' || needs.recorded.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Publish the frozen selection before infrastructure execution
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRACKING_ISSUE: ${{ needs.boundary.outputs.issue-number }}
+          OPERATION: ${{ needs.boundary.outputs.operation }}
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection }}
+          REQUEST_JSON: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
+        run: python3 scripts/preview/issue_commands.py plan
+
   execute:
-    needs: [select, recorded]
-    if: ${{ !cancelled() && (needs.select.result == 'success' || needs.recorded.result == 'success') }}
+    needs: [boundary, select, recorded, announce]
+    if: ${{ !cancelled() && (needs.select.result == 'success' || needs.recorded.result == 'success') && (needs.announce.result == 'success' || (needs.boundary.outputs.issue-number == '' && needs.announce.result == 'skipped')) }}
     permissions:
       contents: read
       packages: read
@@ -180,5 +220,26 @@ jobs:
     # Required for the called job to resolve its protected environment secrets.
     secrets: inherit
     with:
-      operation: ${{ inputs.operation }}
+      operation: ${{ needs.boundary.outputs.operation }}
       request: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
+
+  report:
+    needs: [boundary, select, recorded, announce, execute]
+    if: ${{ always() && needs.boundary.outputs.issue-number != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Report verified result or bounded failure to the originating issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRACKING_ISSUE: ${{ needs.boundary.outputs.issue-number }}
+          OPERATION: ${{ needs.boundary.outputs.operation }}
+          EXECUTION_RESULT: ${{ needs.execute.result }}
+          RESULT_JSON: ${{ needs.execute.outputs.result }}
+        run: python3 scripts/preview/issue_commands.py report

@@ -206,7 +206,7 @@ def main():
             summary.write('Source: `' + request['sourceSha'] + '`; database: `' + request['database'] + '`; VM: `' + request['target']['vmSize'] + '`.\n\n')
             for name, value in contract.images(request).items():
                 summary.write('- ' + name + ': `' + value['reference'] + '`\n')
-            summary.write('\nURL withheld until protected access (#1285). TTL is recorded; automatic expiry is #1286.\n')
+            summary.write('\nURL is returned only after protected readiness checks. TTL is recorded; automatic expiry is #1286.\n')
     except (ValueError, KeyError, TypeError, RuntimeError, ET.ParseError) as error:
         # Only controlled validation messages may be shown; remote JSON/key/parser errors are not echoed.
         print(str(error) if isinstance(error, (ValueError, RuntimeError)) and not isinstance(error, (json.JSONDecodeError, ET.ParseError, UnicodeError))

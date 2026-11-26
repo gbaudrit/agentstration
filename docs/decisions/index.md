@@ -329,3 +329,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 261. [ADR-0261 — Acquisition text content is selected at admission](0261-acquisition-text-content-is-selected-at-admission.md)
 
 262. [ADR-0262 — XML processing uses operator content settings](0262-xml-processing-uses-operator-content-settings.md)
+
+263. [ADR-0263 — Issue preview commands dispatch trusted manual workflows](0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
