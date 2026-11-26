@@ -65,6 +65,7 @@ def locked(root, environment_id):
 
 
 def result(request, state, resources=None, daemon=None, metadata=None):
+    inspected = resources is not None
     resources = resources or {"containers": [], "volumes": [], "networks": []}
     identifiers = {kind: [item["Name"] if kind == "volumes" else item["Id"] for item in values]
                    for kind, values in resources.items()}
@@ -80,7 +81,7 @@ def result(request, state, resources=None, daemon=None, metadata=None):
             "observedImages": {item["Config"]["Labels"].get("com.docker.compose.service", "unknown"): item["Config"]["Image"]
                                for item in resources["containers"]},
             "state": state, "url": url, "expiresAt": expiry,
-            "health": container_health.from_containers(contract.images(request), resources["containers"]),
+            "health": container_health.from_containers(contract.images(request), resources["containers"]) if inspected else {},
             "providerResourceIds": {"dockerDaemon": daemon, "composeProject": "preview-" + request["environmentId"], **identifiers} if daemon else {}}
 
 

@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import azure
 import container_health as health
+import lifecycle
 import preview_feedback as feedback
 from test_azure import azure_request
 
@@ -39,6 +40,7 @@ class ContainerHealthTests(unittest.TestCase):
         table = feedback.health_table({'health': {}, 'images': {'server': {}, 'worker': {}}}, None)
         self.assertIn('| `server` | not observed | not observed | — |', table)
         self.assertNotIn('healthy', table)
+        self.assertEqual({}, lifecycle.result(azure_request(), 'validated')['health'])
 
     def test_status_card_displays_component_health_without_the_redundant_access_sentence(self):
         request = azure_request()
