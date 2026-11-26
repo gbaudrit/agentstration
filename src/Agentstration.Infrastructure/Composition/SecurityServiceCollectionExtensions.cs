@@ -1,3 +1,4 @@
+using Agentstration.Extensions.Aep;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Identity;
@@ -44,6 +45,8 @@ internal static class SecurityServiceCollectionExtensions
         services.AddSingleton<IConnectedServiceResolver>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
         services.AddSingleton<IConnectedServiceExportInspector>(provider => provider.GetRequiredService<ConnectedServiceManagementService>());
         services.AddSingleton<IParameterUsageProvider, ConnectedServiceParameterUsageProvider>();
+        services.AddSingleton<IParameterUsageProvider, ExtensionConfigurationUsages>();
+        services.AddSingleton<ISecretUsageProvider, ExtensionConfigurationUsages>();
         services.AddSingleton<SecretManagementService>();
         services.AddSingleton<ISecretResolver>(provider => provider.GetRequiredService<SecretManagementService>());
         services.AddSingleton<ISecretAccessAuthorizer>(provider => provider.GetRequiredService<SecretManagementService>());

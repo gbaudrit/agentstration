@@ -123,3 +123,31 @@ support, plus Secret access for secured requirements. The optional
 binding exchange; it keeps credentials/configuration out of content Tool inputs.
 The [product integration](../docs/reference/storage-execution.md) preserves explicit
 manual bindings and independently authorizes originating users and transport callers.
+
+## Operational installation configuration
+
+Extensions may implement `IAepOperationalConfiguration`, register it with DI and set
+`AepExtensionOptions.OperationalConfigurationEnabled`. This advertises the optional
+`aep.operational-configuration` version `1.0` capability, independent of the
+contribution option catalogue. Its authenticated GET/PUT path is
+`/aep/operational-configuration`; payloads and responses are limited to 65,536 bytes.
+Disabled enrollment never makes this path anonymous.
+
+Descriptors are immutable id/version/digest contracts over option schemas, required
+and protection metadata, allowed Literal/Parameter/Secret sources, technical scope
+(Process, ConsumerContext, Binding), apply mode (Immediate, NewBinding,
+RestartRequired) and optional atomic groups. A provider must implement only the
+modes it advertises. The initial product writer supports Process/Immediate and
+rejects other writes explicitly. Scope policies and cold activation are later work.
+
+Requests carry configuration identity, generation, desired revision, expected active
+revision and typed `AepBoundValue` values. Secured options use one-use Secret grants;
+providers resolve and validate them before activation and must never return or
+persist their values. GET and acknowledgment contain descriptor, active revision,
+readiness and non-secret applied values. A provider atomically validates/activates a
+candidate and supports replay/conflict detection; the SDK does not invent activation
+or restart a process. `AepClient.GetOperationalConfigurationAsync` returns null for
+legacy extensions; incompatible capability/descriptor versions fail explicitly.
+
+The OpenAPI executable supplies the first durable non-secret implementation.
+See [ADR-0264](../docs/decisions/0264-instance-extension-options-use-an-operational-aep-contract.md).

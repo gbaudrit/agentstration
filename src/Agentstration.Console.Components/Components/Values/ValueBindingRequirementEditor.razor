@@ -114,7 +114,7 @@ else
     </div>;
     private string T(string key, params object[] args) => Localizer[key, args].Value;
     private IReadOnlyList<ValueBindingSourceKind> Sources => AllowedSources.Where(kind =>
-        Enum.IsDefined(kind) && (!Requirement.Secured || kind == ValueBindingSourceKind.Secret)).Distinct().ToArray();
+        Enum.IsDefined(kind) && (!Requirement.Secured || kind == ValueBindingSourceKind.Secret || kind == ValueBindingSourceKind.Omitted && !Requirement.Required)).Distinct().ToArray();
     private IEnumerable<ValueBindingOption> CurrentOptions => Options
         .Concat(createdOption is null || Options.Any(value => value.Address == createdOption.Address && value.Kind == createdOption.Kind) ? [] : new[] { createdOption })
         .Where(value => value.Kind == selection.Kind && Sources.Contains(value.Kind));

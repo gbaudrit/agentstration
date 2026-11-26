@@ -14,6 +14,21 @@ public static class ExtensionEndpoints
         endpoints.MapGet("/api/extensions", ListAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         endpoints.MapGet("/api/extensions/inventory", ListInventoryAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         var registrations = endpoints.MapGroup("/api/extensionregistrations");
+        registrations.MapGet("/{registrationName}/configuration", (string registrationName, string? resourceNamespace,
+            IExtensionConfigurationService service, CancellationToken token) => ExtensionsApiHttp.ExecuteAsync(async () =>
+                Results.Ok(await service.GetAsync(ExtensionsApiHttp.Namespace(resourceNamespace), registrationName, token))))
+            .RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        registrations.MapPut("/{registrationName}/configuration", (string registrationName, string? resourceNamespace,
+            PutExtensionConfigurationRequest body, HttpRequest request, IExtensionConfigurationService service, CancellationToken token) =>
+            ExtensionsApiHttp.ExecuteAsync(async () => Results.Ok(await service.PutAsync(ExtensionsApiHttp.Namespace(resourceNamespace),
+                registrationName, body, ExtensionsApiHttp.IfMatch(request), token))))
+            .WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(Agentstration.Aep.Abstractions.AepOperationalConfigurationProtocol.MaximumBytes))
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        registrations.MapPost("/{registrationName}/configuration/apply", (string registrationName, string? resourceNamespace,
+            HttpRequest request, IExtensionConfigurationService service, CancellationToken token) => ExtensionsApiHttp.ExecuteAsync(async () =>
+                Results.Ok(await service.ApplyAsync(ExtensionsApiHttp.Namespace(resourceNamespace), registrationName,
+                    ExtensionsApiHttp.IfMatch(request) ?? throw new ArgumentException("If-Match is required."), token))))
+            .RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         registrations.MapGet("/", ListRegistrationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         registrations.MapGet("/{registrationName}", GetRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         registrations.MapPost("/", CreateRegistrationAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);

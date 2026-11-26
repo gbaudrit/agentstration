@@ -6,6 +6,7 @@ public sealed record OpenApiOptions
 {
     public const string SectionName = "OpenApi";
     public string[] AllowedDomains { get; set; } = [];
+    public string[] DomainCeiling { get; set; } = [];
     public int[] AllowedPorts { get; set; } = [80, 443];
     public bool AllowPrivateAddresses { get; set; }
     public int MaximumCandidatePaths { get; set; } = 8;
@@ -37,7 +38,7 @@ public sealed class OpenApiOptionsValidator : IValidateOptions<OpenApiOptions>
     public ValidateOptionsResult Validate(string? name, OpenApiOptions options)
     {
         var errors = new List<string>();
-        if (options.AllowedDomains.Length == 0) errors.Add("OpenApi:AllowedDomains must contain at least one domain.");
+        if (options.AllowedDomains.Length > 128) errors.Add("OpenApi:AllowedDomains exceeds its supported count.");
         if (options.AllowedPorts.Length == 0 || options.AllowedPorts.Any(value => value is < 1 or > 65535))
             errors.Add("OpenApi:AllowedPorts must contain valid TCP ports.");
         if (options.MaximumCandidatePaths is < 1 or > 32) errors.Add("OpenApi:MaximumCandidatePaths must be between 1 and 32.");

@@ -165,6 +165,20 @@ public static class AepOptionSchemaValidator
             return;
         }
 
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            var length = value.GetString()!.Length;
+            if (schema.TryGetProperty("minLength", out var min) && length < min.GetInt32()
+                || schema.TryGetProperty("maxLength", out var max) && length > max.GetInt32())
+                issues.Add(new(path, "length", "The string length is outside its declared bounds."));
+        }
+        if (value.ValueKind == JsonValueKind.Array)
+        {
+            var length = value.GetArrayLength();
+            if (schema.TryGetProperty("minItems", out var min) && length < min.GetInt32()
+                || schema.TryGetProperty("maxItems", out var max) && length > max.GetInt32())
+                issues.Add(new(path, "items", "The array length is outside its declared bounds."));
+        }
         if (value.ValueKind == JsonValueKind.Object) ValidateObject(value, schema, path, issues);
         if (value.ValueKind == JsonValueKind.Array && schema.TryGetProperty("items", out var itemSchema))
         {

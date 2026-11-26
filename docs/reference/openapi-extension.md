@@ -4,7 +4,7 @@
 
 ## Run and enroll
 
-Configure at least one destination domain and start the extension independently:
+Start the extension independently. It can enroll with no allowed domains; outbound destinations remain denied until configuration is applied. Existing host settings may provide initial defaults:
 
 ```powershell
 dotnet run --project src/extensions/Agentstration.Extensions.OpenApi --launch-profile http `
@@ -190,3 +190,40 @@ For compatibility with otherwise usable OpenAPI 3 documents, the parser may vali
 Default ceilings are 8 candidates, 2 MiB per contract, 1,000 operations, 256 references, depth 16, 4 MiB per response, 10 pages, 8 connections per server, and 30 seconds per request. Operators may reduce these limits and can increase them only within the validator's hard ranges.
 
 Discovery and invocation logs contain correlation identifiers and bounded metadata, never documents, response bodies, arguments, or credentials. Side-effecting HTTP methods remain governed by the ordinary Tool approval and execution policy.
+
+## Instance installation options
+
+Open the Instance context, then **Extensions → the OpenAPI installation → Installation
+options**. `AllowedDomains` accepts a structured literal list or an Instance-owned
+JSON-array Parameter. The form reuses the common binding editor and contextual
+Parameter creation. Secured options on compatible extensions offer only Secret
+references; OpenAPI does not introduce a new API-token installation option.
+
+Save and apply persists the desired configuration and displays its observed applied
+generation. A delivery failure remains pending; **Retry application** can recover a
+lost acknowledgment. Subsequent destination checks use the acknowledged allowlist
+without restarting OpenAPI. Replacing a Parameter value is revalidated before the
+next product AEP/MCP operation. An empty list is a valid deny-all policy, not an
+outbound authorization. Existing domain matching includes subdomains. Ports, DNS/IP,
+private-address, redirect, method and payload restrictions continue to apply.
+
+`OpenApi:AllowedDomains` supplies initial defaults only. Once an operational state
+exists, its allowlist wins. Optional `OpenApi:DomainCeiling` supplies a deployment-owned
+maximum domain envelope; configuration cannot exceed it. `OpenApi:ConfigurationStateFile`
+selects a writable durable state file. By default, this sits beside the configured AEP
+enrollment state file with suffix `.openapi-configuration.json`; without one it uses
+`.aep/openapi-configuration.json` under the extension content root. Keep it on the same
+persistent volume and back it up with enrollment/control-plane state. It stores only
+configuration identity, generation, active revision and non-secret domains.
+
+The product endpoints are:
+
+- `GET /api/extensionregistrations/{name}/configuration?resourceNamespace=default`
+- `PUT /api/extensionregistrations/{name}/configuration?resourceNamespace=default`
+- `POST /api/extensionregistrations/{name}/configuration/apply?resourceNamespace=default`
+
+Use authenticated Instance context. PUT sends `optionSet`, `version`, `schemaDigest`
+and typed `bindings`; pass the returned configuration ETag in `If-Match` on updates
+and retries. The response separates saved configuration, applied observation and
+functional readiness. Legacy extensions are read-only. Tenant/Workspace overrides,
+new-binding activation and process restarts are not implemented by this first slice.

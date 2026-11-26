@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using Agentstration.Aep.Abstractions;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Aep.Client;
 using Agentstration.Identity.Contracts;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,7 @@ namespace Agentstration.Tools.Mcp;
 public sealed partial class AepMcpTransport(
     IHttpMessageHandlerFactory httpMessageHandlerFactory,
     ILoggerFactory loggerFactory,
-    ICurrentRequestContext? requestContext = null)
+    ICurrentRequestContext? requestContext = null, IExtensionConfigurationSynchronizer? configurationSynchronizer = null)
 {
     public HttpClient CreateConfigurationClient(ResolvedAepExtension extension) => CreateHttpClient(
         McpToolServiceCollectionExtensions.AepClientName, extension.Registration.Definition.Endpoint,
@@ -21,6 +22,7 @@ public sealed partial class AepMcpTransport(
         string? expectedExtensionId,
         CancellationToken cancellationToken)
     {
+        if (configurationSynchronizer is not null) await configurationSynchronizer.EnsureAsync(extension.Registration, cancellationToken);
         using var http = CreateHttpClient(
             McpToolServiceCollectionExtensions.AepClientName,
             extension.Registration.Definition.Endpoint,
@@ -36,19 +38,21 @@ public sealed partial class AepMcpTransport(
         return descriptor;
     }
 
-    public Task<McpClient> ConnectAsync(
-        ResolvedAepExtension extension,
-        AepMcpServerDescriptor server,
-        CancellationToken cancellationToken) => ConnectAsync(
-            AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
-            server.Id,
-            extension.AccessTokenProvider,
-            cancellationToken);
+    public async Task<McpClient> ConnectAsync(ResolvedAepExtension extension, AepMcpServerDescriptor server,
+        CancellationToken cancellationToken)
+    {
+        if (configurationSynchronizer is not null) await configurationSynchronizer.EnsureAsync(extension.Registration, cancellationToken);
+        return await ConnectAsync(AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
+            server.Id, extension.AccessTokenProvider, cancellationToken);
+    }
 
-    public Task<McpClient> ConnectAsync(ResolvedAepExtension extension, AepMcpServerDescriptor server,
-        IReadOnlyDictionary<string, string> protectedHeaders, CancellationToken cancellationToken) => ConnectAsync(
-            AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server), server.Id,
-            extension.AccessTokenProvider, cancellationToken, protectedHeaders);
+    public async Task<McpClient> ConnectAsync(ResolvedAepExtension extension, AepMcpServerDescriptor server,
+        IReadOnlyDictionary<string, string> protectedHeaders, CancellationToken cancellationToken)
+    {
+        if (configurationSynchronizer is not null) await configurationSynchronizer.EnsureAsync(extension.Registration, cancellationToken);
+        return await ConnectAsync(AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
+            server.Id, extension.AccessTokenProvider, cancellationToken, protectedHeaders);
+    }
 
     public Task<McpClient> ConnectAsync(
         Uri endpoint,

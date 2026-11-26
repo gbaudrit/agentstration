@@ -19,7 +19,7 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
     ConnectedServiceManagementService services, ConnectedServiceOperationTypeManagementService operationTypes,
     ConnectedServiceBoundValues boundValues, ISecretResolver secrets, ICurrentRequestContext current,
     IHttpClientFactory clients,
-    BuiltinHttpOperationExecutor httpOperations, IRequestContextScopeFactory requestScopes)
+    BuiltinHttpOperationExecutor httpOperations, IRequestContextScopeFactory requestScopes, IExtensionConfigurationSynchronizer? configurationSynchronizer = null)
 {
     public async Task<JsonElement?> ExecuteAsync(InternalMcpToolInvocation invocation, CancellationToken cancellationToken)
     {
@@ -85,6 +85,7 @@ internal sealed class ConnectedServiceAcquisitionExecutor(
             ?? throw Error("connected_service_acquisition_provider_missing");
         if (!registration.Definition.Enabled || registration.Definition.ExpectedExtensionId != type.Governance!.Origin.Reference)
             throw Error("connected_service_acquisition_provider_unavailable");
+        if (configurationSynchronizer is not null) await configurationSynchronizer.EnsureAsync(registration, cancellationToken);
         using var http = clients.CreateClient("agentstration-aep");
         http.BaseAddress = registration.Definition.Endpoint;
         var client = new AepClient(http, AepExtensionCredentials.Create(registration, secrets),

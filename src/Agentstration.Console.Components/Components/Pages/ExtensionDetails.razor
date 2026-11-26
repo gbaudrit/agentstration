@@ -28,7 +28,7 @@
         Description="@item?.Extension?.Extension?.Description" StatusText="@(item is null ? null : StatusLabel(item.AvailabilityStatus))" Status="@(item is null ? UiStatus.Neutral : ModelManagementUi.Status(item.AvailabilityStatus))"
         ResourceIdentity="@(loadedKey ?? string.Empty)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" AdditionalContent="FamilySection"
         NavigationLabel="@T("ExtensionDetailsTabs")" NavigationTestId="extension-sections" SectionTestIdPrefix="extension" TestId="distribution-extension-details"
-        HasDraft="HasDefinitionDraft" HasAdditionalDraft="@(migrationPreview is not null)" Busy="Busy" Feedback="feedback" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" ShowRefreshAction="true"
+        HasDraft="HasDefinitionDraft" HasAdditionalDraft="@(migrationPreview is not null || installationDraft)" Busy="Busy" Feedback="feedback" LoadState="loadState" OnRefresh="RefreshAsync" OnRetry="RefreshAsync" ShowRefreshAction="true"
         DefinitionReadOnlyReason="@(CanEditRegistration ? null : RegistrationName is null ? ResourceReadOnlyReason.Unspecified : registration?.Value.Definition.Source is ExtensionRegistrationSource.Configuration or ExtensionRegistrationSource.Aspire ? ResourceReadOnlyReason.Managed : ResourceReadOnlyReason.InsufficientPermissions)" AllowAccess="@(RegistrationName is not null && registration is not null)"
         Enabled="@(RegistrationName is null ? null : registration?.Value.Definition.Enabled)" EnabledChanged="SetEnabledAsync" EnabledDisabled="@(!CanEditRegistration || Busy)" EnabledTestId="extension-enabled"
         Yaml="@SavedYaml" YamlTitle="@Shared["ResourceManifest"]" YamlDescription="@T("YamlReadOnlyProjection")" YamlReadOnly="true" MoreActions="actions">
@@ -92,6 +92,16 @@ else
     private RenderFragment DefinitionSection(string path) => path == "definition/identity" ? IdentityFields : ConfigurationFields;
     private RenderFragment FamilySection(string path) => @<div class="resource-editor-view">@if (item is not null)
     {
+    @if (path == "installation")
+    {
+        @if (registration?.Value.ScopeRef == ResourceScopeRef.Instance && ResourceOwnershipContext.TryGetCurrent(Services) == ResourceScopeRef.Instance)
+        {
+            <ExtensionConfigurationPanel RegistrationName="@registration.Value.Name" ResourceNamespace="@registration.Value.Namespace"
+                RegistrationUid="@registration.Value.Uid" ContextKey="@ContextKey" CanManage="@(CanAdminister && ResourceOwnershipContext.CanManage(registration.Value.ScopeRef, Services))"
+                DraftChanged="value => installationDraft = value" />
+        }
+        else { <p>@T("Installation.InstanceOnly")</p> }
+    }
     @if (path == "connections")
     {
         <section class="panel resource-section">
