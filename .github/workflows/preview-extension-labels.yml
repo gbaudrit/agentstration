@@ -1,0 +1,31 @@
+name: Preview extension labels
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/images/extensions/**
+      - scripts/github/apply-issue-labels.ps1
+      - .github/workflows/preview-extension-labels.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synchronize:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Synchronize selectable labels from the trusted AEP image catalogue
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/github/apply-issue-labels.ps1 -Repository $env:GITHUB_REPOSITORY -PreviewExtensionsOnly

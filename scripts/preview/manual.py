@@ -12,6 +12,7 @@ from urllib.parse import quote
 import xml.etree.ElementTree as ET
 
 import contract
+import extensions
 import github_request
 import preview
 from images import catalogue, DIGEST, valid_version
@@ -71,10 +72,12 @@ class PublishedImages:
 
     def entry(self, component, sha):
         trusted = catalogue(component)
-        family = 'applications' if component == 'server' else 'workers'
+        family = 'applications' if component == 'server' else 'workers' if trusted.get('kind') == 'awp-worker' else 'extensions'
         entry = contract.parse(self.source_file(f'deploy/images/{family}/{component}.json', sha))
         preview.require(isinstance(entry, dict) and entry.get('schemaVersion') == 1
-                        and all(entry.get(key) == trusted[key] for key in ('id', 'kind', 'imageName', 'platform', 'versionFile')),
+                        and entry.get('kind', 'aep-extension') == trusted.get('kind', 'aep-extension')
+                        and all(entry.get(key) == trusted[key] for key in ('id', 'imageName', 'platform', 'versionFile'))
+                        and (family != 'extensions' or all(entry.get(key) == trusted[key] for key in extensions.METADATA)),
                         'Published source does not match the supported component catalogue.')
         text = self.source_file(trusted['versionFile'], sha)
         if component == 'server':
@@ -110,7 +113,7 @@ class PublishedImages:
         image = f'ghcr.io/{self.owner}/{self.name}-{trusted["imageName"]}'
         sha = None
         if ref == 'published':
-            preview.require(component == 'maf-worker', 'Only the independently versioned Worker accepts published.')
+            preview.require(trusted.get('kind', 'aep-extension') in ('awp-worker', 'aep-extension'), 'Only independently versioned Workers and extensions accept published.')
             digest = self.latest_tagged(package)
         else:
             sha = self.revision(ref)
@@ -152,10 +155,13 @@ class PublishedImages:
                     return version['name']
             if len(versions) < 100:
                 break
-        raise ValueError('No tagged Worker image found. Publish the Worker or select its explicit published revision.')
+        raise ValueError('No tagged component image found. Publish the component or select its explicit published revision.')
 
 
 def validate_options(options):
+    extensions.validate_ids(options.get('extensions', []))
+    for identifier in options.get('extensions', []):
+        extensions.entry(identifier)
     preview.require(options['operation'] in contract.OPERATIONS and options['provider'] == 'azure-vm', 'Only the Azure VM provider is available in this form.')
     preview.require(preview.ENVIRONMENT_ID.fullmatch(options['environment_id']), 'Use a lowercase environment ID, at most 40 characters.')
     preview.require(options['database'] in ('sqlite', 'postgresql') and options['test_profile'] in ('none', 'readiness'), 'Unsupported database or test profile.')
@@ -181,7 +187,9 @@ def resolve(options, variables, repository, selector=None):
     arguments = {'environment_id': options['environment_id'], 'database': options['database'], 'provider': options['provider'],
                  'target': target, 'ttl_hours': ttl_hours, 'data_mode': options['data_mode'], 'test_profile': options['test_profile']}
     selector = selector or PublishedImages(repository)
-    return contract.plan(selector.select('server', options['revision']), selector.select('maf-worker', options['worker_revision']), **arguments)
+    return contract.plan(selector.select('server', options['revision']), selector.select('maf-worker', options['worker_revision']),
+                         extension_deliveries={identifier: selector.select(identifier, 'published') for identifier in options.get('extensions', [])},
+                         **arguments)
 
 
 def main():

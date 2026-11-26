@@ -191,7 +191,7 @@ class ManualTests(unittest.TestCase):
     def test_latest_worker_skips_untagged_manifests_and_refuses_empty_inventory(self):
         self.assertEqual('c' * 40, self.resolve()['deliveries']['worker']['sourceSha'])
         self.metadata.versions = self.metadata.versions[:1]
-        with self.assertRaisesRegex(ValueError, 'No tagged Worker'):
+        with self.assertRaisesRegex(ValueError, 'No tagged component'):
             self.resolve()
 
     def test_invalid_choices_fail_before_any_registry_read(self):

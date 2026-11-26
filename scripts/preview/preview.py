@@ -34,10 +34,21 @@ def image_record(delivery, kind, registry):
     require(delivery.get("schemaVersion") == 1 and SHA.fullmatch(delivery.get("sourceSha", ""))
             and DIGEST.fullmatch(delivery.get("digest", "")), "Expected an exact source SHA and OCI delivery digest.")
     entry = delivery_entry(delivery)
-    expected_id, expected_name = ("server", "server") if kind == "server" else ("maf-worker", "worker-maf")
-    require(entry.get("kind") == kind and entry.get("id") == expected_id and entry.get("imageName") == expected_name
+    if kind == "aep-extension":
+        import extensions
+        require(entry.get("kind", "aep-extension") == kind and extensions.ID.fullmatch(entry.get("id", ""))
+                and re.fullmatch(r"extension-[a-z][a-z0-9-]{0,31}", entry.get("imageName", ""))
+                and re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,127}", entry.get("extensionId", ""))
+                and "__" not in entry["extensionId"] and entry.get("aepVersion") == "agentstration.io/v1"
+                and entry.get("contributionKind") in ("modelProviders", "tools", "sourceProviders", "dataSourceProfileBundles", "schemaFormats", "connectedServiceTypes", "connectedServiceOperationTypes", "storageTypes")
+                and isinstance(entry.get("contributionId"), str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", entry["contributionId"]),
+                "Unsupported AEP delivery identity/protocol/contribution metadata.")
+        expected_id, expected_name = entry["id"], entry["imageName"]
+    else:
+        expected_id, expected_name = ("server", "server") if kind == "server" else ("maf-worker", "worker-maf")
+    require(entry.get("kind", "aep-extension") == kind and entry.get("id") == expected_id and entry.get("imageName") == expected_name
             and entry.get("platform") == "linux/amd64" and valid_version(entry.get("version")),
-            "The delivery does not identify the supported server/MAF Worker image.")
+            "The delivery does not identify a supported OCI component.")
     repository = delivery.get("repository", "").lower()
     require(re.fullmatch(r"[a-z0-9_.-]+/[a-z0-9_.-]+", repository), "Expected an owner/repository image source.")
     require(REGISTRY.fullmatch(registry) and (registry == "ghcr.io" or 1024 <= int(registry.split(":")[1]) <= 65535),
@@ -47,6 +58,8 @@ def image_record(delivery, kind, registry):
               "sourceSha": delivery["sourceSha"], "version": entry["version"], "platform": entry["platform"]}
     if kind == "awp-worker":
         record.update({key: entry[key] for key in ("runtimeKind", "capabilityVersion", "executionMaterialVersions", "awpVersion")})
+    if kind == "aep-extension":
+        record.update({key: entry[key] for key in ("extensionId", "aepVersion", "contributionKind", "contributionId")})
     return record
 
 
@@ -68,21 +81,29 @@ def validate_state(state):
     if "deploymentOwnerId" in state:
         uuid.UUID(state["deploymentOwnerId"])
     expected = {"server", "worker", "postgres"} if state["database"] == "postgresql" else {"server", "worker"}
-    require(set(state["images"]) == expected, "Preview images must match its selected database.")
+    optional = {name for name in state["images"] if name.startswith("extension-")}
+    import extensions
+    extensions.validate_ids(sorted(name[len("extension-"):] for name in optional))
+    require(set(state["images"]) == expected | optional, "Preview images must match its selected database.")
     if state["database"] == "postgresql":
         postgres = state["images"]["postgres"]
         require(POSTGRES_IMAGE.fullmatch(postgres["reference"]) and postgres["platform"] == "linux/amd64",
                 "PostgreSQL requires an official version 17 image pinned by digest.")
-    for name in ("server", "worker"):
+    for name in ("server", "worker", *optional):
         image = state["images"][name]
         require(re.fullmatch(r"(?:ghcr\.io|localhost:[0-9]{1,5})/[a-z0-9_.-]+/[a-z0-9_.-]+@sha256:[0-9a-f]{64}", image["reference"])
                 and SHA.fullmatch(image["sourceSha"]) and valid_version(image["version"]), "Invalid pinned preview image.")
+    for identifier, version in state.get("extensionConfigurations", {}).items():
+        extensions.validate_ids([identifier])
+        uuid.UUID(version)
     require(state["sourceSha"] == state["images"]["server"]["sourceSha"], "Preview revision differs from its server image.")
     return state
 
 
 def prepare(directory, server_delivery, worker_delivery, environment_id, port=5080, registry="ghcr.io", bootstrap=None,
-            database=None, postgres_image=None):
+            database=None, postgres_image=None, extension_deliveries=None, extension_configuration=None):
+    import extensions
+    settings = extensions.configuration(extension_configuration if extension_configuration is not None else {}, extension_deliveries or {})
     require(ENVIRONMENT_ID.fullmatch(environment_id), "Environment ID must use 1–40 lowercase letters, digits or hyphens, starting with a letter.")
     require(bootstrap is None or isinstance(bootstrap, dict), "Bootstrap configuration must be a JSON object.")
     images = {"server": image_record(server_delivery, "server", registry),
@@ -114,6 +135,9 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
                               "platform": "linux/amd64"}
     else:
         require(postgres_image is None, "A PostgreSQL image can only be selected for the PostgreSQL profile.")
+    for identifier, receipt in (extension_deliveries or {}).items():
+        import extensions
+        images[extensions.service(identifier)] = image_record(receipt, "aep-extension", registry)
     state.update(port=port, images=images, sourceSha=images["server"]["sourceSha"])
     validate_state(state)
     if bootstrap is not None:
@@ -127,6 +151,9 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
         private_write(directory / "worker.key", secrets.token_urlsafe(48))
         if state["database"] == "postgresql":
             private_write(directory / "postgres.password", secrets.token_urlsafe(48))
+    import extensions
+    extensions.prepare(directory, state, configuration, extension_deliveries or {})
+    obsolete_settings = extensions.prepare_configuration(directory, state, settings)
     if state["database"] == "postgresql":
         password = (directory / "postgres.password").read_text()
         require(re.fullmatch(r"[A-Za-z0-9_-]{64}", password), "Restore the original generated PostgreSQL password file.")
@@ -135,6 +162,8 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
             "Host=postgres;Port=5432;Database=agentstration;Username=agentstration;Password=" + password}
     private_write(directory / "server-configuration.json", json.dumps(configuration, indent=2) + "\n")
     private_write(state_path, json.dumps(state, indent=2) + "\n")
+    for path in obsolete_settings:
+        path.unlink()
     return state
 
 
@@ -154,6 +183,12 @@ def compose_command(directory):
                "--file", str(ROOT / "deploy/preview/compose.yml")]
     if state["database"] == "postgresql":
         command += ["--file", str(ROOT / "deploy/preview/postgresql.yml")]
+    import extensions
+    optional = extensions.overlay(directory, state)
+    if optional["services"]:
+        path = directory / "extensions.compose.json"
+        private_write(path, json.dumps(optional) + "\n")
+        command += ["--file", str(path)]
     return command, environment
 
 
@@ -189,6 +224,22 @@ def verify(directory):
             require(not any((container["HostConfig"].get("PortBindings") or {}).values())
                     and not any(value.startswith("POSTGRES_PASSWORD=") for value in container["Config"]["Env"]),
                     "PostgreSQL must not publish a host port or receive a plaintext password environment variable.")
+        if service.startswith("extension-"):
+            bindings = container["HostConfig"].get("PortBindings") or {}
+            require(set(bindings) == {"8080/tcp"} and len(bindings["8080/tcp"]) == 1
+                    and bindings["8080/tcp"][0]["HostIp"] == "127.0.0.1", "Extension ports must bind only guest loopback.")
+            mounts = {mount["Destination"]: mount for mount in container["Mounts"] if mount["Type"] != "tmpfs"}
+            version = state.get("extensionConfigurations", {}).get(service[len("extension-"):])
+            expected_mounts = {"/run/secrets/aep-key", "/var/lib/aep"} | ({"/app/appsettings.Preview.json"} if version else set())
+            if version:
+                import extensions
+                require(not mounts.get("/app/appsettings.Preview.json", {}).get("RW", True)
+                        and mounts["/app/appsettings.Preview.json"]["Source"] == str(extensions.configuration_path(directory, service[len("extension-"):], version)),
+                        "Extension configuration differs from its recorded private file.")
+            require(set(mounts) == expected_mounts
+                    and not mounts["/run/secrets/aep-key"]["RW"] and mounts["/var/lib/aep"]["RW"]
+                    and not any(value.lower().startswith("connectionstrings") for value in container["Config"]["Env"]),
+                    "Extensions may receive only their own enrollment key, private settings and state volume.")
         if service == "worker":
             require({mount["Destination"] for mount in container["Mounts"]} == {"/run/secrets/awp_key"}
                     and all(not mount["RW"] for mount in container["Mounts"])
@@ -198,7 +249,9 @@ def verify(directory):
     for path in ("/health/live", "/health/ready"):
         with urllib.request.urlopen(base + path, timeout=10) as response:
             require(response.status == 200, "Server is not ready.")
-    return {"environmentId": state["environmentId"], "database": state["database"], "images": state["images"], "url": base}
+    import extensions
+    verified = extensions.verify(directory, state)
+    return {"extensionsVerified": verified, "environmentId": state["environmentId"], "database": state["database"], "images": state["images"], "url": base}
 
 
 def main():
