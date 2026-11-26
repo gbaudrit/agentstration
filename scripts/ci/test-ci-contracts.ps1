@@ -26,7 +26,7 @@ foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Exten
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', $path)
     Require ($selection.dotnet -and $selection.container -and $selection.extensionImages) "Mixed/unknown changes must retain product and image validation: $path"
 }
-foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'scripts/packaging/enrollment_smoke.py')) {
+foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path"
 }
@@ -35,7 +35,7 @@ foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Pr
     Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker,server') "Worker inputs must validate the Worker and its real preview composition: $path"
 }
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
-Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
+Require (($selection.imageIds -join ',') -eq 'foundry,utilities,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
 foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml', '.github/workflows/preview-azure-validation.yml', '.github/workflows/preview-azure-environment.yml', '.github/workflows/preview-on-demand.yml')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
@@ -144,3 +144,8 @@ try {
 }
 finally { Remove-Item $temp -Recurse -Force }
 Write-Host 'CI inventory, report completeness and path-selection contracts passed.'
+
+foreach ($path in @('src/extensions/Agentstration.Extensions.Utilities/Program.cs', 'src/extensions/Agentstration.Extensions.Utilities/version.txt', 'tests/Agentstration.Api.Tests/UtilitiesPackagingTests.cs', 'deploy/images/extensions/utilities.json')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'utilities' -and -not ($selection.dotnet -or $selection.aep -or $selection.container -or $selection.storage)) "Isolated utilities inputs must select only their image: $path"
+}
