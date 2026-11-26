@@ -80,7 +80,7 @@ manual export mapping. A disabled native preparation can still be saved before
 an output Storage is selected.
 
 The initial retained-publication implementation supports builtin local Storages.
-It stores sealed content separately from mutable ASP objects and never overwrites
+It stores sealed content separately from mutable ASC objects and never overwrites
 a sealed publication. A provider supporting ordinary object reads and writes is
 not automatically compatible. The bounded initial inline Flow profile supports
 64 KiB per content object, subject to lower Storage limits.

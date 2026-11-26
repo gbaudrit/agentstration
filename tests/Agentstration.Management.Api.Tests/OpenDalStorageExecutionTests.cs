@@ -137,7 +137,7 @@ public sealed class OpenDalStorageExecutionTests : ModelManagementApiTestBase
             Assert.AreEqual("real OpenDAL through product", Encoding.UTF8.GetString(Convert.FromBase64String(
                 (await gateway.ReadAsync(target, written.Reference, 0, 100)).ContentBase64)));
             // Native Data Source keys span several physical filesystem path segments and
-            // acquired values can exceed the default ASP transfer chunk (16 KiB).
+            // acquired values can exceed the default ASC transfer chunk (16 KiB).
             var acquisitionKey = "notes/datasets/" + new string('a', 32) + "/" + new string('b', 32)
                 + "/acquisition-" + new string('c', 32) + ".json";
             var acquisitionBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { value = new string('x', 18146) }));

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Agentstration.Resources;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
@@ -17,11 +17,11 @@ public sealed class LocalStorageDefinitionValidator : IStorageDefinitionValidato
         try
         {
             var policy = definition.Envelope.Deserialize<StorageContentPolicy>(Json)
-                ?? throw new AspException("invalid_policy", "A local envelope is required.");
+                ?? throw new AscException("invalid_policy", "A local envelope is required.");
             StorageContentValidation.Policy(new(policy.List, policy.Stat, policy.Read, policy.Write, policy.Prefix,
                 policy.MaximumReadBytes, policy.MaximumWriteBytes, policy.MaximumPageSize, policy.KeyFrom, policy.KeyBefore));
         }
-        catch (Exception exception) when (exception is AspException or JsonException)
+        catch (Exception exception) when (exception is AscException or JsonException)
         { throw new StorageException("storage_configuration_invalid", "The local Storage envelope contains invalid restrictions."); }
     }
 }

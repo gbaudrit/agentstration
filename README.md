@@ -68,7 +68,7 @@ executable outside the extension directory.
 
 Connected Services, their service types and their protocol-specific operation types are scoped product resources. A type may be bootstrapped by Core, authored by a user or materialized from an AEP contribution with extension governance; a configured service pins one exact type revision, while durable Flow-backed discovery materializes validated read-only operations. The REST surfaces and localized Console journeys are documented in [Connected Services API](docs/reference/connected-services.md); consumer bindings such as Storage/OpenDAL remain explicit and do not couple extensions together.
 
-The standalone Agentstration Storage Protocol SDK is staged in [`asp/`](asp/README.md): neutral bounded content contracts, MCP client/server adapters, an offline sample and conformance tests. It does not yet integrate product Storage resources or promise durable Snapshot retention.
+The standalone Agentstration Storage Contract SDK is staged in [`asc/`](asc/README.md): neutral bounded content and document contracts, MCP client/server adapters, offline samples and conformance tests. Its `ASC.mcp.v1` exposure integrates product Storage resources through explicit AEP mappings; it does not promise durable Snapshot retention.
 
 Read the [architecture overview](https://docs.agentstration.io/architecture/overview) and [current capabilities reference](https://docs.agentstration.io/reference/current-capabilities) for the detailed boundaries and guarantees.
 

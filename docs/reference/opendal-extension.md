@@ -1,7 +1,7 @@
 # OpenDAL Storage extension
 
 The optional standalone extension implements FR #1039 under #1032. It contributes
-Storage types through AEP and executes ASP content operations over MCP through the
+Storage types through AEP and executes ASC content operations over MCP through the
 existing server SDK. It has no dependency on Agentstration business resources and
 does not create Connected Services, infer mappings or publish Agent Tools.
 
@@ -10,8 +10,8 @@ does not create Connected Services, infer mappings or publish Agent Tools.
 | Type | Version | Execution | Connection requirements |
 | --- | --- | --- | --- |
 | opendal.fs | 1.0.0 | Four text/blob methods, list/stat, session controls | None |
-| opendal.s3 | 1.0.0 | Same generic ASP group through native S3 Operator | endpoint, region, access-key; secured secret-key |
-| opendal.azblob | 1.0.0 | Same generic ASP group through native Azure Blob Operator | endpoint, account; secured account-key |
+| opendal.s3 | 1.0.0 | Same generic ASC group through native S3 Operator | endpoint, region, access-key; secured secret-key |
+| opendal.azblob | 1.0.0 | Same generic ASC group through native Azure Blob Operator | endpoint, account; secured account-key |
 
 All types handled by this extension are contributed and executable. Other services
 compiled into Apache.OpenDAL are not integrated StorageTypes. Adding one requires
@@ -119,7 +119,7 @@ deployment/authentication practices.
    Connected Service or requirement mapping is needed for this offline backend.
 4. Use the existing authorized Storage content gateway. The product revalidates
    resource identity, scope and generic Use, then configures a short-lived
-   protected ASP binding and invokes the known MCP operation group.
+   protected ASC binding and invokes the known MCP operation group.
 5. Provider authentication, allowlist, exact StoreRef, envelope and per-operation
    checks remain mandatory. Disablement, revoked access and stale identities fail.
 
@@ -142,11 +142,11 @@ content serialization, object/version index or persisted protocol receipt ledger
 Filesystem-specific containment/link checks protect the local mapping; all actual
 content I/O uses the same OpenDAL Operator/Stream methods as remote backends.
 
-ASP.Server supplies [text/blob sessions](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asp/docs/protocol.md),
+ASC.Server supplies [text/blob sessions](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asc/docs/protocol.md),
 strict UTF-8, fixed byte ranges, sequencing, replay, expiry and explicit finalization.
 Protected AEP binding leases still last at most 30 seconds. Longer direct SDK
 transfers must renew the protected lease with the same exact target and authority;
-a lease is not extended by an ASP session. The current product content port remains
+a lease is not extended by an ASC session. The current product content port remains
 bounded to one returned payload.
 
 The extension translates authorized operations and native capabilities. It exposes
@@ -187,7 +187,7 @@ no physical settings in content arguments and adds no blind retry loop.
   not sessions/receipts; reacquire list/object references after restart. No durable
   exactly-once promise, historical-version retention or Snapshot retention is made.
 
-The 0.3.1 .NET `List` API materializes native entries. ASP pages are ordinal, filtered
+The 0.3.1 .NET `List` API materializes native entries. ASC pages are ordinal, filtered
 and bounded, but large namespace listing can use memory proportional to those
 entries; a native iterator binding would be needed for bounded listing memory.
 Pagination is live rather than a snapshot. Blob content transfers themselves use
@@ -210,7 +210,7 @@ is unsupported. Do not enable trimming, single-file publication or Native AOT.
 The RID publish includes the managed wrapper, matching native library and
 `licenses/opendal/` with Apache/MPL/CC0 licenses, NOTICE and the upstream README
 containing third-party source links. No upstream source code was copied from
-Xuanwo/mcp-server-opendal; it is an implementation reference, not our ASP endpoint.
+Xuanwo/mcp-server-opendal; it is an implementation reference, not our ASC endpoint.
 The native and managed binding are consumed together from the official package.
 
 `deploy/opendal/Dockerfile` builds the optional Linux glibc distribution. Mount

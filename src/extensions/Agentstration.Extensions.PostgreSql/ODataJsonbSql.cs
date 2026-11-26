@@ -1,8 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.OData;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.OData;
 using Microsoft.OData.Edm;
 using Microsoft.OData.UriParser;
 using Npgsql;
@@ -98,7 +98,7 @@ internal sealed class ODataJsonbSql
         while (literal is ConvertNode convert) literal = convert.Source;
         if (literal is not ConstantNode { Value: not null } constant || Primitive(property) == EdmPrimitiveTypeKind.None) return null;
         string[] path;
-        try { path = ODataDocumentQuery.Path(property); } catch (AspException) { return null; }
+        try { path = ODataDocumentQuery.Path(property); } catch (AscException) { return null; }
         if (path.Length == 0) return null;
         JsonNode? node = JsonSerializer.SerializeToNode(constant.Value);
         for (var index = path.Length - 1; index >= 0; index--) node = new JsonObject { [path[index]] = node };
@@ -119,7 +119,7 @@ internal sealed class ODataJsonbSql
 
     public string After(ODataDocumentQuery query, ODataDocumentPosition position)
     {
-        AspValidation.Require(position.Values.Count == query.Sort.Count, "invalid_reference", "Invalid query position.");
+        AscValidation.Require(position.Values.Count == query.Sort.Count, "invalid_reference", "Invalid query position.");
         var clauses = new List<string>(); var equal = new List<string>();
         for (var i = 0; i < query.Sort.Count; i++)
         {
@@ -136,5 +136,5 @@ internal sealed class ODataJsonbSql
     }
     public string Order(ODataDocumentQuery query) => string.Join(",", query.Sort.Select(s => Expression(s.Expression)
         + (s.Descending ? " DESC NULLS LAST" : " ASC NULLS FIRST")).Append("d.id COLLATE \"C\" ASC"));
-    private static AspException Unsupported() => new("unsupported_query", "This OData expression is not supported by the JSONB translator.");
+    private static AscException Unsupported() => new("unsupported_query", "This OData expression is not supported by the JSONB translator.");
 }

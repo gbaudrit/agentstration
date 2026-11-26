@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Agentstration.Infrastructure.Storage;
 
 namespace Agentstration.Infrastructure.Tests;
@@ -19,7 +19,7 @@ public sealed class StorageBindingFailureTests
     {
         using var response = new HttpResponseMessage((HttpStatusCode)status)
         { Content = new StringContent(body, Encoding.UTF8, "application/problem+json") };
-        var error = await Assert.ThrowsAsync<AspException>(() => StorageAspRemoteAdapter.EnsureDocumentBindingSuccessAsync(response, default));
+        var error = await Assert.ThrowsAsync<AscException>(() => StorageAscRemoteAdapter.EnsureDocumentBindingSuccessAsync(response, default));
         Assert.AreEqual(expected, error.Code);
         Assert.DoesNotContain("PRIVATE", error.ToString());
     }
@@ -29,7 +29,7 @@ public sealed class StorageBindingFailureTests
     {
         using var response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
         { Content = new StringContent(new string('x', 8192)) };
-        var error = await Assert.ThrowsAsync<AspException>(() => StorageAspRemoteAdapter.EnsureDocumentBindingSuccessAsync(response, default));
+        var error = await Assert.ThrowsAsync<AscException>(() => StorageAscRemoteAdapter.EnsureDocumentBindingSuccessAsync(response, default));
         Assert.AreEqual("provider_unavailable", error.Code);
     }
 }
