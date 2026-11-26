@@ -120,6 +120,12 @@ class AdmissionTests(unittest.TestCase):
             with self.subTest(body=body), self.assertRaises(ValueError):
                 commands.tracking(selected, REPOSITORY, github)
 
+    def test_redeploy_failure_feedback_explains_when_reset_or_deployment_should_be_retried(self):
+        text = commands.feedback.failed('deploy', REPOSITORY, 'https://github.com/' + REPOSITORY + '/actions/runs/1',
+            'execute', {**commands.parse('/preview redeploy'), 'environment_id': 'issue-17'})
+        self.assertIn('If removal failed, retry `/preview redeploy`', text)
+        self.assertIn('if only recreation failed, use `/preview`', text)
+
     def test_unique_native_link_freezes_head_and_dispatches_only_main_without_executing_source(self):
         github = GitHub()
         self.assertTrue(github.admit())

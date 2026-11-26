@@ -183,5 +183,6 @@ def failed(operation, repository, run_url, stage, options, failure=None):
     else:
         lines.append('Resources may remain after this failure; no unverified access URL is published.')
         if reset:
-            lines.append('The previous preview and its data may already have been removed. Check `/preview status`; use `/preview` to retry deployment without another reset.')
+            lines.append('The previous preview and its data may already have been removed. Check `/preview status`. '
+                         'If removal failed, retry `/preview redeploy`; if only recreation failed, use `/preview` to resume without another reset.')
     return '\n\n'.join([*lines, '[Inspect the failed step](' + run_url + ').'])
