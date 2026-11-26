@@ -77,16 +77,30 @@ class PublishedImages:
         preview.require(len(result) <= 65536, 'Source metadata exceeds 64 KiB.')
         return result.decode('utf-8')
 
+    def component(self, identifier):
+        if identifier in ('server', 'maf-worker'):
+            return catalogue(identifier)
+        extensions.validate_ids([identifier])
+        if extensions.catalogue_path(identifier).exists():
+            return extensions.entry(identifier)
+        # Only the fixed AEP recipe/namespace is available before catalogue merge.
+        return {'id': identifier, 'kind': 'aep-extension', 'imageName': 'extension-' + identifier, 'platform': 'linux/amd64'}
+
     def entry(self, component, sha):
-        trusted = catalogue(component)
+        trusted = self.component(component)
         family = 'applications' if component == 'server' else 'workers' if trusted.get('kind') == 'awp-worker' else 'extensions'
         entry = contract.parse(self.source_file(f'deploy/images/{family}/{component}.json', sha))
-        preview.require(isinstance(entry, dict) and entry.get('schemaVersion') == 1
+        preview.require(isinstance(entry, dict) and type(entry.get('schemaVersion')) is int and entry['schemaVersion'] == 1
                         and entry.get('kind', 'aep-extension') == trusted.get('kind', 'aep-extension')
-                        and all(entry.get(key) == trusted[key] for key in ('id', 'imageName', 'platform', 'versionFile'))
-                        and (family != 'extensions' or all(entry.get(key) == trusted[key] for key in extensions.METADATA)),
+                        and all(entry.get(key) == trusted[key] for key in ('id', 'imageName', 'platform'))
+                        and ('versionFile' not in trusted or entry.get('versionFile') == trusted['versionFile'])
+                        and (family != 'extensions' or all(entry.get(key) == trusted[key] for key in extensions.METADATA if key in trusted)),
                         'Published source does not match the supported component catalogue.')
-        text = self.source_file(trusted['versionFile'], sha)
+        if family == 'extensions':
+            preview.require(isinstance(entry.get('versionFile'), str)
+                            and re.fullmatch(r'src/extensions/[A-Za-z][A-Za-z0-9_.-]*/version\.txt', entry['versionFile']),
+                            'Extension versions must use a bounded source version.txt path.')
+        text = self.source_file(entry['versionFile'], sha)
         if component == 'server':
             preview.require('<!DOCTYPE' not in text.upper() and '<!ENTITY' not in text.upper(), 'XML entities are not source version metadata.')
             properties = ET.fromstring(text)
@@ -96,7 +110,11 @@ class PublishedImages:
         else:
             version = text.strip()
         preview.require(valid_version(version), 'Published source has no supported SemVer version.')
-        return {**entry, 'version': version}
+        value = {**entry, 'version': version}
+        if family == 'extensions':
+            preview.image_record({'schemaVersion': 1, 'component': value, 'repository': self.repository,
+                                  'sourceSha': sha, 'digest': 'sha256:' + '0' * 64}, 'aep-extension', 'ghcr.io')
+        return value
 
     def private_package(self, image_name):
         if self.package_root is None:
@@ -115,7 +133,7 @@ class PublishedImages:
                                    'inspect', '--config', 'docker://' + reference]))
 
     def select(self, component, ref):
-        trusted = catalogue(component)
+        trusted = self.component(component)
         try:
             package = self.private_package(trusted['imageName'])
         except Unavailable as error:
@@ -126,6 +144,8 @@ class PublishedImages:
             preview.require(trusted.get('kind', 'aep-extension') in ('awp-worker', 'aep-extension'), 'Only independently versioned Workers and extensions accept published.')
             try:
                 digest = self.latest_tagged(package)
+            except Unavailable as error:
+                raise SelectionError('registry-access', component, 'Private GHCR image versions are unavailable.') from error
             except ValueError as error:
                 raise SelectionError('image-unavailable', component, 'No tagged component image found. Publish the component or select its explicit published revision.') from error
         else:
@@ -173,8 +193,6 @@ class PublishedImages:
 
 def validate_options(options):
     extensions.validate_ids(options.get('extensions', []))
-    for identifier in options.get('extensions', []):
-        extensions.entry(identifier)
     preview.require(options['operation'] in contract.OPERATIONS and options['provider'] == 'azure-vm', 'Only the Azure VM provider is available in this form.')
     preview.require(preview.ENVIRONMENT_ID.fullmatch(options['environment_id']), 'Use a lowercase environment ID, at most 40 characters.')
     preview.require(options['database'] in ('sqlite', 'postgresql') and options['test_profile'] in ('none', 'readiness'), 'Unsupported database or test profile.')

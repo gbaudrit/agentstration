@@ -87,13 +87,17 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertIn("os.environ['GITHUB_EVENT_NAME'] in ('workflow_dispatch', 'push')", provider)
         self.assertNotIn("'issue_comment'", provider)
 
-    def test_pr_tracking_read_permission_reaches_the_boundary_and_announcement(self):
+    def test_pr_comment_write_permission_reaches_writers_and_the_reusable_caller(self):
+        admission = self.workflows()['preview-issue.yml']
         relay = self.workflows()['preview-issue-deployment.yml']
         source = self.workflows()['preview-on-demand.yml']
-        self.assertIn('pull-requests: read', relay)
-        for name, following in (('boundary', 'select'), ('announce', 'execute')):
-            job = source.split('\n  ' + name + ':\n', 1)[1].split('\n  ' + following + ':\n', 1)[0]
-            self.assertIn('pull-requests: read', job)
+        for writer in (admission, relay, source.split('\n  announce:\n', 1)[1].split('\n  execute:\n', 1)[0],
+                       source.split('\n  report:\n', 1)[1]):
+            self.assertIn('issues: write', writer)
+            self.assertIn('pull-requests: write', writer)
+        boundary = source.split('\n  boundary:\n', 1)[1].split('\n  select:\n', 1)[0]
+        self.assertIn('pull-requests: read', boundary)
+        self.assertNotIn('pull-requests: write', boundary)
         report = source.split('\n  report:\n', 1)[1]
         self.assertIn('fromJSON(inputs.selection).tracking_feedback', report)
         self.assertIn('SELECTION_JSON: ${{ needs.boundary.outputs.selection || inputs.selection }}', report)

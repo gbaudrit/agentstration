@@ -22,7 +22,21 @@ def api(path, method='GET', body=None):
             file = Path(directory) / 'body.json'
             preview.private_write(file, json.dumps(body))
             arguments += ['--input', str(file)]
-        raw = manual.command(arguments)
+        try:
+            raw = manual.command(arguments)
+        except manual.Unavailable:
+            # Labels and provider/API errors are untrusted. Only name fixed API stages.
+            stage = 'GitHub metadata lookup'
+            permission = 'repository metadata/read access'
+            if method == 'POST' and path.endswith('/comments') or method == 'PATCH' and '/issues/comments/' in path:
+                stage, permission = 'Preview comment publication', 'issues:write for issues and pull-requests:write for PRs'
+            elif path.endswith('/permission'):
+                stage = 'Requester permission verification'
+            elif '/issues/comments/' in path:
+                stage = 'Command or feedback comment lookup'
+            elif path.endswith('/dispatches'):
+                stage, permission = 'Trusted-main workflow dispatch', 'actions:write'
+            raise manual.Unavailable(stage + ' failed; check ' + permission + '. Remote response is withheld.') from None
     return json.loads(raw) if raw else None
 
 
@@ -162,8 +176,6 @@ def context(options, repository, issue, current, call):
 
 
 def safe_error(error):
-    if type(error) is ValueError and str(error).startswith('Extension has no implemented image catalogue: '):
-        return 'A selected extension is not yet available in the main catalogue. Merge its packaging, verify its private GHCR publication, then post /preview deploy again.'
     return str(error) if type(error) is ValueError or isinstance(error, manual.Unavailable) else 'Preview request failed; inspect the trusted workflow run. Remote content is withheld.'
 
 

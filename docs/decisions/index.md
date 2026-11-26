@@ -337,3 +337,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 265. [ADR-0265 — Preview labels select independently delivered AEP extensions](0265-preview-labels-select-independently-delivered-aep-extensions.md)
 
 266. [ADR-0266 — PR preview commands use frozen heads and owned feedback](0266-pr-preview-commands-use-frozen-heads-and-owned-feedback.md)
+
+267. [ADR-0267 — Pre-merge AEP previews consume published catalogue data](0267-pre-merge-aep-previews-consume-published-catalogue-data.md)
