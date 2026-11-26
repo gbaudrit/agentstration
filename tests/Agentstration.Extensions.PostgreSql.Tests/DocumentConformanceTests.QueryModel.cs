@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.OData;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.OData;
 
 namespace Agentstration.Extensions.PostgreSql.Tests;
 
@@ -28,7 +28,7 @@ public sealed partial class DocumentConformanceTests
     public void OrderingRequiresADeclaredScalarAtTheActualQueryModelLevel()
     {
         var envelope = new ODataDocumentProfile(AlertEnvelopeModel);
-        var failure = Assert.Throws<AspException>(() => envelope.Parse(Json(AlertQuery)));
+        var failure = Assert.Throws<AscException>(() => envelope.Parse(Json(AlertQuery)));
         Assert.AreEqual("unsupported_query", failure.Code);
         StringAssert.Contains(failure.Message, "Sorting requires a declared scalar field");
         var records = new ODataDocumentProfile(AlertRecordModel).Parse(Json(AlertQuery));

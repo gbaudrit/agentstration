@@ -331,3 +331,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 262. [ADR-0262 — XML processing uses operator content settings](0262-xml-processing-uses-operator-content-settings.md)
 
 263. [ADR-0263 — Issue preview commands dispatch trusted manual workflows](0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
+
+264. [ADR-0264 — Storage contract identity is independent of its MCP exposure](0264-storage-contract-identity-and-mcp-exposure.md)

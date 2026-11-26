@@ -133,7 +133,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
 | `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
 | `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
-| `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem/S3/Azure operators, real ASP/MCP, isolation, progressive transfer and restart |
+| `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem/S3/Azure operators, real ASC/MCP, isolation, progressive transfer and restart |
 | `Agentstration.Web.Tests` | Integration | Combined standalone composition, startup, storage profiles, workers, and lifecycle |
 | `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
 | `Agentstration.Workplace.Web.Tests` | Integration | Workplace HTTP host |
@@ -205,7 +205,7 @@ Negative controls deliberately changed an authorized Model Provider operation to
 ## Structured document provider lane
 
 The default deterministic suites run the memory-backed structured-document cases.
-Set `AGENTSTRATION_TEST_ASP_POSTGRES` to an explicitly disposable local database to
+Set `AGENTSTRATION_TEST_ASC_POSTGRES` to an explicitly disposable local database to
 run matching PostgreSQL cases; never target production content. The
 `structured-documents.yml` workflow runs contracts plus V2/V3 against PostgreSQL 17.
 See [Structured documents](../reference/structured-documents.md) for commands and

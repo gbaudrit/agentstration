@@ -3,9 +3,9 @@
     <ProjectReference Include="../Agentstration.Functions/Agentstration.Functions.csproj" />
     <ProjectReference Include="../Agentstration.Functions.Builtins/Agentstration.Functions.Builtins.csproj" />
 
-    <ProjectReference Include="../../asp/src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
-    <ProjectReference Include="../../asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
-    <ProjectReference Include="../../asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
+    <ProjectReference Include="../../asc/src/Agentstration.Asc.OData/Agentstration.Asc.OData.csproj" />
+    <ProjectReference Include="../../asc/src/Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
+    <ProjectReference Include="../../asc/src/Agentstration.Asc.Client/Agentstration.Asc.Client.csproj" />
     <ProjectReference Include="../Agentstration.Storage/Agentstration.Storage.csproj" />
     <ProjectReference Include="../Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <ProjectReference Include="../Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />

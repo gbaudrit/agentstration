@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using OpenDAL;
 
 namespace Agentstration.Extensions.OpenDal.Tests;
@@ -9,8 +9,8 @@ public sealed class OpenDalProviderTests
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "opendal-provider-" + Guid.NewGuid().ToString("N"));
     private readonly OpenDalExecutionGate execution = new();
-    private static readonly AspStoreRef Store = new("store", "binding", "revision");
-    private static readonly AspAccessContext Context = new(Store, "subject", "grant", new(true, true, true, true, "notes/", 65536, 65536, 100));
+    private static readonly AscStoreRef Store = new("store", "binding", "revision");
+    private static readonly AscAccessContext Context = new(Store, "subject", "grant", new(true, true, true, true, "notes/", 65536, 65536, 100));
     private OpenDalObjectProvider Provider => OpenDalFileSystem.Create(root, Store, execution);
     [TestCleanup]
     public void Cleanup() { execution.Dispose(); if (Directory.Exists(root)) Directory.Delete(root, true); }
@@ -42,7 +42,7 @@ public sealed class OpenDalProviderTests
         var dependencies = typeof(OpenDalBindingFactory).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
         Assert.IsTrue(dependencies.Contains("OpenDAL", StringComparer.Ordinal));
         Assert.IsFalse(dependencies.Any(n => n.StartsWith("Agentstration.", StringComparison.Ordinal)
-            && !n.StartsWith("Agentstration.Asp.", StringComparison.Ordinal) && !n.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)));
+            && !n.StartsWith("Agentstration.Asc.", StringComparison.Ordinal) && !n.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)));
     }
     [TestMethod]
     public async Task ProviderIndependentlyEnforcesExactStoreAuthorityAndKeyRestrictions()
@@ -62,7 +62,7 @@ public sealed class OpenDalProviderTests
         async Task<bool> Create(byte value)
         {
             try { await using var writer = await Provider.OpenWriteAsync(Context, new("notes/race"), default); await writer.Content.WriteAsync(new byte[] { value }); await writer.CompleteAsync(default); return true; }
-            catch (AspException e) when (e.Code == "conflict") { return false; }
+            catch (AscException e) when (e.Code == "conflict") { return false; }
         }
         var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(i => Create((byte)i)));
         Assert.AreEqual(1, results.Count(r => r));
@@ -127,5 +127,5 @@ public sealed class OpenDalProviderTests
         Assert.HasCount(7, (await provider.ListAsync(Context, "notes/", null, 10, default)).Objects);
     }
 
-    private static async Task Error(string code, Func<Task> operation) => Assert.AreEqual(code, (await Assert.ThrowsAsync<AspException>(operation)).Code);
+    private static async Task Error(string code, Func<Task> operation) => Assert.AreEqual(code, (await Assert.ThrowsAsync<AscException>(operation)).Code);
 }

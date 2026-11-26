@@ -19,7 +19,7 @@ Additional modules follow the same principle: abstractions and domain models do 
 - Endpoints, UI components, MCP tools, workers, and `Program.cs` delegate business behavior to application services.
 
 `Storage.Contracts`, `Storage` and `Storage.Api` own selectable Storage resources.
-Storage consumes Connected Service export metadata through contracts only; ASP/AEP,
+Storage consumes Connected Service export metadata through contracts only; ASC/AEP,
 Artifact and physical provider adapters remain outside the family. See the
 [Storage vertical](storage-vertical.md) for its authority layers and composition.
 

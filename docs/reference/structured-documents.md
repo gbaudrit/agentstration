@@ -1,7 +1,7 @@
 # Governed structured documents
 
 The active [#1150](https://github.com/gbaudrit/agentstration/issues/1150) vertical
-adds JSON documents and queries to ASP without changing the existing content
+adds JSON documents and queries to ASC without changing the existing content
 profile. PostgreSQL JSONB is an optional autonomous provider. Memory integration
 [#1156](https://github.com/gbaudrit/agentstration/issues/1156) remains on hold.
 
@@ -9,8 +9,8 @@ profile. PostgreSQL JSONB is an optional autonomous provider. Memory integration
 
 | Boundary | Responsibility |
 |---|---|
-| ASP Abstractions / Server / Client | `asp.documents/1`, canonical MCP schemas, exact logical selection, conditional document operations, query profile pins, protected cursors and optional immutable publication |
-| ASP OData | Optional `odata/4.01@1.0` grammar/model binding through Microsoft.OData.Core; no generic public parser AST |
+| ASC Abstractions / Server / Client | `asc.documents/1`, canonical MCP schemas, exact logical selection, conditional document operations, query profile pins, protected cursors and optional immutable publication |
+| ASC OData | Optional `odata/4.01@1.0` grammar/model binding through Microsoft.OData.Core; no generic public parser AST |
 | AEP | Authenticated contribution discovery, typed capabilities and the existing protected `/aep/storage/bindings` exchange |
 | Connected Service | Typed host, port, database, username and secured password exports; existing Parameter and Secret resolution |
 | Storage | Exact implementation/service/export pins, common operation envelope and logical collection declarations |
@@ -28,14 +28,14 @@ sequenceDiagram
     participant Tool as Governed relay
     participant Product as Document gateway
     participant Service as Connected Service / Secrets
-    participant Extension as AEP / ASP provider
+    participant Extension as AEP / ASC provider
     participant Database as Optional PostgreSQL
     Caller->>Tool: Public operation arguments
     Tool->>Product: Fixed exact Storage, collection, profile
     Product->>Product: Reauthorize current scope, Use, operation and limits
     Product->>Service: Resolve explicit exports and short-lived Secret capability
     Product->>Extension: Protected binding on existing AEP channel
-    Product->>Extension: Canonical ASP MCP operation
+    Product->>Extension: Canonical ASC MCP operation
     Extension->>Extension: Enforce fixed selection, policy and query limits
     Extension->>Database: Partitioned parameterized SQL
     Database-->>Caller: Bounded document/page through governed boundaries
@@ -74,7 +74,7 @@ The initial profile uses standard OData expressions in a JSON options object:
 }
 ```
 
-The outer ASP request supplies `pageSize` and an optional opaque `cursor`. The
+The outer ASC request supplies `pageSize` and an optional opaque `cursor`. The
 profile does not expose `$top`, `$skip`, SQL, joins, `$expand`, arbitrary functions
 nested lambda captures or nested transformation pipelines. Supported features include comparisons,
 `and`/`or`/`not`, bounded `in`, `contains`/`startswith`/`endswith`, `any`/`all`,
@@ -99,7 +99,7 @@ JSON Pointers; remote references, cycles and unsupported unions fail explicitly.
 Schemas are bounded to 64 KiB, eight expansion levels and 2,048 expanded nodes.
 Validation uses JsonSchema.Net without remote resolution. The original schema
 remains stored and hashed; expansion is only an internal validation/query model.
-This ASP profile does not change the separate Schema-family contracts attached
+This ASC profile does not change the separate Schema-family contracts attached
 to acquired Artifacts. Shared Schema discovery/adoption across OpenAPI, Artifacts
 and collections is tracked separately in [#1172](https://github.com/gbaudrit/agentstration/issues/1172).
 Invalid collection definitions return
@@ -119,7 +119,7 @@ Limits are 64 expression nodes, depth 12, four sort keys, 32 in-list values,
 by policy. Aggregate results fit one bounded page or fail explicitly. Request
 payloads, parsing, SQL execution and cancellation remain bounded. Cursor integrity
 binds caller/grant, StoreRef, collection/publication, exact profile/model, query
-and page size. ASP cursors expire after five minutes; Knowledge continuations use
+and page size. ASC cursors expire after five minutes; Knowledge continuations use
 a shorter four-minute bound and an existing retention lease.
 
 Get accepts an optional exact current revision. Put without `expectedRevision`
@@ -148,7 +148,7 @@ loopback host. `ProvisionSchema=true` is an operator-owned setup option. Product
 roles can instead receive the provisioned tables and DML rights separately from
 the provisioning role.
 
-The extension owns the `asp_jsonb` layout. Compound keys independently constrain
+The extension owns the `asc_jsonb` layout. Compound keys independently constrain
 Store, binding, collection, publication and document. A path-ops GIN index supports
 the extra containment predicate used for declared scalar equality. Typed range
 and sort expressions can use bounded scans; SQL timeouts and collection limits
@@ -252,7 +252,7 @@ content from retirement, subject to current authorization on every request.
 ## Deterministic validation
 
 The provider test project runs the same MCP cases with a bounded memory fixture
-and, when `AGENTSTRATION_TEST_ASP_POSTGRES` is set, a dedicated local PostgreSQL.
+and, when `AGENTSTRATION_TEST_ASC_POSTGRES` is set, a dedicated local PostgreSQL.
 Product tests exercise real AEP contributions, late-bound Secrets, MCP, separate
 agent relays, acquired JSON normalization and historical Snapshot queries. They
 require neither an LLM nor internet access at execution time.
@@ -375,7 +375,7 @@ logical Snapshot Artifacts.
 
 `StorageDocumentCapabilities.DocumentSelection` advertises implemented trusted
 read-only document subsets. The gateway requires this capability and an exact
-publication for a non-null `StorageDocumentTarget.DocumentIds`. ASP's corresponding
+publication for a non-null `StorageDocumentTarget.DocumentIds`. ASC's corresponding
 policy set is bounded to 100 unique logical IDs; null means unrestricted within
 the already authorized collection/publication, while an empty set selects no
 records. Intersection never widens a set. Subset policies cannot authorize
