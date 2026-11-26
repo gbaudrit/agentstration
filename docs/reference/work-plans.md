@@ -161,6 +161,8 @@ The internal MCP broker publishes these Workspace operations:
 | `work.plan.revise` | Revise an inactive plan using its expected version |
 | `work.plan.validate` / `work.plan.activate` | Transition an exact revision number and digest |
 | `work.plan.start` / `work.plan.advance` | Configure and advance the durable execution path |
+| `work.tracking.describe` / `work.tracking.get` | Discover optional tracking capabilities or read a private operation receipt |
+| `work.tracking.begin` / `work.tracking.resume` | Use the same tracking application service with a stable trusted Tool call identity |
 
 Schemas expose the same definition and execution-target shapes as the REST contracts.
 MCP WorkPlan results contain `commandId` and `value`, where `value` is the same
@@ -179,58 +181,66 @@ writes and reports that canonical execution validation is still required.
 
 ## Optional external task operations
 
-A Project can explicitly bind a `ToolProvider` with purpose `TaskOperations`. Local
-plans and internal child tasks continue to work with no such binding. External reads,
-updates and publication use a separate receipt; none of these operations activates a
-plan or gives functional acceptance to a task.
+A Project can select one explicit `Tracking` connection using the exact Describe Tool,
+ToolProvider, ExtensionRegistration and configured provider/target/binding/revision
+introduced by [Project contexts](projects.md). ATC targets need no repository.
+Local plans and internal child tasks continue to work without a tracking connection.
+External writes retain their own private receipts and never activate or accept a plan.
 
 | Endpoint under `/api/workspaces/{workspaceName}/projects/{projectId}` | Result |
 | --- | --- |
 | `GET /task-provider?bindingName=tracker&operation=Publish` | Resolve one authorized capability route |
-| `POST /task-operations` | Admit and invoke an operation; return its current receipt with HTTP 202 |
+| `POST /task-operations` | Admit and invoke an operation; return its receipt with HTTP 202 |
 | `POST /task-operations/{operationId}/resume` | Explicitly recover an uncertain operation |
 | `GET /task-operations/{operationId}` | Read the private receipt |
 | `GET /task-operations?skip=0&take=25` | Page private receipts, up to 100 per page |
 
-A request includes a stable operation `id`, `expectedProjectVersion`, explicit
-`bindingName`, and an `input` with `operation` (`Read`, `Update` or `Publish`) and
-`repository`. Reads and updates select `taskId`; publication supplies `title` and
-optional `body`. Updates require `expectedRevision`. Optional labels and relations
-remain provider-neutral data; consumers must use relation kinds supported by their
-provider. Associate an operation with a plan by supplying `planId`, `planRevision`
-and `planDigest` together. A rejected operation returns Problem Details and retains
-its receipt for inspection.
+For a Tracking connection, an input uses `tracking: {providerId, targetId}` and omits
+`repository` (its default is the empty string). Both identifiers must equal the
+selected connection. `Read` selects `taskId`; `Publish` supplies `title` and optional
+`body`. All other operations require `taskId` and the observed `expectedRevision`:
 
-The provider's AEP Tool metadata declares:
+- `Update` changes `title`/`body` and adds `labels` as native classifications. It does
+  not replace classifications or implicitly change state.
+- `Comment` supplies `comment` text.
+- `Relate` supplies `relation: {kind, item: {providerId, targetId, itemId}}` using
+  `Parent`, `Child`, `Related`, `Blocks` or `BlockedBy`; unsupported relations fail.
+- `Transition` supplies the exact native `transitionId` from an observation.
 
-```json
-{
-  "agentstration.work.task-provider": {
-    "version": "1.0",
-    "operations": ["Read", "Update", "Publish"],
-    "idempotentOperations": true,
-    "operationRecovery": true
-  }
-}
-```
+Each request performs one ATC mutation. Publication with labels, composite relations,
+or arbitrary state writes is rejected rather than partially applying several writes.
+Snapshots preserve the provider-qualified identity, exact revision, native state and
+completion reason, classifications, complete relation observations, comments and
+available transitions in `task.tracking`. No observation grants functional acceptance.
 
-The selected MCP Tool accepts `{mode, operationKey, intentDigest, input}`, where
-`mode` is `execute` or `recover`. Its structured result is
-`{operationKey, intentDigest, status, task?, errorCode?}`. Status is `Missing`,
-`Succeeded`, `Rejected` or `Uncertain`. Successful snapshots include repository,
-external task ID, exact observed revision, title/body/state, optional URL, labels
-and relations. The provider must atomically deduplicate writes by operation key and
-must not return `Missing` when a prior write could have succeeded. Generic adapters
-cannot manufacture that guarantee for a vendor API.
+A request also includes a stable `id`, `expectedProjectVersion` and `bindingName`.
+Optional `planId`, `planRevision` and `planDigest` must be supplied together. REST and
+authorized Work planning Tools invoke the same application service; no agent Run or
+LLM is needed. Private receipt reads and resumption remain scoped to the Workspace,
+principal and Project.
 
-A lost response or cancelled call remains `Uncertain`. Replay retains the captured
-provider, Tool generation and intent; it recovers the old receipt before considering
-another call with the same key. Changed bindings and obsolete plan intents cannot
-silently republish. Providers unable to establish the outcome must keep it uncertain
-for explicit operator reconciliation. These contracts introduce no automatic retries.
+Infrastructure uses the independent typed ATC contract
+`agentstration.tracking.contracts.mcp.v1` through the governed Tool pipeline, not a
+vendor MCP schema. It validates current grants, Describe capabilities, configured
+target and all native schemas; retained route fingerprints fence changes before a
+remote call. Work stores only neutral capability/evidence records, the local intent
+and a separately pinned ATC wire intent digest before any external effect.
 
-Concrete repository and PR operations use [Coding GitHub connections](coding-github.md).
-An exact published Tool relay may also be selected for a TaskOperations binding;
-its immutable capability declaration and source pins are checked before dispatch.
+A lost response, cancellation, invalid receipt or incomplete observation remains
+`Uncertain`. Explicit recovery retains the original operation key and intent. A
+correlated `Missing` can authorize re-execution only with durable recovery, within
+the declared receipt window and under the same current binding and plan intent.
+Process-local recovery may recover an existing receipt, but a missing or expired
+receipt cannot justify another publication. Providers with no recovery leave writes
+uncertain for operator reconciliation. Concurrency is exposed as actually declared
+(`None`, `Observation`, `AtomicRevision`); Agentstration does not strengthen it.
+ATC v1 admits no partial item in a non-applied receipt: invalid partial evidence stays
+uncertain and is never presented as a successful linkage.
+
+The existing native `TaskOperations` contract and published relays remain used by
+current Coding consumers until their own ATC adoption (#958/#1346/#1349). They retain
+repository inputs and `agentstration.work.task-provider` metadata. A `Tracking`
+connection never falls back to that native protocol. Concrete GitHub/AFC adoption is
+separate; see [Coding GitHub connections](coding-github.md).
 
 Task attempts also expose [revision-pinned execution evidence and paginated output history](task-execution-evidence.md). Retaining evidence never accepts a task automatically.

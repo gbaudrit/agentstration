@@ -163,6 +163,20 @@ public sealed partial class WorkPlanTests
         Assert.IsNull(receipt.Task);
     }
 
+    [TestMethod]
+    public async Task TaskProviderNeverReplaysAnUncorrelatedMissingReceipt()
+    {
+        await using var fixture = await Fixture.CreateAsync(); var (project, plan) = await ProviderProjectAsync(fixture);
+        var gateway = new TaskProviderFixture { SuppressEffect = true, WrongCoordinate = true };
+        var service = TaskProviders(fixture, gateway); await service.InitializeAsync(default);
+        var command = Publish(project, plan);
+        _ = Operation(await service.BeginAsync(fixture.Workspace, project.Id, command, default));
+        gateway.SuppressEffect = false;
+        var resumed = Operation(await service.ResumeAsync(fixture.Workspace, project.Id, command.Id, default));
+        Assert.AreEqual(WorkTaskOperationStatus.Uncertain, resumed.Status);
+        Assert.AreEqual("task_provider_response_invalid", resumed.ErrorCode); Assert.AreEqual(0, gateway.Effects);
+    }
+
     private static WorkTaskOperation Operation(Result<WorkTaskOperation> result) { Assert.IsTrue(result.IsSuccess, result.ErrorCode); return result.Value!; }
     private static BeginWorkTaskOperation Publish(WorkProjectSnapshot project, WorkPlanView plan) => new(new(Guid.NewGuid()), project.Version, "tracker",
         new(ExternalTaskOperationKind.Publish, "fixture/repository", Title: "Parent work", Body: "Keep children local"), plan.Plan.Id, plan.Revision.Number, plan.Revision.Digest);
@@ -206,7 +220,7 @@ public sealed partial class WorkPlanTests
             {
                 Recoveries++;
                 return Task.FromResult(receipts.TryGetValue(operation.OperationKey, out var prior) ? prior
-                    : new ExternalTaskProviderResponse(operation.OperationKey, operation.IntentDigest, ExternalTaskProviderStatus.Missing));
+                    : new ExternalTaskProviderResponse(WrongCoordinate ? "foreign" : operation.OperationKey, operation.IntentDigest, ExternalTaskProviderStatus.Missing));
             }
             if (SuppressEffect) return Task.FromResult(new ExternalTaskProviderResponse(operation.OperationKey, operation.IntentDigest, ExternalTaskProviderStatus.Uncertain));
             var response = receipts.GetOrAdd(operation.OperationKey, _ => new(operation.OperationKey, operation.IntentDigest, ExternalTaskProviderStatus.Succeeded,

@@ -797,3 +797,18 @@ Optional Work epics are logical plan membership with independent organization re
 receipts in the Work tracking store. YAML import explicitly preserves/replaces organization, and
 sharing uses a separate Organization record. Group edits do not save functional Projects/plans/tasks,
 retarget active Work, write GitHub hierarchy or recount usage. See ADR-0287.
+
+
+### Optional Work tracking operations over ATC (#955)
+
+Explicit Tracking connections now drive deterministic Work read, publication, update,
+comment, relation and native-transition operations through a typed Infrastructure ATC
+adapter and the existing governed Tool pipeline. Work retains neutral capability,
+connection and observation records plus the separate wire intent digest in its existing
+SQLite/PostgreSQL JSON receipts. Current access, route/schema pins and immutable
+operation coordinates are revalidated before dispatch. Process-local missing receipts
+and expired recovery windows cannot authorize a new effect; invalid or incomplete
+observations remain uncertain. Local plans remain provider-optional. Offline real-MCP
+and SQLite restart tests exercise this service path without agents or LLMs. Existing
+Coding native consumers await #958/#1346/#1349; this is not vendor adoption.
+See [ADR-0290](../../decisions/0290-work-task-operations-adopt-atc-with-explicit-recovery-guarantees.md).

@@ -9,6 +9,8 @@ public interface IWorkTaskProviderGateway
 {
     Task<Result<WorkTaskProviderRoute>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, ExternalTaskOperationKind operation, CancellationToken cancellationToken);
+    Task<Result<WorkTaskProviderRoute>> PrepareAsync(WorkTaskProviderRoute route, ExternalTaskOperationInput input, CancellationToken cancellationToken)
+        => Task.FromResult(Result<WorkTaskProviderRoute>.Success(route));
     Task<ExternalTaskProviderResponse> InvokeAsync(WorkTaskOperation operation, bool recover, CancellationToken cancellationToken);
 }
 
@@ -26,7 +28,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
     {
         var project = Owns(workspaceId) ? await projects.GetAsync(workspaceId, context.PrincipalId, projectId, token) : null;
         if (project is null) return Result<WorkTaskProviderRoute>.Failure("work_project_not_found");
-        var binding = project.Definition.Bindings.SingleOrDefault(value => value.Name == bindingName && value.Purpose == WorkProjectBindingPurpose.TaskOperations);
+        var binding = project.Definition.Bindings.SingleOrDefault(value => value.Name == bindingName && value.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Tracking);
         return binding is null ? Result<WorkTaskProviderRoute>.Failure("task_provider_binding_missing")
             : await provider.ResolveAsync(workspaceId, context.PrincipalId, binding, operation, token);
     }
@@ -42,15 +44,23 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
             || (command.PlanId is null ? command.PlanRevision is not null || command.PlanDigest is not null
                 : command.PlanId.Value.Value == Guid.Empty || command.PlanRevision is not >= 1 || command.PlanDigest?.Length != 64))
             return Failure("task_provider_command_invalid");
-        var digest = WorkPlanDefinition.Digest(new { projectId, command.ExpectedProjectVersion, command.BindingName, command.Input,
-            command.PlanId, command.PlanRevision, command.PlanDigest });
+        var digest = WorkPlanDefinition.Digest(new
+        {
+            projectId,
+            command.ExpectedProjectVersion,
+            command.BindingName,
+            command.Input,
+            command.PlanId,
+            command.PlanRevision,
+            command.PlanDigest
+        });
         var existing = await operations.GetAsync(workspaceId, context.PrincipalId, command.Id, token);
         if (existing is not null)
             return existing.ProjectId != projectId || existing.IntentDigest != digest ? Failure("task_provider_operation_conflict") : await DriveAsync(existing, true, token);
         var project = await projects.GetAsync(workspaceId, context.PrincipalId, projectId, token);
         if (project is null) return Failure("work_project_not_found");
         if (project.Version != command.ExpectedProjectVersion) return Failure("work_project_conflict");
-        var binding = project.Definition.Bindings.SingleOrDefault(value => value.Name == command.BindingName && value.Purpose == WorkProjectBindingPurpose.TaskOperations);
+        var binding = project.Definition.Bindings.SingleOrDefault(value => value.Name == command.BindingName && value.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Tracking);
         if (binding is null) return Failure("task_provider_binding_missing");
         WorkProjectPlanObservation? planObservation = null;
         if (command.PlanId is { } planId)
@@ -63,6 +73,8 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
             planObservation = new(planId, plan.Value.Plan.Version);
         }
         var route = await provider.ResolveAsync(workspaceId, context.PrincipalId, binding, command.Input.Operation, token);
+        if (!route.IsSuccess) return Failure(route.ErrorCode!);
+        route = await provider.PrepareAsync(route.Value!, command.Input, token);
         if (!route.IsSuccess) return Failure(route.ErrorCode!);
         var now = clock.GetUtcNow();
         var operationKey = WorkPlanDefinition.Digest(new { scope.TenantId, workspaceId, context.PrincipalId, command.Id });
@@ -104,16 +116,21 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
     {
         if (operation.Status is WorkTaskOperationStatus.Succeeded or WorkTaskOperationStatus.Rejected) return Result<WorkTaskOperation>.Success(operation);
         var project = await projects.GetAsync(operation.WorkspaceId, context.PrincipalId, operation.ProjectId, token);
-        if (project?.Definition.Bindings.Contains(operation.Route.Binding) != true) return Failure("task_provider_binding_changed");
+        if (project?.Definition.Bindings.Any(binding => WorkPlanDefinition.Digest(binding) == WorkPlanDefinition.Digest(operation.Route.Binding)) != true) return Failure("task_provider_binding_changed");
         var route = await provider.ResolveAsync(operation.WorkspaceId, context.PrincipalId, operation.Route.Binding, operation.Input.Operation, token);
         if (!route.IsSuccess) return Failure(route.ErrorCode!);
-        if (route.Value!.Tool != operation.Route.Tool || route.Value.Provider != operation.Route.Provider) return Failure("task_provider_route_changed");
+        if (route.Value!.Tool != operation.Route.Tool || route.Value.Provider != operation.Route.Provider
+            || WorkPlanDefinition.Digest(route.Value.Tracking is { } fresh ? fresh with { WireIntentDigest = null } : null)
+                != WorkPlanDefinition.Digest(operation.Route.Tracking is { } captured ? captured with { WireIntentDigest = null } : null)) return Failure("task_provider_route_changed");
         ExternalTaskProviderResponse response;
         try
         {
             token.ThrowIfCancellationRequested();
             response = await provider.InvokeAsync(operation, recover, token);
-            if (response.Status == ExternalTaskProviderStatus.Missing && recover)
+            if (response.Status == ExternalTaskProviderStatus.Missing && recover
+                && response.OperationKey == operation.OperationKey && response.IntentDigest == operation.IntentDigest
+                && response.Task is null && response.ErrorCode is null
+                && operation.Route.Capabilities.IdempotentOperations && operation.Route.Capabilities.OperationRecovery)
             {
                 // A missing receipt permits a retry only under the same idempotent provider identity.
                 // A newer local plan revision must not publish an obsolete intent.
@@ -163,10 +180,13 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
     }
 
     private static bool ValidSnapshot(ExternalTaskSnapshot? task, ExternalTaskOperationInput input) => task is not null
+        && (input.Tracking is null ? task.Tracking is null : task.Tracking is { RelationsComplete: true } observation
+            && observation.Identity.ProviderId == input.Tracking.ProviderId && observation.Identity.TargetId == input.Tracking.TargetId
+            && observation.Identity.ItemId == task.TaskId)
         && task.Repository == input.Repository && (input.Operation == ExternalTaskOperationKind.Publish || task.TaskId == input.TaskId)
         && task.TaskId is { Length: > 0 and <= 256 } && task.Revision is { Length: > 0 and <= 256 }
-        && task.Title is { Length: > 0 and <= 512 } && task.Body?.Length is not > 32_768 && task.State is { Length: > 0 and <= 64 }
-        && task.CompletionReason?.Length is not > 64 && task.CompletionReason?.Any(char.IsControl) != true
+        && task.Title is { Length: > 0 and <= 512 } && task.Body?.Length is not > 32_768 && task.State is { Length: > 0 and <= 128 }
+        && task.CompletionReason?.Length is not > 128 && task.CompletionReason?.Any(char.IsControl) != true
         && task.Labels is { Count: <= 32 } && task.Labels.All(value => value is { Length: > 0 and <= 128 })
         && task.Relations is { Count: <= 100 } && task.Relations.All(value => value is not null && value.Kind is { Length: > 0 and <= 64 }
             && value.Repository is { Length: > 0 and <= 512 } && value.TaskId is { Length: > 0 and <= 256 })

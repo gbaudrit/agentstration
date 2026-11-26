@@ -42,7 +42,8 @@ internal static class InternalToolsServiceCollectionExtensions
                 provider.GetRequiredService<Agentstration.Application.Work.WorkPlanService>(),
                 provider.GetRequiredService<Agentstration.Application.Work.WorkPlanExecutionService>(),
                 provider.GetRequiredService<Agentstration.Identity.Contracts.ICurrentRequestContext>(),
-                provider.GetRequiredService<Agentstration.Identity.Contracts.IAuthorizationService>()));
+                provider.GetRequiredService<Agentstration.Identity.Contracts.IAuthorizationService>(),
+                provider.GetRequiredService<Agentstration.Application.Work.WorkTaskProviderService>()));
             services.AddSingleton<IInternalMcpToolDefinitionProvider>(_ => new WorkPlanningToolDefinition(operation));
         }
         AddInternalTool<ResourcePlanCreateMcpTool>(services);

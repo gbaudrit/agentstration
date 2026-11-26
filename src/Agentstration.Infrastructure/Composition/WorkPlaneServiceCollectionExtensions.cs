@@ -48,6 +48,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<ICodingIssueBindingPolicy, CodingIssueBindingPolicy>();
         services.AddSingleton<IWorkPlanAdmissionGate, CodingIssueAdmissionGate>();
         services.AddSingleton<ICodingProviderGateway, McpCodingProviderGateway>();
+        services.AddSingleton<AtcWorkTaskProviderGateway>();
         services.AddSingleton<IWorkTaskProviderGateway, McpWorkTaskProviderGateway>();
         services.AddSingleton<WorkProjectContextService>();
         services.AddSingleton<IWorkProjectBindingResolver, WorkProjectBindingResolver>();

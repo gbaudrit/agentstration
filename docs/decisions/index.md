@@ -383,3 +383,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 288. [ADR-0288 — Forge operations are an independent contract over MCP](0288-forge-operations-are-an-independent-contract-over-mcp.md)
 
 289. [ADR-0289 — Project connections pin tracking and forge contract evidence](0289-project-connections-pin-tracking-and-forge-contract-evidence.md)
+
+290. [ADR-0290 — Work task operations adopt ATC with explicit recovery guarantees](0290-work-task-operations-adopt-atc-with-explicit-recovery-guarantees.md)

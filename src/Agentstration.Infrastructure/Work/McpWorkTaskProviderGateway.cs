@@ -16,7 +16,7 @@ namespace Agentstration.Infrastructure.Work;
 
 public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
     IResourceAccessPolicyService access, IToolExecutionPipeline pipeline, ICurrentRequestContext current,
-    IAuthorizationService authorization, TimeProvider clock) : IWorkTaskProviderGateway
+    IAuthorizationService authorization, TimeProvider clock, AtcWorkTaskProviderGateway? tracking = null) : IWorkTaskProviderGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, MaxDepth = 16 };
@@ -24,6 +24,8 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
     public async Task<Result<WorkTaskProviderRoute>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, ExternalTaskOperationKind operation, CancellationToken token)
     {
+        if (binding.Purpose == WorkProjectBindingPurpose.Tracking)
+            return tracking is null ? Failure("task_provider_contract_missing") : await tracking.ResolveAsync(workspaceId, principalId, binding, operation, token);
         if (current.Current.WorkspaceId != workspaceId.Value || current.Current.PrincipalId != principalId
             || !await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, token)) return Failure("task_provider_denied");
         if (binding.Purpose != WorkProjectBindingPurpose.TaskOperations || binding.Target.Address.Kind is not (ToolResourceKinds.ToolProvider or ToolResourceKinds.Tool)
@@ -85,11 +87,18 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         if (!(await access.EvaluateAsync(identity, consumer, ResourceAccessAction.Use, token)).Allowed) return Failure("task_provider_denied");
         return Result<WorkTaskProviderRoute>.Success(new(binding, new(ScopedResourceAddress.Create(owner, selected.Tool.Namespace,
             selected.Tool.Kind, selected.Tool.Name), selected.Tool.Uid, selected.Tool.Generation), selected.Capabilities)
-            { Provider = exactTool is null ? null : providerReference });
+        { Provider = exactTool is null ? null : providerReference });
     }
+
+    public Task<Result<WorkTaskProviderRoute>> PrepareAsync(WorkTaskProviderRoute route, ExternalTaskOperationInput input, CancellationToken token)
+        => route.Binding.Purpose == WorkProjectBindingPurpose.Tracking
+            ? tracking is null ? Task.FromResult(Failure("task_provider_contract_missing")) : tracking.PrepareAsync(route, input, token)
+            : Task.FromResult(input.Tracking is null ? Result<WorkTaskProviderRoute>.Success(route) : Failure("task_provider_binding_invalid"));
 
     public async Task<ExternalTaskProviderResponse> InvokeAsync(WorkTaskOperation operation, bool recover, CancellationToken token)
     {
+        if (operation.Route.Binding.Purpose == WorkProjectBindingPurpose.Tracking && tracking is not null)
+            return await tracking.InvokeAsync(operation, recover, token);
         ExternalTaskProviderResponse Unknown(string code) => new(operation.OperationKey, operation.IntentDigest, ExternalTaskProviderStatus.Uncertain, ErrorCode: code);
         if (current.Current.TenantId != operation.TenantId || current.Current.WorkspaceId != operation.WorkspaceId.Value
             || current.Current.PrincipalId != operation.OwnerPrincipalId) return Unknown("task_provider_denied");
@@ -108,13 +117,23 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
                 OwnerKind = ToolExecutionOwnerKind.WorkOperation,
                 ToolCallId = operation.OperationKey,
                 InvocationId = $"work-operation:{operation.Id}:{(recover ? "recover" : "execute")}",
-                ToolId = tool.Name, ToolName = tool.Definition.ExternalId ?? tool.Name,
-                ToolNamespace = tool.Namespace, ToolScopeRef = tool.ScopeRef, ToolUid = tool.Uid, ToolGeneration = tool.Generation,
-                ToolProviderId = providerReference.Address.Name, ToolProviderNamespace = providerReference.Address.Namespace,
-                ToolProviderScopeRef = providerReference.Address.ScopeRef, ToolProviderUid = providerReference.Uid,
-                ToolProviderGeneration = providerReference.Generation, ExternalToolId = tool.Definition.ExternalId,
-                TenantId = operation.TenantId, WorkspaceId = operation.WorkspaceId, PrincipalId = operation.OwnerPrincipalId,
-                CorrelationId = $"work-operation:{operation.Id}", PersistArguments = false,
+                ToolId = tool.Name,
+                ToolName = tool.Definition.ExternalId ?? tool.Name,
+                ToolNamespace = tool.Namespace,
+                ToolScopeRef = tool.ScopeRef,
+                ToolUid = tool.Uid,
+                ToolGeneration = tool.Generation,
+                ToolProviderId = providerReference.Address.Name,
+                ToolProviderNamespace = providerReference.Address.Namespace,
+                ToolProviderScopeRef = providerReference.Address.ScopeRef,
+                ToolProviderUid = providerReference.Uid,
+                ToolProviderGeneration = providerReference.Generation,
+                ExternalToolId = tool.Definition.ExternalId,
+                TenantId = operation.TenantId,
+                WorkspaceId = operation.WorkspaceId,
+                PrincipalId = operation.OwnerPrincipalId,
+                CorrelationId = $"work-operation:{operation.Id}",
+                PersistArguments = false,
                 Arguments = JsonSerializer.SerializeToElement(new ExternalTaskProviderRequest(recover ? "recover" : "execute",
                     operation.OperationKey, operation.IntentDigest, operation.Input), Json)
             }, linked.Token);

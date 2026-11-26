@@ -3,10 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Agentstration.Application.Work;
-using Agentstration.Infrastructure.Work;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Identity.Contracts;
+using Agentstration.Infrastructure.Work;
 using Agentstration.Tools;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
@@ -41,7 +41,8 @@ public sealed class WorkPlanningMcpTests
                 var flows = factory.Services.GetRequiredService<FlowService>();
                 var graph = new FlowGraphDefinition
                 {
-                    EntryStep = "input", Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "done" }],
+                    EntryStep = "input",
+                    Steps = [new InputFlowStepDefinition { Name = "input" }, new OutputFlowStepDefinition { Name = "done" }],
                     Transitions = [new("done", "input", "completed", "done")]
                 };
                 var workflow = new WorkflowFlowDefinition("input", [new("input", FlowNodeKind.Input), new("done", FlowNodeKind.Output)], [new("input", "done")], ["done"]);
@@ -80,7 +81,10 @@ public sealed class WorkPlanningMcpTests
                 Assert.AreEqual(plan.Status, rest.Status);
                 startArguments = JsonSerializer.SerializeToElement(new
                 {
-                    planId, expectedVersion = plan.Version, revision = plan.CurrentRevision, revisionDigest = plan.Revision.Digest,
+                    planId,
+                    expectedVersion = plan.Version,
+                    revision = plan.CurrentRevision,
+                    revisionDigest = plan.Revision.Digest,
                     targets = new[] { new WorkPlanExecutionTargetRequest(taskId, new(new FlowId("mcp-work")), JsonSerializer.SerializeToElement(new { evidence = "deterministic" })) }
                 }, Json);
                 _ = Plan(await CallAsync(mcp, "work.plan.start", "start", startArguments));
@@ -158,7 +162,7 @@ public sealed class WorkPlanningMcpTests
             var tool = new WorkPlanningMcpTool(WorkPlanningOperation.Projects,
                 factory.Services.GetRequiredService<WorkProjectService>(), factory.Services.GetRequiredService<WorkTaskTreeService>(),
                 factory.Services.GetRequiredService<WorkPlanService>(), factory.Services.GetRequiredService<WorkPlanExecutionService>(),
-                factory.Services.GetRequiredService<ICurrentRequestContext>(), new DeniedAuthorization());
+                factory.Services.GetRequiredService<ICurrentRequestContext>(), new DeniedAuthorization(), factory.Services.GetRequiredService<WorkTaskProviderService>());
             var error = await Assert.ThrowsAsync<ToolDefinitionInvocationException>(() => tool.ExecuteAsync(new(context.TenantId,
                 new(context.WorkspaceId), context.PrincipalId, "revoked", null, JsonSerializer.SerializeToElement(new { }), ToolDefinitionCallerKind.Mcp), default));
             Assert.AreEqual("authorization_denied", error.Code);
@@ -188,7 +192,8 @@ public sealed class WorkPlanningMcpTests
     { Endpoint = new Uri(http.BaseAddress!, "mcp"), Name = "work-planning-test" }, http, NullLoggerFactory.Instance, ownsHttpClient: false), loggerFactory: NullLoggerFactory.Instance);
     private static ValueTask<CallToolResult> CallAsync(McpClient mcp, string name, string callId, JsonElement arguments) => mcp.CallToolAsync(new CallToolRequestParams
     {
-        Name = name, Arguments = arguments.Deserialize<Dictionary<string, JsonElement>>()!,
+        Name = name,
+        Arguments = arguments.Deserialize<Dictionary<string, JsonElement>>()!,
         Meta = new JsonObject { ["agentstration/idempotencyKey"] = callId, ["agentstration/correlationId"] = "work-planning-test" }
     });
     private static JsonElement Value(CallToolResult result)

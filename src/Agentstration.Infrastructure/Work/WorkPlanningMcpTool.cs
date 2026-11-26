@@ -18,7 +18,7 @@ using static Agentstration.Work.Contracts.WorkProjectContractMapping;
 
 namespace Agentstration.Infrastructure.Work;
 
-public enum WorkPlanningOperation { Projects, Project, Task, CreateTasks, Outcome, Get, Propose, Revise, Validate, Activate, Start, Advance }
+public enum WorkPlanningOperation { Projects, Project, Task, CreateTasks, Outcome, Get, Propose, Revise, Validate, Activate, Start, Advance, TaskProvider, TaskOperation, BeginTaskOperation, ResumeTaskOperation }
 
 public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
 {
@@ -32,17 +32,19 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
     private readonly WorkTaskTreeService tasks;
     private readonly WorkPlanService plans;
     private readonly WorkPlanExecutionService execution;
+    private readonly WorkTaskProviderService providers;
     private readonly ICurrentRequestContext current;
     private readonly IAuthorizationService authorization;
 
     public WorkPlanningMcpTool(WorkPlanningOperation operation, WorkProjectService projects, WorkTaskTreeService tasks,
-        WorkPlanService plans, WorkPlanExecutionService execution, ICurrentRequestContext current, IAuthorizationService authorization)
+        WorkPlanService plans, WorkPlanExecutionService execution, ICurrentRequestContext current, IAuthorizationService authorization, WorkTaskProviderService providers)
     {
         this.operation = operation;
         this.projects = projects;
         this.tasks = tasks;
         this.plans = plans;
         this.execution = execution;
+        this.providers = providers;
         this.current = current;
         this.authorization = authorization;
         Definition = Describe(operation);
@@ -57,7 +59,7 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
             || trusted.TenantId != invocation.TenantId || trusted.WorkspaceId != invocation.WorkspaceId.Value
             || trusted.PrincipalId != invocation.PrincipalId)
             throw Error("work_planning_scope_required");
-        var permission = operation is WorkPlanningOperation.Projects or WorkPlanningOperation.Project or WorkPlanningOperation.Task or WorkPlanningOperation.Get
+        var permission = operation is WorkPlanningOperation.Projects or WorkPlanningOperation.Project or WorkPlanningOperation.Task or WorkPlanningOperation.Get or WorkPlanningOperation.TaskOperation
             ? AuthorizationPermissions.RunsRead : AuthorizationPermissions.RunsExecute;
         if (!await authorization.HasPermissionAsync(trusted, permission, cancellationToken)) throw Error("authorization_denied");
         if (invocation.CallerKind == ToolDefinitionCallerKind.Agent
@@ -97,11 +99,24 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
                     task.Title, task.Instruction, task.ParentTaskId is { } parent ? new(parent) : null, task.Description, task.IsOptional)).ToArray() ?? []);
                 _ = Value(tree.Validate());
             }
+            if (operation == WorkPlanningOperation.BeginTaskOperation)
+                _ = Value(Read<ExternalTaskOperationInput>(arguments, "input").Validate());
             // A preview validates structure only; lifecycle and resource authority are checked on execution.
-            if (dryRun && operation is not (WorkPlanningOperation.Projects or WorkPlanningOperation.Project or WorkPlanningOperation.Task or WorkPlanningOperation.Get))
+            if (dryRun && operation is not (WorkPlanningOperation.Projects or WorkPlanningOperation.Project or WorkPlanningOperation.Task or WorkPlanningOperation.Get or WorkPlanningOperation.TaskOperation))
                 return JsonSerializer.SerializeToElement(new { dryRun = true, structurallyValid = true, requiresExecutionValidation = true, commandId }, Json);
             object value = operation switch
             {
+                WorkPlanningOperation.TaskProvider => Value(await providers.DiscoverAsync(workspace, new(Read<Guid>(arguments, "projectId")),
+                    Read<string>(arguments, "bindingName"), Read<ExternalTaskOperationKind>(arguments, "operation"), cancellationToken)),
+                WorkPlanningOperation.TaskOperation => Value(await providers.GetAsync(workspace, new(Read<Guid>(arguments, "projectId")),
+                    new(Read<Guid>(arguments, "operationId")), cancellationToken)),
+                WorkPlanningOperation.BeginTaskOperation => Value(await providers.BeginAsync(workspace, new(Read<Guid>(arguments, "projectId")),
+                    new(new(commandId), Read<long>(arguments, "expectedProjectVersion"), Read<string>(arguments, "bindingName"),
+                        Read<ExternalTaskOperationInput>(arguments, "input"), arguments.TryGetProperty("planId", out _) ? planId : null,
+                        arguments.TryGetProperty("planRevision", out _) ? Read<long>(arguments, "planRevision") : null,
+                        arguments.TryGetProperty("planDigest", out _) ? Read<string>(arguments, "planDigest") : null), cancellationToken)),
+                WorkPlanningOperation.ResumeTaskOperation => Value(await providers.ResumeAsync(workspace, new(Read<Guid>(arguments, "projectId")),
+                    new(Read<Guid>(arguments, "operationId")), cancellationToken)),
                 WorkPlanningOperation.Projects => ProjectPage(Value(await projects.ListAsync(workspace, OptionalInt(arguments, "skip", 0), OptionalInt(arguments, "take", 25), cancellationToken)), arguments),
                 WorkPlanningOperation.Project => ToProjectResponse(Value(await projects.GetAsync(workspace, new(Read<Guid>(arguments, "projectId")), cancellationToken))),
                 WorkPlanningOperation.Task => Value(await tasks.GetAsync(workspace, new(Read<Guid>(arguments, "taskId")), cancellationToken)),
@@ -160,6 +175,15 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
         string name;
         switch (operation)
         {
+            case WorkPlanningOperation.TaskProvider:
+                name = "work.tracking.describe"; Add<Guid>("projectId"); Add<string>("bindingName"); Add<ExternalTaskOperationKind>("operation"); break;
+            case WorkPlanningOperation.TaskOperation:
+                name = "work.tracking.get"; Add<Guid>("projectId"); Add<Guid>("operationId"); break;
+            case WorkPlanningOperation.BeginTaskOperation:
+                name = "work.tracking.begin"; Add<Guid>("projectId"); Add<long>("expectedProjectVersion"); Add<string>("bindingName");
+                Add<ExternalTaskOperationInput>("input"); Add<Guid>("planId", true); Add<long>("planRevision", true); Add<string>("planDigest", true); break;
+            case WorkPlanningOperation.ResumeTaskOperation:
+                name = "work.tracking.resume"; Add<Guid>("projectId"); Add<Guid>("operationId"); break;
             case WorkPlanningOperation.Projects: name = "work.project.list"; Add<int>("skip", true); Add<int>("take", true); break;
             case WorkPlanningOperation.Project: name = "work.project.get"; Add<Guid>("projectId"); break;
             case WorkPlanningOperation.Task: name = "work.task.get"; Add<Guid>("taskId"); break;
@@ -177,7 +201,7 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
                 break;
         }
         Add<bool>(ToolDryRunContract.ParameterName, true);
-        return new(name, name, "Governed local Work planning in the authenticated Workspace and Principal. Uses canonical Work services; no tracker or template required. Mutations replay by trusted Tool call identity. Dry runs validate structure without effects.",
+        return new(name, name, "Governed local Work planning in the authenticated Workspace and Principal. Uses canonical Work services, including optional capability-described tracking connections; no template required. Mutations replay by trusted Tool call identity. Dry runs validate structure without effects.",
             JsonSerializer.SerializeToElement(new { type = "object", properties, required, additionalProperties = false }, Json),
             JsonSerializer.SerializeToElement(new { type = "object" }, Json),
             InitialCategory: new("work-planning", "Work planning", "Local Project, task and WorkPlan operations."));

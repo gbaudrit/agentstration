@@ -51,8 +51,8 @@ public sealed class RegistrationContractTests
             [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (3, ServiceLifetime.Singleton),
             [typeof(IToolExecutionHook)] = (2, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolDefinitionProvider)] = (68, ServiceLifetime.Singleton),
-            [typeof(IInternalMcpToolHandler)] = (68, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolDefinitionProvider)] = (72, ServiceLifetime.Singleton),
+            [typeof(IInternalMcpToolHandler)] = (72, ServiceLifetime.Singleton),
             [typeof(IFlowVersionActivationGuard)] = (4, ServiceLifetime.Singleton),
             [typeof(IFlowDeletionGuard)] = (3, ServiceLifetime.Singleton),
             [typeof(IWorkExecutionScopeAccessor)] = (2, ServiceLifetime.Singleton)
@@ -80,6 +80,7 @@ public sealed class RegistrationContractTests
             .ToArray();
         Assert.HasCount(0, accidentalDuplicates, string.Join(Environment.NewLine, accidentalDuplicates));
         AssertSingleton<IRuntimeRunExecutionScope>(services, typeof(WorkspaceRuntimeRunExecutionScope));
+        AssertSingleton<Agentstration.Infrastructure.Work.AtcWorkTaskProviderGateway>(services);
         AssertSingleton<ConnectedServiceAcquisitionExecutor>(services);
         AssertSingleton<ConnectedServiceBoundValues>(services);
         AssertSingleton<ICurrentRequestContext>(services);
