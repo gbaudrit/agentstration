@@ -355,3 +355,93 @@ Docker Hub publication remains deferred by maintainer decision. Do not create an
 requests Docker Hub publication. Keep #1291 open for its deferred public delivery
 criteria; the pilot does not claim a complete compatibility matrix or a published
 Docker Hub release. No extension tag or image is published merely by adding the catalogue.
+
+## PostgreSQL document-storage extension
+
+[#1294](https://github.com/gbaudrit/agentstration/issues/1294) packages the autonomous
+PostgreSQL JSONB document-storage extension as catalogue ID `postgresql`, using
+`Dockerfile.extension` and the shared OCI workflows. This is separate from the
+server's optional PostgreSQL storage profile; SQLite remains the product default.
+The source `version.txt`, assembly informational version, advertised AEP identity
+and OCI version label share independent version `0.1.0`. AEP `agentstration.io/v1`,
+Storage Type `postgresql.jsonb@1.0.0`, Connected Service Type `postgresql@1.0.0`
+and the `postgresql-jsonb` ASP provider version `1.0.0` retain their existing versions.
+The manifest also advertises the `documents` MCP server at `/mcp`.
+
+```sh
+python3 scripts/packaging/images.py describe --extension postgresql
+python3 scripts/packaging/images.py build --extension postgresql \
+  --repository gbaudrit/agentstration --directory artifacts/postgresql
+```
+
+The manual **OCI images** workflow offers `postgresql`. Run it on the reviewed
+branch with `publish_preview=true` only after verifying that
+`ghcr.io/gbaudrit/agentstration-extension-postgresql` is **private** and that
+`gbaudrit/agentstration` has **Manage Actions access → Write**. Missing or unreadable
+package metadata stops publication. Follow **First package initialization** above
+if an administrator has not provisioned the private destination. Owner-token access
+alone does not prove repository Actions access. Retain `delivery.json`, provenance,
+SBOM and `publication-ghcr.json`; deployment references must use
+`ghcr.io/gbaudrit/agentstration-extension-postgresql@sha256:<recorded-digest>`.
+The preview tag is `sha-<full-source-sha>`.
+
+### PostgreSQL extension configuration
+
+Environment variables use .NET's `__` separator:
+
+| Variable | Behavior |
+|---|---|
+| `Aep__EnrollmentMode=SharedKeyFile` | Protected AEP/ASP/MCP transport using the existing enrollment mechanism. |
+| `Aep__SharedKeyFile__Path` | Read-only protected key mount, shared with the authority's per-extension trust configuration. |
+| `Aep__SharedKeyFile__ClientId` | Defaults to `agentstration-development`; match it in the explicit caller allowlist. |
+| `Aep__SharedKeyFile__AuthorityUrl`, `PublicEndpoint` | Authority announcement URL and reachable extension URL. Use full `Aep__SharedKeyFile__...` names. |
+| `Aep__SharedKeyFile__StateFile` | Persist the parent directory read/write to preserve the installation identity across container recreation. |
+| `Aep__SharedKeyFile__AllowInsecureHttp` | Explicit isolated Development HTTP opt-in; use HTTPS for ordinary deployment. |
+| `PostgreSqlDocuments__AllowedClients__0` (and subsequent indices) | Required explicit allowed authenticated caller identities, maximum 32. The packaging fixture uses the default SharedKeyFile client identity. |
+| `PostgreSqlDocuments__AllowPairedClient` | Optional paired-client authorization; requires `Aep__EnrollmentMode=PairingCode`. |
+| `PostgreSqlDocuments__ProvisionSchema` | Defaults to `false`; schema creation is an explicit operator action. |
+| `PostgreSqlDocuments__AllowLoopbackWithoutTls` | Defaults to `false`; allows non-TLS only for explicitly loopback-bound local development. |
+| `PostgreSqlDocuments__Enabled` | Defaults to `true`; disabling denies document callers. |
+
+Do not configure a database connection string in the image or catalogue. Host,
+port, database, username and secured password come from the existing typed
+Connected Service exports and AEP bound values/Secret capabilities. No database
+connection is needed for startup, health, contribution discovery or MCP tool listing.
+Database data belongs in separately managed PostgreSQL storage; the extension
+needs only its persisted AEP state and read-only key, with permissions restricted
+to its process user. Never mount server SQLite databases into the extension.
+Preserve the existing 100,000-byte HTTP limit, bounded document/payload policies,
+10-second database timeouts, four-connection pools and default VerifyFull TLS.
+
+### PostgreSQL validation and qualification
+
+The shared generic smokes check exact digest/version/source labels, authenticated
+AEP discovery of both Storage and Connected Service Type identities, invalid bearer rejection,
+SharedKeyFile enrollment, invalid announcement proof rejection, idempotent
+reannouncement and preservation of installation/registration identity after both
+containers are recreated. The authority fixture uses the same source, pinned
+base images, SQLite and deterministic AI. These checks require no PostgreSQL
+server or LLM. `PackagingTests` additionally starts the actual extension host and
+lists its ASP MCP tools without a database. The catalogue selects the whole
+`Agentstration.Extensions.PostgreSql.Tests` offline project; real PostgreSQL rows
+are explicitly inconclusive unless `AGENTSTRATION_TEST_ASP_POSTGRES` is supplied.
+
+The existing **Structured documents conformance** workflow remains the real local
+PostgreSQL 17 JSONB provider validation, including AEP/MCP/product-boundary tests.
+Its database is a disposable isolated CI fixture, separate from server-profile
+qualification. See [structured documents](../reference/structured-documents.md)
+for document semantics and provisioning permissions. Linux amd64 is the supported
+image platform. A successful workflow's delivery/enrollment receipts identify the
+exact tested source, extension digest, AEP version and same-source authority image;
+there is no claim of a broader product-version compatibility matrix.
+
+Real registry publication and digest smoke results must be taken from completed
+workflow evidence; catalogue contracts or source-host tests alone do not establish
+private qualification. Keep #1294 open until the private qualification is recorded.
+Docker Hub and official release qualification are deferred to
+[#1384](https://github.com/gbaudrit/agentstration/issues/1384), retaining same-archive
+promotion, independent tag/version checks, immutable source/digest references,
+provenance/SBOM, anonymous public pull and health/discovery/enrollment/restart
+criteria. Do not create `extension/postgresql/v0.1.0`: the current release path
+also requests Docker Hub publication. Preview extension selection is a separate
+workstream.

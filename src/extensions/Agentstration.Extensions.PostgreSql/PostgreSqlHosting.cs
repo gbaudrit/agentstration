@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
@@ -100,7 +101,10 @@ public static class PostgreSqlHosting
         services.AddSingleton<IAspDocumentAepBindingFactory, PostgreSqlBindingFactory>();
         services.AddAgentstrationAep(o =>
         {
-            o.Extension = new(PostgreSqlStorageTypes.ExtensionId, "PostgreSQL structured storage", "1.0.0");
+            var version = typeof(PostgreSqlHosting).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+                ?? throw new InvalidOperationException("The PostgreSQL extension version is required.");
+            o.Extension = new(PostgreSqlStorageTypes.ExtensionId, "PostgreSQL structured storage", version);
             o.Capabilities[AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion);
             o.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
             o.McpServers.Add(new("documents", "/mcp"));

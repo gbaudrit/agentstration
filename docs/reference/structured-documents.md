@@ -162,7 +162,9 @@ connection configuration, and SQL commands time out after ten seconds.
 Aspire startup is opt-in with `PostgreSqlDocuments:Enabled=true`. It starts the
 extension and reuses development AEP enrollment; it does not provision a database
 or invent service bindings. The default product still runs without PostgreSQL.
-The container distribution is `deploy/postgresql-documents/Dockerfile`.
+The independently versioned OCI distribution uses catalogue ID `postgresql` and the
+shared `Dockerfile.extension`; see [image packaging](../contributing/image-packaging.md#postgresql-document-storage-extension).
+The existing `deploy/postgresql-documents/Dockerfile` remains a development build recipe.
 
 Relational access to existing databases, governed SQL, JSONPath, full-text search,
 pgvector, embeddings and hybrid Search are future profiles/capabilities. None is

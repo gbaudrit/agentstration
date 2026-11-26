@@ -8,7 +8,7 @@ function Must-Fail([scriptblock] $Action, [string] $Message) {
     Require $failed $Message
 }
 Assert-CoverageInventory $root
-foreach ($path in @('src/Agentstration.ResourcePlanning.Storage.PostgreSql/Migrations/Test.cs', 'src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Test.cs', 'src/extensions/Agentstration.Extensions.PostgreSql/Program.cs', 'Directory.Packages.props', 'scripts/ci/classify-changes.ps1', '.github/actions/restore-linux-build/action.yml')) {
+foreach ($path in @('src/Agentstration.ResourcePlanning.Storage.PostgreSql/Migrations/Test.cs', 'src/Agentstration.Security.AspNetCoreIdentity.PostgreSql/Test.cs', 'Directory.Packages.props', 'scripts/ci/classify-changes.ps1', '.github/actions/restore-linux-build/action.yml')) {
     $result = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require ($result.storage -and $result.dotnet) "Missing storage selection: $path"
 }
@@ -28,14 +28,23 @@ foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Exten
 }
 foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'scripts/packaging/enrollment_smoke.py')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
-    Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path"
+    if ($path -like 'src/*') { Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path" }
+    else { Require (($selection.imageIds -join ',') -eq 'foundry,postgresql') 'Shared enrollment smoke must validate every implemented AEP extension.' }
 }
 foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Program.cs', 'Dockerfile.worker', 'deploy/images/workers/maf-worker.json', 'scripts/packaging/worker_smoke.py', 'awp/src/Agentstration.Awp.Abstractions/AwpProtocol.cs')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker,server') "Worker inputs must validate the Worker and its real preview composition: $path"
 }
+foreach ($path in @('src/extensions/Agentstration.Extensions.PostgreSql/PostgreSqlHosting.cs', 'src/extensions/Agentstration.Extensions.PostgreSql/version.txt', 'tests/Agentstration.Extensions.PostgreSql.Tests/PackagingTests.cs', 'deploy/images/extensions/postgresql.json', 'scripts/packaging/test_postgresql_image.py')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path, 'docs/contributing/image-packaging.md')
+    Require (($selection.imageIds -join ',') -eq 'postgresql' -and -not ($selection.dotnet -or $selection.aep -or $selection.container -or $selection.storage)) "PostgreSQL extension-only edits must select targeted validation: $path"
+}
+foreach ($path in @('aep/src/Agentstration.Aep.Abstractions/AepStorage.cs', 'asp/src/Agentstration.Asp.Aep/AspDocumentAepBindings.cs', 'Directory.Build.props')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require ($selection.dotnet -and $selection.imageIds.Contains('postgresql')) "Shared PostgreSQL dependencies must retain transverse and targeted validation: $path"
+}
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
-Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
+Require (($selection.imageIds -join ',') -eq 'foundry,postgresql,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
 foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml', '.github/workflows/preview-azure-validation.yml', '.github/workflows/preview-azure-environment.yml', '.github/workflows/preview-on-demand.yml')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
