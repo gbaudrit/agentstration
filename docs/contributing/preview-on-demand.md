@@ -213,7 +213,7 @@ tags or catalogue entries have subsequently changed. Legacy core-only version 1
 requests remain supported; selected extensions use version 2 public receipts.
 The original manual form remains unchanged and core-only. Advanced canonical
 requests can include an `extensions` map. See
-[ADR-0264](../decisions/0264-preview-labels-select-independently-delivered-aep-extensions.md).
+[ADR-0265](../decisions/0265-preview-labels-select-independently-delivered-aep-extensions.md).
 
 ### Qualify issue commands after merge
 

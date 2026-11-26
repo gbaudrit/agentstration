@@ -1,4 +1,4 @@
-# ADR-0264: Preview labels select independently delivered AEP extensions
+# ADR-0265: Preview labels select independently delivered AEP extensions
 
 Status: Proposed — 2026-11-26
 
