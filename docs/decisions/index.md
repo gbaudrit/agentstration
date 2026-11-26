@@ -335,3 +335,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 264. [ADR-0264 — Storage contract identity is independent of its MCP exposure](0264-storage-contract-identity-and-mcp-exposure.md)
 
 265. [ADR-0265 — Preview labels select independently delivered AEP extensions](0265-preview-labels-select-independently-delivered-aep-extensions.md)
+
+266. [ADR-0266 — PR preview commands use frozen heads and owned feedback](0266-pr-preview-commands-use-frozen-heads-and-owned-feedback.md)

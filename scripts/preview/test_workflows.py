@@ -73,7 +73,7 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertIn('issue_comment:', source)
         self.assertIn('types: [created]', source)
         self.assertIn("github.ref == 'refs/heads/main'", source)
-        self.assertIn('!github.event.issue.pull_request', source)
+        self.assertNotIn('!github.event.issue.pull_request', source)
         self.assertIn('actions: write', source)
         for forbidden in ('environment:', 'secrets:', 'id-token:', 'azure/login', 'head.sha', 'head.ref', 'run: ${{'):
             self.assertNotIn(forbidden, source)
@@ -86,6 +86,19 @@ class WorkflowSecretTests(unittest.TestCase):
         provider = self.workflows()['preview-environment.yml']
         self.assertIn("os.environ['GITHUB_EVENT_NAME'] in ('workflow_dispatch', 'push')", provider)
         self.assertNotIn("'issue_comment'", provider)
+
+    def test_pr_tracking_read_permission_reaches_the_boundary_and_announcement(self):
+        relay = self.workflows()['preview-issue-deployment.yml']
+        source = self.workflows()['preview-on-demand.yml']
+        self.assertIn('pull-requests: read', relay)
+        for name, following in (('boundary', 'select'), ('announce', 'execute')):
+            job = source.split('\n  ' + name + ':\n', 1)[1].split('\n  ' + following + ':\n', 1)[0]
+            self.assertIn('pull-requests: read', job)
+        report = source.split('\n  report:\n', 1)[1]
+        self.assertIn('fromJSON(inputs.selection).tracking_feedback', report)
+        self.assertIn('SELECTION_JSON: ${{ needs.boundary.outputs.selection || inputs.selection }}', report)
+        self.assertIn('STAGE_RESULTS: ${{ toJSON(needs) }}', report)
+        self.assertIn('SELECTION_FAILURE: ${{ needs.select.outputs.failure }}', report)
 
     def test_issue_execution_is_gated_by_successful_publication_and_failures_are_reported(self):
         source = self.workflows()['preview-on-demand.yml']

@@ -4,6 +4,11 @@ import copy
 from datetime import datetime, timezone
 import hashlib
 import json
+import io
+import os
+from pathlib import Path
+import tempfile
+from contextlib import redirect_stderr
 import unittest
 from unittest.mock import patch
 
@@ -146,8 +151,9 @@ class ManualTests(unittest.TestCase):
 
     def test_missing_image_never_falls_back_to_another_revision_or_builds(self):
         self.metadata.missing_all_tags = True
-        with self.assertRaisesRegex(ValueError, 'Publish this component'):
+        with self.assertRaisesRegex(manual.SelectionError, 'Publish this component') as failure:
             self.resolve()
+        self.assertEqual({'code': 'image-unavailable', 'component': 'server'}, failure.exception.public)
 
     def test_frozen_index_is_verified_before_config_inspection(self):
         self.metadata.tamper = True
@@ -203,6 +209,28 @@ class ManualTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             manual.resolve(options(), variables, 'owner/repo', self.selector)
         self.assertEqual([], self.metadata.calls)
+
+    def test_registry_api_failure_is_classified_without_copying_remote_output(self):
+        def run(arguments):
+            if '/packages/' in arguments[-1]:
+                raise manual.Unavailable('PRIVATE PROVIDER RESPONSE')
+            return self.metadata.run(arguments)
+        selector = manual.PublishedImages('owner/repo', run)
+        with self.assertRaises(manual.SelectionError) as failure:
+            manual.resolve(options(), VARIABLES, 'owner/repo', selector)
+        self.assertEqual({'code': 'registry-access', 'component': 'server'}, failure.exception.public)
+        self.assertNotIn('PRIVATE', str(failure.exception))
+
+    def test_failed_selector_exports_only_controlled_diagnosis_for_feedback(self):
+        self.metadata.missing_all_tags = True
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'output'
+            variables = {**VARIABLES, 'GITHUB_REPOSITORY': 'owner/repo', 'SELECTION_JSON': json.dumps(options()),
+                         'GITHUB_OUTPUT': str(output)}
+            with patch.dict(os.environ, variables, clear=True), patch.object(manual.PublishedImages, 'api', side_effect=self.selector.api), \
+                    patch.object(manual.PublishedImages, 'raw', side_effect=self.selector.raw), redirect_stderr(io.StringIO()):
+                self.assertEqual(1, manual.main())
+            self.assertEqual({'code': 'image-unavailable', 'component': 'server'}, json.loads(output.read_text().removeprefix('failure=')))
 
 
 class RecordedSelectionTests(unittest.TestCase):

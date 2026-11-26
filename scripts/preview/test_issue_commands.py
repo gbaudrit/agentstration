@@ -30,6 +30,8 @@ class GitHub:
         self.graphql_errors = None
         self.fork = False
         self.calls = []
+        self.card = None
+        self.head_sha = SHA
 
     @staticmethod
     def pull(number):
@@ -39,7 +41,15 @@ class GitHub:
     def __call__(self, path, method='GET', body=None):
         self.calls.append((path, method, copy.deepcopy(body)))
         if method == 'POST' and path != 'graphql':
-            return {'id': 701} if path.endswith('/comments') else None
+            if path.endswith('/comments'):
+                self.card = {'id': 701, 'issue_url': self.comment['issue_url'], 'body': body['body'],
+                             'user': {'login': 'github-actions[bot]', 'type': 'Bot'}}
+                return copy.deepcopy(self.card)
+            return None
+        if path.endswith('/issues/comments/701'):
+            if method == 'PATCH':
+                self.card['body'] = body['body']
+            return copy.deepcopy(self.card)
         if path.endswith('/issues/comments/700'):
             return copy.deepcopy(self.comment)
         if path.endswith('/collaborators/maintainer/permission'):
@@ -52,7 +62,9 @@ class GitHub:
             return {'data': {'repository': {'issue': {'closedByPullRequestsReferences': {
                 'nodes': copy.deepcopy(self.nodes), 'pageInfo': {'hasNextPage': self.more}}}}}}
         if '/pulls/' in path:
-            return {'head': {'repo': {'full_name': 'foreign/fork' if self.fork else REPOSITORY}, 'sha': SHA}}
+            return {'number': int(path.rsplit('/', 1)[1]), 'state': self.issue['state'],
+                    'base': {'repo': {'full_name': REPOSITORY}},
+                    'head': {'repo': {'full_name': 'foreign/fork' if self.fork else REPOSITORY}, 'sha': self.head_sha}}
         if '/commits/' in path:
             return {'sha': SHA}
         raise AssertionError('Unexpected GitHub endpoint: ' + path)
@@ -66,7 +78,7 @@ class GitHub:
         return commands.admit(event or self.event(), REPOSITORY, self, selector)
 
     def mutations(self):
-        return [call for call in self.calls if call[1] == 'POST' and call[0] != 'graphql']
+        return [call for call in self.calls if call[1] in ('POST', 'PATCH') and call[0] != 'graphql']
 
     def selection(self):
         dispatches = [body for path, method, body in self.calls if path.endswith('/dispatches')]
@@ -74,7 +86,7 @@ class GitHub:
         return json.loads(dispatches[0]['inputs']['selection'])
 
     def feedback(self):
-        return '\n'.join(body['body'] for path, method, body in self.calls if path.endswith('/comments') and method == 'POST')
+        return '\n'.join(body['body'] for path, method, body in self.calls if (path.endswith('/comments') and method == 'POST') or (path.endswith('/issues/comments/701') and method == 'PATCH'))
 
 
 class AdmissionTests(unittest.TestCase):
@@ -92,7 +104,7 @@ class AdmissionTests(unittest.TestCase):
         self.assertIn('closedByPullRequestsReferences', query['query'])
         self.assertIn('includeClosedPrs:false', query['query'])
         self.assertIn('first:50', query['query'])
-        self.assertIn('pr:123', github.feedback())
+        self.assertIn('/commit/' + SHA, github.feedback())
 
     def test_no_link_and_multiple_links_explain_selection_without_dispatch(self):
         for nodes, expected in (([], 'No linked open PR'), ([GitHub.pull(12), GitHub.pull(42)], '#12, #42')):
@@ -148,17 +160,15 @@ class AdmissionTests(unittest.TestCase):
             github.permission = permission
             self.assertTrue(github.admit())
 
-    def test_bot_pr_and_non_command_events_are_ignored(self):
-        for change in ('bot', 'pull', 'ordinary', 'edited-event'):
+    def test_bot_and_non_command_events_are_ignored(self):
+        for change in ('bot', 'ordinary', 'edited-event'):
             github = GitHub()
             if change == 'bot':
                 github.comment['user']['type'] = 'Bot'
             elif change == 'ordinary':
                 github.comment['body'] = 'Looks good'
             event = github.event()
-            if change == 'pull':
-                event['issue']['pull_request'] = {}
-            elif change == 'edited-event':
+            if change == 'edited-event':
                 event['action'] = 'edited'
             self.assertFalse(github.admit(event))
             self.assertEqual([], github.mutations())
@@ -272,12 +282,12 @@ class TrackingAndFeedbackTests(unittest.TestCase):
         self.assertIn(request['sourceSha'], github.feedback())
         self.assertIn(request['deliveries']['server']['digest'], github.feedback())
         self.assertIn(request['deliveries']['worker']['digest'], github.feedback())
-        self.assertIn('automatic expiry cleanup is not implemented', github.feedback())
+        self.assertIn('L’arrêt automatique n’est pas encore actif', github.feedback())
         github.calls = []
         status, _ = self.run_mode('report', {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy', 'EXECUTION_RESULT': 'failure',
                                           'RESULT_JSON': 'private-provider-body'}, github)
         self.assertEqual(0, status)
-        self.assertIn('No verified preview URL is reported', github.feedback())
+        self.assertIn('aucun lien d’accès non vérifié', github.feedback())
         self.assertNotIn('private-provider-body', github.feedback())
 
     def test_revocation_or_request_substitution_stops_the_pre_execution_announcement(self):
@@ -329,6 +339,155 @@ class TrackingAndFeedbackTests(unittest.TestCase):
             return b'{"id":701}'
         with patch.object(manual, 'command', side_effect=run):
             self.assertEqual({'id': 701}, commands.api(PREFIX + '/issues/17/comments', 'POST', {'body': 'line1\n`literal` $(literal)'}))
+
+
+class PullRequestTests(unittest.TestCase):
+    run_mode = TrackingAndFeedbackTests.run_mode
+
+    def github(self, operation='deploy'):
+        github = GitHub('/preview ' + operation)
+        github.issue['pull_request'] = {'url': 'https://api.github.com/' + PREFIX + '/pulls/17'}
+        return github
+
+    def test_pr_uses_own_frozen_head_labels_and_environment_then_preserves_it_when_head_moves(self):
+        github = self.github()
+        github.issue['labels'] = [{'name': 'preview:extension:foundry'}]
+        self.assertTrue(github.admit())
+        selected = github.selection()
+        self.assertEqual(('pr-17', 'pull_request', SHA, ['foundry']),
+                         (selected['environment_id'], selected['tracking_kind'], selected['revision'], selected['extensions']))
+        self.assertFalse(any(path == 'graphql' or '/commits/' in path or '/pulls/123' in path for path, _, _ in github.calls))
+        github.head_sha = 'b' * 40
+        self.assertEqual('17', commands.tracking(selected, REPOSITORY, github))
+        self.assertEqual(SHA, selected['revision'])
+        github.issue['labels'] = []
+        with self.assertRaisesRegex(ValueError, 'labels changed'):
+            commands.tracking(selected, REPOSITORY, github)
+
+    def test_pr_rejects_forks_closed_deploy_and_other_source_overrides(self):
+        for change in ('fork', 'closed', 'branch', 'other-pr', 'event-kind'):
+            with self.subTest(change=change):
+                github = self.github()
+                if change == 'fork':
+                    github.fork = True
+                elif change == 'closed':
+                    github.issue['state'] = 'closed'
+                elif change in ('branch', 'other-pr'):
+                    github.comment['body'] += ' ref=' + ('main' if change == 'branch' else 'pr:123')
+                event = github.event()
+                if change == 'event-kind':
+                    del event['issue']['pull_request']
+                self.assertFalse(github.admit(event))
+                self.assertFalse(any(path.endswith('/dispatches') for path, _, _ in github.calls))
+        github = self.github()
+        github.comment['body'] += ' ref=pr:17'
+        self.assertTrue(github.admit())
+
+    def test_closed_pr_cleanup_does_not_need_head_repository_catalogue_or_registry(self):
+        for operation in ('status', 'destroy'):
+            github = self.github(operation)
+            github.issue.update(state='closed', labels=[{'name': 'preview:extension:no-longer-supported'}])
+            github.fork = True  # Even a deleted head repository is irrelevant to cleanup.
+            self.assertTrue(github.admit())
+            self.assertEqual('17', commands.tracking(github.selection(), REPOSITORY, github))
+            self.assertEqual('pr-17', github.selection()['environment_id'])
+            self.assertFalse(any('/pulls/' in path or '/commits/' in path or path == 'graphql' for path, _, _ in github.calls))
+
+    def test_each_command_updates_only_its_bot_owned_card_at_every_stage(self):
+        github = self.github()
+        self.assertTrue(github.admit())
+        selected = github.selection()
+        request = {**azure_request(), 'environmentId': 'pr-17'}
+        variables = {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy', 'SELECTION_JSON': json.dumps(selected),
+                     'REQUEST_JSON': json.dumps(request)}
+        self.assertEqual(0, self.run_mode('plan', variables, github)[0])
+        import contract
+        result = {'environmentId': 'pr-17', 'state': 'running', 'url': 'https://dev-pr-17.agentstration.cloud',
+                  'sourceSha': SHA, 'database': 'sqlite', 'images': contract.images(request), 'expiresAt': '2026-11-26T18:30:00+00:00'}
+        self.assertEqual(0, self.run_mode('report', {**variables, 'EXECUTION_RESULT': 'success', 'RESULT_JSON': json.dumps(result)}, github)[0])
+        posts = [path for path, method, _ in github.calls if method == 'POST' and path.endswith('/comments')]
+        patches = [path for path, method, _ in github.calls if method == 'PATCH']
+        self.assertEqual([PREFIX + '/issues/17/comments'], posts)
+        self.assertEqual([PREFIX + '/issues/comments/701'] * 2, patches)
+        card = github.card['body']
+        for text in ('Prévisualisation prête', 'dev-pr-17.agentstration.cloud', SHA[:12], '**sqlite**',
+                     '26/11/2026 à 18:30 UTC', '/preview destroy', '<details>', request['deliveries']['server']['digest']):
+            self.assertIn(text, card)
+        # A later status/failure summary is allowed even if the PR closes or labels change during execution.
+        github.issue.update(state='closed', labels=[])
+        self.assertEqual(0, self.run_mode('report', {**variables, 'EXECUTION_RESULT': 'failure', 'RESULT_JSON': 'PRIVATE RESPONSE'}, github)[0])
+        self.assertNotIn('PRIVATE RESPONSE', github.card['body'])
+        self.assertNotIn('Ouvrir Agentstration', github.card['body'])
+
+    def test_card_ownership_context_and_entire_frozen_selection_are_verified(self):
+        for change in ('user', 'other-bot', 'other-issue', 'marker', 'source', 'feedback-id', 'extension'):
+            github = self.github()
+            github.admit()
+            selected = github.selection()
+            if change == 'user':
+                github.card['user'] = {'login': 'maintainer', 'type': 'User'}
+            elif change == 'other-bot':
+                github.card['user']['login'] = 'other[bot]'
+            elif change == 'other-issue':
+                github.card['issue_url'] = 'https://api.github.com/' + PREFIX + '/issues/18'
+            elif change == 'marker':
+                github.card['body'] = 'unrelated bot comment'
+            elif change == 'source':
+                selected['revision'] = 'b' * 40
+            elif change == 'extension':
+                selected['extensions'] = ['foundry']
+                github.issue['labels'] = [{'name': 'preview:extension:foundry'}]
+            else:
+                selected['tracking_feedback'] = '700'  # Original human command must never be patched.
+            github.calls = []
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                commands.tracking(selected, REPOSITORY, github)
+            self.assertEqual([], github.mutations())
+
+    def test_failure_reports_update_the_card_even_when_boundary_has_no_outputs(self):
+        for stage in ('boundary', 'select', 'recorded', 'announce', 'execute'):
+            github = self.github()
+            github.admit()
+            selected = github.selection()
+            variables = {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy', 'SELECTION_JSON': json.dumps(selected),
+                         'STAGE_RESULTS': json.dumps({stage: {'result': 'failure', 'outputs': {'ignored': 'PRIVATE'}}}),
+                         'EXECUTION_RESULT': 'skipped', 'RESULT_JSON': 'PRIVATE'}
+            self.assertEqual(0, self.run_mode('report', variables, github)[0])
+            self.assertIn('**À faire :**', github.card['body'])
+            self.assertNotIn('PRIVATE', github.card['body'])
+            if stage != 'execute':
+                self.assertIn('n’a pas été lancée', github.card['body'])
+            else:
+                self.assertIn('Des ressources peuvent subsister', github.card['body'])
+
+    def test_missing_image_and_package_access_have_specific_safe_remediation(self):
+        for code, expected in (('image-unavailable', 'extension=server'), ('registry-access', 'Manage Actions access')):
+            github = self.github()
+            github.admit()
+            status, _ = self.run_mode('report', {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy',
+                'SELECTION_JSON': json.dumps(github.selection()), 'EXECUTION_RESULT': 'failure',
+                'STAGE_RESULTS': '{"select":"failure"}', 'SELECTION_FAILURE': json.dumps({'code': code, 'component': 'server'}),
+                'RESULT_JSON': 'PRIVATE'}, github)
+            self.assertEqual(0, status)
+            self.assertIn(expected, github.card['body'])
+            self.assertNotIn('PRIVATE', github.card['body'])
+
+    def test_dispatch_failure_updates_existing_card_and_does_not_create_second_reply(self):
+        github = self.github()
+        def call(path, method='GET', body=None):
+            if path.endswith('/dispatches'):
+                raise manual.Unavailable('Dispatch failed.')
+            return github(path, method, body)
+        self.assertFalse(commands.admit(github.event(), REPOSITORY, call))
+        self.assertEqual(1, sum(path.endswith('/comments') and method == 'POST' for path, method, _ in github.calls))
+        self.assertIn('lancement du workflow a échoué', github.card['body'])
+
+    def test_legacy_issue_selection_without_card_or_kind_remains_accepted(self):
+        github = GitHub()
+        github.admit()
+        selected = github.selection()
+        del selected['tracking_kind'], selected['tracking_feedback']
+        self.assertEqual('17', commands.tracking(selected, REPOSITORY, github))
 
 
 if __name__ == '__main__':
