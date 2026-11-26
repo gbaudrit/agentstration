@@ -4,7 +4,7 @@ The optional `Agentstration.Runtime.Worker.Coding` executable runs one atomic Co
 through the existing AWP enrollment, claim, lease, cancellation and fencing protocol. It advertises
 `coding-cli`, capability `1.0`, material `1.0`. It cannot claim MAF assignments. This is an optional
 Linux capability; ordinary deterministic Work and the MAF worker do not require it.
-See [ADR-0270](../decisions/0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).
+See [ADR-0279](../decisions/0279-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).
 
 ## Prerequisites and configuration
 

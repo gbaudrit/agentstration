@@ -151,7 +151,7 @@ public sealed class KnowledgeOutputPublisher(IStoragePublicationGateway publicat
                 (clock ?? TimeProvider.System).GetUtcNow().AddMinutes(4), cancellationToken);
             var binding = new StoragePublicationBinding(resolved.Type, resolved.ConnectedService,
                 resolved.ConnectedServiceType, StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Bindings)),
-                StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Documents)), "asp.document-publication/1");
+                StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Documents)), "asc.document-publication/1");
             for (var index = 0; index < result.Count; index++)
             {
                 var members = recordMembers[result[index].ArtifactId];

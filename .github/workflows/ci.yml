@@ -281,16 +281,22 @@ jobs:
             @{ Name = 'Agentstration.Api.Flows.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Execution.Tests'; Tests = 58; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Resources.Tests'; Tests = 111; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Api.DataSources.Tests'; Tests = 80; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.DataSources.Tests'; Tests = 82; Warning = 2048; Failure = 2432 },
+            @{ Name = 'Agentstration.Api.DataSources.Rss.Tests'; Tests = 3; Warning = 2048; Failure = 2432 },
             @{ Name = 'Agentstration.Api.Artifacts.Tests'; Tests = 39; Warning = 2048; Failure = 2432 },
-            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 112; Warning = 1920; Failure = 2560 },
-            @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 31; Warning = 500; Failure = 700 },
-            @{ Name = 'Agentstration.Management.Bootstrap.Scenarios.Tests'; Tests = 10; Warning = 500; Failure = 700 },
+            @{ Name = 'Agentstration.Management.Api.Tests'; Tests = 124; Warning = 1920; Failure = 2560 },
+            @{ Name = 'Agentstration.Management.Models.Api.Tests'; Tests = 40; Warning = 1920; Failure = 2560 },
+            @{ Name = 'Agentstration.Management.Bootstrap.Tests'; Tests = 34; Warning = 500; Failure = 700 },
+            @{ Name = 'Agentstration.Management.Bootstrap.Startup.Tests'; Tests = 27; Warning = 500; Failure = 700 },
+            @{ Name = 'Agentstration.Management.Bootstrap.Scenarios.Tests'; Tests = 6; Warning = 500; Failure = 700 },
+            @{ Name = 'Agentstration.Management.Bootstrap.Progress.Tests'; Tests = 7; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Bootstrap.Plans.Tests'; Tests = 6; Warning = 500; Failure = 700 },
             @{ Name = 'Agentstration.Management.Security.Tests'; Tests = 64; Warning = 1280; Failure = 1664 },
-            @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 29; Warning = 832; Failure = 1024 }
+            @{ Name = 'Agentstration.Management.Aep.Tests'; Tests = 38; Warning = 832; Failure = 1024 },
+            @{ Name = 'Agentstration.Management.Aep.Automatic.Tests'; Tests = 11; Warning = 832; Failure = 1024 }
           )
-          $modules = @($modules | Where-Object { ($_.Name -eq 'Agentstration.Management.Api.Tests') -eq ('${{ matrix.group }}' -eq 'management-api') })
+          $managementApiModules = @('Agentstration.Management.Api.Tests', 'Agentstration.Management.Models.Api.Tests')
+          $modules = @($modules | Where-Object { ($_.Name -in $managementApiModules) -eq ('${{ matrix.group }}' -eq 'management-api') })
           ./scripts/ci/run-hosted-module-diagnostics.ps1 -Modules $modules
       - name: Upload hosted module diagnostics
         if: always()

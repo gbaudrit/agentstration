@@ -152,7 +152,7 @@ new Snapshot is published meanwhile.
 
 Cleanup preserves metadata and producer/Storage provenance after retiring bytes.
 Active input/read leases and Workspace executions postpone cleanup. Built-in local
-Storage supports exact retirement; supported remote ASP stores use a conditional
+Storage supports exact retirement; supported remote ASC stores use a conditional
 empty replacement, while unsupported/revoked providers remain pending. Provider
 backups and object version history have their own retention settings. Existing
 resources without lifecycle keep legacy binding freshness rules.

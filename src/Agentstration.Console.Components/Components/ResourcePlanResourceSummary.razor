@@ -1,0 +1,41 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.ResourcePlanning.Contracts
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="resource-plan-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Title" TechnicalName="@Resource.Id.ToString()" Version="@Resource.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture)" VersionDescription="@Localizer["PlanRevision"]"
+            Description="@Resource.Description" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="resource-plan-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="PresentationScopeRef" /></Scope>
+
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="resource-plan-configuration-summary">
+        <CollectionView TItem="ReviewSetting" Items="SavedSettings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch">
+                <Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity>
+                <Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information>
+            </CollectionView>
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ResourcePlan Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
+    private string T(string key) => Localizer[key];
+    private sealed record ReviewSetting(string Label, string Value);
+    private IReadOnlyList<ReviewSetting> SavedSettings =>
+    [new(T("Goal"), Resource.Goal), new(T("SchemaVersion"), Resource.Content.SchemaVersion), new(T("Updated"), Resource.UpdatedAt.ToLocalTime().ToString("g")), new(T("Status"), T($"Status.{Resource.Status}"))];
+
+}

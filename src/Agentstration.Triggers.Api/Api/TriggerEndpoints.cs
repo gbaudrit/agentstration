@@ -38,11 +38,11 @@ internal sealed partial class TriggerEndpoints
         return Results.Ok((@namespace is null ? values : values.Where(value => value.Value.Namespace == @namespace.Value)).Select(value => value.Value));
     });
 
-    private static Task<IResult> GetAsync(string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => GetCoreAsync(ResourceNamespace.Default, name, response, service, token);
-    private static Task<IResult> GetNamespacedAsync(string @namespace, string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => GetCoreAsync(ResourceNamespace.Parse(@namespace), name, response, service, token);
-    private static Task<IResult> GetCoreAsync(ResourceNamespace @namespace, string name, HttpResponse response, TriggerManagementService service, CancellationToken token) => TriggersApiHttp.ExecuteAsync(async () =>
+    private static Task<IResult> GetAsync(string name, string? scopeRef, HttpResponse response, TriggerManagementService service, CancellationToken token) => GetCoreAsync(ResourceNamespace.Default, name, scopeRef, response, service, token);
+    private static Task<IResult> GetNamespacedAsync(string @namespace, string name, string? scopeRef, HttpResponse response, TriggerManagementService service, CancellationToken token) => GetCoreAsync(ResourceNamespace.Parse(@namespace), name, scopeRef, response, service, token);
+    private static Task<IResult> GetCoreAsync(ResourceNamespace @namespace, string name, string? scopeRef, HttpResponse response, TriggerManagementService service, CancellationToken token) => TriggersApiHttp.ExecuteAsync(async () =>
     {
-        var stored = await service.GetAsync(@namespace, name, token) ?? throw new ResourceNotFoundException(new(TriggerResourceKinds.Trigger, name, @namespace));
+        var stored = await (scopeRef is null ? service.GetAsync(@namespace, name, token) : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), @namespace, name, token)) ?? throw new ResourceNotFoundException(new(TriggerResourceKinds.Trigger, name, @namespace));
         return TriggersApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
     });
 

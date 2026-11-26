@@ -1,0 +1,27 @@
+name: Preview issue commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+jobs:
+  admit:
+    if: github.ref == 'refs/heads/main' && !github.event.issue.pull_request && startsWith(github.event.comment.body, '/preview ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Authorize the comment and dispatch frozen source selection to main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/preview/issue_commands.py admit

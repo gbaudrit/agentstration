@@ -23,6 +23,9 @@ public sealed class ToolCategoryService(
         CancellationToken cancellationToken) =>
         store.GetAsync<ToolCategoryResource>(new(ToolResourceKinds.ToolCategory, name, @namespace), cancellationToken);
 
+    public Task<StoredResource<ToolCategoryResource>?> GetExactAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        store.GetExactAsync<ToolCategoryResource>(ScopedResourceAddress.Create(owner, ns, ToolResourceKinds.ToolCategory, name), token);
+
     public async Task<StoredResource<ToolCategoryResource>> CreateAsync(
         ToolCategoryResource resource,
         CancellationToken cancellationToken)

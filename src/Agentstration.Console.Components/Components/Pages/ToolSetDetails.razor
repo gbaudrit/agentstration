@@ -20,7 +20,7 @@
         <MetricCard Label="@T("Members")" Value="@toolSet.Definition.Members.Count.ToString()" Detail="@T("GovernedIndividually")" Status="UiStatus.Neutral" />
         <MetricCard Label="@T("PublishedVersions")" Value="@versions.Count.ToString()" Detail="@T("Immutable")" Status="UiStatus.Success" />
     }</OverviewMetrics>
-    <OverviewConfiguration>@Configuration</OverviewConfiguration>
+    <OverviewSummary Context="identity">@if (toolSet is not null) { <ToolSetResourceSummary Resource="toolSet" Identity="identity" /> }</OverviewSummary>
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="toolset-inspection-form" FormName="toolset-inspection"
         Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
     <AdditionalContent Context="path">@Versions</AdditionalContent>
@@ -32,11 +32,10 @@
         TechnicalName="@model.Name" TechnicalNameExpression="@(() => model.Name)" Namespace="@model.Namespace" NamespaceExpression="@(() => model.Namespace)"
         ScopeRef="model.ScopeRef" Description="@model.Description" DescriptionExpression="@(() => model.Description)" Labels="@model.Tags" LabelsExpression="@(() => model.Tags)"
         ReadOnly="true" TestId="toolset-identity-editor" />;
-    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>;
     private RenderFragment DefinitionSection(string path) => path switch
     {
         "definition/identity" => Identity,
-        "definition/configuration" => @<FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary">@Configuration</FormSection>,
+        "definition/configuration" => @<ToolSetResourceSummary Resource="toolSet!" ShowIdentity="false" ConfigurationInitiallyCollapsed="false" />,
         _ => throw new ArgumentOutOfRangeException(nameof(path))
     };
     private RenderFragment Versions => @<div>
@@ -91,14 +90,6 @@
         [nameof(model.Name)] = IdentityLabels["TechnicalName"], [nameof(model.DisplayName)] = IdentityLabels["DisplayName"], [nameof(model.Namespace)] = Shared["Namespace"],
         [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"], [nameof(model.ScopeRef)] = Shared["Scope"]
     };
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => toolSet is null ? [] : [
-        new(Shared["Enabled"], T(toolSet.Definition.Enabled ? "Enabled" : "Disabled")),
-        new(T("Category"), toolSet.Definition.Category is { } category ? ReferenceText(category) : "—"),
-        new(T("DraftVersion"), toolSet.Definition.Version), new(T("Publication"), T(toolSet.Definition.Publish ? "PublishRequested" : "Draft")),
-        new(T("Members"), string.Join("\n", toolSet.Definition.Members.Select(m => $"{m.Capability} · {m.Route} · {ReferenceText(m.Tool)}"))),
-        new(T("Annotations"), Map(toolSet.Metadata.Annotations))];
-
     private bool CanMutate => toolSet is { ScopeRef: { } owner, Governance.IsManaged: false } && ResourceOwnershipContext.CanManage(owner, Services);
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     protected override Task OnParametersSetAsync()

@@ -28,7 +28,7 @@
         <MetricCard Label="@T("Dependents")" Value="@(usageCount?.ToString() ?? "—")" Detail="@T("DependentsExplanation")" />
     </OverviewMetrics>
     <IdentityDetails>@if (resource is { } saved) { <dt>@T("ServiceType")</dt><dd>@(TypeResource?.Definition.DisplayName ?? saved.Definition.Type.Type.Name) · @saved.Definition.Type.Version</dd> }</IdentityDetails>
-    <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
+    <OverviewSummary Context="identity">@if (resource is not null) { <ConnectedServiceResourceSummary Resource="resource" Identity="identity" /> }</OverviewSummary>
     <DefinitionContent Context="path">
         @if (resource is { } saved)
         {
@@ -40,7 +40,7 @@
         }
     </DefinitionContent>
     <AdditionalContent Context="path">
-        @if (path == "discovery" && resource is { } saved) { <ConnectedServiceDiscoveryPanel @key="saved.Uid" Service="saved" Supported="@(TypeVersion?.OperationDiscovery is not null)" /> }
+        @if (path == "discovery" && resource is { } saved) { <ConnectedServiceDiscoveryPanel @key="saved.Uid" Service="saved" PreviewRequested="OpenOperationPreview" Supported="@(TypeVersion?.OperationDiscovery is not null)" /> }
         else if (path == "dependents") { @Dependents }
     </AdditionalContent>
     <DraftActions><button type="button" class="button-secondary" disabled="@Busy" @onclick="DiscardDefinition">@Shared["Discard"]</button><button type="submit" form="@editor?.FormId" class="button-primary" disabled="@(Busy || editor?.CanEdit != true)" data-testid="connected-service-save">@T("Save")</button></DraftActions>
@@ -48,7 +48,15 @@
 <ConfirmationDialog IsOpen="confirmReconcile" Title="@T("Reconcile")" Message="@T("ReconcileConfirm")" ConfirmLabel="@T("Reconcile")" OnConfirm="ReconcileAsync" OnCancel="() => confirmReconcile = false" />
 <ConfirmationDialog IsOpen="confirmDeactivate" Title="@T("Deactivate")" Message="@T("DeactivateConfirm")" ConfirmLabel="@T("Deactivate")" OnConfirm="DeactivateAsync" OnCancel="() => confirmDeactivate = false" />
 
+<ResourceCollectionPreview @ref="operationPreview" ResourceKind="@ConnectedServiceResourceKinds.ConnectedServiceOperation" ContextKey="@(loadedKey)" Enabled="@(resource is not null)">
+    <ChildContent Context="address"><ConnectedServiceOperationResourcePreview Address="address" OverviewHref="@OperationPreviewUrl(address)" DefinitionHref="" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? operationPreview;
+    private void OpenOperationPreview(ScopedResourceAddress address) => operationPreview?.Open(address);
+    private string OperationPreviewUrl(ScopedResourceAddress address) => ResourceOwnershipContext.Resource(Services, "/connected-service-operations", address.Name, address.Namespace, address.ScopeRef) + "#overview";
+
     [Parameter] public string? Name { get; set; }
     [SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
     [SupplyParameterFromQuery(Name = "namespace")] public string? Namespace { get; set; }
@@ -222,16 +230,6 @@
         finally { if (request == loadVersion && !disposed) changingEnabled = false; }
     }
     private sealed record DetailBundle(ResourceSnapshot<ConnectedServiceResource> Snapshot, IReadOnlyList<ConnectedServiceTypeResource> Catalog, IReadOnlyList<ConnectedServiceUsageResponse> Usages, int? UsageCount, AgentstrationApiException? Failure);
-    private RenderFragment ConfigurationSummary => @<div>
-        @if (ConfigurationRows.Count == 0) { <p>@T("NoBindings")</p> }
-        else
-        {
-            <CollectionView TItem="ConfigurationRow" Items="ConfigurationRows" IdentityLabel="@T("Input")" InformationLabels="@(new[] { T("ValueOrResource") })">
-                <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity>
-                <Information Context="row"><CollectionValue Label="@T("ValueOrResource")"><span class="configuration-value"><small>@row.Source</small><br />@row.Value</span></CollectionValue></Information>
-            </CollectionView>
-        }
-    </div>;
     private RenderFragment Diagnostics => @<div class="service-diagnostics">
         <h3>@T("Diagnostics")</h3>
         @if (resource?.ObservedState is not { } observed) { <p>@T("NotObserved")</p> }
@@ -252,29 +250,6 @@
     });
     private string StatusLabel(ConnectedServiceAvailability status) => T($"Availability.{status}");
     private static UiStatus StatusColor(ConnectedServiceAvailability status) => status switch { ConnectedServiceAvailability.Ready => UiStatus.Success, ConnectedServiceAvailability.Stale => UiStatus.Warning, ConnectedServiceAvailability.Unavailable => UiStatus.Danger, _ => UiStatus.Neutral };
-    private IReadOnlyList<ConfigurationRow> ConfigurationRows
-    {
-        get
-        {
-            if (resource is null) return [];
-            var rows = resource.Definition.Bindings.Select(binding => new ConfigurationRow(binding.InputId, BindingKindLabel(binding.Kind), BindingValue(binding))).ToList();
-            if (resource.Definition.Options.ValueKind == JsonValueKind.Object)
-                rows.AddRange(resource.Definition.Options.EnumerateObject().Select(option => new ConfigurationRow(option.Name, BindingKindLabel(ConnectedServiceBindingKind.Literal), ConfigurationValue(option.Value))));
-            return rows;
-        }
-    }
-    private static string ConfigurationValue(JsonElement value) => value.ValueKind == JsonValueKind.String
-        ? value.GetString() ?? string.Empty : JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = true });
-    private sealed record ConfigurationRow(string Name, string Source, string Value);
-    private string BindingKindLabel(ConnectedServiceBindingKind kind) => T($"BindingKind.{kind}");
-    private static string BindingValue(ConnectedServiceValueBinding binding)
-    {
-        if (binding.Kind == ConnectedServiceBindingKind.Literal && binding.Literal is { } literal)
-            return literal.ValueKind == JsonValueKind.String ? literal.GetString() ?? string.Empty : literal.GetRawText();
-        var address = binding.Parameter?.Address ?? binding.Secret?.Address;
-        var scope = binding.Parameter?.ScopeRef ?? binding.Secret?.ScopeRef;
-        return address is not { } exact ? "—" : $"{scope}/{exact.Namespace}/{exact.Name}";
-    }
     private static string UsageUrl(ConnectedServiceUsageResponse usage) => usage.ResourceType == StorageResourceKinds.Storage ? StorageLinks.FromApi(usage.Url) : usage.Url;
     public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
     private sealed record RawConnectedService

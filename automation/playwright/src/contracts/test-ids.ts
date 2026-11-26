@@ -50,7 +50,13 @@ export const TestIds = {
     secretDialog: 'contextual-secret-creator',
     secretValue: 'contextual-secret-value',
   },
+  collectionLayout: {
+    queries: 'dataset-queries', queryRow: 'dataset-query-row', queryPreview: 'data-source-query-preview',
+    artifactRow: 'durable-artifact-row', artifactPreview: 'durable-artifact-preview',
+    functionPreview: 'transformation-function-preview', previewContent: 'resource-preview-content',
+  },
   transformationFunctions: {
+    collection: 'function-catalog',
     description: 'function-description', descriptionInput: 'function-description-input',
     catalogue: 'transformation-functions', row: 'transformation-function-row',
     editor: 'transformation-function-editor', name: 'function-name', kind: 'function-kind', implementation: 'function-implementation', save: 'function-save',
@@ -449,6 +455,7 @@ export const TestIds = {
     modelIdentity: 'model-identity-editor',
     modelResourceRefresh: 'model-refresh',
     modelYaml: 'model-yaml-editor',
+    modelConfigurationSummary: 'model-configuration-summary',
     editModelOverride: 'edit-model-override',
     modelOverrideContextTokens: 'model-override-context-tokens',
     saveModelOverride: 'save-model-override',

@@ -61,12 +61,18 @@ public static class ResourcePlanningApiModule
 
     private static Task<IResult> GetAsync(
         Guid id,
+        HttpRequest request,
         HttpResponse response,
         ResourcePlanService service,
         ICurrentRequestContext context,
         CancellationToken cancellationToken) => ExecuteAsync(async () =>
     {
-        var stored = await service.GetAsync(Scope(RequireWorkspace(context)), new(id), cancellationToken)
+        if (!context.IsInitialized) return Results.Forbid();
+        var current = RequireWorkspace(context);
+        if (request.Query.ContainsKey("scopeRef") && (!ResourceScopeRef.TryParse(request.Query["scopeRef"].ToString(), out var owner)
+            || owner != ResourceScopeRef.Workspace(current.WorkspaceId)) || request.Query.ContainsKey("namespace") && !ResourceNamespace.Parse(request.Query["namespace"].ToString()).IsDefault)
+            return Results.NotFound();
+        var stored = await service.GetAsync(Scope(current), new(id), cancellationToken)
             ?? throw new ResourcePlanNotFoundException(new(id));
         response.Headers.ETag = stored.ETag;
         return Results.Ok(stored.Value);

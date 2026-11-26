@@ -73,10 +73,11 @@ public partial class ModelProfiles
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { ClearOperations(); items = null; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); ClearOperations(); items = null; query = new(); contextKey = scope; }
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {
             ClearOperations();
+            preview?.Close();
             items = null;
             loadState = new(Context.Error is null ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed);
             return;

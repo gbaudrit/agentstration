@@ -1,0 +1,3331 @@
+{
+  "testedCommit": "1e52fb3e06c303b4ad32e10398edef214c1f780b",
+  "testCommand": "npm run test:smoke -- collection-layout.spec.ts --config=/tmp/1257-layout-evidence.config.mts",
+  "runtime": "Linux; Chromium 154; Playwright 1.63.0; frozen Release hosts; disposable local inventory fixture",
+  "sourceProofEncoding": "SHA-256 of UTF-8 text with LF line endings",
+  "sourceProof": {
+    "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor": "7e5772785107d89531b8ce2fa58e0b7f0cb2117448ca4c77e63e704ef977b72d",
+    "src/Agentstration.Console.Components/Components/Pages/Artifacts.razor.css": "c67713a9f447a86e47b81bdb8a2db6a49f61ff474959f161df209e9e4d161a45",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor": "bf0db25d8e2a39fbe7173e4ce5f09f5755b3585a381ee1cf5bef04448d9d6289",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceQueries.razor.css": "0191c518a013af334bfc8c259f9497abcd7e92792e8a7de14ac20648eba5c671",
+    "src/Agentstration.Console.Components/Components/Pages/DataSourceDatasetEditor.razor": "7d60e68a32eb640079eeadb189f1f5103590a83d48822af35a4cddc31c86c551",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor": "43a7e2f4a34b081341d2acfae0d4ee43d25b9c020e3a905c7b09166a029ec06c",
+    "src/Agentstration.Console.Components/Components/Pages/TransformationFunctions.razor.css": "16a9512496ae965350afa9190a45122f584c2ea08bc5fd44f614a352d3edb9b0",
+    "src/Agentstration.Web.Components/CollectionIdentity.razor": "4f7abca6d18618884a3d152b5b0fa47f0ddace2624f18ebef35eae80ef123e69",
+    "src/Agentstration.Web.Components/ResourceScopeBadge.razor": "2975159d4d0dd11d6ba7cb1d65a919b0700551d4cb30c2407f1f584b878b0204",
+    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "8fe4f3f12ba17306e9b3506e9560f2a9695e1c152e1629659b0080e1ac4046f5",
+    "src/Agentstration.Web.Components/wwwroot/management.css": "f07a2850a20ae0f6c20e58863594b69caa4a8eb99cc5709e18d75ae7739bb815",
+    "src/Agentstration.Web.Components/wwwroot/collection-ui.js": "463ca21a209abd9fbe987d5852fa12dccfc1ca7c58110fe37f7c69cbe9829be6",
+    "src/Agentstration.Web.Components/wwwroot/dialog.js": "8c9d75ec30d717f861a698cc680f058e8df21b997a1090acb989f513e6a83699",
+    "src/Agentstration.Web.Components/wwwroot/agentstration.css": "a79eb40f961f6c2aa327dbd4944cbf09a7e65c1b23698ca1d87011f9f0367cc2",
+    "src/Agentstration.Web.Components/CollectionView.razor": "93e933abd6791e5a3661d21baac1ee0463127f30198a81afceaa9ba9fc792cef",
+    "src/Agentstration.Web.Components/DataGrid.razor": "a0bc6ca6f37c8e5450bf421a5db8b90c3047eccad830a25df5f37a988a774041",
+    "src/Agentstration.Web.Components/ModalFrame.razor": "2f41cd1f5928c31e8c53b4c4e2be0ad69f0c0da255ac747864cd65ede039fdea",
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor": "fa41b7cb259961b1993f34531140dc3982cf3a3700a825cb1c7cb6fd591005e5",
+    "src/Agentstration.Web.Components/ResourcePreviewPanel.razor.css": "c478cfc0eb44b9dcfced3b1c8815cad66bee88116f7e44f9e4dd495258b1da13",
+    "src/Agentstration.Web.Components/ResourceNavigation.razor": "56ba15b89dc694e1d5df308746330f80bbe82a7c6282784d9b7176f78aa46025",
+    "src/Agentstration.Web.Components/ResourceNavigation.razor.css": "d6248979605bbefe2b9371d10e61ae7d10f384d2bc231c0ce659c94d23fb0b8a",
+    "automation/playwright/src/pages/collection-layout.page.ts": "1d46b7592d2af133d34051659f30a477cf4a1480dbe849ac8d93bcef26f547f1",
+    "automation/playwright/src/pages/transformation-function-collection.page.ts": "d31fd66f3c2c5e3391dd7daf7446d0c619abd95787bd8ac72b0be182f7f9e13e",
+    "automation/playwright/tests/collection-layout.spec.ts": "d291051360863a19ecc3bfbc758d6f7c3d65ed59841d385ef8bfaaf95f4b6209",
+    "automation/playwright/fixtures/GovernedInventoryHost/CollectionLayoutSeeds.cs": "8709cf84e1dd1282e91493d872e33496ecba2787631fbe8bce94feb2df7ca557",
+    "automation/playwright/fixtures/GovernedInventoryHost/FixtureHost.cs": "0bcf6296e38c1ed843e9f9ca92053e7537b4d4f353feba426d89d8ba442258ba",
+    "automation/playwright/src/fixtures/source-lifecycle.ts": "0e59e5f335e09177f46b5a641d3ae5a8f7701b83a6d39698d0386b111785a934",
+    "automation/playwright/src/fixtures/product-hosts.ts": "fb5e5554d816bbb176c08e4bfacf8858fb072585d1464474aa96df589843f461",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor": "e95d612b9b692c974b6721f2ac703d37825a122026bd7ec31bf38017a666ee89",
+    "src/Agentstration.Console.Components/Components/Pages/ArtifactReference.razor.css": "fdef898f88c876434b6a2e87e53fd21907d0bb537fa52f5733d5f7e2d2b238ab"
+  },
+  "causeAndCorrection": "Le badge de périmètre textuel occupait la couche absolue IconBadges. Il utilise désormais Indicators, dans le flux normal, entre l’icône et le texte. Le conteneur imbriqué nécessite aussi min-width:0. Le tableau à deux colonnes réserve la place des Actions et borne l’identité longue ; les boutons ne peuvent plus être comprimés verticalement. La fermeture du Preview restaure le fragment natif #queries.",
+  "cases": [
+    {
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-en-US-light-1440-closed.png",
+          "sha256": "359b7cbdf361af80e6b0b2e25b51dd648d1d3ca85ec53e9e8e7e0416314401a2",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-en-US-light-1440-actions.png",
+          "sha256": "5ba24abd42a63d31346549e039d9d41a2029aba25ebdfb8ff522d739efeb62ee",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-en-US-light-1440-preview.png",
+          "sha256": "a60f9d5da14ced2ded87570a124b50805bdcc12440d7f9d6eaecd568a0f58ba8",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-en-US-light-1440-after-close.png",
+          "sha256": "7ccf7251816a36e1f94d37adc8f52d2ab6c9a1eeaa110b4419d3d3a32cafe23e",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-en-US-light-1440-closed.png",
+          "sha256": "46f97cfc33526add844eab6a5fb45b134b525afba05ae7f1fc102997e1204da2",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-en-US-light-1440-actions.png",
+          "sha256": "f1640e9e6b041f45fcf01ece6c85389367119abd41b22793cb9ccf1dd4b59883",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-en-US-light-1440-preview.png",
+          "sha256": "92863791ed549fad07beea198a6be767de41c6d54d5d09725a34fa08dcd4df16",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-en-US-light-1440-after-close.png",
+          "sha256": "d509e521ed543323a938db683c087db8be82ee192d499d1bf443c650ee10d572",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-en-US-dark-1440-closed.png",
+          "sha256": "f2f73519e4ebc0d43efb5046d289db7ec2e22354cae87c8dcdc27be7ee9808f5",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-en-US-dark-1440-actions.png",
+          "sha256": "bb3899adfb7dd81114cf4967b663a59c38a4e59bfe6ca5eed5fa351390db6635",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-en-US-dark-1440-preview.png",
+          "sha256": "5e7a7ab3a0630ea2bd87cbea3b9aa04e74e3b0d253a321a636a174b78f5086d4",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-en-US-dark-1440-after-close.png",
+          "sha256": "2d9aede3a4b38df3e64fda27356fe375bda8bcb7b49a91b0810cf3b58a1b9e9a",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-en-US-dark-1440-closed.png",
+          "sha256": "8a7dfc46bf8444f62b1bec77b8d8fb13d2850c5a6cf37751b8c46e411a45bea7",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-en-US-dark-1440-actions.png",
+          "sha256": "676b80e58bf376e197bbb66c9055004cc25d94ea34d4331818761e8fc318baeb",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-en-US-dark-1440-preview.png",
+          "sha256": "6595fb5016f1597afda36bd3abf33f9cc104b8426b1243bf56e2ef3d54cdb1c5",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-en-US-dark-1440-after-close.png",
+          "sha256": "994b126383f6bd5ef9cb85c737122985728064429a1e9b864f15c1b07fdc4057",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 484,
+              "textRight": 107.0625
+            },
+            {
+              "width": 128,
+              "right": 612,
+              "textRight": 555.0625
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-en-US-light-390-closed.png",
+          "sha256": "f9588bc5b3a0bd2da651ab3ed01589b72d9e082d7b65d14ff237e4b1ae12a4af",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-en-US-light-390-actions.png",
+          "sha256": "45d0934a087e0c5bddeba30c8cf1274da9f3996521ff93e401834eb174647c18",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-en-US-light-390-preview.png",
+          "sha256": "dfc328eb981d27cbe15ddff61827ac281ab0f67f527ae34d9a3008b7e1c149cb",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-en-US-light-390-after-close.png",
+          "sha256": "8f7d904054822f6913c6accac2ef76f1511c3dd42ed6b9a8eb4aef78d6b0631f",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-en-US-light-390-closed.png",
+          "sha256": "6d09248d122a692bcc411441adb194d41937f6badc3a80157664a8a190711922",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-en-US-light-390-actions.png",
+          "sha256": "fd89717920aa8810c38b141a30f6ff51d028b7f0979b7319101032632deb30ae",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-en-US-light-390-preview.png",
+          "sha256": "dfc328eb981d27cbe15ddff61827ac281ab0f67f527ae34d9a3008b7e1c149cb",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-en-US-light-390-after-close.png",
+          "sha256": "b9df25ddb75bfece5302fa39cf0c492ad27b5fc452192f25df0975dbeebd78b8",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 484,
+              "textRight": 107.0625
+            },
+            {
+              "width": 128,
+              "right": 612,
+              "textRight": 555.0625
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-en-US-dark-390-closed.png",
+          "sha256": "87a22c63e7cf938537a3ea5f74ce2968cefa9db5fea236ae018b80e200ca1217",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-en-US-dark-390-actions.png",
+          "sha256": "b811ea9b1858d951b5499b1ab7e676bf439835b016cf3ef27b1fe822b891a24a",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-en-US-dark-390-preview.png",
+          "sha256": "300d546978ec4beefa216994f4086eff1cc0f4522b4145a8bc1df0b1f264f138",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-en-US-dark-390-after-close.png",
+          "sha256": "9df8f36e5821c8c4cbc1d1952a0cccb0e4ffc7c7fbc6a9bd57fbf38da93f51a8",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "en-US",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-en-US-dark-390-closed.png",
+          "sha256": "53f8e76ba09adb494934ffeeca07100f2ef4a3a69bec30c30d0ea2439ee2e348",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-en-US-dark-390-actions.png",
+          "sha256": "74e1806e44ac771bce39f2a4763704bd31b44ac8584b49b18b0e1a6dd6e0a8e4",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-en-US-dark-390-preview.png",
+          "sha256": "300d546978ec4beefa216994f4086eff1cc0f4522b4145a8bc1df0b1f264f138",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-en-US-dark-390-after-close.png",
+          "sha256": "c257fb00649f5df85ab9c34f737e56f10f17e41947549d76d8e0b1e6c1718ea8",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 484,
+              "textRight": 107.0625
+            },
+            {
+              "width": 128,
+              "right": 612,
+              "textRight": 555.0625
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-fr-FR-light-390-closed.png",
+          "sha256": "29fdf509a64ecd272506d8ae73f803c32d083175f01d7a088327e8c55fbb94d2",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-fr-FR-light-390-actions.png",
+          "sha256": "0eda3bd70a3b94b9c1ebe827670611248231fb6940b4d03e3321dea187fb1e2f",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-fr-FR-light-390-preview.png",
+          "sha256": "36e1359d45f9c949b6da10c184b4bbf9f645fd5a7c994560e0c361f554e0d632",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-fr-FR-light-390-after-close.png",
+          "sha256": "d10e13803cb259d178a40892ef1ad1366d4f0b25307e7c5f4b05cd6fe6e67dd9",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-fr-FR-light-390-closed.png",
+          "sha256": "91f3e57fa42870a918528d10eb4127544480b359f903adbbd20dfd71974d7fa1",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-fr-FR-light-390-actions.png",
+          "sha256": "7b2f2058ca388eda3f8d2b3ad4d17cb1eb08fb74d84cdc3a7b04ea3679ba5b0a",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-fr-FR-light-390-preview.png",
+          "sha256": "36e1359d45f9c949b6da10c184b4bbf9f645fd5a7c994560e0c361f554e0d632",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-fr-FR-light-390-after-close.png",
+          "sha256": "b0a123de70706f284626270b5bdcb7b432a3d1c776ccfd6939429b0bae4c6e54",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 58.390625,
+              "textLeft": 168.828125,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 484,
+              "textRight": 107.0625
+            },
+            {
+              "width": 128,
+              "right": 612,
+              "textRight": 555.0625
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 240,
+          "scrollWidth": 576,
+          "clientWidth": 318,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": -181.609375,
+              "textLeft": -71.171875,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 448,
+              "right": 244,
+              "textRight": -132.9375
+            },
+            {
+              "width": 128,
+              "right": 372,
+              "textRight": 315.0625
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-fr-FR-dark-390-closed.png",
+          "sha256": "7d55b4cf45fe39bb70802d2103e4962e0e9b9ddbbbbc17d100650c2d87c2de32",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-fr-FR-dark-390-actions.png",
+          "sha256": "5340386296b89a9892a1072461d5b2e0ae2b974d412066c5ebc4c3dd52c132b4",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-fr-FR-dark-390-preview.png",
+          "sha256": "f1641d3f8765f5c15ec3f355820014362a11f8b9e8479c804d774bdb37299d2a",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-fr-FR-dark-390-after-close.png",
+          "sha256": "37a7e49a64a619c428e34a323805317414f325b11d4f786f8c7b4da32c394038",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 54.390625,
+              "textLeft": 164.828125,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-fr-FR-dark-390-closed.png",
+          "sha256": "e969892293f67157cb1c0c03010aa0b9dace3698443b84ada38f58ef92c35fa1",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-fr-FR-dark-390-actions.png",
+          "sha256": "4fd10f38121f8eafabb56752261033157723ac4de804b06723748c1a1c02ee76",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-fr-FR-dark-390-preview.png",
+          "sha256": "f1641d3f8765f5c15ec3f355820014362a11f8b9e8479c804d774bdb37299d2a",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-fr-FR-dark-390-after-close.png",
+          "sha256": "284cc4a8bc1b62b907f57b1492617470560350e0566b9de621374eee4dee8a15",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-fr-FR-light-1440-closed.png",
+          "sha256": "d6fdd646fc3d3ed0db69612d05f36b57987f0ec199f3fd7d871a58cd9b782a8a",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-fr-FR-light-1440-actions.png",
+          "sha256": "9f9f641614fd3a90dfc4ba61ebfb5f6697f7be9bbe96f8df2c03fc6f93396414",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-fr-FR-light-1440-preview.png",
+          "sha256": "7e905d41a4e1275f05c811f69279bba6b46996d1b60488e82ec008945ea511c7",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-fr-FR-light-1440-after-close.png",
+          "sha256": "9cec66dd50b69672fa086d908b723a3b09410dfe9baeb7c8eda40c777b485390",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-fr-FR-light-1440-closed.png",
+          "sha256": "0d76be96c7ee3b767d67acc94960ada757d453a7eac9c00080104718b12c975b",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-fr-FR-light-1440-actions.png",
+          "sha256": "ccef503aedf67d8b20cfe7d2b3e700595bfc7e1a1dfd0b9362c2ce3262f0e739",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-fr-FR-light-1440-preview.png",
+          "sha256": "0f95cc3477847672adcafcad7cf0d1cd105bedcad71e6f3e0f92fadc115aa057",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-fr-FR-light-1440-after-close.png",
+          "sha256": "675294cac1300ab47d6709d039d6b970c9932926d6ff22fab872567b9ac703de",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "table",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 766,
+          "clientWidth": 766,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.5625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.0625,
+              "iconLeft": 367.578125,
+              "textLeft": 478.015625,
+              "actionHeight": 35.453125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": [
+            {
+              "width": 637.625,
+              "right": 982.8125,
+              "textRight": 416.25
+            },
+            {
+              "width": 128,
+              "right": 1110.8125,
+              "textRight": 1053.875
+            }
+          ]
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/table-fr-FR-dark-1440-closed.png",
+          "sha256": "010f8873b7958da91c892e3ce878c716bfad55caf352dcc3ed79d4bd3ede0a89",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/table-fr-FR-dark-1440-actions.png",
+          "sha256": "4cfe3203b4c1025b5209311c7708859a2eb1c2082c4980635a01697c7663cf7b",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/table-fr-FR-dark-1440-preview.png",
+          "sha256": "e29c184b1814be99d960d58ce9a674206db628243742c7402871a67bd49dc45c",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/table-fr-FR-dark-1440-after-close.png",
+          "sha256": "6d81b4b78863241b56756fa622f2d61f964370be6e0303d3118527f798f61f06",
+          "visuallyInspected": true
+        }
+      }
+    },
+    {
+      "locale": "fr-FR",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "view": "cards",
+      "status": "passed",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 125.578125,
+              "iconLeft": 363.578125,
+              "textLeft": 474.015625,
+              "actionHeight": 38.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ],
+          "headers": []
+        }
+      },
+      "screenshots": {
+        "closed": {
+          "path": "grids/cards-fr-FR-dark-1440-closed.png",
+          "sha256": "1e201fca994bcfb6a60be9f74c0623b37cb68aa7453dbfea35acfb6d35722727",
+          "visuallyInspected": true
+        },
+        "actions": {
+          "path": "grids/cards-fr-FR-dark-1440-actions.png",
+          "sha256": "afc8d3f817d18c1610607d311bea35574887c3c0397329fc26ca4f36ba9d15d3",
+          "visuallyInspected": true
+        },
+        "preview": {
+          "path": "grids/cards-fr-FR-dark-1440-preview.png",
+          "sha256": "0c34ccde03383274aa226424c7511ada50063ca3fb9b33dbb751344250dd618d",
+          "visuallyInspected": true
+        },
+        "after-close": {
+          "path": "grids/cards-fr-FR-dark-1440-after-close.png",
+          "sha256": "cb629bc5262b1afca98b65902ecd9ac8a445d55898cd6546c09d515e85476cc8",
+          "visuallyInspected": true
+        }
+      }
+    }
+  ],
+  "automaticChecks": [
+    "multiple persisted resources and long identities",
+    "header text fits allocated columns; Actions column >=104px and menu trigger height <=48px",
+    "bounded row heights and readable function descriptions",
+    "scope badge/icon/text do not overlap",
+    "no document horizontal overflow; native Artifact and Query tables fit desktop content at 1440px",
+    "mouse/touch Actions; Escape/End; menu and dialog focus restoration; menu viewport bounds",
+    "Preview open/close preserves horizontal position",
+    "durable identity stays visible through horizontal scrolling",
+    "native section restored after close"
+  ],
+  "visualInspection": {
+    "status": "completed",
+    "method": "view_image of every new viewport PNG at original readable size; no thumbnail-only inspection",
+    "date": "2026-11-22",
+    "inspectedPngCount": 64,
+    "totalAcrossThreeFamilies": 198,
+    "findings": "Icône, badge Instance et texte occupent des places distinctes en tableau et cartes. Les Actions restent horizontales. À 1440 px, les deux colonnes tiennent dans la section sans déplacer l’identité. À 390 px, le tableau forcé défile normalement : l’identité peut sortir de la fenêtre en allant vers Actions ; les cartes gardent toute la composition visible. Le retour du Preview conserve la section Queries.",
+    "outstandingTargetedDefects": [],
+    "scope": "Original viewport PNGs, individually inspected at native readable size; visible grid regions, menu bounds, modal identity and close control. Automatic geometry also checks offscreen rows and horizontal offsets. No claim of full-page or every Preview section inspection.",
+    "scrollLimit": "Only horizontal position preservation is asserted; some native close navigation resets vertical position."
+  },
+  "limitations": [
+    "Les trois requêtes désactivées et le dataset désactivé sont des métadonnées synthétiques persistées dans le hôte jetable, avec des pins inertes. Aucune acquisition, création de collection documentaire, exécution ou publication de requête n’est validée.",
+    "Le contrat Query ne possède pas de Description ; les noms d’affichage et techniques longs sont testés."
+  ]
+}

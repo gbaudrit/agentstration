@@ -68,6 +68,8 @@ Packs form a distribution layer above these boundaries. The repository produces 
 
 The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
 
+The independent [Tracking Contract (ATC) SDK](atc/README.md) defines versioned tracking semantics over MCP, with typed client/server adapters, optional AEP declarations and deterministic conformance fixtures. It supports repository and non-repository targets without an agent or LLM; product/provider adoption is tracked separately.
+
 The ten autonomous extension executables live in [`src/extensions/`](src/extensions/),
 with their existing project names and independent packaging. Product-owned extension
 management modules remain directly under `src/`; the MAF AWP Worker is a separate
@@ -75,7 +77,9 @@ executable outside the extension directory.
 
 Connected Services, their service types and their protocol-specific operation types are scoped product resources. A type may be bootstrapped by Core, authored by a user or materialized from an AEP contribution with extension governance; a configured service pins one exact type revision, while durable Flow-backed discovery materializes validated read-only operations. The REST surfaces and localized Console journeys are documented in [Connected Services API](docs/reference/connected-services.md); consumer bindings such as Storage/OpenDAL remain explicit and do not couple extensions together.
 
-The standalone Agentstration Storage Protocol SDK is staged in [`asp/`](asp/README.md): neutral bounded content contracts, MCP client/server adapters, an offline sample and conformance tests. It does not yet integrate product Storage resources or promise durable Snapshot retention.
+The standalone Agentstration Storage Contract SDK is staged in [`asc/`](asc/README.md): neutral bounded content and document contracts, MCP client/server adapters, offline samples and conformance tests. Its `ASC.mcp.v1` exposure integrates product Storage resources through explicit AEP mappings; it does not promise durable Snapshot retention.
+
+The independent [Forge Contract (AFC) SDK](afc/README.md) exposes repository resolution, change requests and revision-bound review/check observations over MCP. It supplies typed client/server adapters, optional AEP declarations and an authenticated offline fixture; Git transport, tracking authority and product delivery orchestration retain their separate owners.
 
 Read the [architecture overview](https://docs.agentstration.io/architecture/overview) and [current capabilities reference](https://docs.agentstration.io/reference/current-capabilities) for the detailed boundaries and guarantees.
 

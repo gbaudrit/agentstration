@@ -14,15 +14,28 @@
                             EmptyTitle="@T("NoVaults")" EmptyMessage="@T("NoVaultsMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
                             OnRefresh="LoadAsync" OnRetry="RetryAsync">
     <Navigation><ResourceTabs Label="@T("SecretManagement")"><a href="@Navigate("/secrets")">@T("Secrets")</a><a class="active" href="@Navigate("/vaults")">@T("Vaults")</a></ResourceTabs></Navigation>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Resource.Name">
+        <a href="@(ResourceUrl(item.Resource) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item.Resource)) { <a href="@(ResourceUrl(item.Resource) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.Resource.ScopeRef is null)" data-testid="vault-preview" @onclick="() => OpenPreview(item.Resource)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@SecretResourceKinds.Vault" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><VaultResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(VaultResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(VaultResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, SecretResourceKinds.Vault, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/vaults", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key) => Localizer[key].Value;
     private string StatusText(string status) => T($"Status.{StatusValue(status)}");
     private string ProviderText(string provider) { var text = Localizer[$"Provider.{provider}"]; return text.ResourceNotFound ? provider : text.Value; }
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/vaults/new")">@T("CreateVault")</a></PermissionGate> : null;
-    private CollectionColumn<VaultResponse> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@ResourceUrl(item.Resource)" IconName="lock" Domain="neutral">
+    private CollectionColumn<VaultResponse> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Resource.Definition.DisplayName" Namespace="@item.Resource.Namespace.Value" Name="@item.Resource.Name" Href="@(ResourceUrl(item.Resource) + "#overview")" IconName="lock" Domain="neutral">
         <IconBadges><ResourceScopeBadge ScopeRef="item.Resource.ScopeRef" ShowName IconOnly /><StatusBadge Text="@StatusText(item.Status)" Status="@Tone(item.Status)" IconOnly /><ManagedResourceBadge IsManaged="@item.Resource.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Resource.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {

@@ -39,9 +39,10 @@ public sealed partial class ToolDefinitionConsoleTests
         {
             StringAssert.Contains(rendered.Markup, "Send notification");
             StringAssert.Contains(rendered.Markup, "notification-flow");
-            var edit = rendered.Find(".collection-primary-actions a");
+            var edit = rendered.Find(".collection-actions-menu a[href$=\"#overview\"]");
+            Assert.IsEmpty(rendered.FindAll(".collection-actions-menu a[href*=\"definition/configuration\"]"), "Inherited definitions cannot be edited in this context.");
             Assert.Contains("/tools/definitions/notification.send?namespace=default", edit.GetAttribute("href")!);
-            Assert.HasCount(0, rendered.FindAll(".collection-actions-menu"), "Editing remains directly available.");
+            Assert.HasCount(1, rendered.FindAll(".collection-actions-menu"));
             StringAssert.Contains(rendered.Markup, "/tools/definitions/notification.send?namespace=default");
             Assert.AreEqual("/tools/definitions/new?context=%2Fworkspaces%2F11111111-1111-1111-1111-111111111111",
                 rendered.Find("a.button-primary").GetAttribute("href"));

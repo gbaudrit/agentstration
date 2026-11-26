@@ -20,6 +20,7 @@ internal sealed class SourceEndpoints : IManagementEndpoint
         sources.MapPut("/console/{publisher}/{name}/versions/{versionUid:guid}/bindings", ConfigureConsoleBindingsAsync);
         sources.MapGet("", ListAsync);
         sources.MapGet("/{publisher}/{name}", GetAsync);
+        sources.MapGet("/{publisher}/{name}/summary", GetSavedSummaryAsync);
         sources.MapDelete("/{publisher}/{name}", DeleteAsync);
         sources.MapPost("/{publisher}/{name}/refresh", RefreshSourceAsync);
         sources.MapPut("/{publisher}/{name}/refresh-policy", UpdateRefreshPolicyAsync);
@@ -126,6 +127,11 @@ internal sealed class SourceEndpoints : IManagementEndpoint
 
     private static Task<IResult> ListAsync(SourceManagementService service, CancellationToken cancellationToken) =>
         SourcesApiHttp.ExecuteAsync(async () => Results.Ok(await service.ListAsync(cancellationToken)));
+
+    private static Task<IResult> GetSavedSummaryAsync(string publisher, string name, string scopeRef,
+        SourceManagementService service, CancellationToken cancellationToken) => SourcesApiHttp.ExecuteAsync(async () =>
+        Results.Ok(await service.GetSavedSummaryExactAsync(Agentstration.Resources.ResourceScopeRef.Parse(scopeRef), publisher, name, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(SourceResourceKinds.Source, name, new Agentstration.Resources.ResourceNamespace(publisher)))));
 
     private static Task<IResult> GetAsync(
         string publisher,

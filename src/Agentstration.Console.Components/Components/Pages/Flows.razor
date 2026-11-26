@@ -28,7 +28,7 @@
 @code {
     private string T(string key) => Localizer[key];
     private ResourceCollectionPreview? preview;
-    private bool CanEdit(FlowSummary item) => item.Kind != nameof(FlowKind.Runtime) && !item.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private bool CanEdit(FlowSummary item) => item.Kind != nameof(FlowKind.Runtime) && !item.IsManaged && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
     private void OpenPreview(FlowSummary item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, FlowResourceKinds.Flow, item.Id)); }
     private string OverviewUrl(FlowSummary item) => DetailsUrl(item).Split('#')[0] + "#overview";
     private string DefinitionUrl(FlowSummary item) => DetailsUrl(item).Split('#')[0] + "#definition/configuration";

@@ -68,6 +68,11 @@ Configure the authoritative server in `appsettings.json` or environment variable
       "MaximumHttpResponseBytes": 10485760
     },
     "FunctionContent": { "MaximumValueBytes": 10485760 },
+    "XmlContent": {
+      "MaximumDocumentBytes": 10485760, "MaximumDepth": 32, "MaximumNodes": 8192,
+      "MaximumAttributesPerElement": 64, "MaximumSelectedNodes": 8192,
+      "MaximumArrayItems": 100, "MaximumMappingOperations": 32768
+    },
     "FlowContent": { "MaximumValueBytes": 10485760 }
   }
 }
@@ -104,7 +109,7 @@ refuse content or local state that no longer fits; it does not delete data.
 `MaximumWriteBytes` limits one product write; native dataset results are written
 whole. `MaximumObjectBytes` bounds native content and retained publication objects.
 Native Artifact copies transfer multiple chunks bounded by `TransferChunkBytes`.
-The integrated ASP remote adapters and standalone protocols are unchanged. Content
+The integrated ASC remote adapters and standalone protocols are unchanged. Content
 wire/contribution ceilings remain 64 KiB and advertised remote type/provider limits
 still apply. Structured documents keep their separate `maximumDocumentBytes` and
 `maximumResultBytes` policies; these content settings do not widen document/query
@@ -220,11 +225,18 @@ The script creates only uniquely named test volumes/containers and removes them
 afterward. It removes the write container before creating the read container and
 retains both volumes between phases. It does not use an external model or service.
 
-## AEP/ASP extension contract
+## AEP/ASC extension contract
+
+Each Storage Type version explicitly declares `asc.contract` as
+`agentstration.storage.contracts.mcp.v1` (`ASC.mcp.v1`), `asc.revision` as `1.0`
+and `asc.mcpProtocolVersion` as `2026-07-28`, alongside its profile, MCP server,
+Tool prefix and exact provider pins. These identities are validated independently
+of AEP capability and provider software versions. See the
+[identity inventory and development-state procedure](asc-identity-migration.md).
 
 An extension advertises `aep.storage-types` version `1.0` and versioned
 `StorageTypes` contributions. Each includes exact schema digests, typed/protected
-requirements, actual capabilities/limits and an `asp.content/1` MCP mapping.
+requirements, actual capabilities/limits and an `asc.content/1` MCP mapping.
 Requirements use the existing bound-values/Secret-access capabilities as needed.
 Enrollment keeps the exact registration UID/generation, extension namespace and
 contribution digest. An unchanged version cannot absorb provider drift.
@@ -233,11 +245,11 @@ The product rechecks the live authenticated manifest before invocation. Only sav
 manual export bindings are resolved. The protected authenticated
 `POST /aep/storage/bindings` exchange carries connection grants, opaque configuration,
 opaque envelope and consumer restrictions separately. A short-lived lease selects
-the configured target through `X-Agentstration-Asp-Binding`; MCP business arguments
+the configured target through `X-Agentstration-Asc-Binding`; MCP business arguments
 remain the SDK's `{ store, arguments }` envelope.
 
-The optional independent `Agentstration.Asp.Aep` library provides bounded lease
-handling and the configuration endpoint. Its `IAspAepBindingFactory` must validate
+The optional independent `Agentstration.Asc.Aep` library provides bounded lease
+handling and the configuration endpoint. Its `IAscAepBindingFactory` must validate
 provider-specific schemas/envelopes, resolve AEP grants privately and authorize the
 actual authenticated caller independently on every operation. Explicitly authorize
 which callers may configure bindings. Use the declared immutable provider ID,
@@ -270,19 +282,26 @@ Agent Tool; optional fixed-target exposure belongs to #1044.
 - #1033: integrated UX scenario, after its existing implemented-UX approval/merge gate.
 
 
-### ASP progressive content contract
+### ASC progressive content contract
 
-FR #1085 directly replaces the unreleased `asp_read`/`asp_write` wire methods with
-`asp_read_text`, `asp_read_blob`, `asp_write_text` and `asp_write_blob`. Providers
+FR #1085 directly replaces the unreleased `asc_read`/`asc_write` wire methods with
+`asc_read_text`, `asc_read_blob`, `asc_write_text` and `asc_write_blob`. Providers
 supply byte-oriented streams; the independent SDK manages scoped implicit sessions,
 sequencing, bounded replay receipts and explicit finalization. The product's bounded
 content port delegates to these methods without exposing a backend to the Agent.
 Every continuation and status/cleanup call rechecks the current binding and grant.
-See the [ASP protocol](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asp/docs/protocol.md) and
+See the [ASC protocol](https://github.com/gbaudrit/agentstration/blob/integration/fr-1032/asc/docs/protocol.md) and
 [ADR-0205](../decisions/0205-asp-uses-scoped-progressive-content-sessions.md).
 
 ## Structured documents
 
 The additive [document/query vertical](structured-documents.md) uses the same MCP,
 AEP, Connected Service and exact Storage resolution boundaries. Its separate
-`asp.documents/1` mapping does not change the content sessions described above.
+`asc.documents/1` mapping does not change the content sessions described above.
+
+XML instance validation and mapping use the positive `Agentstration:XmlContent`
+settings documented in [Transformation Schemas](transformation-schemas.md#xml-processing-settings-and-limit-diagnostics).
+The XML document budget defaults to 10 MiB; mapped JSON uses the existing function
+value budget. These replace the unreleased fixed 64 KiB XML instance/output caps
+without changing the schema-authoring or external protocol profiles. Limit errors
+carry measured counts, units and configuration keys, without source content.

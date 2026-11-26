@@ -6,8 +6,8 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.Client;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.Client;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -24,8 +24,8 @@ public sealed class OpenDalMcpTests
     // Public disposable loopback test credentials, never production credentials.
     private const string Credential = "public-disposable-opendal-fixture-token-1039";
     private const string OtherCredential = "public-disposable-opendal-other-token-1039";
-    private static readonly AspStoreRef First = new("first", "filesystem", "revision-1");
-    private static readonly AspAccessPolicy Policy = new(true, true, true, true, "notes/", 65536, 65536, 10);
+    private static readonly AscStoreRef First = new("first", "filesystem", "revision-1");
+    private static readonly AscAccessPolicy Policy = new(true, true, true, true, "notes/", 65536, 65536, 10);
     private readonly string root = Path.Combine(Path.GetTempPath(), "opendal-mcp-" + Guid.NewGuid().ToString("N"));
     private Factory factory = null!;
 
@@ -168,7 +168,7 @@ public sealed class OpenDalMcpTests
         await Error("forbidden", () => lease.Client.WriteBlobAsync(Write("outside/a", "x")));
         await Error("limit_exceeded", () => lease.Client.WriteBlobAsync(Write("notes/large", new string('x', 65537))));
         var wire = JsonSerializer.SerializeToElement(new { store = First, arguments = new { requestId = "override", prefix = "notes/", limit = 1, root = "/tmp/escape" } });
-        var response = await lease.Mcp.CallToolAsync("asp_list", wire.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value));
+        var response = await lease.Mcp.CallToolAsync("asc_list", wire.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value));
         Assert.AreEqual("invalid_request", response.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString());
         await using var readOnly = await ConnectAsync(First, new { prefix = "notes/", write = false });
         Assert.IsFalse(readOnly.Client.Description.Capabilities.Write);
@@ -185,9 +185,9 @@ public sealed class OpenDalMcpTests
         using var other = factory.Authenticated(OtherCredential);
         other.DefaultRequestHeaders.Add(AepStorageProtocol.BindingHeader, lease.Token);
         await using var otherMcp = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new("http://localhost/mcp") }, other));
-        await Error("forbidden", () => AspClient.ConnectAsync(otherMcp, "asp", First));
-        await Error("forbidden", () => AspClient.ConnectAsync(lease.Mcp, "asp", First with { Revision = "forged" }));
-        await Error("incompatible_provider", () => AspClient.ConnectAsync(lease.Mcp, "asp", First, expectedProviderVersion: "2.0.0"));
+        await Error("forbidden", () => AscClient.ConnectAsync(otherMcp, "asc", First));
+        await Error("forbidden", () => AscClient.ConnectAsync(lease.Mcp, "asc", First with { Revision = "forged" }));
+        await Error("incompatible_provider", () => AscClient.ConnectAsync(lease.Mcp, "asc", First, expectedProviderVersion: "2.0.0"));
         factory.Options.Value = new() { RootDirectory = root, AllowedClients = ["product"], Enabled = false };
         await Error("forbidden", () => lease.Client.ListAsync(new("revoked", "notes/", 1)));
     }
@@ -250,7 +250,7 @@ public sealed class OpenDalMcpTests
         Assert.IsEmpty((await lease.Client.ListAsync(new("empty", "notes/", 10))).Objects);
     }
 
-    private async Task<Lease> ConnectAsync(AspStoreRef store, object? envelope = null)
+    private async Task<Lease> ConnectAsync(AscStoreRef store, object? envelope = null)
     {
         var http = factory.Authenticated();
         try
@@ -260,26 +260,26 @@ public sealed class OpenDalMcpTests
             var bound = (await response.Content.ReadFromJsonAsync<AepStorageBindingLease>(AepProtocol.JsonOptions))!;
             http.DefaultRequestHeaders.Add(AepStorageProtocol.BindingHeader, bound.Token);
             var mcp = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new("http://localhost/mcp") }, http));
-            try { return new(http, mcp, await AspClient.ConnectAsync(mcp, "asp", store), bound.Token); }
+            try { return new(http, mcp, await AscClient.ConnectAsync(mcp, "asc", store), bound.Token); }
             catch { await mcp.DisposeAsync(); throw; }
         }
         catch { http.Dispose(); throw; }
     }
 
-    private static AepStorageBindingRequest Binding(AspStoreRef store, object? envelope = null)
+    private static AepStorageBindingRequest Binding(AscStoreRef store, object? envelope = null)
     {
         var version = OpenDalStorageTypes.Contributions.Single(c => c.Id == OpenDalStorageTypes.FileSystemId).Versions.Single();
         return new(OpenDalStorageTypes.FileSystemId, version.Version, AepStorageProtocol.Digest(version),
-            JsonSerializer.SerializeToElement(store, AspProtocol.JsonOptions), [], JsonSerializer.SerializeToElement(new { }),
-            JsonSerializer.SerializeToElement(envelope ?? new { prefix = "notes/", write = true }, AspProtocol.JsonOptions),
-            JsonSerializer.SerializeToElement(Policy, AspProtocol.JsonOptions), new string('a', 64), DateTimeOffset.UtcNow.AddSeconds(25));
+            JsonSerializer.SerializeToElement(store, AscContract.JsonOptions), [], JsonSerializer.SerializeToElement(new { }),
+            JsonSerializer.SerializeToElement(envelope ?? new { prefix = "notes/", write = true }, AscContract.JsonOptions),
+            JsonSerializer.SerializeToElement(Policy, AscContract.JsonOptions), new string('a', 64), DateTimeOffset.UtcNow.AddSeconds(25));
     }
-    private static AspWriteBlobRequest Write(string key, string value) => new(Guid.NewGuid().ToString("N"), 0, true,
+    private static AscWriteBlobRequest Write(string key, string value) => new(Guid.NewGuid().ToString("N"), 0, true,
         Convert.ToBase64String(Encoding.UTF8.GetBytes(value)), Options: new(key), NotAfter: DateTimeOffset.UtcNow.AddMinutes(2));
     private static async Task Error(string code, Func<Task> action) =>
-        Assert.AreEqual(code, (await Assert.ThrowsAsync<AspException>(action)).Code);
+        Assert.AreEqual(code, (await Assert.ThrowsAsync<AscException>(action)).Code);
 
-    private sealed record Lease(HttpClient Http, McpClient Mcp, AspClient Client, string Token) : IAsyncDisposable
+    private sealed record Lease(HttpClient Http, McpClient Mcp, AscClient Client, string Token) : IAsyncDisposable
     {
         public async ValueTask DisposeAsync() { await Mcp.DisposeAsync(); Http.Dispose(); }
     }

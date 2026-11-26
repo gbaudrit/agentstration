@@ -1,4 +1,4 @@
-# Local SQLite preview: exact image references and host-side credentials only.
+# Default SQLite preview: exact images and host-side credentials; optional PostgreSQL overlay.
 x-ready: &ready
   test:
     - CMD
@@ -17,10 +17,12 @@ services:
     labels:
       io.agentstration.preview.environment: ${PREVIEW_ENVIRONMENT_ID:?}
       io.agentstration.preview.source: ${PREVIEW_SERVER_SHA:?}
+      io.agentstration.preview.owner: ${PREVIEW_OWNER_ID:-unmanaged}
     ports: ["127.0.0.1:${PREVIEW_PORT:?}:8080"]
     environment:
       ASPNETCORE_ENVIRONMENT: Preview
-      AllowedHosts: localhost;127.0.0.1;server
+      AllowedHosts: ${PREVIEW_ALLOWED_HOSTS:-localhost;127.0.0.1;server}
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: ${PREVIEW_FORWARDED_HEADERS:-false}
       AI__Provider: Deterministic
       Data__Directory: /data
       Agentstration__Storage__Provider: Sqlite
@@ -41,6 +43,7 @@ services:
     labels:
       io.agentstration.preview.environment: ${PREVIEW_ENVIRONMENT_ID}
       io.agentstration.preview.source: ${PREVIEW_WORKER_SHA:?}
+      io.agentstration.preview.owner: ${PREVIEW_OWNER_ID:-unmanaged}
     environment:
       Agentstration__RuntimeWorker__AuthorityUrl: http://server:8080
       Agentstration__RuntimeWorker__InstanceId: ${PREVIEW_INSTANCE_ID:?}
@@ -50,13 +53,20 @@ services:
       Agentstration__RuntimeWorker__AllowInsecureHttp: "true"
     secrets: [awp_key]
     depends_on:
-      server: {condition: service_healthy}
+      server: {condition: service_started}
     healthcheck: *ready
 
 volumes:
   data:
     labels:
       io.agentstration.preview.environment: ${PREVIEW_ENVIRONMENT_ID}
+      io.agentstration.preview.owner: ${PREVIEW_OWNER_ID:-unmanaged}
+
+networks:
+  default:
+    labels:
+      io.agentstration.preview.environment: ${PREVIEW_ENVIRONMENT_ID}
+      io.agentstration.preview.owner: ${PREVIEW_OWNER_ID:-unmanaged}
 
 secrets:
   server_configuration:

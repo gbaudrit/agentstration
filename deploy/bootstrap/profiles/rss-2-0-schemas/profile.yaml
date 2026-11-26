@@ -1,0 +1,10 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: rss-2-0-schemas
+definition:
+  displayName: rss-2-0-schemas
+  description: Permissive RSS 2.0 structural contracts and independent transformation declaration; creates no named function.
+  # Installation owner: instance, tenant or workspace.
+  # Use the same targetScope in rss-2-0-schemas and rss-2-0-functions.
+  targetScope: instance

@@ -27,9 +27,20 @@ Console and Workplace shells consume the authoritative APIs and own no business
 state. Deterministic AI remains the offline validation and fallback path; provider
 integrations are optional.
 
-The [local SQLite preview](../../contributing/preview-environments.md) consumes
+The [local database preview](../../contributing/preview-environments.md) consumes
 independently versioned server and Worker OCI deliveries by digest. Its two-container
-composition uses the existing Runtime and Bootstrap boundaries, keeps initial
+SQLite composition optionally adds a digest-pinned PostgreSQL container, following
+[ADR-0078](../../decisions/0078-postgresql-is-an-optional-server-storage-profile.md).
+It uses the existing Runtime and Bootstrap boundaries, keeps initial
 Bootstrap disabled unless explicitly configured, and requires no local inference
 or cloud account. This external packaging increment does not add a Runtime deployment
 orchestrator; see [ADR-0255](../../decisions/0255-sqlite-previews-consume-private-oci-deliveries.md).
+
+The optional [Azure preview adapter](../../contributing/preview-azure.md) wraps this
+same Compose lifecycle with external Bicep, OIDC and private OCI archive transfer.
+It creates no Azure dependency in the standalone product or its image packages.
+Its closed-ingress VM has no managed identity. Optional public preview access uses
+an owned outbound Cloudflare tunnel and an isolated credential-stripping local
+proxy, external to the Runtime. See [ADR-0257](../../decisions/0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
+for transport/ownership and [ADR-0259](../../decisions/0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)
+for the protected route and remaining live qualification.

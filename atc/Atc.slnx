@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="src/Agentstration.Atc.Abstractions/Agentstration.Atc.Abstractions.csproj" />
+  <Project Path="src/Agentstration.Atc.Server/Agentstration.Atc.Server.csproj" />
+  <Project Path="src/Agentstration.Atc.Client/Agentstration.Atc.Client.csproj" />
+  <Project Path="src/Agentstration.Atc.Aep/Agentstration.Atc.Aep.csproj" />
+  <Project Path="samples/LocalTracking/LocalTracking.csproj" />
+  <Project Path="tests/Agentstration.Atc.Tests/Agentstration.Atc.Tests.csproj" />
+  <Project Path="../aep/src/Agentstration.Aep.Abstractions/Agentstration.Aep.Abstractions.csproj" />
+</Solution>

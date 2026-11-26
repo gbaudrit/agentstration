@@ -2,7 +2,7 @@
 
 Delivery connects an existing acknowledged issue and allocated shared WorkPlan to retained native
 Coding output, an authorized code commit, one draft pull request, shared progress and canonical usage.
-See [ADR-0273](../decisions/0273-coding-delivery-retains-frozen-intents-and-recovers-native-effects.md).
+See [ADR-0283](../decisions/0283-coding-delivery-retains-frozen-intents-and-recovers-native-effects.md).
 This API increment adds no Console journey and never accepts a task, merges a PR or closes an issue.
 
 ## Prepare and execute

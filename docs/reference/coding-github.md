@@ -104,7 +104,7 @@ injection. They do not validate live GitHub credentials, permissions or service 
 Live vendor smoke is an explicit opt-in using a disposable repository. No browser
 journey is introduced by this increment.
 
-See [ADR-0264](../decisions/0264-coding-github-operations-use-protected-relays-and-native-recovery.md).
+See [ADR-0273](../decisions/0273-coding-github-operations-use-protected-relays-and-native-recovery.md).
 
 Generic repository content/diff/publication operations use the separate existing
 [Git extension capability](git-operations.md); native issue and PR policy stays here.

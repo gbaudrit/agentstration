@@ -2,7 +2,7 @@
 
 Coding can associate one repository-qualified issue with one shared realization plan. The shared
 plan owns internal tasks and allocation; the tracker owns native issue hierarchy and cross-plan
-`blocked-by` relationships. See [ADR-0267](../decisions/0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md).
+`blocked-by` relationships. See [ADR-0276](../decisions/0276-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md).
 
 ## Configure and acknowledge
 

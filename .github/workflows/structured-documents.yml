@@ -2,7 +2,7 @@ name: Structured documents conformance
 on:
   pull_request:
     paths:
-      - 'asp/**'
+      - 'asc/**'
       - 'aep/**'
       - 'src/Agentstration.Storage*/**'
       - 'src/Agentstration.Knowledge*/**'
@@ -28,16 +28,16 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: asp_structured_test
+          POSTGRES_DB: asc_structured_test
           POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 55432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d asp_structured_test"
+          --health-cmd "pg_isready -U postgres -d asc_structured_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       # Disposable loopback-only CI database; no production credentials or data.
-      AGENTSTRATION_TEST_ASP_POSTGRES: Host=127.0.0.1;Port=55432;Database=asp_structured_test;Username=postgres;SslMode=Disable
+      AGENTSTRATION_TEST_ASC_POSTGRES: Host=127.0.0.1;Port=55432;Database=asc_structured_test;Username=postgres;SslMode=Disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6

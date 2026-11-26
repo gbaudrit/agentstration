@@ -49,13 +49,15 @@ internal static class ToolCategoryEndpoints
     private static Task<IResult> GetAsync(
         string categoryName,
         string? resourceNamespace,
+        string? scopeRef,
         HttpResponse response,
         ToolCategoryService service,
         CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () =>
         {
             var @namespace = ResourceNamespace.Parse(resourceNamespace);
-            var stored = await service.GetAsync(@namespace, categoryName, cancellationToken)
+            var stored = await (scopeRef is null ? service.GetAsync(@namespace, categoryName, cancellationToken)
+                : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), @namespace, categoryName, cancellationToken))
                 ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolCategory, categoryName, @namespace));
             return ToolsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });

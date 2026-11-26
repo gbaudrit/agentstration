@@ -60,7 +60,7 @@ public partial class DataSourceProfiles
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { items = null; extensions = []; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); items = null; extensions = []; query = new(); contextKey = scope; }
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {
             items = null;

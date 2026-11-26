@@ -2,7 +2,7 @@
 
 A HarnessProfile publishes a pinned native configuration and instructions for a developer CLI.
 The first materializer is Codex `1.0.0`. Preview/export work offline and do not run Codex or modify
-a repository. See [ADR-0268](../decisions/0268-harness-profiles-publish-pinned-standalone-native-configuration.md).
+a repository. See [ADR-0277](../decisions/0277-harness-profiles-publish-pinned-standalone-native-configuration.md).
 
 ## Publish and export
 
@@ -104,7 +104,7 @@ disposes the authority before starting a separate inventory probe. The probe ref
 .NET base libraries. The test restarts/publishes v2 and proves the v1 clone's bytes/commit remain
 unchanged, then asserts ordinary Git conflict markers for divergent native edits. Changed native
 files invalidate provenance. No background propagation, runtime profile fetch or Git reconciliation
-is installed. This extends ADR-0268 without adding another execution authority.
+is installed. This extends ADR-0277 without adding another execution authority.
 
 Run the offline scenario with the standard Release build:
 

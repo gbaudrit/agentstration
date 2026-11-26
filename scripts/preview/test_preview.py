@@ -156,6 +156,7 @@ class PreviewContracts(unittest.TestCase):
         self.assertTrue(all(port["host_ip"] == "127.0.0.1" for port in server["ports"]))
         self.assertNotIn("ports", worker)
         self.assertNotIn("volumes", worker)
+        self.assertEqual("service_started", worker["depends_on"]["server"]["condition"])
         self.assertEqual(["awp_key"], [value["source"] for value in worker["secrets"]])
         self.assertTrue(all("ConnectionStrings" not in key for key in worker["environment"]))
 
@@ -164,6 +165,7 @@ class PreviewContracts(unittest.TestCase):
         containers = {name: {"Config": {"Image": image["reference"], "Env": []}, "Image": name,
                      "State": {"Health": {"Status": "healthy"}}, "Mounts": []} for name, image in state["images"].items()}
         containers["worker"]["Mounts"] = [{"Destination": "/run/secrets/awp_key", "RW": False}]
+        containers["server"]["HostConfig"] = {"PortBindings": {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": str(state["port"])}]}}
 
         def evaluate(values):
             def inspect(command, **_arguments):
@@ -181,6 +183,11 @@ class PreviewContracts(unittest.TestCase):
                 return preview.verify(self.directory)
 
         self.assertEqual("sqlite", evaluate(containers)["database"])
+        for address in ('0.0.0.0', '::'):
+            invalid = copy.deepcopy(containers)
+            invalid['server']['HostConfig']['PortBindings']['8080/tcp'][0]['HostIp'] = address
+            with self.subTest(address=address), self.assertRaisesRegex(ValueError, 'loopback'):
+                evaluate(invalid)
         for field, value in (("Config", {"Image": "floating:latest", "Env": []}),
                              ("State", {"Health": {"Status": "unhealthy"}}),
                              ("Mounts", [{"Destination": "/data", "RW": True}])):
@@ -194,6 +201,7 @@ class PreviewContracts(unittest.TestCase):
             evaluate(invalid)
 
     def test_failure_evidence_keeps_technical_codes_and_redacts_credentials(self):
+        self.prepare()
         credential = "private-credential-must-not-appear"
         opaque_token = "x" * 48
         logs = "System.InvalidOperationException: bootstrap_profile_failed " + credential + " " + opaque_token
@@ -213,6 +221,123 @@ class PreviewContracts(unittest.TestCase):
         self.assertTrue(any(value.isupper() for value in password))
         self.assertTrue(any(value.isdigit() for value in password))
         self.assertTrue(any(not value.isalnum() for value in password))
+
+    def test_postgresql_credentials_are_private_and_preserved_on_repeat(self):
+        first = self.prepare(database="postgresql")
+        secret = (self.directory / "postgres.password").read_text()
+        self.assertEqual(64, len(secret))
+        self.assertEqual(0o600, stat.S_IMODE((self.directory / "postgres.password").stat().st_mode))
+        self.assertRegex(first["images"]["postgres"]["reference"], preview.POSTGRES_IMAGE)
+        configuration = preview.read_json(self.directory / "server-configuration.json")
+        self.assertIn("Password=" + secret, configuration["ConnectionStrings"]["Agentstration"])
+        self.assertNotIn(secret, json.dumps(first))
+        _, environment = preview.compose_command(self.directory)
+        self.assertFalse(any(secret in value for value in environment.values()),
+                         "A database credential must not enter the Compose process environment.")
+        repeated = self.prepare()
+        self.assertEqual(first, repeated)
+        self.assertEqual(secret, (self.directory / "postgres.password").read_text())
+        changed = "docker.io/library/postgres:17@sha256:" + "e" * 64
+        self.assertEqual(changed, self.prepare(postgres_image=changed)["images"]["postgres"]["reference"])
+
+    def test_database_selection_cannot_change_for_existing_state(self):
+        for database, other in (("sqlite", "postgresql"), ("postgresql", "sqlite")):
+            with self.subTest(database=database):
+                self.directory = Path(self.temporary.name) / database
+                self.prepare(database=database)
+                before = {file.name: file.read_bytes() for file in self.directory.iterdir()}
+                with self.assertRaises(ValueError):
+                    self.prepare(database=other)
+                self.assertEqual(before, {file.name: file.read_bytes() for file in self.directory.iterdir()})
+
+    def test_unsupported_database_and_floating_or_major_upgrade_images_are_rejected_before_writing(self):
+        for arguments in ({"database": "unknown"}, {"database": "postgresql", "postgres_image": "postgres:17"},
+                          {"database": "postgresql", "postgres_image": "docker.io/library/postgres:18@sha256:" + "e" * 64},
+                          {"database": "postgresql", "postgres_image": "untrusted.example/postgres:17@sha256:" + "e" * 64},
+                          {"postgres_image": "docker.io/library/postgres:17@sha256:" + "e" * 64}):
+            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                self.prepare(**arguments)
+            self.assertFalse(self.directory.exists())
+
+    def test_postgresql_missing_or_symlinked_password_is_not_regenerated(self):
+        self.prepare(database="postgresql")
+        path = self.directory / "postgres.password"
+        original = path.read_text()
+        path.unlink()
+        with self.assertRaises(ValueError):
+            self.prepare()
+        self.assertFalse(path.exists())
+        target = Path(self.temporary.name) / "outside.password"
+        target.write_text(original)
+        path.symlink_to(target)
+        with self.assertRaises(ValueError):
+            self.prepare()
+        self.assertEqual(original, target.read_text())
+
+    @unittest.skipUnless(shutil.which("docker"), "Compose configuration requires the Docker CLI")
+    def test_effective_postgresql_overlay_excludes_password_values_and_keeps_worker_isolated(self):
+        state = self.prepare(database="postgresql")
+        command, environment = preview.compose_command(self.directory)
+        model = json.loads(subprocess.check_output([*command, "config", "--format", "json"], env=environment, text=True))
+        self.assertEqual({"server", "worker", "postgres"}, set(model["services"]))
+        database = model["services"]["postgres"]
+        self.assertEqual(state["images"]["postgres"]["reference"], database["image"])
+        self.assertEqual("linux/amd64", database["platform"])
+        self.assertNotIn("ports", database)
+        self.assertNotIn("POSTGRES_PASSWORD", database["environment"])
+        self.assertEqual("/run/secrets/postgres_password", database["environment"]["POSTGRES_PASSWORD_FILE"])
+        secret = (self.directory / "postgres.password").read_text()
+        self.assertNotIn(secret, json.dumps(model))
+        server, worker = model["services"]["server"], model["services"]["worker"]
+        self.assertEqual("PostgreSql", server["environment"]["Agentstration__Storage__Provider"])
+        self.assertEqual("service_healthy", server["depends_on"]["postgres"]["condition"])
+        self.assertEqual("service_started", worker["depends_on"]["server"]["condition"])
+        self.assertNotIn("ConnectionStrings__Agentstration", server["environment"])
+        self.assertNotIn("volumes", worker)
+        self.assertEqual(["awp_key"], [item["source"] for item in worker["secrets"]])
+        self.assertEqual({"preview-example_data", "preview-example_postgres-data"},
+                         {volume["name"] for volume in model["volumes"].values()})
+
+    def test_postgresql_verification_rejects_published_ports_and_password_environments(self):
+        state = self.prepare(database="postgresql")
+        postgres = {"Config": {"Image": state["images"]["postgres"]["reference"], "Env": []},
+                    "State": {"Health": {"Status": "healthy"}}, "HostConfig": {"PortBindings": {}}, "Image": "postgres"}
+
+        def inspect(command, **_arguments):
+            if command[1] == "image":
+                image = state["images"][command[-1]]
+                return json.dumps([{"Config": {"Labels": {"org.opencontainers.image.revision": image["sourceSha"],
+                                                         "org.opencontainers.image.version": image["version"]}}}])
+            if command[-1] == "postgres":
+                return json.dumps([postgres])
+            return json.dumps([{"Config": {"Image": state["images"][command[-1]]["reference"], "Env": []},
+                                "HostConfig": {"PortBindings": {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": str(state['port'])}]}},
+                                "Image": command[-1], "State": {"Health": {"Status": "healthy"}},
+                                "Mounts": [{"Destination": "/run/secrets/awp_key", "RW": False}]}])
+
+        response = MagicMock()
+        response.__enter__.return_value.status = 200
+        with patch.object(preview, "compose", side_effect=lambda _directory, *args, **_kwargs: args[-1]), \
+                patch.object(preview, "server_address", return_value="http://127.0.0.1:5080"), \
+                patch.object(preview.subprocess, "check_output", side_effect=inspect), \
+                patch.object(preview.urllib.request, "urlopen", return_value=response):
+            self.assertEqual("postgresql", preview.verify(self.directory)["database"])
+            postgres["HostConfig"]["PortBindings"] = {"5432/tcp": [{"HostPort": "5432"}]}
+            with self.assertRaises(ValueError):
+                preview.verify(self.directory)
+            postgres["HostConfig"]["PortBindings"] = {}
+            postgres["Config"]["Env"] = ["POSTGRES_PASSWORD=disposable-test-value"]
+            with self.assertRaises(ValueError):
+                preview.verify(self.directory)
+
+    def test_postgresql_smoke_requires_module_tables_in_the_selected_database(self):
+        schemas = ["management", "work", "flow", "runtime", "identity", "scheduler", "resource_planning"]
+        with patch.object(preview, "compose", return_value="\n".join(schemas)) as execute:
+            self.assertEqual(set(schemas), set(preview_smoke.database_evidence(self.directory, "postgresql")["schemas"]))
+            self.assertIn("psql", execute.call_args.args)
+        with patch.object(preview, "compose", return_value="management\n"):
+            with self.assertRaises(ValueError):
+                preview_smoke.database_evidence(self.directory, "postgresql")
 
 
 if __name__ == "__main__":

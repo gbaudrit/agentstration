@@ -1,8 +1,8 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
     <ProjectReference Include="../../src/extensions/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj" />
-    <ProjectReference Include="../../asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
-    <ProjectReference Include="../../asp/samples/LocalStorage/LocalStorage.csproj" />
+    <ProjectReference Include="../../asc/src/Agentstration.Asc.Aep/Agentstration.Asc.Aep.csproj" />
+    <ProjectReference Include="../../asc/samples/LocalStorage/LocalStorage.csproj" />
     <ProjectReference Include="../../src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj" Aliases="openapi" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices/Agentstration.ConnectedServices.csproj" />
     <ProjectReference Include="../../src/Agentstration.ConnectedServices.Contracts/Agentstration.ConnectedServices.Contracts.csproj" />
@@ -41,6 +41,10 @@
     <ProjectReference Include="../../src/Agentstration.Tools.SourceRegistry/Agentstration.Tools.SourceRegistry.csproj" />
     <ProjectReference Include="../../src/Agentstration.Web/Agentstration.Web.csproj" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" Aliases="awpworker" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../ManagementApiTestFixtures/ModelManagementApiTestBase.cs" Link="Fixtures/ModelManagementApiTestBase.cs" />
+    <Compile Include="../ManagementApiTestFixtures/AwpTestWorker.cs" Link="Fixtures/AwpTestWorker.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />

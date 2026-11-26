@@ -27,8 +27,9 @@ public sealed class ToolCollectionTests
         using var context = Context(handler);
         var cut = context.Render<Agentstration.Web.Components.Pages.Tools>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions, header a"));
-        Assert.HasCount(2, cut.FindAll("th"));
+        Assert.IsEmpty(cut.FindAll("header a"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
+        Assert.HasCount(3, cut.FindAll("th"));
         Assert.IsFalse(cut.FindAll("th").Any(heading => heading.TextContent == (cultureName == "fr-FR" ? "Activé" : "Enabled")));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/tools/tool-0?namespace=team&scopeRef=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&context=%2Fworkspaces%2Faaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");

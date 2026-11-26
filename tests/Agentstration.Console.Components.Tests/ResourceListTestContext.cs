@@ -18,11 +18,12 @@ internal static class ResourceListTestContext
 
 internal sealed class ResourceListContextProvider : IConsoleContextProvider
 {
+    public Guid PhysicalWorkspaceId { get; set; }
     public string Scope { get; set; } = "/instance";
     public IReadOnlySet<string> Permissions { get; set; } = new HashSet<string>(StringComparer.Ordinal)
     {
         AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite
     };
     public Task<ConsoleContextSnapshot> GetAsync(CancellationToken cancellationToken) => Task.FromResult(new ConsoleContextSnapshot(
-        Guid.Empty, "Fixture", Scope, ConsoleContextKind.Instance, Guid.Empty, "tenant", "Tenant", Guid.Empty, "workspace", "Workspace", Permissions, [], []));
+        Guid.Empty, "Fixture", Scope, ConsoleContextKind.Instance, Guid.Empty, "tenant", "Tenant", PhysicalWorkspaceId, "workspace", "Workspace", Permissions, [], []));
 }

@@ -49,13 +49,13 @@ public partial class Artifacts
     private Task ChangeStagedQueryAsync(CollectionQuery next) { if (ValidQuery(next)) { stagedQuery = next; CorrectPages(); } return Task.CompletedTask; }
     private static CollectionQuery Clamp(CollectionQuery query, int count) => query with { Page = Math.Clamp(query.Page, 1, Math.Max(1, (int)Math.Ceiling((double)count / query.PageSize))) };
     private void CorrectPages() { durableQuery = Clamp(durableQuery, FilteredDurable.Count); stagedQuery = Clamp(stagedQuery, FilteredStaged.Count); }
-    private void ClearCollections() { durable = null; staged = null; }
+    private void ClearCollections() { preview?.Close(); durable = null; staged = null; }
 
     protected override async Task OnInitializedAsync()
     {
-        Context.Changed += ContextChanged;
         await Context.EnsureLoadedAsync(cancellation.Token);
         if (disposed) return;
+        Context.Changed += ContextChanged;
         contextKey = CurrentContextKey;
         initialized = true;
         await LoadAsync();

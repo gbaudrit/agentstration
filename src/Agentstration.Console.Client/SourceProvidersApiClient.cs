@@ -11,7 +11,7 @@ public interface ISourceProvidersClient
     Task<IReadOnlyList<SourceProviderSummaryResponse>> GetSourceProvidersAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> GetSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
-        GetSourceProviderAsync(@namespace, name, cancellationToken);
+        throw new NotSupportedException("This client does not support exact scoped Source Provider reads.");
     Task<ResourceSnapshot<SourceProviderResource>> CreateSourceProviderAsync(CreateSourceProviderRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceProviderResource>> UpdateSourceProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, PutSourceProviderRequest request, string etag, CancellationToken cancellationToken) =>

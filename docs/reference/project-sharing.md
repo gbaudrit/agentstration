@@ -1,7 +1,7 @@
 # Project sharing
 
 A private Project can connect to one portable sharing space while retaining local Work execution.
-The default local Project needs no connector. See [ADR-0266](../decisions/0266-project-sharing-preserves-portable-plans-and-local-execution-authority.md).
+The default local Project needs no connector. See [ADR-0275](../decisions/0275-project-sharing-preserves-portable-plans-and-local-execution-authority.md).
 
 ## Configure a connection
 
@@ -111,4 +111,4 @@ records while retaining the original Git history. A legacy `index.json` at the s
 returns `sharing_format_upgrade_required`; it is never treated as an empty new space. Never reset
 an existing index or replay an uncertain old operation into a different format/location.
 
-See [ADR-0274](../decisions/0274-tracking-documents-use-strict-versioned-yaml.md).
+See [ADR-0284](../decisions/0284-tracking-documents-use-strict-versioned-yaml.md).

@@ -1,8 +1,10 @@
 @implements IDisposable
 @inject IDataSourcesClient Client
 @inject ConsoleContextState Context
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
-<section data-testid="dataset-queries">
+<section class="data-source-queries" data-testid="dataset-queries">
     <div class="panel-header"><h2>@T(ShowTools ? "Tools" : "Queries")</h2><button type="button" class="button-secondary" disabled="@busy" @onclick="RefreshAsync">@T("Refresh")</button></div>
     <p>@T(ShowTools ? "Queries.ToolsHelp" : "Queries.Help")</p>
     @if (loading) { <p role="status">@T("Loading")</p> }
@@ -13,7 +15,7 @@
         {
             <CollectionView TItem="DataSourceQueryToolPublication" Items="tools" Compact RowTestId="dataset-query-tool-row" IdentityLabel="@T("Tools")" InformationLabels="@(new[] { T("Queries.Version"), T("Queries.QueryVersion"), T("DatasetContentAcquisition") })">
                 <Identity Context="item"><CollectionIdentity DisplayName="@(item.DisplayName ?? item.Tool.Name)" Namespace="@((item.Tool.Namespace ?? ResourceNamespace.Default).Value)" Name="@item.Tool.Name" Href="@ToolUrl(item.Tool)" IconName="tools">
-                    <IconBadges><ResourceScopeBadge ScopeRef="item.Tool.ScopeRef" Compact /></IconBadges>
+                    <Indicators><ResourceScopeBadge ScopeRef="item.Tool.ScopeRef" Compact /></Indicators>
                 </CollectionIdentity></Identity>
                 <Information Context="item">
                     <CollectionValue Label="@T("Queries.Version")"><CollectionVersion Label="@T("Queries.Version")" Value="@item.ToolVersion" Compact /></CollectionValue>
@@ -49,15 +51,22 @@
         else
         {
             <CollectionView TItem="DataSourceQueryResource" Items="queries" Compact RowTestId="dataset-query-row" IdentityLabel="@T("Queries")" InformationLabels="@(Array.Empty<string>())">
-                <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" OnOpen="() => LoadQueryAsync(item)" disabled="@busy" IconName="search">
-                    <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef != Owner)" IconOnly /></IconBadges>
+                <Identity Context="item"><CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@DataSourceQueryNavigation.Destination(item, Services, false)" IconName="search">
+                    <Indicators><ResourceScopeBadge ScopeRef="item.ScopeRef" Compact /></Indicators>
+                    <IconBadges><StatusBadge Text="@T(item.Definition.Enabled ? "Enabled" : "Disabled")" Status="@(item.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="item.Governance.IsManaged" IsReadOnly="@(item.ScopeRef != Owner)" IconOnly /></IconBadges>
                 </CollectionIdentity></Identity>
                 <Information></Information>
-                <Actions Context="item"><button class="button-secondary" type="button" disabled="@busy" @onclick="() => LoadQueryAsync(item)">@T("Queries.Edit")</button></Actions>
+                <Actions Context="item"><CollectionActions ResourceName="@item.Name">
+                    <a href="@DataSourceQueryNavigation.Destination(item, Services, false)"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+                    @if (CanWrite && !item.Governance.IsManaged && item.ScopeRef == Owner) { <button type="button" disabled="@busy" data-testid="dataset-query-edit" @onclick="() => EditQueryAsync(item)"><UiIcon Name="pencil" />@Shared["EditDefinition"]</button> }
+                    <button type="button" disabled="@(busy || item.ScopeRef is null)" data-testid="data-source-query-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+                </CollectionActions></Actions>
             </CollectionView>
         }
         @if (selected is not null)
         {
+            <DataSourceQueryResourceSummary Resource="selected.Value" ReadOnly="@(!CanEdit)" />
+            @if (definitionSelected) {
             <fieldset class="form-grid" disabled="@(busy || !CanEdit)">
                 <ResourceIdentityFields @bind-DisplayName="displayName" TechnicalName="@selected.Value.Name" IsNew="false" DisplayNameTestId="dataset-query-edit-display-name" TechnicalNameTestId="dataset-query-edit-name" />
                 <label><span>@T("Enabled")</span><FormCheckbox @bind-Value="enabled" disabled="@(!CanEdit)" /></label>
@@ -69,6 +78,7 @@
                     <button class="button-primary" type="button" disabled="@(!enabled)" @onclick="PublishAsync" data-testid="dataset-query-publish">@T("Queries.Publish")</button>
                 }
             </fieldset>
+            }
             <details><summary>@T("Queries.Reference")</summary><pre class="runner-json">@ReferenceJson</pre></details>
             @if (CanWrite && selected.Value.ScopeRef == Owner)
             {
@@ -91,6 +101,16 @@
     @if (notice) { <p role="status">@T("Queries.Done")</p> }
 </section>
 @code {
+    [SupplyParameterFromQuery(Name = "query")] public string? RequestedQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "queryNamespace")] public string? RequestedQueryNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "queryOwner")] public string? RequestedQueryOwner { get; set; }
+    [SupplyParameterFromQuery(Name = "queryView")] public string? RequestedQueryView { get; set; }
+    [Parameter] public EventCallback<ScopedResourceAddress> PreviewRequested { get; set; }
+    private string? requestedQueryKey;
+    private bool definitionSelected;
+    private Task OpenPreview(DataSourceQueryResource item) => item.ScopeRef is { } owner ? PreviewRequested.InvokeAsync(ScopedResourceAddress.Create(owner, item.Namespace, item.Kind, item.Name)) : Task.CompletedTask;
+    private async Task EditQueryAsync(DataSourceQueryResource item) { await LoadQueryAsync(item); definitionSelected = true; }
+
     [Parameter, EditorRequired] public DataSourceResource Source { get; set; } = null!;
     [Parameter] public bool ShowTools { get; set; }
     [Parameter] public IReadOnlyList<DataSourceAcquisitionResource> Acquisitions { get; set; } = [];
@@ -108,15 +128,31 @@
     private Exception? error;
     private ResourceScopeRef Owner => ResourceScopeRef.Parse(Context.Current?.SelectedScopeRef ?? Source.ScopeRef!.Value.Value);
     private bool CanWrite => Context.HasPermission("resources/write");
-    private bool CanEdit => CanWrite && selected?.Value.ScopeRef == Owner;
+    private bool CanEdit => CanWrite && selected?.Value.ScopeRef == Owner && selected?.Value.Governance.IsManaged == false;
     private IEnumerable<DataSourceAcquisitionResource> Retained => Acquisitions.Where(a => a.State == DataSourceAcquisitionState.Succeeded && a.ContentRetiredAt is null && a.Publication?.Records?.DocumentPublication is not null
         && (selected is null || a.LogicalScopeRef == selected.Value.Definition.Selection.AcquisitionScope));
     protected override async Task OnParametersSetAsync()
     {
-        if (loaded == Source.Uid && loadedScope == Owner.Value) return;
-        loaded = Source.Uid; loadedScope = Owner.Value; loading = true;
-        selected = null; versions = []; queries = []; tools = []; result = null; selectedUid = "";
-        try { await LoadAsync(); } catch (Exception e) { error = e; } finally { loading = false; }
+        var next = $"{Source.Uid}|{Owner}|{RequestedQuery}|{RequestedQueryNamespace}|{RequestedQueryOwner}|{RequestedQueryView}";
+        if (requestedQueryKey == next) return;
+        requestedQueryKey = next;
+        if (loaded != Source.Uid || loadedScope != Owner.Value)
+        {
+            loaded = Source.Uid; loadedScope = Owner.Value; loading = true;
+            selected = null; versions = []; queries = []; tools = []; result = null; selectedUid = "";
+            try { await LoadAsync(); } catch (Exception e) { error = e; } finally { loading = false; }
+        }
+        if (!ShowTools && !string.IsNullOrWhiteSpace(RequestedQuery) && ResourceScopeRef.TryParse(RequestedQueryOwner, out var requestedOwner))
+        {
+            await PerformAsync(async () =>
+            {
+                var exact = await Client.GetQueryAsync(requestedOwner, ResourceNamespace.Parse(RequestedQueryNamespace), RequestedQuery, cancellation.Token);
+                if (exact.Value.ScopeRef != requestedOwner || exact.Value.Namespace != ResourceNamespace.Parse(RequestedQueryNamespace) || exact.Value.Name != RequestedQuery
+                    || exact.Value.Definition.Selection.SourceUid != Source.Uid) throw new InvalidOperationException("Query address mismatch.");
+                await AdoptQueryAsync(exact);
+                definitionSelected = RequestedQueryView == "definition";
+            });
+        }
     }
     private async Task LoadAsync()
     {
@@ -132,12 +168,19 @@
     }
     private Task LoadQueryAsync(DataSourceQueryResource value) => PerformAsync(async () =>
     {
-        selected = await Client.GetQueryAsync(value.ScopeRef!.Value, value.Namespace, value.Name, cancellation.Token);
-        versions = await Client.GetQueryVersionsAsync(value.ScopeRef.Value, value.Namespace, value.Name, cancellation.Token);
-        selectedUid = value.Uid.ToString(); selectedVersion = ""; result = null; showAccess = false;
-        name = value.Name; displayName = selected.Value.Definition.DisplayName; enabled = selected.Value.Definition.Enabled;
-        payload = JsonSerializer.Serialize(selected.Value.Definition.Query, Pretty);
+        var saved = await Client.GetQueryAsync(value.ScopeRef!.Value, value.Namespace, value.Name, cancellation.Token);
+        if (saved.Value.ScopeRef != value.ScopeRef || saved.Value.Namespace != value.Namespace || saved.Value.Name != value.Name || saved.Value.Definition.Selection.SourceUid != Source.Uid)
+            throw new InvalidOperationException("Query address mismatch.");
+        await AdoptQueryAsync(saved);
     });
+    private async Task AdoptQueryAsync(ResourceSnapshot<DataSourceQueryResource> saved)
+    {
+        selected = saved;
+        versions = await Client.GetQueryVersionsAsync(saved.Value.ScopeRef!.Value, saved.Value.Namespace, saved.Value.Name, cancellation.Token);
+        selectedUid = saved.Value.Uid.ToString(); selectedVersion = ""; result = null; showAccess = false;
+        name = saved.Value.Name; displayName = saved.Value.Definition.DisplayName; enabled = saved.Value.Definition.Enabled;
+        payload = JsonSerializer.Serialize(saved.Value.Definition.Query, Pretty);
+    }
     private async Task SaveCoreAsync()
     {
         using var json = JsonDocument.Parse(payload);

@@ -70,9 +70,10 @@ public partial class KnowledgeSources
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { items = null; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); items = null; query = new(); contextKey = scope; }
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {
+            preview?.Close();
             items = null;
             loadState = new(Context.Error is null ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed);
             return;
@@ -92,7 +93,7 @@ public partial class KnowledgeSources
             if (!IsCurrent(requestRevision, scope)) return;
             var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
             var forbidden = status is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized;
-            if (forbidden) items = null;
+            if (forbidden) { preview?.Close(); items = null; }
             loadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed)
             {
                 HasContent = items is not null,

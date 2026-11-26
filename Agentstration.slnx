@@ -1,18 +1,34 @@
 <Solution>
+  <Folder Name="/afc/">
+    <Project Path="afc/samples/LocalForge/LocalForge.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Abstractions/Agentstration.Afc.Abstractions.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Aep/Agentstration.Afc.Aep.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Client/Agentstration.Afc.Client.csproj" />
+    <Project Path="afc/src/Agentstration.Afc.Server/Agentstration.Afc.Server.csproj" />
+    <Project Path="afc/tests/Agentstration.Afc.Tests/Agentstration.Afc.Tests.csproj" />
+  </Folder>
+  <Folder Name="/atc/">
+    <Project Path="atc/samples/LocalTracking/LocalTracking.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Abstractions/Agentstration.Atc.Abstractions.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Aep/Agentstration.Atc.Aep.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Client/Agentstration.Atc.Client.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Server/Agentstration.Atc.Server.csproj" />
+    <Project Path="atc/tests/Agentstration.Atc.Tests/Agentstration.Atc.Tests.csproj" />
+  </Folder>
   <Folder Name="/aep/src/" />
-  <Folder Name="/asp/">
-    <Project Path="asp/src/Agentstration.Asp.Abstractions/Agentstration.Asp.Abstractions.csproj" />
-    <Project Path="asp/src/Agentstration.Asp.Server/Agentstration.Asp.Server.csproj" />
-    <Project Path="asp/src/Agentstration.Asp.Aep/Agentstration.Asp.Aep.csproj" />
-    <Project Path="asp/src/Agentstration.Asp.Client/Agentstration.Asp.Client.csproj" />
-    <Project Path="asp/samples/LocalStorage/LocalStorage.csproj" />
-    <Project Path="asp/tests/Agentstration.Asp.Tests/Agentstration.Asp.Tests.csproj" />
+  <Folder Name="/asc/">
+    <Project Path="asc/src/Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
+    <Project Path="asc/src/Agentstration.Asc.Server/Agentstration.Asc.Server.csproj" />
+    <Project Path="asc/src/Agentstration.Asc.Aep/Agentstration.Asc.Aep.csproj" />
+    <Project Path="asc/src/Agentstration.Asc.Client/Agentstration.Asc.Client.csproj" />
+    <Project Path="asc/samples/LocalStorage/LocalStorage.csproj" />
+    <Project Path="asc/tests/Agentstration.Asc.Tests/Agentstration.Asc.Tests.csproj" />
   </Folder>
-  <Folder Name="/asp/samples/">
-    <Project Path="asp/samples/StructuredDocuments/StructuredDocuments.csproj" />
+  <Folder Name="/asc/samples/">
+    <Project Path="asc/samples/StructuredDocuments/StructuredDocuments.csproj" />
   </Folder>
-  <Folder Name="/asp/src/">
-    <Project Path="asp/src/Agentstration.Asp.OData/Agentstration.Asp.OData.csproj" />
+  <Folder Name="/asc/src/">
+    <Project Path="asc/src/Agentstration.Asc.OData/Agentstration.Asc.OData.csproj" />
   </Folder>
   <Folder Name="/automation/">
     <Project Path="automation/playwright/fixtures/AcquisitionFailureHost/AcquisitionFailureHost.csproj" />
@@ -224,6 +240,7 @@
     <Project Path="tests/Agentstration.Api.Execution.Tests/Agentstration.Api.Execution.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Resources.Tests/Agentstration.Api.Resources.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.DataSources.Tests/Agentstration.Api.DataSources.Tests.csproj" />
+    <Project Path="tests/Agentstration.Api.DataSources.Rss.Tests/Agentstration.Api.DataSources.Rss.Tests.csproj" />
     <Project Path="tests/Agentstration.Api.Artifacts.Tests/Agentstration.Api.Artifacts.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Application/">
@@ -240,6 +257,7 @@
   </Folder>
   <Folder Name="/tests/Extensions/">
     <Project Path="tests/Agentstration.Management.Aep.Tests/Agentstration.Management.Aep.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Aep.Automatic.Tests/Agentstration.Management.Aep.Automatic.Tests.csproj" />
     <Project Path="tests/Agentstration.SourceProviders.Git.Tests/Agentstration.SourceProviders.Git.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj" />
     <Project Path="tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj" />
@@ -266,8 +284,11 @@
     <Project Path="tests/Agentstration.Management.Storage.Tests/Agentstration.Management.Storage.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Sources.Tests/Agentstration.Management.Sources.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Api.Tests/Agentstration.Management.Api.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Models.Api.Tests/Agentstration.Management.Models.Api.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Tests/Agentstration.Management.Bootstrap.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Bootstrap.Startup.Tests/Agentstration.Management.Bootstrap.Startup.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Scenarios.Tests/Agentstration.Management.Bootstrap.Scenarios.Tests.csproj" />
+    <Project Path="tests/Agentstration.Management.Bootstrap.Progress.Tests/Agentstration.Management.Bootstrap.Progress.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Plans.Tests/Agentstration.Management.Bootstrap.Plans.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Security.Tests/Agentstration.Management.Security.Tests.csproj" />
   </Folder>

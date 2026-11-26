@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Agentstration.Identity.Contracts;
 using Agentstration.Packs.Contracts;
 using Agentstration.Resources;
+using Agentstration.Web.Components;
 using Agentstration.Web.Components.State;
 using Agentstration.Web.Console;
 using Bunit;
@@ -26,7 +27,7 @@ public sealed class PacksCollectionTests
         using var context = Context(handler);
         var cut = context.Render<PacksPage>();
         Assert.HasCount(20, cut.FindAll("[data-testid=installed-pack-row]"));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());
         Assert.HasCount(5, cut.FindAll("[data-testid=installed-pack-row]"));
         await cut.Find("[data-filter-key=state] select").ChangeAsync(new() { Value = "Failed" });
@@ -83,7 +84,7 @@ public sealed class PacksCollectionTests
     }
 
     [TestMethod]
-    public async Task ReadOnlyViewerOpensForeignOwnerInItsExactContextWithoutReadingTheWrongPack()
+    public void ReadOnlyViewerPreservesTheCurrentContextAndExactOwnerWithoutReadingTheWrongPack()
     {
         using var handler = new Handler(_ => Task.FromResult(Response(2, sharedIdentity: true)));
         var provider = new ResourceListContextProvider { Permissions = new HashSet<string> { AuthorizationPermissions.ResourcesRead } };
@@ -91,10 +92,13 @@ public sealed class PacksCollectionTests
         context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext());
         var cut = context.Render<PacksPage>();
         Assert.IsEmpty(cut.FindAll(".page-actions button, .page-actions a"));
-        await cut.FindAll(".collection-identity-button")[1].ClickAsync(new());
-        var navigation = context.Services.GetRequiredService<NavigationManager>();
-        StringAssert.Contains(navigation.Uri, "publisher=contoso&name=shared");
-        StringAssert.Contains(navigation.Uri, $"context=%2Fworkspaces%2F{WorkspaceId:D}");
+        var row = cut.FindAll("[data-testid=installed-pack-row]")[1];
+        var href = row.QuerySelector("a.resource-name-link")!.GetAttribute("href")!;
+        StringAssert.Contains(href, "/packs/resources/7-contoso-shared?");
+        StringAssert.Contains(href, $"scopeRef=%2Fworkspaces%2F{WorkspaceId:D}");
+        StringAssert.Contains(href, "context=%2Finstance#overview");
+        Assert.IsNull(row.QuerySelector("[data-testid=pack-manage]"));
+        Assert.AreEqual(0, handler.ScopedReads);
         Assert.AreEqual(1, handler.Requests);
     }
 
@@ -105,9 +109,23 @@ public sealed class PacksCollectionTests
         using var context = Context(handler);
         context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext());
         var cut = context.Render<PacksPage>();
-        await cut.Find(".collection-identity-button").ClickAsync(new());
+        await cut.Find("[data-testid=pack-manage]").ClickAsync(new());
         Assert.AreEqual(1, handler.ScopedReads);
         StringAssert.Contains(cut.Find(".pack-details").TextContent, "1.0.0");
+    }
+
+    [TestMethod]
+    public async Task ManagementNavigationReadsOneExactTargetFromTheLoadedCatalog()
+    {
+        using var handler = new Handler(_ => Task.FromResult(Response(1)));
+        using var context = Context(handler);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext());
+        var cut = context.Render<PacksPage>();
+        await cut.InvokeAsync(() => context.Services.GetRequiredService<NavigationManager>().NavigateTo(
+            "/packs?publisher=contoso&name=pack-0&scopeRef=%2Finstance&context=%2Finstance#pack-management"));
+        cut.WaitForAssertion(() => Assert.HasCount(1, cut.FindComponents<InstalledPackResourceSummary>()));
+        Assert.AreEqual(1, handler.Requests, "Navigation must retain the loaded catalog.");
+        Assert.AreEqual(1, handler.ScopedReads);
     }
 
     private sealed class NavigationContext : IConsoleNavigationContext
@@ -122,7 +140,7 @@ public sealed class PacksCollectionTests
             Uid = Guid.NewGuid(),
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = PackKinds.InstalledPack,
-            Metadata = new() { Name = sharedIdentity ? "same-resource-name" : $"pack-{index}" },
+            Metadata = new() { Name = new PackIdentity("contoso", sharedIdentity ? "shared" : $"pack-{index}").ResourceName },
             ScopeRef = index % 2 == 0 ? ResourceScopeRef.Instance : ResourceScopeRef.Workspace(WorkspaceId),
             Definition = new() { Publisher = "contoso", PackName = sharedIdentity ? "shared" : $"pack-{index}", Version = "1.0.0", DisplayName = $"Pack {index}", Source = "fixture.zip", InstalledAt = DateTimeOffset.UnixEpoch, State = index % 3 == 0 ? InstalledPackState.Failed : InstalledPackState.Installed, Purpose = index % 2 == 0 ? PackPurpose.Sample : PackPurpose.Standard, Audience = index % 2 == 0 ? PackAudience.Personal : PackAudience.Professional }
         }).ToArray())

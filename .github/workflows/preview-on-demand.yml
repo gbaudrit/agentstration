@@ -1,0 +1,245 @@
+name: Preview on demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Operation (reset is explicit destroy only)
+        type: choice
+        options: [validate, deploy, status, destroy]
+        default: validate
+        required: true
+      environment_id:
+        description: Stable isolated environment ID; reuse for status/destroy
+        type: string
+        default: manual-preview
+        required: true
+      revision:
+        description: Published server revision (branch, tag, SHA or pr:NUMBER); ignored for status/destroy
+        type: string
+        default: main
+        required: true
+      provider:
+        description: Deployment provider
+        type: choice
+        options: [azure-vm]
+        default: azure-vm
+      database:
+        description: Database profile; change requires explicit reset first
+        type: choice
+        options: [sqlite, postgresql]
+        default: sqlite
+      vm_size_profile:
+        description: AZURE_PREVIEW_VM_SIZE slot in preview-deployment
+        type: choice
+        options: ['1', '2', '3', '4', '5']
+        default: '1'
+      ttl_hours:
+        description: Recorded TTL, 1-168 hours (automatic cleanup is follow-up 1286)
+        type: number
+        default: 2
+      data_mode:
+        description: Preserve data, or reset all owned resources on destroy
+        type: choice
+        options: [preserve, reset]
+        default: preserve
+      test_profile:
+        description: Guest readiness profile; deployed Playwright is follow-up 1287
+        type: choice
+        options: [readiness, none]
+        default: readiness
+      worker_revision:
+        description: Independent Worker revision, or published for its newest tagged image
+        type: string
+        default: published
+  workflow_call:
+    inputs:
+      selection:
+        description: Canonical form options and optional issue tracking (public metadata only)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# Distinct from the reusable provider's concurrency group to avoid caller/callee deadlock.
+concurrency:
+  group: manual-preview-${{ inputs.environment_id || fromJSON(inputs.selection || '{}').environment_id }}
+  cancel-in-progress: false
+
+jobs:
+  boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      issue-number: ${{ steps.tracking.outputs.issue-number }}
+      selection: ${{ steps.tracking.outputs.selection }}
+      operation: ${{ steps.tracking.outputs.operation }}
+    steps:
+      - name: Require the trusted deployment workflow branch
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo '::error::Run this workflow on main; select the application revision in the revision field.'
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate form choices before privileged jobs
+        env:
+          SELECTION_JSON: ${{ inputs.selection || toJSON(inputs) }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'scripts/preview')
+          import contract, manual
+          manual.validate_options(contract.parse(os.environ['SELECTION_JSON']))
+          PY
+      - name: Recheck issue command ownership and current requester permission
+        id: tracking
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTION_JSON: ${{ inputs.selection || toJSON(inputs) }}
+        run: python3 scripts/preview/issue_commands.py tracking
+
+  select:
+    needs: boundary
+    if: github.ref == 'refs/heads/main' && (needs.boundary.outputs.operation == 'validate' || needs.boundary.outputs.operation == 'deploy')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: preview-deployment
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      request: ${{ steps.select.outputs.request }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install OCI metadata reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Freeze published images and protected environment defaults without Azure login
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection }}
+          AZURE_PREVIEW_SUBSCRIPTION_ID: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
+          AZURE_PREVIEW_RESOURCE_GROUP: ${{ vars.AZURE_PREVIEW_RESOURCE_GROUP }}
+          AZURE_PREVIEW_REGION: ${{ vars.AZURE_PREVIEW_REGION }}
+          AZURE_PREVIEW_IMAGE_VERSION: ${{ vars.AZURE_PREVIEW_IMAGE_VERSION }}
+          AZURE_PREVIEW_OS_PROFILE: ${{ vars.AZURE_PREVIEW_OS_PROFILE }}
+          AZURE_PREVIEW_VM_SIZE1: ${{ vars.AZURE_PREVIEW_VM_SIZE1 }}
+          AZURE_PREVIEW_VM_SIZE2: ${{ vars.AZURE_PREVIEW_VM_SIZE2 }}
+          AZURE_PREVIEW_VM_SIZE3: ${{ vars.AZURE_PREVIEW_VM_SIZE3 }}
+          AZURE_PREVIEW_VM_SIZE4: ${{ vars.AZURE_PREVIEW_VM_SIZE4 }}
+          AZURE_PREVIEW_VM_SIZE5: ${{ vars.AZURE_PREVIEW_VM_SIZE5 }}
+        run: python3 scripts/preview/manual.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: manual-preview-request-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/manual-request.json
+          retention-days: 30
+          if-no-files-found: error
+
+  recorded:
+    needs: boundary
+    if: github.ref == 'refs/heads/main' && (needs.boundary.outputs.operation == 'status' || needs.boundary.outputs.operation == 'destroy')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: preview-deployment
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      request: ${{ steps.recorded.outputs.request }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_PREVIEW_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_PREVIEW_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
+      - name: Read the recorded selection without resolving image tags or new defaults
+        id: recorded
+        env:
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection }}
+          AZURE_PREVIEW_SUBSCRIPTION_ID: ${{ vars.AZURE_PREVIEW_SUBSCRIPTION_ID }}
+          AZURE_PREVIEW_RESOURCE_GROUP: ${{ vars.AZURE_PREVIEW_RESOURCE_GROUP }}
+          AZURE_PREVIEW_STORAGE_ACCOUNT: ${{ vars.AZURE_PREVIEW_STORAGE_ACCOUNT }}
+          AZURE_PREVIEW_STORAGE_CONTAINER: ${{ vars.AZURE_PREVIEW_STORAGE_CONTAINER || 'previews' }}
+        run: python3 scripts/preview/manual.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: manual-preview-request-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/manual-request.json
+          retention-days: 30
+          if-no-files-found: error
+
+  announce:
+    needs: [boundary, select, recorded]
+    if: ${{ !cancelled() && needs.boundary.outputs.issue-number != '' && (needs.select.result == 'success' || needs.recorded.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Publish the frozen selection before infrastructure execution
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRACKING_ISSUE: ${{ needs.boundary.outputs.issue-number }}
+          OPERATION: ${{ needs.boundary.outputs.operation }}
+          SELECTION_JSON: ${{ needs.boundary.outputs.selection }}
+          REQUEST_JSON: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
+        run: python3 scripts/preview/issue_commands.py plan
+
+  execute:
+    needs: [boundary, select, recorded, announce]
+    if: ${{ !cancelled() && (needs.select.result == 'success' || needs.recorded.result == 'success') && (needs.announce.result == 'success' || (needs.boundary.outputs.issue-number == '' && needs.announce.result == 'skipped')) }}
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    uses: ./.github/workflows/preview-environment.yml
+    # Required for the called job to resolve its protected environment secrets.
+    secrets: inherit
+    with:
+      operation: ${{ needs.boundary.outputs.operation }}
+      request: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
+
+  report:
+    needs: [boundary, select, recorded, announce, execute]
+    if: ${{ always() && needs.boundary.outputs.issue-number != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Report verified result or bounded failure to the originating issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRACKING_ISSUE: ${{ needs.boundary.outputs.issue-number }}
+          OPERATION: ${{ needs.boundary.outputs.operation }}
+          EXECUTION_RESULT: ${{ needs.execute.result }}
+          RESULT_JSON: ${{ needs.execute.outputs.result }}
+        run: python3 scripts/preview/issue_commands.py report

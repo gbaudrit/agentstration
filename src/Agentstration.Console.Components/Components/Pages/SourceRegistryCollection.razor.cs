@@ -42,10 +42,10 @@ public partial class SourceRegistryCollection
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { registries = null; hasCatalogAuthorization = false; contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); registries = null; hasCatalogAuthorization = false; contextKey = scope; }
         if (Context.Error is not null)
         {
-            registries = null; hasCatalogAuthorization = false;
+            preview?.Close(); registries = null; hasCatalogAuthorization = false;
             loadState = new(ResourceLoadStatus.Failed);
             return;
         }
@@ -64,7 +64,7 @@ public partial class SourceRegistryCollection
             if (!IsCurrent(requestRevision, scope)) return;
             var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
             var forbidden = status is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized;
-            if (forbidden) { registries = null; hasCatalogAuthorization = false; }
+            if (forbidden) { preview?.Close(); registries = null; hasCatalogAuthorization = false; }
             loadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed)
             {
                 HasContent = registries is not null,
@@ -83,7 +83,7 @@ public partial class SourceRegistryCollection
             if (disposed) return;
             // The API rechecks PlatformAdmin after every context/role notification.
             operationError = null;
-            registries = null; hasCatalogAuthorization = false;
+            preview?.Close(); registries = null; hasCatalogAuthorization = false;
             var loading = LoadAsync();
             StateHasChanged();
             await loading;

@@ -2,7 +2,7 @@
 
 An atomic functional task keeps every explicit WorkPlan attempt. Technical success does not accept
 the task: use the existing task outcome command after reviewing the retained evidence. See
-[ADR-0269](../decisions/0269-task-execution-evidence-projects-canonical-plan-attempts.md).
+[ADR-0278](../decisions/0278-task-execution-evidence-projects-canonical-plan-attempts.md).
 
 All routes are under `/api/workspaces/{workspace}` and require the authenticated private task owner,
 current Workspace and the normal Run read/execute permission. Another Principal or Workspace

@@ -313,38 +313,71 @@ Use **Proposed** when implementation or repository evidence does not establish a
 253. [ADR-0253 — Initial Bootstrap admits its own Worker assignments](0253-initial-bootstrap-admits-its-own-worker-assignments.md)
 
 254. [ADR-0254 — MAF Worker images have independent AWP releases](0254-maf-worker-images-have-independent-awp-releases.md)
+
 255. [ADR-0255 — SQLite previews consume private OCI deliveries](0255-sqlite-previews-consume-private-oci-deliveries.md)
-256. [ADR-0256 — Functional task trees extend existing Work Items](0256-functional-task-trees-extend-work-items.md)
-257. [ADR-0257 — Functional acceptance consolidates independently of runtime completion](0257-functional-acceptance-is-independent-of-runtime-completion.md)
-258. [ADR-0258 — WorkPlans pin revisions and coordinate readiness](0258-workplans-pin-revisions-and-coordinate-readiness.md)
-259. [ADR-0259 — WorkPlan dispatch persists admission before root Flow submission](0259-workplan-dispatch-persists-admission-before-root-flow-submission.md)
-260. [ADR-0260 — Projects group private work without changing Workspace ownership](0260-projects-group-private-work-without-changing-workspace-ownership.md)
-261. [ADR-0261 — Project context is authorized and captured at task admission](0261-project-context-is-authorized-and-captured-at-task-admission.md)
-262. [ADR-0262 — Governed Work planning Tools reuse Work services](0262-governed-work-planning-tools-reuse-work-services.md)
-263. [ADR-0263 — Task providers use Project bindings and durable operation receipts](0263-task-providers-use-project-bindings-and-durable-operation-receipts.md)
-264. [ADR-0264 — Coding GitHub operations use protected relays and native recovery](0264-coding-github-operations-use-protected-relays-and-native-recovery.md)
-265. [ADR-0265 — Generic Git publication uses protected connections and native CAS](0265-generic-git-publication-uses-protected-connections-and-native-cas.md)
 
-266. [ADR-0266 — Project sharing preserves portable plans and local execution authority](0266-project-sharing-preserves-portable-plans-and-local-execution-authority.md)
+256. [ADR-0256 — Preview lifecycle binds provider-neutral requests to owned resources](0256-preview-lifecycle-binds-provider-neutral-requests-to-owned-resources.md)
 
-267. [ADR-0267 — Repository issue authority gates shared-plan intake and dispatch](0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md)
+257. [ADR-0257 — Azure previews use OIDC and credential-free OCI transfer](0257-azure-previews-use-oidc-and-credential-free-oci-transfer.md)
 
-268. [ADR-0268 — HarnessProfiles publish pinned standalone native configuration](0268-harness-profiles-publish-pinned-standalone-native-configuration.md)
+258. [ADR-0258 — Manual previews resolve published revisions as data](0258-manual-previews-resolve-published-revisions-as-data.md)
 
-269. [ADR-0269 — Task execution evidence projects canonical plan attempts](0269-task-execution-evidence-projects-canonical-plan-attempts.md)
+259. [ADR-0259 — Preview routes use owned tunnels and an isolated Access proxy](0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md)
 
-270. [ADR-0270 — Coding CLI Runs use AWP and an isolated native helper](0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md)
+260. [ADR-0260 — Transformation Schemas have explicit function exposure](0260-transformation-schemas-have-explicit-function-exposure.md)
 
-271. [ADR-0271 — Workspace seeds reuse pinned Bootstrap and explicit sharing handover](0271-workspace-seeds-reuse-pinned-bootstrap-and-explicit-sharing-handover.md)
+261. [ADR-0261 — Acquisition text content is selected at admission](0261-acquisition-text-content-is-selected-at-admission.md)
 
-272. [ADR-0272 — Terminal Work usage retains immutable corrections and portable accounting](0272-terminal-work-usage-retains-immutable-corrections-and-portable-accounting.md)
+262. [ADR-0262 — XML processing uses operator content settings](0262-xml-processing-uses-operator-content-settings.md)
 
-273. [ADR-0273 — Coding delivery retains frozen intents and recovers native effects](0273-coding-delivery-retains-frozen-intents-and-recovers-native-effects.md)
+263. [ADR-0263 — Issue preview commands dispatch trusted manual workflows](0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
 
-274. [ADR-0274 — Tracking documents use strict versioned YAML](0274-tracking-documents-use-strict-versioned-yaml.md)
+264. [ADR-0264 — Storage contract identity is independent of its MCP exposure](0264-storage-contract-identity-and-mcp-exposure.md)
 
-275. [ADR-0275 — YAML seeds select explicit Bootstrap compositions](0275-yaml-seeds-select-explicit-bootstrap-compositions.md)
+265. [ADR-0265 — Functional task trees extend existing Work Items](0265-functional-task-trees-extend-work-items.md)
 
-276. [ADR-0276 — YAML Work imports prepare reviewed drafts](0276-yaml-work-imports-prepare-reviewed-drafts.md)
+266. [ADR-0266 — Functional acceptance consolidates independently of runtime completion](0266-functional-acceptance-is-independent-of-runtime-completion.md)
 
-277. [ADR-0277 — Epics organize plans without execution authority](0277-epics-organize-plans-without-execution-authority.md)
+267. [ADR-0267 — WorkPlans pin revisions and coordinate readiness](0267-workplans-pin-revisions-and-coordinate-readiness.md)
+
+268. [ADR-0268 — WorkPlan dispatch persists admission before root Flow submission](0268-workplan-dispatch-persists-admission-before-root-flow-submission.md)
+
+269. [ADR-0269 — Projects group private work without changing Workspace ownership](0269-projects-group-private-work-without-changing-workspace-ownership.md)
+
+270. [ADR-0270 — Project context is authorized and captured at task admission](0270-project-context-is-authorized-and-captured-at-task-admission.md)
+
+271. [ADR-0271 — Governed Work planning Tools reuse Work services](0271-governed-work-planning-tools-reuse-work-services.md)
+
+272. [ADR-0272 — Task providers use Project bindings and durable operation receipts](0272-task-providers-use-project-bindings-and-durable-operation-receipts.md)
+
+273. [ADR-0273 — Coding GitHub operations use protected relays and native recovery](0273-coding-github-operations-use-protected-relays-and-native-recovery.md)
+
+274. [ADR-0274 — Generic Git publication uses protected connections and native CAS](0274-generic-git-publication-uses-protected-connections-and-native-cas.md)
+
+275. [ADR-0275 — Project sharing preserves portable plans and local execution authority](0275-project-sharing-preserves-portable-plans-and-local-execution-authority.md)
+
+276. [ADR-0276 — Repository issue authority gates shared-plan intake and dispatch](0276-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md)
+
+277. [ADR-0277 — HarnessProfiles publish pinned standalone native configuration](0277-harness-profiles-publish-pinned-standalone-native-configuration.md)
+
+278. [ADR-0278 — Task execution evidence projects canonical plan attempts](0278-task-execution-evidence-projects-canonical-plan-attempts.md)
+
+279. [ADR-0279 — Coding CLI Runs use AWP and an isolated native helper](0279-coding-cli-runs-use-awp-and-an-isolated-native-helper.md)
+
+280. [ADR-0280 — ATC is an independent tracking contract over MCP](0280-atc-is-an-independent-tracking-contract-over-mcp.md)
+
+281. [ADR-0281 — Workspace seeds reuse pinned Bootstrap and explicit sharing handover](0281-workspace-seeds-reuse-pinned-bootstrap-and-explicit-sharing-handover.md)
+
+282. [ADR-0282 — Terminal Work usage retains immutable corrections and portable accounting](0282-terminal-work-usage-retains-immutable-corrections-and-portable-accounting.md)
+
+283. [ADR-0283 — Coding delivery retains frozen intents and recovers native effects](0283-coding-delivery-retains-frozen-intents-and-recovers-native-effects.md)
+
+284. [ADR-0284 — Tracking documents use strict versioned YAML](0284-tracking-documents-use-strict-versioned-yaml.md)
+
+285. [ADR-0285 — YAML seeds select explicit Bootstrap compositions](0285-yaml-seeds-select-explicit-bootstrap-compositions.md)
+
+286. [ADR-0286 — YAML Work imports prepare reviewed drafts](0286-yaml-work-imports-prepare-reviewed-drafts.md)
+
+287. [ADR-0287 — Epics organize plans without execution authority](0287-epics-organize-plans-without-execution-authority.md)
+
+288. [ADR-0288 — Forge operations are an independent contract over MCP](0288-forge-operations-are-an-independent-contract-over-mcp.md)

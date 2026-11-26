@@ -1,0 +1,69 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelProfileEditorStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings> ModelLabels
+
+<ResourceSummary TestId="model-profile-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="model-profile-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="model-profile-configuration-summary">
+        <CollectionView TItem="ProfileSetting" Items="@SavedEntries.ToArray()" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@if (entry.Href is { } href) { <a href="@href">@entry.Value</a> } else { @entry.Value }</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ModelProfileResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private sealed record ProfileSetting(string Label, string Value, string? Href = null);
+    private IEnumerable<ProfileSetting> SavedEntries
+    {
+        get
+        {
+            var saved = Resource;
+            var definition = saved.Definition;
+            var providerNamespace = definition.Provider.Namespace ?? saved.Namespace;
+            var owner = definition.Provider.ScopeRef ?? ProviderOwner;
+            yield return new(T("Provider"), $"{providerNamespace}/{definition.Provider.Name}", owner is { } scope ? ResourceOwnershipContext.Resource(Services, "/modelproviders", definition.Provider.Name, providerNamespace, scope) : null);
+            yield return new(T("Model"), definition.Model.Name);
+            yield return new(T("Temperature"), Number(definition.Generation.Temperature));
+            yield return new(T("TopP"), Number(definition.Generation.TopP));
+            yield return new(T("TopK"), Number(definition.Generation.TopK));
+            yield return new(T("MaximumOutputTokens"), Number(definition.Generation.MaxOutputTokens));
+            yield return new(T("Seed"), Number(definition.Generation.Seed));
+            yield return new(T("StopSequences"), definition.Generation.StopSequences is { Count: > 0 } stops ? string.Join(Environment.NewLine, stops) : "—");
+            yield return new(T("ReasoningMode"), EnumLabel(definition.Reasoning.Mode));
+            yield return new(T("ReasoningEffort"), definition.Reasoning.Effort is { } effort ? EnumLabel(effort) : T("ProviderDefault"));
+            yield return new(T("OutputFormat"), EnumLabel(definition.Output.Format));
+            yield return new(T("StrictStructuredOutput"), T(definition.Output.Strict ? "ReasoningMode.Enabled" : "ReasoningMode.Disabled"));
+            if (definition.Output.JsonSchema is { } schema) yield return new(T("JsonSchema"), schema.GetRawText());
+            yield return new(T("ProviderOptions"), definition.ProviderOptions.Count == 0 ? "—" : JsonSerializer.Serialize(definition.ProviderOptions));
+        }
+    }
+    private static string Number<T>(T? value) where T : struct, IFormattable => value?.ToString(null, System.Globalization.CultureInfo.CurrentCulture) ?? "—";
+    private string EnumLabel<TEnum>(TEnum value) where TEnum : struct, Enum => value switch
+    {
+        ReasoningMode mode => T("ReasoningMode." + mode),
+        ReasoningEffort effort => ModelLabels["ReasoningEffort." + effort],
+        ModelOutputFormat format => T("OutputFormat." + format),
+        _ => value.ToString()
+    };
+    [Parameter] public ResourceScopeRef? ProviderOwner { get; set; }
+
+}

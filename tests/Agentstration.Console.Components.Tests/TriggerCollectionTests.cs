@@ -24,7 +24,7 @@ public sealed class TriggerCollectionTests
         using var context = Context(handler);
         var cut = context.Render<Agentstration.Web.Components.Pages.Triggers>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         Assert.AreEqual("45", cut.FindAll(".metric-card strong").First().TextContent.Trim());
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/triggers/trigger-0?namespace=schedules&scopeRef=%2Finstance");

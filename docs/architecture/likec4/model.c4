@@ -162,7 +162,7 @@ model {
       }
 
       storageExecution = component 'Storage execution adapters' {
-        description 'Infrastructure-owned exact Storage and collection resolution, local content and canonical document Artifact adapters, protected AEP bindings, versioned ASP document/query profiles and lease-aware publication retirement'
+        description 'Infrastructure-owned exact Storage and collection resolution, local content and canonical document Artifact adapters, protected AEP bindings, versioned ASC document/query profiles and lease-aware publication retirement'
       }
 
       scheduling = component 'Scheduling and background processing' {
@@ -212,7 +212,7 @@ model {
   }
 
   aepExtensions = softwareSystem 'AEP extensions' {
-    description 'Independently deployable provider and utility adapters enrolled with Agentstration, including optional PostgreSQL JSONB ASP storage and generic authenticated Git reads/CAS publication used by the Project sharing adapter'
+    description 'Independently deployable provider and utility adapters enrolled with Agentstration, including optional PostgreSQL JSONB ASC document/query storage and generic authenticated Git reads/CAS publication used by the Project sharing adapter'
   }
 
   providerServices = softwareSystem 'Optional provider services' {
@@ -297,7 +297,7 @@ model {
   agentstration.server.storageExecution -> agentstration.server.identity 'Checks current scoped use and execution rights'
   agentstration.server.tools -> agentstration.server.storageExecution 'Uses governed content, document and query relays with exact fixed targets'
   agentstration.server.storageExecution -> agentstration.storageContent 'Reads and writes isolated local content'
-  agentstration.server.storageExecution -> aepExtensions 'Configures protected bindings and invokes generic ASP operations'
+  agentstration.server.storageExecution -> aepExtensions 'Configures protected bindings and invokes generic ASC operations'
   agentstration.server.identity -> agentstration.identityData 'Reads and writes'
   agentstration.server.resources -> agentstration.controlPlaneData 'Reads and writes'
   agentstration.server.work -> agentstration.workData 'Reads and writes'

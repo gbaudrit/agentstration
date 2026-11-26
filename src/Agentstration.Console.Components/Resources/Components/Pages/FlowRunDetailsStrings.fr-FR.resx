@@ -321,4 +321,49 @@
   <data name="ToolStatus.Unknown" xml:space="preserve"><value>Inconnu</value></data>
   <data name="RunIdentifier"><value>Identifiant d’exécution</value></data>
   <data name="IdentityMismatch"><value>La réponse ne correspond pas à l’exécution et au périmètre demandés.</value></data>
+  <data name="ContractTitle.Limit" xml:space="preserve"><value>Limite de données non respectée</value></data>
+  <data name="ContractSummary.LimitMaximum" xml:space="preserve"><value>Valeur mesurée : {0}. Le maximum autorisé est de {1}.</value></data>
+  <data name="ContractSummary.LimitMinimum" xml:space="preserve"><value>Valeur mesurée : {0}. Le minimum requis est de {1}.</value></data>
+  <data name="ContractAdvice.OperatorLimit" xml:space="preserve"><value>Réduisez la taille des données ou le travail du mapping, ou demandez à un administrateur d’instance d’ajuster le réglage indiqué ci-dessous puis de redémarrer le serveur. Les autres limites d’acquisition, de fonction, de Flow et de Storage continuent de s’appliquer. Démarrez une nouvelle exécution après correction.</value></data>
+  <data name="ContractAdvice.SchemaLimit" xml:space="preserve"><value>Adaptez la valeur produite ou adoptez explicitement un contrat de schéma compatible, puis démarrez une nouvelle exécution. Les réglages du serveur ne remplacent pas les contraintes du schéma.</value></data>
+  <data name="ContractLimit.Setting" xml:space="preserve"><value>Réglage du serveur :</value></data>
+  <data name="ContractLimit.Measured" xml:space="preserve"><value>Valeur mesurée</value></data>
+  <data name="ContractLimit.Minimum" xml:space="preserve"><value>Minimum</value></data>
+  <data name="ContractLimit.Maximum" xml:space="preserve"><value>Maximum</value></data>
+  <data name="ContractLimit.Value" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="ContractLimit.AtMost" xml:space="preserve"><value>Au maximum {0}</value></data>
+  <data name="ContractLimit.AtLeast" xml:space="preserve"><value>Au minimum {0}</value></data>
+  <data name="ContractLimit.Unit.utf8Bytes" xml:space="preserve"><value>octets UTF-8</value></data>
+  <data name="ContractLimit.Unit.jsonBytes" xml:space="preserve"><value>octets JSON sérialisés</value></data>
+  <data name="ContractLimit.Unit.characters" xml:space="preserve"><value>caractères</value></data>
+  <data name="ContractLimit.Unit.items" xml:space="preserve"><value>éléments</value></data>
+  <data name="ContractLimit.Unit.xmlDepth" xml:space="preserve"><value>niveaux d’imbrication XML</value></data>
+  <data name="ContractLimit.Unit.xmlNodes" xml:space="preserve"><value>nœuds XML</value></data>
+  <data name="ContractLimit.Unit.xmlAttributes" xml:space="preserve"><value>attributs par élément XML</value></data>
+  <data name="ContractLimit.Unit.selectedNodes" xml:space="preserve"><value>nœuds sélectionnés</value></data>
+  <data name="ContractLimit.Unit.arrayItems" xml:space="preserve"><value>éléments de tableau</value></data>
+  <data name="ContractLimit.Unit.mappingOperations" xml:space="preserve"><value>opérations de mapping</value></data>
+  <data name="ContractLevel.FunctionInput" xml:space="preserve"><value>Entrée de fonction</value></data>
+  <data name="ContractLevel.FunctionOutput" xml:space="preserve"><value>Sortie de fonction</value></data>
+  <data name="ContractSummary.LengthLegacy" xml:space="preserve"><value>La longueur du texte ne respecte pas le minimum ou le maximum déclaré par son schéma. Cette exécution enregistrée ne contient pas la longueur mesurée.</value></data>
+  <data name="ContractTitle.Xml" xml:space="preserve"><value>Contrat d’entrée XML non respecté</value></data>
+  <data name="ContractSummary.Xml.contract" xml:space="preserve"><value>Le XML est bien formé mais ne respecte pas le XSD accepté. Comparez l’emplacement XML indiqué au schéma exact affiché ci-dessous.</value></data>
+  <data name="ContractSummary.Xml.syntax" xml:space="preserve"><value>L’entrée ne peut pas être lue comme du XML ou contient une construction interdite. Vérifiez la ligne et la colonne indiquées avant d’appliquer le mapping.</value></data>
+  <data name="ContractSummary.Xml.definition" xml:space="preserve"><value>Le XSD accepté n’a pas pu être validé ou compilé. Sa définition autonome doit être corrigée.</value></data>
+  <data name="ContractSummary.Xml.legacy" xml:space="preserve"><value>La validation du XML d’entrée a échoué. Cette exécution enregistrée ne contient pas de diagnostic XSD détaillé. Relancez l’acquisition avec l’implémentation mise à jour pour identifier l’emplacement et le schéma.</value></data>
+  <data name="ContractAdvice.Xml.contract" xml:space="preserve"><value>Vérifiez les noms d’éléments, les espaces de noms, l’ordre, les cardinalités, les attributs requis et les types scalaires à cet emplacement. Corrigez l’entrée ou adoptez explicitement un profil XSD adapté aux données voulues. Le mapping JSON s’exécute uniquement après validation du XML ; modifier les limites de taille ne corrigera pas cette incompatibilité.</value></data>
+  <data name="ContractAdvice.Xml.syntax" xml:space="preserve"><value>Corrigez la syntaxe XML ou l’échappement à l’emplacement indiqué, puis démarrez une nouvelle exécution. Les DTD et les entités externes restent interdites. Aucun message brut du parseur ni aucune valeur source n’est exposé.</value></data>
+  <data name="ContractAdvice.Xml.definition" xml:space="preserve"><value>Inspectez la version figée du schéma, puis corrigez ou adoptez explicitement sa définition XSD autonome avant de démarrer une nouvelle exécution. Les imports, inclusions, ressources externes et patterns non pris en charge ne sont pas récupérés.</value></data>
+  <data name="ContractAdvice.Xml.legacy" xml:space="preserve"><value>Ce message seul ne permet pas d’identifier le champ en cause. Ne modifiez pas le mapping ou les limites de traitement au hasard. Inspectez le XSD accepté par la fonction et relancez pour obtenir le détail de la validation.</value></data>
+  <data name="ContractXml.Schema" xml:space="preserve"><value>Schéma XSD et version acceptés</value></data>
+  <data name="ContractXml.Path" xml:space="preserve"><value>Emplacement XML</value></data>
+  <data name="ContractXml.Location" xml:space="preserve"><value>Position dans le document</value></data>
+  <data name="ContractXml.LineColumn" xml:space="preserve"><value>Ligne {0}, colonne {1}</value></data>
+  <data name="ContractXml.Type" xml:space="preserve"><value>Type XSD déclaré</value></data>
+  <data name="ContractXml.Structure" xml:space="preserve"><value>Structure / contraintes XSD déclarées</value></data>
+  <data name="ContractXml.Expected" xml:space="preserve"><value>XML conforme au XSD accepté</value></data>
+  <data name="ContractXml.Actual.contract" xml:space="preserve"><value>XML bien formé rejeté par son XSD</value></data>
+  <data name="ContractXml.Actual.syntax" xml:space="preserve"><value>XML illisible ou construction interdite</value></data>
+  <data name="ContractXml.Actual.definition" xml:space="preserve"><value>Définition XSD invalide ou non prise en charge</value></data>
+  <data name="ContractXml.LineOnly" xml:space="preserve"><value>Ligne {0}</value></data>
 </root>

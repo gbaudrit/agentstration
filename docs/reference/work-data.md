@@ -99,7 +99,7 @@ source review but retains the same functional plan/task identities. Omission nev
 No import activates, allocates, dispatches, accepts outcomes, publishes code or closes issues.
 
 See [Project sharing](project-sharing.md), [WorkPlans](work-plans.md) and
-[ADR-0276](../decisions/0276-yaml-work-imports-prepare-reviewed-drafts.md).
+[ADR-0286](../decisions/0286-yaml-work-imports-prepare-reviewed-drafts.md).
 
 ## Optional logical epics
 
@@ -156,4 +156,4 @@ Publish shared plans before an organization referring to them. The separate `Org
 record never modifies their digests, allocation or usage. An uncertain publication is recovered at
 the returned ordinary sharing-operation location; do not create another publication ID to bypass
 an uncertain effect. Local grouping edits and normal pulls never write GitHub hierarchy/dependencies.
-See [ADR-0277](../decisions/0277-epics-organize-plans-without-execution-authority.md).
+See [ADR-0287](../decisions/0287-epics-organize-plans-without-execution-authority.md).

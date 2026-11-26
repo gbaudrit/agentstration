@@ -132,6 +132,8 @@ internal static class StandaloneHostCompositionExtensions
                 .Get<Agentstration.Storage.StorageContentOptions>() ?? new(),
             DataSourceContent = builder.Configuration.GetSection(Agentstration.DataSources.DataSourceContentOptions.SectionName)
                 .Get<Agentstration.DataSources.DataSourceContentOptions>() ?? new(),
+            XmlContent = builder.Configuration.GetSection(Agentstration.Schemas.XmlContentOptions.SectionName)
+                .Get<Agentstration.Schemas.XmlContentOptions>() ?? new(),
             FunctionContent = builder.Configuration.GetSection(Agentstration.Functions.FunctionContentOptions.SectionName)
                 .Get<Agentstration.Functions.FunctionContentOptions>() ?? new(),
             FlowContent = builder.Configuration.GetSection(Agentstration.Flows.Application.FlowContentOptions.SectionName)
@@ -211,6 +213,7 @@ internal static class StandaloneHostCompositionExtensions
         app.UseAuthentication();
         app.UseMiddleware<PrincipalResolutionMiddleware>();
         app.UseMiddleware<RequestContextMiddleware>();
+        app.UseMiddleware<AepDiscoveryOperationMiddleware>();
         app.UseMiddleware<BootstrapStartupAdmissionMiddleware>();
         app.UseWhen(context => context.RequestServices.GetRequiredService<BootstrapStartupState>().IsReady
             && !context.Request.Path.StartsWithSegments("/api/bootstrap/startup")

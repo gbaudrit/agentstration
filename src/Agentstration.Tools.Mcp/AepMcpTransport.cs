@@ -1,20 +1,22 @@
 using System.Net.Http.Headers;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
+using Agentstration.Identity.Contracts;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 
 namespace Agentstration.Tools.Mcp;
 
-public sealed class AepMcpTransport(
+public sealed partial class AepMcpTransport(
     IHttpMessageHandlerFactory httpMessageHandlerFactory,
-    ILoggerFactory loggerFactory)
+    ILoggerFactory loggerFactory,
+    ICurrentRequestContext? requestContext = null)
 {
     public HttpClient CreateConfigurationClient(ResolvedAepExtension extension) => CreateHttpClient(
         McpToolServiceCollectionExtensions.AepClientName, extension.Registration.Definition.Endpoint,
         extension.AccessTokenProvider, TimeSpan.FromSeconds(30));
 
-    public async Task<AepManifest> DiscoverAsync(
+    private async Task<AepManifest> DiscoverCoreAsync(
         ResolvedAepExtension extension,
         string? expectedExtensionId,
         CancellationToken cancellationToken)

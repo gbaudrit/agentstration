@@ -1,0 +1,58 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="source-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Configuration.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Version="@Version?.Definition.Version" Description="@Version?.Definition.PublishedDefinition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="source-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="source-configuration-summary">
+        <CollectionView TItem="SourceSetting" Items="SavedSourceSettings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+    @AdditionalContent
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public SourceResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private sealed record SourceSetting(string Label, string Value);
+    private IReadOnlyList<SourceSetting> SavedSourceSettings
+    {
+        get
+        {
+            var values = new List<SourceSetting>
+            {
+                new(T("Publisher"), Resource.Definition.Publisher),
+                new(T("Origin"), Configuration.Definition.Origin?.Url ?? T("PastedManifest")),
+                new(T("SourceDefinitionRefresh"), PolicySummary(Configuration.Definition.Refresh.Source)),
+                new(T("ChannelRefreshDefaults"), PolicySummary(Configuration.Definition.Refresh.Channels))
+            };
+            values.AddRange(Configuration.Definition.Refresh.ChannelOverrides.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new SourceSetting(F("ChannelRefreshTarget", pair.Key), PolicySummary(pair.Value))));
+            values.AddRange(Configuration.Definition.Bindings.Select(binding => new SourceSetting($"{T("Bindings")} · {binding.Name}", ReferenceText(binding.Target))));
+            if (Version is not null) values.AddRange(Version.Definition.PublishedDefinition.Channels.Select(channel => new SourceSetting($"{T("Channel")} · {channel.Name}", F("ChannelContract", channel.Provider.Binding, channel.Configuration.OptionSet, channel.Configuration.Version) + Environment.NewLine + (channel.Configuration.Values.ValueKind == JsonValueKind.Undefined ? "—" : channel.Configuration.Values.GetRawText()))));
+            return values;
+        }
+    }
+    private string PolicySummary(SourceRefreshPolicy policy) => F("PolicySummary", T(policy.Enabled ? "Enabled" : "Disabled"), policy.IntervalSeconds, policy.TimeoutSeconds, policy.MaximumAttempts, policy.InitialBackoffSeconds, policy.MaximumBackoffSeconds, policy.JitterSeconds);
+    private static string ReferenceText(ResourceReference value) => $"{value.ScopeRef?.Value} · {value.Namespace?.Value ?? ResourceNamespace.DefaultValue}/{value.Name}";
+    [Parameter, EditorRequired] public SourceConfigurationResource Configuration { get; set; } = null!;
+    [Parameter] public SourceVersionResource? Version { get; set; }
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+    private string F(string key, params object[] args) => Localizer[key, args];
+
+}

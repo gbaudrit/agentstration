@@ -1,6 +1,6 @@
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.Client;
-using Asp.Samples.StructuredDocuments;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.Client;
+using Asc.Samples.StructuredDocuments;
 
 namespace Agentstration.Extensions.PostgreSql.Tests;
 
@@ -16,10 +16,10 @@ public sealed partial class DocumentConformanceTests
             [new("a", Json("""{"status":"a","metrics":{"errorRate":1}}""")),
              new("b", Json("""{"status":"b","metrics":{"errorRate":100}}""")),
              new("c", Json("""{"status":"c","metrics":{"errorRate":2}}"""))]));
-        var sealing = await AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store, new("sample", publication.Id));
+        var sealing = await AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store, new("sample", publication.Id));
         await sealing.SealAsync(new("subset-seal", publication.Id, publication.Digest));
         host.Access.Policy = host.Access.Policy with { Put = false, Delete = false, Publish = false, DocumentIds = ["a", "c"] };
-        var client = await AspDocumentClient.ConnectAsync(host.Mcp, "aspdoc", StructuredSampleAccess.Store, new("sample", publication.Id));
+        var client = await AscDocumentClient.ConnectAsync(host.Mcp, "ascdoc", StructuredSampleAccess.Store, new("sample", publication.Id));
         var first = await client.QueryAsync(host.Query("{}", 1));
         Assert.AreEqual("a", first.Documents.Single().Id);
         Assert.IsNotNull(first.Cursor);

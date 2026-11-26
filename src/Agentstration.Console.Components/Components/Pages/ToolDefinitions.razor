@@ -18,17 +18,27 @@
     <Navigation>
         <ResourceTabs Label="@T("SectionsLabel")"><a href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a class="active" href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs>
     </Navigation>
-    <ItemActions Context="definition">
-        <CollectionActions ResourceName="@($"{definition.Definition.DisplayName} ({definition.Namespace}/{definition.Name}, {definition.ScopeRef})")"><Primary><a class="button-secondary" href="@EditUrl(definition)">@T("EditAction")</a></Primary></CollectionActions>
-    </ItemActions>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(EditUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(EditUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="tool-definition-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ToolResourceKinds.ToolDefinition" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ToolDefinitionResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(ToolDefinitionResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(ToolDefinitionResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, ToolResourceKinds.ToolDefinition, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/tools/definitions", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@NavigationContext.AddToUri("/tools/definitions/new")">@T("NewDefinition")</a></PermissionGate> : null;
-    private CollectionColumn<ToolDefinitionResource> IdentityColumn => new("identity", T("Tool"), definition => @<CollectionIdentity DisplayName="@definition.Definition.DisplayName" Namespace="@definition.Namespace.Value" Name="@definition.Name" Href="@EditUrl(definition)" IconName="wrench">
+    private CollectionColumn<ToolDefinitionResource> IdentityColumn => new("identity", T("Tool"), definition => @<CollectionIdentity DisplayName="@definition.Definition.DisplayName" Namespace="@definition.Namespace.Value" Name="@definition.Name" Href="@(EditUrl(definition) + "#overview")" IconName="wrench">
         <IconBadges><ResourceScopeBadge ScopeRef="definition.ScopeRef" ShowName IconOnly /><StatusBadge Text="@BooleanLabel(definition.Definition.Enabled)" Status="@(definition.Definition.Enabled ? UiStatus.Success : UiStatus.Neutral)" IconOnly /><ManagedResourceBadge IsManaged="@definition.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(definition.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {

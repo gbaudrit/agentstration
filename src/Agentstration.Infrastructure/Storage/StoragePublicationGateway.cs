@@ -48,7 +48,7 @@ public sealed class StoragePublicationGateway(LocalStoragePublicationGateway loc
         {
             Binding = new(resolved.Type, resolved.ConnectedService, resolved.ConnectedServiceType,
                 StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Bindings)),
-                StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Documents)), "asp.document-publication/1"),
+                StorageDigests.Schema(JsonSerializer.SerializeToElement(resolved.Documents)), "asc.document-publication/1"),
             Records = new(values.Select(value =>
             {
                 var bytes = StorageDocumentEncoding.Encode(value.Value);

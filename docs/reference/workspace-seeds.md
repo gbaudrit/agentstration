@@ -117,7 +117,7 @@ A failed sync retains created resources. Repair the prerequisite/connection, rev
 seed and submit a **new application request**. Existing compatible resources and local Project edits
 are preserved; immutable mismatches conflict. Restart interrupts in-flight manual applications;
 it does not automatically replay them. Ordinary Work sharing pulls never apply Bootstrap, activate
-plans or admit work. See [ADR-0271](../decisions/0271-workspace-seeds-reuse-pinned-bootstrap-and-explicit-sharing-handover.md).
+plans or admit work. See [ADR-0281](../decisions/0281-workspace-seeds-reuse-pinned-bootstrap-and-explicit-sharing-handover.md).
 
 The deferred reusable Console journey is #1350. Its maintainer validation/merge gate still applies;
 it is separate from implementation behavior checks and desktop/mobile smoke.
@@ -152,4 +152,4 @@ and retained records, never a second Flow definition.
 Format 1.0 JSON seeds must be regenerated as format 2.0 YAML packages/pointers. Existing receipts and
 historical artifacts remain private retained evidence; the loader does not silently reinterpret an
 old package. Sharing independently uses its format-2.0 YAML contract. See
-[ADR-0275](../decisions/0275-yaml-seeds-select-explicit-bootstrap-compositions.md).
+[ADR-0285](../decisions/0285-yaml-seeds-select-explicit-bootstrap-compositions.md).

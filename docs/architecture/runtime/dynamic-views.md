@@ -240,4 +240,4 @@ sequenceDiagram
 
 The helper never receives AWP credentials or server database access. Cancellation kills its process
 tree; worker loss remains an explicit failure without automatic replay. See
-[ADR-0270](../../decisions/0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).
+[ADR-0279](../../decisions/0279-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).

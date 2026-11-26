@@ -1,6 +1,6 @@
 # ToolDefinitions and parameter relays
 
-A `ToolDefinition` publishes a product-owned Tool. `definition.toolKind` selects `flow`, `relay` or `acquisition`. A relay fixes selected inputs of an existing governed Tool and exposes the remaining contract. It is independent of ASP and storage providers.
+A `ToolDefinition` publishes a product-owned Tool. `definition.toolKind` selects `flow`, `relay` or `acquisition`. A relay fixes selected inputs of an existing governed Tool and exposes the remaining contract. It is independent of ASC and storage providers.
 
 ## Independent publications and consumers
 
@@ -67,7 +67,7 @@ bindings:
       scopeRef: /workspaces/11111111-1111-1111-1111-111111111111
 ```
 
-This does not introduce credentials into ASP schemas or move Connected Service/Storage connection configuration into a relay. Bind only inputs actually declared by the Tool.
+This does not introduce credentials into ASC schemas or move Connected Service/Storage connection configuration into a relay. Bind only inputs actually declared by the Tool.
 
 Flow definitions use `toolKind: flow` and their `flow` reference. Acquisition definitions use `toolKind: acquisition` and an acquisition replay binding, without a required executable Flow field. The existing `/from-acquisition/{id}` application/API path creates and publishes the first acquisition Tool version.
 

@@ -1,0 +1,24 @@
+name: Preview issue deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      selection:
+        description: Frozen source and original issue command identifiers (no credentials)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    permissions:
+      contents: read
+      issues: write
+      packages: read
+      id-token: write
+    uses: ./.github/workflows/preview-on-demand.yml
+    secrets: inherit
+    with:
+      selection: ${{ inputs.selection }}

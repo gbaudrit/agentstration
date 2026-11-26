@@ -8,14 +8,14 @@ Terminal [Work usage](../../reference/work-usage.md) explicitly captures histori
 into the Work store before recoverable Project sharing publication. It reuses canonical nullable
 Flow totals, deduplicates native observations, retains immutable corrections and separates measured,
 estimated and unknown rollups. Portable producer attribution is captured at admission; physical
-Workspace/private Project ownership remains local (ADR-0272).
+Workspace/private Project ownership remains local (ADR-0282).
 
 Recoverable [Coding delivery](../../reference/coding-delivery.md) composes issue/shared-plan authority,
 retained isolated CLI/check output, protected Git and draft-PR recovery, functional evidence and shared
 usage. Work stores one frozen intent and CAS stage receipt per owned attempt; Coding coordinates the
 existing boundaries. An explicit CodePublication binding constrains derived branches and code paths.
 Response loss never authorizes execution replay, and delivery never accepts/merges/closes work
-(ADR-0273).
+(ADR-0283).
 
 ## Solution tree
 
@@ -101,6 +101,7 @@ tests/
   Agentstration.Management.Storage.Tests/
   Agentstration.Management.Sources.Tests/
   Agentstration.Management.Api.Tests/
+  Agentstration.Management.Models.Api.Tests/
   Agentstration.Management.Bootstrap.Tests/
   Agentstration.Management.Security.Tests/
   Agentstration.Management.Aep.Tests/
@@ -164,7 +165,7 @@ The optional Foundry AEP extension is process-stateless with respect to projects
 | Resource Planning | durable Workspace-scoped Resource Plans, deterministic materialization with explicit per-Agent Model and Runtime Profile bindings, reviewable ChangeSets, validation, governed application through canonical services, planning Tools, specialist Flows, and Console review UX | an official installable Pack |
 | Runtime plane | durable Run resources and events, SSE observation, cancellation/retry, durable Worker assignments with renewable leases and fencing, authenticated AWP registration and governed operations, independent MAF Worker processes, bounded pull-based claim/heartbeat transport, governed AWP model streaming over typed SSE events, Aspire/Compose/manual hosting, registry, reconciliation, and provider-neutral AWP v1 wire contracts | additional Runtime implementations, Kubernetes integration, and automatic checkpoint-based recovery after Worker loss |
 | Model providers | SQLite-backed extension registrations and provider bindings with ETag CRUD and usage protection, explicit configuration/Aspire refresh, durable asynchronous AEP health/model discovery with bounded retries and cached status reads, exact-model staged Bootstrap dependencies, persisted logical profiles, and provider-neutral `IChatClient` resolution | additional AEP extensions |
-| Storages | Governed immutable types, independent StorageType and Storage Console administration, explicit version publication, discoverable references, scoped generic Discover/Use grant administration/evaluation, manual Connected Service export mappings, JSON Schema validation, ETag lifecycle/reconciliation, Bootstrap, protected neutral resolution | ASP/AEP/Artifact adapters (#1040), dataset/Snapshot consumers (#1041/#1042), new user-permission work (#1077), UsePolicy administration (#1078), gated administration scenario (#1065) |
+| Storages | Governed immutable types, independent StorageType and Storage Console administration, explicit version publication, discoverable references, scoped generic Discover/Use grant administration/evaluation, manual Connected Service export mappings, JSON Schema validation, ETag lifecycle/reconciliation, Bootstrap, protected neutral resolution | ASC/AEP/Artifact adapters (#1040), dataset/Snapshot consumers (#1041/#1042), new user-permission work (#1077), UsePolicy administration (#1078), gated administration scenario (#1065) |
 | Connected Services | Governed service and operation types (Core-, user-, Bootstrap- or extension-owned), exact type/Flow pins, Instance-/Tenant-/Workspace-owned remote-service definitions, durable Flow-backed operation discovery, schema-validated read-only operation materialization, typed Literal and late-bound Parameter/Secret inputs, scoped CRUD and reconciliation | invocation dispatch and explicit consumer export bindings, including Storage/OpenDAL adapters |
 | Work plane | `WorkItem` lifecycle, interactions, idempotent runtime events, results, canonical REST API; atomic functional task trees, bounded subtree reads, evidence-based required-child acceptance; immutable WorkPlan revisions, graph validation, activation and readiness; explicit execution configuration, transactional admission intents, canonical root Flow dispatch, restart-safe completion projection, cancellation and explicit technical retry | Automatic functional acceptance or recovery of a lost AWP Worker |
 | Work storage | independent SQLite/PostgreSQL snapshots, WorkPlan/Project/sharing tables, indexed query fields, optimistic version concurrency, SQLite upgrades and PostgreSQL migrations; private Projects group existing owned plans/tasks and retain exact authorized context references with per-attempt snapshots | richer projections |
@@ -614,7 +615,7 @@ Storage and narrowing rule are selected. The existing transformation/projection
 Flows execute through Runtime/AWP; Storage preparation and sealing precede
 immutable Snapshot creation and separate activation. The first retained-output
 adapter supports builtin local Storages using a namespace distinct from mutable
-ASP objects. Existing Artifact-only Snapshots remain readable through their
+ASC objects. Existing Artifact-only Snapshots remain readable through their
 receipts. Projection request identities and pending evidence support restart
 recovery through the existing worker; current authorization is checked again.
 See [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md).
@@ -688,7 +689,7 @@ business references; per-consumer credentials use existing Secret relay bindings
 persistent provider journal recovers uncertain native creates without blind resubmission.
 Git acquisition, issue coordination and local harness execution remain separate increments.
 See [Coding GitHub](../../reference/coding-github.md) and
-[ADR-0264](../../decisions/0264-coding-github-operations-use-protected-relays-and-native-recovery.md).
+[ADR-0273](../../decisions/0273-coding-github-operations-use-protected-relays-and-native-recovery.md).
 
 ## Generic Git operations
 
@@ -699,7 +700,7 @@ repository/ref/path policies; provider-owned prepared/sent journals recover the
 original native commit without blind resubmission. It has no Work, Coding, Bootstrap
 or usage semantics and introduces no host storage dependency. See
 [Git operations](../../reference/git-operations.md) and
-[ADR-0265](../../decisions/0265-generic-git-publication-uses-protected-connections-and-native-cas.md).
+[ADR-0274](../../decisions/0274-generic-git-publication-uses-protected-connections-and-native-cas.md).
 
 ## Project sharing
 
@@ -709,7 +710,7 @@ authorization pipeline. Work stores projections, plan mappings and durable publi
 CAS merges disjoint additions and surfaces stale plan/allocation conflicts. Explicit import creates
 local draft Work. Fresh shared allocation evidence gates new attempts; synchronization never applies
 Bootstrap configuration or replaces local execution state. See [Project sharing](../../reference/project-sharing.md)
-and [ADR-0266](../../decisions/0266-project-sharing-preserves-portable-plans-and-local-execution-authority.md).
+and [ADR-0275](../../decisions/0275-project-sharing-preserves-portable-plans-and-local-execution-authority.md).
 
 ## Repository issue authority
 
@@ -719,7 +720,7 @@ retains the confirmed operation reference. Fresh native hierarchy and blocked-by
 new attempts; only confirmed completed upstream issues satisfy cross-plan waits. Native parentage
 does not create a sequencing edge, and active local attempts retain captured authority. See
 [Repository issue coordination](../../reference/repository-issue-coordination.md) and
-[ADR-0267](../../decisions/0267-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md).
+[ADR-0276](../../decisions/0276-repository-issue-authority-gates-shared-plan-intake-and-dispatch.md).
 
 ## Native harness publication
 
@@ -728,7 +729,7 @@ The first Codex materializer validates bounded string bindings and emits determi
 AGENTS/config/provenance files without resolving Secrets or writing Git. Existing generic resource
 stores/governance retain exact source/native pins; owning Workspace Bootstrap handlers resolve
 semantic version references. See [HarnessProfiles](../../reference/harness-profiles.md) and
-[ADR-0268](../../decisions/0268-harness-profiles-publish-pinned-standalone-native-configuration.md).
+[ADR-0277](../../decisions/0277-harness-profiles-publish-pinned-standalone-native-configuration.md).
 
 The standalone native fixture is verified against a real API ZIP, committed and freshly cloned in
 the offline integration scenario. A separate dependency-free process verifies native inventory with
@@ -742,7 +743,7 @@ The Work stores transactionally project attempts into an owned task index for pa
 with SQLite/PostgreSQL backfill. Existing result/artifact tables provide exact task-filtered pages.
 Evidence validates admission pins, current task/plan versions and same-run output references without
 changing functional acceptance. See [Task execution evidence](../../reference/task-execution-evidence.md)
-and [ADR-0269](../../decisions/0269-task-execution-evidence-projects-canonical-plan-attempts.md).
+and [ADR-0278](../../decisions/0278-task-execution-evidence-projects-canonical-plan-attempts.md).
 
 ## Native Coding execution
 
@@ -755,7 +756,7 @@ Codex, checks and post-execution Git inspection from worker credentials and serv
 Diagnostics retain bounded patch/test/result and stable known/partial/unavailable usage observations,
 including failures and cancellation. No implicit code publication, acceptance, worker recovery or
 remote fetch is added. See [worker prerequisites and contracts](../../reference/coding-worker.md) and
-[ADR-0270](../../decisions/0270-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).
+[ADR-0279](../../decisions/0279-coding-cli-runs-use-awp-and-an-isolated-native-helper.md).
 
 ### Workspace seed initialization
 
@@ -766,7 +767,7 @@ capabilities and current grants are prerequisites. Protected relay publications 
 bindings are created through their owning services; explicit first-sync/draft-import receipts remain in
 application history. Restart still interrupts manual applications; explicit new reviewed applications
 retry create-only configuration without replacing operator edits. Sharing never auto-applies Bootstrap.
-See [Workspace seeds](../../reference/workspace-seeds.md) and ADR-0271.
+See [Workspace seeds](../../reference/workspace-seeds.md) and ADR-0281.
 
 ### Reviewed YAML Work data
 
@@ -776,9 +777,9 @@ imports uploaded local files or protected exact-revision Git content, reusing Wo
 canonical draft creation. Private Work operation documents retain frozen intent, local observations,
 per-plan progress and explicit partial/resume state in SQLite/PostgreSQL. Import never activates,
 allocates, dispatches or acknowledges repository issues. See [Work data](../../reference/work-data.md)
-and ADR-0276.
+and ADR-0286.
 
 Optional Work epics are logical plan membership with independent organization revisions and command
 receipts in the Work tracking store. YAML import explicitly preserves/replaces organization, and
 sharing uses a separate Organization record. Group edits do not save functional Projects/plans/tasks,
-retarget active Work, write GitHub hierarchy or recount usage. See ADR-0277.
+retarget active Work, write GitHub hierarchy or recount usage. See ADR-0287.

@@ -30,7 +30,7 @@ Definitions containing composition or reference constructs such as `$ref`, `$def
 
 The standalone product registers a native `json-schema` provider and does not require AEP. The supported dialect is `https://json-schema.org/draft/2020-12/schema`.
 
-The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the asserted `uri` and `date-time` formats. Date-time validation reuses JsonSchema.Net, as does the ASP document profile. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
+The bounded handler validates object definitions and instances for `type`, `properties`, `required`, boolean `additionalProperties`, homogeneous `items`, `enum`, `default`, `examples`, descriptions and titles, numeric bounds, string and array length bounds, `pattern`, and the asserted `uri` and `date-time` formats. Date-time validation reuses JsonSchema.Net, as does the ASC document profile. Unsupported keywords and dialects return path-specific diagnostics. This bounded behavior is deliberate: it is safer to report an unsupported construct than to claim validation while ignoring it.
 
 Format resolution is capability-based. A provider has a stable identity and version, lists its dialects and capabilities, and reports availability. Multiple capable providers require one explicit default or an exact caller pin; registration order is never used as an implicit selection policy.
 
@@ -63,3 +63,13 @@ Structured Storage collections support inline or shared bindings. Create or expl
 An enabled AEP Extension Registration may contribute one or more additional Schema format handlers through the `aep.schema-formats` capability. Each contribution maps definition and instance validation to private MCP operations. These operations reuse the registration's scope, expected extension identity and credential, but they are not Agent Tools and never appear in the Tool catalog.
 
 The adapter validates bounded structured results and enforces an operation timeout. If an extension that was discovered previously becomes unreachable, its providers remain inspectable as unavailable rather than disappearing silently. The built-in JSON Schema provider remains independent and the default; an AEP implementation for the same format must be selected by the registry's explicit default or exact provider-pin rules.
+
+## XML contracts and transformation declarations
+
+The local format registry also provides standalone XSD 1.0 (`xml-xsd`) and
+independent XML-to-JSON mapping declarations (`xml-json-transformation`). Native
+XSD content is XML text, carried as a JSON string. Published mappings are exposed
+explicitly as named TransformationFunctions; publication alone creates no named
+function. Input XML validation and output JSON validation retain separate exact
+contract evidence. See [Transformation Schemas](../reference/transformation-schemas.md)
+and [ADR-0260](../decisions/0260-transformation-schemas-have-explicit-function-exposure.md).

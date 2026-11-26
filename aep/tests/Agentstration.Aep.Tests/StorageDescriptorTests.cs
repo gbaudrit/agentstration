@@ -16,7 +16,26 @@ public sealed class StorageDescriptorTests
         var version = copy.Contributions.StorageTypes!.Single().Versions.Single();
         Assert.AreEqual(AepStorageProtocol.Digest(original), AepStorageProtocol.Digest(version));
         Assert.IsTrue(version.ConfigurationSchema.GetProperty("properties").TryGetProperty("Backend_KEY", out _));
-        Assert.AreNotEqual(AepStorageProtocol.Digest(original), AepStorageProtocol.Digest(original with { Asp = original.Asp with { ProviderVersion = "2.0" } }));
+        Assert.AreNotEqual(AepStorageProtocol.Digest(original), AepStorageProtocol.Digest(original with { Asc = original.Asc with { ProviderVersion = "2.0" } }));
+    }
+
+    [TestMethod]
+    public void ContractIdentityRevisionAndExposureAreExplicitAndValidated()
+    {
+        var version = Version();
+        foreach (var mapping in new[]
+        {
+            version.Asc with { Contract = "agentstration.storage.contracts.mcp.v2" },
+            version.Asc with { Contract = "" },
+            version.Asc with { Revision = "2.0" },
+            version.Asc with { Revision = "1.1" },
+            version.Asc with { McpProtocolVersion = "unknown" },
+            version.Asc with { Profile = "asc.documents/1" }
+        })
+            Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { Asc = mapping })));
+        Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { Asc = null! })));
+        var json = JsonSerializer.Serialize(Manifest(version), AepProtocol.JsonOptions);
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<AepManifest>(json.Replace("\"revision\":\"1.0\",", "", StringComparison.Ordinal), AepProtocol.JsonOptions));
     }
 
     [TestMethod]
@@ -25,7 +44,7 @@ public sealed class StorageDescriptorTests
         var version = Version();
         Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { SchemaDigest = "sha256:wrong" })));
         Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { Capabilities = version.Capabilities with { StableVersions = true } })));
-        Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { Asp = version.Asp with { McpServer = "foreign" } })));
+        Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { Asc = version.Asc with { McpServer = "foreign" } })));
         Assert.IsNotEmpty(AepStorageDescriptorValidator.Validate(Manifest(version with { Limits = version.Limits with { MaximumReadBytes = 65537 } })));
     }
 
@@ -61,6 +80,7 @@ public sealed class StorageDescriptorTests
     {
         var schema = JsonSerializer.SerializeToElement(new { type = "object", properties = new { Backend_KEY = new { type = "string" } } });
         return new("1.0.0", AepSchemaDigest.Compute(schema), schema, AepSchemaDigest.Compute(schema), schema,
-            false, [], new(true, true, true, true), new(100, 65536, 65536), new("asp.content/1", "content", "content", "fixture", "1.0"));
+            false, [], new(true, true, true, true), new(100, 65536, 65536), new("asc.content/1", "content", "content", "fixture", "1.0")
+            { Contract = AepStorageProtocol.Contract, Revision = AepStorageProtocol.ContractRevision, McpProtocolVersion = AepStorageProtocol.McpProtocolVersion });
     }
 }

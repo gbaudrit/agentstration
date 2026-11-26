@@ -96,4 +96,4 @@ public Source workflow. A protected-relay API test exercises actual AEP/MCP and 
 resolution and denies fixed-credential overrides/foreign Workspace context. Live hosted
 Git authentication and permission smoke remains a separate opt-in with a disposable repo.
 
-See [ADR-0265](../decisions/0265-generic-git-publication-uses-protected-connections-and-native-cas.md).
+See [ADR-0274](../decisions/0274-generic-git-publication-uses-protected-connections-and-native-cas.md).

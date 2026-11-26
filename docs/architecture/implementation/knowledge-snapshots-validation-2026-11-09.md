@@ -11,7 +11,7 @@ also have Artifact catalogue entries with producer and Storage evidence.
 This report covers [#1042](https://github.com/gbaudrit/agentstration/issues/1042)
 and [PR #1088](https://github.com/gbaudrit/agentstration/pull/1088), compared with
 `integration/fr-1032` at `f27857701517e0ac2fa2561ae180d7eb2c680585`.
-The baseline includes the merged Data Source composition in #1084. Parallel ASP
+The baseline includes the merged Data Source composition in #1084. Parallel ASC
 Sessions (#1086) and OpenDAL (#1082) are not prerequisites or qualified Snapshot
 providers. The implemented publication decision is
 [ADR-0207](../../decisions/0207-knowledge-publishes-retained-storage-content.md);
@@ -106,7 +106,7 @@ The subsequent delivery commit contains documentation only.
 ## Supported guarantees and remaining gates
 
 - Retained publication supports the builtin local Storage implementation only.
-  Sealed content occupies a separate namespace outside mutable ASP objects;
+  Sealed content occupies a separate namespace outside mutable ASC objects;
   publication retries compare evidence and cannot overwrite sealed documents.
 - Each content object is bounded to 64 KiB, with lower Storage envelope limits
   preserved. Capacity is 1,024 retained documents per Storage/execution Workspace.
@@ -117,7 +117,7 @@ The subsequent delivery commit contains documentation only.
 - A changed or revoked dependency fails explicitly. Historical references are
   never redirected to a newer Storage revision or backend; retained bytes remain
   intact even when the old revision becomes unavailable.
-- Generic ASP read/write capability, OpenDAL and ASP Sessions do not establish
+- Generic ASC read/write capability, OpenDAL and ASC Sessions do not establish
   retention guarantees. Other providers require a real publication adapter.
 - [#1033](https://github.com/gbaudrit/agentstration/issues/1033) still owns the
   reusable integrated browser journey, blocked by explicit implemented-UX approval

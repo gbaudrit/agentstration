@@ -93,26 +93,46 @@
         if (card) values["class"] = values.TryGetValue("class", out var value) ? $"collection-card {value}" : "collection-card";
         return values;
     }
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private Task pendingInterop = Task.CompletedTask;
+    private Task? disposal;
+    private bool disposed;
+    protected override Task OnAfterRenderAsync(bool firstRender)
+        => firstRender ? pendingInterop = ObserveAsync() : Task.CompletedTask;
+    private async Task ObserveAsync()
     {
-        if (!firstRender) return;
-        module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
-        reference = DotNetObjectReference.Create(this);
-        await module.InvokeVoidAsync("observeCollection", root, reference);
+        try
+        {
+            module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Agentstration.Web.Components/collection-ui.js");
+            if (disposed) return;
+            reference = DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("observeCollection", root, reference);
+        }
+        catch (JSDisconnectedException) when (disposed) { }
+        catch (OperationCanceledException) when (disposed) { }
     }
     private void SelectView(bool value) { selectedView = true; cards = value; }
     [JSInvokable] public Task SetNarrow(bool narrow)
     {
-        if (!selectedView) { cards = narrow; return InvokeAsync(StateHasChanged); }
+        if (!disposed && !selectedView) { cards = narrow; return InvokeAsync(StateHasChanged); }
         return Task.CompletedTask;
     }
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (module is not null)
+        disposed = true;
+        return new(disposal ??= ReleaseAsync());
+    }
+    private async Task ReleaseAsync()
+    {
+        try
         {
-            try { await module.InvokeVoidAsync("releaseCollection", root); await module.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
+            await pendingInterop;
+            if (module is null) return;
+            await module.InvokeVoidAsync("releaseCollection", root);
+            await module.DisposeAsync();
+            module = null;
         }
-        reference?.Dispose();
+        catch (JSDisconnectedException) { }
+        catch (OperationCanceledException) { }
+        finally { reference?.Dispose(); }
     }
 }

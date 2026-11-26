@@ -53,6 +53,15 @@ Every successful projection creates and activates a distinct immutable Snapshot.
 
 ## Native datasets and independent Snapshot output
 
+Native acquisition history lists read the authorized persisted acquisition state.
+Listing a source's acquisitions, or the Workspace acquisition collection, does
+not synchronize its Flow, publish records, seal Storage content or repair missing
+Artifact catalog metadata. Publication continues through the existing durable
+recovery worker, independently of a Console refresh or its cancellation. The
+displayed state changes after that work is persisted; the recovery scan currently
+runs every 30 seconds. Exact acquisition detail and explicit content/execution
+operations retain their existing synchronization and authorization behavior.
+
 JSON storage accepts a collection of object records under one logical Artifact.
 By default the acquired root object is one record, with its root contract. Use
 `json.explode` and an exact item Schema to select `/results` into multiple records
@@ -71,7 +80,7 @@ manual export mapping. A disabled native preparation can still be saved before
 an output Storage is selected.
 
 The initial retained-publication implementation supports builtin local Storages.
-It stores sealed content separately from mutable ASP objects and never overwrites
+It stores sealed content separately from mutable ASC objects and never overwrites
 a sealed publication. A provider supporting ordinary object reads and writes is
 not automatically compatible. The bounded initial inline Flow profile supports
 64 KiB per content object, subject to lower Storage limits.

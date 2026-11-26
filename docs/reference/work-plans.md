@@ -111,7 +111,7 @@ The caller-supplied plan ID and `(revision number, digest)` retain a portable in
 
 Plans are limited to 100 tasks, 1,000 explicit edges, 8,000 intent characters, 100 revisions and 1,024 authoring/control versions. Existing receipts remain replayable at the history limit. Already admitted completion and cancellation can still progress at that limit. Execution retains at most 200 attempts. Definition HTTP bodies are limited to 256 KiB and lifecycle bodies to 4 KiB. Invalid graph/input failures use Problem Details `400`; inaccessible records use `404` after authorization; concurrency, active-work, history-limit and lifecycle conflicts use `409`.
 
-Revisions/readiness are #948 and durable execution is #949; Project sharing remains #1345. In issue-realization mode, #1346 owns the one-issue/one-plan association and repository-owned issue acknowledgement, hierarchy and dependencies. Those external relationships are not copied into this internal dependency graph. See [ADR-0258](../decisions/0258-workplans-pin-revisions-and-coordinate-readiness.md) and [ADR-0259](../decisions/0259-workplan-dispatch-persists-admission-before-root-flow-submission.md).
+Revisions/readiness are #948 and durable execution is #949; Project sharing remains #1345. In issue-realization mode, #1346 owns the one-issue/one-plan association and repository-owned issue acknowledgement, hierarchy and dependencies. Those external relationships are not copied into this internal dependency graph. See [ADR-0267](../decisions/0267-workplans-pin-revisions-and-coordinate-readiness.md) and [ADR-0268](../decisions/0268-workplan-dispatch-persists-admission-before-root-flow-submission.md).
 
 ## Execute an active plan
 

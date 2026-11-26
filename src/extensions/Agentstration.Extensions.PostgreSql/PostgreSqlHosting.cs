@@ -3,9 +3,9 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.Aep;
-using Agentstration.Asp.Server;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.Aep;
+using Agentstration.Asc.Server;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol.AspNetCore;
 using Npgsql;
@@ -26,35 +26,35 @@ public sealed class PostgreSqlOptions
 }
 
 public sealed class PostgreSqlBindingFactory(IOptionsMonitor<PostgreSqlOptions> options,
-    IHttpClientFactory clients, TimeProvider? timeProvider = null) : IAspDocumentAepBindingFactory
+    IHttpClientFactory clients, TimeProvider? timeProvider = null) : IAscDocumentAepBindingFactory
 {
     public IReadOnlyList<AepStorageTypeContribution> Contributions => PostgreSqlStorageTypes.Contributions;
-    public async ValueTask<AspDocumentBinding> CreateAsync(AepStorageBindingRequest request, ClaimsPrincipal caller, CancellationToken ct)
+    public async ValueTask<AscDocumentBinding> CreateAsync(AepStorageBindingRequest request, ClaimsPrincipal caller, CancellationToken ct)
     {
-        AspValidation.Require(options.CurrentValue.Authorizes(caller), "forbidden", "The PostgreSQL caller is not authorized.");
-        AspValidation.Require(request.Configuration.ValueKind == JsonValueKind.Object && !request.Configuration.EnumerateObject().Any(),
+        AscValidation.Require(options.CurrentValue.Authorizes(caller), "forbidden", "The PostgreSQL caller is not authorized.");
+        AscValidation.Require(request.Configuration.ValueKind == JsonValueKind.Object && !request.Configuration.EnumerateObject().Any(),
             "invalid_request", "JSONB physical layout is owned by the provider.");
-        var store = AspValidation.Parse<AspStoreRef>(request.Store);
-        var requested = AspValidation.Parse<AspDocumentPolicy>(request.DatasetRule);
-        var declarations = request.DocumentCollections!.Value.Deserialize<AspDocumentCollectionDeclaration[]>(AspProtocol.JsonOptions)!;
-        AspValidation.Require(declarations.Length is > 0 and <= 32 && declarations.Select(c => c.Id).Distinct(StringComparer.Ordinal).Count() == declarations.Length,
+        var store = AscValidation.Parse<AscStoreRef>(request.Store);
+        var requested = AscValidation.Parse<AscDocumentPolicy>(request.DatasetRule);
+        var declarations = request.DocumentCollections!.Value.Deserialize<AscDocumentCollectionDeclaration[]>(AscContract.JsonOptions)!;
+        AscValidation.Require(declarations.Length is > 0 and <= 32 && declarations.Select(c => c.Id).Distinct(StringComparer.Ordinal).Count() == declarations.Length,
             "invalid_request", "Invalid logical collection declarations.");
         var collection = declarations.SingleOrDefault(c => c.Id == requested.Collection)
-            ?? throw new AspException("forbidden", "The requested collection is not configured.");
+            ?? throw new AscException("forbidden", "The requested collection is not configured.");
         DocumentModel.ValidateSchema(collection.Schema);
-        var envelope = AspValidation.Parse<PostgreSqlDocumentEnvelope>(request.Envelope).For(collection.Id);
-        var policy = AspDocumentValidation.Intersect(AspDocumentValidation.Intersect(envelope, collection.Policy), requested);
+        var envelope = AscValidation.Parse<PostgreSqlDocumentEnvelope>(request.Envelope).For(collection.Id);
+        var policy = AscDocumentValidation.Intersect(AscDocumentValidation.Intersect(envelope, collection.Policy), requested);
         using var http = clients.CreateClient("postgresql-secret-access");
         var values = new AepValueResolver(request.Connection, http);
         async Task<string> Text(string name)
         {
             using var value = await values.ResolveAsync(name, ct); var text = value.ReadString();
-            AspValidation.Require(text is { Length: > 0 and <= 4096 } && !text.Any(char.IsControl), "invalid_request", "Invalid connection value.");
+            AscValidation.Require(text is { Length: > 0 and <= 4096 } && !text.Any(char.IsControl), "invalid_request", "Invalid connection value.");
             return text;
         }
         var host = await Text("host"); var database = await Text("database"); var username = await Text("username"); var password = await Text("password");
         var portBinding = request.Connection.Single(v => v.RequirementId == "port");
-        AspValidation.Require(portBinding.InlineValue is { ValueKind: JsonValueKind.Number } portValue && portValue.TryGetInt32(out var port) && port is > 0 and <= 65535,
+        AscValidation.Require(portBinding.InlineValue is { ValueKind: JsonValueKind.Number } portValue && portValue.TryGetInt32(out var port) && port is > 0 and <= 65535,
             "invalid_request", "A typed PostgreSQL port is required.");
         var local = host is "localhost" or "127.0.0.1" or "::1";
         var connection = new NpgsqlConnectionStringBuilder
@@ -70,7 +70,7 @@ public sealed class PostgreSqlBindingFactory(IOptionsMonitor<PostgreSqlOptions> 
             Timeout = 10,
             CommandTimeout = 10,
             IncludeErrorDetail = false,
-            ApplicationName = "Agentstration ASP JSONB"
+            ApplicationName = "Agentstration ASC JSONB"
         };
         var provider = new PostgreSqlDocumentProvider(connection.ConnectionString, collection.Schema, timeProvider);
         if (options.CurrentValue.ProvisionSchema) await provider.InitializeAsync(ct);
@@ -78,9 +78,9 @@ public sealed class PostgreSqlBindingFactory(IOptionsMonitor<PostgreSqlOptions> 
         return new(store, policy, provider, (call, token) =>
         {
             token.ThrowIfCancellationRequested();
-            AspValidation.Require(options.CurrentValue.Authorizes(call.User) && call.User!.FindFirstValue(ClaimTypes.NameIdentifier) == subject,
+            AscValidation.Require(options.CurrentValue.Authorizes(call.User) && call.User!.FindFirstValue(ClaimTypes.NameIdentifier) == subject,
                 "forbidden", "The caller is no longer authorized.");
-            return ValueTask.FromResult(new AspDocumentContext(store, new(collection.Id), subject, "postgresql-grant-v1", policy));
+            return ValueTask.FromResult(new AscDocumentContext(store, new(collection.Id), subject, "postgresql-grant-v1", policy));
         });
     }
 }
@@ -97,7 +97,7 @@ public static class PostgreSqlHosting
         services.AddSingleton(TimeProvider.System); services.AddHttpContextAccessor();
         services.AddHttpClient("postgresql-secret-access", c => c.Timeout = TimeSpan.FromSeconds(10))
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
-        services.AddSingleton<IAspDocumentAepBindingFactory, PostgreSqlBindingFactory>();
+        services.AddSingleton<IAscDocumentAepBindingFactory, PostgreSqlBindingFactory>();
         services.AddAgentstrationAep(o =>
         {
             o.Extension = new(PostgreSqlStorageTypes.ExtensionId, "PostgreSQL structured storage", "1.0.0");
@@ -108,18 +108,18 @@ public static class PostgreSqlHosting
             o.ConnectedServiceTypes.Add(PostgreSqlConnectedServiceType.Contribution);
         });
         services.AddAepEnrollmentAuthentication(configuration);
-        services.AddSingleton(sp => new AspDocumentAepBindings(sp.GetRequiredService<IAspDocumentAepBindingFactory>(),
+        services.AddSingleton(sp => new AscDocumentAepBindings(sp.GetRequiredService<IAscDocumentAepBindingFactory>(),
             sp.GetRequiredService<IHttpContextAccessor>(), caller => sp.GetRequiredService<IOptionsMonitor<PostgreSqlOptions>>().CurrentValue.Authorizes(caller),
             sp.GetRequiredService<TimeProvider>()));
-        services.AddSingleton(sp => new AspDocumentServer(sp.GetRequiredService<AspDocumentAepBindings>().ResolveAsync, sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(sp => new AscDocumentServer(sp.GetRequiredService<AscDocumentAepBindings>().ResolveAsync, sp.GetRequiredService<TimeProvider>()));
         services.AddMcpServer().WithHttpTransport(o => o.SessionMode = HttpServerSessionMode.Stateless)
-            .WithListToolsHandler((r, ct) => r.Services!.GetRequiredService<AspDocumentServer>().ListToolsAsync(r, ct))
-            .WithCallToolHandler((r, ct) => r.Services!.GetRequiredService<AspDocumentServer>().CallToolAsync(r, ct));
+            .WithListToolsHandler((r, ct) => r.Services!.GetRequiredService<AscDocumentServer>().ListToolsAsync(r, ct))
+            .WithCallToolHandler((r, ct) => r.Services!.GetRequiredService<AscDocumentServer>().CallToolAsync(r, ct));
         return services;
     }
     public static WebApplication MapPostgreSqlDocuments(this WebApplication app)
     {
-        app.UseAuthentication(); app.UseAuthorization(); app.MapAgentstrationAep(); app.MapAspDocumentAepBindings();
+        app.UseAuthentication(); app.UseAuthorization(); app.MapAgentstrationAep(); app.MapAscDocumentAepBindings();
         app.MapMcp("/mcp").RequireAuthorization(AepAuthenticationDefaults.Policy); return app;
     }
 }

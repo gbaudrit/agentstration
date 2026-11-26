@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Independent AFC client SDK.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Afc.Abstractions/Agentstration.Afc.Abstractions.csproj" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+</Project>

@@ -22,7 +22,7 @@ public static class DependencyInjection
         services.AddAgentstrationAgents(context);
         services.AddAgentstrationPacks(context);
         services.AddAgentstrationSources(context);
-        services.AddAgentstrationSchemas();
+        services.AddAgentstrationSchemas(context);
         services.AddAgentstrationFunctions(context);
         services.AddAgentstrationTools();
         services.AddAgentstrationTriggerScheduling(context);

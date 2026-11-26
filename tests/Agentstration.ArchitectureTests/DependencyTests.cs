@@ -117,7 +117,7 @@ public sealed class DependencyTests
         var references = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
             .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.PostgreSql.csproj", StringComparison.Ordinal)).ToArray();
         CollectionAssert.AreEqual(new[] { appHostProject }, references);
-        var generic = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "asp", "src", "Agentstration.Asp.Abstractions", "Agentstration.Asp.Abstractions.csproj"));
+        var generic = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "asc", "src", "Agentstration.Asc.Abstractions", "Agentstration.Asc.Abstractions.csproj"));
         Assert.DoesNotContain("OData", generic, StringComparison.Ordinal);
         Assert.DoesNotContain("Npgsql", generic, StringComparison.Ordinal);
     }
@@ -946,7 +946,7 @@ public sealed class DependencyTests
             "Agentstration.Extensions", "Agentstration.Infrastructure", "Agentstration.Web"
         };
         Assert.IsFalse(references.Any(reference => forbidden.Contains(reference, StringComparer.Ordinal)
-            || reference.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+            || reference.StartsWith("Agentstration.Asc.", StringComparison.Ordinal)
             || reference.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
             || reference.Contains("EntityFramework", StringComparison.Ordinal)));
         var projects = new[] { "Agentstration.Storage", "Agentstration.Storage.Contracts", "Agentstration.Storage.Api" };
@@ -961,15 +961,15 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void StorageContentPortsRemainNeutralAndAspConfigurationCannotDependOnProductResources()
+    public void StorageContentPortsRemainNeutralAndAscConfigurationCannotDependOnProductResources()
     {
         Assert.AreEqual(typeof(IStorageResolver).Assembly, typeof(IStorageContentGateway).Assembly);
         var contracts = typeof(IStorageContentGateway).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
-        Assert.IsFalse(contracts.Any(name => name.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+        Assert.IsFalse(contracts.Any(name => name.StartsWith("Agentstration.Asc.", StringComparison.Ordinal)
             || name.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name is "Agentstration.Infrastructure" or "Agentstration.Web"));
-        var adapter = typeof(Agentstration.Asp.Aep.AspAepBindings).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+        var adapter = typeof(Agentstration.Asc.Aep.AscAepBindings).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
         Assert.IsFalse(adapter.Any(name => name.StartsWith("Agentstration.Storage", StringComparison.Ordinal)
             || name.StartsWith("Agentstration.ConnectedServices", StringComparison.Ordinal)
             || name.StartsWith("Agentstration.Identity", StringComparison.Ordinal)
@@ -1565,18 +1565,36 @@ public sealed class DependencyTests
 
                 // This opt-in instrumentation is owned by the test root, not another module.
                 if (include.Replace('\\', '/') == "../TestHostMetrics.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Management.Api.Tests"
+                        or "Agentstration.Management.Models.Api.Tests" or "Agentstration.Management.Security.Tests") continue;
+
+                if (include.Replace('\\', '/') == "../AepEnrollmentTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Aep.Tests"
+                        or "Agentstration.Management.Aep.Automatic.Tests") continue;
+
+                // Declarative fixtures are shared only by these bounded Bootstrap modules.
+                if (include.Replace('\\', '/') == "../BootstrapDeclarativeTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
+                        or "Agentstration.Management.Bootstrap.Startup.Tests") continue;
 
                 // This fixture belongs to the test root and is compiled into
                 // independently bounded Bootstrap test processes.
                 if (include.Replace('\\', '/') == "../BootstrapApiOnlyWebApplicationFactory.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
                         or "Agentstration.Management.Bootstrap.Scenarios.Tests"
-                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Plans.Tests"
+                        or "Agentstration.Management.Bootstrap.Startup.Tests"
+                        or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
 
                 if (include.Replace('\\', '/') == "../BootstrapApplicationTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Scenarios.Tests"
-                        or "Agentstration.Management.Bootstrap.Plans.Tests") continue;
+                        or "Agentstration.Management.Bootstrap.Plans.Tests"
+                        or "Agentstration.Management.Bootstrap.Progress.Tests") continue;
+
+                if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/DataSourceDatasetTestFixture.cs"
+                        or "../ApiResourceTestFixtures/StructuredStorageFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.DataSources.Tests"
+                        or "Agentstration.Api.DataSources.Rss.Tests") continue;
 
                 // The native Git HTTP fixture is owned by the test root and reused
                 // only by its provider and governed transport integration modules.
@@ -1588,8 +1606,17 @@ public sealed class DependencyTests
                 if (include.Replace('\\', '/') is "../ApiResourceTestFixtures/ResourceManagementApiTestBase.cs"
                         or "../ApiResourceTestFixtures/ResourceServiceFixture.cs"
                         or "../ApiResourceTestFixtures/AwpTestWorker.cs"
+                        or "../ApiResourceTestFixtures/RssTransformationTestData.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Api.Resources.Tests"
-                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests") continue;
+                        or "Agentstration.Api.DataSources.Tests" or "Agentstration.Api.Artifacts.Tests"
+                        or "Agentstration.Api.DataSources.Rss.Tests") continue;
+
+                // These test-root fixtures are compiled into the independently
+                // bounded Management API and Model API test processes.
+                if (include.Replace('\\', '/') is "../ManagementApiTestFixtures/ModelManagementApiTestBase.cs"
+                        or "../ManagementApiTestFixtures/AwpTestWorker.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Management.Api.Tests"
+                        or "Agentstration.Management.Models.Api.Tests") continue;
 
                 var normalized = include.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
                 var sourcePath = Path.GetFullPath(Path.Combine(projectDirectory, normalized));

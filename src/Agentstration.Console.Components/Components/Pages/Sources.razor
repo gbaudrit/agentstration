@@ -1,5 +1,4 @@
 @page "/settings/sources"
-@page "/settings/sources/{Publisher}/{Name}"
 @implements IDisposable
 @using System.Globalization
 @inject ISourceConsoleApiClient Service
@@ -31,6 +30,11 @@
             <MetricCard Label="@T("Healthy")" Value="@sources.Count(IsHealthy).ToString()" Detail="@T("LastImportSucceeded")" Status="UiStatus.Success" />
         }</Metrics>
         <Feedback>@if (error is not null) { <ErrorState Message="@error"><button class="button-secondary" @onclick="() => error = null">@T("Close")</button></ErrorState> }</Feedback>
+        <ItemActions Context="item"><CollectionActions ResourceName="@item.Source.Configuration.Definition.DisplayName">
+            <a href="@(SourceUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+            @if (CanPreviewEdit(item)) { <a href="@(SourceUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+            <button type="button" data-testid="source-preview" disabled="@(item.Source.Source.ScopeRef is null)" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+        </CollectionActions></ItemActions>
     </ResourceCollectionTemplate>
     @if (importing && hasCollectionAuthorization)
     {
@@ -62,8 +66,7 @@ else
             @if (detail is not null && !installedPacksKnown) { <p class="muted">@T("InstalledPacksUnavailable")</p> }
         </Feedback>
         <OverviewMetrics><MetricCard Label="@T("Versions")" Value="@(detail?.Source.VersionCount.ToString(CultureInfo.CurrentCulture) ?? "—")" /><MetricCard Label="@T("ChannelsAndCatalogs")" Value="@(detail?.SelectedVersion.Definition.PublishedDefinition.Channels.Count.ToString(CultureInfo.CurrentCulture) ?? "—")" /><MetricCard Label="@T("Bindings")" Value="@(detail is null ? "—" : detail.Bindings.Ready ? T("Ready") : T("NeedsConfiguration"))" Status="@(detail?.Bindings.Ready == true ? UiStatus.Success : UiStatus.Neutral)" /></OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="SourceSetting" Items="SavedSourceSettings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })"><Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity><Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
-        <OverviewContent>@if (detail is not null) { <div class="source-detail-grid">        <article class="panel">
+        <OverviewSummary Context="identity">@if (detail is not null) { <SourceResourceSummary Resource="detail.Source.Source" Configuration="detail.Source.Configuration" Version="detail.SelectedVersion" Identity="identity"><AdditionalContent>@if (detail is not null) { <div class="source-detail-grid">        <article class="panel">
             <div class="panel-header"><div><p class="eyebrow">@T("PublishedIdentity")</p><h2>@T("Publisher")</h2></div></div>
             <dl class="resource-details"><dt>@T("Declared")</dt><dd>@PublisherLabel(detail.Verification.DeclaredPublisher)</dd><dt>@T("Verified")</dt><dd>@(detail.Verification.VerifiedPublisher is null ? T("NotVerified") : PublisherLabel(detail.Verification.VerifiedPublisher))</dd><dt>@T("ManifestDigest")</dt><dd><ValueDisclosure Value="@detail.SelectedVersion.Definition.ManifestDigest" /></dd></dl>
         </article>
@@ -89,7 +92,8 @@ else
                 <div class="refresh-overview-value"><strong>@NextRefreshDate(nextRefresh)</strong><span>@nextRefresh.Target</span></div>
             }
         </article>
-</div> }</OverviewContent>
+</div> }</AdditionalContent></SourceResourceSummary> }</OverviewSummary>
+
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" Id="source-definition-form" EditContext="DetailContext" FieldLabels="DetailFieldLabels" Sections="presentations" SectionState="sectionState" SectionContent="DetailSectionContent" SectionRequested="ShowSection" OnValidSubmit="SaveDefinitionAsync" OnInvalidSubmit="InvalidDefinitionSubmitAsync" InvalidInputChanged="value => invalidInput = value" ReadOnly="@(!CanWrite)" Busy="DetailBusy" data-testid="source-definition-form" /></DefinitionContent>
         <AdditionalContent Context="path">@if (path == "versions") { @VersionContent } else if (path == "content") { @ChannelContent }</AdditionalContent>
         <DraftActions><button class="button-secondary" type="button" disabled="@DetailBusy" @onclick="DiscardDefinitionAsync">@Shared["Discard"]</button><button type="submit" form="source-definition-form" class="button-primary" disabled="@(DetailBusy || !CanWrite || pendingReceipt is not null)" data-testid="source-save">@T("Save")</button></DraftActions>
@@ -137,7 +141,19 @@ else
 }
 </div>
 
+@if (IsCollection)
+{
+<ResourceCollectionPreview @ref="collectionPreview" ResourceKind="@SourceResourceKinds.Source" ContextKey="@collectionContextKey" Enabled="@(IsCollection && hasCollectionAuthorization && collectionContextKey is not null && ContextState.Error is null && collectionLoad.Status != ResourceLoadStatus.Forbidden)">
+    <ChildContent Context="address"><SourceResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+}
+
+
 @code {
+    private ResourceCollectionPreview? collectionPreview;
+    private bool CanPreviewEdit(SourceConsoleListItem item) => !item.Source.Source.Governance.IsManaged && !item.Source.Configuration.Governance.IsManaged && ContextState.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.Source.Source.ScopeRef?.Value == ContextState.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.Source.Source.ScopeRef, Services);
+    private void OpenPreview(SourceConsoleListItem item) { if (item.Source.Source.ScopeRef is { } owner) collectionPreview?.Open(ScopedResourceAddress.Create(owner, item.Source.Source.Namespace, SourceResourceKinds.Source, item.Source.Source.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.PreserveNavigation($"/settings/sources/{Uri.EscapeDataString(address.Namespace.Value)}/{Uri.EscapeDataString(address.Name)}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}", Services).Split('#')[0] + "#" + section;
     private RenderFragment VersionContent => @<div class="resource-editor-view">@if (detail is not null) {        <FormSection Title="@T("Versions")" Eyebrow="@T("ImmutableHistory")" Description="@T("VersionHistoryDescription")"><ChildContent>
         <div class="version-strip">
             @foreach (var version in detail.Versions)
@@ -552,7 +568,7 @@ else
 }
 
 @code {
-    private CollectionColumn<SourceConsoleListItem> SourceIdentityColumn => new("identity", T("Source"), item => @<text><CollectionIdentity DisplayName="@item.Source.Configuration.Definition.DisplayName" Namespace="@item.Source.Source.Namespace.Value" Name="@item.Source.Source.Name" Href="@SourceUrl(item)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" IconOnly /><ManagedResourceBadge IsManaged="@item.Source.Source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Source.Source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></text>)
+    private CollectionColumn<SourceConsoleListItem> SourceIdentityColumn => new("identity", T("Source"), item => @<text><CollectionIdentity DisplayName="@item.Source.Configuration.Definition.DisplayName" Namespace="@item.Source.Source.Namespace.Value" Name="@item.Source.Source.Name" Href="@(SourceUrl(item) + "#overview")" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="@item.Source.Source.ScopeRef" ShowName IconOnly /><StatusBadge Text="@ImportOutcome(item.Source.Observed.Definition.LastOutcome)" Status="@(IsHealthy(item) ? UiStatus.Success : UiStatus.Danger)" IconOnly /><ManagedResourceBadge IsManaged="@item.Source.Source.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Source.Source.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><code>@item.Source.Source.Definition.Publisher/@item.Source.Source.Name</code></text>)
     {
         Filters = [new("health", T("Health"), CollectionFilterKind.Choice) { Options = (sources ?? []).Select(item => item.Source.Observed.Definition.LastOutcome).Distinct().Select(value => new CollectionFilterOption(value.ToString(), ImportOutcome(value))).ToArray() }]
     };
