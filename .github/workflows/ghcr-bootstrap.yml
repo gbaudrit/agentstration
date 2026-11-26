@@ -1,0 +1,125 @@
+name: Initialize private GHCR packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  initialize:
+    if: github.repository == 'gbaudrit/agentstration' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: preview-deployment
+
+    steps:
+      - name: Initialize empty packages and verify private visibility
+        env:
+          GH_TOKEN: ${{ secrets.GHCR_BOOTSTRAP_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::error::GHCR_BOOTSTRAP_TOKEN is missing."
+            exit 1
+          fi
+
+          owner="$(gh api user --jq .login)"
+          if [[ "${owner,,}" != gbaudrit ]]; then
+            echo "::error::The bootstrap token must belong to gbaudrit."
+            exit 1
+          fi
+
+          bootstrap_root="$(mktemp -d "$RUNNER_TEMP/ghcr-bootstrap.XXXXXX")"
+          export DOCKER_CONFIG="$bootstrap_root/docker"
+          mkdir -p "$DOCKER_CONFIG" "$bootstrap_root/context"
+          printf 'FROM scratch\n' > "$bootstrap_root/context/Dockerfile"
+
+          cleanup() {
+            docker logout ghcr.io >/dev/null 2>&1 || true
+            rm -rf "$bootstrap_root"
+          }
+          trap cleanup EXIT
+
+          # A scoped owner inventory distinguishes an absent package from a masked access error.
+          gh api --include user > "$bootstrap_root/identity-headers"
+          scopes="$(awk 'tolower($1) == "x-oauth-scopes:" { $1=""; gsub(/[ \r]/, ""); print }' "$bootstrap_root/identity-headers")"
+          case ",$scopes," in
+            *,write:packages,*) ;; # write:packages implies read:packages.
+            *) echo "::error::Cannot verify read:packages and write:packages on the bootstrap identity."; exit 1 ;;
+          esac
+          gh api --paginate 'user/packages?package_type=container&per_page=100' \
+            --jq '.[].name' > "$bootstrap_root/package-inventory"
+
+          printf '%s' "$GH_TOKEN" |
+            docker login ghcr.io --username gbaudrit --password-stdin
+
+          metadata() {
+            gh api "users/gbaudrit/packages/container/$1" \
+              --jq .visibility \
+              > "$bootstrap_root/visibility" \
+              2> "$bootstrap_root/metadata-error"
+          }
+
+          require_private() {
+            local package="$1"
+            for attempt in 1 2 3 4 5 6; do
+              if metadata "$package"; then
+                if [[ "$(cat "$bootstrap_root/visibility")" != private ]]; then
+                  echo "::error::$package is not private. Stop before application publication."
+                  exit 1
+                fi
+                return 0
+              fi
+              sleep 2
+            done
+            echo "::error::Cannot verify private visibility for $package."
+            exit 1
+          }
+
+          push_empty() {
+            local package="$1"
+            local phase="$2"
+            local image="ghcr.io/gbaudrit/$package:registry-init-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${phase}"
+            local arguments=(--tag "$image")
+
+            if [[ "$phase" == linked ]]; then
+              arguments+=(--label "org.opencontainers.image.source=https://github.com/gbaudrit/agentstration")
+            fi
+
+            docker build "${arguments[@]}" "$bootstrap_root/context"
+            docker push "$image"
+          }
+
+          for component in openapi postgresql ollama; do
+            package="agentstration-extension-$component"
+
+            if metadata "$package"; then
+              require_private "$package"
+            else
+              if ! grep -q 'HTTP 404' "$bootstrap_root/metadata-error"; then
+                echo "::error::Package metadata access failed for $package."
+                exit 1
+              fi
+              if grep -Fxq "$package" "$bootstrap_root/package-inventory"; then
+                echo "::error::Owner inventory contains $package but its metadata is inaccessible."
+                exit 1
+              fi
+
+              push_empty "$package" initial
+              require_private "$package"
+            fi
+
+            push_empty "$package" linked
+            require_private "$package"
+            repository="$(gh api "users/gbaudrit/packages/container/$package" --jq '.repository.full_name // ""')"
+            if [[ "$repository" != gbaudrit/agentstration ]]; then
+              echo "::error::Cannot verify repository association for $package."
+              exit 1
+            fi
+
+            echo "Verified private: $package"
+          done
