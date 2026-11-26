@@ -248,8 +248,13 @@ mutable convenience tag at deployment time.
 `ollama`. It packages only `Agentstration.Extensions.Ollama`, using the same
 `Dockerfile.extension`, builder, publisher and generic AEP smokes as Foundry.
 No Ollama inference server, model file or model acquisition command is included.
-The existing `deploy/compose/ollama.yml` remains a separate source-build topology;
-selecting extensions in digest-based previews is a different workstream.
+The existing `deploy/compose/ollama.yml` remains a separate source-build topology.
+The trusted-main preview-label synchronization from
+[#1389](https://github.com/gbaudrit/agentstration/pull/1389) derives
+`preview:extension:ollama` from this catalogue ID once the entry reaches `main`.
+It does not deploy anything or assign the label to issues. Preview deployment
+selection remains separate from packaging and requires a qualified private OCI
+delivery; see [preview on demand](preview-on-demand.md).
 
 Its own `version.txt` starts at `0.1.0` and feeds the assembly informational
 version, AEP identity `Agentstration.Extensions.Ollama` and OCI version label.
