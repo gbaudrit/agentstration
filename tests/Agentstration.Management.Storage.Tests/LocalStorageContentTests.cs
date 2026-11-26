@@ -1,5 +1,5 @@
 using System.Text;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Agentstration.Infrastructure.Storage;
 using Agentstration.Resources;
 using Agentstration.Storage;
@@ -12,13 +12,13 @@ public sealed class LocalStorageContentTests
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "agentstration-local-storage-" + Guid.NewGuid().ToString("N"));
     private readonly TestClock clock = new();
-    private static readonly AspAccessPolicy Policy = new(true, true, true, true, "notes/", 65536, 65536, 100);
+    private static readonly AscAccessPolicy Policy = new(true, true, true, true, "notes/", 65536, 65536, 100);
     private LocalStoragePaths Paths => new(new(root));
     private LocalStorageObjectProvider Provider => new(Paths, clock);
     private static StorageRevisionReference Store(Guid? workspace = null, Guid? uid = null) => new(
         new(ResourceScopeRef.Workspace(workspace ?? Guid.NewGuid()), ResourceNamespace.Default, "Storage", "local"),
         uid ?? Guid.NewGuid(), 1, "sha256:binding");
-    private static AspAccessContext Access(StorageRevisionReference store) => new(
+    private static AscAccessContext Access(StorageRevisionReference store) => new(
         new(store.StorageUid.ToString("N"), "builtin-local", store.BindingDigest), "caller", "access-v1", Policy);
     private LocalContentWrite Write(string id, string key = "notes/item", string value = "hello", string? version = null) =>
         new(id, clock.GetUtcNow().AddMinutes(1), key, Encoding.UTF8.GetBytes(value), version);
@@ -27,7 +27,7 @@ public sealed class LocalStorageContentTests
     public void Cleanup() { if (Directory.Exists(root)) Directory.Delete(root, recursive: true); }
 
     [TestMethod]
-    public async Task TenMebibyteContentRoundTripsWithoutChangingTheAspWireChunkCeiling()
+    public async Task TenMebibyteContentRoundTripsWithoutChangingTheAscWireChunkCeiling()
     {
         var store = Store();
         var bytes = new byte[10 * 1024 * 1024];
@@ -35,7 +35,7 @@ public sealed class LocalStorageContentTests
         var access = Access(store) with { Policy = Policy with { MaxWriteBytes = bytes.Length, MaxReadBytes = bytes.Length } };
         var item = await Provider.WriteAsync(store, access, new("ten-mib", clock.GetUtcNow().AddMinutes(1), "notes/large", bytes, null), default);
         CollectionAssert.AreEqual(bytes, (await Provider.ReadAsync(store, access, item.Key, item.Version, 0, bytes.Length, default)).Content);
-        Assert.Throws<AspException>(() => AspValidation.Policy(access.Policy));
+        Assert.Throws<AscException>(() => AscValidation.Policy(access.Policy));
     }
 
     [TestMethod]
@@ -44,11 +44,11 @@ public sealed class LocalStorageContentTests
         var store = Store();
         var provider = new LocalStorageObjectProvider(Paths, clock, new() { LocalMaximumObjects = 1 });
         var item = await provider.WriteAsync(store, Access(store), Write("first"), default);
-        var full = await Assert.ThrowsAsync<AspException>(() => provider.WriteAsync(store, Access(store), Write("second", "notes/second"), default));
+        var full = await Assert.ThrowsAsync<AscException>(() => provider.WriteAsync(store, Access(store), Write("second", "notes/second"), default));
         Assert.AreEqual("capacity_exceeded", full.Code);
         _ = await provider.WriteAsync(store, Access(store), Write("replace", version: item.Version), default);
         var receipts = new LocalStorageObjectProvider(Paths, clock, new() { LocalMaximumReceipts = 2 });
-        var receiptLimit = await Assert.ThrowsAsync<AspException>(() => receipts.WriteAsync(store, Access(store), Write("third"), default));
+        var receiptLimit = await Assert.ThrowsAsync<AscException>(() => receipts.WriteAsync(store, Access(store), Write("third"), default));
         Assert.AreEqual("capacity_exceeded", receiptLimit.Code);
     }
 
@@ -60,7 +60,7 @@ public sealed class LocalStorageContentTests
         { MaximumObjectBytes = 8, LocalMaximumStoreBytes = 10 });
         var first = await provider.WriteAsync(store, Access(store), Write("first", value: "12345678"), default);
         await provider.WriteAsync(store, Access(store), Write("second", "notes/second", "12"), default);
-        var full = await Assert.ThrowsAsync<AspException>(() => provider.WriteAsync(store, Access(store), Write("third", "notes/third", "1"), default));
+        var full = await Assert.ThrowsAsync<AscException>(() => provider.WriteAsync(store, Access(store), Write("third", "notes/third", "1"), default));
         Assert.AreEqual("capacity_exceeded", full.Code);
         await provider.WriteAsync(store, Access(store), Write("replace", value: "12", version: first.Version), default);
         await provider.WriteAsync(store, Access(store), Write("third", "notes/third", "123456"), default);
@@ -73,7 +73,7 @@ public sealed class LocalStorageContentTests
         var original = await Provider.WriteAsync(store, access, request, default);
         var exact = new StorageObject(original.Key, original.Version, original.Length, original.Sha256, "opaque");
         var replacement = await Provider.WriteAsync(store, access, Write("replace", value: "new content", version: original.Version), default);
-        Assert.AreEqual("version_unavailable", (await Assert.ThrowsAsync<AspException>(() => Provider.RetireAsync(store, access, exact, default))).Code);
+        Assert.AreEqual("version_unavailable", (await Assert.ThrowsAsync<AscException>(() => Provider.RetireAsync(store, access, exact, default))).Code);
         Assert.AreEqual(replacement, await Provider.StatAsync(store, access, replacement.Key, replacement.Version, default));
         Assert.IsTrue(await Provider.RetireAsync(store, access, new(replacement.Key, replacement.Version, replacement.Length, replacement.Sha256, "opaque"), default));
         Assert.AreEqual(original, await Provider.WriteAsync(store, access, request, default));
@@ -108,7 +108,7 @@ public sealed class LocalStorageContentTests
         Assert.AreNotEqual(Paths.DirectoryFor(first), Paths.DirectoryFor(second));
         Assert.AreNotEqual(Paths.DirectoryFor(first), Paths.DirectoryFor(third));
         Assert.AreEqual("one", Encoding.UTF8.GetString((await Provider.ReadAsync(first, Access(first), one.Key, one.Version, 0, 10, default)).Content));
-        var foreign = await Assert.ThrowsAsync<AspException>(() => Provider.ReadAsync(second, Access(second), one.Key, one.Version, 0, 10, default));
+        var foreign = await Assert.ThrowsAsync<AscException>(() => Provider.ReadAsync(second, Access(second), one.Key, one.Version, 0, 10, default));
         Assert.AreEqual("version_unavailable", foreign.Code);
         Assert.AreEqual(Paths.DirectoryFor(first), Paths.DirectoryFor(first with { Storage = first.Storage with { Name = "renamed" } }));
     }
@@ -119,13 +119,13 @@ public sealed class LocalStorageContentTests
         var store = Store(); var access = Access(store); var request = Write("same-request");
         var replies = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Provider.WriteAsync(store, access, request, default)));
         Assert.HasCount(1, replies.Select(r => r.Version).Distinct().ToArray());
-        var conflict = await Assert.ThrowsAsync<AspException>(() => Provider.WriteAsync(store, access, Write("other-request"), default));
+        var conflict = await Assert.ThrowsAsync<AscException>(() => Provider.WriteAsync(store, access, Write("other-request"), default));
         Assert.AreEqual("conflict", conflict.Code);
-        var changed = await Assert.ThrowsAsync<AspException>(() => Provider.WriteAsync(store, access, request with { Content = [42] }, default));
+        var changed = await Assert.ThrowsAsync<AscException>(() => Provider.WriteAsync(store, access, request with { Content = [42] }, default));
         Assert.AreEqual("idempotency_conflict", changed.Code);
         var replacement = await Provider.WriteAsync(store, access, Write("replacement", value: "new", version: replies[0].Version), default);
         Assert.AreNotEqual(replies[0].Version, replacement.Version);
-        var stale = await Assert.ThrowsAsync<AspException>(() => Provider.ReadAsync(store, access, replacement.Key, replies[0].Version, 0, 100, default));
+        var stale = await Assert.ThrowsAsync<AscException>(() => Provider.ReadAsync(store, access, replacement.Key, replies[0].Version, 0, 100, default));
         Assert.AreEqual("version_unavailable", stale.Code); // No unimplemented stable-version claim.
     }
 
@@ -138,7 +138,7 @@ public sealed class LocalStorageContentTests
     public async Task TraversalAndEnvelopeEscapesFailBeforeWriting(string key)
     {
         var store = Store();
-        await Assert.ThrowsAsync<AspException>(() => Provider.WriteAsync(store, Access(store), Write("invalid", key), default));
+        await Assert.ThrowsAsync<AscException>(() => Provider.WriteAsync(store, Access(store), Write("invalid", key), default));
         Assert.IsFalse(File.Exists(Path.Combine(root, "outside")));
     }
 
@@ -151,12 +151,12 @@ public sealed class LocalStorageContentTests
         var directory = Paths.DirectoryFor(store);
         Directory.CreateDirectory(Path.GetDirectoryName(directory)!);
         Directory.CreateSymbolicLink(directory, outside);
-        var linked = await Assert.ThrowsAsync<AspException>(() => Provider.WriteAsync(store, Access(store), Write("link"), default));
+        var linked = await Assert.ThrowsAsync<AscException>(() => Provider.WriteAsync(store, Access(store), Write("link"), default));
         Assert.AreEqual("storage_path_unsafe", linked.Code);
         Directory.Delete(directory);
         Directory.CreateDirectory(directory);
         File.CreateSymbolicLink(Path.Combine(directory, "objects.json"), Path.Combine(outside, "missing.json"));
-        await Assert.ThrowsAsync<AspException>(() => Provider.ListAsync(store, Access(store), "notes/", null, 10, default));
+        await Assert.ThrowsAsync<AscException>(() => Provider.ListAsync(store, Access(store), "notes/", null, 10, default));
         Assert.IsFalse(File.Exists(Path.Combine(outside, "missing.json")));
         File.Delete(Path.Combine(directory, "objects.json"));
     }
@@ -173,9 +173,9 @@ public sealed class LocalStorageContentTests
         Assert.AreEqual("notes/b", (await Provider.ListAsync(store, access, "notes/", page.NextKey, 1, default)).Objects.Single().Key);
         var restricted = access with { Policy = access.Policy with { KeyFrom = "notes/b", KeyBefore = "notes/c" } };
         Assert.AreEqual("notes/b", (await Provider.ListAsync(store, restricted, "notes/", null, 10, default)).Objects.Single().Key);
-        await Assert.ThrowsAsync<AspException>(() => Provider.ListAsync(store, access, "notes/", null, 101, default));
-        await Assert.ThrowsAsync<AspException>(() => Provider.WriteAsync(store, access with { Policy = Policy with { CanWrite = false } }, Write("denied"), default));
-        await Assert.ThrowsAsync<AspException>(() => Provider.WriteAsync(store, access, Write("expired") with { NotAfter = clock.GetUtcNow() }, default));
+        await Assert.ThrowsAsync<AscException>(() => Provider.ListAsync(store, access, "notes/", null, 101, default));
+        await Assert.ThrowsAsync<AscException>(() => Provider.WriteAsync(store, access with { Policy = Policy with { CanWrite = false } }, Write("denied"), default));
+        await Assert.ThrowsAsync<AscException>(() => Provider.WriteAsync(store, access, Write("expired") with { NotAfter = clock.GetUtcNow() }, default));
         using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
         await Assert.ThrowsAsync<OperationCanceledException>(() => Provider.WriteAsync(store, access, Write("cancelled"), cancelled.Token));
     }

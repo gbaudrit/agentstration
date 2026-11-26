@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Agentstration.Extensions.PostgreSql;
 using Npgsql;
 
@@ -28,9 +28,9 @@ public sealed class DocumentConnectionFailureTests
             Pooling = false
         };
         var provider = new PostgreSqlDocumentProvider(connection.ConnectionString, DocumentConformanceTests.Schema);
-        var context = new AspDocumentContext(new("store", "binding", new string('a', 64)), new("collection"),
+        var context = new AscDocumentContext(new("store", "binding", new string('a', 64)), new("collection"),
             "caller", "grant", new("collection", QueryProfiles: []));
-        var error = await Assert.ThrowsAsync<AspException>(async () =>
+        var error = await Assert.ThrowsAsync<AscException>(async () =>
         {
             if (initialize) await provider.InitializeAsync(default);
             else _ = await provider.GetAsync(context, new("get", "document"), default);

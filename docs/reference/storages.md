@@ -142,7 +142,7 @@ requirements; a Storage contains at most 64 bindings. Opaque configuration is no
 a universal bucket/path/table contract.
 
 Collection document schemas are validated by the selected versioned document
-profile through its registered definition validator. The ASP profile supports
+profile through its registered definition validator. The ASC profile supports
 bounded local definitions/references, nullable objects and asserted formats;
 see [structured documents](structured-documents.md). Errors identify the
 collection schema and include bounded field paths/codes. Shared Schema resource
@@ -170,9 +170,9 @@ are no secrets in this object. It is a selector/evidence object, not a bearer
 credential; the resolver must be called under current authorization before use.
 
 #1040 consumes these ports, resolves Secret references late through Connected
-Services, and maps the separate authority layers into protected ASP invocation
+Services, and maps the separate authority layers into protected ASC invocation
 contexts. It owns actual caller authorization at the provider, AEP contributions,
-ASP capabilities and Artifact integration. It must revalidate exact revisions at
+ASC capabilities and Artifact integration. It must revalidate exact revisions at
 invocation, enforce limits and never accept lower-authority configuration overrides.
 #1041/#1042 select Storage revisions and supply dataset/Snapshot rules separately.
 #1046 supplies Storage Console administration and #1064 adds independent
@@ -216,7 +216,7 @@ enablement, availability, configuration, mappings and capabilities still apply.
 Connected Services retain their own checks. User-permission expansion is deferred to
 [#1077](https://github.com/gbaudrit/agentstration/issues/1077), and UsePolicy
 administration to [#1078](https://github.com/gbaudrit/agentstration/issues/1078).
-The Instance-owned builtin uses functional `local@1.0.0`. There is no automatic grant, global exemption, ASP bypass
+The Instance-owned builtin uses functional `local@1.0.0`. There is no automatic grant, global exemption, ASC bypass
 or per-Workspace type copy. Synchronization and restart preserve grants/revocations.
 
 Type reads project `observedUse` with the authenticated consumer scope and the
@@ -243,4 +243,4 @@ See [Console administration](storage-console.md) for scoped routes, explicit map
 reconciliation and UI delivery boundaries.
 
 See [Storage execution](storage-execution.md) for the provider-neutral content port,
-functional local version, Workspace defaults, AEP/ASP bindings and Docker persistence.
+functional local version, Workspace defaults, AEP/ASC bindings and Docker persistence.

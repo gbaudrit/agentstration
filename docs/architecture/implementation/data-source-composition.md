@@ -371,7 +371,7 @@ applicable to datasets without the new lifecycle.
 History maintenance uses the existing recovery worker, current authorization,
 conditional retirement claims and exact provider checks. Running projections,
 native input/read leases and conservatively all nonterminal Workspace Flows defer
-retirement. Local providers remove exact content; remote ASP providers may use a
+retirement. Local providers remove exact content; remote ASC providers may use a
 verified conditional empty replacement when supported, otherwise cleanup remains
 pending. Immutable Snapshots and Artifact provenance remain visible after their
 bytes retire. See [ADR-0212](../../decisions/0212-source-content-lifecycle-and-ephemeral-handoff.md).

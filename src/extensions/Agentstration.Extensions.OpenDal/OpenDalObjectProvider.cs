@@ -1,15 +1,15 @@
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using OpenDAL;
 using OpenDAL.Layer;
 using OpenDAL.Options;
 
 namespace Agentstration.Extensions.OpenDal;
 
-/// <summary>ASP-to-OpenDAL adapter. The SDK owns protocol sessions; OpenDAL owns physical content.</summary>
-public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
+/// <summary>ASC-to-OpenDAL adapter. The SDK owns protocol sessions; OpenDAL owns physical content.</summary>
+public sealed class OpenDalObjectProvider : IAscObjectReader, IAscObjectWriter
 {
-    private readonly AspStoreRef store;
+    private readonly AscStoreRef store;
     private readonly Func<Operator> create;
     private readonly Action<string>? checkKey;
     private readonly OpenDalExecutionGate execution;
@@ -19,10 +19,10 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
     public string ProviderId { get; }
     public string ProviderVersion => OpenDalStorageTypes.Version;
     public JsonElement ConfigurationSchema { get; }
-    public AspTransferCapabilities Transfers { get; }
-    public AspCapabilities Capabilities => new(capability.List, capability.Stat, capability.Read, capability.Write, false, false, false);
+    public AscTransferCapabilities Transfers { get; }
+    public AscCapabilities Capabilities => new(capability.List, capability.Stat, capability.Read, capability.Write, false, false, false);
 
-    public OpenDalObjectProvider(AspStoreRef store, string providerId, JsonElement schema, Func<Operator> create,
+    public OpenDalObjectProvider(AscStoreRef store, string providerId, JsonElement schema, Func<Operator> create,
         OpenDalExecutionGate execution, Action<string>? checkKey = null,
         Func<string, string>? encodeKey = null, Func<string, string?>? decodeKey = null)
     {
@@ -42,61 +42,61 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
             DefaultChunkSizeBytes: 16_384, CreateOnly: capability.WriteWithIfNotExists, EmptyWrite: capability.WriteCanEmpty);
     }
 
-    public async ValueTask<AspProviderPage> ListAsync(AspAccessContext context, string prefix, string? afterKey, int limit, CancellationToken ct)
+    public async ValueTask<AscProviderPage> ListAsync(AscAccessContext context, string prefix, string? afterKey, int limit, CancellationToken ct)
     {
-        Validate(context); AspValidation.Prefix(prefix);
-        AspValidation.Require(context.Policy.CanList && capability.List && prefix.StartsWith(context.Policy.Prefix, StringComparison.Ordinal), "forbidden", "List is not authorized.");
-        AspValidation.Require(limit > 0 && limit <= context.Policy.MaxPageSize, "limit_exceeded", "Invalid page size.");
+        Validate(context); AscValidation.Prefix(prefix);
+        AscValidation.Require(context.Policy.CanList && capability.List && prefix.StartsWith(context.Policy.Prefix, StringComparison.Ordinal), "forbidden", "List is not authorized.");
+        AscValidation.Require(limit > 0 && limit <= context.Policy.MaxPageSize, "limit_exceeded", "Invalid page size.");
         // List() in binding 0.3.1 materializes native entries. Limit is a backend page hint,
-        // not a global lexical limit; sort/filter before exposing the bounded ASP page.
+        // not a global lexical limit; sort/filter before exposing the bounded ASC page.
         return await RunAsync(async op =>
         {
             var directory = encodeKey is null && prefix.Contains('/') ? prefix[..(prefix.LastIndexOf('/') + 1)] : "";
             var entries = await op.ListAsync(directory, new ListOptions { Recursive = true }, CancellationToken.None);
             ct.ThrowIfCancellationRequested();
             var keys = entries.Where(e => e.Metadata.IsFile).Select(e => decodeKey is null ? e.Path : decodeKey(e.Path)).OfType<string>()
-                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal) && AspValidation.Allows(context.Policy, k)
+                .Where(k => k.StartsWith(prefix, StringComparison.Ordinal) && AscValidation.Allows(context.Policy, k)
                     && (afterKey is null || string.CompareOrdinal(k, afterKey) > 0))
                 .OrderBy(k => k, StringComparer.Ordinal).Take(limit + 1).ToArray();
-            var page = new List<AspProviderObject>();
+            var page = new List<AscProviderObject>();
             foreach (var key in keys.Take(limit))
             {
                 ValidateKey(context, key);
                 page.Add(Map(key, await op.StatAsync(NativeKey(key), cancellationToken: CancellationToken.None)));
                 ct.ThrowIfCancellationRequested();
             }
-            return new AspProviderPage(page, keys.Length > limit ? page[^1].Key : null);
+            return new AscProviderPage(page, keys.Length > limit ? page[^1].Key : null);
         }, ct);
     }
 
-    public async ValueTask<AspProviderObject> StatAsync(AspAccessContext context, string key, string? version, string? etag, CancellationToken ct)
+    public async ValueTask<AscProviderObject> StatAsync(AscAccessContext context, string key, string? version, string? etag, CancellationToken ct)
     {
-        ValidateKey(context, key); AspValidation.Require(context.Policy.CanStat && capability.Stat, "forbidden", "Stat is not authorized.");
+        ValidateKey(context, key); AscValidation.Require(context.Policy.CanStat && capability.Stat, "forbidden", "Stat is not authorized.");
         return await RunAsync(async op => await StatCoreAsync(op, key, version, etag, ct), ct);
     }
-    private async Task<AspProviderObject> StatCoreAsync(Operator op, string key, string? version, string? etag, CancellationToken ct)
+    private async Task<AscProviderObject> StatCoreAsync(Operator op, string key, string? version, string? etag, CancellationToken ct)
     {
-        AspValidation.Require(version is null || capability.StatWithVersion, "unsupported_option", "Native version selection is unavailable.");
+        AscValidation.Require(version is null || capability.StatWithVersion, "unsupported_option", "Native version selection is unavailable.");
         var item = Map(key, await op.StatAsync(NativeKey(key), new StatOptions
         {
             Version = version,
             IfMatch = capability.StatWithIfMatch ? etag : null
         }, CancellationToken.None));
         ct.ThrowIfCancellationRequested();
-        AspValidation.Require((version is null || version == item.Version) && (etag is null || etag == item.ETag), "version_unavailable", "The selected object identity changed.");
+        AscValidation.Require((version is null || version == item.Version) && (etag is null || etag == item.ETag), "version_unavailable", "The selected object identity changed.");
         return item;
     }
-    public async ValueTask<AspReadHandle> OpenReadAsync(AspAccessContext context, string key, string? version, string? etag, AspByteRange? range, CancellationToken ct)
+    public async ValueTask<AscReadHandle> OpenReadAsync(AscAccessContext context, string key, string? version, string? etag, AscByteRange? range, CancellationToken ct)
     {
-        ValidateKey(context, key); AspValidation.Require(context.Policy.CanRead && capability.Read, "forbidden", "Read is not authorized.");
+        ValidateKey(context, key); AscValidation.Require(context.Policy.CanRead && capability.Read, "forbidden", "Read is not authorized.");
         await execution.Slots.WaitAsync(ct); Operator? op = null;
         try
         {
             op = Open();
             var item = await StatCoreAsync(op, key, version, etag, ct);
             var offset = range?.Offset ?? 0;
-            AspValidation.Require(offset >= 0 && offset <= item.Length && range?.Length is null or >= 0, "invalid_range", "Invalid byte range.");
-            AspValidation.Require((version is null || capability.ReadWithVersion) && (etag is null || capability.ReadWithIfMatch),
+            AscValidation.Require(offset >= 0 && offset <= item.Length && range?.Length is null or >= 0, "invalid_range", "Invalid byte range.");
+            AscValidation.Require((version is null || capability.ReadWithVersion) && (etag is null || capability.ReadWithIfMatch),
                 "unsupported_option", "The native reader cannot protect this object identity.");
             var length = Math.Min(range?.Length ?? long.MaxValue, item.Length - offset);
             Stream input = length == 0 ? Stream.Null : op.OpenReadStream(NativeKey(key),
@@ -106,11 +106,11 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
         catch (OpenDALException error) { op?.Dispose(); execution.Slots.Release(); throw Error(error); }
         catch { op?.Dispose(); execution.Slots.Release(); throw; }
     }
-    public async ValueTask<IAspWriteHandle> OpenWriteAsync(AspAccessContext context, AspWriteOptions options, CancellationToken ct)
+    public async ValueTask<IAscWriteHandle> OpenWriteAsync(AscAccessContext context, AscWriteOptions options, CancellationToken ct)
     {
         ValidateKey(context, options.Key);
-        AspValidation.Require(context.Policy.CanWrite && capability.Write, "forbidden", "Write is not authorized.");
-        AspValidation.Require(options.Mode is "create" or "replace" && options.ExpectedVersion is null
+        AscValidation.Require(context.Policy.CanWrite && capability.Write, "forbidden", "Write is not authorized.");
+        AscValidation.Require(options.Mode is "create" or "replace" && options.ExpectedVersion is null
             && (options.Mode != "create" || Transfers.CreateOnly)
             && (options.IfMatch is null && options.IfNoneMatch is null || Transfers.ETagConditions)
             && (options.Metadata is null || Transfers.Metadata), "unsupported_option", "The native writer cannot uphold these options.");
@@ -151,20 +151,20 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
         finally { execution.Slots.Release(); }
     }
     private string NativeKey(string key) => encodeKey is null ? key : encodeKey(key);
-    private void Validate(AspAccessContext context)
+    private void Validate(AscAccessContext context)
     {
-        AspValidation.Context(context);
-        AspValidation.Require(context.Store == store, "forbidden", "The exact logical Storage differs from this binding.");
+        AscValidation.Context(context);
+        AscValidation.Require(context.Store == store, "forbidden", "The exact logical Storage differs from this binding.");
     }
-    private void ValidateKey(AspAccessContext context, string key) { Validate(context); AspValidation.DemandKey(context, key); checkKey?.Invoke(key); }
-    private static AspProviderObject Map(string key, Metadata metadata)
+    private void ValidateKey(AscAccessContext context, string key) { Validate(context); AscValidation.DemandKey(context, key); checkKey?.Invoke(key); }
+    private static AscProviderObject Map(string key, Metadata metadata)
     {
-        AspValidation.Require(metadata.IsFile && metadata.ContentLength <= long.MaxValue, "invalid_result", "The backend returned invalid object metadata.");
+        AscValidation.Require(metadata.IsFile && metadata.ContentLength <= long.MaxValue, "invalid_result", "The backend returned invalid object metadata.");
         return new(key, string.IsNullOrEmpty(metadata.Version) ? null : metadata.Version, (long)metadata.ContentLength, null,
             string.IsNullOrEmpty(metadata.ETag) ? null : metadata.ETag,
             new(metadata.ContentType, metadata.ContentEncoding, metadata.ContentDisposition, metadata.CacheControl, metadata.UserMetadata));
     }
-    private static AspException Error(OpenDALException error) => new(error.Code switch
+    private static AscException Error(OpenDALException error) => new(error.Code switch
     {
         ErrorCode.NotFound => "not_found",
         ErrorCode.AlreadyExists or ErrorCode.ConditionNotMatch or ErrorCode.Conflict => "conflict",
@@ -174,16 +174,16 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
         _ => "provider_failure"
     }, "The OpenDAL operation did not produce a confirmed result.");
 
-    private sealed class SingleWriter(Operator op, OpenDalExecutionGate execution, AspWriteOptions options,
-        WriteOptions nativeOptions, int limit, string nativeKey) : IAspWriteHandle
+    private sealed class SingleWriter(Operator op, OpenDalExecutionGate execution, AscWriteOptions options,
+        WriteOptions nativeOptions, int limit, string nativeKey) : IAscWriteHandle
     {
         private readonly MemoryStream buffer = new();
         private bool disposed;
         public Stream Content => buffer;
-        public async ValueTask<AspProviderObject> CompleteAsync(CancellationToken ct)
+        public async ValueTask<AscProviderObject> CompleteAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            AspValidation.Require(buffer.Length <= limit, "limit_exceeded", "Non-progressive native writes are bounded to one ASP chunk.");
+            AscValidation.Require(buffer.Length <= limit, "limit_exceeded", "Non-progressive native writes are bounded to one ASC chunk.");
             try
             {
                 var metadata = await op.WriteAsync(nativeKey, buffer.ToArray(), nativeOptions, CancellationToken.None);
@@ -198,11 +198,11 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
             return ValueTask.CompletedTask;
         }
     }
-    private sealed class Writer(NativeStream content, OperatorOutputStream native, AspWriteOptions options) : IAspWriteHandle
+    private sealed class Writer(NativeStream content, OperatorOutputStream native, AscWriteOptions options) : IAscWriteHandle
     {
         private bool finalized;
         public Stream Content => content;
-        public async ValueTask<AspProviderObject> CompleteAsync(CancellationToken ct)
+        public async ValueTask<AscProviderObject> CompleteAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
             try { await native.CompleteAsync(CancellationToken.None); }
@@ -215,7 +215,7 @@ public sealed class OpenDalObjectProvider : IAspObjectReader, IAspObjectWriter
         public async ValueTask AbortAsync(CancellationToken ct)
         {
             await content.DisposeAsync();
-            if (!finalized) throw new AspException("unknown_outcome", "OpenDAL disposal may close and publish an unfinished writer; rollback is not available.");
+            if (!finalized) throw new AscException("unknown_outcome", "OpenDAL disposal may close and publish an unfinished writer; rollback is not available.");
         }
         public ValueTask DisposeAsync() => content.DisposeAsync();
     }

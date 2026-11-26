@@ -117,9 +117,9 @@ Extensions may advertise `aep.storage-types` version `1.0` through
 `AepExtensionOptions.StorageTypes`. Contributions describe immutable Storage
 implementation versions, typed/protected connection requirements, opaque
 configuration/envelope schemas and digests, actual capabilities/limits, and the
-`asp.content/1` MCP mapping. Requirement-bearing types also advertise bound-value
+`asc.content/1` MCP mapping. Requirement-bearing types also advertise bound-value
 support, plus Secret access for secured requirements. The optional
-[`Agentstration.Asp.Aep`](../asp/README.md) adapter owns the bounded authenticated
+[`Agentstration.Asc.Aep`](../asc/README.md) adapter owns the bounded authenticated
 binding exchange; it keeps credentials/configuration out of content Tool inputs.
 The [product integration](../docs/reference/storage-execution.md) preserves explicit
 manual bindings and independently authorizes originating users and transport callers.
