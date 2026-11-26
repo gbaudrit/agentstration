@@ -13,7 +13,10 @@ inside Runtime. The catalogue will grow through separate packaging requests.
 ## Decision
 
 Use ordinary issue labels `preview:extension:<catalogue-id>` as deployment intent.
-Keep `extension:*` labels for work classification. Admission reads live labels,
+Keep `extension:*` labels for work classification. A trusted-main workflow
+derives selectable labels from the catalogue through the existing label script,
+with issue-write permission and no cloud environment or OIDC. It does not delete
+historical labels or trigger deployment. Admission reads live labels,
 accepts only implemented AEP catalogue entries, freezes a sorted selection, and
 rechecks it before announcing digests. A changed selection requires a new command.
 Labels alone never trigger infrastructure. Preserve the existing ten-input manual

@@ -27,6 +27,15 @@ class WorkflowSecretTests(unittest.TestCase):
     def workflows(self):
         return {path.name: path.read_text() for path in (preview.ROOT / '.github/workflows').glob('preview*.yml')}
 
+    def test_extension_label_sync_is_main_only_and_has_no_cloud_or_dispatch_permission(self):
+        source = self.workflows()['preview-extension-labels.yml']
+        self.assertIn("github.ref == 'refs/heads/main'", source)
+        self.assertIn('branches: [main]', source)
+        self.assertIn('issues: write', source)
+        self.assertIn('-PreviewExtensionsOnly', source)
+        for privileged in ('id-token:', 'environment:', 'secrets: inherit', 'actions: write', 'packages: write'):
+            self.assertNotIn(privileged, source)
+
     def test_all_preview_callers_preserve_the_secret_boundary(self):
         found = {name: assert_secret_boundary(source) for name, source in self.workflows().items()}
         self.assertEqual('deployment', found['preview-on-demand.yml']['execute'])

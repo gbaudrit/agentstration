@@ -5,7 +5,10 @@ param(
     [string] $Repository,
 
     [Parameter()]
-    [switch] $DryRun
+    [switch] $DryRun,
+
+    [Parameter()]
+    [switch] $PreviewExtensionsOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,7 +47,10 @@ if (-not (Test-Path -LiteralPath $labelsPath -PathType Leaf)) {
     throw "Label definition not found: $labelsPath"
 }
 
-$labels = @(Get-Content -LiteralPath $labelsPath -Raw | ConvertFrom-Json)
+$labels = @()
+if (-not $PreviewExtensionsOnly) {
+    $labels = @(Get-Content -LiteralPath $labelsPath -Raw | ConvertFrom-Json)
+}
 # Deployment selection follows the implemented OCI catalogue, independently of
 # extension:* backlog classification. New packaged AEP components need no new list.
 $extensionCatalogue = Join-Path $repositoryRoot 'deploy\images\extensions'
@@ -91,7 +97,7 @@ foreach ($label in $labels) {
 }
 
 if ($DryRun) {
-    Write-Host "Dry run: would create or update $($labels.Count) labels in $Repository from $labelsPath."
+    Write-Host "Dry run: would create or update $($labels.Count) labels in $Repository from label definitions and the OCI catalogue."
     Write-Host 'No label changes were made.'
     $labels | Format-Table -Property name, color, description
     return

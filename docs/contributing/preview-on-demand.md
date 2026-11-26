@@ -181,12 +181,13 @@ extension defaults to its own newest tagged published delivery, independently of
 the server PR, and is frozen by digest. There is no implicit local inference.
 The digest announcement is the reviewable selection for that run.
 
-To expose new packaged entries as selectable GitHub labels, run the existing
-label synchronization script after their catalogue changes merge:
+The **Preview extension labels** workflow synchronizes selectable labels when
+catalogue changes merge to `main`, using only repository issue permissions. It
+does not publish images or deploy resources. For a manual inspection/retry:
 
 ```powershell
-./scripts/github/apply-issue-labels.ps1 -Repository gbaudrit/agentstration -DryRun
-./scripts/github/apply-issue-labels.ps1 -Repository gbaudrit/agentstration
+./scripts/github/apply-issue-labels.ps1 -Repository gbaudrit/agentstration -PreviewExtensionsOnly -DryRun
+./scripts/github/apply-issue-labels.ps1 -Repository gbaudrit/agentstration -PreviewExtensionsOnly
 ```
 
 The script derives deployment labels from the catalogue. A new compatible AEP
