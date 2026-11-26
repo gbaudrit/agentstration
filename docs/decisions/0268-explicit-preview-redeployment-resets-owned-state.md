@@ -21,9 +21,10 @@ it refuses the flag on other operations or unsupported providers.
 
 Freeze the selected current head, labels and private image digests and validate
 private settings before touching the old deployment. Under the existing exclusive
-blob lease, verify scope/repository ownership, withdraw the old route, remove
-owned infrastructure and wait for empty inventory. Remove the owned tunnel,
-record completion of reset, then recreate using the existing deploy path with a
+blob lease, verify scope/repository ownership and audit the current shared Access
+policy before withdrawing the old route or deleting infrastructure. Remove owned
+infrastructure, wait for empty inventory, remove the owned tunnel and record
+completion of reset. Then recreate using the existing deploy path with a
 new owner, expiry and credentials. Shared resources remain. An absent environment
 is created normally. A failed reset prevents recreation; a failed recreation never
 restores deleted data and can resume with ordinary data-preserving deploy.

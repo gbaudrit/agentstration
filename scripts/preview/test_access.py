@@ -320,6 +320,18 @@ class AzureAccessTests(unittest.TestCase):
         self.assertTrue(any(method == 'DELETE' and path.endswith('/' + TUNNEL) for method, path, _ in self.api.changes))
         self.assertEqual('reset', self.cloud.effects[0])
 
+    def test_redeploy_rechecks_shared_access_policy_before_deleting_the_old_environment(self):
+        self.execute('deploy')
+        original = copy.deepcopy(self.cloud.record)
+        self.cloud.effects = []
+        self.api.changes = []
+        self.api.policies[0]['decision'] = 'bypass'
+        with self.assertRaises(ValueError):
+            self.execute('deploy', reset_before_deploy=True)
+        self.assertEqual([], self.cloud.effects)
+        self.assertEqual([], self.api.changes)
+        self.assertEqual(original, self.cloud.record)
+
     def test_publish_redeploy_preserve_and_reset_share_the_provider_lease(self):
         first = self.execute('deploy')
         self.assertEqual('https://dev-pr-17.agentstration.cloud', first['url'])

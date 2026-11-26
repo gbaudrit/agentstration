@@ -486,8 +486,9 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
             if action == 'deploy':
                 if reset_before_deploy and existing_record and not record['destroyed']:
                     # Keep one provider lease across reset and recreation. Never deploy after a partial reset.
-                    routes = route_factory(request, record, client.write, os.environ) if 'access' in record else None
+                    routes = route_factory(request, record, client.write, os.environ)
                     if routes:
+                        routes.audit()
                         routes.withdraw()
                     client.reset(record)
                     resources = client.resources(record)
