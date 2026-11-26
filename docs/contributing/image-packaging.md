@@ -365,8 +365,12 @@ server's optional PostgreSQL storage profile; SQLite remains the product default
 The source `version.txt`, assembly informational version, advertised AEP identity
 and OCI version label share independent version `0.1.0`. AEP `agentstration.io/v1`,
 Storage Type `postgresql.jsonb@1.0.0`, Connected Service Type `postgresql@1.0.0`
-and the `postgresql-jsonb` ASP provider version `1.0.0` retain their existing versions.
-The manifest also advertises the `documents` MCP server at `/mcp`.
+and the `postgresql-jsonb` ASC provider version `1.0.0` retain their existing versions.
+The manifest also advertises the `documents` MCP server at `/mcp`. Its ASC mapping
+uses contract `agentstration.storage.contracts.mcp.v1`, revision `1.0`, MCP version
+`2026-07-28` and document profile `asc.documents/1`, following
+[ADR-0264](../decisions/0264-storage-contract-identity-and-mcp-exposure.md).
+These identities remain independent of the extension package version.
 
 ```sh
 python3 scripts/packaging/images.py describe --extension postgresql
@@ -391,7 +395,7 @@ Environment variables use .NET's `__` separator:
 
 | Variable | Behavior |
 |---|---|
-| `Aep__EnrollmentMode=SharedKeyFile` | Protected AEP/ASP/MCP transport using the existing enrollment mechanism. |
+| `Aep__EnrollmentMode=SharedKeyFile` | Protected AEP/ASC/MCP transport using the existing enrollment mechanism. |
 | `Aep__SharedKeyFile__Path` | Read-only protected key mount, shared with the authority's per-extension trust configuration. |
 | `Aep__SharedKeyFile__ClientId` | Defaults to `agentstration-development`; match it in the explicit caller allowlist. |
 | `Aep__SharedKeyFile__AuthorityUrl`, `PublicEndpoint` | Authority announcement URL and reachable extension URL. Use full `Aep__SharedKeyFile__...` names. |
@@ -422,9 +426,9 @@ reannouncement and preservation of installation/registration identity after both
 containers are recreated. The authority fixture uses the same source, pinned
 base images, SQLite and deterministic AI. These checks require no PostgreSQL
 server or LLM. `PackagingTests` additionally starts the actual extension host and
-lists its ASP MCP tools without a database. The catalogue selects the whole
+lists its ASC MCP tools without a database. The catalogue selects the whole
 `Agentstration.Extensions.PostgreSql.Tests` offline project; real PostgreSQL rows
-are explicitly inconclusive unless `AGENTSTRATION_TEST_ASP_POSTGRES` is supplied.
+are explicitly inconclusive unless `AGENTSTRATION_TEST_ASC_POSTGRES` is supplied.
 
 The existing **Structured documents conformance** workflow remains the real local
 PostgreSQL 17 JSONB provider validation, including AEP/MCP/product-boundary tests.

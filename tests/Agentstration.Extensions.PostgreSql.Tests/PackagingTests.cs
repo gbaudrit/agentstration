@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Security.Cryptography;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using ModelContextProtocol.Client;
@@ -45,15 +45,19 @@ public sealed class PackagingTests
             Assert.AreEqual("1.0.0", storage.PreferredVersion);
             var version = storage.Versions.Single();
             Assert.AreEqual("1.0.0", version.Version);
-            Assert.AreEqual(AspDocuments.Profile, version.Asp.Profile);
+            Assert.AreEqual(AscDocuments.Profile, version.Asc.Profile);
+            Assert.AreEqual(AscContract.Identity, version.Asc.Contract);
+            Assert.AreEqual(AscContract.Version, version.Asc.Revision);
+            Assert.AreEqual(AscContract.McpProtocolVersion, version.Asc.McpProtocolVersion);
+            Assert.AreEqual("1.0.0", version.Asc.ProviderVersion);
             Assert.AreEqual(AepValueProtection.Secured, version.Requirements.Single(value => value.Id == "password").Protection);
             Assert.AreEqual("postgresql", manifest.Contributions.ConnectedServiceTypes!.Single().Id);
             Assert.AreEqual("1.0.0", manifest.Contributions.ConnectedServiceTypes!.Single().PreferredVersion);
             Assert.AreEqual("/mcp", manifest.Mcp!.Servers.Single().Endpoint);
             await using var mcp = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new("http://localhost/mcp") }, client));
             var tools = await mcp.ListToolsAsync();
-            Assert.IsTrue(tools.Any(tool => tool.Name == "aspdoc_get"));
-            Assert.IsTrue(tools.Any(tool => tool.Name == "aspdoc_query"));
+            Assert.IsTrue(tools.Any(tool => tool.Name == "ascdoc_get"));
+            Assert.IsTrue(tools.Any(tool => tool.Name == "ascdoc_query"));
         }
         finally
         {

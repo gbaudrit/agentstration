@@ -39,7 +39,7 @@ foreach ($path in @('src/extensions/Agentstration.Extensions.PostgreSql/PostgreS
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path, 'docs/contributing/image-packaging.md')
     Require (($selection.imageIds -join ',') -eq 'postgresql' -and -not ($selection.dotnet -or $selection.aep -or $selection.container -or $selection.storage)) "PostgreSQL extension-only edits must select targeted validation: $path"
 }
-foreach ($path in @('aep/src/Agentstration.Aep.Abstractions/AepStorage.cs', 'asp/src/Agentstration.Asp.Aep/AspDocumentAepBindings.cs', 'Directory.Build.props')) {
+foreach ($path in @('aep/src/Agentstration.Aep.Abstractions/AepStorage.cs', 'asc/src/Agentstration.Asc.Aep/AscDocumentAepBindings.cs', 'Directory.Build.props')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require ($selection.dotnet -and $selection.imageIds.Contains('postgresql')) "Shared PostgreSQL dependencies must retain transverse and targeted validation: $path"
 }
