@@ -6,9 +6,9 @@ using System.Text;
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.Aep;
-using Agentstration.Asp.Server;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.Aep;
+using Agentstration.Asc.Server;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Aep;
@@ -22,7 +22,7 @@ using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Storage;
 using Agentstration.Storage.Contracts;
-using Asp.Samples.StructuredDocuments;
+using Asc.Samples.StructuredDocuments;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -54,8 +54,8 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
         ResourceScopeRef owner, bool postgres, JsonElement? documentSchema = null,
         Agentstration.Schemas.Contracts.SchemaBinding? schemaBinding = null)
     {
-        var connectionText = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_ASP_POSTGRES");
-        if (postgres && string.IsNullOrWhiteSpace(connectionText)) Assert.Inconclusive("Set AGENTSTRATION_TEST_ASP_POSTGRES for the disposable local provider.");
+        var connectionText = Environment.GetEnvironmentVariable("AGENTSTRATION_TEST_ASC_POSTGRES");
+        if (postgres && string.IsNullOrWhiteSpace(connectionText)) Assert.Inconclusive("Set AGENTSTRATION_TEST_ASC_POSTGRES for the disposable local provider.");
         var connection = new NpgsqlConnectionStringBuilder(connectionText ?? "Host=127.0.0.1;Port=1;Database=fixture;Username=fixture;SslMode=Disable");
         if (postgres) await new PostgreSqlDocumentProvider(connection.ConnectionString, Schema).InitializeAsync(default);
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseUrls("http://127.0.0.1:0"); builder.Logging.ClearProviders();
@@ -68,7 +68,7 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
         builder.Services.AddPostgreSqlDocuments(builder.Configuration);
         builder.Services.AddAepStaticBearerAuthentication(o => o.AddToken("fixture", "product", Credential));
         var factory = new BindingFactory(postgres, secretClient);
-        builder.Services.Replace(ServiceDescriptor.Singleton<IAspDocumentAepBindingFactory>(factory));
+        builder.Services.Replace(ServiceDescriptor.Singleton<IAscDocumentAepBindingFactory>(factory));
         var app = builder.Build(); app.MapPostgreSqlDocuments(); await app.StartAsync();
         try
         {
@@ -183,7 +183,7 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
         catch { await app.StopAsync(); await app.DisposeAsync(); throw; }
     }
 
-    internal sealed class BindingFactory(bool postgres, HttpClient secrets) : IAspDocumentAepBindingFactory
+    internal sealed class BindingFactory(bool postgres, HttpClient secrets) : IAscDocumentAepBindingFactory
     {
         private readonly ConcurrentDictionary<string, MemoryDocumentProvider> providers = new(StringComparer.Ordinal);
         public int Configurations { get; private set; }
@@ -191,16 +191,16 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
         public string? FailureCode { get; set; }
         public AepStorageBindingRequest? Last { get; private set; }
         public IReadOnlyList<AepStorageTypeContribution> Contributions => PostgreSqlStorageTypes.Contributions;
-        public async ValueTask<AspDocumentBinding> CreateAsync(AepStorageBindingRequest request, ClaimsPrincipal caller, CancellationToken ct)
+        public async ValueTask<AscDocumentBinding> CreateAsync(AepStorageBindingRequest request, ClaimsPrincipal caller, CancellationToken ct)
         {
             Configurations++; Last = request;
-            if (FailureCode is { } failure) throw new AspException(failure, "PRIVATE PROVIDER DETAILS");
+            if (FailureCode is { } failure) throw new AscException(failure, "PRIVATE PROVIDER DETAILS");
             var production = new PostgreSqlBindingFactory(new Options(), new Clients(secrets));
             var binding = await production.CreateAsync(request, caller, ct);
             if (postgres) return binding;
-            var declared = request.DocumentCollections!.Value.Deserialize<AspDocumentCollectionDeclaration[]>(AspProtocol.JsonOptions)!.Single();
+            var declared = request.DocumentCollections!.Value.Deserialize<AscDocumentCollectionDeclaration[]>(AscContract.JsonOptions)!.Single();
             var schema = UseWrongDocumentSchema ? Schema : declared.Schema;
-            var memory = providers.GetOrAdd(declared.Id + ":" + AspDocumentValidation.Digest(schema), _ => new(schema, TimeProvider.System));
+            var memory = providers.GetOrAdd(declared.Id + ":" + AscDocumentValidation.Digest(schema), _ => new(schema, TimeProvider.System));
             return binding with { Provider = new MemoryIdentity(memory) };
         }
     }
@@ -225,20 +225,20 @@ internal sealed class StructuredStorageFixture(WebApplication extension, Storage
             return await client.SendAsync(forwarded, ct);
         }
     }
-    private sealed class MemoryIdentity(MemoryDocumentProvider inner) : IAspDocumentProvider, IAspDocumentPublisher, IAspDocumentSubsetProvider
+    private sealed class MemoryIdentity(MemoryDocumentProvider inner) : IAscDocumentProvider, IAscDocumentPublisher, IAscDocumentSubsetProvider
     {
         public string ProviderId => "postgresql-jsonb";
         public string ProviderVersion => "1.0.0";
         public JsonElement ConfigurationSchema => PostgreSqlStorageTypes.ConfigurationSchema;
         public JsonElement DocumentSchema => inner.DocumentSchema;
-        public IReadOnlyList<AspQueryProfileDescriptor> QueryProfiles => inner.QueryProfiles;
-        public ValueTask<AspDocument> GetAsync(AspDocumentContext c, AspDocumentGet r, CancellationToken ct) => inner.GetAsync(c, r, ct);
-        public ValueTask<AspDocument> PutAsync(AspDocumentContext c, AspDocumentPut r, CancellationToken ct) => inner.PutAsync(c, r, ct);
-        public ValueTask<AspDocumentDeleted> DeleteAsync(AspDocumentContext c, AspDocumentDelete r, CancellationToken ct) => inner.DeleteAsync(c, r, ct);
-        public ValueTask<AspDocumentProviderPage> QueryAsync(AspDocumentContext c, AspDocumentQuery r, string? p, CancellationToken ct) => inner.QueryAsync(c, r, p, ct);
-        public ValueTask<AspDocumentPublication> PrepareAsync(AspDocumentContext c, AspDocumentPrepare r, CancellationToken ct) => inner.PrepareAsync(c, r, ct);
-        public ValueTask<AspDocumentPublication> SealAsync(AspDocumentContext c, AspDocumentPublicationRequest r, CancellationToken ct) => inner.SealAsync(c, r, ct);
-        public ValueTask<AspDocumentPublication> InspectAsync(AspDocumentContext c, AspDocumentPublicationRequest r, CancellationToken ct) => inner.InspectAsync(c, r, ct);
-        public ValueTask RetireAsync(AspDocumentContext c, AspDocumentPublicationRequest r, CancellationToken ct) => inner.RetireAsync(c, r, ct);
+        public IReadOnlyList<AscQueryProfileDescriptor> QueryProfiles => inner.QueryProfiles;
+        public ValueTask<AscDocument> GetAsync(AscDocumentContext c, AscDocumentGet r, CancellationToken ct) => inner.GetAsync(c, r, ct);
+        public ValueTask<AscDocument> PutAsync(AscDocumentContext c, AscDocumentPut r, CancellationToken ct) => inner.PutAsync(c, r, ct);
+        public ValueTask<AscDocumentDeleted> DeleteAsync(AscDocumentContext c, AscDocumentDelete r, CancellationToken ct) => inner.DeleteAsync(c, r, ct);
+        public ValueTask<AscDocumentProviderPage> QueryAsync(AscDocumentContext c, AscDocumentQuery r, string? p, CancellationToken ct) => inner.QueryAsync(c, r, p, ct);
+        public ValueTask<AscDocumentPublication> PrepareAsync(AscDocumentContext c, AscDocumentPrepare r, CancellationToken ct) => inner.PrepareAsync(c, r, ct);
+        public ValueTask<AscDocumentPublication> SealAsync(AscDocumentContext c, AscDocumentPublicationRequest r, CancellationToken ct) => inner.SealAsync(c, r, ct);
+        public ValueTask<AscDocumentPublication> InspectAsync(AscDocumentContext c, AscDocumentPublicationRequest r, CancellationToken ct) => inner.InspectAsync(c, r, ct);
+        public ValueTask RetireAsync(AscDocumentContext c, AscDocumentPublicationRequest r, CancellationToken ct) => inner.RetireAsync(c, r, ct);
     }
 }

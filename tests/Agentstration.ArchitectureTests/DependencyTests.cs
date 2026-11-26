@@ -71,7 +71,7 @@ public sealed class DependencyTests
         var references = Directory.EnumerateFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
             .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.PostgreSql.csproj", StringComparison.Ordinal)).ToArray();
         CollectionAssert.AreEqual(new[] { appHostProject }, references);
-        var generic = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "asp", "src", "Agentstration.Asp.Abstractions", "Agentstration.Asp.Abstractions.csproj"));
+        var generic = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "asc", "src", "Agentstration.Asc.Abstractions", "Agentstration.Asc.Abstractions.csproj"));
         Assert.DoesNotContain("OData", generic, StringComparison.Ordinal);
         Assert.DoesNotContain("Npgsql", generic, StringComparison.Ordinal);
     }
@@ -898,7 +898,7 @@ public sealed class DependencyTests
             "Agentstration.Extensions", "Agentstration.Infrastructure", "Agentstration.Web"
         };
         Assert.IsFalse(references.Any(reference => forbidden.Contains(reference, StringComparer.Ordinal)
-            || reference.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+            || reference.StartsWith("Agentstration.Asc.", StringComparison.Ordinal)
             || reference.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
             || reference.Contains("EntityFramework", StringComparison.Ordinal)));
         var projects = new[] { "Agentstration.Storage", "Agentstration.Storage.Contracts", "Agentstration.Storage.Api" };
@@ -913,15 +913,15 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void StorageContentPortsRemainNeutralAndAspConfigurationCannotDependOnProductResources()
+    public void StorageContentPortsRemainNeutralAndAscConfigurationCannotDependOnProductResources()
     {
         Assert.AreEqual(typeof(IStorageResolver).Assembly, typeof(IStorageContentGateway).Assembly);
         var contracts = typeof(IStorageContentGateway).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
-        Assert.IsFalse(contracts.Any(name => name.StartsWith("Agentstration.Asp.", StringComparison.Ordinal)
+        Assert.IsFalse(contracts.Any(name => name.StartsWith("Agentstration.Asc.", StringComparison.Ordinal)
             || name.StartsWith("Agentstration.Aep.", StringComparison.Ordinal)
             || name.Contains("EntityFramework", StringComparison.Ordinal)
             || name is "Agentstration.Infrastructure" or "Agentstration.Web"));
-        var adapter = typeof(Agentstration.Asp.Aep.AspAepBindings).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
+        var adapter = typeof(Agentstration.Asc.Aep.AscAepBindings).Assembly.GetReferencedAssemblies().Select(a => a.Name!).ToArray();
         Assert.IsFalse(adapter.Any(name => name.StartsWith("Agentstration.Storage", StringComparison.Ordinal)
             || name.StartsWith("Agentstration.ConnectedServices", StringComparison.Ordinal)
             || name.StartsWith("Agentstration.Identity", StringComparison.Ordinal)

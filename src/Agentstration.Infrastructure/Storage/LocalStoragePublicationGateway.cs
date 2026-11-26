@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
@@ -10,7 +10,7 @@ using Agentstration.Storage.Contracts;
 
 namespace Agentstration.Infrastructure.Storage;
 
-/// <summary>Local retained publications use a separate namespace from mutable ASP objects.</summary>
+/// <summary>Local retained publications use a separate namespace from mutable ASC objects.</summary>
 public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IStorageContentGateway content, IResourceStore resources,
     LocalStoragePaths paths, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock, StorageContentOptions? options = null) : IStoragePublicationGateway
 {
@@ -253,7 +253,7 @@ public sealed class LocalStoragePublicationGateway(IStorageResolver resolver, IS
     private static async Task<T> GuardAsync<T>(Func<Task<T>> action)
     {
         try { return await action(); }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or AspException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or AscException)
         { throw Error("storage_publication_unavailable", "The exact publication backend is unavailable or invalid."); }
     }
     private static bool AllowsKey(StorageContentPolicy policy, string key) => key.StartsWith(policy.Prefix, StringComparison.Ordinal)

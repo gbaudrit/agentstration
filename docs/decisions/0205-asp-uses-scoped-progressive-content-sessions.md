@@ -4,6 +4,8 @@
 
 Proposed
 
+Naming and unreleased wire identities superseded by [ADR-0264](0264-storage-contract-identity-and-mcp-exposure.md); behavioral decisions below remain the baseline.
+
 ## Context
 
 FR #1085 extends the unreleased ASP SDK for binary, text and large content. A

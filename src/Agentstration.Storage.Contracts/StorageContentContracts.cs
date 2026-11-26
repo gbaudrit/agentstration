@@ -22,7 +22,7 @@ public sealed record StorageWrite(string RequestId, DateTimeOffset NotAfter, str
 /// <summary>Each operation reauthorizes an exact Storage. No session is an authorization cache.</summary>
 public interface IStorageContentGateway
 {
-    // Provider-qualified retirement of a producer-owned exact result; never inferred from generic ASP delete.
+    // Provider-qualified retirement of a producer-owned exact result; never inferred from generic ASC delete.
     Task<bool> RetireAsync(StorageContentRequest target, StorageObject exact, CancellationToken cancellationToken = default) => Task.FromResult(false);
 
     Task ValidateAsync(StorageContentRequest target, CancellationToken cancellationToken = default);
@@ -37,8 +37,13 @@ public interface IStorageContentGateway
 }
 
 /// <summary>Versioned protocol mapping; contains no credentials or physical target configuration.</summary>
-public sealed record StorageAspBindingDescriptor(string Profile, string McpServer, string ToolPrefix,
-    string ProviderId, string ProviderVersion, string BindingPath);
+public sealed record StorageAscBindingDescriptor(string Profile, string McpServer, string ToolPrefix,
+    string ProviderId, string ProviderVersion, string BindingPath)
+{
+    public required string Contract { get; init; }
+    public required string Revision { get; init; }
+    public required string McpProtocolVersion { get; init; }
+}
 
 /// <summary>Pure provider-owned validation in addition to the immutable JSON schemas. Never resolves values or performs I/O.</summary>
 public interface IStorageDefinitionValidator
