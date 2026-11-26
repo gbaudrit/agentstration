@@ -287,6 +287,18 @@ def failure_stage():
                 'cancelled' if 'cancelled' in stages.values() else 'execute')
 
 
+def report_result():
+    # Azure login masks subscription IDs, which can suppress otherwise public job outputs.
+    # The workflow downloads only this run/attempt's existing public result artifact.
+    if os.environ.get('RESULT_FILE'):
+        with open(os.environ['RESULT_FILE'], encoding='utf-8') as file:
+            text = file.read(65537)
+    else:
+        text = os.environ.get('RESULT_JSON', '')
+    preview.require(bool(text), 'Verified lifecycle result is missing; inspect the result artifact.')
+    return contract.parse(text)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('mode', choices=('admit', 'tracking', 'plan', 'report'))
@@ -332,7 +344,7 @@ def main():
                                     'Frozen extension deliveries differ from the issue labels.')
                 message = plan_message(request, operation, run_url, repository)
             elif os.environ['EXECUTION_RESULT'] == 'success':
-                result = contract.parse(os.environ['RESULT_JSON'])
+                result = report_result()
                 preview.require(result['environmentId'] == environment, 'Result targets another environment.')
                 state = result['state']
                 preview.require(state in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy', 'provisioning', 'drifted'), 'Invalid preview result state.')

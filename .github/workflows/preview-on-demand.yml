@@ -239,6 +239,12 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Read the current attempt's public lifecycle result
+        if: needs.execute.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: preview-result-${{ fromJSON(needs.boundary.outputs.selection || inputs.selection).environment_id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-feedback
       - name: Report verified result or bounded failure to the originating issue or PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -249,5 +255,5 @@ jobs:
           STAGE_RESULTS: ${{ toJSON(needs) }}
           SELECTION_FAILURE: ${{ needs.select.outputs.failure }}
           EXECUTION_RESULT: ${{ needs.execute.result }}
-          RESULT_JSON: ${{ needs.execute.outputs.result }}
+          RESULT_FILE: ${{ runner.temp }}/preview-feedback/preview-result.json
         run: python3 scripts/preview/issue_commands.py report
