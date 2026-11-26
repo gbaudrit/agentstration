@@ -5,34 +5,34 @@ import re
 import contract
 import preview
 
-OPERATIONS = {'deploy': 'Déploiement', 'status': 'État de la prévisualisation', 'destroy': 'Suppression'}
+OPERATIONS = {'deploy': 'Deployment', 'status': 'Preview status', 'destroy': 'Removal'}
 
 
 def revision(repository, sha):
-    return '[' + sha[:12] + '](https://github.com/' + repository + '/commit/' + sha + ')' if preview.SHA.fullmatch(sha or '') else 'non résolue'
+    return '[' + sha[:12] + '](https://github.com/' + repository + '/commit/' + sha + ')' if preview.SHA.fullmatch(sha or '') else 'not resolved'
 
 
 def extension_names(values):
-    return ', '.join('`' + name.removeprefix('extension-') + '`' for name in values) or 'aucune — serveur et worker MAF uniquement'
+    return ', '.join('`' + name.removeprefix('extension-') + '`' for name in values) or 'none — server and MAF worker only'
 
 
 def actions():
-    return ('**Commandes :** `/preview status` pour vérifier l’état · `/preview deploy` pour mettre à jour en conservant les données · '
-            '`/preview destroy` pour supprimer la preview **et ses données**.')
+    return ('**Commands:** `/preview status` to check the environment · `/preview deploy` to update while preserving data · '
+            '`/preview destroy` to remove the preview **and its data**.')
 
 
 def expiry(value):
     try:
         date = datetime.fromisoformat(value)
         if date.tzinfo is None:
-            return 'non disponible'
-        return date.astimezone(timezone.utc).strftime('%d/%m/%Y à %H:%M UTC')
+            return 'not available'
+        return date.astimezone(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
     except (TypeError, ValueError):
-        return 'non disponible'
+        return 'not available'
 
 
 def details(request):
-    lines = ['<details><summary>Images exactes utilisées</summary>', '', '| Composant | Version | Image par digest |', '| --- | --- | --- |']
+    lines = ['<details><summary>Exact images used</summary>', '', '| Component | Version | Image by digest |', '| --- | --- | --- |']
     for name, image in contract.images(request).items():
         lines.append('| ' + name + ' | ' + image.get('version', '—')[:120] + ' | `' + image['reference'] + '` |')
     return '\n'.join([*lines, '', '</details>'])
@@ -40,71 +40,71 @@ def details(request):
 
 def accepted(options, repository, run_url):
     operation = options['operation']
-    lines = ['**' + OPERATIONS[operation] + ' — demande reçue**',
-             'Environnement : `' + options['environment_id'] + '`.']
+    lines = ['**' + OPERATIONS[operation] + ' — request received**',
+             'Environment: `' + options['environment_id'] + '`.']
     if operation == 'deploy':
-        lines += ['Révision serveur : ' + revision(repository, options['revision']) + '.',
-                  'Base : **' + options['database'] + '**. Extensions : ' + extension_names(options.get('extensions', [])) + '.',
-                  'Étape suivante : vérifier les images publiées et les paramètres du déploiement. Aucune VM n’a encore été créée par cette demande.']
+        lines += ['Server revision: ' + revision(repository, options['revision']) + '.',
+                  'Database: **' + options['database'] + '**. Extensions: ' + extension_names(options.get('extensions', [])) + '.',
+                  'Next: check published images and deployment settings. This request has not created a VM yet.']
     elif operation == 'destroy':
-        lines.append('La suppression complète de la VM, de ses disques/IP et des données de cette preview est demandée.')
+        lines.append('Full removal of this preview’s VM, disks/IP and application data has been requested.')
     else:
-        lines.append('Lecture de l’environnement enregistré ; les labels et révisions actuels ne modifient pas ce contrôle.')
-    return '\n\n'.join([*lines, '[Suivre le traitement](' + run_url + ').'])
+        lines.append('Reading the recorded environment; current labels and revisions do not change this check.')
+    return '\n\n'.join([*lines, '[Follow progress](' + run_url + ').'])
 
 
 def planned(request, operation, repository, run_url):
-    lines = ['**' + OPERATIONS[operation] + ' — vérifications terminées**',
-             'Environnement : `' + request['environmentId'] + '`.',
-             'Révision serveur : ' + revision(repository, request['sourceSha']) + '.',
-             'Base : **' + request['database'] + '**. Extensions : ' + extension_names(request.get('extensions', {})) + '.']
+    lines = ['**' + OPERATIONS[operation] + ' — checks completed**',
+             'Environment: `' + request['environmentId'] + '`.',
+             'Server revision: ' + revision(repository, request['sourceSha']) + '.',
+             'Database: **' + request['database'] + '**. Extensions: ' + extension_names(request.get('extensions', {})) + '.']
     if operation == 'deploy':
         target = request['target']
-        lines += ['Machine : **' + target['vmSize'] + '**, région **' + target['region'] + '**.',
-                  'Les images sont disponibles. Le déploiement va démarrer dès que son créneau d’exécution sera disponible.',
-                  '**Durée prévue : ' + str(request['ttlHours']) + ' h. L’arrêt automatique n’est pas encore actif ; utilisez `/preview destroy` après le test.**']
+        lines += ['VM: **' + target['vmSize'] + '**, region: **' + target['region'] + '**.',
+                  'The images are available. Deployment will start when its execution slot is available.',
+                  '**Recorded lifetime: ' + str(request['ttlHours']) + ' h. Automatic expiry cleanup is not implemented yet; use `/preview destroy` after testing.**']
     elif operation == 'destroy':
-        lines.append('La suppression va retirer les ressources propres à cette preview et **effacer ses données**.')
-    return '\n\n'.join([*lines, '[Exécution du workflow](' + run_url + ').', details(request)])
+        lines.append('Removal will delete this preview’s owned resources and **erase its application data**.')
+    return '\n\n'.join([*lines, '[Workflow execution](' + run_url + ').', details(request)])
 
 
 def completed(result, operation, repository, run_url, request=None):
     state = result['state']
-    titles = {'running': 'Prévisualisation prête', 'destroyed': 'Prévisualisation supprimée', 'absent': 'Aucun environnement actif',
-              'stopped': 'Prévisualisation arrêtée', 'unhealthy': 'Prévisualisation indisponible',
-              'provisioning': 'Prévisualisation en cours de démarrage', 'drifted': 'Configuration de la prévisualisation à vérifier'}
+    titles = {'running': 'Preview ready', 'destroyed': 'Preview removed', 'absent': 'No active environment',
+              'stopped': 'Preview stopped', 'unhealthy': 'Preview unavailable',
+              'provisioning': 'Preview starting', 'drifted': 'Preview configuration needs attention'}
     if state == 'running' and not result.get('url'):
-        titles[state] = 'Environnement démarré — accès non confirmé'
-    lines = ['**' + titles[state] + '**', 'Environnement : `' + result['environmentId'] + '`.']
+        titles[state] = 'Environment running — access not confirmed'
+    lines = ['**' + titles[state] + '**', 'Environment: `' + result['environmentId'] + '`.']
     if result.get('url'):
-        lines += ['[**Ouvrir Agentstration**](' + result['url'] + ')', 'Accès protégé par Cloudflare Access / Entra.']
+        lines += ['[**Open Agentstration**](' + result['url'] + ')', 'Access protected by Cloudflare Access / Entra.']
     if state == 'destroyed':
-        lines.append('La VM, les disques/IP et les données propres à cette preview ont été supprimés. Les services partagés sont conservés.')
+        lines.append('This preview’s VM, disks/IP and application data have been removed. Shared services are retained.')
     elif state == 'absent':
-        lines.append('Utilisez `/preview deploy` pour créer une prévisualisation.')
+        lines.append('Use `/preview deploy` to create a preview.')
     else:
         sha = result.get('sourceSha') or (request or {}).get('sourceSha')
         if sha:
-            lines.append('Révision serveur : ' + revision(repository, sha) + '.')
+            lines.append('Server revision: ' + revision(repository, sha) + '.')
         if result.get('database'):
-            lines.append('Base : **' + result['database'] + '**.')
+            lines.append('Database: **' + result['database'] + '**.')
         selected = (request or {}).get('extensions')
         if selected is None:
             selected = [name for name in result.get('images', {}) if name.startswith('extension-')]
-        lines.append('Extensions : ' + extension_names(selected) + '.')
+        lines.append('Extensions: ' + extension_names(selected) + '.')
         if request:
-            lines.append('Machine : **' + request['target']['vmSize'] + '**, région **' + request['target']['region'] + '**.')
+            lines.append('VM: **' + request['target']['vmSize'] + '**, region: **' + request['target']['region'] + '**.')
         if state == 'running':
             if not result.get('url'):
-                lines.append('L’URL est masquée : l’accès protégé n’a pas pu être confirmé par ce contrôle.')
-            lines += ['Échéance prévue : **' + expiry(result.get('expiresAt')) + '**.',
-                      '**L’arrêt automatique n’est pas encore actif. Supprimez la preview après le test pour libérer ses ressources.**']
+                lines.append('The URL is withheld: this check could not confirm protected access.')
+            lines += ['Recorded expiry: **' + expiry(result.get('expiresAt')) + '**.',
+                      '**Automatic expiry cleanup is not implemented yet. Remove the preview after testing to release its resources.**']
         elif state == 'stopped':
-            lines.append('Les données sont conservées ; des disques/IP peuvent rester facturés. `/preview destroy` les supprime.')
+            lines.append('Data is retained; disks/IP may still incur charges. Use `/preview destroy` to remove them.')
         else:
-            lines.append('L’URL est masquée tant que la disponibilité et la protection ne sont pas confirmées.')
+            lines.append('The URL is withheld until availability and protection are confirmed.')
         lines.append(actions())
-    lines.append('[Détails de l’exécution](' + run_url + ').')
+    lines.append('[Execution details](' + run_url + ').')
     if request:
         lines.append(details(request))
     return '\n\n'.join(lines)
@@ -118,35 +118,35 @@ def failed(operation, repository, run_url, stage, options, failure=None):
     code = failure.get('code')
     preview.require(code not in ('image-unavailable', 'registry-access') or component is not None, 'Missing failure component.')
     reasons = {
-        'boundary': ('La commande n’a pas passé les contrôles d’autorisation ou de cohérence.',
-                     'Vérifiez vos droits, l’ouverture de la PR/issue et ses labels, puis publiez une nouvelle commande non éditée.'),
-        'select': ('La vérification des images ou des paramètres a échoué.',
-                   'Vérifiez les publications GHCR privées, leurs accès Actions et les paramètres Azure de l’environnement.'),
-        'recorded': ('L’environnement enregistré n’a pas pu être lu.',
-                     'Vérifiez qu’un déploiement existe pour cet environnement et consultez l’étape de lecture de l’état.'),
-        'announce': ('Le contrôle final avant exécution a échoué.',
-                     'Les labels, l’état de la PR/issue ou les droits ont pu changer. Publiez une nouvelle commande après vérification.'),
-        'execute': ('L’opération Azure ou les contrôles de disponibilité/protection ont échoué.',
-                    'Utilisez `/preview status` pour vérifier les ressources restantes, puis `/preview deploy` pour réessayer ou `/preview destroy` pour nettoyer.'),
-        'cancelled': ('L’exécution a été annulée.', 'Vérifiez l’état avec `/preview status` avant de relancer une commande.')}
+        'boundary': ('The command failed authorization or consistency checks.',
+                     'Check your repository access, the issue/PR open state and its labels, then post a new, unedited command.'),
+        'select': ('Image or deployment setting checks failed.',
+                   'Check private GHCR publications, their Actions access and the Azure environment settings.'),
+        'recorded': ('The recorded environment could not be read.',
+                     'Check that a deployment exists for this environment and inspect the saved-state reading step.'),
+        'announce': ('The final check before execution failed.',
+                     'Labels, issue/PR state or permissions may have changed. Check them and post a new command.'),
+        'execute': ('The Azure operation or availability/protection checks failed.',
+                    'Use `/preview status` to inspect remaining resources, then `/preview deploy` to retry or `/preview destroy` to clean up.'),
+        'cancelled': ('Execution was cancelled.', 'Check the environment with `/preview status` before retrying.')}
     reason, next_step = reasons.get(stage, reasons['execute'])
     if code == 'image-unavailable':
-        reason = 'L’image ' + ('serveur' if component == 'server' else 'du worker MAF' if component == 'maf-worker' else 'de l’extension `' + component + '`') + ' n’est pas disponible pour la révision demandée.'
-        next_step = ('Lancez **OCI images** avec `extension=' + component + '` et `publish_preview=true` sur la révision à publier, puis relancez `/preview deploy`. '
-                     'Publier une extension ne publie pas l’image serveur de la PR.')
+        reason = 'The ' + ('server' if component == 'server' else 'MAF worker' if component == 'maf-worker' else '`' + component + '` extension') + ' image is unavailable for the requested selection.'
+        next_step = ('Run **OCI images** with `extension=' + component + '` and `publish_preview=true` on the revision to publish, then retry `/preview deploy`. '
+                     'Publishing an extension does not publish the PR’s server image.')
     elif code == 'registry-access':
-        reason = 'Le package GHCR privé de `' + component + '` est absent ou inaccessible au workflow.'
-        next_step = 'Vérifiez sa visibilité **Private** et **Manage Actions access → gbaudrit/agentstration → Write**, puis relancez la commande.'
-    lines = ['**' + OPERATIONS[operation] + ' — échec**', reason]
+        reason = 'The private GHCR package for `' + component + '` is missing or inaccessible to the workflow.'
+        next_step = 'Check its **Private** visibility and **Manage Actions access → gbaudrit/agentstration → Write**, then retry the command.'
+    lines = ['**' + OPERATIONS[operation] + ' — failed**', reason]
     if options.get('environment_id'):
-        lines.append('Environnement : `' + options['environment_id'] + '`.')
+        lines.append('Environment: `' + options['environment_id'] + '`.')
     if preview.SHA.fullmatch(options.get('revision') or ''):
-        lines.append('Révision demandée : ' + revision(repository, options['revision']) + '.')
+        lines.append('Requested revision: ' + revision(repository, options['revision']) + '.')
     if operation == 'deploy':
-        lines.append('Base demandée : **' + options.get('database', 'sqlite') + '**. Extensions : ' + extension_names(options.get('extensions', [])) + '.')
-    lines.append('**À faire :** ' + next_step)
+        lines.append('Requested database: **' + options.get('database', 'sqlite') + '**. Extensions: ' + extension_names(options.get('extensions', [])) + '.')
+    lines.append('**Next action:** ' + next_step)
     if stage in ('boundary', 'select', 'recorded', 'announce'):
-        lines.append('L’exécution du déploiement Azure n’a pas été lancée par cette tentative.')
+        lines.append('Azure deployment execution was not started by this attempt.')
     else:
-        lines.append('Des ressources peuvent subsister après cet échec ; aucun lien d’accès non vérifié n’est publié.')
-    return '\n\n'.join([*lines, '[Voir l’étape en échec](' + run_url + ').'])
+        lines.append('Resources may remain after this failure; no unverified access URL is published.')
+    return '\n\n'.join([*lines, '[Inspect the failed step](' + run_url + ').'])

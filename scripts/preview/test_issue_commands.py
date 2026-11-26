@@ -282,12 +282,12 @@ class TrackingAndFeedbackTests(unittest.TestCase):
         self.assertIn(request['sourceSha'], github.feedback())
         self.assertIn(request['deliveries']['server']['digest'], github.feedback())
         self.assertIn(request['deliveries']['worker']['digest'], github.feedback())
-        self.assertIn('L’arrêt automatique n’est pas encore actif', github.feedback())
+        self.assertIn('Automatic expiry cleanup is not implemented yet', github.feedback())
         github.calls = []
         status, _ = self.run_mode('report', {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy', 'EXECUTION_RESULT': 'failure',
                                           'RESULT_JSON': 'private-provider-body'}, github)
         self.assertEqual(0, status)
-        self.assertIn('aucun lien d’accès non vérifié', github.feedback())
+        self.assertIn('no unverified access URL', github.feedback())
         self.assertNotIn('private-provider-body', github.feedback())
 
     def test_revocation_or_request_substitution_stops_the_pre_execution_announcement(self):
@@ -410,14 +410,14 @@ class PullRequestTests(unittest.TestCase):
         self.assertEqual([PREFIX + '/issues/17/comments'], posts)
         self.assertEqual([PREFIX + '/issues/comments/701'] * 2, patches)
         card = github.card['body']
-        for text in ('Prévisualisation prête', 'dev-pr-17.agentstration.cloud', SHA[:12], '**sqlite**',
-                     '26/11/2026 à 18:30 UTC', '/preview destroy', '<details>', request['deliveries']['server']['digest']):
+        for text in ('Preview ready', 'dev-pr-17.agentstration.cloud', SHA[:12], '**sqlite**',
+                     '2026-11-26 18:30 UTC', '/preview destroy', '<details>', request['deliveries']['server']['digest']):
             self.assertIn(text, card)
         # A later status/failure summary is allowed even if the PR closes or labels change during execution.
         github.issue.update(state='closed', labels=[])
         self.assertEqual(0, self.run_mode('report', {**variables, 'EXECUTION_RESULT': 'failure', 'RESULT_JSON': 'PRIVATE RESPONSE'}, github)[0])
         self.assertNotIn('PRIVATE RESPONSE', github.card['body'])
-        self.assertNotIn('Ouvrir Agentstration', github.card['body'])
+        self.assertNotIn('Open Agentstration', github.card['body'])
 
     def test_card_ownership_context_and_entire_frozen_selection_are_verified(self):
         for change in ('user', 'other-bot', 'other-issue', 'marker', 'source', 'feedback-id', 'extension'):
@@ -453,12 +453,12 @@ class PullRequestTests(unittest.TestCase):
                          'STAGE_RESULTS': json.dumps({stage: {'result': 'failure', 'outputs': {'ignored': 'PRIVATE'}}}),
                          'EXECUTION_RESULT': 'skipped', 'RESULT_JSON': 'PRIVATE'}
             self.assertEqual(0, self.run_mode('report', variables, github)[0])
-            self.assertIn('**À faire :**', github.card['body'])
+            self.assertIn('**Next action:**', github.card['body'])
             self.assertNotIn('PRIVATE', github.card['body'])
             if stage != 'execute':
-                self.assertIn('n’a pas été lancée', github.card['body'])
+                self.assertIn('was not started', github.card['body'])
             else:
-                self.assertIn('Des ressources peuvent subsister', github.card['body'])
+                self.assertIn('Resources may remain', github.card['body'])
 
     def test_missing_image_and_package_access_have_specific_safe_remediation(self):
         for code, expected in (('image-unavailable', 'extension=server'), ('registry-access', 'Manage Actions access')):
@@ -480,7 +480,7 @@ class PullRequestTests(unittest.TestCase):
             return github(path, method, body)
         self.assertFalse(commands.admit(github.event(), REPOSITORY, call))
         self.assertEqual(1, sum(path.endswith('/comments') and method == 'POST' for path, method, _ in github.calls))
-        self.assertIn('lancement du workflow a échoué', github.card['body'])
+        self.assertIn('Workflow dispatch failed', github.card['body'])
 
     def test_legacy_issue_selection_without_card_or_kind_remains_accepted(self):
         github = GitHub()

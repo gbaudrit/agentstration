@@ -37,7 +37,7 @@ the original user command or another bot's comment. Keep legacy in-flight issue
 selections without card identifiers compatible. A new command gets its own card,
 so concurrent command histories cannot replace each other's source selection.
 
-Render French operator feedback: requested/checked/completed state, short linked
+Render English operator feedback: requested/checked/completed state, short linked
 server commit, database and selected extensions, VM/region when known, verified
 protected URL, expiry limitation, relevant lifecycle commands and workflow link.
 Keep full component versions/digests in collapsed details. Missing image/private

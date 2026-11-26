@@ -163,7 +163,7 @@ def context(options, repository, issue, current, call):
 
 def safe_error(error):
     if type(error) is ValueError and str(error).startswith('Extension has no implemented image catalogue: '):
-        return 'Une extension sélectionnée n’est pas encore disponible dans le catalogue de main. Fusionnez son packaging, vérifiez sa publication privée GHCR, puis republiez /preview deploy.'
+        return 'A selected extension is not yet available in the main catalogue. Merge its packaging, verify its private GHCR publication, then post /preview deploy again.'
     return str(error) if type(error) is ValueError or isinstance(error, manual.Unavailable) else 'Preview request failed; inspect the trusted workflow run. Remote content is withheld.'
 
 
@@ -211,9 +211,9 @@ def admit(event, repository, call=api, selector=None):
              {'ref': 'main', 'inputs': {'selection': json.dumps(options)}})
         return True
     except (ValueError, RuntimeError, KeyError, TypeError, AttributeError) as error:
-        message = '**Commande non exécutée**\n\n' + safe_error(error)
+        message = '**Command not executed**\n\n' + safe_error(error)
         if options and options.get('tracking_feedback'):
-            publish(options, repository, message + '\n\nLe lancement du workflow a échoué. Vérifiez les permissions Actions et publiez une nouvelle commande.', call)
+            publish(options, repository, message + '\n\nWorkflow dispatch failed. Check Actions permissions and post a new command.', call)
         else:
             reply(repository, issue, message, call)
         return False
