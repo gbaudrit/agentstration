@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -398,6 +399,14 @@ public sealed partial class OpenApiExtensionTests
         var manifest = await new AepClient(factory.CreateClient()).GetManifestAsync();
 
         Assert.AreEqual("Agentstration.Extensions.OpenApi", manifest.Extension.Id);
+        var assembly = typeof(OpenApiOptions).Assembly;
+        var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
+        Assert.AreEqual("0.1.0", version);
+        Assert.AreEqual(version, manifest.Extension.Version);
+        Assert.AreEqual(new Version(0, 1, 0, 0), assembly.GetName().Version);
+        Assert.AreEqual("agentstration.io/v1", manifest.ProtocolVersion);
+        Assert.AreEqual("1.0.0", manifest.Contributions.SchemaFormats?.Single().Version);
+        Assert.AreEqual("1.0.0", manifest.Contributions.ConnectedServiceTypes?.Single().PreferredVersion);
         Assert.AreEqual("openapi", manifest.Contributions.SchemaFormats?.Single().Format);
         CollectionAssert.AreEquivalent(new[] { "openapi.contract.discover", "openapi.operation.invoke" },
             manifest.Contributions.Tools?.Select(value => value.Id).ToArray());

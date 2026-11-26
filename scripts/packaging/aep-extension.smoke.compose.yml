@@ -31,6 +31,7 @@ services:
 
   extension:
     image: ${SMOKE_EXTENSION_IMAGE:?Supply the exact AEP extension delivery digest}
+    env_file: ${SMOKE_DIRECTORY}/extension.env
     pull_policy: never
     user: "${SMOKE_UID:?Supply the host test user}:${SMOKE_GID:?Supply the host test group}"
     ports: ["127.0.0.1::8080"]

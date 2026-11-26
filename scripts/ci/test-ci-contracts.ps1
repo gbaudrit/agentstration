@@ -22,11 +22,11 @@ foreach ($path in @('aep/src/Agentstration.Aep.Abstractions/AepProtocol.cs', 'Di
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require ($selection.dotnet -and $selection.extensionImages) "Shared image inputs lost product or image validation: $path"
 }
-foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Extensions.Contracts/ExtensionContracts.cs', 'src/extensions/Agentstration.Extensions.OpenApi/Program.cs', 'src/extensions/Unknown/Program.cs', 'deploy/images/extensions/openapi.json')) {
+foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Extensions.Contracts/ExtensionContracts.cs', 'src/extensions/Unknown/Program.cs')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', $path)
     Require ($selection.dotnet -and $selection.container -and $selection.extensionImages) "Mixed/unknown changes must retain product and image validation: $path"
 }
-foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'scripts/packaging/enrollment_smoke.py')) {
+foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path"
 }
@@ -35,12 +35,20 @@ foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Pr
     Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker,server') "Worker inputs must validate the Worker and its real preview composition: $path"
 }
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
-Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
+Require (($selection.imageIds -join ',') -eq 'foundry,openapi,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
 foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml', '.github/workflows/preview-azure-validation.yml', '.github/workflows/preview-azure-environment.yml', '.github/workflows/preview-on-demand.yml')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"
 }
-$selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.OpenApi/Program.cs')
+foreach ($path in @('src/extensions/Agentstration.Extensions.OpenApi/Program.cs', 'src/extensions/Agentstration.Extensions.OpenApi/version.txt', 'deploy/images/extensions/openapi.json', 'tests/Agentstration.Extensions.OpenApi.Tests/OpenApiExtensionTests.cs')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'openapi' -and -not ($selection.dotnet -or $selection.container -or $selection.aep -or $selection.storage)) "OpenAPI-only inputs must select only the implemented image validation: $path"
+}
+foreach ($path in @('scripts/packaging/enrollment_smoke.py', 'scripts/packaging/test_enrollment_smoke.py', 'scripts/packaging/aep-extension.smoke.compose.yml', 'aep/src/Agentstration.Aep.Abstractions/AepProtocol.cs')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require ($selection.imageIds -contains 'foundry' -and $selection.imageIds -contains 'openapi') "Shared AEP inputs must validate all implemented extensions: $path"
+}
+$selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Unknown/Program.cs')
 Require ($selection.dotnet -and $selection.container -and -not $selection.extensionImages) 'Unimplemented packaging verticals must retain current validation.'
 foreach ($project in Get-ChildItem (Join-Path $root 'src') -Directory -Filter '*PostgreSql*') {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @("src/$($project.Name)/Migration.cs")
