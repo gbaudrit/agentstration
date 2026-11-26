@@ -341,3 +341,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 267. [ADR-0267 — Pre-merge AEP previews consume published catalogue data](0267-pre-merge-aep-previews-consume-published-catalogue-data.md)
 
 268. [ADR-0268 — Explicit preview redeployment resets owned state](0268-explicit-preview-redeployment-resets-owned-state.md)
+
+269. [ADR-0269 — Preview reconciliation enforces owned expiry and capacity](0269-preview-reconciliation-enforces-owned-expiry-and-capacity.md)

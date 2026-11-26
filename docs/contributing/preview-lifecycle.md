@@ -118,7 +118,9 @@ host configuration/keys remain available for a deliberate redeployment. No host
 or infrastructure is deleted, and no database-provider conversion is performed.
 
 Expiry is anchored to the first managed deployment; a retry does not renew it.
-Changing TTL recalculates from that anchor. Automatic expiration/cleanup is #1286.
+Changing TTL recalculates from that anchor. [Azure reconciliation](preview-automation.md)
+enforces that expiry with full cleanup and persists deletion completion/reason.
+The standalone Docker CLI still records expiry without scheduling a host worker.
 
 ## GitHub Actions entrypoint
 

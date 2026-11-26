@@ -190,6 +190,8 @@ jobs:
       DOCKER_CONFIG: /tmp/agentstration-preview-auth-${{ github.run_id }}-${{ github.run_attempt }}
       AZURE_PREVIEW_STORAGE_ACCOUNT: ${{ vars.AZURE_PREVIEW_STORAGE_ACCOUNT }}
       AZURE_PREVIEW_STORAGE_CONTAINER: ${{ vars.AZURE_PREVIEW_STORAGE_CONTAINER || 'previews' }}
+      AZURE_PREVIEW_MAX_ENVIRONMENTS: ${{ vars.AZURE_PREVIEW_MAX_ENVIRONMENTS || '2' }}
+      AZURE_PREVIEW_MAX_VCPUS: ${{ vars.AZURE_PREVIEW_MAX_VCPUS || '4' }}
     outputs:
       result: ${{ steps.lifecycle.outputs.result }}
       state: ${{ steps.lifecycle.outputs.state }}

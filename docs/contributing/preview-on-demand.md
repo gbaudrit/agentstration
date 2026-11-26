@@ -11,9 +11,9 @@ protected HTTPS, preserve/restart and reset. Its [protected route](preview-acces
 returns an HTTPS URL only after fresh protection and readiness checks. The
 remaining same-tenant non-member check is tracked in
 [#1285](https://github.com/gbaudrit/agentstration/issues/1285).
-Issue comment commands are the first automation slice of #1286 (#1382).
-Automatic PR-label deployment/TTL cleanup remains #1286; deployed smoke/Playwright
-journeys are #1287. No Runtime deployment service is introduced.
+Issue/PR commands and [scheduled reconciliation](preview-automation.md) implement
+the external automation in #1286. Deployed smoke/Playwright journeys remain #1287.
+No Runtime deployment service is introduced.
 
 Prepare the [shared Access configuration](preview-access.md) and run its opt-in,
 read-only audit before the first route deployment. It uses the same protected
@@ -62,7 +62,7 @@ The existing `preview-deployment` environment stays restricted to `main`.
 | `provider` | `azure-vm`; future providers reuse the portable contract |
 | `database` | `sqlite` (default) or `postgresql`; changing a live database requires reset first |
 | `vm_size_profile` | Environment variable slot 1–5, default 1 |
-| `ttl_hours` | Whole number 1–168, default 2; recorded expiry, not yet automatic cleanup |
+| `ttl_hours` | Whole number 1–168, default 2; expiry enforced by scheduled reconciliation |
 | `data_mode` | `preserve` (default), or explicit `reset` on `destroy` only |
 | `test_profile` | `readiness` (default) or `none`; exact-image/healthy-container checks remain mandatory |
 | `worker_revision` | `published` (default) or an independent already-published Worker revision |
@@ -189,8 +189,8 @@ comments, another bot's comment or another command's card.
 The card shows the requested/checked/ready or failed state, linked server commit,
 database, selected extensions, known VM/region and workflow link. Full image
 versions/digests are collapsed. A successful readiness check adds the protected
-application URL and recorded expiry; the card explicitly says **automatic expiry
-cleanup is not implemented** and offers `/preview destroy`. An active VM without
+application URL and recorded expiry; the card describes scheduled full cleanup
+and offers `/preview destroy` for earlier removal. An active VM without
 confirmed protected access does not get an access link.
 
 Completed checks show a table for server, Worker, selected extensions and the
@@ -237,10 +237,11 @@ executor. The main-only provider event boundary remains unchanged. See
 [ADR-0263](../decisions/0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
 and [ADR-0266](../decisions/0266-pr-preview-commands-use-frozen-heads-and-owned-feedback.md).
 
-TTL is still **recorded only**. This slice does not implement automatic expiry,
-PR close/label events, global quotas or orphan reconciliation; remove test previews
-with `/preview destroy` after use. Manual and issue operations share the same
-environment serialization, provider lease and ownership checks.
+The [reconciliation workflow](preview-automation.md) enforces expiry, PR opt-in
+and close/opt-out cleanup, capacity reservations and owned orphan recovery.
+Manual and issue operations share the same environment lease and capacity
+admission. `/preview status` reports confirmed deletion time/reason, retained
+resources or incomplete cleanup instead of treating every missing VM as absence.
 
 ### Choose optional AEP extensions with issue labels
 

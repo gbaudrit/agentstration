@@ -49,6 +49,10 @@ class Cloud:
         self.record = copy.deepcopy(record)
 
     @contextmanager
+    def capacity(self):
+        yield
+
+    @contextmanager
     def lock(self):
         if self.leased:
             raise ValueError('Another operation holds the lease')
@@ -62,7 +66,8 @@ class Cloud:
         self.effects.append('provision')
         identifiers = azure.resource_ids(self.request).values()
         other = [item for item in self.items if item['id'] not in identifiers]
-        self.items = other + [{'id': identifier, 'name': identifier.rsplit('/', 1)[1], 'tags': azure.tags(self.request, record)}
+        self.items = other + [{'id': identifier, 'name': identifier.rsplit('/', 1)[1], 'tags': azure.tags(self.request, record),
+                              'type': 'Microsoft.Compute/disks' if identifier.endswith(('-os', '-data')) else 'fixture'}
                              for identifier in identifiers]
         self.running = True
 
@@ -133,13 +138,16 @@ class AzureTests(unittest.TestCase):
     def test_reset_failure_or_remaining_resources_never_starts_replacement(self):
         for failure in ('exception', 'remaining'):
             with self.subTest(failure=failure):
+                self.cloud = Cloud()
                 self.execute('deploy')
                 original = copy.deepcopy(self.cloud.record)
                 self.cloud.effects = []
                 with patch.object(self.cloud, 'reset', side_effect=RuntimeError('reset failed') if failure == 'exception' else None):
                     with self.assertRaises((ValueError, RuntimeError)):
                         self.execute('deploy', reset_before_deploy=True)
-                self.assertEqual(original, self.cloud.record)
+                pending = copy.deepcopy(self.cloud.record)
+                self.assertIsNone(pending.pop('deletion')['completedAt'])
+                self.assertEqual(original, pending)
                 self.assertNotIn('provision', self.cloud.effects)
                 self.assertFalse(self.cloud.leased)
 
@@ -226,8 +234,8 @@ class AzureTests(unittest.TestCase):
         self.assertEqual('running', first['state'])
         self.assertIsNone(first['url'])
         stopped = self.execute('destroy')
-        self.assertEqual('destroyed', stopped['state'])
-        self.assertEqual(6, len(stopped['providerResourceIds']['resources']))
+        self.assertEqual('stopped', stopped['state'])
+        self.assertEqual(7, len(stopped['providerResourceIds']['resources']))
         self.assertEqual('stopped', self.execute('status')['state'])
         again = self.execute('deploy', now=datetime(2026, 11, 25, tzinfo=timezone.utc))
         self.assertEqual(record['ownerId'], self.cloud.record['ownerId'])

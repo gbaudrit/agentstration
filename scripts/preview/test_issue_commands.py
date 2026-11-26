@@ -321,7 +321,7 @@ class TrackingAndFeedbackTests(unittest.TestCase):
         self.assertIn(request['sourceSha'], github.feedback())
         self.assertIn(request['deliveries']['server']['digest'], github.feedback())
         self.assertIn(request['deliveries']['worker']['digest'], github.feedback())
-        self.assertIn('Automatic expiry cleanup is not implemented yet', github.feedback())
+        self.assertIn('scheduled reconciliation', github.feedback())
         github.calls = []
         status, _ = self.run_mode('report', {'TRACKING_ISSUE': '17', 'OPERATION': 'deploy', 'EXECUTION_RESULT': 'failure',
                                           'RESULT_JSON': 'private-provider-body'}, github)

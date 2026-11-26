@@ -353,7 +353,7 @@ def main():
                 result = report_result()
                 preview.require(result['environmentId'] == environment, 'Result targets another environment.')
                 state = result['state']
-                preview.require(state in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy', 'provisioning', 'drifted'), 'Invalid preview result state.')
+                preview.require(state in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy', 'provisioning', 'drifted', 'cleanup-pending'), 'Invalid preview result state.')
                 url = result.get('url')
                 preview.require(url is None or isinstance(url, str) and re.fullmatch(r'https://dev-' + re.escape(environment) + r'\.[a-z0-9.-]+', url), 'Invalid protected preview URL.')
                 preview.require(not url or state == 'running', 'An inactive preview cannot publish a URL.')
