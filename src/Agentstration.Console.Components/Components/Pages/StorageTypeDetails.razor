@@ -19,8 +19,7 @@
     <Actions>@if (CanDelete) { <button class="button-danger" type="button" @onclick="RequestDelete" disabled="@Busy" data-testid="storage-type-delete">@T("Type.Delete")</button> }</Actions>
     <Feedback><StorageError Error="error" />@if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }</Feedback>
     <OverviewMetrics><MetricCard Label="@T("Generation")" Value="@(resource?.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /><MetricCard Label="@T("Type.PreferredVersion")" Value="@(resource?.Definition.PreferredVersion ?? "—")" /></OverviewMetrics>
-    <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
-    <OverviewContent>@Usages</OverviewContent>
+    <OverviewSummary Context="identity">@if (resource is not null) { <StorageTypeResourceSummary Resource="resource" Identity="identity" AdditionalContent="Usages" /> }</OverviewSummary>
     <DefinitionContent Context="path">
         @if (resource is { ScopeRef: { } owner } saved)
         {
@@ -209,16 +208,6 @@
     public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
     private sealed record DetailBundle(ResourceSnapshot<StorageTypeResource> Snapshot, IReadOnlyList<StorageUsage> Usages, bool UsagesKnown);
     private sealed record RawType(string ApiVersion, string Kind, ResourceMetadata Metadata, ResourceScopeRef? ScopeRef, StorageTypeProperties Definition);
-    private sealed record ConfigurationRow(string Name, string Value);
-    private IReadOnlyList<ConfigurationRow> ConfigurationRows => resource is null ? [] : [
-        new(T("Enabled"), T(resource.Definition.Enabled ? "Value.Yes" : "Value.No")),
-        new(T("Type.PreferredVersion"), resource.Definition.PreferredVersion),
-        new(T("Type.GenericUse"), resource.ObservedUse is null ? T("Type.UseUnknown") : T(resource.ObservedUse.Use.Allowed ? "Type.UseGranted" : "Type.UseNotGranted")),
-        new(Shared["Access"], JsonSerializer.Serialize(resource.Definition.UsePolicy, PrettyJson))];
-    private RenderFragment ConfigurationSummary => @<CollectionView TItem="ConfigurationRow" Items="ConfigurationRows" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Type.Value") })">
-        <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity>
-        <Information Context="row"><CollectionValue Label="@T("Type.Value")"><span class="configuration-value">@row.Value</span></CollectionValue></Information>
-    </CollectionView>;
     private RenderFragment Usages => @<FormSection Title="@T("Type.Usages")" Description="@T("Type.UsagesHelp")">
         @if (!usagesKnown) { <p>@T("Type.UsagesUnknown")</p> }
         else if (usages.Count == 0) { <p>@T("Type.NoUsages")</p> }

@@ -9,15 +9,30 @@
 
 <PageTitle>@T("Title") · Agentstration</PageTitle>
 <ResourceCollectionTemplate TItem="ModelProfileSummaryResponse" Title="@T("Title")" Description="@T("Description")" TestId="resource-model-profiles"
-                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey" ItemActions="RowActions"
+                            IdentityColumn="IdentityColumn" Columns="Columns" AdditionalFilters="ExtraFilters" Items="PageItems" ContextKey="@contextKey"
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="Pagination" LoadState="loadState" Disabled="@(!interactive || operationBusy)"
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
-                            OnRefresh="RefreshAsync" OnRetry="RetryAsync" Feedback="OperationFeedback" />
+                            OnRefresh="RefreshAsync" Feedback="OperationFeedback" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(DetailsUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(DetailsUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="model-profile-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+        @if (CanDelete(item)) { <button class="danger-text" type="button" disabled="@(operationBusy || loadState.Status == ResourceLoadStatus.Refreshing)" @onclick="() => RequestDeleteAsync(item)">@T("Delete")</button> }
+    </CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
 
 <ConfirmationDialog IsOpen="@(pendingDelete is not null)" Title="@T("DeleteDialogTitle")" Message="@DeleteMessage" ConfirmLabel="@T("DeleteDialogConfirm")" OnConfirm="DeleteAsync" OnCancel="CancelDelete" />
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ModelResourceKinds.ModelProfile" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ModelProfileResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(ModelProfileSummaryResponse item) => !item.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(ModelProfileSummaryResponse item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, ResourceNamespace.Parse(item.Namespace), ModelResourceKinds.ModelProfile, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/modelprofiles", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string DeleteMessage => pendingDelete is null ? string.Empty : T("DeleteMessage", pendingDelete.Name);
     private string AgentCount(int count) => T(count == 1 ? "AgentCount.One" : "AgentCount.Many", count);
@@ -30,7 +45,7 @@
     </text> : null;
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@Navigate("/modelprofiles/new")">@T("CreateModelProfile")</a></PermissionGate> : null;
-    private CollectionColumn<ModelProfileSummaryResponse> IdentityColumn => new("identity", T("Profile"), profile => @<CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@DetailsUrl(profile)" IconName="layers" Domain="model">
+    private CollectionColumn<ModelProfileSummaryResponse> IdentityColumn => new("identity", T("Profile"), profile => @<CollectionIdentity DisplayName="@profile.Properties.DisplayName" Namespace="@profile.Namespace" Name="@profile.Name" Href="@(DetailsUrl(profile) + "#overview")" IconName="layers" Domain="model">
         <IconBadges><ResourceScopeBadge ShowName ScopeRef="@profile.ScopeRef" Kind="ResourceScopeKind.Workspace" IconOnly /><StatusBadge Text="@StatusLabel(profile.Properties.Status)" Status="@StatusTone(profile.Properties.Status)" IconOnly /><ManagedResourceBadge IsManaged="@profile.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(profile.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {
@@ -68,9 +83,6 @@
             Options = (items ?? []).Select(profile => profile.ScopeRef?.Value).OfType<string>().Distinct(StringComparer.Ordinal).Order().Select(value => new CollectionFilterOption(value, Context.Current?.Contexts.FirstOrDefault(context => context.ScopeRef == value)?.DisplayName ?? value)).ToArray()
         }
     ];
-    private RenderFragment<ModelProfileSummaryResponse>? RowActions => (items ?? []).Any(CanDelete) ? profile => @<text>
-        @if (CanDelete(profile)) { <CollectionActions ResourceName="@($"{profile.Properties.DisplayName} ({profile.Namespace}/{profile.Name}, {profile.ScopeRef})")"><button class="danger-text" type="button" disabled="@(operationBusy || loadState.Status == ResourceLoadStatus.Refreshing)" @onclick="() => RequestDeleteAsync(profile)">@T("Delete")</button></CollectionActions> }
-    </text> : null;
     private static string StatusKey(string? status) => status?.ToLowerInvariant() switch
     {
         "available" => "Available", "unavailable" => "Unavailable", "incompatible" => "Incompatible", "ready" => "Ready",
@@ -80,6 +92,6 @@
     private static UiStatus StatusTone(string? status) => StatusKey(status) == "Unknown" ? UiStatus.Neutral : ModelManagementUi.Status(status);
     private Task RefreshAsync() { operationFailed = false; operationErrorId = null; deleteConflictUsages = []; return LoadAsync(); }
     private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
-    private string DetailsUrl(ModelProfileSummaryResponse profile) => Navigate(ConsoleResourceUrls.ModelProfile(ResourceAddress.Create(ResourceNamespace.Parse(profile.Namespace), ModelResourceKinds.ModelProfile, profile.Name), profile.ScopeRef));
+    private string DetailsUrl(ModelProfileSummaryResponse profile) => ResourceOwnershipContext.Resource(Services, "/modelprofiles", profile.Name, ResourceNamespace.Parse(profile.Namespace), profile.ScopeRef);
     private static string AgentUrl(ModelProfileUsageResponse usage) => ConsoleResourceUrls.Agent(ResourceNamespace.Parse(usage.Namespace), usage.Name, usage.ScopeRef, usage.ScopeRef);
 }

@@ -15,6 +15,23 @@ namespace Agentstration.Management.Tests;
 public sealed class ControlPlaneStoreHardeningTests
 {
     [TestMethod]
+    public async Task ExactReadOfAMissingOwnerReturnsMissingWithoutFallingBackToAHomonym()
+    {
+        await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());
+        var known = await fixture.Store.PutExactAsync(ResourceScopeRef.Instance, new ExtensionResource
+        {
+            ApiVersion = "extensions.agentstration.io/v1",
+            Kind = "MemoryProvider",
+            ScopeRef = ResourceScopeRef.Instance,
+            Metadata = new() { Name = "preview-homonym" },
+            Definition = new ExtensionDefinition("local")
+        }, null, true, default);
+        var target = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(Guid.NewGuid()), ResourceNamespace.Default, "MemoryProvider", "preview-homonym");
+        Assert.IsNull(await fixture.Store.GetExactAsync<ExtensionResource>(target, default));
+        Assert.AreEqual(known.Value.Uid, (await fixture.Store.GetExactAsync<ExtensionResource>(target with { ScopeRef = ResourceScopeRef.Instance }, default))!.Value.Uid);
+    }
+
+    [TestMethod]
     public async Task DiscoveryWindowDoesNotDeserializeResourcesOutsideItsBound()
     {
         await using var fixture = await StoreFixture.CreateAsync(new SystemOperationRequestContext());

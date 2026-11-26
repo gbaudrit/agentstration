@@ -118,4 +118,36 @@ public sealed class DataContractsTests
         Assert.ThrowsExactly<DataContractException>(() => DataContracts.ValidateDefinition(new() { Mode = DataContractMode.Absent, Schema = Json("{}") }, "fixture"));
         Assert.ThrowsExactly<DataContractException>(() => DataContracts.Declared(Json("{\"$ref\":\"https://unavailable.test/schema\"}"), "fixture"));
     }
+    [TestMethod]
+    [DataRow(2, 1, 4)]
+    [DataRow(0, 1, 4)]
+    public void StringBoundsHaveSafeMeasuredMetadataAndRoundTrip(int length, int minimum, int maximum)
+    {
+        var contract = DataContracts.Declared(JsonSerializer.SerializeToElement(new
+        { type = "object", properties = new { value = new { type = "string", minLength = minimum, maxLength = maximum } } }), "function-input")!;
+        var value = JsonSerializer.SerializeToElement(new { value = new string('x', length == 2 ? maximum + 1 : length) });
+        var error = Assert.ThrowsExactly<DataContractException>(() => DataContracts.Validate(contract, value, "function-input"));
+        var limit = error.Failure.Limit!;
+        Assert.AreEqual((long)minimum, limit.Minimum);
+        Assert.AreEqual((long)maximum, limit.Maximum);
+        Assert.AreEqual((long)value.GetProperty("value").GetString()!.Length, limit.Actual);
+        Assert.AreEqual("characters", limit.Unit);
+        Assert.AreEqual("$.value", error.Failure.Path);
+        Assert.IsNull(limit.Setting, "A schema constraint is distinct from an operator setting.");
+        var serialized = JsonSerializer.Serialize(new { contractFailure = error.Failure });
+        Assert.AreEqual(limit, DataContracts.ParseFailure(serialized)!.Limit);
+        Assert.DoesNotContain("xxxxx", serialized);
+    }
+
+    [TestMethod]
+    public void MalformedLimitMetadataCannotBreakTheErrorRenderer()
+    {
+        var failure = new DataContractFailure("function-input", "function-input", "$.value", "json_schema_instance_length", "string", "string");
+        foreach (var limit in new[] { new DataContractLimit("characters", -1, Maximum: 4),
+            new("characters", 5, Maximum: 10), new("unknown", 20, Maximum: 10),
+            new("characters", 20, Maximum: 10, Setting: new string('x', 129)) })
+            Assert.IsNull(DataContracts.ParseFailure(JsonSerializer.Serialize(failure with { Limit = limit })));
+        Assert.IsNotNull(DataContracts.ParseFailure(JsonSerializer.Serialize(failure)), "Old recorded failures remain readable.");
+    }
+
 }

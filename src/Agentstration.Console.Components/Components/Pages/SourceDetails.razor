@@ -1,0 +1,8 @@
+@page "/settings/sources/{Publisher}/{Name}"
+
+<Sources Publisher="@Publisher" Name="@Name" />
+
+@code {
+    [Parameter] public string Publisher { get; set; } = string.Empty;
+    [Parameter] public string Name { get; set; } = string.Empty;
+}

@@ -399,7 +399,12 @@ public sealed class DataSourceAcquisitionService(
         }
         var result = new List<DataSourceAcquisitionResource>();
         foreach (var item in selected.OrderByDescending(item => item.Value.CreatedAt))
-            result.Add((await SynchronizeAsync(item, context, cancellationToken)).Value);
+        {
+            // Native synchronization may publish/seal every record or repair Artifact metadata.
+            // History reads leave that durable work to recovery, outside the HTTP lifetime.
+            result.Add(item.Value.Dataset is not null ? item.Value
+                : (await SynchronizeAsync(item, context, cancellationToken)).Value);
+        }
         return result;
     }
 

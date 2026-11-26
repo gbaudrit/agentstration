@@ -8,7 +8,7 @@
 
 <PageTitle>@(artifact is null ? Id : ArtifactName(artifact)) · Agentstration</PageTitle>
 @{ var presentations = Presentations; }
-<ConsoleResourceDetailsTemplate Resource="artifact" Name="@(artifact is null ? Id : ArtifactName(artifact))" ResourceType="@T("Artifact")" Domain="artifact" IconName="file" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)" CollectionLabel="@T("Back")"
+<ConsoleResourceDetailsTemplate Resource="artifact" PresentationScopeRef="PresentationScope" Name="@(artifact is null ? Id : ArtifactName(artifact))" ResourceType="@T("Artifact")" Domain="artifact" IconName="file" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/artifacts", Services)" CollectionLabel="@T("Back")"
     StatusText="@(artifact is null ? null : T("Immutable"))" Status="UiStatus.Neutral" ResourceIdentity="@(loadedKey ?? Id)"
     SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections"
     LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="loading" DefinitionReadOnlyReason="ResourceReadOnlyReason.Unspecified"
@@ -20,8 +20,7 @@
         <MetricCard Label="@T("Created")" Value="@artifact.CreatedAt.ToLocalTime().ToString("d")" Detail="@artifact.CreatedAt.ToLocalTime().ToString("t")" />
     }</OverviewMetrics>
     <IdentityDetails>@if (artifact is not null) { <dt>@T("Identifier")</dt><dd><CopyableValue Value="@artifact.ArtifactId.ToString()" /></dd> }</IdentityDetails>
-    <OverviewConfiguration>@Configuration</OverviewConfiguration>
-    <OverviewContent>@OverviewPanels</OverviewContent>
+    <OverviewSummary Context="identity">@if (artifact is not null) { <DurableArtifactResourceSummary Resource="artifact" PresentationScopeRef="PresentationScope"><Identity>@identity</Identity><AdditionalContent>@OverviewPanels</AdditionalContent></DurableArtifactResourceSummary> }</OverviewSummary>
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="durable-artifact-inspection-form" FormName="durable-artifact-inspection"
         Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" Busy="loading" /></DefinitionContent>
     <AdditionalContent Context="path">@AdditionalContent(path)</AdditionalContent>
@@ -155,6 +154,10 @@
         _ => throw new ArgumentOutOfRangeException(nameof(path))
     };
     private static readonly JsonSerializerOptions ContractJson = new() { WriteIndented = true };
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedOwner { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? RequestedNamespace { get; set; }
+    private ScopedResourceAddress? ExactAddress => RequestedOwner is null ? null : ScopedResourceAddress.Create(ResourceScopeRef.Parse(RequestedOwner), ResourceNamespace.Parse(RequestedNamespace), ArtifactResourceKinds.FlowRunArtifact, ArtifactId.ToString());
+    private ResourceScopeRef? PresentationScope => ResourceOwnershipContext.TryGetCurrent(Services);
     [Parameter] public string Id { get; set; } = string.Empty;
     private readonly CancellationTokenSource cancellation = new();
     private FlowRunArtifactResource? artifact;
@@ -196,7 +199,7 @@
 
     protected override Task OnParametersSetAsync()
     {
-        var key = $"{Id}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
+        var key = $"{Id}|{RequestedOwner}|{RequestedNamespace}|{ResourceOwnershipContext.TryGetCurrent(Services)}";
         if (loadedKey == key) return Task.CompletedTask;
         loadedKey = key; sectionState.Reset(key); ClearPrivate();
         return LoadAsync(refresh: false);
@@ -213,9 +216,9 @@
         try
         {
             var requestedId = ArtifactId;
-            var saved = await Client.GetDurableAsync(requestedId, cancellation.Token);
+            var saved = ExactAddress is { } exact ? await Client.GetDurableAtAddressAsync(exact, cancellation.Token) : await Client.GetDurableAsync(requestedId, cancellation.Token);
             if (request != loadVersion) return;
-            if (saved is null || saved.ArtifactId != requestedId || expected is not null && (saved.Name != expected.Name || saved.Namespace != expected.Namespace || saved.ScopeRef != expected.ScopeRef || expected.Uid != Guid.Empty && saved.Uid != expected.Uid))
+            if (saved is null || saved.ArtifactId != requestedId || ExactAddress is { } requested && (saved.ScopeRef != requested.ScopeRef || saved.Namespace != requested.Namespace || saved.Name != requested.Name || saved.Kind != requested.Kind) || expected is not null && (saved.Name != expected.Name || saved.Namespace != expected.Namespace || saved.ScopeRef != expected.ScopeRef || expected.Uid != Guid.Empty && saved.Uid != expected.Uid))
             {
                 ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound) { Message = T("DurableNotFound") }; return;
             }

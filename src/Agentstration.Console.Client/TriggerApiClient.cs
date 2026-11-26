@@ -11,6 +11,8 @@ public interface ITriggerApiClient
 {
     Task<IReadOnlyList<TriggerResource>> ListAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<TriggerResource>?> GetAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<TriggerResource>> GetAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact scoped Trigger reads.");
     Task<ResourceSnapshot<TriggerResource>> SaveAsync(TriggerResource resource, string? etag, CancellationToken cancellationToken);
     Task DeleteAsync(ResourceNamespace @namespace, string name, string etag, CancellationToken cancellationToken);
     Task<TriggerOccurrence> RunNowAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken);
@@ -28,6 +30,12 @@ public sealed class TriggerApiClient(HttpClient httpClient) : ITriggerApiClient
         using var response = await httpClient.GetAsync(Path(@namespace, name), cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
         return await ReadResourceAsync(response, cancellationToken);
+    }
+
+    public async Task<ResourceSnapshot<TriggerResource>> GetAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync(Path(ns, name) + $"?scopeRef={Uri.EscapeDataString(owner.Value)}", token);
+        return await ReadResourceAsync(response, token);
     }
 
     public async Task<ResourceSnapshot<TriggerResource>> SaveAsync(TriggerResource resource, string? etag, CancellationToken cancellationToken)

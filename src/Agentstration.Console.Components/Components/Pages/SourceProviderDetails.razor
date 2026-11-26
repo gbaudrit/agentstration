@@ -45,9 +45,7 @@ else
         Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
         Yaml="@SavedYaml" Busy="busy" SectionTestIdPrefix="source-provider">
         <OverviewMetrics>@if (status is not null) { <MetricCard Label="@Shared["CollectionState"]" Value="@StatusLabel(status.Status)" Status="@ModelManagementUi.Status(status.Status)" /> }</OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]">@if (entry.Href is { } href) { <a class="configuration-value resource-name-link" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information>
-        </CollectionView></OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (resource is not null) { <SourceProviderResourceSummary Resource="resource" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="source-provider-resource-form" FormName="source-provider-editor" data-resource-etag="@etag"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
             OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
@@ -164,12 +162,6 @@ else
     private ExtensionResponse? SavedExtension => resource is null ? null : extensions.SingleOrDefault(e => e.RegistrationName == resource.Definition.Extension.Name && e.RegistrationNamespace == (resource.Definition.Extension.Namespace ?? resource.Namespace).Value && e.RegistrationScopeRef == resource.Definition.Extension.ScopeRef);
     private ExtensionResponse? ConnectionExtension => IsNew || sectionState.CurrentPath.StartsWith("definition/", StringComparison.Ordinal) ? SelectedExtension : SavedExtension;
     private string ConnectionContribution => IsNew || sectionState.CurrentPath.StartsWith("definition/", StringComparison.Ordinal) ? Model.ContributionId : resource?.Definition.ContributionId ?? string.Empty;
-    private sealed record ConfigurationEntry(string Label, string Value, string? Href = null);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => resource is null ? [] :
-    [
-        new(T("ExtensionRegistration"), $"{resource.Definition.Extension.Namespace ?? resource.Namespace}/{resource.Definition.Extension.Name}", ResourceOwnershipContext.Resource(Services, "/extensions", resource.Definition.Extension.Name, resource.Definition.Extension.Namespace ?? resource.Namespace, resource.Definition.Extension.ScopeRef)),
-        new(T("Contribution"), resource.Definition.ContributionId)
-    ];
     private IReadOnlyList<ExtensionResponse> EligibleExtensions => extensions.Where(extension =>
         extension.RegistrationScopeRef is { } extensionScope
         && selectedScope is { } providerScope

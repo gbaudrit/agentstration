@@ -18,8 +18,7 @@
     <Actions>@if (CanWrite) { <button class="button-secondary" type="button" disabled="@Busy" @onclick="RequestReconcile" data-testid="storage-reconcile">@T("Reconcile")</button> }</Actions>
     <Feedback><StorageError Error="error" />@if (newerBundle is not null) { <div class="form-alert form-alert-warning" role="status">@T("RefreshDraftConflict")</div> }</Feedback>
     <OverviewMetrics><MetricCard Label="@T("Availability")" Value="@AvailabilityLabel" Status="AvailabilityColor" /><MetricCard Label="@T("Generation")" Value="@(resource?.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—")" /></OverviewMetrics>
-    <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
-    <OverviewContent>@ConnectionSummary</OverviewContent>
+    <OverviewSummary Context="identity">@if (resource is not null) { <StorageResourceSummary Resource="resource" Identity="identity" TypeDisplayName="@TypeChoice?.Resource.Definition.DisplayName" /> }</OverviewSummary>
     <DefinitionContent Context="path">
         @if (resource is { } saved)
         {
@@ -203,40 +202,6 @@
     public void Dispose() { if (disposed) return; disposed = true; ++loadVersion; cancellation.Cancel(); cancellation.Dispose(); }
     private sealed record DetailBundle(ResourceSnapshot<StorageResource> Snapshot, IReadOnlyList<StorageTypeResource> Catalog, IReadOnlyList<StorageUsage> Usages, bool UsagesKnown, AgentstrationApiException? Failure);
     private sealed record RawStorage(string ApiVersion, string Kind, ResourceMetadata Metadata, ResourceScopeRef? ScopeRef, StorageProperties Definition);
-    private sealed record ConfigurationRow(string Name, string Value, string? Href = null);
-    private IReadOnlyList<ConfigurationRow> ConfigurationRows => resource is not { } saved ? [] : [
-        new(T("SavedType"), $"{TypeChoice?.Resource.Definition.DisplayName ?? saved.Definition.Type.Type.Name} · {saved.Definition.Type.Type.Namespace ?? saved.Namespace}/{saved.Definition.Type.Type.Name}", saved.Definition.Type.Type.ScopeRef is { } typeOwner ? ResourceOwnershipContext.Resource(Services, "/storage-types", saved.Definition.Type.Type.Name, saved.Definition.Type.Type.Namespace ?? saved.Namespace, typeOwner) : null),
-        new(T("Version"), saved.Definition.Type.Version),
-        new(T("Enabled"), T(saved.Definition.Enabled ? "Value.Yes" : "Value.No")),
-        new(T("Configuration"), JsonSerializer.Serialize(saved.Definition.Configuration, SavedJson)),
-        new(T("Envelope"), JsonSerializer.Serialize(saved.Definition.Envelope, SavedJson)),
-        new(T("Documents.Collections"), JsonSerializer.Serialize(saved.Definition.Collections, SavedJson)),
-        new(T("DescendantUsePolicy"), JsonSerializer.Serialize(saved.Definition.UsePolicy, SavedJson))];
-    private RenderFragment ConfigurationSummary => @<CollectionView TItem="ConfigurationRow" Items="ConfigurationRows" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Type.Value") })">
-        <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity>
-        <Information Context="row"><CollectionValue Label="@T("Type.Value")"><span class="configuration-value">@if (row.Href is { } href) { <a href="@href">@row.Value</a> } else { @row.Value }</span></CollectionValue></Information>
-    </CollectionView>;
-    private RenderFragment ConnectionSummary => @<FormSection Title="@T("ConnectedService")">
-        @if (resource is { } saved)
-        {
-            @if (saved.Definition.ConnectedService is { } service)
-            {
-                <CollectionIdentity DisplayName="@service.Service.Address.Name" Name="@service.Service.Address.Name" Namespace="@service.Service.Address.Namespace.Value" Href="@ServiceUrl(service)" IconName="plug"><IconBadges><ResourceScopeBadge ScopeRef="service.Service.ScopeRef" IconOnly /></IconBadges></CollectionIdentity>
-                <p>@T("Generation") · @service.Generation</p>
-                @if (saved.Definition.ConnectedServiceType is { } serviceType) { <p>@T("ServiceType") · <code>@serviceType.Type.Namespace/@serviceType.Type.Name</code> · @T("Version") @serviceType.Version</p> }
-            }
-            else { <p>@T("LocalStorage")</p> }
-            <h3>@T("Mappings")</h3>
-            @if (saved.Definition.Bindings.Count == 0) { <p>@T("NoMappings")</p> }
-            else
-            {
-                <CollectionView TItem="StorageExportBinding" Items="saved.Definition.Bindings" IdentityLabel="@T("Requirement")" InformationLabels="@(new[] { T("Export"), T("ValueType"), T("Protection") })" RowTestId="storage-mapping">
-                    <Identity Context="binding"><strong class="configuration-key">@binding.RequirementId</strong></Identity>
-                    <Information Context="binding"><CollectionValue Label="@T("Export")"><CopyableValue Value="@binding.Export.Id" /></CollectionValue><CollectionValue Label="@T("ValueType")">@T($"ValueType.{binding.Export.Type}")</CollectionValue><CollectionValue Label="@T("Protection")">@T($"Protection.{binding.Export.Protection}")</CollectionValue></Information>
-                </CollectionView>
-            }
-        }
-    </FormSection>;
     private RenderFragment Diagnostics => @<div class="resource-editor-view">
         <FormSection Title="@T("Diagnostics")">
             @if (resource?.ObservedState is { } state) { <p>@T("ObservedAt"): @state.ObservedAt.ToLocalTime().ToString("g")</p>@foreach (var diagnostic in state.Diagnostics.Take(16)) { <p><code>@diagnostic.Code</code> · @T(StorageErrorKey.For(new AgentstrationApiException(string.Empty, string.Empty, problemTitle: diagnostic.Code)))</p> } }

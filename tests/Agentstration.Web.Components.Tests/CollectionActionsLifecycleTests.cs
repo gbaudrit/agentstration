@@ -114,6 +114,42 @@ public sealed class CollectionActionsLifecycleTests
             .Add(value => value.Secondary, builder => builder.AddContent(0, "Open"))));
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task CircuitCancellationDuringMenuDisposalDoesNotEscape(bool cancelModuleDisposal)
+    {
+        using var context = new BunitContext();
+        var runtime = new ControlledRuntime();
+        runtime.Module.CancelRelease = !cancelModuleDisposal;
+        runtime.Module.CancelDisposal = cancelModuleDisposal;
+        context.Services.AddLocalization();
+        context.Services.AddSingleton<IJSRuntime>(runtime);
+        var cut = context.Render<CollectionActions>(p => p.Add(c => c.ResourceName, "Resource")
+            .Add(c => c.Secondary, builder => builder.AddContent(0, "Open")));
+        await cut.InvokeAsync(async () => await cut.Instance.DisposeAsync());
+        await cut.InvokeAsync(async () => await cut.Instance.DisposeAsync());
+        Assert.AreEqual(1, runtime.Module.Attachments);
+        Assert.AreEqual(cancelModuleDisposal ? 1 : 0, runtime.Module.Disposals);
+    }
+    [TestMethod]
+    public async Task ACancelledImportIsToleratedAfterTheMenuHasBeenDisposed()
+    {
+        using var context = new BunitContext();
+        var runtime = new ControlledRuntime { DelayImport = true };
+        context.Services.AddLocalization();
+        context.Services.AddSingleton<IJSRuntime>(runtime);
+        var cut = context.Render<CollectionActions>(p => p.Add(c => c.ResourceName, "Resource")
+            .Add(c => c.Secondary, builder => builder.AddContent(0, "Open")));
+        Task? disposal = null;
+        await cut.InvokeAsync(() => { disposal = cut.Instance.DisposeAsync().AsTask(); });
+        runtime.ImportReady.SetCanceled();
+        await disposal!;
+        await cut.InvokeAsync(() => { });
+        Assert.AreEqual(0, runtime.Module.Attachments);
+        Assert.AreEqual(0, runtime.Module.Disposals);
+    }
+
     private sealed class ControlledRuntime : IJSRuntime
     {
         public ControlledModule Module { get; } = new();
@@ -136,6 +172,8 @@ public sealed class CollectionActionsLifecycleTests
         public int Disposals { get; private set; }
         public bool Disposed { get; private set; }
         public bool FailAttachWithDisconnect { get; set; }
+        public bool CancelRelease { get; set; }
+        public bool CancelDisposal { get; set; }
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args) => InvokeAsync<TValue>(identifier, CancellationToken.None, args);
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, CancellationToken cancellationToken, object?[]? args)
         {
@@ -148,6 +186,7 @@ public sealed class CollectionActionsLifecycleTests
             else
             {
                 Assert.AreEqual("releaseActions", identifier);
+                if (CancelRelease) throw new TaskCanceledException();
                 if (PauseNextReleases-- > 0)
                 {
                     var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -159,6 +198,6 @@ public sealed class CollectionActionsLifecycleTests
         }
         private static async Task<TValue> WaitAsync<TValue>(Task completion) { await completion; return default!; }
         public void CompletePendingReleases() { foreach (var completion in pendingReleases) completion.TrySetResult(); }
-        public ValueTask DisposeAsync() { Disposals++; Disposed = true; return ValueTask.CompletedTask; }
+        public ValueTask DisposeAsync() { Disposals++; Disposed = true; if (CancelDisposal) throw new TaskCanceledException(); return ValueTask.CompletedTask; }
     }
 }

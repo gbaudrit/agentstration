@@ -28,8 +28,8 @@
         <MetricCard Label="@T("NextOccurrence")" Value="@TriggerUi.FormatDate(trigger.Observed.NextOccurrenceAt)" Detail="@TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)" Status="UiStatus.Info" />
         <MetricCard Label="@T("LastFired")" Value="@TriggerUi.FormatDate(trigger.Observed.LastFiredAt)" Detail="@T($"Outcome.{trigger.Observed.LastOutcome}")" Status="@OutcomeStatus(trigger.Observed.LastOutcome)" />
     }</OverviewMetrics>
-    <OverviewConfiguration>@ConfigurationSummary</OverviewConfiguration>
-    <OverviewContent>@if (stored?.Value.Observed.LastOutcome == TriggerLastOutcome.Failed) { <FormSection Title="@T("LastFiringFailed")"><p>@(stored.Value.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></FormSection> }</OverviewContent>
+    <OverviewSummary Context="identity">@if (stored is not null) { <TriggerResourceSummary Resource="stored.Value" Identity="identity"><AdditionalContent>@if (stored?.Value.Observed.LastOutcome == TriggerLastOutcome.Failed) { <FormSection Title="@T("LastFiringFailed")"><p>@(stored.Value.Observed.LastErrorCode ?? T("UnknownTriggerError"))</p></FormSection> }</AdditionalContent></TriggerResourceSummary> }</OverviewSummary>
+
     <DefinitionContent Context="path">@if (stored is { Value: var trigger }) {
         <TriggerEditor @ref="editor" @key="loadedKey" Name="@trigger.Name" Embedded EmbeddedAddress="@(new ScopedResourceAddress(trigger.ScopeRef!.Value, trigger.Namespace, trigger.Kind, trigger.Name))"
             InitialSnapshot="stored" ExternalActions SaveBlocked="@(loading || commandBusy)" ReadOnlyReason="ReadOnlyReason"
@@ -221,18 +221,6 @@
     private string ConcurrencyLabel(TriggerConcurrencyPolicy value) => T(value == TriggerConcurrencyPolicy.Skip ? "Concurrency.SkipActive" : "Concurrency.AllowOverlap");
     private static UiStatus OutcomeStatus(TriggerLastOutcome value) => value switch { TriggerLastOutcome.Submitted => UiStatus.Success, TriggerLastOutcome.Skipped => UiStatus.Warning, TriggerLastOutcome.Failed => UiStatus.Danger, _ => UiStatus.Neutral };
     private static UiStatus OccurrenceStatus(TriggerOccurrenceOutcome value) => value switch { TriggerOccurrenceOutcome.Submitted => UiStatus.Success, TriggerOccurrenceOutcome.Skipped => UiStatus.Warning, TriggerOccurrenceOutcome.Failed => UiStatus.Danger, TriggerOccurrenceOutcome.Pending => UiStatus.Info, _ => UiStatus.Neutral };
-    private sealed record Setting(string Name, string Value, string? Href = null);
-    private IReadOnlyList<Setting> Settings => stored is not { Value: var trigger } ? [] : [
-        new(T("Schedule"), TriggerUi.ScheduleLabel(trigger.Definition.Source.Schedule, Localizer)),
-        new(T("Flow"), $"{trigger.Definition.Target.Flow!.Namespace ?? trigger.Namespace}/{trigger.Definition.Target.Flow.Name}", FlowUrl(trigger)),
-        new(T("DefinitionScope"), TriggerUi.DefinitionScope(trigger)?.Value ?? "—"),
-        new(T("Resolution"), trigger.Definition.Target.Flow.Version is null ? T("ActiveVersionThenPinned") : T("PinnedVersion", trigger.Definition.Target.Flow.Version)),
-        new(T("Misfire"), MisfireLabel(trigger.Definition.MisfirePolicy)), new(T("Concurrency"), ConcurrencyLabel(trigger.Definition.ConcurrencyPolicy)),
-        new(T("LastScheduled"), TriggerUi.FormatDate(trigger.Observed.LastScheduledAt)), new(T("ErrorCode"), trigger.Observed.LastErrorCode ?? "—"),
-        new(T("Input"), PrettyInput(trigger.Definition.Input))];
-    private RenderFragment ConfigurationSummary => @<CollectionView TItem="Setting" Items="Settings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { T("Value") })">
-        <Identity Context="row"><strong class="configuration-key">@row.Name</strong></Identity><Information Context="row"><CollectionValue Label="@T("Value")">@if (row.Href is { } href) { <a class="configuration-value text-button" href="@href">@row.Value</a> } else { <span class="configuration-value">@row.Value</span> }</CollectionValue></Information>
-    </CollectionView>;
     private RenderFragment HistoryPanel => @<div>@if (stored is { Value: var trigger }) {
             <section class="panel trigger-history" data-testid="trigger-occurrences">
                 <div class="panel-header"><div><p class="eyebrow">@T("History")</p><h2>@T("TriggerOccurrences")</h2></div><button class="text-button" disabled="@Busy" @onclick="LoadHistoryAsync" data-testid="trigger-refresh-occurrences">@(refreshing ? T("Refreshing") : T("Refresh"))</button></div>

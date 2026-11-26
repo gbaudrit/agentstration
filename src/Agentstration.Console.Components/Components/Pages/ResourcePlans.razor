@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @inject IResourcePlansApiClient Client
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject IServiceProvider Services
 @inject ConsoleContextState Context
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ResourcePlansStrings> Localizer
@@ -10,9 +11,18 @@
 <ResourceCollectionTemplate TItem="ResourcePlanSnapshot" Title="@T("Title")" Description="@($"{T("ListDescription")} {T("CurrentWorkspace", Context.Current?.WorkspaceDisplayName ?? "—")}")" TestId="resource-plans"
                             IdentityColumn="IdentityColumn" Columns="Columns" Items="@(items ?? [])" ContextKey="@contextKey"
                             Query="query" QueryChanged="ChangeQueryAsync" Pagination="pagination" LoadState="loadState" Disabled="@(!interactive)"
-                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyDescription")" OnRefresh="ReloadAsync" OnRetry="RetryAsync" />
+                            EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyDescription")" OnRefresh="ReloadAsync" OnRetry="RetryAsync">
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Value.Title"><a href="@PlanUrl(item)"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a><button type="button" data-testid="resource-plan-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button></CollectionActions></ItemActions>
+</ResourceCollectionTemplate>
+<ResourceCollectionPreview @ref="preview" ResourceKind="ResourcePlan" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && Context.HasPermission(AuthorizationPermissions.ResourcesRead) && loadState.Status != ResourceLoadStatus.Forbidden)">
+    <ChildContent Context="address"><ResourcePlanResourcePreview Address="address" OverviewHref="@PlanPreviewUrl(address)" DefinitionHref="" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private void OpenPreview(ResourcePlanSnapshot plan) => preview?.Open(ScopedResourceAddress.Create(ResourceScopeRef.Workspace(plan.Value.Scope.WorkspaceId.Value), ResourceNamespace.Default, "ResourcePlan", plan.Value.Id.Value.ToString("N")));
+    private string PlanPreviewUrl(ScopedResourceAddress address) => Guid.TryParseExact(address.Name, "N", out var id) ? ResourceOwnershipContext.PreserveNavigation($"/resource-plans/{id:D}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}#overview", Services) : ResourceOwnershipContext.PreserveNavigation("/resource-plans", Services);
+
     private string T(string key, params object[] args) => Localizer[key, args].Value;
     private CollectionColumn<ResourcePlanSnapshot> IdentityColumn => new("identity", T("Plan"), item => @<text>
         <CollectionIdentity DisplayName="@item.Value.Title" Name="@item.Value.Id.ToString()" Href="@PlanUrl(item)" IconName="clipboard-list">
@@ -33,7 +43,7 @@
         new("updated", T("Updated"), item => @<time datetime="@item.Value.UpdatedAt.ToString("O")">@item.Value.UpdatedAt.ToLocalTime().ToString("g")</time>)
     ];
     private string StatusText(ResourcePlanStatus status) => T($"Status.{(Enum.IsDefined(status) ? status.ToString() : "Unknown")}");
-    private string PlanUrl(ResourcePlanSnapshot item) => ResourceOwnershipContext.PreserveNavigation($"/resource-plans/{item.Value.Id.Value:D}", Services);
+    private string PlanUrl(ResourcePlanSnapshot item) => PlanPreviewUrl(ScopedResourceAddress.Create(ResourceScopeRef.Workspace(item.Value.Scope.WorkspaceId.Value), ResourceNamespace.Default, "ResourcePlan", item.Value.Id.Value.ToString("N")));
     private static UiStatus Tone(ResourcePlanStatus status) => status switch
     {
         ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success,

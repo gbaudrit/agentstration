@@ -14,14 +14,27 @@
                             SearchEnabled SearchLabel="@Shared["Search"]" SearchPlaceholder="@Shared["Search"]"
                             EmptyTitle="@T("EmptyTitle")" EmptyMessage="@T("EmptyMessage")" OnRefresh="LoadAsync" OnRetry="RetryAsync">
     <Navigation><ResourceTabs Label="@T("SectionsLabel")"><a class="active" href="@Navigate("/tools")">@T("Catalog")</a><a href="@Navigate("/tools/sets")">@T("ToolSets")</a><a href="@Navigate("/tools/categories")">@T("Categories")</a><a href="@Navigate("/tools/definitions")">@T("Definitions")</a><a href="@Navigate("/tools/providers")">@T("Providers")</a></ResourceTabs></Navigation>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(ToolUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanPreviewEdit(item)) { <a href="@(ToolUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="tool-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ToolResourceKinds.Tool" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ToolResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(ToolResource item) => false;
+    private void OpenPreview(ToolResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, ToolResourceKinds.Tool, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/tools", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments];
     private string AvailabilityLabel(bool available) => T(available ? "Available" : "Unavailable");
     private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
     private string Navigate(string path) => ResourceOwnershipContext.PreserveNavigation(path, Services);
-    private CollectionColumn<ToolResource> IdentityColumn => new("identity", T("Tool"), tool => @<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@ToolUrl(tool)" IconName="wrench">
+    private CollectionColumn<ToolResource> IdentityColumn => new("identity", T("Tool"), tool => @<CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(ToolUrl(tool) + "#overview")" IconName="wrench">
         <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>)
     {
@@ -65,21 +78,7 @@
             && value.RegistrationNamespace == (extension.Namespace ?? provider!.Namespace).Value
             && value.RegistrationScopeRef == (extension.ScopeRef ?? provider!.ScopeRef));
     }
-    private string ToolUrl(ToolResource tool)
-    {
-        var query = new List<string>();
-        if (!tool.Namespace.IsDefault) query.Add($"namespace={Uri.EscapeDataString(tool.Namespace.Value)}");
-        if (tool.ScopeRef is { } scopeRef)
-        {
-            var context = scopeRef.Kind == ResourceScopeKind.Workspace
-                && Services.GetService<ConsoleContextState>()?.Current?.WorkspaceId == scopeRef.TargetId
-                ? ResourceOwnershipContext.TryGetCurrent(Services) ?? scopeRef : scopeRef;
-            query.Add($"scopeRef={Uri.EscapeDataString(scopeRef.Value)}");
-            query.Add($"context={Uri.EscapeDataString(context.Value)}");
-        }
-        var path = $"/tools/{Uri.EscapeDataString(tool.Name)}";
-        return query.Count == 0 ? path : $"{path}?{string.Join('&', query)}";
-    }
+    private string ToolUrl(ToolResource tool) => ResourceOwnershipContext.Resource(Services, "/tools", tool.Name, tool.Namespace, tool.ScopeRef);
     private static string ExtensionUrl(ExtensionInventoryItemResponse extension)
     {
         var scope = extension.RegistrationScopeRef ?? ResourceScopeRef.Instance;

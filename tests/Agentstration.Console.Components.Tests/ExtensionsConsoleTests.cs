@@ -320,12 +320,12 @@ public sealed partial class ExtensionsConsoleTests
             Assert.HasCount(6, rendered.FindAll(".extension-contribution-card"));
             var bundle = rendered.Find("[data-contribution-id='crawl4ai-web']");
             StringAssert.Contains(bundle.TextContent, "3 ressource(s) gouvernée(s) matérialisée(s)");
-            Assert.IsNotNull(bundle.QuerySelector("a[href='/tools/sets/crawl4ai-web-acquisition?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
-            Assert.IsNotNull(bundle.QuerySelector("a[href='/data-source-profiles/crawl4ai-web?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
-            Assert.IsNotNull(bundle.QuerySelector("a[href='/flows/crawl4ai-web-acquisition?scopeRef=%2Finstance&context=%2Finstance']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/tools/sets/crawl4ai-web-acquisition?namespace=default&scopeRef=%2Finstance&context=%2Finstance#overview']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/data-source-profiles/crawl4ai-web?namespace=default&scopeRef=%2Finstance&context=%2Finstance#overview']"));
+            Assert.IsNotNull(bundle.QuerySelector("a[href='/flows/crawl4ai-web-acquisition?scopeRef=%2Finstance&context=%2Finstance#overview']"));
 
             var tool = rendered.Find("[data-contribution-id='web.crawl']");
-            Assert.IsNotNull(tool.QuerySelector("a[href='/tools/paired-crawl4ai.web.crawl?namespace=default&scopeRef=%2Finstance&context=%2Finstance']"));
+            Assert.IsNotNull(tool.QuerySelector("a[href='/tools/paired-crawl4ai.web.crawl?namespace=default&scopeRef=%2Finstance&context=%2Finstance#overview']"));
         });
     }
 
@@ -861,6 +861,13 @@ public sealed partial class ExtensionsConsoleTests
         public Task<ResourceSnapshot<ToolProviderResource>> UpdateProviderAsync(string name, PutToolProviderRequest request, string etag, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ToolConnectionTestResponse> TestAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ToolDiscoveryDiffResponse> RefreshAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public int ExactToolReads { get; private set; }
+        public ScopedResourceAddress? RequestedTool { get; private set; }
+        public Task<ResourceSnapshot<ToolResource>> GetToolAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, CancellationToken cancellationToken)
+        {
+            ExactToolReads++; RequestedTool = ScopedResourceAddress.Create(scope, ns, ToolResourceKinds.Tool, name);
+            return Task.FromResult(new ResourceSnapshot<ToolResource>(Values.Single(value => value.ScopeRef == scope && value.Namespace == ns && value.Name == name), "\"tool-etag\""));
+        }
         public Task<ResourceSnapshot<ToolResource>> GetToolAsync(string name, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken) => throw new NotSupportedException();
 

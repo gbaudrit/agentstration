@@ -1,0 +1,10 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: rss-2-0-functions
+definition:
+  displayName: rss-2-0-functions
+  description: Explicitly expose the previously published RSS 2.0 mapping. Apply rss-2-0-schemas first in the same scope.
+  # Installation owner: instance, tenant or workspace.
+  # Use the same targetScope in rss-2-0-schemas and rss-2-0-functions.
+  targetScope: instance

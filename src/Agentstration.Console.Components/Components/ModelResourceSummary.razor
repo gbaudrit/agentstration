@@ -1,0 +1,98 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ModelDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject IServiceProvider Services
+
+<ResourceSummary TestId="model-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Version="@Resource.Definition.Identity?.Version" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="model-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="model-configuration-summary">
+        <div class="model-summary-content"><p class="field-help">@T("ReadOnlyDescription")</p>@ProviderFacts @Capabilities(true) @Limits</div>
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ModelResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private RenderFragment ProviderFacts
+    {
+        get
+        {
+            var saved = Resource;
+            return @<dl class="resource-details model-identity-grid">
+                <dt>@T("Provider")</dt><dd>@if (ProviderUrl is { } url) { <a class="text-button" href="@url"><code>@ProviderAddress</code></a> } else { <code>@ProviderAddress</code> }</dd>
+                <dt>@T("ExternalId")</dt><dd><code>@saved.Definition.ExternalId</code></dd>
+                <dt>@T("Publisher")</dt><dd>@Text(saved.Definition.Identity?.Publisher)</dd>
+                <dt>@T("ModelFamily")</dt><dd>@Text(saved.Definition.Identity?.Model)</dd>
+                <dt>@T("Version")</dt><dd>@Text(saved.Definition.Identity?.Version)</dd>
+                <dt>@T("ResourceGeneration")</dt><dd>@saved.Generation</dd>
+            </dl>;
+        }
+    }
+
+    private RenderFragment Capabilities(bool allowEdit) => @<FormSection Title="@T("Capabilities")" Eyebrow="@T("EffectiveSpecification")" Description="@T("CapabilitiesHelp")" Class="model-capabilities-panel" TestId="@(allowEdit ? "model-capabilities" : null)"><Actions>@ConfigurationActions</Actions><ChildContent>
+                <div class="model-capability-grid">
+                    @Capability(T("Streaming"), ObservedSpecification.Features.Streaming?.Support, EffectiveSpecification.Features.Streaming?.Support, HasStreamingOverride)
+                    @Capability(T("Tools"), ObservedSpecification.Features.Tools?.Support, EffectiveSpecification.Features.Tools?.Support, HasToolsOverride, ToolDetails)
+                    @Capability(T("StructuredOutput"), ObservedSpecification.Features.StructuredOutput?.Support, EffectiveSpecification.Features.StructuredOutput?.Support, HasStructuredOutputOverride, StructuredOutputDetails)
+                    @Capability(T("Reasoning"), ObservedSpecification.Features.Reasoning?.Support, EffectiveSpecification.Features.Reasoning?.Support, HasReasoningOverride, ReasoningDetails)
+                </div>
+            </ChildContent></FormSection>;
+
+    private RenderFragment Limits => @<FormSection Title="@T("KnownLimits")" Eyebrow="@T("Capacity")" Description="@T("LimitsHelp")"><ChildContent>
+                <div class="model-limit-grid">
+                    @Limit(T("ContextTokens"), ObservedSpecification.Limits.ContextTokens, EffectiveSpecification.Limits.ContextTokens, HasContextLimitOverride)
+                    @Limit(T("MaxOutputTokens"), ObservedSpecification.Limits.MaxOutputTokens, EffectiveSpecification.Limits.MaxOutputTokens, HasOutputLimitOverride)
+                </div>
+            </ChildContent></FormSection>;
+
+    private RenderFragment Capability(string label, ModelFeatureSupport? observed, ModelFeatureSupport? current, bool overridden, string? details = null) => @<article class="model-capability-card">
+            <div class="model-capability-heading"><strong>@label</strong><StatusBadge Text="@SupportLabel(current)" Status="@SupportTone(current)" /></div>
+            <dl><dt>@T("Observed")</dt><dd>@SupportLabel(observed)</dd><dt>@T("Effective")</dt><dd>@SupportLabel(current)</dd><dt>@T("Provenance")</dt><dd>@ProvenanceLabel(overridden)</dd></dl>
+            @if (!string.IsNullOrWhiteSpace(details)) { <p><span>@T("Details")</span> @details</p> }
+        </article>;
+
+    private RenderFragment Limit(string label, long? observed, long? current, bool overridden) => @<article class="model-limit-card"><span>@label</span><strong>@Number(current)</strong><small>@T("ObservedValue", Number(observed)) · @ProvenanceLabel(overridden)</small></article>;
+
+    private string SupportLabel(ModelFeatureSupport? support) => support is null ? T("Support.Omitted") : T($"Support.{support}");
+    private static UiStatus SupportTone(ModelFeatureSupport? support) => support switch { ModelFeatureSupport.Native => UiStatus.Success, ModelFeatureSupport.Emulated => UiStatus.Info, ModelFeatureSupport.Partial => UiStatus.Warning, ModelFeatureSupport.Unsupported => UiStatus.Neutral, _ => UiStatus.Neutral };
+    private string ProvenanceLabel(bool overridden) => overridden ? T("ProviderOverride") : T("ProviderObservation");
+    private string Modalities(IReadOnlyList<ModelContentType>? values) => values is null ? T("Unknown") : values.Count == 0 ? T("None") : string.Join(", ", values.Select(value => T($"Modality.{value}")));
+    private string Text(string? value) => string.IsNullOrWhiteSpace(value) ? T("NotObserved") : value;
+    private string Number(long? value) => value?.ToString("N0") ?? T("Unknown");
+    private string Join(IEnumerable<string>? values) => values is null || !values.Any() ? T("NoDetails") : string.Join(", ", values);
+    [Parameter] public ModelSpecification? KnownEffectiveSpecification { get; set; }
+    [Parameter] public ModelSpecificationOverride? KnownOverride { get; set; }
+    [Parameter] public RenderFragment? ConfigurationActions { get; set; }
+    private ResourceAddress ProviderAddress => Resource.Definition.Provider.Resolve(Resource.Namespace, ModelResourceKinds.ModelProvider);
+    private string? ProviderUrl => Resource.Definition.Provider.ScopeRef is { } owner && owner != ResourceScopeRef.Instance ? null
+        : ResourceOwnershipContext.Resource(Services, "/modelproviders", ProviderAddress.Name, ProviderAddress.Namespace, Resource.Definition.Provider.ScopeRef ?? Resource.ScopeRef) + "#overview";
+    private ModelSpecification ObservedSpecification => Resource.Definition.Specification;
+    private ModelSpecification EffectiveSpecification => KnownEffectiveSpecification ?? ObservedSpecification;
+    private bool HasStreamingOverride => KnownOverride?.Features.Streaming is not null;
+    private bool HasToolsOverride => KnownOverride?.Features.Tools is not null;
+    private bool HasStructuredOutputOverride => KnownOverride?.Features.StructuredOutput is not null;
+    private bool HasReasoningOverride => KnownOverride?.Features.Reasoning is not null;
+    private bool HasContextLimitOverride => KnownOverride?.Limits.ContextTokens is not null;
+    private bool HasOutputLimitOverride => KnownOverride?.Limits.MaxOutputTokens is not null;
+    private string ToolDetails => Join(EffectiveSpecification.Features.Tools?.Modes.Keys.Select(value => T($"ToolMode.{value}")));
+    private string StructuredOutputDetails => Join(EffectiveSpecification.Features.StructuredOutput?.Formats.Keys.Select(value => T($"OutputFormat.{value}")));
+    private string ReasoningDetails => Join(EffectiveSpecification.Features.Reasoning?.Efforts.Keys.Select(value => T($"ReasoningEffort.{value}")));
+
+}

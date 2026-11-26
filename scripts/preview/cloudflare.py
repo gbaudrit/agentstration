@@ -62,10 +62,17 @@ class ReadOnlyAPI:
         self.opener = urllib.request.build_opener(NoRedirect())
 
     def get(self, path):
+        return self._request('GET', path)
+
+    def _request(self, method, path, body=None):
         preview.require(path.startswith('/') and not path.startswith('//') and '#' not in path,
                         'Invalid Cloudflare API path.')
-        request = urllib.request.Request(API + path, method='GET',
-                                         headers={'Authorization': 'Bearer ' + self.token, 'Accept': 'application/json'})
+        headers = {'Authorization': 'Bearer ' + self.token, 'Accept': 'application/json'}
+        if body is not None:
+            headers['Content-Type'] = 'application/json'
+        request = urllib.request.Request(API + path, method=method,
+                                         data=json.dumps(body).encode() if body is not None else None,
+                                         headers=headers)
         try:
             with self.opener.open(request, timeout=30) as response:
                 raw = response.read(MAX_RESPONSE + 1)
@@ -221,7 +228,7 @@ def audit(values, api):
     api.list(root + '/cfd_tunnel')
     api.list('/zones/' + values['ZONE_ID'] + '/dns_records')
     return {'schemaVersion': 1, 'state': 'configuration-validated', 'hostnamePattern': expected,
-            'teamDomain': values['TEAM_DOMAIN'], 'accessAppId': app['id'],
+            'teamDomain': values['TEAM_DOMAIN'], 'accessAppId': app['id'], 'accessAudience': app['aud'],
             'checks': {'humanPolicy': 'entra-group', 'humanProviderBinding': binding,
                        'humanProviderFields': [field for field in provider_fields if field in group],
                        'humanGroupLabelPresent': 'name' in group,

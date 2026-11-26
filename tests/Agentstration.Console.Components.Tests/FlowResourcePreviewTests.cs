@@ -157,6 +157,20 @@ public sealed class FlowResourcePreviewTests
         Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
     }
 
+    [TestMethod]
+    public async Task LosingReadPermissionClearsTheSnapshotWithoutAnotherRead()
+    {
+        using var handler = new Handler((_, _) => Task.FromResult(Response(Resource("flow-a"))));
+        using var context = await ContextAsync(handler);
+        var cut = Render(context, Target("flow-a"));
+        var provider = (ResourceListContextProvider)context.Services.GetRequiredService<IConsoleContextProvider>();
+        provider.Permissions = new HashSet<string>();
+        await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default));
+        Assert.IsEmpty(cut.FindComponents<FlowResourceSummary>());
+        Assert.AreEqual(ResourceLoadStatus.Forbidden, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+        Assert.AreEqual(1, handler.Reads);
+    }
+
     private static ScopedResourceAddress Target(string name) => ScopedResourceAddress.Create(Scope, ResourceNamespace.Default, FlowResourceKinds.Flow, name);
     private static FlowResponse Resource(string name) => new(name, "Saved " + name, null, "1.0.0", true, "1.0.0",
         new DirectFlowDefinition(new FlowTargetReference(FlowTargetKind.Agent, "agent")),

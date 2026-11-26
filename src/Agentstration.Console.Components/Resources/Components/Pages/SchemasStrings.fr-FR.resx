@@ -27,4 +27,9 @@
 <data name="ApplySourceFirst" xml:space="preserve"><value>Appliquez le contenu source avant de créer le schéma.</value></data>
 <data name="DefinitionSource" xml:space="preserve"><value>Contenu du schéma</value></data>
 
+  <data name="ExposeAsFunction" xml:space="preserve"><value>Exposer comme fonction</value></data>
+  <data name="ExposureHelp" xml:space="preserve"><value>Créez une fonction nommée figée sur cette déclaration publiée, son moteur et ses contrats d’entrée et de sortie. Publier la déclaration seule ne crée aucune fonction.</value></data>
+  <data name="ExposureFailed" xml:space="preserve"><value>La fonction n’a pas pu être exposée. Vérifiez le nom, la version, les dépendances et les permissions.</value></data>
+  <data name="Format.XmlXsd" xml:space="preserve"><value>Schéma XML (XSD 1.0)</value></data>
+  <data name="Format.XmlJsonTransformation" xml:space="preserve"><value>Transformation XML vers JSON</value></data>
 </root>

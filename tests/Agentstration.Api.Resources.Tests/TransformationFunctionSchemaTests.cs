@@ -107,7 +107,7 @@ public sealed class TransformationFunctionSchemaTests : ResourceManagementApiTes
         var largeBinding = new SchemaBinding { Reference = new() { Name = largeSchema.Value.Name, Version = "A", ScopeRef = owner } };
         var largeSnapshot = await factory.Services.GetRequiredService<ISchemaBindingResolver>().ResolveAsync("$.itemSchema", largeBinding,
             new(owner, ResourceNamespace.Default, SchemaFormatIds.JsonSchema), default);
-        var oversized = await Assert.ThrowsExactlyAsync<Agentstration.Functions.Abstractions.TransformationFunctionException>(() =>
+        var oversized = await Assert.ThrowsExactlyAsync<Agentstration.Schemas.DataContractException>(() =>
             factory.Services.GetRequiredService<Agentstration.Functions.TransformationFunctionService>().InvokeAsync(functionContract, owner,
                 JsonSerializer.SerializeToElement(new { value = new { content = new string('x', 1_000_000) }, path = "", itemSchema = largeBinding }, JsonSerializerOptions.Web),
                 default, schemaBindings: new Dictionary<string, SchemaBindingSnapshot> { ["itemSchema"] = largeSnapshot }));

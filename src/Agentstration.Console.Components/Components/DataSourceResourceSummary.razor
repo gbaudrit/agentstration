@@ -1,0 +1,63 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<DataSourcesStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject IServiceProvider Services
+@using Agentstration.Schemas.Contracts
+
+<ResourceSummary TestId="data-source-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="data-source-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="@ConfigurationTestId">
+        @if (Resource.Definition.Dataset is not null)
+        {
+            <CollectionView TItem="DatasetSetting" Items="DatasetSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>
+        }
+        else
+        {
+            <CollectionView TItem="SourceSetting" Items="ProfileSettings" IdentityLabel="@T("Name")" InformationLabels="@(new[] { T("SourceSettingValue") })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@T("SourceSettingValue")">@if (entry.Href is { } href) { <a class="configuration-value" href="@href">@entry.Value</a> } else { <span class="configuration-value">@entry.Value</span> }</CollectionValue></Information></CollectionView>
+        }
+    </FormSection>
+    @AdditionalContent
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public DataSourceResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private sealed record SourceSetting(string Label, string Value, string? Href = null);
+    private string SavedProfileLabel => Resource.Definition.Profile is not { } profile ? "—" : $"{profile.Namespace ?? Resource.Namespace}/{profile.Name}{(profile.ScopeRef is { } scope ? $" · {scope.Value}" : string.Empty)}";
+    private string? SavedProfileUrl => Resource.Definition.Profile is { ScopeRef: { } owner } profile
+        ? ResourceOwnershipContext.Resource(Services, "/data-source-profiles", profile.Name, profile.Namespace ?? Resource.Namespace, owner) : null;
+    private IReadOnlyList<SourceSetting> ProfileSettings =>
+        [new(T("Enabled"), T(Resource.Definition.Enabled ? "Enabled" : "Disabled")), new(T("Profile"), SavedProfileLabel, SavedProfileUrl), new(T("Configuration"), Resource.Definition.Configuration.GetRawText())];
+    private sealed record DatasetSetting(string Label, string Value);
+    private IReadOnlyList<DatasetSetting> DatasetSettings => Resource.Definition.Dataset is not { } saved ? [] :
+    [new(T("DatasetService"), ServiceDisplayName ?? saved.Acquisition.Operation.Operation.ToString()), new(T("DatasetOperation"), OperationDisplayName ?? saved.Acquisition.Operation.Operation.ToString()),
+     new(T("Parameters"), saved.Acquisition.ParameterBindings.Count == 0 ? saved.Acquisition.Parameters.GetRawText()
+        : JsonSerializer.Serialize(new { saved.Acquisition.Parameters, saved.Acquisition.ParameterBindings })), new(T("DatasetStorage"), StorageDisplayName ?? (saved.Storage is null ? T("DirectInput") : saved.Storage.Storage.ToString())), new(T("DatasetPrefix"), saved.Rule.Prefix),
+     new(T("AcquisitionOutputSchema"), ContractSummary(saved.Acquisition.OutputSchemaBinding)), new(T("ProjectedOutputSchema"), ContractSummary(saved.OutputSchemaBinding)),
+     new(T("LifecycleTitle"), JsonSerializer.Serialize(saved.Lifecycle)), new(T("WizardTreatments"), JsonSerializer.Serialize(new { saved.Orchestration, saved.Compositions, saved.Transformations }))];
+    [Parameter] public string ConfigurationTestId { get; set; } = "data-source-configuration-summary";
+    [Parameter] public string? ServiceDisplayName { get; set; }
+    [Parameter] public string? OperationDisplayName { get; set; }
+    [Parameter] public string? StorageDisplayName { get; set; }
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+    private string ContractSummary(SchemaBinding? binding) => binding?.Reference is { } reference
+        ? $"{reference.Namespace?.Value ?? Resource.Namespace.Value}/{reference.Name} · {reference.Version}"
+        : T(binding?.Inline is not null ? "WizardInlineContract" : "WizardNoContract");
+
+}

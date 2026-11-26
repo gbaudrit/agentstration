@@ -68,7 +68,7 @@ public partial class RuntimeWorkers
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { items = null; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); items = null; query = new(); contextKey = scope; }
         if (Context.Error is not null || Context.Current is null)
         {
             items = null;
@@ -90,7 +90,7 @@ public partial class RuntimeWorkers
             if (!IsCurrent(requestRevision, scope)) return;
             var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
             var forbidden = status is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized;
-            if (forbidden) { items = null; }
+            if (forbidden) { preview?.Close(); items = null; }
             loadState = new(forbidden ? ResourceLoadStatus.Forbidden : ResourceLoadStatus.Failed)
             {
                 HasContent = items is not null,

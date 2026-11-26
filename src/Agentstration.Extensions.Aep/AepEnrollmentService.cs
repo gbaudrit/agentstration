@@ -116,6 +116,16 @@ public sealed class AepEnrollmentService(
         return new(announcement.InstanceId, State(initialState));
     }
 
+    public async Task<StoredResource<AepEnrollmentRequestResource>> GetSavedExactAsync(RequestContext context, ResourceScopeRef owner, ResourceNamespace ns, Guid requestId, CancellationToken token)
+    {
+        using var scopeContext = PushFallbackContext(context);
+        await AuthorizeAsync(context, token);
+        if (owner != ResourceScopeRef.Instance || !ns.IsDefault || requestId == Guid.Empty)
+            throw new AepEnrollmentException("request_not_found", "The enrollment request was not found.", 404);
+        var saved = await GetVisibleAsync(context, requestId, token);
+        return saved with { Value = Sanitize(saved.Value) };
+    }
+
     public async Task<IReadOnlyList<AepEnrollmentRequestResource>> ListAsync(RequestContext context, CancellationToken cancellationToken)
     {
         using var scopeContext = PushFallbackContext(context);

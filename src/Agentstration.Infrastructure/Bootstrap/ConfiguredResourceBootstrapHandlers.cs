@@ -129,6 +129,13 @@ public sealed class SchemaBootstrapResourceHandler(SchemaManagementService servi
     public string Kind => SchemaResourceKinds.Schema;
     public BootstrapProfileScope Scope => BootstrapProfileScope.Instance;
     public bool SupportsProfileScope(BootstrapProfileScope profileScope) => true;
+    internal static SchemaResource Parse(BootstrapResourceDocument document, BootstrapResourceOperationContext operation)
+    {
+        var resource = WorkspaceBootstrapResource.Parse<SchemaResource>(document);
+        return resource with { ScopeRef = DataSourceProfileBootstrapResourceHandler.TargetScope(operation) };
+    }
+    internal static string? Publication(BootstrapResourceDocument document) => document.Definition.TryGetProperty("publishVersion", out var value) ? value.GetString() : null;
+
     public async Task<BootstrapResourcePlanResult> PlanAsync(BootstrapResourceDocument resource,
         BootstrapResourceOperationContext operation, BootstrapPlanningContext planning, CancellationToken cancellationToken)
     {

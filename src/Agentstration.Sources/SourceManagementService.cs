@@ -181,6 +181,19 @@ public sealed partial class SourceManagementService(
         return await BuildViewAsync(source.Value, cancellationToken);
     }
 
+    public async Task<SourceSavedSummarySnapshot?> GetSavedSummaryExactAsync(ResourceScopeRef owner, string publisher, string name, CancellationToken token)
+    {
+        ValidatePortableName(publisher, "publisher");
+        ValidatePortableName(name, "metadata.name");
+        using var system = scopes.PushSystem();
+        var ns = new ResourceNamespace(publisher);
+        var source = await store.GetExactAsync<SourceResource>(ScopedResourceAddress.Create(owner, ns, SourceResourceKinds.Source, name), token);
+        if (source is null) return null;
+        var configuration = await store.GetExactAsync<SourceConfigurationResource>(ScopedResourceAddress.Create(owner, ns, SourceResourceKinds.SourceConfiguration, name), token);
+        return configuration is null || configuration.Value.Definition.SourceUid != source.Value.Uid
+            ? null : new(source.Value, configuration.Value);
+    }
+
     public async Task<SourceView?> GetExactAsync(
         ResourceScopeRef scopeRef,
         string publisher,

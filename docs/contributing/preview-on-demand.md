@@ -7,13 +7,14 @@ private GHCR packages. SQLite is the default; PostgreSQL is an optional overlay.
 Deployment never builds or republishes an application image.
 
 This increment deploys healthy isolated containers and supports explicit teardown.
-It intentionally returns **no public URL** until [#1285](https://github.com/gbaudrit/agentstration/issues/1285)
+Its [protected route](preview-access.md) returns an HTTPS URL only after fresh
+protection and readiness checks. [#1285](https://github.com/gbaudrit/agentstration/issues/1285)
 verifies Cloudflare Tunnel and Access protection. #1284 remains open for that
 acceptance criterion. Automatic PR deployment/TTL cleanup is #1286; deployed
 smoke/Playwright journeys are #1287. No Runtime deployment service is introduced.
 
 Prepare the [shared Access configuration](preview-access.md) and run its opt-in,
-read-only audit before the protected route increment. It uses the same protected
+read-only audit before the first route deployment. It uses the same protected
 environment without creating cloud resources or publishing a URL.
 
 ## Prepare a published selection

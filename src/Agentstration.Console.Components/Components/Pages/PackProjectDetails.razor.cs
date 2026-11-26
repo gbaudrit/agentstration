@@ -22,6 +22,9 @@ public partial class PackProjectDetails
 {
     [Parameter] public Guid ProjectId { get; set; }
     [SupplyParameterFromQuery(Name = "context")] public string? ContextValue { get; set; }
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedOwner { get; set; }
+    [SupplyParameterFromQuery(Name = "namespace")] public string? RequestedNamespace { get; set; }
+    [SupplyParameterFromQuery(Name = "resourceName")] public string? RequestedResourceName { get; set; }
     private static readonly JsonSerializerOptions PublicJsonOptions = new(JsonSerializerDefaults.Web);
     private readonly CancellationTokenSource cancellation = new();
     private readonly CancellationToken lifetimeToken;
@@ -54,7 +57,7 @@ public partial class PackProjectDetails
     private IReadOnlyList<ParameterResource> parameters = [];
 
     public PackProjectDetails() { lifetimeToken = cancellation.Token; metadataContext = new(model); validation = new(metadataContext); }
-    private string ContextKey => $"{ProjectId:D}|{ContextValue}|{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
+    private string ContextKey => $"{ProjectId:D}|{RequestedResourceName}|{RequestedOwner}|{RequestedNamespace}|{ContextValue}|{ContextState.Current?.UserId}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.WorkspaceId}";
     private string Identity => $"{loadedKey}|{project?.Value.Uid}|{project?.Value.ScopeRef}|{project?.Value.Namespace}|{project?.Value.Name}";
     private string Fingerprint => JsonSerializer.Serialize(model);
     private bool HasMetadataDraft => baseline is not null && (Fingerprint != baseline || invalidMetadata);
@@ -98,7 +101,16 @@ public partial class PackProjectDetails
         model = new(); metadataContext = new(model); validation = new(metadataContext); baseline = null; invalidMetadata = false; message = null; installationBaseline = null; replaceExisting = false; installationSavedBindings.Clear(); installationSavedReplace = previewVerified = false; commandBusy = building = installing = hasError = false;
     }
     private bool Current(long request, string? key) => !disposed && request == loadVersion && key == loadedKey && key == ContextKey;
-    private bool Matches(ResourceSnapshot<PackProjectResource> snapshot, ResourceSnapshot<PackProjectResource>? previous) => snapshot.Value.Uid == ProjectId && snapshot.Value.Uid != Guid.Empty && snapshot.Value.Kind == PackAuthoringKinds.PackProject && snapshot.Value.ScopeRef is not null && !string.IsNullOrWhiteSpace(snapshot.Value.Name) && (previous is null || snapshot.Value.ScopeRef == previous.Value.ScopeRef && snapshot.Value.Namespace == previous.Value.Namespace && snapshot.Value.Name == previous.Value.Name);
+    private Task<ResourceSnapshot<PackProjectResource>> ReadProjectAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(RequestedOwner))
+        {
+            if (!ResourceScopeRef.TryParse(RequestedOwner, out var owner)) throw new HttpRequestException("The project owner is unavailable.", null, HttpStatusCode.NotFound);
+            return Client.GetProjectAtAddressAsync(ScopedResourceAddress.Create(owner, ResourceNamespace.Parse(RequestedNamespace), PackAuthoringKinds.PackProject, RequestedResourceName ?? string.Empty), lifetimeToken);
+        }
+        return Client.GetProjectAsync(ProjectId, lifetimeToken);
+    }
+    private bool Matches(ResourceSnapshot<PackProjectResource> snapshot, ResourceSnapshot<PackProjectResource>? previous) => snapshot.Value.Uid == ProjectId && snapshot.Value.Uid != Guid.Empty && snapshot.Value.Kind == PackAuthoringKinds.PackProject && snapshot.Value.ScopeRef is not null && !string.IsNullOrWhiteSpace(snapshot.Value.Name) && (string.IsNullOrWhiteSpace(RequestedOwner) || snapshot.Value.ScopeRef?.Value == RequestedOwner && snapshot.Value.Namespace == ResourceNamespace.Parse(RequestedNamespace) && snapshot.Value.Name == RequestedResourceName) && (previous is null || snapshot.Value.ScopeRef == previous.Value.ScopeRef && snapshot.Value.Namespace == previous.Value.Namespace && snapshot.Value.Name == previous.Value.Name);
     private bool MatchesBuild(PackProjectBuildResource build) => project is not null && build.Uid != Guid.Empty && build.Kind == PackAuthoringKinds.PackProjectBuild && build.Definition.ProjectId == ProjectId && build.ScopeRef is not null;
     private static ResourceLoadStatus FailureStatus(Exception exception) => exception is AgentstrationApiException api ? api.StatusCode switch { HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden, HttpStatusCode.NotFound => ResourceLoadStatus.NotFound, _ => ResourceLoadStatus.Failed } : ResourceLoadStatus.Failed;
     private Task RefreshAsync() => busy ? Task.CompletedTask : LoadAsync(project is not null);
@@ -110,7 +122,7 @@ public partial class PackProjectDetails
         {
             await ContextState.EnsureLoadedAsync(lifetimeToken); if (disposed || request != loadVersion) return; loadedKey = key = ContextKey;
             if (!ContextState.HasPermission("resources/read")) { ClearPrivate(); loadState = new(ResourceLoadStatus.Forbidden); return; }
-            var incoming = await Client.GetProjectAsync(ProjectId, lifetimeToken); if (!Current(request, key)) return;
+            var incoming = await ReadProjectAsync(); if (!Current(request, key)) return;
             if (!Matches(incoming, previous)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
             IReadOnlyList<PackProjectBuildResource>? incomingBuilds = builds; IReadOnlyList<PackProjectSourceDocument>? incomingSources = sourceDocuments; AgentstrationApiException? auxiliaryError = null;
             try { incomingBuilds = await Client.GetBuildsAsync(ProjectId, lifetimeToken); }
@@ -217,7 +229,7 @@ public partial class PackProjectDetails
             var built = await Client.BuildAsync(ProjectId, lifetimeToken); if (!Current(request, key)) return;
             if (!MatchesBuild(built)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
             builds = await Client.GetBuildsAsync(ProjectId, lifetimeToken); if (!Current(request, key)) return;
-            var incoming = await Client.GetProjectAsync(ProjectId, lifetimeToken); if (!Current(request, key)) return;
+            var incoming = await ReadProjectAsync(); if (!Current(request, key)) return;
             if (!Matches(incoming, previous)) { ClearPrivate(); loadState = new(ResourceLoadStatus.NotFound); return; }
             var sameDefinition = JsonSerializer.Serialize(PackProjectEditorModel.From(previous.Value)) == JsonSerializer.Serialize(PackProjectEditorModel.From(incoming.Value)) && previous.Value.Definition.SourceArtifact.Sha256 == incoming.Value.Definition.SourceArtifact.Sha256;
             AcknowledgeEnvelope(incoming, metadataSaved: false, rebaseSources: sameDefinition); await SetPreviewAsync(built, request, key);

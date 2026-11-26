@@ -1,0 +1,6 @@
+      Unhandled exception in circuit '3O7BYRAmyfmkhpCUGEjlc9smEYNE2H0zIBZPKPTGKog'.
+      System.InvalidOperationException: A pending resource requires a blocking load state.
+         at Agentstration.Web.Components.ConsoleResourceDetailsTemplate.OnParametersSet() in /workspace/agentstration/src/Agentstration.Console.Components/Components/ConsoleResourceDetailsTemplate.razor:line 135
+         at Microsoft.AspNetCore.Components.ComponentBase.CallOnParametersSetAsync()
+         at Microsoft.AspNetCore.Components.ComponentBase.SetParametersAsync(ParameterView parameters)
+         at Microsoft.AspNetCore.Components.Rendering.ComponentState.SupplyCombinedParameters(ParameterView directAndCascadingParameters)

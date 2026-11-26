@@ -56,4 +56,6 @@
 <data name="Project.ReplaceSourceDraftTitle" xml:space="preserve"><value>Utiliser cette version de l’éditeur ?</value></data>
 <data name="Project.ReplaceSourceDraftMessage" xml:space="preserve"><value>Le contenu en attente dans l’autre vue de l’éditeur sera remplacé par cette version. Un enregistrement refusé conserve les deux brouillons.</value></data>
 <data name="Project.UseCurrentSource" xml:space="preserve"><value>Utiliser cette version</value></data>
+  <data name="PackInspectionOnly" xml:space="preserve"><value>Cette page permet de consulter la définition du Pack installé. Gérez son installation depuis le catalogue.</value></data>
+  <data name="ManageInstallation" xml:space="preserve"><value>Gérer l’installation</value></data>
 </root>

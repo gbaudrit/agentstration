@@ -111,6 +111,21 @@ public sealed class AgentsCollectionTests
         Assert.AreEqual(1, handler.DetailReads);
     }
 
+    [TestMethod]
+    public async Task InheritedAgentPreviewRunKeepsItsExactOwnerAndCurrentAdministration()
+    {
+        using var handler = new Handler((skip, take, _) => Task.FromResult(Page(skip, take, 1)));
+        using var context = Context(handler, "/instance");
+        var cut = context.Render<AgentsPage>();
+        await cut.Find("[data-testid=agent-preview]").ClickAsync(new());
+        var href = cut.Find("[data-testid=agent-summary-run]").GetAttribute("href")!;
+        Assert.Contains("scopeRef=" + Uri.EscapeDataString(Scope), href);
+        Assert.Contains("context=%2Finstance", href);
+        Assert.DoesNotContain("context=" + Uri.EscapeDataString(Scope), href);
+        Assert.IsEmpty(cut.FindAll("[data-testid=agent-preview-edit]"));
+        Assert.AreEqual(1, handler.DetailReads);
+    }
+
     private static AgentResource Agent(int index) => new()
     {
         ApiVersion = ResourceApiVersions.CoreV1,
@@ -121,17 +136,17 @@ public sealed class AgentsCollectionTests
         Definition = new() { DisplayName = $"Agent {index}", Instructions = "Public fixture instructions", ModelProfile = new("fixture-profile") }
     };
     private static HttpResponseMessage Page(int skip, int take, int count) => new(HttpStatusCode.OK) { Content = JsonContent.Create(new PagedResponse<AgentResource>(Enumerable.Range(0, count).Skip(skip).Take(take).Select(Agent).ToArray(), skip + take <= count ? $"/api/agents?allNamespaces=true&skip={skip + take}&top={take}" : null)) };
-    private sealed class NavigationContext : IConsoleNavigationContext
+    private sealed class NavigationContext(string? selectedScope = null) : IConsoleNavigationContext
     {
-        public string ScopeRef => Scope;
-        public string AddToUri(string uri) => QueryHelpers.AddQueryString(uri, "context", Scope);
+        public string ScopeRef => selectedScope ?? Scope;
+        public string AddToUri(string uri) => QueryHelpers.AddQueryString(uri, "context", ScopeRef);
     }
-    private static BunitContext Context(Handler handler)
+    private static BunitContext Context(Handler handler, string? selectedScope = null)
     {
-        var context = new BunitContext().WithCollectionPresentation().WithResourceListContext(new ResourceListContextProvider { Scope = Scope, Permissions = new HashSet<string> { AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite, AuthorizationPermissions.ResourcesDelete, AuthorizationPermissions.RunsExecute } });
+        var context = new BunitContext().WithCollectionPresentation().WithResourceListContext(new ResourceListContextProvider { Scope = selectedScope ?? Scope, Permissions = new HashSet<string> { AuthorizationPermissions.ResourcesRead, AuthorizationPermissions.ResourcesWrite, AuthorizationPermissions.ResourcesDelete, AuthorizationPermissions.RunsExecute } });
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.JSInterop.SetupModule("./_content/Agentstration.Web.Components/dialog.js").Mode = JSRuntimeMode.Loose;
-        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext());
+        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(selectedScope));
         context.Services.AddSingleton(new NotificationState());
         context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
         context.Services.AddSingleton<IManagementApiClient>(new ManagementApiClient(new HttpClient(handler, false) { BaseAddress = new("https://agentstration.test/") }));

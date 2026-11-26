@@ -24,6 +24,8 @@ API integration tests run in six independent test assemblies: `Agentstration.Api
 
 The #1044 reconciliation moves the 12 ToolDefinition and 5 relay API cases into the existing `Agentstration.Api.Tests` assembly, retaining the existing per-assembly host/Worker fixture pattern and preserving test namespaces and method names. Each assembly owns its fixture sources; the opt-in host instrumentation remains owned by the test root. Before redistribution, all 133 Management API cases passed, but [the retained CI diagnostic](https://github.com/gbaudrit/agentstration/actions/runs/42512171729/job/128828401591) measured 2831.1 MiB against its unchanged 2560 MiB ceiling. At that baseline, redistribution preserved all 1099 Integration cases (40 API and 116 Management API). Subsequent #1079 moved five Storage execution cases into Management Storage and added one StorageType administration case, leaving 112 Management API cases. Keep the existing process/worker limits and memory ceilings, and retain new diagnostic measurements before claiming a memory improvement.
 
+By PR #1273, Management API had grown to 164 cases and again exceeded the same ceiling despite all tests passing. Its [CI investigation](ci-memory-1273.md) moves the 40 Model/Profile/Provider cases to `Agentstration.Management.Models.Api.Tests`, leaving 124 in Management API. Both compile the test-root `ManagementApiTestFixtures`, retain private per-test state and one class worker, and run separately with unchanged 1920/2560 MiB limits. Both participate in Integration and coverage shard A; the existing Management API diagnostic runner executes them sequentially. Minimum counts require the complete 124 + 40 inventory. The global module concurrency remains unchanged.
+
 ### Local Storage link rejection on Windows
 
 `LocalStorageContentTests.LinksAtStorageDirectoryAndContentFileAreRejected` creates real directory and file symbolic links before checking that Storage rejects them. The Windows test session must have permission to create those links. A privilege failure during setup is an environment limitation, not a successful Storage validation: report it explicitly and run the case in an environment with that capability. Keep the rejection assertions enabled; do not replace this check with a passing stub or silently skip it.
@@ -83,7 +85,8 @@ The Management budgets below use Release runs on Windows 11 10.0.26200 with .NET
 | `Agentstration.Api.Resources.Tests` | Pending after resource-family split | 2048 | 2432 | 111 |
 | `Agentstration.Api.DataSources.Tests` | Pending after resource-family split | 2048 | 2432 | 80 |
 | `Agentstration.Api.Artifacts.Tests` | Pending after resource-family split | 2048 | 2432 | 39 |
-| `Agentstration.Management.Api.Tests` | 1784.1 | 1920 | 2560 | 112 |
+| `Agentstration.Management.Api.Tests` | Historical consolidated baseline: 1784.1 | 1920 | 2560 | 124 |
+| `Agentstration.Management.Models.Api.Tests` | Pending CI baseline after split | 1920 | 2560 | 40 |
 | `Agentstration.Management.Bootstrap.Tests` | 355.3 | 500 | 700 | 31 |
 | `Agentstration.Management.Bootstrap.Scenarios.Tests` | Pending CI baseline after split | 500 | 700 | 10 |
 | `Agentstration.Management.Bootstrap.Plans.Tests` | Pending CI baseline after split | 500 | 700 | 6 |
@@ -121,6 +124,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Api.DataSources.Tests` | Integration | Data Source acquisition, Knowledge Snapshots and structured Storage |
 | `Agentstration.Api.Artifacts.Tests` | Integration | Artifact APIs, processing and storage-backed content |
 | `Agentstration.Management.Api.Tests` | Integration | Hosted Management API tests using the API-only test profile |
+| `Agentstration.Management.Models.Api.Tests` | Integration | Hosted Model/Profile/Provider API and exact-read tests using the same API-only test profile |
 | `Agentstration.Management.Bootstrap.Tests` | Integration | Bootstrap framework, catalog, enrollment and startup contracts using the API-only test profile |
 | `Agentstration.Management.Bootstrap.Scenarios.Tests` | Integration | Durable profile application/progress and versioned Assistant/documentation profile scenarios |
 | `Agentstration.Management.Bootstrap.Plans.Tests` | Integration | Ordered multi-target plans, future targets, producer bindings, cancellation and deferred validation |

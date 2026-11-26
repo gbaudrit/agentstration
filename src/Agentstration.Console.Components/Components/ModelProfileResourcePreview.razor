@@ -1,0 +1,79 @@
+@namespace Agentstration.Web.Components
+@implements IDisposable
+@inject IModelProfilesClient Client
+@inject ConsoleContextState Context
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Pages.ModelProfileEditorStrings> Localizer
+
+<div aria-busy="@((loadState.Status == ResourceLoadStatus.Loading).ToString().ToLowerInvariant())" data-testid="model-profile-preview-body">
+    @if (resource is null) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" RetryTestId="model-profile-preview-retry" /> }
+    else
+    {
+        <ModelProfileResourceSummary Resource="resource" ReadOnly="@(!CanEdit)" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false">
+            <QuickActions>
+                <a class="button-secondary" href="@OverviewHref" data-testid="model-profile-preview-open"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+                @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="model-profile-preview-edit"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+
+            </QuickActions>
+        </ModelProfileResourceSummary>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ScopedResourceAddress Address { get; set; }
+    [Parameter, EditorRequired] public string OverviewHref { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string DefinitionHref { get; set; } = string.Empty;
+    private ModelProfileResource? resource;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private CancellationTokenSource? pending;
+    private string? requestedKey;
+    private long revision;
+    private bool disposed;
+    private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
+    private bool CanEdit => resource is not null && !resource.Governance.IsManaged
+        && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef
+        && ResourceOwnershipContext.CanManage(resource.ScopeRef, Services);
+    protected override void OnInitialized() => Context.Changed += ContextChanged;
+    private void ContextChanged() => _ = InvokeAsync(async () => { if (disposed) return; await LoadAsync(); if (!disposed) StateHasChanged(); });
+    protected override Task OnParametersSetAsync() => requestedKey == SelectionKey ? Task.CompletedTask : LoadAsync();
+    private async Task LoadAsync()
+    {
+        if (disposed) return;
+        var target = Address;
+        var key = requestedKey = SelectionKey;
+        var requestRevision = ++revision;
+        pending?.Cancel(); pending?.Dispose(); pending = new();
+        var token = pending.Token;
+        resource = null; loadState = new(ResourceLoadStatus.Loading);
+        if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+        if (target.Kind != ModelResourceKinds.ModelProfile || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
+        try
+        {
+            var snapshot = await Client.GetModelProfileAsync(target.Namespace, target.Name, target.ScopeRef, token);
+            if (!IsCurrent(requestRevision, key)) return;
+            if (snapshot.Value.Kind != target.Kind || snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Name != target.Name)
+            { loadState = new(ResourceLoadStatus.Forbidden); return; }
+            resource = snapshot.Value; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception error) when (error is HttpRequestException or AgentstrationApiException or OperationCanceledException)
+        {
+            if (!IsCurrent(requestRevision, key)) return;
+            var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
+            loadState = new(status switch
+            {
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+                _ => ResourceLoadStatus.Failed
+            }) { ErrorId = (error as AgentstrationApiException)?.ErrorId };
+        }
+    }
+    private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey
+        && Context.Error is null && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true; revision++; Context.Changed -= ContextChanged; pending?.Cancel(); pending?.Dispose(); GC.SuppressFinalize(this);
+    }
+}

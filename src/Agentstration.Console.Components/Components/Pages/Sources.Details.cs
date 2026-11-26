@@ -55,25 +55,6 @@ public partial class Sources
     private IReadOnlyList<ResourceNavigationItem> DetailAdditionalSections => [new("content", T("ChannelsAndCatalogs"), "database"), new("versions", T("Versions"), "history")];
     private RenderFragment DetailSectionContent(string path) => path switch { "definition/identity" => IdentityContent, "definition/refresh" => RefreshContent, _ => BindingContent };
     private void ShowSection(string path) => Navigation.NavigateTo(new UriBuilder(Navigation.Uri) { Fragment = path }.Uri.AbsoluteUri);
-    private sealed record SourceSetting(string Label, string Value);
-    private IReadOnlyList<SourceSetting> SavedSourceSettings
-    {
-        get
-        {
-            if (detail is null) return [];
-            var values = new List<SourceSetting>
-            {
-                new(T("Publisher"), detail.Source.Source.Definition.Publisher), new(T("SelectedVersion"), detail.SelectedVersion.Definition.Version),
-                new(T("Origin"), detail.Source.Configuration.Definition.Origin?.Url ?? T("PastedManifest")),
-                new(T("SourceDefinitionRefresh"), PolicySummary(detail.Source.Configuration.Definition.Refresh.Source)),
-                new(T("ChannelRefreshDefaults"), PolicySummary(detail.Source.Configuration.Definition.Refresh.Channels))
-            };
-            values.AddRange(detail.Source.Configuration.Definition.Refresh.ChannelOverrides.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new SourceSetting(F("ChannelRefreshTarget", pair.Key), PolicySummary(pair.Value))));
-            values.AddRange(detail.Source.Configuration.Definition.Bindings.Select(binding => new SourceSetting($"{T("Bindings")} · {binding.Name}", ReferenceText(binding.Target))));
-            values.AddRange(detail.SelectedVersion.Definition.PublishedDefinition.Channels.Select(channel => new SourceSetting($"{T("Channel")} · {channel.Name}", F("ChannelContract", channel.Provider.Binding, channel.Configuration.OptionSet, channel.Configuration.Version) + Environment.NewLine + (channel.Configuration.Values.ValueKind == JsonValueKind.Undefined ? "—" : channel.Configuration.Values.GetRawText()))));
-            return values;
-        }
-    }
     private string PolicySummary(SourceRefreshPolicy policy) => F("PolicySummary", T(policy.Enabled ? "Enabled" : "Disabled"), policy.IntervalSeconds, policy.TimeoutSeconds, policy.MaximumAttempts, policy.InitialBackoffSeconds, policy.MaximumBackoffSeconds, policy.JitterSeconds);
     private static string ReferenceText(ResourceReference value) => $"{value.ScopeRef?.Value} · {value.Namespace?.Value ?? ResourceNamespace.DefaultValue}/{value.Name}";
     private static bool EqualJson<T>(T left, T right) => JsonNode.DeepEquals(JsonSerializer.SerializeToNode(left), JsonSerializer.SerializeToNode(right));

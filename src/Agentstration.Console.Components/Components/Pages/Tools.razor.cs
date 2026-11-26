@@ -67,7 +67,7 @@ public partial class Tools
         pending = CancellationTokenSource.CreateLinkedTokenSource(cancellation.Token);
         var token = pending.Token;
         var scope = CurrentContextKey;
-        if (scope != contextKey) { items = null; providers = []; extensions = []; query = new(); contextKey = scope; }
+        if (scope != contextKey) { preview?.Close(); items = null; providers = []; extensions = []; query = new(); contextKey = scope; }
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead))
         {
             items = null;

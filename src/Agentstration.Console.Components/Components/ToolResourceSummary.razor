@@ -1,0 +1,233 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ToolDetailsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject IServiceProvider Services
+
+<ResourceSummary TestId="tool-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (ShowIdentity)
+    {
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="tool-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="tool-configuration-summary">
+        @Configuration
+    </FormSection>
+    @if (ShowSpecificContent) { @OverviewPanels }
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public ToolResource Resource { get; set; } = null!;
+    [Parameter] public ToolProviderResource? Provider { get; set; }
+    [Parameter] public ExtensionInventoryItemResponse? ManagingExtension { get; set; }
+    [Parameter] public bool ShowIdentity { get; set; } = true;
+    [Parameter] public bool ShowSpecificContent { get; set; } = true;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] arguments) => Localizer[key, arguments];
+    private RenderFragment Configuration => @<CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch">
+        <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+    </CollectionView>;
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration =>  [new(T("TechnicalProvider"), Resource.Definition.Provider?.ResourceId ?? "—"), new(T("ExternalName"), Resource.Definition.ExternalId ?? "—"), new(T("Enabled"), BooleanLabel(Resource.Definition.Enabled)), new(T("RequiresApproval"), BooleanLabel(Resource.Definition.RequiresApproval)), new(T("AvailableLabel"), Resource.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")];
+    private RenderFragment OverviewPanels => @<div>@if (Resource is not null) {
+            <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
+                <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
+                <p>@(string.IsNullOrWhiteSpace(Resource.Definition.Description) ? T("NoDescription") : Resource.Definition.Description)</p>
+            </section>
+
+            <section class="panel tool-contract" aria-labelledby="tool-input-heading">
+                <div class="panel-header"><h2 id="tool-input-heading">@T("InputContract")</h2></div>
+                @SchemaSummary(Resource.Definition.Schema?.Input)
+                @RawSchema(Resource.Definition.Schema?.Input, "RawInputSchema")
+            </section>
+
+            <section class="panel tool-contract" aria-labelledby="tool-output-heading">
+                <div class="panel-header"><h2 id="tool-output-heading">@T("OutputContract")</h2></div>
+                @SchemaSummary(Resource.Definition.Schema?.Output)
+                @RawSchema(Resource.Definition.Schema?.Output, "RawOutputSchema")
+            </section>
+
+            <section class="panel" aria-labelledby="tool-governance-heading">
+                <div class="panel-header"><h2 id="tool-governance-heading">@T("GovernanceAndSource")</h2></div>
+                <dl class="resource-details">
+                    @if (ManagingExtension is not null)
+                    {
+                        <dt>@T("ManagingExtension")</dt><dd><a class="text-button" href="@ManagingExtensionUrl">@ManagingExtension.DisplayName</a><br /><code>@ManagingExtension.ExtensionId</code> · @(Resource.Governance.Origin.Version ?? ManagingExtension.Version ?? "—") · <ResourceScopeBadge ScopeRef="ManagingExtension.RegistrationScopeRef" Compact /></dd>
+                    }
+                    <dt>@T("TechnicalProvider")</dt><dd>@if (Provider is not null) { <a href="@ProviderUrl"><code>@Resource.Definition.Provider?.ResourceId</code></a> } else { <code>@Resource.Definition.Provider?.ResourceId</code> }</dd>
+                    <dt>@T("ExternalName")</dt><dd><code>@Resource.Definition.ExternalId</code></dd>
+                    <dt>@T("Enabled")</dt><dd>@BooleanLabel(Resource.Definition.Enabled)</dd>
+                    <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(Resource.Definition.RequiresApproval)</dd>
+                    <dt>@T("AvailableLabel")</dt><dd>@(Resource.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")</dd>
+                    <dt>@T("FirstSeen")</dt><dd>@Resource.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>
+                    <dt>@T("LastSeen")</dt><dd>@Resource.Definition.Discovery?.LastSeenAt.ToString("g")</dd>
+                </dl>
+            </section>
+    }</div>;
+    private RenderFragment SchemaSummary(JsonElement? schema) => builder =>
+    {
+        if (schema is null || schema.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "tool-contract-note");
+            builder.AddContent(2, T("NoSchema"));
+            builder.CloseElement();
+            return;
+        }
+
+        if (schema.Value.ValueKind != JsonValueKind.Object ||
+            !schema.Value.TryGetProperty("properties", out var properties) ||
+            properties.ValueKind != JsonValueKind.Object)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "tool-contract-note");
+            builder.AddContent(2, T("UnstructuredSchema"));
+            builder.CloseElement();
+            return;
+        }
+
+        var fields = properties.EnumerateObject().ToArray();
+        if (fields.Length == 0)
+        {
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "class", "tool-contract-note");
+            builder.AddContent(2, T("NoProperties"));
+            builder.CloseElement();
+            return;
+        }
+
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        if (schema.Value.TryGetProperty("required", out var requiredValue) && requiredValue.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in requiredValue.EnumerateArray())
+            {
+                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } fieldName)
+                {
+                    required.Add(fieldName);
+                }
+            }
+        }
+
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "tool-fields");
+        foreach (var field in fields)
+        {
+            builder.OpenElement(2, "article");
+            builder.AddAttribute(3, "class", "tool-field");
+            builder.OpenElement(4, "div");
+            builder.AddAttribute(5, "class", "tool-field-heading");
+            builder.OpenElement(6, "code");
+            builder.AddContent(7, field.Name);
+            builder.CloseElement();
+            builder.OpenElement(8, "span");
+            builder.AddAttribute(9, "class", required.Contains(field.Name) ? "tool-field-required" : "tool-field-optional");
+            builder.AddContent(10, T(required.Contains(field.Name) ? "Required" : "Optional"));
+            builder.CloseElement();
+            builder.CloseElement();
+
+            var type = PropertyText(field.Value, "type");
+            if (type is not null)
+            {
+                builder.OpenElement(11, "p");
+                builder.AddAttribute(12, "class", "tool-field-type");
+                builder.AddContent(13, T("Type", type));
+                builder.CloseElement();
+            }
+
+            var description = PropertyText(field.Value, "description");
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                builder.OpenElement(14, "p");
+                builder.AddContent(15, description);
+                builder.CloseElement();
+            }
+
+            var constraints = Constraints(field.Value);
+            if (constraints.Count > 0)
+            {
+                builder.OpenElement(16, "ul");
+                builder.AddAttribute(17, "class", "tool-field-constraints");
+                foreach (var constraint in constraints)
+                {
+                    builder.OpenElement(18, "li");
+                    builder.AddContent(19, constraint);
+                    builder.CloseElement();
+                }
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private RenderFragment RawSchema(JsonElement? schema, string titleKey) => builder =>
+    {
+        if (schema is null || schema.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return;
+        }
+
+        builder.OpenElement(0, "details");
+        builder.AddAttribute(1, "class", "tool-raw-schema");
+        builder.OpenElement(2, "summary");
+        builder.AddContent(3, T(titleKey));
+        builder.CloseElement();
+        builder.OpenElement(4, "pre");
+        builder.AddContent(5, JsonSerializer.Serialize(schema.Value, new JsonSerializerOptions { WriteIndented = true }));
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private static string? PropertyText(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private List<string> Constraints(JsonElement property)
+    {
+        var result = new List<string>();
+        if (property.ValueKind != JsonValueKind.Object)
+        {
+            return result;
+        }
+
+        AddConstraint("minLength", "MinLength");
+        AddConstraint("maxLength", "MaxLength");
+        AddConstraint("minimum", "Minimum");
+        AddConstraint("maximum", "Maximum");
+        AddConstraint("pattern", "Pattern");
+        AddConstraint("format", "Format");
+        if (property.TryGetProperty("enum", out var allowed) && allowed.ValueKind == JsonValueKind.Array)
+        {
+            result.Add(T("AllowedValues", string.Join(", ", allowed.EnumerateArray().Select(item => item.ToString()))));
+        }
+        return result;
+
+        void AddConstraint(string jsonName, string label)
+        {
+            if (property.TryGetProperty(jsonName, out var value) && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
+            {
+                result.Add(T(label, value.ToString()));
+            }
+        }
+    }
+    private string ManagingExtensionUrl => ManagingExtension?.RegistrationName is null ? "/extensions"
+        : ResourceOwnershipContext.Resource(Services, "/extensions", ManagingExtension.RegistrationName, ResourceNamespace.Parse(ManagingExtension.RegistrationNamespace), ManagingExtension.RegistrationScopeRef);
+    private string ProviderUrl => ResourceOwnershipContext.Resource(Services, "/tools/providers", Provider!.Name, Provider.Namespace, Provider.ScopeRef);
+
+    private string BooleanLabel(bool value) => T(value ? "Yes" : "No");
+
+}

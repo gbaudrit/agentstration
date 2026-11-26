@@ -1,0 +1,125 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<PackStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject IServiceProvider Services
+
+<ResourceSummary TestId="pack-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (ShowIdentity)
+    {
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@(Resource.Definition.DisplayName ?? Resource.Definition.PackName)" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Version="@Resource.Definition.Version" Description="@Resource.Definition.Description" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="pack-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    }
+    @if (ShowConfiguration)
+    {
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="pack-configuration-summary">
+                    <dl class="resource-details pack-facts">
+                <dt>@T("Identity")</dt><dd><code>@Resource.Definition.Publisher/@Resource.Definition.PackName</code></dd>
+                <dt>@T("Scope")</dt><dd><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></dd>
+                <dt>@T("Namespace")</dt><dd><code>@Resource.Definition.Namespace</code></dd>
+                <dt>@T("Version")</dt><dd>@Resource.Definition.Version</dd>
+                <dt>@T("Purpose")</dt><dd><span class="pack-kind">@PurposeLabel(Resource.Definition.Purpose)</span></dd>
+                <dt>@T("Audience")</dt><dd>@AudienceLabel(Resource.Definition.Audience)</dd>
+                <dt>@T("Source")</dt><dd>@Resource.Definition.Source</dd>
+                <dt>@T("Installed")</dt><dd>@Resource.Definition.InstalledAt.ToLocalTime().ToString("F")</dd>
+            </dl>
+            @if (Resource.Definition.SourceProvenance is { } source)
+            {
+                <section class="pack-source-provenance">
+                    <p class="eyebrow">@T("SourceProvenance")</p>
+                    <div class="pack-source-heading">
+                        <div>
+                            <h3>@(SourceDisplayName ?? $"{source.SourcePublisher}/{source.SourceName}")</h3>
+                            @if (SourceDisplayName is not null) { <code>@source.SourcePublisher/@source.SourceName</code> }
+                        </div>
+                        @if (SourceHref is not null) { <a class="text-button" href="@SourceHref">@T("OpenSource") →</a> }
+                    </div>
+                    <dl class="resource-details pack-facts">
+                        <dt>@T("SourceVersion")</dt><dd>@source.SourceVersion · <code>@source.ManifestDigest</code></dd>
+                        <dt>@T("Channel")</dt><dd>@source.Channel · <code>@source.ProviderRevision</code></dd>
+                        <dt>@T("Snapshot")</dt><dd><code>@source.SnapshotUid</code> · <code>@source.SnapshotDigest</code></dd>
+                        <dt>@T("CatalogEntry")</dt><dd>@source.CatalogName/@source.EntryName · <code>@source.EntryPath</code></dd>
+                    </dl>
+                </section>
+            }
+            <h3>@T("ResourceBindings")</h3>
+            @if (Resource.Definition.Bindings.Count == 0) { <p class="pack-muted">@T("NoDeclaredBindings")</p> }
+            else
+            {
+                <div class="pack-binding-list">
+                    @foreach (var binding in Resource.Definition.Bindings)
+                    {
+                        <article>
+                            <span class="pack-kind">@BindingKindLabel(binding.TargetKind)</span>
+                            <div><strong>@binding.Name</strong><small><code>@BindingTarget(binding.Target)</code></small></div>
+                            <StatusBadge Text="@T("SecretStatus.Configured")" Status="UiStatus.Success" />
+                        </article>
+                    }
+                </div>
+            }
+            <h3>@T("ManagedResources")</h3>
+            @if (Resource.Definition.ManagedResources.Count == 0) { <p class="pack-muted">@T("NoManagedResources")</p> }
+            else
+            {
+                <div class="pack-resource-list">
+                    @foreach (var resource in Resource.Definition.ManagedResources)
+                    {
+                        <article><CollectionIdentity DisplayName="@resource.Name" Namespace="@resource.Namespace.Value" Name="@resource.Name" Href="@(DefinitionFormUrl(resource) is { } target ? target.Split('#')[0] + "#overview" : null)" IconName="layers"><IconBadges><ResourceScopeBadge ScopeRef="Resource.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="true" IsReadOnly="@(!ResourceOwnershipContext.CanManage(Resource.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity><span class="pack-kind">@resource.Kind</span><small>@resource.Path</small>@if (DefinitionFormUrl(resource) is { } formUrl) { <CollectionActions ResourceName="@resource.Name"><a class="text-button" href="@formUrl">@T("Form")</a></CollectionActions> }</article>
+                    }
+                </div>
+            }
+
+    </FormSection>
+    }
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public InstalledPackResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    [Parameter] public string? SourceDisplayName { get; set; }
+    [Parameter] public string? SourceHref { get; set; }
+    [Parameter] public bool ShowIdentity { get; set; } = true;
+    [Parameter] public bool ShowConfiguration { get; set; } = true;
+    private string PurposeLabel(PackPurpose purpose) => T($"Purpose.{purpose}").ToUpperInvariant();
+    private string AudienceLabel(PackAudience audience) => T($"Audience.{audience}");
+    private static string BindingTarget(ResourceReference target) => $"{(target.Namespace ?? ResourceNamespace.Default).Value}/{target.Name}";
+    [Parameter] public ResourceScopeRef? EntryExecutionOwner { get; set; }
+    private string? DefinitionFormUrl(ManagedPackResource resource)
+    {
+        var owner = resource.Kind == EntryResourceKinds.Entry ? EntryExecutionOwner : Resource.ScopeRef;
+        if (owner is null) return null;
+        var path = resource.Kind switch
+        {
+            AgentResourceKinds.Agent => ConsoleResourceUrls.Agent(resource.Namespace, resource.Name),
+            FlowResourceKinds.Flow => ConsoleResourceUrls.Flow(new(resource.Name, resource.Namespace)),
+            EntryResourceKinds.Entry => ConsoleResourceUrls.Entry(new(resource.Name, resource.Namespace)),
+            _ => null
+        };
+        return path is null ? null : ConsoleResourceUrls.WithOwnerScope(ResourceOwnershipContext.PreserveNavigation(path, Services), owner) + "#definition/configuration";
+    }
+    private string BindingKindLabel(PackBindingTargetKind kind) => kind switch
+    {
+        PackBindingTargetKind.Secret => T("Binding.Secret"),
+        PackBindingTargetKind.Parameter => T("Binding.Parameter"),
+        PackBindingTargetKind.ModelProvider => T("Binding.ModelProvider"),
+        PackBindingTargetKind.RuntimeProfile => T("Binding.RuntimeProfile"),
+        PackBindingTargetKind.ExtensionRegistration => T("Binding.ExtensionRegistration"),
+        _ => T("Binding.ModelProfile")
+    };
+
+}

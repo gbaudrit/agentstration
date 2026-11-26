@@ -72,6 +72,8 @@ public interface IRuntimeApiClient
         GetAgentInstancesAsync(cancellationToken);
     Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime Worker inventory.");
+    Task<RuntimeWorkerSummaryResponse> GetRuntimeWorkerSummaryAsync(Guid workerId, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Worker summaries.");
     Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
         throw new NotSupportedException("This client does not support Runtime Worker details.");
     Task<RuntimeAssignmentPlacementResponse?> GetPlacementAsync(RuntimeAssignmentTargetKind targetKind, string runId, CancellationToken cancellationToken) =>
@@ -133,6 +135,10 @@ public interface IWorkApiClient
 public interface IEntryAdministrationApiClient
 {
     Task<IReadOnlyList<EntryDraftResponse>> GetEntriesAsync(CancellationToken cancellationToken);
+    Task<EntrySavedSummaryResponse> GetEntrySummaryAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Entry summaries.");
+    Task<EntryDraftResponse> GetEntryAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact Entry editor reads.");
     Task<EntryDraftResponse> GetEntryAsync(string name, CancellationToken cancellationToken);
     Task<EntryDraftResponse> GetEntryAsync(ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         @namespace.IsDefault ? GetEntryAsync(name, cancellationToken) : throw new NotSupportedException("This client does not support namespaced Entries.");

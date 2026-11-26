@@ -6,11 +6,13 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Schemas;
+using Agentstration.Schemas.Contracts;
 
 namespace Agentstration.Functions;
 
-public sealed class TransformationFunctionService(IResourceStore store, IResourceScopeOperations scopes,
+public sealed partial class TransformationFunctionService(IResourceStore store, IResourceScopeOperations scopes,
     IResourceAccessPolicyService access, NativeFunctionRegistry registry, NativeFunctionExecutionContext execution,
+    ISchemaBindingResolver schemaResolver, ISchemaFormatRegistry schemaFormats,
     FunctionContentOptions? options = null) : ITransformationFunctionResolver
 {
     public static JsonElement NativeDefinitionSchema => NativeFunctionKindContract.DefinitionSchema;
@@ -72,7 +74,8 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
                 versions.Add(version with
                 {
                     FunctionKind = resolved.FunctionKind,
-                    NativeContractDigest = FunctionDigests.Compute(registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).Descriptor)
+                    NativeContractDigest = FunctionDigests.Compute(registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).Descriptor),
+                    TransformationSnapshot = resolved.Transformation
                 });
             }
             value = value with { Definition = value.Definition with { Versions = versions } };
@@ -117,9 +120,18 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
         var handler = registry.Resolve(implementation.GetProperty("id").GetString()!, implementation.GetProperty("version").GetString()!);
         if (version.NativeContractDigest is { } nativeDigest && nativeDigest != FunctionDigests.Compute(handler.Descriptor))
             throw Error("function_implementation_changed", "The exact native implementation contract has changed.");
+        var transformation = version.TransformationSchema is null ? null
+            : await ResolveTransformationAsync(version.TransformationSchema, resource.ScopeRef!.Value, resource.Namespace, consumer, ct);
+        if (transformation is not null && (handler.Descriptor.Id != "xml.to_json" || handler.Descriptor.Version != "1.0.0"))
+            throw Error("transformation_engine_invalid", "The exposed function must use the declared XML mapping engine.");
+        if (version.TransformationSnapshot is { } snapshot && FunctionDigests.Compute(snapshot) != FunctionDigests.Compute(transformation))
+            throw Error("transformation_dependency_changed", "An exact transformation dependency has changed.");
         return new(new(resource.Name, version.Version, resource.ScopeRef!.Value, resource.Namespace, resource.Uid, FunctionDigests.Compute(version)),
             new(kind.Name, kindVersion.Version, kind.ScopeRef!.Value, kind.Namespace, kind.Uid, FunctionDigests.Compute(kindVersion)),
-            handler.Descriptor.Id, handler.Descriptor.Version, handler.Descriptor.InputSchema.Clone(), handler.Descriptor.OutputSchema.Clone());
+            handler.Descriptor.Id, handler.Descriptor.Version,
+            transformation is null ? handler.Descriptor.InputSchema.Clone() : XmlInvocationSchema,
+            transformation is null ? handler.Descriptor.OutputSchema.Clone() : transformation.Output.Content.Clone())
+        { Transformation = transformation };
     }
 
     public async Task<JsonElement> InvokeAsync(ResolvedTransformationFunction accepted, ResourceScopeRef consumer, JsonElement input, CancellationToken ct, string? invocationId = null,
@@ -149,6 +161,30 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
             input = JsonSerializer.SerializeToElement(values);
             ValidateValue(resolved.InputSchema, input, "function-input", (options ?? new()).MaximumValueBytes);
         }
+        if (resolved.Transformation is { } mapping)
+        {
+            var validator = await schemaFormats.ResolveAsync(mapping.Input.Format, SchemaFormatCapabilities.ValidateInstance,
+                new("builtin/xml-xsd", "1.0"), ct);
+            var validation = await validator.ValidateInstanceAsync(mapping.Input.Content, input.GetProperty("value"), mapping.Input.Dialect, ct);
+            if (!validation.IsValid)
+            {
+                if (validation.Issues.FirstOrDefault(issue => issue.Limit is not null) is { Limit: { } limit } exceeded)
+                    throw DataContracts.Failure("transformation_input_invalid", "function-input", mapping.Input.Path, "$.value",
+                        exceeded.Code, "bounded XML content", "processing limit exceeded", limit: limit);
+                var issue = validation.Issues[0];
+                var xml = issue.Xml ?? new XmlContractDiagnostic("contract");
+                if (mapping.Input.Source is { ScopeRef: { } schemaScope, Namespace: { } schemaNamespace } source
+                    && mapping.Input.SchemaUid is { } schemaUid && mapping.Input.SchemaGeneration is { } generation)
+                    xml = xml with
+                    {
+                        Schema = new(source.Name, source.Version, schemaScope, schemaNamespace, schemaUid, generation,
+                        mapping.Input.ParentDefinitionHash ?? mapping.Input.DefinitionHash, source.SchemaPath, mapping.Input.DefinitionHash)
+                    };
+                throw DataContracts.Failure("transformation_input_invalid", "function-input", mapping.Input.Path, "$.value",
+                    issue.Code, "XML matching the accepted XSD", "invalid XML content", xml: xml);
+            }
+            input = JsonSerializer.SerializeToElement(new { value = input.GetProperty("value"), rules = ParseDeclaration(mapping.Declaration.Content).Rules });
+        }
         var output = await registry.Resolve(resolved.ImplementationId, resolved.ImplementationVersion).ExecuteAsync(input, ct);
         ValidateValue(resolved.OutputSchema, output, "function-output", (options ?? new()).MaximumValueBytes);
         return output.Clone();
@@ -157,8 +193,13 @@ public sealed class TransformationFunctionService(IResourceStore store, IResourc
     public static void ValidateValue(JsonElement schema, JsonElement value, string boundary,
         int maximumValueBytes = FunctionContentOptions.DefaultMaximumValueBytes)
     {
-        if (value.ValueKind == JsonValueKind.Undefined || JsonSerializer.SerializeToUtf8Bytes(value).Length > maximumValueBytes)
-            throw Error("function_value_too_large", "The function value exceeds the bounded JSON invocation limit.");
+        if (value.ValueKind == JsonValueKind.Undefined)
+            throw Error("function_value_too_large", "The function value is undefined.");
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value).LongLength;
+        if (bytes > maximumValueBytes)
+            throw DataContracts.Failure("function_value_too_large", boundary, boundary, "$", "function_value_bytes",
+                "bounded JSON value", "processing limit exceeded", limit: new("jsonBytes", bytes, Maximum: maximumValueBytes,
+                    Setting: FunctionContentOptions.SectionName + ":MaximumValueBytes"));
         DataContracts.Validate(DataContracts.Declared(schema, boundary), value, boundary);
     }
 

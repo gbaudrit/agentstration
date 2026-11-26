@@ -133,6 +133,27 @@ public sealed partial class EntryAdministrationComponentTests
         Assert.DoesNotContain("Pending permission change", page.Markup);
         Assert.AreEqual(ResourceLoadStatus.Forbidden, page.FindComponent<ResourceDetailsTemplate>().Instance.LoadState!.Status);
     }
+    [TestMethod]
+    public void EntryCatalogKeepsItsLogicalContextAndItsExactPhysicalExecutionOwner()
+    {
+        using var context = CreateContext();
+        var client = new FakeEntryAdministrationApiClient { EntryDrafts = [FakeEntryAdministrationApiClient.EntryDraftResponse("prepare-report")] };
+        context.WithResourceListContext(new() { Scope = "/instance", PhysicalWorkspaceId = FakeEntryAdministrationApiClient.WorkspaceResourceId });
+        context.Services.AddSingleton<IEntryAdministrationApiClient>(client);
+        context.Services.AddSingleton<IConsoleNavigationContext>(new LogicalEntryNavigationContext());
+        var cut = context.Render<Entries>();
+        var href = cut.Find("a.entry-card-link").GetAttribute("href")!;
+        Assert.Contains("context=%2Finstance", href);
+        Assert.Contains("scopeRef=" + Uri.EscapeDataString($"/workspaces/{FakeEntryAdministrationApiClient.WorkspaceResourceId:D}"), href);
+        Assert.IsTrue(href.EndsWith("#overview", StringComparison.Ordinal));
+        Assert.AreEqual(1, client.CatalogReads, "Initial context loading must not duplicate the catalog read.");
+    }
+    private sealed class LogicalEntryNavigationContext : IConsoleNavigationContext
+    {
+        public string ScopeRef => "/instance";
+        public string AddToUri(string uri) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(uri, "context", ScopeRef);
+    }
+
     private sealed class MutableEntryContextProvider : IConsoleContextProvider, IConsoleNavigationContext
     {
         public required ConsoleContextSnapshot Snapshot { get; set; }

@@ -1,0 +1,12 @@
+.resource-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    gap: var(--form-section-gap);
+}
+
+.resource-summary ::deep .resource-configuration-summary .data-grid { table-layout: fixed; min-width: 0; }
+.resource-summary ::deep .resource-configuration-summary .data-grid th:first-child { width: 30%; }
+.resource-summary ::deep .resource-configuration-summary .data-grid th:last-child { width: 70%; }
+.resource-summary ::deep .configuration-key { overflow-wrap: anywhere; }
+.resource-summary ::deep .configuration-value { display: block; white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; line-height: 1.5; }

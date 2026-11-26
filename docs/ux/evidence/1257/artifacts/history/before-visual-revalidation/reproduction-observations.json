@@ -1,0 +1,559 @@
+{
+  "productCommit": "9132710e74385460a78306db84cdaa7a5ca694dc",
+  "fixture": "new disposable layout seed; product binaries unchanged from baseline",
+  "status": "partial reproduction run; harness stopped at query overflow/header navigation interception; not a passing campaign",
+  "observations": [
+    {
+      "project": "desktop-chromium",
+      "name": "artifacts-table-geometry",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.28125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.28125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.28125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 1072,
+          "clientWidth": 1072,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.78125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 58.28125,
+              "iconLeft": 340.1875,
+              "textLeft": 378.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "project": "desktop-chromium",
+      "name": "artifacts-cards-geometry",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 879.796875,
+              "textLeft": 918.1875,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 336.1875,
+              "textLeft": 374.578125,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "project": "mobile-chromium",
+      "name": "artifacts-table-geometry",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 1024,
+          "clientWidth": 360,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 63.78125,
+              "iconLeft": 31,
+              "textLeft": 69.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.78125,
+              "iconLeft": 31,
+              "textLeft": 69.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.28125,
+              "iconLeft": 31,
+              "textLeft": 69.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 648,
+          "scrollWidth": 1024,
+          "clientWidth": 360,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 63.78125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.78125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.28125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 648,
+          "scrollWidth": 1024,
+          "clientWidth": 360,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 63.78125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.78125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.28125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 648,
+          "scrollWidth": 1024,
+          "clientWidth": 360,
+          "documentOverflow": 0,
+          "identityVisible": false,
+          "rows": [
+            {
+              "height": 63.78125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.78125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 63.28125,
+              "iconLeft": -617,
+              "textLeft": -578.609375,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "project": "mobile-chromium",
+      "name": "artifacts-cards-geometry",
+      "geometry": {
+        "before": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "actions": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "opened": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        },
+        "closed": {
+          "scrollLeft": 0,
+          "scrollWidth": 0,
+          "clientWidth": 0,
+          "documentOverflow": 0,
+          "identityVisible": true,
+          "rows": [
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            },
+            {
+              "height": 309.71875,
+              "iconLeft": 27,
+              "textLeft": 65.390625,
+              "descriptionWidth": null,
+              "iconTextOverlap": false,
+              "badgeIconOverlap": false
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+@page "/function-kinds/{Name}"
+@implements IDisposable
+@using Agentstration.Functions.Contracts
+@using Agentstration.ResourceManagement
+@inject ITransformationFunctionsClient Client
+@inject ConsoleContextState Context
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+@inject Microsoft.Extensions.Localization.IStringLocalizer<FunctionStrings> Localizer
+
+<PageTitle>@(resource?.Definition.DisplayName ?? Name) · Agentstration</PageTitle>
+<ConsoleResourceDetailsTemplate Resource="resource" Name="@(resource?.Definition.DisplayName ?? Name)" ResourceType="@Localizer["Kind"]" Domain="function" IconName="layers"
+    CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/function-kinds", Services)" CollectionLabel="@Localizer["Kinds"]"
+    ResourceIdentity="@SelectionKey" SectionState="sections" SectionPresentations="Presentations"
+    LoadState="loadState" OnRetry="LoadAsync" OnRefresh="LoadAsync" Yaml="@(resource is null ? "" : ResourceManifestSerializer.ToYaml(resource))" YamlReadOnly
+    TestId="resource-function-kind-details" SectionTestIdPrefix="function-kind">
+    <OverviewSummary Context="identity">@if (resource is not null) { <FunctionKindResourceSummary Resource="resource" Identity="identity" /> }</OverviewSummary>
+    <DefinitionContent Context="path">@if (resource is not null) { <FunctionKindResourceSummary Resource="resource" ShowIdentity="@(path == "definition/identity")" ShowConfiguration="@(path != "definition/identity")" ConfigurationInitiallyCollapsed="false" /> }</DefinitionContent>
+</ConsoleResourceDetailsTemplate>
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter, SupplyParameterFromQuery(Name = "scopeRef")] public string? ScopeRefValue { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "namespace")] public string? NamespaceValue { get; set; }
+    private ScopedResourceAddress Address => ResourceScopeRef.TryParse(ScopeRefValue, out var owner) && !string.IsNullOrWhiteSpace(Name)
+        ? ScopedResourceAddress.Create(owner, ResourceNamespace.Parse(NamespaceValue), FunctionResourceKinds.FunctionKind, Name) : default;
+    private readonly ResourceSectionState sections = new();
+    private IReadOnlyDictionary<string, ResourceSectionPresentation> Presentations => new Dictionary<string, ResourceSectionPresentation>
+    {
+        ["definition/identity"] = new() { ReadOnly = true, ReadOnlyMessage = Localizer["KindInspectionOnly"] },
+        ["definition/configuration"] = new() { ReadOnly = true, ReadOnlyMessage = Localizer["KindInspectionOnly"] },
+        ["yaml"] = new() { ReadOnly = true }
+    };
+    private FunctionKindResource? resource;
+    private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
+    private CancellationTokenSource? pending;
+    private string? requestedKey;
+    private long revision;
+    private bool disposed;
+    private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
+    protected override void OnInitialized() => Context.Changed += ContextChanged;
+    private void ContextChanged() => _ = InvokeAsync(async () => { if (disposed) return; await LoadAsync(); if (!disposed) StateHasChanged(); });
+    protected override Task OnParametersSetAsync() => requestedKey == SelectionKey ? Task.CompletedTask : LoadAsync();
+    private async Task LoadAsync()
+    {
+        if (disposed) return;
+        var target = Address;
+        var key = requestedKey = SelectionKey;
+        var requestRevision = ++revision;
+        pending?.Cancel(); pending?.Dispose(); pending = new();
+        var token = pending.Token;
+        resource = null; loadState = new(ResourceLoadStatus.Loading);
+        if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+        if (target.Kind != FunctionResourceKinds.FunctionKind || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
+        try
+        {
+            var snapshot = await Client.GetKindAsync(new(target.Name, "", target.ScopeRef, target.Namespace), token);
+            if (!IsCurrent(requestRevision, key)) return;
+            if (snapshot.Value.Kind != target.Kind || snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Name != target.Name)
+            { loadState = new(ResourceLoadStatus.Forbidden); return; }
+            resource = snapshot.Value; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception error) when (error is HttpRequestException or AgentstrationApiException or OperationCanceledException)
+        {
+            if (!IsCurrent(requestRevision, key)) return;
+            var status = error is AgentstrationApiException api ? api.StatusCode : (error as HttpRequestException)?.StatusCode;
+            loadState = new(status switch
+            {
+                System.Net.HttpStatusCode.NotFound => ResourceLoadStatus.NotFound,
+                System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden => ResourceLoadStatus.Forbidden,
+                _ => ResourceLoadStatus.Failed
+            }) { ErrorId = (error as AgentstrationApiException)?.ErrorId };
+        }
+    }
+    private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision && key == SelectionKey
+        && Context.Error is null && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true; revision++; Context.Changed -= ContextChanged; pending?.Cancel(); pending?.Dispose(); GC.SuppressFinalize(this);
+    }
+}

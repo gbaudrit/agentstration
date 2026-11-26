@@ -1,0 +1,26 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Runtime.Contracts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<Pages.RuntimeWorkerStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+<ResourceSummary TestId="runtime-worker-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    <ResourceIdentitySummary DisplayName="@Resource.DisplayName" TechnicalName="@Resource.WorkerId.ToString("D")" Version="@Resource.SoftwareVersion" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="runtime-worker-identity-summary">
+        <Scope><ResourceScopeBadge ScopeRef="ResourceScopeRef.Instance" /></Scope>
+        <AdditionalDetails><dt>@T("Session")</dt><dd><CopyableValue Value="@Resource.SessionId?.ToString("D")" /></dd><dt>@T("Registered")</dt><dd>@(Resource.RegisteredAt?.ToLocalTime().ToString("g") ?? "—")</dd></AdditionalDetails>
+    </ResourceIdentitySummary>
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Description="@T("CompatibilityAndCapacity")" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="runtime-worker-configuration-summary">
+
+                <dl class="details-list"><dt>@T("Version")</dt><dd><span>@SoftwareVersion(Resource.SoftwareVersion)</span>@if (SoftwareBuild(Resource.SoftwareVersion) is { } build) { <small class="worker-build" title="@Resource.SoftwareVersion">+@build</small> }</dd><dt>@T("Protocol")</dt><dd>@Resource.ProtocolVersion</dd><dt>@T("Capacity")</dt><dd>@(Resource.MaximumConcurrentAssignments?.ToString() ?? "—")</dd><dt>@T("Capabilities")</dt><dd>@(Resource.Capabilities.Count == 0 ? "—" : string.Join(", ", Resource.Capabilities.Select(FormatCapability)))</dd></dl>
+
+    </FormSection>
+</ResourceSummary>
+@code {
+    [Parameter, EditorRequired] public RuntimeWorkerSummaryResponse Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private static string FormatCapability(RuntimeWorkerCapabilityResponse capability) => $"{capability.RuntimeKind} {capability.CapabilityVersion}";
+    private static string SoftwareVersion(string? version) => string.IsNullOrWhiteSpace(version) ? "—" : version.Split('+', 2)[0];
+    private static string? SoftwareBuild(string? version) => version?.Split('+', 2) is [_, var build] ? build : null;
+}

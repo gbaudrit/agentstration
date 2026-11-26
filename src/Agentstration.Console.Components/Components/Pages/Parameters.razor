@@ -14,14 +14,26 @@
                             EmptyTitle="@T("NoParameters")" EmptyMessage="@T("NoParametersMessage")" PrimaryActions="CreateAction" EmptyActions="CreateAction"
                             OnRefresh="LoadAsync" OnRetry="RetryAsync">
     <Feedback><div class="form-alert form-alert-info"><strong>@T("ReadableConfiguration")</strong><span>@T("SecretGuidance")</span></div></Feedback>
+    <ItemActions Context="item"><CollectionActions ResourceName="@item.Name">
+        <a href="@(ResourceUrl(item) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+        @if (CanEdit(item)) { <a href="@(ResourceUrl(item) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+        <button type="button" disabled="@(item.ScopeRef is null)" data-testid="parameter-preview" @onclick="() => OpenPreview(item)"><UiIcon Name="eye" />@Shared["Preview"]</button>
+    </CollectionActions></ItemActions>
 </ResourceCollectionTemplate>
+<ResourceCollectionPreview @ref="preview" ResourceKind="@ParameterResourceKinds.Parameter" ContextKey="@contextKey" Enabled="@(contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden && Context.HasPermission(AuthorizationPermissions.ResourcesRead))">
+    <ChildContent Context="address"><ParameterResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
 
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanEdit(ParameterResource item) => !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private void OpenPreview(ParameterResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, ParameterResourceKinds.Parameter, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/parameters", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string TypeLabel(ParameterValueType type) => T($"ValueType.{type}");
     private RenderFragment? CreateAction => Context.HasPermission(AuthorizationPermissions.ResourcesWrite)
         ? @<PermissionGate Permission="@AuthorizationPermissions.ResourcesWrite"><a class="button-primary" href="@ResourceOwnershipContext.PreserveNavigation("/parameters/new", Services)" data-testid="parameter-create">@T("CreateParameter")</a></PermissionGate> : null;
-    private CollectionColumn<ParameterResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@ResourceUrl(item)" IconName="settings" Domain="neutral">
+    private CollectionColumn<ParameterResource> IdentityColumn => new("identity", T("Name"), item => @<CollectionIdentity DisplayName="@item.Definition.DisplayName" Namespace="@item.Namespace.Value" Name="@item.Name" Href="@(ResourceUrl(item) + "#overview")" IconName="settings" Domain="neutral">
         <IconBadges><ResourceScopeBadge ScopeRef="item.ScopeRef" ShowName IconOnly /><ManagedResourceBadge IsManaged="@item.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.ScopeRef, Services))" IconOnly /></IconBadges>
     </CollectionIdentity>);
     private IReadOnlyList<CollectionColumn<ParameterResource>> Columns =>

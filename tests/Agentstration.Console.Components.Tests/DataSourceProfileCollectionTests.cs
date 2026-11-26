@@ -24,7 +24,7 @@ public sealed class DataSourceProfileCollectionTests
         using var context = Context(handler);
         var cut = context.Render<DataSourceProfiles>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/data-source-profiles/profile-0?namespace=team&scopeRef=%2Finstance&context=%2Finstance");
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());
@@ -118,6 +118,28 @@ public sealed class DataSourceProfileCollectionTests
         Assert.IsEmpty(cut.FindAll("[role=alert]"));
         Assert.AreEqual(1, profiles.Requests);
         Assert.AreEqual(1, inventory.Requests, "One shared optional inventory request, never one per row.");
+    }
+
+    [TestMethod]
+    public void InheritedLinksPreserveTheCurrentContextAndHideEditing()
+    {
+        var selected = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001"));
+        using var handler = new Handler(_ => Task.FromResult(Response(1)));
+        using var context = Context(handler, new() { Scope = selected.Value });
+        context.Services.AddSingleton<IConsoleNavigationContext>(new NavigationContext(selected));
+        var cut = context.Render<DataSourceProfiles>();
+        var href = cut.Find(".resource-name-link").GetAttribute("href")!;
+        Assert.Contains("scopeRef=%2Finstance", href);
+        Assert.Contains("context=" + Uri.EscapeDataString(selected.Value), href);
+        Assert.EndsWith("#overview", href);
+        Assert.IsEmpty(cut.FindAll(".collection-actions-menu a[href*='definition/configuration']"));
+        Assert.AreEqual(1, handler.Requests);
+    }
+
+    private sealed class NavigationContext(ResourceScopeRef scope) : IConsoleNavigationContext
+    {
+        public string? ScopeRef => scope.Value;
+        public string AddToUri(string uri) => Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(uri, "context", scope.Value);
     }
 
     private static HttpResponseMessage Response(int count) => new(HttpStatusCode.OK)

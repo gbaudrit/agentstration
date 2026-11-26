@@ -6,10 +6,11 @@ selected domain is `agentstration.cloud`; PR hostnames will be
 `dev-pr-123.agentstration.cloud`. The existing `agentstration.io` website and
 `docs.agentstration.io` DNS remain independent.
 
-The first executable increment is a **read-only configuration audit**. It does
-not deploy a VM, create a tunnel or DNS record, or publish an application URL.
-The existing [manual deployment](preview-on-demand.md) still returns no public
-URL. #1284 and #1285 remain open until the protected route has been exercised.
+The read-only configuration audit is complemented by an owned route in the
+existing [manual deployment](preview-on-demand.md). It publishes an HTTPS URL
+only after protection checks pass. #1284 and #1285 remain open until the merged
+route has been qualified against Azure, Cloudflare and real Entra users.
+See [ADR-0259](../decisions/0259-preview-routes-use-owned-tunnels-and-an-isolated-access-proxy.md).
 
 ## One-time configuration
 
@@ -119,12 +120,24 @@ the preview DNS zone:
 | Account | Access: Organizations, Identity Providers, and Groups | Read |
 | Zone | DNS | Edit |
 
-The audit only exercises reads. Edit permissions are reserved for the future
-owned tunnel/DNS lifecycle. No Access policy write permission is required: the
+The standalone audit only exercises reads. The owned deployment lifecycle uses
+the tunnel/DNS Edit permissions. No Access policy write permission is required: the
 deployer must not silently weaken the human access gate. Avoid an IP filter tied
 to one hosted GitHub runner, whose address can change. Track and renew token
 expirations. An API token is separate from the CI service token: one manages
-infrastructure, while the other will authenticate bounded application probes.
+infrastructure, while the other authenticates bounded application probes.
+
+Both trusted-main callers (`preview-on-demand.yml` and
+`preview-azure-environment.yml`) explicitly use `secrets: inherit` when calling
+`preview-environment.yml`. This opt-in is required for secrets to resolve in the
+called job's protected environment, even though its public environment variables
+are already available. The callee retains `environment: preview-deployment` and
+the main-only execution boundary. Keep the secrets at environment scope; no copy
+to repository variables or request JSON is needed. Inheritance can also expose
+repository/organization secrets to the trusted callee; never add it to the
+credential-free PR validation caller. See the
+[GitHub workflow reuse guidance](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
+and [upstream runner report](https://github.com/actions/runner/issues/4453).
 
 ## Run the read-only audit
 
@@ -148,7 +161,8 @@ The audit checks required values, the account's team domain, exact wildcard
 application scope, Entra group support, the two policies, overlapping application
 inventory, and readable tunnel/DNS inventories. Its small artifact and summary
 report **configuration-validated**, **configured-not-exercised** for the service
-credentials, and a null URL. A successful configuration check does **not** prove:
+credentials, the public application AUD and a null URL. The route reuses this
+validated audience snapshot. A successful configuration check does **not** prove:
 
 - that the supplied Client ID/Secret corresponds to the service token in the
   policy, is unexpired or can authenticate to a deployed application;
@@ -159,32 +173,104 @@ credentials, and a null URL. A successful configuration check does **not** prove
 - that public-origin bypass is impossible or that credentials are stripped before
   an application receives traffic.
 
-These are acceptance checks for the next deployment increment. The default
+These are acceptance checks for the deployed route. The default
 Python suite tests policy rejection, scope isolation, credential-safe HTTP
-failures, pagination and the trusted-workflow boundary without network access:
+failures, pagination and the trusted-workflow boundary without internet access
+or cloud credentials; HTTP transport regression uses a disposable loopback server:
 
 ```bash
 python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
 ```
 
-## Remaining implementation verticals
+## Owned route lifecycle
 
-1. **Owned route lifecycle**: reuse the existing Azure ownership blob, provider
-   lease and guest transport from ADR-0257/0258. Record tunnel and per-preview DNS
-   identities with the preview owner. Refuse foreign resources, keep retries
-   idempotent, tear down the route on destroy and reconcile interrupted creation.
-   Keep Cloudflare integration outside the Runtime and the portable image format.
-2. **Protected guest connection**: run a digest-pinned connector with only its
-   own tunnel credential, validate Access JWTs at the connector, and retain the
-   existing closed Azure ingress. Strip machine authentication headers and Access
-   bearer credentials before requests reach selected PR code. Management and
-   probe credentials stay in trusted CI. Support browser/WebSocket traffic.
-3. **Live qualification and URL publication**: verify no unauthenticated or
-   invalid-token request reaches the origin; exercise the scoped machine probe,
-   authorized human login and direct-IP denial. Verify SQLite and optional
-   PostgreSQL still work, redeploy/preserve/reset and partial-failure cleanup.
-   Publish the stable HTTPS URL only after the protection checks succeed. PR/TTL
-   automation remains #1286 and reusable deployed Playwright journeys #1287.
+Run **Preview on demand** from `main` with `operation: deploy` and an environment
+ID such as `pr-123`. The adapter records its Cloudflare scope, owner-derived
+tunnel name and resource IDs in the existing private Azure ownership blob, under
+the same exclusive lease as ARM mutations. It saves creation intent before API
+writes and reconciles interrupted tunnel/DNS creation against that intent. A
+foreign tunnel, DNS target, owner comment or changed account/zone is an error;
+the adapter never replaces it. Restore the recorded scope before teardown if
+environment variables have been changed.
 
-This guide records the staged plan; these three routing verticals are not yet
-implemented by the configuration audit.
+The guest runs the images pinned in `deploy/preview/access.json`: `cloudflared`
+for the outbound tunnel and Caddy for a local HTTP/WebSocket proxy. Neither is
+part of the application Compose project. All incoming Azure ports remain denied;
+application/proxy/connector metrics listeners bind loopback. Cloudflare terminates
+public HTTPS. Caddy does not use ACME or create certificates. The exact-host
+tunnel ingress requires an Access JWT for the audited AUD/team and ends with a
+404 catch-all. The connector receives only its own tunnel token through ARM
+protected parameters and a root-only file mounted exclusively into that container.
+The token is removed from the environment before any Docker/Compose subprocess.
+
+Caddy strips all `Cf-Access-*` request headers and the `CF_Authorization` cookie
+before the selected application sees a request. It preserves other cookies and
+application `Authorization`, supports WebSockets, and sets the public Host and
+HTTPS forwarding headers. Application containers receive no management token,
+CI probe credential, connector token, Docker socket or host configuration mount.
+Infrastructure container logging is disabled. Do not enable request-header/body
+logging while investigating a credential-bearing request.
+
+Deployment always verifies guest image/source identity, loopback binding,
+connector readiness, observed Azure NIC/NSG ingress and current Access/ingress
+configuration. The optional `test_profile: none` does not disable these gates.
+It then verifies anonymous and invalid-token denial and authenticated readiness
+over HTTPS. All three probe phases send the descriptive
+`User-Agent: Agentstration-Preview-Probe/1.0`, rather than Python's library default;
+the User-Agent identifies the client and grants no authorization.
+Probe requests never follow redirects or export response bodies,
+cookies or credentials. Only then does the result contain the stable HTTPS URL.
+Failed HTTP probes report their phase, numeric HTTP status and, when present,
+the fixed `CF-Mitigated: challenge` marker. Arbitrary header values are withheld. A 401/403
+alone does not identify whether rejection occurred at Access, the origin JWT
+guard or another edge security control; inspect that distinction before changing
+credentials. Redirect
+locations, response bodies, cookies and authentication headers remain withheld.
+`status` repeats the protection checks before returning it; an unhealthy/stopped
+guest returns no URL. The result exposes public tunnel/DNS IDs, never tokens.
+
+If a 403 has no matching Access log, inspect the zone's **Security Events** for
+the preview hostname, `/health/ready` and the workflow's time window. Browser
+Integrity Check can reject the default `Python-urllib` User-Agent before Access,
+as observed during route qualification. Cloudflare recommends a descriptive
+[application User-Agent](https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/).
+Keep Browser Integrity Check and Access enabled while retrying with the identified
+probe; a missing Access event alone does not establish a credential fault. The
+offline loopback HTTP regression checks the actual headers and authorization
+outcome across anonymous, invalid-token and authenticated requests. Successful
+Cloudflare authentication still requires a live deployed check after merge.
+
+Redeploy withdraws the old DNS record before updating the guest. A failed deploy
+withdraws its owned DNS publication, retains ownership metadata and can be retried.
+Inspect status and the protected state after an interrupted run; the existing
+infinite Azure lease must be recovered before another operation can proceed.
+`destroy` removes DNS, stops/deallocates or deletes the VM, clears stale tunnel
+sessions and removes the owned tunnel. This also works when the VM is already
+absent. Preserve retains server/Worker identities and application data; reset
+removes them. The shared Access application, its policies, DNS zone and unrelated
+environments are retained. DNS deletion alone is not immediate revocation because
+of caches: connector JWT validation and stopping the connector remain essential.
+
+## Qualification and validation
+
+The real-image smoke exercises HTTP and a WebSocket upgrade/echo through the
+pinned proxy, credential removal, preservation of application authentication,
+and parsing of the connector's guarded ingress. It uses only disposable fixtures:
+
+```bash
+python3 scripts/preview/access_smoke.py
+```
+
+It requires Linux Docker, free loopback ports 5080/5081 and initial access to the
+public pinned infrastructure images; it needs no cloud credentials or model.
+The same smoke runs in **Preview deployment contracts** on PRs and `main`.
+
+After merge, qualify a manually deployed SQLite preview, then PostgreSQL, with
+the configured protected environment. Record real HTTPS/CI probe evidence, an
+authorized Entra member login, a denied non-member login, public-IP denial and
+the browser/Blazor WebSocket journey. Exercise redeploy, preserve/recreate and
+explicit reset, verify unchanged OCI digests and verify no owned DNS/tunnel is
+left after destruction. Local proxy checks are not evidence of live Entra
+authorization. Access protects the route; the application retains its own
+bootstrap/account and authorization model. No Development fixture is enabled.
+PR/TTL automation remains #1286 and reusable deployed Playwright journeys #1287.

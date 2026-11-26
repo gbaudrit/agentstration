@@ -55,10 +55,10 @@ export class SourceLifecycleFixtures {
     }), 201, `publish Flow '${name}'`);
   }
 
-  public async createDurableArtifact(consoleUrl: string, suffix: string): Promise<string> {
+  public async createDurableArtifact(consoleUrl: string, suffix: string, fileName = `schema-input-${suffix}.txt`): Promise<string> {
     const created = await this.page.request.post(`${consoleUrl}/api/artifacts/staged`, {
       data: {
-        fileName: `schema-input-${suffix}.txt`, mediaType: 'text/plain',
+        fileName, mediaType: 'text/plain',
         producer: { kind: 0, id: `schema-input-${suffix}`, flowRunId: `schema-input-${suffix}`, flowStepId: 'fixture' },
       },
     });

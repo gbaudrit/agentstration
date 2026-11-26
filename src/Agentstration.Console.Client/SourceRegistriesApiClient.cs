@@ -10,6 +10,8 @@ public interface ISourceRegistriesClient
 {
     Task<IReadOnlyList<SourceRegistryRegistrationView>> GetRegistriesAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceRegistryRegistrationView>> GetRegistryAsync(string name, CancellationToken cancellationToken);
+    Task<ResourceSnapshot<SourceRegistryRegistrationResource>> GetRegistrationAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact scoped Source Registry reads.");
     Task<ResourceSnapshot<SourceRegistryRegistrationView>> CreateRegistryAsync(CreateSourceRegistryRequest request, CancellationToken cancellationToken);
     Task<ResourceSnapshot<SourceRegistryRegistrationView>> UpdateRegistryAsync(string name, PutSourceRegistryRequest request, string etag, CancellationToken cancellationToken);
     Task DeleteRegistryAsync(string name, string etag, CancellationToken cancellationToken);
@@ -29,6 +31,13 @@ public sealed class SourceRegistriesApiClient(HttpClient httpClient) : ISourceRe
 
     public Task<ResourceSnapshot<SourceRegistryRegistrationView>> GetRegistryAsync(string name, CancellationToken cancellationToken) =>
         ReadSnapshotAsync(HttpMethod.Get, RegistryPath(name), null, null, cancellationToken);
+
+    public async Task<ResourceSnapshot<SourceRegistryRegistrationResource>> GetRegistrationAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"{RegistryPath(name)}/registration?namespace={Uri.EscapeDataString(ns.Value)}&scopeRef={Uri.EscapeDataString(owner.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return new((await response.Content.ReadFromJsonAsync<SourceRegistryRegistrationResource>(token))!, response.Headers.ETag?.ToString() ?? throw new InvalidOperationException("Missing ETag."));
+    }
 
     public Task<ResourceSnapshot<SourceRegistryRegistrationView>> CreateRegistryAsync(CreateSourceRegistryRequest request, CancellationToken cancellationToken) =>
         ReadSnapshotAsync(HttpMethod.Post, "api/sourceregistries", JsonContent.Create(request), null, cancellationToken);

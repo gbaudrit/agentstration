@@ -62,7 +62,12 @@ else
 <ConfirmationDialog IsOpen="@confirmDelete" Title="@T("DeleteExtensionRegistration")" Message="@T("DeleteRegistrationMessage", registration?.Value.Namespace.Value ?? string.Empty, registration?.Value.Name ?? string.Empty)" ConfirmLabel="@T("DeleteRegistration")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 <ConfirmationDialog IsOpen="@confirmUnenroll" Title="@T("UnenrollExtension")" Message="@T("UnenrollExtensionMessage")" ConfirmLabel="@T("ConfirmUnenrollExtension")" OnConfirm="UnenrollAsync" OnCancel="() => confirmUnenroll = false" />
 
+<ResourceCollectionPreview @ref="toolPreview" ResourceKind="@ToolResourceKinds.Tool" ContextKey="@ToolPreviewContextKey" Enabled="@(contextState?.HasPermission(AuthorizationPermissions.ResourcesRead) == true && contextState.Error is null)">
+    <ChildContent Context="address"><ToolResourcePreview Address="address" OverviewHref="@(ToolReferenceUrl(address.ScopeRef, new(address.Name, address.ScopeRef, address.Namespace)) + "#overview")" DefinitionHref="" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? toolPreview;
     private RenderFragment IdentityFields => @<ResourceIdentityEditor ResourceKind="@(SavedResource?.Kind ?? ExtensionKinds.ExtensionRegistration)"
         DisplayName="@form.DisplayName" DisplayNameChanged="value => form.DisplayName = value" DisplayNameExpression="@(() => form.DisplayName)"
         TechnicalName="@form.Name" TechnicalNameExpression="@(() => form.Name)" Namespace="@form.Namespace" NamespaceExpression="@(() => form.Namespace)"
@@ -208,7 +213,7 @@ else
                                             <li><CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(toolState != "Conflict" ? ToolUrl(tool) : null)" IconName="wrench">
                                                 <IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges>
                                                 <Badges><small>@T("ContributionKind.tool") · @tool.Definition.ExternalId</small></Badges>
-                                            </CollectionIdentity></li>
+                                            </CollectionIdentity>@if (toolState != "Conflict" && tool.ScopeRef is { } owner) { <CollectionActions ResourceName="@tool.Name"><a href="@ToolUrl(tool)"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a><button type="button" data-testid="extension-tool-preview" disabled="@(contextState?.HasPermission(AuthorizationPermissions.ResourcesRead) != true)" @onclick="() => toolPreview?.Open(ScopedResourceAddress.Create(owner, tool.Namespace, tool.Kind, tool.Name))"><UiIcon Name="eye" />@Shared["Preview"]</button></CollectionActions> }</li>
                                         }
                                         @foreach (var resource in resources)
                                         {

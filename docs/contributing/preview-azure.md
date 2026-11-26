@@ -19,8 +19,9 @@ version in the target region. `latest` is rejected.
 The Bicep template creates a B2ms/B4ms VM, a 64 GiB Standard SSD data disk, an
 explicit outbound public IP, NIC, isolated VNet and NSG denying **all** ingress.
 The VM has no Azure identity. Neither SSH nor application ports are publicly
-reachable. The application binds guest loopback; `url` stays null until the
-protected-access increment (#1285). Bootstrap is disabled by default, just as
+reachable. The application binds guest loopback; the [protected outbound route](preview-access.md)
+publishes `url` only after current Access, ingress and HTTPS probes succeed.
+Bootstrap is disabled by default, just as
 in the local Preview profile; Development fixture credentials are not enabled.
 
 CI pulls private GHCR indexes by digest with its ephemeral `GITHUB_TOKEN`,
@@ -53,8 +54,8 @@ have been reset; deleting it loses their ownership records.
 
 Retries preserve the original expiry. Reset allows a new data lifecycle, including
 a database change, with a new owner/expiry. Database conversion, automatic TTL
-cleanup (#1286), public URL/access policy (#1285)
-and optional extension selection remain separate work. A reset removes the
+cleanup (#1286) and optional extension selection remain separate work. The
+protected route's live qualification remains #1285. A reset removes the
 environment's server and Worker identities; preserve-destroy retains them.
 
 ## One-time Azure and GitHub preparation

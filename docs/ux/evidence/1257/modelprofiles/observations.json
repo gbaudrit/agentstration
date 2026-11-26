@@ -1,0 +1,102 @@
+{
+  "browser": "System Chromium, headless; isolated deterministic standalone Web",
+  "sourceProof": {
+    "src/Agentstration.Console.Components/Components/ModelProfileResourcePreview.razor": "5df27c3bc5e9d2bd4fbec9467a595d2121041add3decbd3b86a8ae0444198603",
+    "src/Agentstration.Console.Components/Components/ModelProfileResourceSummary.razor": "a2ffff3db40e3d088f826836b906480452a9940db4d7a81e6ce6706aad3725c6",
+    "src/Agentstration.Console.Components/Components/Pages/ModelProfiles.razor": "d855280a3eb108367f5259585e129d0cf2b0765c32b7383445fe33ad0abe9a19",
+    "src/Agentstration.Web.Components/CollectionActions.razor": "310d2030838c80d090f6488d8271774facd7d998153a50a19528af529e72ca07",
+    "src/Agentstration.Web.Components/CollectionView.razor": "93e933abd6791e5a3661d21baac1ee0463127f30198a81afceaa9ba9fc792cef",
+    "src/Agentstration.Web.Components/ModalFrame.razor": "2f41cd1f5928c31e8c53b4c4e2be0ad69f0c0da255ac747864cd65ede039fdea",
+    "src/Agentstration.Web.Components/ResourceCollectionPreview.razor": "a155d0ed78831aa2abf8480c09521d112d8866d0473bb3e6d0f8ba566a8c8bd8",
+    "src/Agentstration.Web.Components/ResourceNavigation.razor": "56ba15b89dc694e1d5df308746330f80bbe82a7c6282784d9b7176f78aa46025",
+    "src/Agentstration.Web.Components/ResourceSummary.razor": "12600afa42c43c5285bff9258e9de215ee0d403bf1837f01e1983abe7c5de1c4",
+    "src/Agentstration.Web.Components/ResourceSummary.razor.css": "459280f1d102433019ce02ca8f76c80bd2ada56708df7341b133ef8648680fdf",
+    "src/Agentstration.Web.Components/ValueDisclosure.razor": "ca0d72f0afcd4a22bc2c2f0999f5322e8471735feb18a612a04073bb2320cb6d",
+    "src/Agentstration.Web.Components/wwwroot/preview-location.js": "98c9c6569437d1aeca8520a7e9a00b4c6432fcb95649e470221cd19204e46753",
+    "src/Agentstration.Web.Components/wwwroot/resource-navigation.js": "2b5359a7a4446dceb8fe478c9116d6ea5502ccf16c3371cf3a9cd2bfc62af128"
+  },
+  "cases": [
+    {
+      "key": "model-profile-en-US-light-1440",
+      "status": "passed",
+      "checks": [
+        "localized theme",
+        "table/mobile cards",
+        "saved summary",
+        "independent disclosure",
+        "hidden selector",
+        "bounds and reachable close",
+        "healthy Blazor circuit and no actionable browser errors",
+        "Open/Edit Back",
+        "reload and direct URL",
+        "Escape and explicit close",
+        "scoped keyboard menu navigation and Escape/focus",
+        "desktop pointer activation",
+        "native same-fragment reopening"
+      ],
+      "screenshot": "model-profile-en-US-light-1440.png"
+    },
+    {
+      "key": "model-profile-fr-FR-dark-1440",
+      "status": "passed",
+      "checks": [
+        "localized theme",
+        "table/mobile cards",
+        "saved summary",
+        "independent disclosure",
+        "hidden selector",
+        "bounds and reachable close",
+        "healthy Blazor circuit and no actionable browser errors",
+        "Open/Edit Back",
+        "reload and direct URL",
+        "Escape and explicit close",
+        "scoped keyboard menu navigation and Escape/focus",
+        "desktop pointer activation",
+        "native same-fragment reopening"
+      ],
+      "screenshot": "model-profile-fr-FR-dark-1440.png"
+    },
+    {
+      "key": "model-profile-en-US-dark-390",
+      "status": "passed",
+      "checks": [
+        "localized theme",
+        "table/mobile cards",
+        "saved summary",
+        "independent disclosure",
+        "hidden selector",
+        "bounds and reachable close",
+        "healthy Blazor circuit and no actionable browser errors",
+        "Open/Edit Back",
+        "reload and direct URL",
+        "Escape and explicit close",
+        "scoped keyboard menu navigation and Escape/focus",
+        "mobile touch",
+        "native same-fragment reopening"
+      ],
+      "screenshot": "model-profile-en-US-dark-390.png"
+    },
+    {
+      "key": "model-profile-fr-FR-light-390",
+      "status": "passed",
+      "checks": [
+        "localized theme",
+        "table/mobile cards",
+        "saved summary",
+        "independent disclosure",
+        "hidden selector",
+        "bounds and reachable close",
+        "healthy Blazor circuit and no actionable browser errors",
+        "Open/Edit Back",
+        "reload and direct URL",
+        "Escape and explicit close",
+        "scoped keyboard menu navigation and Escape/focus",
+        "mobile touch",
+        "native same-fragment reopening"
+      ],
+      "screenshot": "model-profile-fr-FR-light-390.png"
+    }
+  ],
+  "toolInvocationCount": 0,
+  "sourceProofEncoding": "SHA-256 of UTF-8 text with LF line endings"
+}

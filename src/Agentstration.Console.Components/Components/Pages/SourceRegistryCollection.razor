@@ -2,6 +2,7 @@
 @inject ISourceRegistriesClient Client
 @inject IServiceProvider Services
 @inject ConsoleContextState Context
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject TimeProvider Clock
 @inject Microsoft.Extensions.Localization.IStringLocalizer<SourceRegistriesStrings> Localizer
 
@@ -22,19 +23,31 @@
     <EmptyActions>@if (hasCatalogAuthorization) { <a class="button-primary" href="@CreateUrl">@T("AddRegistry")</a> }</EmptyActions>
     <ItemActions Context="item">
         <CollectionActions ResourceName="@item.Registration.Definition.DisplayName">
+            <a href="@(RegistryResourceUrl(item.Registration) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
+            @if (CanPreviewEdit(item.Registration)) { <a href="@(RegistryResourceUrl(item.Registration) + "#definition/configuration")"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
+            <button type="button" data-testid="source-registry-preview" disabled="@(item.Registration.ScopeRef is null)" @onclick="() => OpenPreview(item.Registration)"><UiIcon Name="eye" />@Shared["Preview"]</button>
             <button class="switch-button" type="button" role="switch" aria-checked="@item.Registration.Definition.Enabled.ToString().ToLowerInvariant()" aria-label="@F("ToggleRegistry", item.Registration.Definition.DisplayName)" disabled="@(busy || !interactive)" @onclick="() => ToggleAsync(item)"><span></span>@BooleanLabel(item.Registration.Definition.Enabled)</button>
             <button class="text-button" disabled="@(busy || !interactive || !item.Registration.Definition.Enabled)" @onclick="() => RefreshAsync(item)">@T("RefreshNow")</button>
         </CollectionActions>
     </ItemActions>
 </ResourceCollectionTemplate>
 
+<ResourceCollectionPreview @ref="preview" ResourceKind="@SourceRegistryKinds.SourceRegistryRegistration" ContextKey="@contextKey" Enabled="@(hasCatalogAuthorization && contextKey is not null && Context.Error is null && loadState.Status != ResourceLoadStatus.Forbidden)">
+    <ChildContent Context="address"><SourceRegistryRegistrationResourcePreview Address="address" OverviewHref="@PreviewUrl(address, "overview")" DefinitionHref="@PreviewUrl(address, "definition/configuration")" /></ChildContent>
+</ResourceCollectionPreview>
+
 @code {
+    private ResourceCollectionPreview? preview;
+    private bool CanPreviewEdit(SourceRegistryRegistrationResource item) => hasCatalogAuthorization && !item.Governance.IsManaged && Context.HasPermission(AuthorizationPermissions.ResourcesWrite) && item.ScopeRef?.Value == Context.Current?.SelectedScopeRef && ResourceOwnershipContext.CanManage(item.ScopeRef, Services);
+    private string RegistryResourceUrl(SourceRegistryRegistrationResource item) => ResourceOwnershipContext.Resource(Services, "/settings/source-registries", item.Name, item.Namespace, item.ScopeRef);
+    private void OpenPreview(SourceRegistryRegistrationResource item) { if (item.ScopeRef is { } owner) preview?.Open(ScopedResourceAddress.Create(owner, item.Namespace, SourceRegistryKinds.SourceRegistryRegistration, item.Name)); }
+    private string PreviewUrl(ScopedResourceAddress address, string section) => ResourceOwnershipContext.Resource(Services, "/settings/source-registries", address.Name, address.Namespace, address.ScopeRef).Split('#')[0] + "#" + section;
     private string T(string key) => Localizer[key].Value;
     private string F(string key, params object[] arguments) => Localizer[key, arguments].Value;
     private string CreateUrl => ResourceOwnershipContext.PreserveNavigation("/settings/source-registries/new", Services);
     private string RegistryUrl(string name) => ResourceOwnershipContext.PreserveNavigation($"/settings/source-registries/{Uri.EscapeDataString(name)}", Services);
     private CollectionColumn<SourceRegistryRegistrationView> IdentityColumn => new("identity", T("Registry"), item => @<text>
-        <CollectionIdentity DisplayName="@item.Registration.Definition.DisplayName" Namespace="@item.Registration.Namespace.Value" Name="@item.Registration.Name" Href="@RegistryUrl(item.Registration.Name)" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.Registration.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@item.Registration.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Registration.ScopeRef, Services))" IconOnly /><StatusBadge Text="@ObservedStatus(item.Observed.Definition.Status)" Status="@ObservedTone(item.Observed.Definition.Status)" IconOnly /></IconBadges><Badges><small>@FormatDate(item.Observed.Definition.LastSuccessfulRefreshAt)</small></Badges></CollectionIdentity>
+        <CollectionIdentity DisplayName="@item.Registration.Definition.DisplayName" Namespace="@item.Registration.Namespace.Value" Name="@item.Registration.Name" Href="@(RegistryResourceUrl(item.Registration) + "#overview")" IconName="database"><IconBadges><ResourceScopeBadge ScopeRef="item.Registration.ScopeRef" Kind="ResourceScopeKind.Instance" IconOnly /><ManagedResourceBadge IsManaged="@item.Registration.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(item.Registration.ScopeRef, Services))" IconOnly /><StatusBadge Text="@ObservedStatus(item.Observed.Definition.Status)" Status="@ObservedTone(item.Observed.Definition.Status)" IconOnly /></IconBadges><Badges><small>@FormatDate(item.Observed.Definition.LastSuccessfulRefreshAt)</small></Badges></CollectionIdentity>
         @if (IsOfficial(item)) { <span class="registry-kind-note">@T("WellKnownOfficial")</span> }
     </text>);
     private IReadOnlyList<CollectionColumn<SourceRegistryRegistrationView>> Columns =>

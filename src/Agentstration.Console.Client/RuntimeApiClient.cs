@@ -151,6 +151,9 @@ public sealed class RuntimeApiClient(HttpClient httpClient) : IRuntimeApiClient,
     public Task<IReadOnlyList<RuntimeWorkerSummaryResponse>> GetRuntimeWorkersAsync(CancellationToken cancellationToken) =>
         ReadArrayAsync<RuntimeWorkerSummaryResponse>("api/runtime/workers", cancellationToken);
 
+    public Task<RuntimeWorkerSummaryResponse> GetRuntimeWorkerSummaryAsync(Guid workerId, CancellationToken token) =>
+        ApiResponse.ReadAsync<RuntimeWorkerSummaryResponse>(httpClient, $"api/runtime/workers/{workerId:D}/summary", token);
+
     public Task<RuntimeWorkerDetailsResponse> GetRuntimeWorkerAsync(Guid workerId, CancellationToken cancellationToken) =>
         ApiResponse.ReadAsync<RuntimeWorkerDetailsResponse>(httpClient, $"api/runtime/workers/{workerId:D}", cancellationToken);
 

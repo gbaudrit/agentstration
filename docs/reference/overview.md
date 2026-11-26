@@ -6,6 +6,7 @@ Reference documentation describes verified contracts and operational details:
 - [HTTP API and OpenAPI](api/overview.md)
 - [Declarative resources](resources/overview.md)
 - [Declarative bootstrap](declarative-bootstrap.md)
+- [Transformation Schemas and explicit function exposure](transformation-schemas.md)
 - [Pack format and lifecycle](packs.md)
 - [Agent resource](resources/agents.md)
 - [Secrets and Vaults](secrets-and-vaults.md)

@@ -9,7 +9,7 @@
     @if (resource is null) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" RetryTestId="flow-preview-retry" /> }
     else
     {
-        <FlowResourceSummary Resource="resource" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false" ShowLastPublication="false" ReadOnly="@(resource.ScopeRef?.Value != Context.Current?.SelectedScopeRef)">
+        <FlowResourceSummary Resource="resource" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false" ShowLastPublication="false" ReadOnly="@(!CanEdit)">
             <QuickActions>
                 <a class="button-secondary" href="@OverviewHref" data-testid="flow-preview-open"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
                 @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="flow-preview-edit"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }

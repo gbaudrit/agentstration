@@ -176,6 +176,10 @@ def verify(directory):
         container = json.loads(subprocess.check_output(["docker", "inspect", container_id], text=True))[0]
         require(container["Config"]["Image"] == expected["reference"] and container["State"].get("Health", {}).get("Status") == "healthy",
                 "Preview container is unready or differs from its recorded digest.")
+        if service == "server":
+            require(container.get("HostConfig", {}).get("PortBindings", {}).get("8080/tcp") ==
+                    [{"HostIp": "127.0.0.1", "HostPort": str(state["port"])}],
+                    "Preview application ports must bind only the requested guest loopback port.")
         if service != "postgres":
             image = json.loads(subprocess.check_output(["docker", "image", "inspect", container["Image"]], text=True))[0]
             labels = image["Config"]["Labels"]

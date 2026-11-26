@@ -335,6 +335,7 @@ public sealed class ToolCategoryConsoleTests
         public int Reads { get; private set; }
         public int Deletes { get; private set; }
         public Func<Task<ResourceSnapshot<ToolCategoryResource>>>? Loader { get; set; }
+        public Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token = default) => GetCategoryAsync(name, token);
         public Task<ResourceSnapshot<ToolCategoryResource>> GetCategoryAsync(string name, CancellationToken cancellationToken = default) { Reads++; return Loader?.Invoke() ?? Task.FromResult(new ResourceSnapshot<ToolCategoryResource>(Resource, "\"etag\"")); }
         public Task<IReadOnlyList<ToolCategoryMember>> GetMembersAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolCategoryMember>>(Resource.Definition.Tools.Select(reference => new ToolCategoryMember(reference, reference.Name == "operations.run" ? ToolsClient.Tool : null, reference.Name == "operations.run" ? "available" : "missing")).ToArray());
         public Task<IReadOnlyList<ToolCategoryResource>> GetCategoriesAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<ToolCategoryResource>>([Resource]);

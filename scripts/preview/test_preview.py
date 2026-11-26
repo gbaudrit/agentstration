@@ -165,6 +165,7 @@ class PreviewContracts(unittest.TestCase):
         containers = {name: {"Config": {"Image": image["reference"], "Env": []}, "Image": name,
                      "State": {"Health": {"Status": "healthy"}}, "Mounts": []} for name, image in state["images"].items()}
         containers["worker"]["Mounts"] = [{"Destination": "/run/secrets/awp_key", "RW": False}]
+        containers["server"]["HostConfig"] = {"PortBindings": {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": str(state["port"])}]}}
 
         def evaluate(values):
             def inspect(command, **_arguments):
@@ -182,6 +183,11 @@ class PreviewContracts(unittest.TestCase):
                 return preview.verify(self.directory)
 
         self.assertEqual("sqlite", evaluate(containers)["database"])
+        for address in ('0.0.0.0', '::'):
+            invalid = copy.deepcopy(containers)
+            invalid['server']['HostConfig']['PortBindings']['8080/tcp'][0]['HostIp'] = address
+            with self.subTest(address=address), self.assertRaisesRegex(ValueError, 'loopback'):
+                evaluate(invalid)
         for field, value in (("Config", {"Image": "floating:latest", "Env": []}),
                              ("State", {"Health": {"Status": "unhealthy"}}),
                              ("Mounts", [{"Destination": "/data", "RW": True}])):
@@ -305,6 +311,7 @@ class PreviewContracts(unittest.TestCase):
             if command[-1] == "postgres":
                 return json.dumps([postgres])
             return json.dumps([{"Config": {"Image": state["images"][command[-1]]["reference"], "Env": []},
+                                "HostConfig": {"PortBindings": {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": str(state['port'])}]}},
                                 "Image": command[-1], "State": {"Health": {"Status": "healthy"}},
                                 "Mounts": [{"Destination": "/run/secrets/awp_key", "RW": False}]}])
 

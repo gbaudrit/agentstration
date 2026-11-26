@@ -153,6 +153,30 @@ public sealed class AgentResourcePreviewTests
         Assert.AreEqual(ResourceLoadStatus.Failed, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
     }
 
+    [TestMethod]
+    public async Task LosingReadPermissionClearsTheSnapshotWithoutAnotherRead()
+    {
+        using var handler = new Handler((_, _) => Task.FromResult(Response(Resource("agent-a"))));
+        using var context = await ContextAsync(handler);
+        var cut = Render(context, Target("agent-a"));
+        var provider = (ResourceListContextProvider)context.Services.GetRequiredService<IConsoleContextProvider>();
+        provider.Permissions = new HashSet<string>();
+        await cut.InvokeAsync(() => context.Services.GetRequiredService<ConsoleContextState>().LoadAsync(default));
+        Assert.IsEmpty(cut.FindComponents<AgentResourceSummary>());
+        Assert.AreEqual(ResourceLoadStatus.Forbidden, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+        Assert.AreEqual(1, handler.Reads);
+    }
+
+    [TestMethod]
+    public async Task WrongKindCannotMasqueradeAsTheSelectedAgent()
+    {
+        using var handler = new Handler((_, _) => Task.FromResult(Response(Resource("agent-a") with { Kind = "Other" })));
+        using var context = await ContextAsync(handler);
+        var cut = Render(context, Target("agent-a"));
+        Assert.IsEmpty(cut.FindComponents<AgentResourceSummary>());
+        Assert.AreEqual(ResourceLoadStatus.Forbidden, cut.FindComponent<ResourceLoadFeedback>().Instance.State.Status);
+    }
+
     private static ScopedResourceAddress Target(string name) => ScopedResourceAddress.Create(Scope, ResourceNamespace.Default, AgentResourceKinds.Agent, name);
     private static AgentResource Resource(string name) => new()
     {

@@ -1,6 +1,7 @@
 @using Agentstration.Web.Components.Pages
 @implements IDisposable
 @inject IArtifactsClient Artifacts
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
 @inject Microsoft.Extensions.Localization.IStringLocalizer<FlowRunDetailsStrings> Localizer
 @inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> ArtifactLocalizer
 
@@ -34,7 +35,7 @@
                         @if (artifact.Receipt.Materialization is { } location)
                         { <div><dt>@ArtifactLocalizer["Storage"]</dt><dd><a class="text-button" href="@ArtifactResourceLinks.Storage(location)">@location.Target.Storage.Storage.Name</a></dd></div> }
                     </dl>
-                    <div class="collection-actions"><CollectionActions ResourceName="@artifact.ArtifactId.ToString()"><Primary><a class="button-secondary" href="@ArtifactUrl(artifact)">@ArtifactLocalizer["Inspect"]</a></Primary></CollectionActions></div>
+                    <div class="collection-actions"><CollectionActions ResourceName="@artifact.ArtifactId.ToString()"><Primary><a class="button-secondary" href="@ArtifactUrl(artifact)">@ArtifactLocalizer["Inspect"]</a></Primary><Secondary><a href="@ArtifactUrl(artifact)"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>@if (artifact.ScopeRef is { } owner) { <button type="button" data-testid="flow-output-artifact-preview" @onclick="() => PreviewRequested.InvokeAsync(ScopedResourceAddress.Create(owner, artifact.Namespace, artifact.Kind, artifact.Name))"><UiIcon Name="eye" />@Shared["Preview"]</button> }</Secondary></CollectionActions></div>
                 </li>
             }
         </ul>
@@ -43,6 +44,7 @@
 
 @code {
     [Parameter, EditorRequired] public FlowRun Run { get; set; } = default!;
+    [Parameter] public EventCallback<ScopedResourceAddress> PreviewRequested { get; set; }
     [Parameter] public int? MaximumPreviewCharacters { get; set; }
     private string FullOutput => JsonSerializer.Serialize(Run.Output, new JsonSerializerOptions { WriteIndented = true });
     private bool PreviewTruncated => MaximumPreviewCharacters is > 0 && FullOutput.Length > MaximumPreviewCharacters;
@@ -90,7 +92,7 @@
     private string ArtifactUrl(FlowRunArtifactResource artifact)
     {
         var context = Run.Scope.LogicalScopeRef ?? Run.ExecutionScopeRef;
-        return $"/artifacts/durable/{artifact.ArtifactId}?context={Uri.EscapeDataString(context.Value)}";
+        return $"/artifacts/durable/{artifact.ArtifactId}?context={Uri.EscapeDataString(context.Value)}{(artifact.ScopeRef is { } owner ? "&scopeRef=" + Uri.EscapeDataString(owner.Value) : "")}#overview";
     }
     public void Dispose() { cancellation.Cancel(); cancellation.Dispose(); }
 }

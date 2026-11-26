@@ -116,6 +116,7 @@ export class SchemaContractsPage {
     await expect(this.page.getByTestId(TestIds.schemaContracts.toolCreateForm)).toHaveAttribute('data-interactive', 'true');
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).fill('Contract Tool');
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateDisplayName).blur();
+    await expect(this.page.getByRole('alertdialog')).toBeHidden();
     await this.page.getByTestId(TestIds.schemaContracts.toolCreateFlowKind).click();
     await this.page.getByTestId(TestIds.creationWizard.next).click();
     const flow = this.page.getByTestId(TestIds.schemaContracts.toolFlow);
@@ -340,8 +341,12 @@ export class SchemaContractsPage {
   }
 
   private async open(url: string, testId: string): Promise<void> {
-    const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    const target = new URL(url);
+    const scopeRef = await this.page.getByTestId(TestIds.console.shell).getAttribute('data-context-scope').catch(() => null);
+    if (scopeRef && !target.searchParams.has('context')) target.searchParams.set('context', scopeRef);
+    const response = await this.page.goto(target.toString(), { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Route '${url}' returned HTTP ${response?.status() ?? 'no response'}.`);
+    await expect(this.page.getByTestId(TestIds.console.shell)).toHaveAttribute('data-preferences-ready', 'true');
     await this.page.getByTestId(testId).waitFor({ state: 'visible' });
   }
 }

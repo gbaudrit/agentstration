@@ -41,11 +41,15 @@ internal static class RuntimeProfileEndpoints
             return Results.Ok(new ValueResponse<RuntimeProfileSummaryResponse>(values));
         });
 
-    private static Task<IResult> GetAsync(string profileName, string? resourceNamespace, HttpResponse response, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> GetAsync(string profileName, string? resourceNamespace, string? scopeRef, HttpResponse response, RuntimeProfileManagementService service, CancellationToken cancellationToken) =>
         RuntimeProfileApiHttp.ExecuteAsync(async () =>
         {
             var @namespace = RuntimeProfileApiHttp.Namespace(resourceNamespace);
-            var stored = await service.GetAsync(@namespace, profileName, cancellationToken)
+            var owner = scopeRef is null ? (ResourceScopeRef?)null : ResourceScopeRef.Parse(scopeRef);
+            if (owner is { } requested && !ResourceScopePolicy.AllowedScopes(RuntimeProfileResourceKinds.RuntimeProfile).Contains(requested.Kind))
+                throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, profileName, @namespace));
+            var stored = await (owner is null ? service.GetAsync(@namespace, profileName, cancellationToken)
+                : service.GetExactAsync(owner.Value, @namespace, profileName, cancellationToken))
                 ?? throw new ResourceNotFoundException(new(RuntimeProfileResourceKinds.RuntimeProfile, profileName, @namespace));
             return RuntimeProfileApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });

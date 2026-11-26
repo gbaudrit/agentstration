@@ -1,0 +1,59 @@
+@namespace Agentstration.Web.Components
+@using System.Text.Json
+@using Agentstration.Work
+@using Agentstration.Work.Contracts
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<WorkplaceStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="entry-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.DisplayName" TechnicalName="@Resource.Name" Version="@Published?.Version.ToString(System.Globalization.CultureInfo.InvariantCulture)" Namespace="@Resource.Id.Namespace.Value"
+            Description="@Resource.Description" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="entry-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="@(PresentationScopeRef ?? ResourceScopeRef.Workspace(Resource.WorkspaceId.Value))" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="@(ManagedByPack == true)" IsReadOnly="ReadOnly" /></Badges>
+
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="entry-configuration-summary">
+        <CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch"><Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information></CollectionView>
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public EntryDraft Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => Configuration(Resource);
+    private IReadOnlyList<ConfigurationEntry> Configuration(EntryDraft value)
+    {
+        var values = new List<ConfigurationEntry>
+        {
+            new(T("Presentation"), EnumLabel("Presentation", value.Presentation.Kind)),
+            new(T("Binding"), BindingText(value.Binding, value.Id.Namespace)), new(T("EntryExposure"), Json(value.Exposure)),
+            new(T("WorkplaceAppearance"), Json(new { value.Presentation.Placeholder, value.Presentation.Icon, value.Presentation.AllowAttachments, value.Presentation.AllowVoiceInput })),
+            new(T("InteractionPresentation"), Json(new { value.Presentation.Participants, value.Presentation.Progress, value.Presentation.Task, value.Presentation.Results })),
+            new(T("InputSchema"), Json(value.Presentation.Fields)), new(T("ConversationAndExecution"), Json(value.Behavior)), new(T("PromptStarters"), Json(value.Presentation.Suggestions))
+        };
+        if (Published is not null) { values.Add(new(T("ResolvedTarget"), Json(Published.ResolvedTarget))); values.Add(new(T("PublishedAt", FormatDate(Published.PublishedAt)), Published.Version.ToString(System.Globalization.CultureInfo.CurrentCulture))); }
+        return values;
+    }
+    private static string Json<T>(T value) => JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    [Parameter] public EntryResource? Published { get; set; }
+    [Parameter] public bool? ManagedByPack { get; set; }
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
+    private string EnumLabel<TValue>(string group, TValue value) where TValue : struct, Enum => T($"{group}.{value}");
+    private string BindingText(EntryBinding value, ResourceNamespace? ns) => $"{EnumLabel("Binding", value.Kind)} · {(value.ScopeRef is { } owner ? owner.Value + " · " : "")}{value.Namespace ?? ns}/{value.ResourceId}";
+    private string FormatDate(DateTimeOffset? value) => value is null || value == default ? T("NotPublished") : value.Value.ToLocalTime().ToString("g");
+
+}

@@ -23,6 +23,11 @@ public sealed partial class PackAuthoringService(
     public async Task<StoredResource<PackProjectResource>?> GetProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
         (await ListProjectsAsync(cancellationToken)).SingleOrDefault(value => value.Value.Uid == projectId);
 
+    public Task<StoredResource<PackProjectResource>?> GetProjectExactAsync(ResourceScopeRef owner, ResourceNamespace ns, string name, CancellationToken token) =>
+        owner.Kind != ResourceScopeKind.Workspace || !ns.IsDefault || !Guid.TryParseExact(name, "N", out _)
+            ? Task.FromResult<StoredResource<PackProjectResource>?>(null)
+            : store.GetExactAsync<PackProjectResource>(ScopedResourceAddress.Create(owner, ns, PackAuthoringKinds.PackProject, name), token);
+
     public async Task<StoredResource<PackProjectResource>> ForkAsync(PackIdentity source, ForkPackCommand command, CancellationToken cancellationToken)
     {
         ValidateCoordinate(command.Publisher, command.Name, command.Version);

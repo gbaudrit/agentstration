@@ -1,0 +1,38 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ArtifactsStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+<ResourceSummary TestId="durable-artifact-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value" ResourceUid="Resource.Uid"
+            Version="@(Resource.Generation.ToString())" VersionDescription="@T("Generation")" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="durable-artifact-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="PresentationScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="@(Resource.Governance.IsManaged)" IsReadOnly="true" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@ArtifactResourceKinds.FlowRunArtifact" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="durable-artifact-configuration-summary">
+        <CollectionView TItem="SavedSetting" Items="Settings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch">
+            <Identity Context="row"><strong class="configuration-key">@row.Label</strong></Identity>
+            <Information Context="row"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@row.Value</span></CollectionValue></Information>
+        </CollectionView>
+    </FormSection>
+    @AdditionalContent
+</ResourceSummary>
+@code {
+    [Parameter, EditorRequired] public FlowRunArtifactResource Resource { get; set; } = null!;
+    private string DisplayName => Resource.Receipt.Provenance.TryGetValue("fileName", out var name) ? name : Resource.Name;
+    [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public RenderFragment? AdditionalContent { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key, params object[] args) => Localizer[key, args];
+    private sealed record SavedSetting(string Label, string Value);
+    private IReadOnlyList<SavedSetting> Settings => [new(T("MediaType"), Resource.Receipt.MediaType), new(T("Size"), T("ExactBytes", Resource.Receipt.Length)), new("SHA-256", Resource.Receipt.Sha256), new(T("Created"), Resource.CreatedAt.ToLocalTime().ToString("g")), new(T("ProducerId"), Resource.ProducerFlowRunId + " / " + Resource.ProducerFlowStepId), new(T("DataContract"), Resource.Receipt.DataContract?.Digest ?? "—")];
+}

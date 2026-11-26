@@ -39,9 +39,7 @@ else
         Feedback="feedback" HasDraft="HasDraft" DefinitionReadOnlyReason="@(CanManage ? null : ResourceReadOnlyReason.InsufficientPermissions)"
         Yaml="@SavedYaml" Busy="busy" TestId="resource-vault-editor" SectionTestIdPrefix="vault">
         <OverviewMetrics><MetricCard Label="@T("Status")" Value="@(status is null ? T("Status.Unknown") : StatusText(status))" Status="StatusTone" /></OverviewMetrics>
-        <OverviewConfiguration><CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
-        </CollectionView></OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (resource is not null) { <VaultResourceSummary Resource="resource" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" @ref="definitionForm" EditContext="FormContext" FieldLabels="FieldLabels" Id="vault-resource-form" FormName="vault-editor"
             Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" SectionRequested="ShowSection"
             OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="busy" ReadOnly="@(!CanManage)" data-interactive="@(interactive ? "true" : "false")" /></DefinitionContent>
@@ -116,9 +114,6 @@ else
         [nameof(model.Namespace)] = Shared["Namespace"], [nameof(model.Description)] = Shared["Description"], [nameof(model.Tags)] = Shared["Labels"]
     };
     private IReadOnlyList<CreationWizardStep> Steps => [new("identity", T("Identity"), IdentityFields) { IsComplete = IdentityComplete }, new("grants", Shared["Configuration"], Grants), new("review", Shared["Verification"], Review) { IsComplete = IdentityComplete }];
-    private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration => resource is null ? [] :
-        [new(T("Provider"), T($"Provider.{resource.Definition.ProviderType}")), new(Shared["Access"], resource.Definition.UsePolicy.Grants.Count == 0 ? Shared["NotProvided"] : string.Join("\n", resource.Definition.UsePolicy.Grants.Select(g => g.ScopeRef.Value)))];
     private void ShowSection(string path) => Navigation.NavigateTo(Navigation.Uri.Split('#')[0] + "#" + path);
     private async Task FinishAsync(CreationWizardFinish finish)
     {

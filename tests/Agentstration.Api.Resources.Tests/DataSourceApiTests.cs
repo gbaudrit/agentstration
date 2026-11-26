@@ -907,7 +907,11 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
             SelectConsoleContext(client, workspace);
         }
 
+        // Exercise completion beyond the former 50-poll wait without changing the target assertions.
+        var deferRediscovery = scopeKind == ResourceScopeKind.Workspace && recoverPending;
+        if (deferRediscovery) gateway.PendingReadsForNextStart = 80;
         var rediscovery = await StartAndAwaitDiscoveryAsync(client, workspace);
+        if (deferRediscovery) Assert.AreEqual(80, gateway.DeferredCompletionReads);
         var targets = await client.GetFromJsonAsync<DataSourceAcquisitionTargetView[]>(
             $"/api/datasources/targeted-origin/acquisition-targets?scopeRef={Uri.EscapeDataString(workspace.Value)}");
         Assert.IsTrue(targets?.Single().Stale);
@@ -957,13 +961,15 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
         var current = await response.Content.ReadFromJsonAsync<DataSourceDiscoveryResource>()
             ?? throw new AssertFailedException("Discovery response missing.");
         if (afterStart is not null) await afterStart();
-        for (var attempt = 0; attempt < 50 && current.State is DataSourceDiscoveryState.Pending
+        for (var attempt = 0; attempt < 200 && current.State is DataSourceDiscoveryState.Pending
                  or DataSourceDiscoveryState.Running or DataSourceDiscoveryState.WaitingForChild; attempt++)
         {
             await Task.Delay(50);
             current = await client.GetFromJsonAsync<DataSourceDiscoveryResource>($"/api/datasourcediscoveries/{current.Name}")
                 ?? throw new AssertFailedException("Discovery status missing.");
         }
+        Assert.AreEqual(DataSourceDiscoveryState.Succeeded, current.State,
+            $"Discovery '{current.Name}' must succeed before its targets are checked; state={current.State}, {current.ErrorCode}: {current.ErrorMessage}.");
         return current;
     }
 
@@ -1281,19 +1287,39 @@ public sealed class DataSourceApiTests : ResourceManagementApiTestBase
     // Simulates a durable Pending operation whose dispatch did not reach Flow.
     private sealed class RecordingDataSourceFlowGateway(DataSourceAcquisitionFlowGateway inner) : IDataSourceAcquisitionFlowGateway
     {
+        private string? delayedRunId;
+        private int pendingReads;
+        private int deferredCompletionReads;
         public bool DeferStarts { get; set; }
+        public int PendingReadsForNextStart { get; set; }
+        public int DeferredCompletionReads => Volatile.Read(ref deferredCompletionReads);
         public ConcurrentQueue<DataSourceFlowRunRequest> Requests { get; } = new();
 
         public Task<DataSourceFlowRunSnapshot> StartAsync(DataSourceFlowRunRequest request, CancellationToken cancellationToken)
         {
             Requests.Enqueue(request);
+            if (PendingReadsForNextStart > 0)
+            {
+                delayedRunId = request.RunId;
+                pendingReads = PendingReadsForNextStart;
+                PendingReadsForNextStart = 0;
+            }
             return DeferStarts
                 ? Task.FromResult(new DataSourceFlowRunSnapshot(request.RunId, DataSourceAcquisitionState.Pending, null, null, null, null))
                 : inner.StartAsync(request, cancellationToken);
         }
 
-        public Task<DataSourceFlowRunSnapshot?> GetAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
-            CancellationToken cancellationToken) => inner.GetAsync(workspaceId, runId, tenantId, principalId, cancellationToken);
+        public async Task<DataSourceFlowRunSnapshot?> GetAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
+            CancellationToken cancellationToken)
+        {
+            var snapshot = await inner.GetAsync(workspaceId, runId, tenantId, principalId, cancellationToken);
+            if (snapshot is not null && runId == delayedRunId && Interlocked.Decrement(ref pendingReads) >= 0)
+            {
+                Interlocked.Increment(ref deferredCompletionReads);
+                return snapshot with { State = DataSourceAcquisitionState.Running, Output = null, CompletedAt = null };
+            }
+            return snapshot;
+        }
 
         public Task<DataSourceFlowRunSnapshot> CancelAsync(Guid workspaceId, string runId, Guid tenantId, Guid principalId,
             CancellationToken cancellationToken) => inner.CancelAsync(workspaceId, runId, tenantId, principalId, cancellationToken);

@@ -1,0 +1,48 @@
+@namespace Agentstration.Web.Components
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<RuntimeProfileEditorStrings> Localizer
+@inject Microsoft.Extensions.Localization.IStringLocalizer<SharedFormStrings> Shared
+
+
+<ResourceSummary TestId="runtime-profile-summary">
+    @if (QuickActions is not null) { <ResourceQuickActions Title="@Shared["QuickActions"]">@QuickActions</ResourceQuickActions> }
+    @if (Identity is not null) { @Identity }
+    else
+    {
+        <ResourceIdentitySummary DisplayName="@Resource.Definition.DisplayName" TechnicalName="@Resource.Name" Namespace="@Resource.Namespace.Value"
+            ResourceUid="Resource.Uid" Labels="Resource.Metadata.Tags" CopyFacts Collapsible="true" InitiallyCollapsed="false" TestId="runtime-profile-identity-summary">
+            <Scope><ResourceScopeBadge ScopeRef="Resource.ScopeRef" /></Scope>
+            <Badges><ManagedResourceBadge IsManaged="Resource.Governance.IsManaged" IsReadOnly="ReadOnly" /></Badges>
+            <AdditionalContent>@if (Resource.ScopeRef is { } owner) { <ExtensionManagedResourcePanel Governance="Resource.Governance" ScopeRef="owner" Namespace="Resource.Namespace" Kind="@Resource.Kind" Name="@Resource.Name" Uid="Resource.Uid" Embedded /> }</AdditionalContent>
+        </ResourceIdentitySummary>
+    }
+    <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" Collapsible InitiallyCollapsed="ConfigurationInitiallyCollapsed" TestId="runtime-profile-configuration-summary">
+        <CollectionView TItem="ConfigurationEntry" Items="SavedConfiguration" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })" ShowViewSwitch="ShowConfigurationViewSwitch">
+            <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
+        </CollectionView>
+    </FormSection>
+
+</ResourceSummary>
+
+@code {
+    [Parameter, EditorRequired] public RuntimeProfileResource Resource { get; set; } = null!;
+    [Parameter] public RenderFragment? Identity { get; set; }
+    [Parameter] public RenderFragment? QuickActions { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ConfigurationInitiallyCollapsed { get; set; } = true;
+    [Parameter] public bool ShowConfigurationViewSwitch { get; set; } = true;
+    private string T(string key) => Localizer[key];
+    private sealed record ConfigurationEntry(string Label, string Value);
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration =>
+    [
+        new(T("RuntimeType"), Resource.Definition.RuntimeType),
+        new(T("SessionMode"), SessionLabel(Resource.Definition.Execution.SessionMode)),
+        new(T("ToolInvocation"), ToolInvocationLabel(Resource.Definition.Execution.ToolInvocation)),
+        new(T("Streaming"), StreamingLabel(Resource.Definition.Execution.Streaming)),
+        new(T("RuntimeOptions"), Resource.Definition.RuntimeOptions.Count == 0 ? Shared["NotProvided"] : JsonSerializer.Serialize(Resource.Definition.RuntimeOptions, new JsonSerializerOptions { WriteIndented = true }))
+    ];
+    private string SessionLabel(RuntimeSessionMode value) => Localizer[$"Session.{value}"];
+    private string ToolInvocationLabel(RuntimeToolInvocationMode value) => Localizer[$"ToolInvocation.{value}"];
+    private string StreamingLabel(StreamingMode value) => Localizer[$"Streaming.{value}"];
+
+}

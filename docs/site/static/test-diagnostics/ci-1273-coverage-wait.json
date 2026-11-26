@@ -1,0 +1,226 @@
+{
+  "head": "f2a90aff20f51e20cc74d07a9bfe0d99b5cdfa14",
+  "ciRun": 45683330133,
+  "hostedDiagnosticsOtherJob": 139457391953,
+  "modules": [
+    {
+      "module": "Agentstration.Api.Tests",
+      "testCount": 44,
+      "passed": 44,
+      "failed": 0,
+      "durationSeconds": 72.7,
+      "peakWorkingSetMiB": 1743.5,
+      "peakPrivateMemoryMiB": 1738,
+      "status": "passed"
+    },
+    {
+      "module": "Agentstration.Api.Flows.Tests",
+      "testCount": 114,
+      "passed": 114,
+      "failed": 0,
+      "durationSeconds": 48.6,
+      "peakWorkingSetMiB": 925.1,
+      "peakPrivateMemoryMiB": 1043.7,
+      "status": "passed"
+    },
+    {
+      "module": "Agentstration.Api.Execution.Tests",
+      "testCount": 83,
+      "passed": 83,
+      "failed": 0,
+      "durationSeconds": 99.5,
+      "peakWorkingSetMiB": 1606,
+      "peakPrivateMemoryMiB": 1561.2,
+      "status": "passed"
+    },
+    {
+      "module": "Agentstration.Api.Resources.Tests",
+      "testCount": 127,
+      "passed": 127,
+      "failed": 0,
+      "durationSeconds": 96.5,
+      "peakWorkingSetMiB": 1347.7,
+      "peakPrivateMemoryMiB": 1291,
+      "status": "passed"
+    },
+    {
+      "module": "Agentstration.Api.DataSources.Tests",
+      "testCount": 87,
+      "passed": 82,
+      "failed": 0,
+      "durationSeconds": 289.1,
+      "peakWorkingSetMiB": 2158.4,
+      "peakPrivateMemoryMiB": 1992.1,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Api.DataSources.Rss.Tests",
+      "testCount": 3,
+      "passed": 3,
+      "failed": 0,
+      "durationSeconds": 37,
+      "peakWorkingSetMiB": 654.8,
+      "peakPrivateMemoryMiB": 726.9,
+      "status": "passed"
+    },
+    {
+      "module": "Agentstration.Api.Artifacts.Tests",
+      "testCount": 39,
+      "passed": 39,
+      "failed": 0,
+      "durationSeconds": 73,
+      "peakWorkingSetMiB": 909.7,
+      "peakPrivateMemoryMiB": 916.7,
+      "status": "passed"
+    },
+    {
+      "module": "Agentstration.Management.Bootstrap.Tests",
+      "testCount": 34,
+      "passed": 34,
+      "failed": 0,
+      "durationSeconds": 30.2,
+      "peakWorkingSetMiB": 643.2,
+      "peakPrivateMemoryMiB": 768.3,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Bootstrap.Startup.Tests",
+      "testCount": 27,
+      "passed": 27,
+      "failed": 0,
+      "durationSeconds": 30.7,
+      "peakWorkingSetMiB": 561.6,
+      "peakPrivateMemoryMiB": 670.9,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Bootstrap.Scenarios.Tests",
+      "testCount": 6,
+      "passed": 6,
+      "failed": 0,
+      "durationSeconds": 25.3,
+      "peakWorkingSetMiB": 524.8,
+      "peakPrivateMemoryMiB": 617.8,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Bootstrap.Progress.Tests",
+      "testCount": 7,
+      "passed": 7,
+      "failed": 0,
+      "durationSeconds": 46.5,
+      "peakWorkingSetMiB": 581.5,
+      "peakPrivateMemoryMiB": 682.7,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Bootstrap.Plans.Tests",
+      "testCount": 6,
+      "passed": 6,
+      "failed": 0,
+      "durationSeconds": 24.3,
+      "peakWorkingSetMiB": 500.3,
+      "peakPrivateMemoryMiB": 580.5,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Security.Tests",
+      "testCount": 67,
+      "passed": 67,
+      "failed": 0,
+      "durationSeconds": 84.3,
+      "peakWorkingSetMiB": 1282,
+      "peakPrivateMemoryMiB": 1413.9,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Aep.Tests",
+      "testCount": 38,
+      "passed": 38,
+      "failed": 0,
+      "durationSeconds": 70,
+      "peakWorkingSetMiB": 961.2,
+      "peakPrivateMemoryMiB": 972.8,
+      "status": "warning"
+    },
+    {
+      "module": "Agentstration.Management.Aep.Automatic.Tests",
+      "testCount": 11,
+      "passed": 11,
+      "failed": 0,
+      "durationSeconds": 20.6,
+      "peakWorkingSetMiB": 463.2,
+      "peakPrivateMemoryMiB": 553.2,
+      "status": "passed"
+    }
+  ],
+  "managementApi": [
+    {
+      "module": "Agentstration.Management.Api.Tests",
+      "testCount": 124,
+      "passed": 124,
+      "failed": 0,
+      "peakWorkingSetMiB": 2167.3,
+      "failureCeilingMiB": 2560
+    },
+    {
+      "module": "Agentstration.Management.Models.Api.Tests",
+      "testCount": 40,
+      "passed": 40,
+      "failed": 0,
+      "peakWorkingSetMiB": 969.8,
+      "failureCeilingMiB": 2560
+    }
+  ],
+  "browser": {
+    "run": 45683330418,
+    "passed": 514,
+    "failed": 0,
+    "retries": 0,
+    "skipped": 0
+  },
+  "fast": {
+    "passed": 3277,
+    "failed": 0,
+    "skipped": 0
+  },
+  "integration": {
+    "passed": 1718,
+    "failed": 0,
+    "skipped": 28
+  },
+  "coverageFailure": {
+    "job": 139457392009,
+    "test": "DiscoveryPromotesExplicitTargetsAndRediscoveryMakesThemStale (Workspace,True)",
+    "assertion": "Assert.IsTrue(targets?.Single().Stale)",
+    "caseDurationSeconds": 6.595,
+    "shardIntegration": {
+      "passed": 702,
+      "failed": 1,
+      "skipped": 15
+    },
+    "interpretation": "The helper could return a nonterminal snapshot after 50 polls, then the test asserted stale immediately. Controlled 80-poll visibility reproduces premature exit. Fix stays test-only and asserts terminal success."
+  },
+  "localNegativeProof": {
+    "baselineHelper": "f2a90aff 50-poll helper plus new delayed-completion fixture",
+    "passed": 5,
+    "failed": 1,
+    "expectedDeferredReads": 80,
+    "actualDeferredReads": 50
+  },
+  "localTargetedAfter": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "localWholeModuleCoverage": {
+    "result": "passed",
+    "total": 127,
+    "passed": 127,
+    "failed": 0,
+    "notExecuted": 0,
+    "durationSeconds": 124.522,
+    "reports": "One TRX and one Cobertura module report; minimum 127 cases; serialized after uninstrumented target checks and formatting."
+  },
+  "correctedTestSourceSha256Lf": "bb0e49c0a1fee6f25536779f5f707bfa86693aca358a4b4ea0ddc881bb8bdd6e"
+}

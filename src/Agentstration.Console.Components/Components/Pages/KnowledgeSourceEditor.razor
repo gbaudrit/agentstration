@@ -24,7 +24,7 @@ else
         HasDraft="HasDraft" Busy="busy" DefinitionReadOnlyReason="@(CanEdit ? null : ResourceReadOnlyReason.InsufficientPermissions)" Yaml="@SavedYaml"
         Enabled="model.Enabled" EnabledChanged="SetEnabled" EnabledDisabled="@(!CanEdit || busy)" TestId="knowledge-source-editor" SectionTestIdPrefix="knowledge-source-editor">
         <Actions><a class="button-secondary" href="@DetailsUrl">@T("Back")</a></Actions>
-        <OverviewConfiguration><CollectionView TItem="KeyValuePair<string,string>" Items="SavedSettings" IdentityLabel="@T("SettingName")" InformationLabels="@(new[] { T("SettingValue") })"><Identity Context="row">@row.Key</Identity><Information Context="row"><CollectionValue Label="@T("SettingValue")"><span class="configuration-value">@row.Value</span></CollectionValue></Information></CollectionView></OverviewConfiguration>
+        <OverviewSummary Context="identity">@if (savedSource is not null) { <KnowledgeSourceResourceSummary Resource="savedSource" Identity="identity" /> }</OverviewSummary>
         <DefinitionContent Context="path">@EditorForm(presentations)</DefinitionContent>
         <DraftActions><button class="text-button" type="button" @onclick="DiscardAsync">@T("DiscardDraft")</button><button class="button-primary" type="submit" form="knowledge-source-definition">@T("Save")</button></DraftActions>
     </ConsoleResourceDetailsTemplate>
@@ -132,7 +132,6 @@ else
     }
     private void ClearPrivate() { loadRevision++; savedSource = null; newerSnapshot = null; model = new(); formContext = null; bindings.Clear(); acquisitionTargets.Clear(); touched = invalidInput = false; baseline = DraftSignature; }
     private string SavedYaml => savedSource is null ? "" : ResourceManifestSerializer.ToYaml(savedSource);
-    private IReadOnlyList<KeyValuePair<string,string>> SavedSettings => savedSource is null ? [] : [new(T("ProjectionFlow"), savedSource.Definition.ProjectionFlow?.Name ?? "—"), new(T("NativeLegacyRetrieval"), savedSource.Definition.RetrievalFlow?.Name ?? "—"), new(T("ProjectionInputs"), savedSource.Definition.DataSources.Count.ToString())];
     private readonly CancellationTokenSource cancellation = new();
     private IReadOnlyList<DataSourceResource> dataSources = [];
     private IReadOnlyList<StorageResource> storages = [];

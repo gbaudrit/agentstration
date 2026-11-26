@@ -9,6 +9,8 @@ public interface IConnectedServiceOperationsClient
     Task<ConnectedServiceOperationContract> GetContractAsync(ConnectedServiceOperationResource operation, CancellationToken token) =>
         throw new NotSupportedException("This client does not support operation contract inspection.");
     Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token);
+    Task<ResourceSnapshot<ConnectedServiceOperationResource>> GetOperationAtAddressAsync(ScopedResourceAddress address, CancellationToken token) =>
+        throw new NotSupportedException("This client does not support exact operation inspection.");
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationResource>> GetForServiceAsync(ConnectedServiceResource service, CancellationToken token);
     Task<IReadOnlyList<ConnectedServiceOperationDiscoveryResource>> GetDiscoveriesAsync(ConnectedServiceResource service, CancellationToken token);
@@ -29,6 +31,19 @@ public sealed class ConnectedServiceOperationsApiClient(HttpClient http) : IConn
 
     public Task<IReadOnlyList<ConnectedServiceOperationTypeResource>> GetTypesAsync(CancellationToken token) =>
         ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationTypeResource>>(http, "api/connected-service-operation-types", token);
+
+    public async Task<ResourceSnapshot<ConnectedServiceOperationResource>> GetOperationAtAddressAsync(ScopedResourceAddress address, CancellationToken token)
+    {
+        if (address.Kind != ConnectedServiceResourceKinds.ConnectedServiceOperation || address.ScopeRef == default)
+            throw new HttpRequestException("The exact operation address is unavailable.", null, System.Net.HttpStatusCode.NotFound);
+        using var response = await http.GetAsync($"api/connected-service-operations/{Uri.EscapeDataString(address.Name)}?scopeRef={Uri.EscapeDataString(address.ScopeRef.Value)}&namespace={Uri.EscapeDataString(address.Namespace.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        var value = await response.Content.ReadFromJsonAsync<ConnectedServiceOperationResource>(token)
+            ?? throw new AgentstrationApiException("The operation snapshot is empty.", Guid.NewGuid().ToString("N"));
+        var etag = response.Headers.ETag?.ToString();
+        if (string.IsNullOrWhiteSpace(etag)) throw new AgentstrationApiException("The operation ETag is missing.", Guid.NewGuid().ToString("N"));
+        return new(value, etag);
+    }
 
     public Task<IReadOnlyList<ConnectedServiceOperationResource>> GetAsync(CancellationToken token) =>
         ApiResponse.ReadAsync<IReadOnlyList<ConnectedServiceOperationResource>>(http, "api/connected-service-operations", token);

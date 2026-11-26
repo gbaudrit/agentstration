@@ -1,6 +1,7 @@
 using Agentstration.Api.Contracts;
 using Agentstration.Models;
 using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Web.Security;
 
 namespace Agentstration.Web.Api.Models;
@@ -23,12 +24,13 @@ internal sealed class GetModelEndpoint : IModelManagementEndpoint
     private static Task<IResult> HandleAsync(
         string modelName,
         string? resourceNamespace,
+        string? scopeRef,
         HttpResponse response,
         ModelDiscoveryService service,
         CancellationToken cancellationToken) =>
         ModelsApiHttp.ExecuteAsync(async () =>
         {
-            var stored = await service.GetAsync(ModelsApiHttp.Namespace(resourceNamespace), modelName, cancellationToken)
+            var stored = await (scopeRef is null ? service.GetAsync(ModelsApiHttp.Namespace(resourceNamespace), modelName, cancellationToken) : service.GetExactAsync(ResourceScopeRef.Parse(scopeRef), ModelsApiHttp.Namespace(resourceNamespace), modelName, cancellationToken))
                 ?? throw new ResourceNotFoundException(new(ModelResourceKinds.Model, modelName, ModelsApiHttp.Namespace(resourceNamespace)));
             return ModelsApiHttp.ResourceResult(stored, response, StatusCodes.Status200OK);
         });

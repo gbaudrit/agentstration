@@ -138,6 +138,16 @@ jobs:
           az bicep install --version v0.44.1
           az bicep build --file deploy/preview/azure/main.bicep --outfile "$RUNNER_TEMP/preview-azure.json"
 
+  access-proxy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Verify credential stripping and WebSocket transport with pinned infrastructure images
+        run: python3 scripts/preview/access_smoke.py
+
   requests:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

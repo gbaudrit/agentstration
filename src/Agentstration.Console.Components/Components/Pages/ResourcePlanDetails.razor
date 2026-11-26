@@ -39,15 +39,7 @@
             <MetricCard Label="@T("Changes")" Value="@(selected?.Value.Changes.Count.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—")" />
             <MetricCard Label="@T("Validation")" Value="@(latestValidation is null ? T("NotValidated") : T($"Readiness.{latestValidation.Readiness}"))" Status="@(latestValidation?.Readiness == ResourceChangeSetReadiness.Ready ? UiStatus.Success : UiStatus.Neutral)" />
         </div>
-        <ResourceIdentitySummary DisplayName="@plan.Value.Title" TechnicalName="@plan.Value.Id.ToString()" Description="@plan.Value.Description" Labels="null" TestId="resource-plan-identity-summary">
-            <AdditionalDetails><dt>@T("Workspace")</dt><dd><code>@plan.Value.Scope.WorkspaceId.Value.ToString("D")</code></dd></AdditionalDetails>
-        </ResourceIdentitySummary>
-        <FormSection Title="@Shared["Configuration"]" Class="resource-configuration-summary" TestId="resource-plan-configuration-summary">
-            <CollectionView TItem="ReviewSetting" Items="SavedSettings" IdentityLabel="@Shared["Configuration"]" InformationLabels="@(new[] { Shared["Saved"].Value })">
-                <Identity Context="setting"><strong class="configuration-key">@setting.Label</strong></Identity>
-                <Information Context="setting"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@setting.Value</span></CollectionValue></Information>
-            </CollectionView>
-        </FormSection>
+        <ResourcePlanResourceSummary Resource="plan.Value" PresentationScopeRef="@PlanPresentationScope" />
     <ol class="resource-plan-review-path" aria-label="@T("ReviewPath")">
         <li class="@(BindingsComplete && !bindingSaveFailed ? "is-done" : null)"><span>1</span><div><strong>@T("StepProfiles")</strong><small>@T("StepProfilesHint")</small></div></li>
         <li class="@(materialization is not null || showRecordedChanges && selected is not null ? "is-done" : null)"><span>2</span><div><strong>@T("StepPreview")</strong><small>@T("StepPreviewHint")</small></div></li>
@@ -254,15 +246,25 @@
     private IReadOnlyList<ResourceNavigationItem> ReviewSections => Views.Select(view => new ResourceNavigationItem(ReviewPath(view), T($"View.{view}"), view switch { "Overview" => "home", "Changes" => "list", "Graph" => "topology-star", "Validation" => "check", "Application" => "player-play", _ => "history" })).ToArray();
     private string BackUrl => ResourceOwnershipContext.PreserveNavigation("/resource-plans", Services);
     [Inject] private IServiceProvider Services { get; set; } = default!;
-    private sealed record ReviewSetting(string Label, string Value);
-    private IReadOnlyList<ReviewSetting> SavedSettings => plan is null ? [] :
-    [new(T("Goal"), plan.Value.Goal), new(T("SchemaVersion"), plan.Value.Content.SchemaVersion), new(T("Updated"), plan.Value.UpdatedAt.ToLocalTime().ToString("g")), new(T("Status"), T($"Status.{plan.Value.Status}"))];
     private static UiStatus PlanTone(ResourcePlanStatus status) => status switch { ResourcePlanStatus.Validated or ResourcePlanStatus.Applied => UiStatus.Success, ResourcePlanStatus.Failed or ResourcePlanStatus.Cancelled => UiStatus.Danger, ResourcePlanStatus.Ready or ResourcePlanStatus.Materialized => UiStatus.Info, _ => UiStatus.Neutral };
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private ReviewSnapshot? newerReview;
     private bool disposed;
     private string loadedKey = string.Empty;
-    private string ContextKey => $"{Id:D}|{ContextState.Current?.UserId:D}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.TenantId:D}|{ContextState.Current?.WorkspaceId:D}";
+    private Task<ResourcePlanSnapshot?> ReadExactPlanAsync()
+    {
+        if (string.IsNullOrWhiteSpace(RequestedOwner)) return Client.GetPlanAsync(Id, lifetime.Token);
+        return ReadOwnedAsync();
+    }
+    private async Task<ResourcePlanSnapshot?> ReadOwnedAsync()
+    {
+        if (!ResourceScopeRef.TryParse(RequestedOwner, out var owner)) return null;
+        return await Client.GetPlanAtAddressAsync(ScopedResourceAddress.Create(owner, ResourceNamespace.Default, "ResourcePlan", Id.ToString("N")), lifetime.Token);
+    }
+    private ResourceScopeRef? PlanPresentationScope => plan is null ? null : ContextState.Current is { } context && context.WorkspaceId == plan.Value.Scope.WorkspaceId.Value
+        ? ResourceScopeRef.Parse(context.SelectedScopeRef) : ResourceScopeRef.Workspace(plan.Value.Scope.WorkspaceId.Value);
+    [SupplyParameterFromQuery(Name = "scopeRef")] public string? RequestedOwner { get; set; }
+    private string ContextKey => $"{Id:D}|{RequestedOwner}|{ContextState.Current?.UserId:D}|{ContextState.Current?.SelectedScopeRef}|{ContextState.Current?.TenantId:D}|{ContextState.Current?.WorkspaceId:D}";
     private bool reviewTouched;
     private bool HasReviewDraft => bindingSaveFailed || bindingSaving || reviewTouched;
     private sealed record ReviewSnapshot(ResourcePlanSnapshot Plan, FunctionalResourcePlanV1? Functional,
@@ -470,7 +472,7 @@
         var previewOnLoad = false;
         try
         {
-            var loadedPlan = await Client.GetPlanAsync(Id, lifetime.Token);
+            var loadedPlan = await ReadExactPlanAsync();
             if (!IsCurrent(version)) return;
             if (loadedPlan is null) { ClearPrivateContent(); loadState = new(ResourceLoadStatus.NotFound); return; }
             EnsurePlanIdentity(loadedPlan.Value);
@@ -536,7 +538,7 @@
     private sealed class ReviewIdentityException : Exception { }
     private void EnsurePlanIdentity(ResourcePlan value)
     {
-        if (value.Id.Value != Id || plan is not null && value.Scope != plan.Value.Scope
+        if (value.Id.Value != Id || !string.IsNullOrWhiteSpace(RequestedOwner) && ResourceScopeRef.Workspace(value.Scope.WorkspaceId.Value).Value != RequestedOwner || plan is not null && value.Scope != plan.Value.Scope
             || ContextState.Current is { SelectedKind: ConsoleContextKind.Workspace } context && (value.Scope.TenantId != context.TenantId || value.Scope.WorkspaceId.Value != context.WorkspaceId))
             throw new ReviewIdentityException();
     }

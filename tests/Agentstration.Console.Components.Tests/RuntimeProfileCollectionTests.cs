@@ -25,7 +25,7 @@ public sealed class RuntimeProfileCollectionTests
         using var context = Context(handler);
         var cut = context.Render<RuntimeProfiles>();
         cut.WaitForAssertion(() => Assert.HasCount(20, cut.FindAll("tbody tr")));
-        Assert.IsEmpty(cut.FindAll(".collection-actions"));
+        Assert.HasCount(20, cut.FindAll(".collection-actions"));
         var originalUrl = cut.Find(".resource-name-link").GetAttribute("href");
         StringAssert.Contains(originalUrl!, "/runtimeprofiles/profile-0?namespace=team");
         await cut.FindAll(".collection-page-number")[2].ClickAsync(new());

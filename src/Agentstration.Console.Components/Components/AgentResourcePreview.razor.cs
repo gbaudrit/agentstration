@@ -21,8 +21,11 @@ public partial class AgentResourcePreview
     private long revision;
     private bool disposed;
     private string SelectionKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{(Address.ScopeRef == default ? string.Empty : Address.ScopeRef.Value)}|{Address.Namespace}|{Address.Kind}|{Address.Name}";
-    private bool CanEdit => resource is not null && resource.Namespace.IsDefault && !resource.Governance.IsManaged
+    private bool CanEdit => resource is not null && !resource.Governance.IsManaged
         && resource.ScopeRef?.Value == Context.Current?.SelectedScopeRef && Context.HasPermission(AuthorizationPermissions.ResourcesWrite);
+
+    protected override void OnInitialized() => Context.Changed += ContextChanged;
+    private void ContextChanged() => _ = InvokeAsync(async () => { if (disposed) return; await LoadAsync(); if (!disposed) StateHasChanged(); });
 
     protected override Task OnParametersSetAsync()
     {
@@ -42,13 +45,13 @@ public partial class AgentResourcePreview
         var token = pending.Token;
         resource = null;
         loadState = new(ResourceLoadStatus.Loading);
-        if (!Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
+        if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
         if (target.Kind != AgentResourceKinds.Agent || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
         try
         {
             var snapshot = await Client.GetAgentAsync(target.Namespace, target.Name, target.ScopeRef, token);
             if (!IsCurrent(requestRevision, key)) return;
-            if (snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Name != target.Name)
+            if (snapshot.Value.Kind != target.Kind || snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Name != target.Name)
             {
                 loadState = new(ResourceLoadStatus.Forbidden);
                 return;
@@ -72,12 +75,13 @@ public partial class AgentResourcePreview
     }
 
     private bool IsCurrent(long requestRevision, string key) => !disposed && revision == requestRevision
-        && key == SelectionKey && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
+        && key == SelectionKey && Context.Error is null && Context.HasPermission(AuthorizationPermissions.ResourcesRead);
 
     public void Dispose()
     {
         if (disposed) return;
         disposed = true;
+        Context.Changed -= ContextChanged;
         revision++;
         pending?.Cancel();
         pending?.Dispose();
