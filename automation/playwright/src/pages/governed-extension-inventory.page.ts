@@ -31,7 +31,10 @@ export class GovernedExtensionInventoryPage {
       const response = await this.page.goto(url, { waitUntil: 'domcontentloaded' });
       expect(response?.ok(), `Governed inventory route ${url}`).toBe(true);
     }
-    await expect(this.page).toHaveURL(url);
+    // The details shell may add its default fragment before navigation settles.
+    await expect(this.page).toHaveURL(actual => actual.origin === target.origin
+      && actual.pathname === target.pathname && actual.search === target.search
+      && (actual.hash === target.hash || !target.hash && actual.hash === '#overview'));
     await expect(this.page.locator('[aria-busy="true"]')).toHaveCount(0);
   }
 
