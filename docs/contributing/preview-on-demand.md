@@ -38,8 +38,9 @@ excluding untagged attestation manifests. Alternatively select its own branch,
 tag, SHA or same-repository PR. This choice is independent of the server revision.
 The selected index digest is frozen before platform-specific config inspection.
 OCI source/version labels must match the component catalogue and version file
-at that exact source SHA, and the platform must be Linux amd64. Only the current
-supported catalogue identities and AWP protocol are accepted. Source files are
+at that exact source SHA, and the platform must be Linux amd64. Core catalogue identities and AWP protocol stay fixed. A new AEP catalogue may
+come from its privately published image’s source before its packaging PR merges;
+its namespace, identity, AEP protocol and contribution remain strictly validated. Source files are
 bounded metadata; their scripts, project files and MSBuild logic are never run.
 
 An absent image produces a publication instruction. A moved SemVer tag with the
@@ -179,12 +180,20 @@ packages point to package visibility and Actions access. Failures before executi
 state that Azure deployment was not started; execution failures recommend status
 and cleanup because partial resources may remain. Provider responses, private
 extension configuration, credentials and unverified URLs are never copied into
-comments. If labels select an extension whose packaging is not yet in `main`,
-merge that catalogue and publish the image before retrying.
+comments. A new AEP extension does not need its catalogue merged into `main`:
+the selector reads bounded catalogue/version data at the published image's exact
+source SHA. Deployment scripts and Compose still come from trusted main.
 
 These workflows use the ephemeral `GITHUB_TOKEN`; no new PAT or Azure/Cloudflare
 secret is required. Repository policy must permit the requested Actions dispatch
-and issue-comment write permissions. Caller secret inheritance remains explicit
+and comment write permissions: `issues: write` for ordinary issues and
+`pull-requests: write` for PR conversations. Admission, announcement and result
+reporting need the corresponding write permission; the reusable deployment caller
+must also grant it because called workflows cannot elevate the caller token.
+Ownership-only checks retain read access. A failed GitHub call identifies its
+fixed stage (comment lookup/publication, permission check, dispatch or metadata
+lookup), while withholding remote responses and comment content.
+Caller secret inheritance remains explicit
 through both reusable workflows; cloud credentials stay in the existing protected
 executor. The main-only provider event boundary remains unchanged. See
 [ADR-0263](../decisions/0263-issue-preview-commands-dispatch-trusted-manual-workflows.md)
@@ -204,10 +213,12 @@ Removing a label and posting `/preview deploy` stops that extension. Labels alon
 do not trigger deployment. No deployment label means server + MAF worker only.
 The `extension:*` backlog labels do not affect the deployed selection.
 
-Only implemented entries in `deploy/images/extensions/*.json` are selectable.
-Foundry is the first entry; OpenAPI, PostgreSQL and Ollama become selectable after
-their separate packaging changes and private GHCR publication. A missing catalogue,
-public/unreadable package or absent tagged image fails before provisioning. Each
+Each selected AEP image must be privately published with an implemented
+`deploy/images/extensions/<id>.json` catalogue at its exact published source SHA.
+The catalogue may belong to an open packaging PR and need not exist in `main` yet.
+For example, OpenAPI can be previewed on its packaging PR before merge. A missing
+source catalogue, public/unreadable package or absent tagged image fails before
+provisioning. Admission freezes well-formed IDs; selection verifies publication. Each
 extension defaults to its own newest tagged published delivery, independently of
 the server PR, and is frozen by digest. There is no implicit local inference.
 The digest announcement is the reviewable selection for that run.
@@ -225,7 +236,14 @@ The script derives deployment labels from the catalogue. A new compatible AEP
 package needs no extra deployment workflow, arbitrary Compose file, or provider
 code. Its catalogue supplies `extensionId`, AEP version and expected contribution;
 its image implements the SDK SharedKeyFile settings and `/var/lib/aep/instance`
-persistence used by the existing packaging enrollment smoke. The common recipe
+persistence used by the existing packaging enrollment smoke. The candidate's
+version path must stay under `src/extensions/<project>/version.txt`; its image
+name is fixed to `extension-<id>`. Source build/project files are never executed
+or copied into the guest transfer. Only canonical public receipt fields become
+frozen catalogue snapshots. Existing main catalogue identities and all persisted
+AEP identities remain protected against substitution or aliasing. See
+[ADR-0267](../decisions/0267-pre-merge-aep-previews-consume-published-catalogue-data.md).
+The common recipe
 provides internal authority/discovery URLs, a unique read-only key and a private
 state volume. It supports Linux amd64 images from `Dockerfile.extension`.
 
@@ -349,8 +367,8 @@ environment. Its target is a contract fixture, not a deployable operator request
 ### Qualify PR commands and feedback after merge
 
 1. Publish a private server image for an open same-repository PR's exact head SHA.
-   If extensions are wanted, first merge their catalogue/packaging and publish
-   their private images; apply the desired `preview:extension:*` labels to the PR.
+   If extensions are wanted, publish their private images with valid source
+   catalogue/version metadata (packaging may remain unmerged); apply the desired `preview:extension:*` labels to the PR.
 2. As a human maintainer, post `/preview deploy` on that PR. Confirm admission is
    not skipped, dispatch runs on `main`, one feedback card advances through checks
    to readiness, and the protected `dev-pr-N.agentstration.cloud` URL works.

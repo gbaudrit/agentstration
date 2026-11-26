@@ -3,6 +3,7 @@ import base64
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -365,6 +366,7 @@ class Azure:
 
 def bundle_images(request, directory):
     """CI exports the exact registry index + attestations. No rebuild or credentials in the bundle."""
+    extensions.trusted(request.get('extensions', {}))
     path = Path(directory) / 'bundle'
     path.mkdir(mode=0o700)
     preview.private_write(path / 'request.json', json.dumps(request) + '\n')
@@ -384,7 +386,12 @@ def bundle_images(request, directory):
             archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
         for identifier in request.get('extensions', {}):
             relative = 'deploy/images/extensions/' + identifier + '.json'
-            archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
+            # Carry canonical receipt data, never build files or scripts from the image source.
+            component = request['extensions'][identifier]['component']
+            raw = json.dumps({'schemaVersion': 1, **component}).encode()
+            info = tarfile.TarInfo('tooling/' + relative)
+            info.size, info.mode = len(raw), 0o600
+            archive.addfile(info, io.BytesIO(raw))
         for file in sorted((preview.ROOT / 'scripts/preview').glob('*.py')):
             if not file.name.startswith('test_'):
                 archive.add(file, arcname='tooling/scripts/preview/' + file.name)

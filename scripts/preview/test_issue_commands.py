@@ -340,6 +340,22 @@ class TrackingAndFeedbackTests(unittest.TestCase):
         with patch.object(manual, 'command', side_effect=run):
             self.assertEqual({'id': 701}, commands.api(PREFIX + '/issues/17/comments', 'POST', {'body': 'line1\n`literal` $(literal)'}))
 
+    def test_api_failure_identifies_the_stage_without_exporting_remote_or_comment_content(self):
+        cases = [('/issues/17/comments', 'POST', 'Preview comment publication', 'pull-requests:write'),
+                 ('/issues/comments/701', 'PATCH', 'Preview comment publication', 'issues:write'),
+                 ('/issues/comments/700', 'GET', 'Command or feedback comment lookup', 'read access'),
+                 ('/collaborators/maintainer/permission', 'GET', 'Requester permission verification', 'read access'),
+                 ('/actions/workflows/preview-issue-deployment.yml/dispatches', 'POST', 'Trusted-main workflow dispatch', 'actions:write'),
+                 ('/pulls/17', 'GET', 'GitHub metadata lookup', 'read access')]
+        for path, method, stage, permission in cases:
+            with self.subTest(path=path), patch.object(manual, 'command', side_effect=manual.Unavailable('PRIVATE PROVIDER RESPONSE')):
+                with self.assertRaises(manual.Unavailable) as failure:
+                    commands.api(PREFIX + path, method, {'body': 'PRIVATE COMMENT CONTENT'} if method != 'GET' else None)
+                message = commands.safe_error(failure.exception)
+                self.assertIn(stage, message)
+                self.assertIn(permission, message)
+                self.assertNotIn('PRIVATE', message)
+
 
 class PullRequestTests(unittest.TestCase):
     run_mode = TrackingAndFeedbackTests.run_mode
