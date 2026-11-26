@@ -188,12 +188,16 @@ public sealed class ToolProviderAdapter(
         ToolProviderResource provider,
         ToolResource tool,
         JsonElement? arguments,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? expectedProviderRouteDigest = null,
+        string? expectedToolSchemaDigest = null,
+        IReadOnlyDictionary<string, string>? expectedProviderToolContracts = null)
     {
         McpClient client;
         string externalId;
         if (provider.Definition.ProviderType == ToolProviderType.Mcp)
         {
+            if (expectedProviderRouteDigest is not null) throw new ToolResolutionException("tool_provider_route_changed", "The pinned provider route is no longer available.");
             client = await ConnectMcpAsync(provider, cancellationToken);
             externalId = tool.Definition.ExternalId
                 ?? throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{tool.Metadata.Name}' has no external Tool identity.");
@@ -205,6 +209,9 @@ public sealed class ToolProviderAdapter(
                 ?? throw new ToolResolutionException("aep_tool_not_found", $"AEP contribution '{tool.Definition.ExternalId}' was not found.");
             var server = descriptor.Mcp?.Servers.FirstOrDefault(value => value.Id == mapping.Mcp.Server)
                 ?? throw new ToolResolutionException("aep_mcp_server_not_found", $"AEP MCP server '{mapping.Mcp.Server}' was not found.");
+            if (expectedProviderRouteDigest is not null
+                && ToolInvocationFingerprint.AepRoute(extension.Registration, descriptor, mapping) != expectedProviderRouteDigest)
+                throw new ToolResolutionException("tool_provider_route_changed", "The pinned provider route has changed.");
             client = await ConnectHttpAsync(
                 AepDescriptorValidator.ResolveMcpEndpoint(extension.Registration.Definition.Endpoint, server),
                 server.Id,
@@ -215,9 +222,19 @@ public sealed class ToolProviderAdapter(
 
         await using (client)
         {
-            var native = (await client.ListToolsAsync(cancellationToken: cancellationToken))
-                .FirstOrDefault(value => value.ProtocolTool.Name == externalId)
+            var nativeTools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+            foreach (var expected in expectedProviderToolContracts ?? new Dictionary<string, string>())
+            {
+                var matches = nativeTools.Where(value => value.ProtocolTool.Name == expected.Key).ToArray();
+                if (matches.Length != 1 || ToolInvocationFingerprint.Schemas(matches[0].ProtocolTool.InputSchema,
+                    matches[0].ProtocolTool.OutputSchema) != expected.Value)
+                    throw new ToolResolutionException("tool_contract_changed", "The pinned provider Tool contracts have changed.");
+            }
+            var native = nativeTools.FirstOrDefault(value => value.ProtocolTool.Name == externalId)
                 ?? throw new ToolResolutionException("mcp_tool_not_found", $"Provider '{provider.Metadata.Name}' no longer exposes tool '{externalId}'.");
+            if (expectedToolSchemaDigest is not null
+                && ToolInvocationFingerprint.Schemas(native.ProtocolTool.InputSchema, native.ProtocolTool.OutputSchema) != expectedToolSchemaDigest)
+                throw new ToolResolutionException("tool_contract_changed", "The pinned Tool contract has changed.");
             var values = arguments is { ValueKind: JsonValueKind.Object }
                 ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal)
                 : new Dictionary<string, object?>();
@@ -492,7 +509,7 @@ public sealed class McpToolInvoker(
             }
             return new ToolInvocationResult(resolved.Protect(result.Output), receipt);
         }
-        return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken)), null);
+        return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken, context.ExpectedProviderRouteDigest, context.ExpectedToolSchemaDigest, context.ExpectedProviderToolContracts)), null);
     }
 
     public async ValueTask<ToolInvocationResult> SimulateDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
@@ -502,7 +519,7 @@ public sealed class McpToolInvoker(
         using var resolved = await ResolveInputsAsync(context, cancellationToken);
         ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
         if (provider.Definition.Mcp?.Internal != true)
-            return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken)), null);
+            return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken, context.ExpectedProviderRouteDigest, context.ExpectedToolSchemaDigest, context.ExpectedProviderToolContracts)), null);
 
         if (context.TenantId is not { } tenantId || context.WorkspaceId is not { } workspaceId || context.PrincipalId is not { } principalId)
             throw new ToolResolutionException("tool_execution_scope_required", "An internal Tool invocation requires trusted Tenant, Workspace, and Principal scope.");

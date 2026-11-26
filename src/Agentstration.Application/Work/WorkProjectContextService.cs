@@ -25,7 +25,8 @@ public sealed class WorkProjectContextService(IWorkProjectRepository projects, I
             var result = await resolver.ResolveAsync(workspaceId, context.PrincipalId, binding, token);
             if (!result.IsSuccess) return Result<IReadOnlyList<WorkProjectResolvedBinding>>.Failure(result.ErrorCode!);
             if (result.Value!.Binding != binding || result.Value.ETag.Length > 256
-                || result.Value.DiscoverDecision.Length > 128 || result.Value.UseDecision.Length > 128)
+                || result.Value.DiscoverDecision.Length > 128 || result.Value.UseDecision.Length > 128
+                || !WorkProjectContextRules.ValidEvidence(binding, result.Value.Contract))
                 return Result<IReadOnlyList<WorkProjectResolvedBinding>>.Failure("work_project_binding_resolution_invalid");
             resolved.Add(result.Value);
         }
@@ -40,7 +41,7 @@ public sealed class WorkProjectContextService(IWorkProjectRepository projects, I
         foreach (var binding in project.Definition.Bindings)
         {
             var result = await resolver.ResolveAsync(workspaceId, context.PrincipalId, binding, token);
-            availability.Add(new(binding, result.IsSuccess, result.IsSuccess ? "resolved" : result.ErrorCode!));
+            availability.Add(new(binding, result.IsSuccess, result.IsSuccess ? "resolved" : result.ErrorCode!) { Contract = result.IsSuccess ? result.Value!.Contract : null });
         }
         return Result<WorkProjectContextView>.Success(new(projectId, project.Version, availability));
     }
@@ -58,6 +59,18 @@ public sealed class WorkProjectContextService(IWorkProjectRepository projects, I
             : WorkPlanDefinition.Digest(new { project.Id, project.Version, Bindings = resolved.Value!, project.Definition.Sharing });
         return Result<WorkProjectContextSnapshot>.Success(new(projectId, project.Version, digest, resolved.Value!, clock.GetUtcNow())
         { Sharing = project.Definition.Sharing });
+    }
+
+    public async Task<Result<WorkProjectResolvedBinding>> RevalidateAsync(WorkspaceId workspaceId,
+        WorkProjectResolvedBinding captured, CancellationToken token)
+    {
+        if (!Owns(workspaceId)) return Result<WorkProjectResolvedBinding>.Failure("work_project_not_found");
+        var current = await resolver.ResolveAsync(workspaceId, context.PrincipalId, captured.Binding, token);
+        if (!current.IsSuccess) return current;
+        if (current.Value!.Binding != captured.Binding || current.Value.ETag != captured.ETag
+            || WorkPlanDefinition.Digest(current.Value.Contract) != WorkPlanDefinition.Digest(captured.Contract))
+            return Result<WorkProjectResolvedBinding>.Failure("work_project_contract_changed");
+        return current;
     }
 
     private bool Owns(WorkspaceId workspaceId) => workspaceId.Value != Guid.Empty && workspaceId == context.WorkspaceId && context.PrincipalId != Guid.Empty;

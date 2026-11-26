@@ -9,7 +9,7 @@ namespace Agentstration.Infrastructure.Work;
 
 public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resources, IResourceAccessPolicyService access,
     DescendantResourceUseAuthorizer ancestry, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
-    Agentstration.Identity.Contracts.IAuthorizationService authorization) : IWorkProjectBindingResolver
+    Agentstration.Identity.Contracts.IAuthorizationService authorization, WorkProjectContractResolver? contracts = null) : IWorkProjectBindingResolver
 {
     public async Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, CancellationToken token)
@@ -20,10 +20,27 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
             return Failure("work_project_binding_denied");
         if (!WorkProjectContextRules.Valid([binding])) return Failure("work_project_bindings_invalid");
         if (!await authorization.HasPermissionAsync(caller, AuthorizationPermissions.RunsRead, token)) return Failure("work_project_binding_denied");
+        var selected = await ResolveReferenceAsync(workspaceId, binding, token);
+        if (!selected.IsSuccess || binding.Contract is null) return selected;
+        if (!await authorization.HasPermissionAsync(caller, AuthorizationPermissions.RunsExecute, token)) return Failure("work_project_binding_denied");
+        if (contracts is null) return Failure("work_project_contract_unavailable");
+        foreach (var reference in new[] { binding.Contract.Provider, binding.Contract.Extension })
+        {
+            var allowed = await ResolveReferenceAsync(workspaceId, binding with { Target = reference, Contract = null }, token);
+            if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
+        }
+        var resolved = await contracts.ResolveAsync(binding, caller,
+            (reference, cancellation) => ResolveReferenceAsync(workspaceId, binding with { Target = reference, Contract = null }, cancellation), token);
+        return resolved.IsSuccess ? Result<WorkProjectResolvedBinding>.Success(selected.Value! with { Contract = resolved.Value }) : Failure(resolved.ErrorCode!);
+    }
+
+    private async Task<Result<WorkProjectResolvedBinding>> ResolveReferenceAsync(WorkspaceId workspaceId,
+        WorkProjectContextBinding binding, CancellationToken token)
+    {
         var target = binding.Target;
         var consumer = ResourceScopeRef.Workspace(workspaceId.Value);
         if (!await ancestry.IsSameOrDescendantAsync(target.Address.ScopeRef, consumer, token)) return Failure("work_project_binding_unavailable");
-        // This reads identity metadata only, after checking the consumer and ownership tree. No configuration or Secret value is resolved.
+        // Only this identity/policy observation enters System mode; configuration and remote calls use the caller's context.
         using var metadata = scopes.PushSystem();
         var identity = await resources.GetIdentityByUidAsync(target.Uid, token);
         if (identity is null || identity.ScopeRef != target.Address.ScopeRef || identity.Namespace != target.Address.Namespace

@@ -349,6 +349,9 @@ public sealed record ToolExecutionContext
     public Guid? ToolProviderUid { get; init; }
     public long? ToolProviderGeneration { get; init; }
     public string? ExternalToolId { get; init; }
+    public string? ExpectedProviderRouteDigest { get; init; }
+    public string? ExpectedToolSchemaDigest { get; init; }
+    public IReadOnlyDictionary<string, string>? ExpectedProviderToolContracts { get; init; }
     public Guid? TenantId { get; init; }
     public WorkspaceId? WorkspaceId { get; init; }
     public Guid? PrincipalId { get; init; }

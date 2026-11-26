@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="../../atc/src/Agentstration.Atc.Aep/Agentstration.Atc.Aep.csproj" />
+    <ProjectReference Include="../../afc/src/Agentstration.Afc.Aep/Agentstration.Afc.Aep.csproj" />
     <ProjectReference Include="../Agentstration.Coding/Agentstration.Coding.csproj" />
     <ProjectReference Include="../Agentstration.Functions/Agentstration.Functions.csproj" />
     <ProjectReference Include="../Agentstration.Functions.Builtins/Agentstration.Functions.Builtins.csproj" />

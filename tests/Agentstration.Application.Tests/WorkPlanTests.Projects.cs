@@ -136,7 +136,8 @@ public sealed partial class WorkPlanTests
         var resource = ResourceManifestSerializer.FromYaml<BootstrapResourceDocument>(await File.ReadAllTextAsync(Path.Combine(root.FullName,
             "deploy", "bootstrap", "profiles", "workspace-project", "project.yaml")));
         var operation = new BootstrapResourceOperationContext("workspace-project", root.FullName, BootstrapProfileScope.Workspace,
-            new(fixture.Principal, fixture.Workspace.Value)) { ActorPrincipalId = fixture.Principal };
+            new(fixture.Principal, fixture.Workspace.Value))
+        { ActorPrincipalId = fixture.Principal };
         Assert.AreEqual(BootstrapResourceDisposition.Create, (await handler.PlanAsync(resource, operation, new(), default)).Disposition);
         Assert.AreEqual(BootstrapResourceApplyResult.Created, await handler.ApplyAsync(resource, operation, default));
         var created = ProjectSuccess(await service.FindAsync(fixture.Workspace, default, "operations", default));
@@ -184,10 +185,11 @@ public sealed partial class WorkPlanTests
     {
         public string? Failure { get; set; }
         public long? RequiredGeneration { get; set; }
+        public Func<WorkProjectContextBinding, WorkProjectContractEvidence?>? Evidence { get; set; }
         public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspace, Guid owner, WorkProjectContextBinding binding, CancellationToken token)
         {
             var failure = Failure ?? (RequiredGeneration is { } generation && binding.Target.Generation != generation ? "work_project_binding_stale" : null);
-            return Task.FromResult(failure is null ? Result<WorkProjectResolvedBinding>.Success(new(binding, "\"binding-" + binding.Target.Generation + "\"", "same_scope", "same_scope"))
+            return Task.FromResult(failure is null ? Result<WorkProjectResolvedBinding>.Success(new(binding, "\"binding-" + binding.Target.Generation + "\"", "same_scope", "same_scope") { Contract = Evidence?.Invoke(binding) })
                 : Result<WorkProjectResolvedBinding>.Failure(failure));
         }
     }

@@ -92,11 +92,11 @@ Create/update definitions can include `bindings`. Every reference is explicit an
 }
 ```
 
-Purpose values are `Context = 0`, `Sharing = 1`, `Repository = 2`. Up to 32 unique names are supported. Sharing has at most one binding and selects a ToolProvider; Repository has at most one and selects a ToolProvider or ConnectedService. Context may also select an immutable SourceVersion. Supply the exact UID/generation and `version` when the resource identity has one. No credentials, arbitrary provider options or Secret targets are accepted. Ordinary Bootstrap Project manifests accept the same bindings, with camel-case purpose names such as `sharing` in YAML.
+Identity-only purposes include `Context = 0`, `Sharing = 1`, `Repository = 2`, `TaskOperations = 3` and `CodePublication = 4`; explicit contract selections use `Tracking = 5` and `Forge = 6` as described below. Up to 32 unique names are supported. Sharing has at most one binding and selects a ToolProvider; Repository has at most one and selects a ToolProvider or ConnectedService. Context may also select an immutable SourceVersion. Supply the exact UID/generation and `version` when the resource identity has one. No credentials, arbitrary provider options or Secret targets are accepted. Ordinary Bootstrap Project manifests accept the same bindings, with camel-case purpose names such as `sharing` in YAML.
 
 Create/update validates the selected ownership tree, current resource identity, Discover permission and Use permission. Missing or undiscoverable references return `work_project_binding_unavailable` (`404`); denied Use is `403`, and an accessible stale identity is `409`. Invalid reference shape/purpose is `400`. Removing or explicitly replacing a broken binding remains possible through the usual version-checked edit; no template or automatic retargeting updates it.
 
-`GET .../projects/{projectId}/context` returns the current Project version and per-binding `available`/`code` diagnostics. A resolved reference has code `resolved`. Availability describes current identity/access metadata, not remote connectivity, health or supported operations. Actual consumers retain their normal capability, health and authorization checks. Resource bodies and protected values are never included.
+`GET .../projects/{projectId}/context` returns the current Project version and per-binding `available`/`code` diagnostics. A resolved reference has code `resolved`. For ordinary bindings, availability describes current identity/access metadata, not remote connectivity, health or supported operations. Explicit Tracking/Forge bindings additionally negotiate their declared contract as described below. Actual consumers retain their normal capability, health and authorization checks. Resource bodies and protected values are never included.
 
 ## Capture context for execution
 
@@ -107,3 +107,58 @@ Every admitted attempt exposes `projectContext`: Project ID, version, digest, ca
 Changing Project v1 to v2 does not alter an existing attempt. Later admissions and explicit retries capture v2. Submission recovery and server restart keep the admitted v1 evidence. Revoking access changes current diagnostics and blocks new admission; earlier evidence remains available. A resource consumer must reauthorize its captured reference and fail explicitly if it is no longer usable, without selecting a replacement. References are not automatically interpolated into Flow input or prompts.
 
 Old Projects with no bindings and standalone plans with no Project remain valid and replay their existing commands. These optional JSON fields require no new SQLite or PostgreSQL migration.
+
+## Explicit tracking and forge connections
+
+`Tracking = 5` and `Forge = 6` select independent logical authorities through the ATC
+and AFC contracts. They can coexist with different providers; a tracking target does
+not require a repository. `TaskOperations = 3` and `CodePublication = 4` retain their
+current native consumer semantics until their owning adoption increments.
+
+For either new purpose, `target` is the exact materialized Describe Tool reference.
+A required `contract` object supplies:
+
+- `provider` and `extension`: exact scoped resource references (address, UID and
+  generation), of kinds `ToolProvider` and `ExtensionRegistration` respectively;
+- `version`: the precise contract revision, currently `1.0`, independently of package,
+  AEP and MCP protocol versions;
+- `providerId`, `targetId`, `bindingId`, `revision`: the configured logical authority
+  and target tuple advertised by the remote contract, not a vendor name or URL;
+- `requiredOperations`: a nonempty unique bounded list of functional operations,
+  such as `["list", "read"]` for tracking or `["resolve", "read"]` for forge.
+
+Do not put credentials, raw MCP names or schemas in this selection. The AEP
+contributions carry `agentstration.tracking.contracts.mcp.v1` or
+`agentstration.forge.contracts.mcp.v1` metadata and exact MCP mappings. The first
+product adapter supports AEP-backed ToolProviders. It does not infer a contract
+from a raw GitHub/GitLab MCP endpoint or from repository access.
+
+Resolution requires run-read and run-execute permissions and current Discover/Use
+access to the selected resources and all mapped Tools. All mapped Tools must be
+enabled and available; a Describe Tool requiring human approval fails explicitly.
+The existing protected AEP connection handles credentials in the caller's context.
+A fresh descriptor, canonical declaration/schemas and target-specific Describe
+reply must match the selection. All live native MCP Tool schemas and an opaque
+registration/manifest/mapping fingerprint are rechecked immediately before invocation.
+The only remote functional operation issued by this increment is Describe.
+
+Successful context availability includes `contract` evidence: implementation identity
+and version, provider/extension references, operation names, contribution references
+and mapping/capability digests. Schemas, native MCP names, headers and credentials are
+not copied into Work. The same evidence becomes part of each admitted attempt's
+immutable `projectContext`, persists across restart and contributes to its digest.
+
+`WorkProjectContextService.RevalidateAsync` authorizes the retained binding again and
+rejects changed resource, mapping, implementation or capability evidence. It never
+replaces a retained route with the current Project selection. Future admissions use
+their explicit current selections; active attempts keep their original snapshots.
+
+Missing/incompatible declarations and unsupported required operations fail with
+bounded `work_project_contract_*` diagnostics (`400`). Resource authorization retains
+`403`/`404`, stale resources or changed captured routes return `409`, and timeout or
+remote unavailability returns `503` on authoring. Availability queries retain their
+per-binding diagnostic shape and omit contract evidence on failure.
+
+This increment negotiates connections. #955 and #958 own task/forge operation adoption;
+#1346/#1349 own their coordination/delivery consumers. See
+[ADR-0289](../decisions/0289-project-connections-pin-tracking-and-forge-contract-evidence.md).

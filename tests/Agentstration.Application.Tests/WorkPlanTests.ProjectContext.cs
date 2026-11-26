@@ -9,19 +9,23 @@ namespace Agentstration.Application.Tests;
 public sealed partial class WorkPlanTests
 {
     [TestMethod]
-    public async Task ActiveAttemptsKeepProjectV1WhileNewAdmissionsCaptureV2AndRevocationDoesNotRewriteEvidence()
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ActiveAttemptsKeepProjectV1WhileNewAdmissionsCaptureV2AndRevocationDoesNotRewriteEvidence(bool contracts)
     {
         await using var fixture = await Fixture.CreateAsync();
         var tree = await fixture.CreateTreeAsync(); var plan = await ActiveAsync(fixture, tree);
-        var bindings = new ProjectBindings(); var projects = ProjectService(fixture, bindings: bindings); await projects.InitializeAsync(default);
+        var bindings = new ProjectBindings { Evidence = ContractEvidence }; var projects = ProjectService(fixture, bindings: bindings); await projects.InitializeAsync(default);
+        var initialBinding = contracts ? ContractBinding(fixture) : Binding(fixture);
         var project = ProjectSuccess(await projects.CreateAsync(fixture.Workspace, WorkProjectId.New(), "coding", default,
-            new(Guid.NewGuid(), 0, new("Coding", null, [plan.Plan.Id], []) { Bindings = [Binding(fixture)] }), default));
+            new(Guid.NewGuid(), 0, new("Coding", null, [plan.Plan.Id], []) { Bindings = [initialBinding] }), default));
         var harness = new ExecutionHarness(fixture) { Bindings = bindings }; await harness.InitializeAsync();
         plan = Success(await harness.Service().StartAsync(fixture.Workspace, plan.Plan.Id, Start(plan, tree) with { ProjectId = project.Id }, default));
         plan = Success(await harness.AdvanceAsync(plan));
         var first = plan.Plan.Attempts.Single(); var original = JsonSerializer.Serialize(first.ProjectContext);
         Assert.AreEqual(1, first.ProjectContext!.ProjectVersion);
         Assert.AreEqual(1, first.ProjectContext.Bindings.Single().Binding.Target.Generation);
+        if (contracts) Assert.IsNotNull(first.ProjectContext.Bindings.Single().Contract);
         var work = (await fixture.Tasks.GetAsync(fixture.Workspace, fixture.Principal, first.WorkItemId, default))!.Value;
         Assert.AreEqual(first.ProjectContext.Digest, work.Metadata["workProject.contextDigest"]);
         bindings.RequiredGeneration = 2;
@@ -43,6 +47,11 @@ public sealed partial class WorkPlanTests
         Assert.AreEqual(2, second.ProjectContext!.ProjectVersion);
         Assert.AreEqual(2, second.ProjectContext.Bindings.Single().Binding.Target.Generation);
         Assert.AreNotEqual(first.ProjectContext.Digest, second.ProjectContext.Digest);
+        if (contracts)
+        {
+            Assert.AreNotEqual(first.ProjectContext.Bindings.Single().Contract!.MappingDigest, second.ProjectContext.Bindings.Single().Contract!.MappingDigest);
+            Assert.AreEqual("work_project_binding_stale", (await ProjectContexts(fixture, bindings).RevalidateAsync(fixture.Workspace, first.ProjectContext.Bindings.Single(), default)).ErrorCode);
+        }
         bindings.Failure = "work_project_binding_denied";
         var available = (await ProjectContexts(fixture, bindings).GetAvailabilityAsync(fixture.Workspace, project.Id, default)).Value!;
         Assert.IsFalse(available.Bindings.Single().Available);
@@ -161,6 +170,26 @@ public sealed partial class WorkPlanTests
         var replay = ProjectSuccess(await ProjectService(fixture).CreateAsync(fixture.Workspace, id, "operations", default,
             new(commandId, 0, new("Operations", null, [], [])), default));
         Assert.AreEqual(1, replay.Version); Assert.HasCount(0, replay.Definition.Bindings);
+    }
+
+    private static WorkProjectContextBinding ContractBinding(Fixture fixture)
+    {
+        var scope = ResourceScopeRef.Workspace(fixture.Workspace.Value);
+        return new("tracking", WorkProjectBindingPurpose.Tracking,
+            new(new(scope, default, "Tool", "tracking-describe"), Guid.NewGuid(), 1))
+        {
+            Contract = new(new(new(scope, default, "ToolProvider", "tracker"), Guid.NewGuid(), 1),
+                new(new(scope, default, "ExtensionRegistration", "tracker"), Guid.NewGuid(), 1),
+                "1.0", "tracker-authority", "no-repository", "binding", "revision-1", ["list"])
+        };
+    }
+
+    private static WorkProjectContractEvidence? ContractEvidence(WorkProjectContextBinding binding)
+    {
+        if (binding.Contract is not { } selection) return null;
+        WorkProjectContributionPin[] pins = [new(binding.Target, WorkPlanDefinition.Digest(binding.Target))];
+        return new(selection.Version, "tracker-fixture", "1.0.0", selection.Provider, selection.Extension,
+            WorkPlanDefinition.Digest(pins), new string('a', 64), ["list"], pins);
     }
 
     private static WorkProjectContextBinding Binding(Fixture fixture) => new("sharing", WorkProjectBindingPurpose.Sharing,

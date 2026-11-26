@@ -1,5 +1,10 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
   <ItemGroup>
+    <ProjectReference Include="../../atc/samples/LocalTracking/LocalTracking.csproj" Aliases="atcSample" />
+    <ProjectReference Include="../../afc/samples/LocalForge/LocalForge.csproj" Aliases="afcSample" />
+    <ProjectReference Include="../../atc/src/Agentstration.Atc.Server/Agentstration.Atc.Server.csproj" />
+    <ProjectReference Include="../../afc/src/Agentstration.Afc.Server/Agentstration.Afc.Server.csproj" />
+    <Compile Include="../fixtures/Work/ProjectContractFixture.cs" Link="Fixtures/ProjectContractFixture.cs" />
     <Compile Include="../fixtures/Git/AuthenticatedGitFixture.cs" Link="Fixtures/AuthenticatedGitFixture.cs" />
     <ProjectReference Include="../../src/Agentstration.Runtime.Worker.Coding/Agentstration.Runtime.Worker.Coding.csproj" Aliases="codingworker" />
     <ProjectReference Include="../fixtures/NativeCodingCli/NativeCodingCli.csproj" ReferenceOutputAssembly="false" />

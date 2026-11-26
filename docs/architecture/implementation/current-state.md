@@ -680,6 +680,20 @@ local destination. A terminal failure retains correction/restart guidance. This
 increment does not add a durable startup journal or change readiness's worker
 barrier. See [ADR-0244](../../decisions/0244-authenticated-startup-progress-and-admission.md).
 
+## Project tracking and forge connections
+
+Explicit Tracking and Forge selections negotiate independent ATC/AFC contracts through
+AEP-backed Describe Tools and the governed Tool pipeline. Resource identities and grants,
+canonical declarations, effective operations and logical targets are checked before
+capture. The MCP adapter rechecks opaque registration/manifest/route fingerprints and
+all native Tool schemas before invocation. Work retains neutral contribution references
+and digests in the existing immutable per-attempt Project context; consumers reauthorize
+captured evidence without retargeting it. The offline fixtures cover separate authorities,
+tracking without a repository, SQLite restart and negative mapping/schema cases.
+Task/provider and delivery adoption retain their owning increments. See
+[Projects](../../reference/projects.md#explicit-tracking-and-forge-connections) and
+[ADR-0289](../../decisions/0289-project-connections-pin-tracking-and-forge-contract-evidence.md).
+
 ## Coding repository boundary
 
 Coding resolves private Project/task repository selections and native pull requests

@@ -381,3 +381,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 287. [ADR-0287 — Epics organize plans without execution authority](0287-epics-organize-plans-without-execution-authority.md)
 
 288. [ADR-0288 — Forge operations are an independent contract over MCP](0288-forge-operations-are-an-independent-contract-over-mcp.md)
+
+289. [ADR-0289 — Project connections pin tracking and forge contract evidence](0289-project-connections-pin-tracking-and-forge-contract-evidence.md)

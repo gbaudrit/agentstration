@@ -59,12 +59,37 @@ public sealed class WorkProjectApiTests
         Assert.AreEqual(HttpStatusCode.BadRequest, invalidPage.StatusCode);
         using var unavailable = await client.PostAsJsonAsync("/api/workspaces/default/projects", create with
         {
-            Id = Guid.NewGuid(), Name = "missing-binding", Definition = create.Definition! with
+            Id = Guid.NewGuid(),
+            Name = "missing-binding",
+            Definition = create.Definition! with
             {
                 Bindings = [new("sharing", WorkProjectBindingPurpose.Sharing, new(new(
                     Agentstration.Resources.ResourceScopeRef.Workspace(project.WorkspaceId), default, "ToolProvider", "missing-provider"), Guid.NewGuid(), 1))]
             }
         });
         Assert.AreEqual(HttpStatusCode.NotFound, unavailable.StatusCode, await unavailable.Content.ReadAsStringAsync());
+        var selectedScope = Agentstration.Resources.ResourceScopeRef.Workspace(project.WorkspaceId);
+        var tracking = new WorkProjectContextBinding("tracking", WorkProjectBindingPurpose.Tracking,
+            new(new(selectedScope, default, "Tool", "missing-describe"), Guid.NewGuid(), 1));
+        using var missingSelection = await client.PostAsJsonAsync("/api/workspaces/default/projects", create with
+        {
+            Id = Guid.NewGuid(),
+            Name = "missing-selection",
+            Definition = create.Definition! with { Bindings = [tracking] }
+        });
+        Assert.AreEqual(HttpStatusCode.BadRequest, missingSelection.StatusCode);
+        tracking = tracking with
+        {
+            Contract = new(new(new(selectedScope, default, "ToolProvider", "tracker"), Guid.NewGuid(), 1),
+            new(new(selectedScope, default, "ExtensionRegistration", "tracker"), Guid.NewGuid(), 1),
+            "1.0", "tracker-authority", "standalone-tracker", "binding", "revision-1", ["list"])
+        };
+        using var missingTarget = await client.PostAsJsonAsync("/api/workspaces/default/projects", create with
+        {
+            Id = Guid.NewGuid(),
+            Name = "missing-contract-target",
+            Definition = create.Definition! with { Bindings = [tracking] }
+        });
+        Assert.AreEqual(HttpStatusCode.NotFound, missingTarget.StatusCode, await missingTarget.Content.ReadAsStringAsync());
     }
 }

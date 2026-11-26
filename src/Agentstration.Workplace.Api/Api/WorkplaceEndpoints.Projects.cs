@@ -1,7 +1,7 @@
-using static Agentstration.Work.Contracts.WorkProjectContractMapping;
 using Agentstration.Application.Work;
 using Agentstration.Work;
 using Agentstration.Work.Contracts;
+using static Agentstration.Work.Contracts.WorkProjectContractMapping;
 
 namespace Agentstration.Web;
 
@@ -46,7 +46,8 @@ public static partial class WorkplaceEndpoints
     {
         "work_project_not_found" or "work_project_work_not_found" => StatusCodes.Status404NotFound,
         "work_project_conflict" or "work_project_command_conflict" or "work_project_work_changed" or "work_project_history_limit" or "work_project_binding_stale"
-            or "work_project_context_changed" or "work_project_plan_not_associated" => StatusCodes.Status409Conflict,
+            or "work_project_context_changed" or "work_project_plan_not_associated" or "work_project_contract_changed" => StatusCodes.Status409Conflict,
+        "work_project_contract_timeout" or "work_project_contract_unavailable" => StatusCodes.Status503ServiceUnavailable,
         "work_project_binding_unavailable" => StatusCodes.Status404NotFound,
         "work_project_binding_denied" => StatusCodes.Status403Forbidden,
         _ => StatusCodes.Status400BadRequest
