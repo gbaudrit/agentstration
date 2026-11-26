@@ -14,6 +14,7 @@ import contract
 import extensions
 import lifecycle
 import preview
+import preview_smoke
 
 
 def run(server_path, worker_path, extension_path, output):
@@ -83,6 +84,13 @@ def run(server_path, worker_path, extension_path, output):
                 'enrolledBeforeManualBootstrap': True, 'anonymousAndWrongKeyRejected': True,
                 'recreationAndReactivationPreserveIdentity': True, 'deselectionRetainsState': True,
                 'expiryPreserved': True, 'fullResetRemovedResources': True}, indent=2) + '\n')
+        except Exception:
+            directory = root / 'state' / environment
+            if (directory / 'deployment.json').exists():
+                keys = [path.read_text() for path in directory.glob('*.key')]
+                diagnostic = preview_smoke.failure_diagnostics(directory, keys)
+                preview.private_write(output, json.dumps({'passed': False, 'diagnostics': diagnostic}, indent=2) + '\n')
+            raise
         finally:
             lifecycle.execute('destroy', {**azure_host.local_request(active), 'dataMode': 'reset'}, root / 'state')
 

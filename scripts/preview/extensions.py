@@ -8,6 +8,7 @@ import re
 import secrets
 import subprocess
 import time
+import urllib.error
 import urllib.request
 import uuid
 
@@ -83,6 +84,8 @@ def prepare(directory, state, configuration, receipts):
         identity = preview.delivery_entry(receipt)['extensionId']
         preview.require(identifier not in known or known[identifier] == identity, 'An extension catalogue ID cannot change its persisted AEP identity.')
         if identifier not in known:
+            preview.require(not (directory / ('extension-' + identifier + '.key')).exists(),
+                            'An unrecorded extension key exists; restore matching host state before retrying.')
             preview.private_write(directory / ('extension-' + identifier + '.key'), secrets.token_urlsafe(48))
             known[identifier] = identity
         managed[identity] = {'EnrollmentMode': 'SharedKeyFile', 'SharedKeyFile': {'Path': '/run/secrets/aep-' + identifier}}
@@ -105,7 +108,8 @@ def overlay(directory, state):
         volumes[name] = {'labels': labels}
         services[name] = {'image': image['reference'], 'restart': 'unless-stopped',
             'labels': {**labels, 'io.agentstration.preview.source': image['sourceSha']},
-            'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'], 'tmpfs': ['/tmp'],
+            # Bind-mounted 0600 keys may belong to the host operator UID. Retain only DAC override.
+            'read_only': True, 'cap_drop': ['ALL'], 'cap_add': ['DAC_OVERRIDE'], 'security_opt': ['no-new-privileges:true'], 'tmpfs': ['/tmp'],
             'ports': ['127.0.0.1::8080'],
             'environment': {'ASPNETCORE_ENVIRONMENT': 'Preview', 'Aep__EnrollmentMode': 'SharedKeyFile',
                 'Aep__SharedKeyFile__Path': '/run/secrets/aep-key',
@@ -137,6 +141,27 @@ def request(url, body=None, headers=None):
         return json.loads(raw)
 
 
+def confirm_enrollment(authority, announcement, key, timeout=60):
+    deadline = time.monotonic() + timeout
+    while True:
+        timestamp = int(time.time())
+        signed = json.dumps({'timestamp': timestamp, 'announcement': announcement}, separators=(',', ':')).encode()
+        signature = base64.b64encode(hmac.digest(key.encode(), signed, hashlib.sha256)).decode()
+        try:
+            result = request(authority + '/api/aep/enrollments/announce', announcement,
+                             {'X-AEP-Enrollment-Timestamp': str(timestamp), 'X-AEP-Enrollment-Signature': signature})
+            preview.require(result['requestId'] == announcement['instanceId'], 'Authority returned another enrollment identity.')
+            if result['state'].lower() == 'available':
+                return
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 503):
+                raise
+        except (urllib.error.URLError, TimeoutError):
+            pass
+        preview.require(time.monotonic() < deadline, 'Authority did not confirm available extension enrollment before the deadline.')
+        time.sleep(1)
+
+
 def verify(directory, state):
     verified = []
     for name, image in state['images'].items():
@@ -156,13 +181,7 @@ def verify(directory, state):
             instance = str(uuid.UUID(preview.compose(directory, 'exec', '-T', name, 'cat', '/var/lib/aep/instance', capture=True).strip()))
             announcement = {'instanceId': instance, 'extension': {field: identity.get(field) for field in ('id', 'name', 'version', 'description')},
                             'endpoint': 'http://' + name + ':8080', 'pairingUri': None, 'method': 'sharedKeyFile'}
-            timestamp = int(time.time())
-            signed = json.dumps({'timestamp': timestamp, 'announcement': announcement}, separators=(',', ':')).encode()
-            signature = base64.b64encode(hmac.digest(key.encode(), signed, hashlib.sha256)).decode()
-            result = request(preview.server_address(directory) + '/api/aep/enrollments/announce', announcement,
-                             {'X-AEP-Enrollment-Timestamp': str(timestamp), 'X-AEP-Enrollment-Signature': signature})
-            preview.require(result['requestId'] == instance and result['state'].lower() == 'available',
-                            'Authority has not confirmed available extension enrollment.')
+            confirm_enrollment(preview.server_address(directory), announcement, key)
         except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             # No response body, key, URL, or subprocess output in CI/ARM logs.
             raise ValueError('Authenticated AEP enrollment verification failed for ' + identifier + '.') from None

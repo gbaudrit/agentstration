@@ -142,6 +142,28 @@ class ExtensionContractTests(unittest.TestCase):
             key.unlink()
             with self.assertRaisesRegex(ValueError, 'original extension'): preview.prepare(directory, *args, extension_deliveries={'foundry': receipt()})
 
+    def test_multiple_catalogue_entries_have_separate_keys_state_and_trust(self):
+        first = contract.delivery(receipt())
+        second = copy.deepcopy(first)
+        second['component'].update(id='another', imageName='extension-another', extensionId='Example.Another',
+                                   contributionKind='tools', contributionId='another-tool')
+        entries = {'foundry': first['component'], 'another': second['component']}
+        with tempfile.TemporaryDirectory() as temporary, patch.object(extensions, 'entry', side_effect=lambda identifier: entries[identifier]):
+            directory = Path(temporary) / 'example'
+            state = preview.prepare(directory, *receipts(), 'example', extension_deliveries={'another': second, 'foundry': first})
+            keys = [(directory / ('extension-' + identifier + '.key')).read_bytes() for identifier in entries]
+            self.assertNotEqual(*keys)
+            overlay = extensions.overlay(directory, state)
+            for identifier in entries:
+                service = overlay['services'][extensions.service(identifier)]
+                self.assertEqual([{'source': 'aep-' + identifier, 'target': '/run/secrets/aep-key'}], service['secrets'])
+                self.assertEqual([extensions.service(identifier) + ':/var/lib/aep'], service['volumes'])
+            self.assertEqual(2, len(overlay['services']['server']['secrets']))
+            preview.prepare(directory, *receipts(), 'example', extension_deliveries={'another': second})
+            config = preview.read_json(directory / 'server-configuration.json')['Agentstration']
+            self.assertEqual({'Example.Another'}, set(config['Extensions']))
+            self.assertEqual(['extension-another'], config['Aep']['Transport']['AllowedHttpHosts'])
+
     def test_authenticated_manifest_and_signed_available_enrollment_are_required(self):
         value = selected()
         image = contract.images(value)['extension-foundry']
@@ -164,7 +186,7 @@ class ExtensionContractTests(unittest.TestCase):
                 payload = json.dumps({'timestamp': int(post[2]['X-AEP-Enrollment-Timestamp']), 'announcement': post[1]}, separators=(',', ':')).encode()
                 self.assertEqual(base64.b64encode(extensions.hmac.digest(key.encode(), payload, 'sha256')).decode(), post[2]['X-AEP-Enrollment-Signature'])
                 self.assertEqual('http://extension-foundry:8080', post[1]['endpoint'])
-                for response in ({'requestId': instance, 'state': 'announced'}, {'requestId': 'other', 'state': 'available'}):
+                for response in ({'requestId': 'other', 'state': 'available'},):
                     call.side_effect = [manifest, response]
                     with self.assertRaisesRegex(ValueError, 'Authenticated AEP'): extensions.verify(directory, {'images': {'extension-foundry': image}})
 
@@ -230,3 +252,18 @@ class ExtensionTransferTests(unittest.TestCase):
 
     def test_authentication_headers_are_not_forwarded_on_redirects(self):
         self.assertIsNone(extensions.NoRedirect().redirect_request(None, None, 302, '', {}, 'https://other.example/'))
+
+
+class EnrollmentDeadlineTests(unittest.TestCase):
+    def test_pending_enrollment_is_retried_but_deadline_is_bounded(self):
+        announcement = {'instanceId': 'public-disposable-instance'}
+        with patch.object(extensions, 'request') as request, patch.object(extensions.time, 'sleep') as sleep:
+            request.side_effect = [{'requestId': announcement['instanceId'], 'state': 'pending'},
+                                   {'requestId': announcement['instanceId'], 'state': 'available'}]
+            extensions.confirm_enrollment('http://127.0.0.1:5080', announcement, 'public-disposable-key')
+            self.assertEqual(2, request.call_count)
+            sleep.assert_called_once_with(1)
+            request.side_effect = None
+            request.return_value = {'requestId': announcement['instanceId'], 'state': 'pending'}
+            with self.assertRaisesRegex(ValueError, 'deadline'):
+                extensions.confirm_enrollment('http://127.0.0.1:5080', announcement, 'public-disposable-key', timeout=0)
