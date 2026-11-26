@@ -94,7 +94,7 @@ jobs:
             docker push "$image"
           }
 
-          for component in openapi postgresql ollama; do
+          for component in openapi postgresql ollama llama-cpp opendal git utilities crawl4ai localai; do
             package="agentstration-extension-$component"
 
             if metadata "$package"; then
