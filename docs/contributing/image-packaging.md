@@ -379,7 +379,9 @@ contribution/provider versions `1.0.0`, ASC identity/revision or MCP exposure.
 Mount writable local data at `/data`, configure `OpenDal__RootDirectory=/data`
 and explicit `OpenDal__AllowedClients__0` entries matching enrolled client IDs.
 The process UID must own this data; authentication keys are separate read-only
-mounts. S3/Azure credentials remain external secured bindings. The image smoke
+mounts. S3/Azure credentials remain external secured bindings. The generic health smoke runs with the invoking UID/GID, as does the enrollment
+Compose fixture: this keeps the host-owned mode-0600 key readable without changing
+its permissions or requiring a root process. The image smoke
 reuses `samples/OpenDalSmoke` to verify native assets/licenses, real ASC/MCP
 write/list/read and persisted content after restart against disposable local
 storage. Synthetic loopback S3/Azure peers stay deterministic; no real cloud
