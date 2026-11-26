@@ -3,7 +3,7 @@
 FR #1046 consumes the [Storage API](storages.md) delivered by #1045. Both the
 standalone Web host and independent Console host register `IStoragesClient`.
 Console assemblies reference `Storage.Contracts`, never Storage services,
-persistence implementations or ASP/AEP adapters.
+persistence implementations or ASC/AEP adapters.
 
 ## Routes and context
 
@@ -128,7 +128,7 @@ localization and host-composition coverage. It does not add another backend.
 The builtin `local@1.0.0` provides bounded local content operations without a
 Connected Service. Descendant use
 requires an explicit generic Use grant; synchronization and restart preserve
-grants and revocations. #1040 supplies ASP/AEP and Artifact adapters and guarded
+grants and revocations. #1040 supplies ASC/AEP and Artifact adapters and guarded
 default provisioning. This UI does not fabricate defaults or advertise operations
 which the selected version does not support. Component fixtures cover an
 extension-provided type and typed standard/protected exports independently of a

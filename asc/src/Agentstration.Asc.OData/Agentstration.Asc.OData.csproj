@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Bounded OData query profile for ASC structured documents.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.OData.Core" />
+  </ItemGroup>
+</Project>

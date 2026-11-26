@@ -148,6 +148,48 @@ jobs:
       - name: Verify credential stripping and WebSocket transport with pinned infrastructure images
         run: python3 scripts/preview/access_smoke.py
 
+  extensions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      AEP_EXTENSION: foundry
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Install OCI archive transport tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Build the preview fixture images once with pinned bases
+        env:
+          SOURCE_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts/packaging')
+          import images
+          server = images.build('server', Path('artifacts/preview-extensions/server'), os.environ['SOURCE_REPOSITORY'])
+          for name in ('maf-worker', os.environ['AEP_EXTENSION']):
+              images.build(name, Path('artifacts/preview-extensions') / name, os.environ['SOURCE_REPOSITORY'], server['buildImages'])
+          PY
+      - name: Verify selected AEP enrollment, preservation and removal without cloud credentials
+        run: |
+          python3 scripts/preview/extension_smoke.py \
+            --server-delivery artifacts/preview-extensions/server/delivery.json \
+            --worker-delivery artifacts/preview-extensions/maf-worker/delivery.json \
+            --extension-delivery "artifacts/preview-extensions/$AEP_EXTENSION/delivery.json" \
+            --output artifacts/preview-extensions/result.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: preview-extension-evidence
+          path: artifacts/preview-extensions/result.json
+          retention-days: 30
+          if-no-files-found: warn
+
   requests:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04

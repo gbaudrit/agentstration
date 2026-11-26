@@ -7,8 +7,8 @@ using System.Text.Json;
 using System.Xml.Linq;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
-using Agentstration.Asp.Abstractions;
-using Agentstration.Asp.Client;
+using Agentstration.Asc.Abstractions;
+using Agentstration.Asc.Client;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -36,29 +36,29 @@ public sealed class OpenDalCloudTests
         {
             using var http = factory.CreateClient(); http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Credential);
             var type = OpenDalStorageTypes.Contributions.Single(c => c.Id == "opendal." + scheme); var version = type.Versions.Single();
-            var store = new AspStoreRef("cloud", "binding", "1");
+            var store = new AscStoreRef("cloud", "binding", "1");
             var values = version.Requirements.Select(r => r.Protection == AepValueProtection.Secured
                 ? AepBoundValue.Secured(r.Id, new(AepProtocol.SecretAccessVersion, new Uri(backend.Endpoint + "/grant"), OpenDalStorageTypes.ExtensionId, r.Id, "fixture", "public-disposable-grant"))
                 : AepBoundValue.Inline(r.Id, JsonSerializer.SerializeToElement(r.Id == "endpoint" ? backend.Endpoint : r.Id == "region" ? "test" : "fixture"))).ToArray();
-            var binding = new AepStorageBindingRequest(type.Id, version.Version, AepStorageProtocol.Digest(version), JsonSerializer.SerializeToElement(store, AspProtocol.JsonOptions), values,
+            var binding = new AepStorageBindingRequest(type.Id, version.Version, AepStorageProtocol.Digest(version), JsonSerializer.SerializeToElement(store, AscContract.JsonOptions), values,
                 JsonSerializer.SerializeToElement(scheme == "s3" ? new Dictionary<string, string> { { "bucket", "fixture" } } : new Dictionary<string, string> { { "container", "fixture" } }),
-                JsonSerializer.SerializeToElement(new { prefix = "notes/", write = true }), JsonSerializer.SerializeToElement(new AspAccessPolicy(true, true, true, true, "notes/", 65536, 65536, 10), AspProtocol.JsonOptions),
+                JsonSerializer.SerializeToElement(new { prefix = "notes/", write = true }), JsonSerializer.SerializeToElement(new AscAccessPolicy(true, true, true, true, "notes/", 65536, 65536, 10), AscContract.JsonOptions),
                 new string('a', 64), DateTimeOffset.UtcNow.AddSeconds(25));
             using var configured = await http.PostAsJsonAsync(AepStorageProtocol.BindingPath, binding, AepProtocol.JsonOptions);
             configured.EnsureSuccessStatusCode();
             var lease = (await configured.Content.ReadFromJsonAsync<AepStorageBindingLease>(AepProtocol.JsonOptions))!;
             Assert.AreEqual(1, backend.Redemptions); http.DefaultRequestHeaders.Add(AepStorageProtocol.BindingHeader, lease.Token);
             await using var mcp = await McpClient.CreateAsync(new HttpClientTransport(new() { Endpoint = new("http://localhost/mcp") }, http));
-            var client = await AspClient.ConnectAsync(mcp, "asp", store, expectedProviderId: type.Id);
+            var client = await AscClient.ConnectAsync(mcp, "asc", store, expectedProviderId: type.Id);
             var first = await client.WriteTextAsync(new("first", 0, false, "cloud-", Options: new("notes/key"), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1)));
-            var lastRequest = new AspWriteTextRequest("last", 1, true, "bytes", first.SessionRef);
+            var lastRequest = new AscWriteTextRequest("last", 1, true, "bytes", first.SessionRef);
             var last = await client.WriteTextAsync(lastRequest); Assert.AreEqual(last, await client.WriteTextAsync(lastRequest));
             Assert.AreEqual(1, backend.Publications); Assert.IsNull(last.Receipt!.Item.Version); Assert.IsNull(last.Receipt.Item.ETag);
             var listed = (await client.ListAsync(new("list", "notes/", 10))).Objects.Single();
             Assert.IsNotNull(listed.ETag);
             var read = await client.ReadTextAsync(new("read", Selection: new(listed.Reference, new(6, 5)), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1)));
             Assert.AreEqual("bytes", read.Content); Assert.IsTrue(read.Final);
-            var conflict = await Assert.ThrowsAsync<AspException>(() => client.WriteTextAsync(new("collision", 0, true, "bad", Options: new("notes/key"), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1))));
+            var conflict = await Assert.ThrowsAsync<AscException>(() => client.WriteTextAsync(new("collision", 0, true, "bad", Options: new("notes/key"), NotAfter: DateTimeOffset.UtcNow.AddMinutes(1))));
             Assert.AreEqual("conflict", conflict.Code);
             Assert.IsFalse(Directory.Exists(root)); // Remote execution never falls back to local files.
         }

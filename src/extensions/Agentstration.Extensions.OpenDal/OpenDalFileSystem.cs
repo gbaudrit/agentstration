@@ -1,15 +1,15 @@
 using System.Text;
 using System.Text.Json;
-using Agentstration.Asp.Abstractions;
+using Agentstration.Asc.Abstractions;
 using OpenDAL;
 
 namespace Agentstration.Extensions.OpenDal;
 
 public static class OpenDalFileSystem
 {
-    public static OpenDalObjectProvider Create(string root, AspStoreRef store, OpenDalExecutionGate execution)
+    public static OpenDalObjectProvider Create(string root, AscStoreRef store, OpenDalExecutionGate execution)
     {
-        AspValidation.Require(Path.IsPathFullyQualified(root), "invalid_request", "An absolute operator-owned root is required.");
+        AscValidation.Require(Path.IsPathFullyQualified(root), "invalid_request", "An absolute operator-owned root is required.");
         var partition = Partition(store);
         var directory = Checked(Path.Combine(root, partition, "data"));
         Operator Open()
@@ -22,20 +22,20 @@ public static class OpenDalFileSystem
         void Check(string key)
         {
             var path = Path.GetFullPath(Path.Combine(directory, EncodeKey(key).Replace('/', Path.DirectorySeparatorChar)));
-            AspValidation.Require(path.StartsWith(directory + Path.DirectorySeparatorChar,
+            AscValidation.Require(path.StartsWith(directory + Path.DirectorySeparatorChar,
                 OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal), "forbidden", "The key escapes its configured root.");
             Checked(path);
         }
         return new(store, OpenDalStorageTypes.FileSystemId, OpenDalStorageTypes.ConfigurationSchema, Open, execution, Check, EncodeKey, DecodeKey);
     }
     // A reversible per-key path, not a content index. Lowercase hex avoids Windows case,
-    // reserved-name and trailing-dot aliases crossing ordinal ASP authorization boundaries.
+    // reserved-name and trailing-dot aliases crossing ordinal ASC authorization boundaries.
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private static string EncodeKey(string key)
     {
         string hex;
         try { hex = Convert.ToHexStringLower(Utf8.GetBytes(key)); }
-        catch (EncoderFallbackException) { throw new AspException("invalid_request", "Invalid Unicode logical key."); }
+        catch (EncoderFallbackException) { throw new AscException("invalid_request", "Invalid Unicode logical key."); }
         return string.Join('/', Enumerable.Range(0, (hex.Length + 119) / 120).Select(i => hex.Substring(i * 120, Math.Min(120, hex.Length - i * 120)))) + ".blob";
     }
     private static string? DecodeKey(string path)
@@ -46,12 +46,12 @@ public static class OpenDalFileSystem
         try
         {
             var key = Utf8.GetString(Convert.FromHexString(hex));
-            AspValidation.Key(key);
+            AscValidation.Key(key);
             return EncodeKey(key) == path ? key : null;
         }
-        catch (Exception error) when (error is DecoderFallbackException or AspException) { return null; }
+        catch (Exception error) when (error is DecoderFallbackException or AscException) { return null; }
     }
-    public static string Partition(AspStoreRef store) => AspValidation.Digest(JsonSerializer.SerializeToUtf8Bytes(new { store.StoreId, store.BindingId }, AspProtocol.JsonOptions));
+    public static string Partition(AscStoreRef store) => AscValidation.Digest(JsonSerializer.SerializeToUtf8Bytes(new { store.StoreId, store.BindingId }, AscContract.JsonOptions));
     private static void CreatePrivateDirectory(string path)
     {
         Checked(path);
@@ -67,7 +67,7 @@ public static class OpenDalFileSystem
             var linked = File.Exists(current) || Directory.Exists(current)
                 ? (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0
                 : new FileInfo(current).LinkTarget is not null;
-            AspValidation.Require(!linked, "forbidden", "The configured filesystem location contains an unsupported link.");
+            AscValidation.Require(!linked, "forbidden", "The configured filesystem location contains an unsupported link.");
         }
         return absolute;
     }

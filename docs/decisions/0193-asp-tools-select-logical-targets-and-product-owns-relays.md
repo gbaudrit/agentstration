@@ -4,6 +4,8 @@
 
 Accepted
 
+Naming and unreleased wire identities superseded by [ADR-0264](0264-storage-contract-identity-and-mcp-exposure.md); behavioral decisions below remain the baseline.
+
 ## Context
 
 The maintainer clarified #1038/#1032 after reviewing the initial ASP implementation:

@@ -22,8 +22,8 @@ internal static class StorageResourcesServiceCollectionExtensions
         services.AddSingleton<LocalStoragePaths>();
         services.AddSingleton<LocalStorageObjectProvider>();
         services.AddSingleton<IStorageDefinitionValidator, LocalStorageDefinitionValidator>();
-        services.AddSingleton<IStorageDefinitionValidator, AspDocumentSchemaDefinitionValidator>();
-        services.AddSingleton<StorageAspRemoteAdapter>();
+        services.AddSingleton<IStorageDefinitionValidator, AscDocumentSchemaDefinitionValidator>();
+        services.AddSingleton<StorageAscRemoteAdapter>();
         services.AddSingleton<IStorageDocumentGateway, StorageDocumentGateway>();
         services.AddSingleton<StorageDocumentService>();
         services.AddSingleton<IStorageDocumentToolExposure, StorageDocumentToolExposure>();

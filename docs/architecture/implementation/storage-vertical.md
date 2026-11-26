@@ -14,7 +14,7 @@ records ownership and authority decisions without changing accepted ADRs.
 
 There is no Storage-specific relational schema. ResourceManagement's existing
 document stores preserve exact scope, UID, governance and optimistic concurrency.
-The family never references EF, ASP, AEP, physical provider SDKs, Console, Data
+The family never references EF, ASC, AEP, physical provider SDKs, Console, Data
 Sources or Knowledge. Extension materialization uses `SynchronizeManagedAsync`
 under exact trusted governance; #1040 owns the actual AEP mapping adapter.
 
@@ -44,7 +44,7 @@ The Core `local@1.0.0` type supports management/resolution and bounded content
 without a Connected Service. Before release, the maintainer retained a single
 functional initial version rather than intermediate compatibility contracts.
 #1040 supplies guarded default provisioning, separate UID-bound directories and protected
-ASP/AEP/Artifact adapters. [Execution and deployment](../../reference/storage-execution.md)
+ASC/AEP/Artifact adapters. [Execution and deployment](../../reference/storage-execution.md)
 and [ADR-0200](../../decisions/0200-storage-execution-pins-protected-bindings-and-local-workspace-defaults.md)
 describe runtime authority, policy preservation, current capability limits and
 historical Artifact handling. [#1046 supplies the Console](../../reference/storage-console.md);
@@ -87,7 +87,7 @@ There is no Storage Console change or new browser journey in #1045.
 The Console client and components reference only `Storage.Contracts`. The two
 existing composition roots register `IStoragesClient` over the product HTTP API.
 The UI preserves exact pins in drafts and separates metadata PUT, observation-only
-reconciliation and confirmed complete replacement. It never invokes ASP/AEP or
+reconciliation and confirmed complete replacement. It never invokes ASC/AEP or
 Secret-resolution ports. Architecture checks explicitly permit this family contract
 while continuing to reject Storage services, API modules and concrete persistence
 from Console assemblies. This follows ADR-0199 and the existing Connected Service
@@ -115,7 +115,7 @@ These changes implement ADR-0172/ADR-0181 and the Storage family contract correc
 by ADR-0200. Generic ResourceAccessPolicy.Use is the current Storage/StorageType
 usage authority; embedded UsePolicy adds no second gate while #1078 is deferred.
 Existing caller-authorization checks remain in place; new user-permission work is
-tracked by #1077. Accepted ADRs remain unchanged. #1040 owns ASP/AEP/Artifact/local
+tracked by #1077. Accepted ADRs remain unchanged. #1040 owns ASC/AEP/Artifact/local
 execution and provisioning; #1041/#1042 retain consumer rules. #1065 remains
 blocked on explicit implemented-UX approval and implementation merge, independently
 of the required implementation smoke/regression checks.
@@ -123,8 +123,8 @@ of the required implementation smoke/regression checks.
 ## Execution boundary
 
 `Storage.Contracts` owns content DTOs, restrictions and `IStorageContentGateway`.
-`Storage` still references no ASP/AEP implementation. Infrastructure composes the
-SDK adapters and the native local backend; the optional independent `Asp.Aep`
+`Storage` still references no ASC/AEP implementation. Infrastructure composes the
+SDK adapters and the native local backend; the optional independent `Asc.Aep`
 library configures extension bindings without product-resource references.
 
 Every content call reauthorizes exact resource/type/service/export pins plus the
@@ -182,7 +182,7 @@ exact cancellation-type assertion; isolated test correction `4840c11` accepts va
 derived .NET cancellation exceptions, and the complete required lane was rerun.
 The Git provider implementation is unchanged.
 
-The AEP SDK and ASP/AEP package source are unchanged by the authorization correction;
+The AEP SDK and ASC/AEP package source are unchanged by the authorization correction;
 independent checks passed earlier (59 AEP tests and package README/license/notices).
 Docker uses the published production-composition probe in a locally assembled
 .NET 10.0.8 runtime image with networking disabled. The official
@@ -209,15 +209,15 @@ and PR #1079. These checks do not approve the UX or authorize a merge.
 ## OpenDAL extension — FR #1039
 
 The autonomous Agentstration.Extensions.OpenDal host consumes Apache.OpenDAL 0.3.1
-through ASP.Server/ASP.Aep. It contributes executable opendal.fs, opendal.s3 and
-opendal.azblob version 1.0.0. One provider translates ASP operations to the same
+through ASC.Server/ASC.Aep. It contributes executable opendal.fs, opendal.s3 and
+opendal.azblob version 1.0.0. One provider translates ASC operations to the same
 native Operator/Stream methods for every backend. Backend capabilities and typed
 connection requirements stay inside the extension; product modules remain
 provider-neutral. See [the OpenDAL reference](../../reference/opendal-extension.md)
 and [ADR-0206](../../decisions/0206-opendal-runs-in-an-autonomous-asp-extension.md).
 
 FR #1085 supplies text/blob sessions and bounded replay receipts in the independent
-ASP SDK (ADR-0205). OpenDAL stores each logical key directly: there is no aggregate
+ASC SDK (ADR-0205). OpenDAL stores each logical key directly: there is no aggregate
 objects.json, custom content engine, persistent protocol receipt ledger, 128-object
 quota or 8 MiB store quota. Optional native conditions/metadata are gated, and native
 stream completion never acquires exact commit metadata by a later stat.
@@ -237,7 +237,7 @@ Console/Workplace UX gates owned by #1033/#1065.
 [#1150](https://github.com/gbaudrit/agentstration/issues/1150) adds bounded logical
 collections to Storage configuration and a provider-neutral document gateway.
 Storage-family projects retain their inward-only dependencies. Infrastructure
-composes ASP and AEP; the optional autonomous PostgreSQL extension references only
+composes ASC and AEP; the optional autonomous PostgreSQL extension references only
 the standalone protocol SDKs, optional OData grammar and Npgsql. Content operations
 and local defaults retain their existing contracts. Query relays fix exact
 Storage/collection/profile pins. Knowledge composes immutable document publications
@@ -245,7 +245,7 @@ and canonical Artifact materializations with its existing Snapshot lifecycle.
 Data Sources can also pin a document collection for JSON-object acquisitions:
 each acquisition owns an immutable publication, exact Artifact evidence and
 producer-governed retention. Collection-schema validation follows the selected
-ASP profile through the existing Storage definition validator boundary; it does
+ASC profile through the existing Storage definition validator boundary; it does
 not alter generic Schema resources or the acquisition's declared output contract.
 
 [Structured documents](../../reference/structured-documents.md) specifies the

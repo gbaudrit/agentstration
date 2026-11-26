@@ -75,8 +75,9 @@ public sealed class AepStorageTypeProvisioner(StorageTypeManagementService types
                 DurableRetention = version.Capabilities.DurableRetention
             },
             Limits = new(version.Limits.MaximumPageSize, version.Limits.MaximumReadBytes, version.Limits.MaximumWriteBytes),
-            Asp = new(version.Asp.Profile, version.Asp.McpServer, version.Asp.ToolPrefix, version.Asp.ProviderId,
-            version.Asp.ProviderVersion, version.Asp.BindingPath),
+            Asc = new(version.Asc.Profile, version.Asc.McpServer, version.Asc.ToolPrefix, version.Asc.ProviderId,
+            version.Asc.ProviderVersion, version.Asc.BindingPath)
+            { Contract = version.Asc.Contract, Revision = version.Asc.Revision, McpProtocolVersion = version.Asc.McpProtocolVersion },
             Contribution = new(provider, providerUid, generation, contributionId, version.Version, AepStorageProtocol.Digest(version)),
             Deprecated = version.Deprecated,
             Documents = version.Documents is { } documents ? new(documents.Get, documents.Put, documents.Delete, documents.Query,

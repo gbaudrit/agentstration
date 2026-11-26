@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Governed ASC MCP server adapter.</Description></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+</Project>

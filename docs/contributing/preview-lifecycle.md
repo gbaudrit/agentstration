@@ -8,17 +8,18 @@ See [ADR-0256](../decisions/0256-preview-lifecycle-binds-provider-neutral-reques
 
 ## Public request and result
 
-`scripts/preview/contract.py` is the executable v1 request validator. Unknown
+`scripts/preview/contract.py` is the executable request validator (v1 core-only; v2 adds selected AEP extensions). Unknown
 fields, duplicate JSON keys, input above 64 KiB, unresolved revisions, mutable
 image references and invalid provider/database combinations are rejected.
 
 | Request field | Meaning |
 | --- | --- |
-| `schemaVersion` | Integer `1` |
+| `schemaVersion` | Integer `1` for core-only requests, or `2` with a nonempty extension selection |
 | `environmentId` | 1–40 lowercase letters/digits/hyphens, starting with a letter |
 | `provider` | `docker`, `azure-vm` or `ssh-docker` |
 | `sourceSha` | Exact server commit; independent Worker source remains in its receipt |
 | `registry`, `deliveries` | Private GHCR and canonical server/Worker metadata, reduced from existing delivery receipts |
+| `extensions` | v2 only: sorted map of catalogue IDs to canonical AEP delivery receipts, each with its independent source/version/digest |
 | `database`, `postgresImage` | SQLite by default; PostgreSQL selects its exact supported image digest |
 | `ttlHours` | Integer 1–168; metadata for later lifecycle/retention orchestration |
 | `dataMode` | `preserve` or explicit destroy-only `reset` |
@@ -39,7 +40,9 @@ No provisioning framework, empty adapter or provider field is added to packaging
 Results contain `schemaVersion`, `environmentId`, `provider`, `sourceSha`, selected
 `images`, `database`, `observedImages`, `state`, host-local `url`, `expiresAt` and
 `providerResourceIds`. The selected receipts describe the desired deployment;
-`observedImages` exposes actual container references when resources exist. States
+`observedImages` exposes actual container references when resources exist. Azure keeps
+its bounded guest response to core image observations and verified extension IDs;
+the canonical request/result retains every selected extension digest. States
 include `validated`, `absent`, `running`, `stopped`, `unhealthy`, `drifted` and
 the `destroyed` operation outcome. The reusable workflow reports `failed` for
 failed operations; it does not substitute a successful validation result for a
@@ -141,3 +144,29 @@ OCI validation exercises this same lifecycle against both database profiles,
 including authenticated execution, preserve/recreate, repeated reset, stable
 expiry, refusal to delete an unmanaged same-name volume and preservation of an
 unrelated environment's volume.
+
+## Optional extension regression
+
+Issue labels and extension lifecycle semantics are documented in
+[Preview on demand](preview-on-demand.md#choose-optional-aep-extensions-with-issue-labels).
+Advanced callers can pass `extension_deliveries={"foundry": receipt}` to
+`contract.plan`; canonical receipts exclude build recipes and credentials.
+Version 1 requests remain unchanged when the map is empty.
+
+To qualify real AEP containers using already-built OCI deliveries, run:
+
+```bash
+python3 scripts/preview/extension_smoke.py \
+  --server-delivery /path/to/server/delivery.json \
+  --worker-delivery /path/to/maf-worker/delivery.json \
+  --extension-delivery /path/to/foundry/delivery.json \
+  --output /tmp/preview-extension-evidence.json
+```
+
+This uses the existing Azure guest transport locally with exact archives and a
+disposable loopback registry. It requires Docker Compose and Skopeo, but no Azure,
+GHCR credential, administrative bootstrap account or model. It checks authenticated
+enrollment before manual bootstrap, invalid discovery/enrollment proofs, persisted
+identity on recreation/reactivation, deselection and full owned-resource cleanup.
+The deployment-contract CI builds its fixtures with the shared OCI recipes and
+pinned bases; it does not publish them or create cloud infrastructure.

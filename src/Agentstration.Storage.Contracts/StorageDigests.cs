@@ -24,8 +24,8 @@ public static class StorageDigests
             version.Contribution,
             version.Deprecated
         });
-        // Preserve the exact published digest of versions with no ASP mapping.
-        var mapped = version.Asp is null ? definition : Compute(new { Definition = definition, version.Asp });
+        // Preserve the exact published digest of versions with no ASC mapping.
+        var mapped = version.Asc is null ? definition : Compute(new { Definition = definition, version.Asc });
         return version.Documents is null ? mapped : Compute(new { Definition = mapped, version.Documents });
     }
     public static string Binding(StorageProperties definition)

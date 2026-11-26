@@ -221,7 +221,7 @@ public sealed class WorkspaceArtifactStorage(IIdentityStore identities, IResourc
         try { return await action(); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         { throw new StorageException("storage_artifact_unavailable", "The Artifact content backend is unavailable.", 503); }
-        catch (Agentstration.Asp.Abstractions.AspException)
+        catch (Agentstration.Asc.Abstractions.AscException)
         { throw new StorageException("storage_artifact_path_invalid", "The configured Artifact content location is unsafe.", 409); }
     }
     private static string Physical(Target target, string key) =>
