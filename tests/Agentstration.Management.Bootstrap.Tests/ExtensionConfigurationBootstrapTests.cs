@@ -67,9 +67,16 @@ public sealed partial class DeclarativeBootstrapTests
             PutExtensionConfigurationRequest request, string? ifMatch, CancellationToken cancellationToken)
         {
             Writes++; Saved = request;
-            resource = new() { ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionConfiguration, ScopeRef = ResourceScopeRef.Instance,
-                Metadata = new() { Name = request.Name! }, Definition = new(Guid.NewGuid(), "extension.public", request.OptionSet, request.Version,
-                    request.SchemaDigest, request.Bindings), Observation = new(1, "active", "applied") };
+            resource = new()
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ExtensionKinds.ExtensionConfiguration,
+                ScopeRef = ResourceScopeRef.Instance,
+                Metadata = new() { Name = request.Name! },
+                Definition = new(Guid.NewGuid(), "extension.public", request.OptionSet, request.Version,
+                    request.SchemaDigest, request.Bindings),
+                Observation = new(1, "active", "applied")
+            };
             return GetAsync(resourceNamespace, registrationName, cancellationToken);
         }
         public Task<ExtensionConfigurationView> ApplyAsync(ResourceNamespace resourceNamespace, string registrationName, string ifMatch, CancellationToken cancellationToken) =>

@@ -9,8 +9,8 @@ using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Secrets;
-using Agentstration.Security.Contracts;
 using Agentstration.Secrets.Abstractions;
+using Agentstration.Security.Contracts;
 using Microsoft.Extensions.Configuration;
 
 namespace Agentstration.Extensions.Aep;
@@ -71,8 +71,10 @@ public sealed class ExtensionConfigurationService(
                     throw Error("configuration_contract_changed");
                 var candidate = (previous?.Value ?? new ExtensionConfigurationResource
                 {
-                    Uid = Guid.NewGuid(), ApiVersion = ResourceApiVersions.CoreV1,
-                    Kind = ExtensionKinds.ExtensionConfiguration, ScopeRef = ResourceScopeRef.Instance,
+                    Uid = Guid.NewGuid(),
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ExtensionKinds.ExtensionConfiguration,
+                    ScopeRef = ResourceScopeRef.Instance,
                     Metadata = new ResourceMetadata { Name = request.Name ?? registration.Name, Namespace = registration.Namespace },
                     Definition = null!
                 }) with
@@ -233,7 +235,9 @@ public sealed class ExtensionConfigurationService(
             var revision = handles.Count > 0 ? Guid.NewGuid().ToString("N")
                 : Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
                 {
-                    resource.Uid, resource.Generation, Values = values
+                    resource.Uid,
+                    resource.Generation,
+                    Values = values
                 }, AepProtocol.JsonOptions)));
             return new(values, revision, () => { foreach (var handle in handles) capabilities.Revoke(handle); });
         }
@@ -285,12 +289,24 @@ public sealed class ExtensionConfigurationService(
     {
         var contract = state?.Descriptor;
         var outOfSync = saved is not null && state is not null && saved.Value.Observation.AppliedRevision != state.AppliedRevision;
-        if (outOfSync) saved = saved! with { Value = saved.Value with { Observation = saved.Value.Observation with
-            { State = "pending", Diagnostic = "configuration_activation_unconfirmed" } } };
+        if (outOfSync) saved = saved! with
+        {
+            Value = saved.Value with
+            {
+                Observation = saved.Value.Observation with
+                { State = "pending", Diagnostic = "configuration_activation_unconfirmed" }
+            }
+        };
         var incompatible = saved is not null && contract is not null && (saved.Value.Definition.OptionSet != contract.Id
             || saved.Value.Definition.Version != contract.Version || saved.Value.Definition.SchemaDigest != contract.SchemaDigest);
-        if (incompatible) saved = saved! with { Value = saved.Value with { Observation = saved.Value.Observation with
-            { State = "incompatible", Diagnostic = "configuration_contract_changed" } } };
+        if (incompatible) saved = saved! with
+        {
+            Value = saved.Value with
+            {
+                Observation = saved.Value.Observation with
+                { State = "incompatible", Diagnostic = "configuration_contract_changed" }
+            }
+        };
         return new(state is not null, contract is null ? null : new(contract.Id, contract.Version, contract.SchemaDigest,
                 contract.Options.Select(o => new ExtensionConfigurationOption(o.Id, o.Schema, o.Required, o.Protection == AepValueProtection.Secured,
                     o.AllowedSources.Select(s => s.ToString()).ToArray(), o.Scope.ToString(), o.ApplyMode.ToString(), o.AtomicGroup)).ToArray()),

@@ -1,6 +1,6 @@
+using Agentstration.Aep.Client;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Contracts;
-using Agentstration.Aep.Client;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 

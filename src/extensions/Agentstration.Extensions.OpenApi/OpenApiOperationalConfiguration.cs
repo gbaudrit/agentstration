@@ -11,7 +11,9 @@ public sealed class OpenApiOperationalConfiguration : IAepOperationalConfigurati
     private sealed record State(Guid ConfigurationId, long Generation, string Revision, string[] Domains);
     private static readonly JsonElement DomainSchema = JsonSerializer.SerializeToElement(new
     {
-        type = "array", maxItems = 128, items = new { type = "string", minLength = 1, maxLength = 253 }
+        type = "array",
+        maxItems = 128,
+        items = new { type = "string", minLength = 1, maxLength = 253 }
     });
     public static AepOperationalConfigurationDescriptor Descriptor { get; } = AepOperationalConfigurationDescriptor.Create(
         "io.agentstration.openapi/installation", "1.0.0",

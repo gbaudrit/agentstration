@@ -1,8 +1,8 @@
 using Agentstration.Aep.Abstractions;
-using Agentstration.Extensions.Contracts;
-using Agentstration.Resources;
 using Agentstration.Aep.Client;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Sources.Contracts;
 

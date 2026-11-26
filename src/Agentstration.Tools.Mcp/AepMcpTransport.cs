@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using Agentstration.Aep.Abstractions;
-using Agentstration.Extensions.Contracts;
 using Agentstration.Aep.Client;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;

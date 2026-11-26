@@ -5,7 +5,6 @@ using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
-using Agentstration.Secrets.Abstractions;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Bootstrap;
@@ -16,6 +15,7 @@ using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Secrets.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -124,7 +124,8 @@ public sealed class ExtensionConfigurationApiTests : ModelManagementApiTestBase
         var handler = new ExtensionConfigurationBootstrapHandler(fixture.Authority.Services.GetRequiredService<IExtensionConfigurationService>());
         var document = new BootstrapResourceDocument
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionConfiguration,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ExtensionKinds.ExtensionConfiguration,
             Metadata = new ResourceMetadata { Name = "initial-openapi-options" },
             Definition = JsonSerializer.SerializeToElement(new
             {
@@ -249,11 +250,18 @@ public sealed class ExtensionConfigurationApiTests : ModelManagementApiTestBase
                 var store = fixture.Authority.Services.GetRequiredService<IResourceStore>();
                 fixture.Registration = (await store.PutExactAsync(ResourceScopeRef.Instance, new ExtensionRegistrationResource
                 {
-                    ApiVersion = ResourceApiVersions.CoreV1, Kind = ExtensionKinds.ExtensionRegistration,
-                    Metadata = new ResourceMetadata { Name = "configurable" }, ScopeRef = ResourceScopeRef.Instance,
-                    Definition = new() { DisplayName = "Configurable", Endpoint = new("http://localhost"),
-                        ExpectedExtensionId = "Agentstration.Extensions.OpenApi", AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
-                        Credential = new("configuration-transport", ResourceScopeRef.Instance) }
+                    ApiVersion = ResourceApiVersions.CoreV1,
+                    Kind = ExtensionKinds.ExtensionRegistration,
+                    Metadata = new ResourceMetadata { Name = "configurable" },
+                    ScopeRef = ResourceScopeRef.Instance,
+                    Definition = new()
+                    {
+                        DisplayName = "Configurable",
+                        Endpoint = new("http://localhost"),
+                        ExpectedExtensionId = "Agentstration.Extensions.OpenApi",
+                        AuthenticationMode = AepTransportAuthenticationMode.StaticBearer,
+                        Credential = new("configuration-transport", ResourceScopeRef.Instance)
+                    }
                 }, null, true, default)).Value;
             }
             return fixture;

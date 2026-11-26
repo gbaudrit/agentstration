@@ -1,8 +1,8 @@
-using System.Text.Json;
 using System.Net;
 using System.Net.Http.Json;
-using Agentstration.Aep.Client;
+using System.Text.Json;
 using Agentstration.Aep.Abstractions;
+using Agentstration.Aep.Client;
 
 namespace Agentstration.Aep.Tests;
 
