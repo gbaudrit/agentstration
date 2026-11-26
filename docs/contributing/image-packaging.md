@@ -241,6 +241,100 @@ archive checksum and refuses replacement of a tag with a different digest.
 Deployment consumers must retain the actual digest reference, not resolve a
 mutable convenience tag at deployment time.
 
+## Ollama AEP extension
+
+[#1298](https://github.com/gbaudrit/agentstration/issues/1298) adds the implemented
+`deploy/images/extensions/ollama.json` entry and the manual **OCI images** choice
+`ollama`. It packages only `Agentstration.Extensions.Ollama`, using the same
+`Dockerfile.extension`, builder, publisher and generic AEP smokes as Foundry.
+No Ollama inference server, model file or model acquisition command is included.
+The existing `deploy/compose/ollama.yml` remains a separate source-build topology;
+selecting extensions in digest-based previews is a different workstream.
+
+Its own `version.txt` starts at `0.1.0` and feeds the assembly informational
+version, AEP identity `Agentstration.Extensions.Ollama` and OCI version label.
+The AEP protocol stays `agentstration.io/v1`; the model-provider contribution is
+`ollama`, and `io.agentstration.ollama/model-profile` stays at option version
+`1.0.0`. Packaging does not migrate persisted option contracts or product versions.
+Linux amd64 is the supported image platform.
+
+```sh
+python3 scripts/packaging/images.py describe --extension ollama
+python3 scripts/packaging/images.py build --extension ollama \
+  --repository gbaudrit/agentstration --directory artifacts/ollama
+dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration Release \
+  --filter 'FullyQualifiedName~Ollama|FullyQualifiedName~InferenceTimeoutTests' --minimum-expected-tests 1
+```
+
+Ollama-only source, catalogue and `Ollama*Tests.cs` changes select its targeted OCI
+validation. Shared AEP/enrollment fixtures select every implemented AEP image;
+shared packaging selects all implemented image families. Mixed product changes,
+shared test projects, SDK/package inputs and classifier changes retain transverse
+validation. Preserve the other implemented entries when integrating concurrent
+packaging changes into the selector and classifier.
+
+### Ollama container settings and state
+
+| Variable | Purpose and default |
+| --- | --- |
+| `ASPNETCORE_URLS` | Container listener, `http://+:8080` from the shared recipe. Publish it only to the intended private network. |
+| `Ollama__Endpoint` | Native inference HTTP endpoint; defaults to `http://localhost:11434`. A container normally needs the explicit DNS name of a separately operated server. Health/discovery/enrollment do not require that server. |
+| `Ollama__Inference__Timeout` | Finite chat and streaming budget, default `00:01:30`; accepted range `00:00:00.001`–`1.00:00:00`. Model listing retains the existing 90-second client budget. |
+| `Aep__EnrollmentMode` | Use `SharedKeyFile` for unattended private delivery. The executable development default is `Disabled`; do not expose that mode. |
+| `Aep__SharedKeyFile__Path` | Read-only file containing the enrollment/invocation key; required for SharedKeyFile. |
+| `Aep__SharedKeyFile__ClientId` | Technical caller identity, default `agentstration-development`; configure it for the installation. |
+| `Aep__SharedKeyFile__AuthorityUrl` | Authoritative Agentstration server URL; enables signed announcements. Use HTTPS outside isolated Development fixtures. |
+| `Aep__SharedKeyFile__PublicEndpoint` | Extension URL reachable from that authority, required when announcing. |
+| `Aep__SharedKeyFile__StateFile` | Persisted installation identity, default `/app/.aep/shared-key-instance`. Prefer an explicit file in a dedicated writable state mount. |
+| `Aep__SharedKeyFile__AllowInsecureHttp` | Default `false`; explicitly `true` only for the isolated Development smoke network. |
+
+Mount the key read-only in both the extension and authority with owner-only file
+permissions. The authority configures matching trust under
+`Agentstration__Extensions__Agentstration.Extensions.Ollama__EnrollmentMode`
+and `Agentstration__Extensions__Agentstration.Extensions.Ollama__SharedKeyFile__Path`. Give the extension only its dedicated writable instance-state mount,
+owned by its configured container UID/GID; retain it when recreating containers.
+It needs no server database, model volume or inference-server state mount. Keep
+keys, model files and generated state outside the build context and artifacts.
+
+### Ollama qualification and private delivery
+
+`OllamaPackagingTests` checks public health, rejected anonymous/invalid discovery,
+authenticated identity and independent assembly/option versions. Its in-process
+HTTP fixture returns fixed native version, model capabilities and chat results;
+unexpected routes fail, so no model download or real LLM is involved. Existing
+Ollama reasoning and finite-timeout tests remain in the catalogue's offline filter.
+The Docker gates reuse generic health/discovery/restart and SQLite-authority
+SharedKeyFile enrollment, invalid-proof rejection and persistent identity checks.
+The authority and extension use the exact same source and pinned build bases.
+
+The compatibility baseline is the selected source revision with its local SQLite,
+deterministic Agentstration authority and AEP `agentstration.io/v1`. The hosted
+native fixture does not establish compatibility with every Ollama server/model.
+`delivery.json` supplies source SHA, extension version, OCI digest, pinned bases,
+archive checksum, provenance and SBOM; `enrollment-smoke.json` supplies the tested
+source/digest/authority identity combination. Validation artifacts and publication
+receipts are the evidence of checks actually completed; adding this catalogue is
+not evidence of registry publication.
+
+Before publishing, an administrator must establish
+`ghcr.io/gbaudrit/agentstration-extension-ollama` as **private** and grant
+`gbaudrit/agentstration` **Manage Actions access → Write**, following the first
+package initialization procedure above. An owner token reading metadata alone
+does not prove repository Actions access. Use the existing `oci-images.yml`
+workflow with `extension=ollama` and `publish_preview=true` only after both checks.
+The job's `GITHUB_TOKEN` publishes the validated archive under
+`sha-<full-source-sha>` and retains the immutable digest receipt. Missing,
+inaccessible or non-private package metadata stops the shared publisher before
+upload. No registry credential is passed into builds or extension settings.
+
+Keep #1298 open until effective private qualification is recorded. Docker Hub is
+explicitly deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384):
+release-tag/main-ancestry validation, same-archive promotion without rebuilding,
+public anonymous pull and lifecycle smoke, immutable digest/provenance/SBOM
+consistency, release-only credentials and retry/conflict handling remain required
+for future public qualification. Do not create `extension/ollama/v0.1.0`; the
+current tag path also invokes Docker Hub.
+
 ## MAF AWP Worker
 
 [#1300](https://github.com/gbaudrit/agentstration/issues/1300) adds `maf-worker` under

@@ -26,7 +26,7 @@ foreach ($path in @('src/Agentstration.Web/Program.cs', 'src/Agentstration.Exten
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', $path)
     Require ($selection.dotnet -and $selection.container -and $selection.extensionImages) "Mixed/unknown changes must retain product and image validation: $path"
 }
-foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs', 'scripts/packaging/enrollment_smoke.py')) {
+foreach ($path in @('src/extensions/Agentstration.Extensions.Foundry/Program.cs')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'foundry') "Foundry-only inputs must not build the Worker: $path"
 }
@@ -34,8 +34,18 @@ foreach ($path in @('src/Agentstration.Runtime.Worker.MicrosoftAgentFramework/Pr
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require ($selection.extensionImages -and ($selection.imageIds -join ',') -eq 'maf-worker,server') "Worker inputs must validate the Worker and its real preview composition: $path"
 }
+foreach ($path in @('src/extensions/Agentstration.Extensions.Ollama/Program.cs', 'src/extensions/Agentstration.Extensions.Ollama/version.txt', 'deploy/images/extensions/ollama.json', 'scripts/packaging/test_ollama_image.py', 'tests/Agentstration.ModelProviders.Tests/OllamaPackagingTests.cs', 'tests/Agentstration.ModelProviders.Tests/OllamaReasoningPropagationTests.cs')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'ollama' -and -not ($selection.dotnet -or $selection.aep -or $selection.container -or $selection.storage)) "Ollama-only inputs must use targeted image validation: $path"
+}
+foreach ($path in @('scripts/packaging/enrollment_smoke.py', 'scripts/packaging/test_enrollment_smoke.py', 'scripts/packaging/aep-extension.smoke.compose.yml')) {
+    $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
+    Require (($selection.imageIds -join ',') -eq 'foundry,ollama') "Shared enrollment inputs must validate all implemented AEP images: $path"
+}
+$selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('src/extensions/Agentstration.Extensions.Ollama/Program.cs', 'src/Agentstration.Web/Program.cs')
+Require ($selection.dotnet -and $selection.container -and $selection.extensionImages) 'Mixed Ollama/product changes must retain transverse validation.'
 $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @('scripts/packaging/images.py')
-Require (($selection.imageIds -join ',') -eq 'foundry,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
+Require (($selection.imageIds -join ',') -eq 'foundry,ollama,maf-worker,server') 'Shared packaging tooling must validate all implemented image families.'
 foreach ($path in @('Dockerfile', 'deploy/images/applications/server.json', 'deploy/preview/compose.yml', 'deploy/preview/postgresql.yml', 'deploy/preview/postgresql.json', 'scripts/preview/preview.py', '.github/workflows/preview-environment.yml', '.github/workflows/preview-azure-validation.yml', '.github/workflows/preview-azure-environment.yml', '.github/workflows/preview-on-demand.yml')) {
     $selection = & (Join-Path $PSScriptRoot 'classify-changes.ps1') -Paths @($path)
     Require (($selection.imageIds -join ',') -eq 'server') "Server preview inputs must select their executable validation: $path"

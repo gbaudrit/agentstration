@@ -8,7 +8,7 @@ on:
       extension:
         description: Catalogue image ID (server, AEP extension or AWP Worker)
         type: choice
-        options: [server, foundry, maf-worker]
+        options: [server, foundry, ollama, maf-worker]
         default: foundry
         required: true
       publish_preview:

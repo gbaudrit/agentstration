@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "ollama",
+  "extensionId": "Agentstration.Extensions.Ollama",
+  "project": "src/extensions/Agentstration.Extensions.Ollama/Agentstration.Extensions.Ollama.csproj",
+  "entrypoint": "Agentstration.Extensions.Ollama.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.Ollama/version.txt",
+  "testProject": "tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Ollama|FullyQualifiedName~InferenceTimeoutTests",
+  "imageName": "extension-ollama",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "modelProviders",
+  "contributionId": "ollama"
+}

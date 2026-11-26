@@ -7,6 +7,7 @@ on:
       - '.github/workflows/resource-plan-ux.yml'
       - 'src/**'
       - '!src/extensions/Agentstration.Extensions.Foundry/**'
+      - '!src/extensions/Agentstration.Extensions.Ollama/**'
       - 'tests/Agentstration.Console.Playwright/**'
       - 'deploy/bootstrap/**'
       - 'Directory.*.props'
