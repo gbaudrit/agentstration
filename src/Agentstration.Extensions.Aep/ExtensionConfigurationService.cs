@@ -307,10 +307,12 @@ public sealed class ExtensionConfigurationService(
                 { State = "incompatible", Diagnostic = "configuration_contract_changed" }
             }
         };
+        var desiredApplied = saved is null || saved.Value.Observation.State == "applied"
+            && saved.Value.Observation.AppliedGeneration == saved.Value.Generation;
         return new(state is not null, contract is null ? null : new(contract.Id, contract.Version, contract.SchemaDigest,
                 contract.Options.Select(o => new ExtensionConfigurationOption(o.Id, o.Schema, o.Required, o.Protection == AepValueProtection.Secured,
                     o.AllowedSources.Select(s => s.ToString()).ToArray(), o.Scope.ToString(), o.ApplyMode.ToString(), o.AtomicGroup)).ToArray()),
-            saved?.Value, saved?.ETag, !incompatible && !outOfSync && state?.Ready == true,
+            saved?.Value, saved?.ETag, !incompatible && !outOfSync && desiredApplied && state?.Ready == true,
             (state?.AppliedValues ?? new Dictionary<string, JsonElement>()).Where(p => contract!.Options.Any(o => o.Id == p.Key && o.Protection != AepValueProtection.Secured))
                 .ToDictionary(p => p.Key, p => p.Value));
     }

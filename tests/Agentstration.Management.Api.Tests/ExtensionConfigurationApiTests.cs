@@ -118,6 +118,39 @@ public sealed class ExtensionConfigurationApiTests : ModelManagementApiTestBase
     }
 
     [TestMethod]
+    public async Task FailedDeliveryRemainsNotReadyAfterReloadWithoutLosingTheLastActivation()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var initial = (await fixture.Client.GetFromJsonAsync<ExtensionConfigurationView>(ConfigurationPath))!;
+        var contract = initial.Contract!;
+        var first = new PutExtensionConfigurationRequest(contract.Id, contract.Version, contract.SchemaDigest,
+            [ModelProviderValueBinding.FromLiteral("AllowedDomains", JsonSerializer.Deserialize<JsonElement>("[\"first.example.test\"]"))]);
+        var applied = await PutAsync(fixture.Client, first, null);
+        fixture.FailNextApplyBeforeDelivery = true;
+        var pending = await PutAsync(fixture.Client, first with
+        {
+            Bindings = [ModelProviderValueBinding.FromLiteral("AllowedDomains", JsonSerializer.Deserialize<JsonElement>("[\"second.example.test\"]"))]
+        }, applied.ETag);
+        Assert.IsFalse(pending.Ready);
+        var reloaded = (await fixture.Client.GetFromJsonAsync<ExtensionConfigurationView>(ConfigurationPath))!;
+        Assert.AreEqual("pending", reloaded.Configuration!.Observation.State);
+        Assert.AreEqual(2L, reloaded.Configuration.Generation);
+        Assert.AreEqual(1L, reloaded.Configuration.Observation.AppliedGeneration);
+        Assert.IsFalse(reloaded.Ready, "An unapplied desired generation must remain not ready after reloading.");
+        var policy = fixture.Extension.Services.GetRequiredService<OpenApi.OpenApiDestinationPolicy>();
+        await policy.ValidateAsync("https://first.example.test", default);
+        await Assert.ThrowsExactlyAsync<OpenApi.OpenApiExtensionException>(() => policy.ValidateAsync("https://second.example.test", default));
+        using var retry = new HttpRequestMessage(HttpMethod.Post, ConfigurationPath + "/apply");
+        retry.Headers.TryAddWithoutValidation("If-Match", reloaded.ETag);
+        using var response = await fixture.Client.SendAsync(retry);
+        response.EnsureSuccessStatusCode();
+        var recovered = (await response.Content.ReadFromJsonAsync<ExtensionConfigurationView>())!;
+        Assert.IsTrue(recovered.Ready);
+        Assert.AreEqual(2L, recovered.Configuration!.Observation.AppliedGeneration);
+        await policy.ValidateAsync("https://second.example.test", default);
+    }
+
+    [TestMethod]
     public async Task BootstrapCreatesSameConfigurationAndPreservesOperatorEditsOnReplay()
     {
         await using var fixture = await Fixture.CreateAsync();
@@ -209,6 +242,7 @@ public sealed class ExtensionConfigurationApiTests : ModelManagementApiTestBase
         public required RequestContext Context { get; set; }
         public IRequestContextScopeFactory Scopes => Authority.Services.GetRequiredService<IRequestContextScopeFactory>();
         public bool LoseNextApplyResponse { get; set; }
+        public bool FailNextApplyBeforeDelivery { get; set; }
         public int ApplyCalls { get; set; }
 
         public static async Task<Fixture> CreateAsync(bool secured = false)
@@ -276,6 +310,12 @@ public sealed class ExtensionConfigurationApiTests : ModelManagementApiTestBase
     {
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
+            if (fixture.FailNextApplyBeforeDelivery && request.Method == HttpMethod.Put
+                && request.RequestUri!.AbsolutePath == AepOperationalConfigurationProtocol.Path)
+            {
+                fixture.FailNextApplyBeforeDelivery = false;
+                throw new HttpRequestException("Simulated unavailable transport.");
+            }
             var response = await base.SendAsync(request, token);
             if (request.Method == HttpMethod.Put && request.RequestUri!.AbsolutePath == AepOperationalConfigurationProtocol.Path)
             {

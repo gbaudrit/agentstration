@@ -201,7 +201,9 @@ references; OpenAPI does not introduce a new API-token installation option.
 
 Save and apply persists the desired configuration and displays its observed applied
 generation. A delivery failure remains pending; **Retry application** can recover a
-lost acknowledgment. Subsequent destination checks use the acknowledged allowlist
+lost acknowledgment. A pending desired generation remains not ready after reloading;
+its previous applied generation and values stay visible until activation succeeds.
+Subsequent destination checks use the acknowledged allowlist
 without restarting OpenAPI. Replacing a Parameter value is revalidated before the
 next product AEP/MCP operation. An empty list is a valid deny-all policy, not an
 outbound authorization. Existing domain matching includes subdomains. Ports, DNS/IP,
