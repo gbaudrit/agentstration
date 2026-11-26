@@ -22,7 +22,7 @@ public sealed class PackagingTests
         await File.WriteAllTextAsync(keyFile, key);
         try
         {
-            await using var host = new WebApplicationFactory<PostgreSqlProgram>().WithWebHostBuilder(builder => builder
+            await using var host = new WebApplicationFactory<PostgreSqlOptions>().WithWebHostBuilder(builder => builder
                 .UseSetting("Aep:EnrollmentMode", "SharedKeyFile")
                 .UseSetting("Aep:SharedKeyFile:Path", keyFile)
                 .UseSetting("PostgreSqlDocuments:AllowedClients:0", "agentstration-development"));
