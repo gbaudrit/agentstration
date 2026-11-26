@@ -41,6 +41,31 @@ class ImageContracts(unittest.TestCase):
             with self.subTest(extension=extension), self.assertRaises(ValueError):
                 images.catalogue(extension)
 
+    def test_smoke_settings_are_public_literal_configuration_and_cannot_override_authentication(self):
+        self.assertEqual({}, images.smoke_environment(self.entry))
+        self.assertEqual({"Fixture__AllowedDomains__0": "fixture.example.test"}, images.smoke_environment(
+            {"smokeEnvironment": {"Fixture__AllowedDomains__0": "fixture.example.test"}}))
+        for environment in ([], {"Aep__EnrollmentMode": "None"}, {"aep__EnrollmentMode": "None"},
+                            {"AspNetCore_Urls": "http://+:8080"}, {"Api__Secret": "value"},
+                            {"DOTNET_STARTUP_HOOKS": "hook"}, {"Api__AllowedDomain": "x\nOTHER=value"},
+                            {"Api__AllowedDomain": "${HOME}"}, {"Api__Port": 8080}):
+            with self.subTest(environment=environment), self.assertRaises(ValueError):
+                images.smoke_environment({"smokeEnvironment": environment})
+
+    def test_all_declared_contribution_families_are_required(self):
+        entry = {**self.entry, "contributions": {"tools": ["fixture.discover", "fixture.invoke"],
+                                                  "schemaFormats": ["fixture.validation"]}}
+        manifest = {"protocolVersion": entry["aepVersion"],
+                    "extension": {"id": entry["extensionId"], "version": entry["version"]},
+                    "contributions": {kind: [{"id": identity} for identity in identities]
+                                      for kind, identities in entry["contributions"].items()}}
+        smoke.check_manifest(manifest, {"extension": entry})
+        for kind in entry["contributions"]:
+            invalid = copy.deepcopy(manifest)
+            invalid["contributions"][kind].pop()
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                smoke.check_manifest(invalid, {"extension": entry})
+
     def test_awp_worker_has_an_independent_catalogue_and_release_namespace(self):
         worker = images.catalogue("maf-worker")
         self.assertEqual("awp-worker", worker["kind"])

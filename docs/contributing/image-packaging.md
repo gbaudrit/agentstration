@@ -355,3 +355,76 @@ Docker Hub publication remains deferred by maintainer decision. Do not create an
 requests Docker Hub publication. Keep #1291 open for its deferred public delivery
 criteria; the pilot does not claim a complete compatibility matrix or a published
 Docker Hub release. No extension tag or image is published merely by adding the catalogue.
+
+## Crawl4AI private image
+
+Related to [#1297](https://github.com/gbaudrit/agentstration/issues/1297).
+`deploy/images/extensions/crawl4ai.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+Set `Crawl4AI__Endpoint` to a separately operated Crawl4AI service (default
+`http://localhost:11235`). `Crawl4AI__AllowedDomains__0` and subsequent indices are
+required; preserve explicit allowed ports, private-address denial, depth/page,
+payload, timeout and spool limits. The public smoke-only domain
+`fixture.example.test` is injected by the test catalogue, not a production default.
+Provide downstream authentication with a protected `Crawl4AI__ApiTokenFile` mount
+(or protected runtime configuration); the AEP key is separate. Set
+`Crawl4AI__ContentDirectory` to an operator-owned writable volume for retained
+acquisition content and preserve the retention/quota policy. `/health` is process
+liveness; `/health/ready` deliberately depends on the upstream service and may be
+503 when it is absent. No upstream server or model is embedded or downloaded.
+External mode uses the existing endpoint. The separate Aspire companion mode uses
+`Crawl4AI:Enabled=true`, `Provisioning=Managed` and its pinned `unclecode/crawl4ai:0.9.4`
+image (override explicitly); `Provisioning=External` disables provisioning.
+Neither companion mode nor live internet acquisition is claimed as tested here;
+the existing HTTP/DNS fixtures qualify bounded provider behavior offline.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-crawl4ai:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-crawl4ai/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=crawl4ai`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:crawl4ai`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/crawl4ai/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1297 open until effective private qualification is recorded; use no
+premature auto-closing keyword.
