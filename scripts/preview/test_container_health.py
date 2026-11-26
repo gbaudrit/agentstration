@@ -85,7 +85,7 @@ class ContainerHealthTests(unittest.TestCase):
         self.assertIn('preview-example', source)
 
     def test_guest_response_stays_below_run_command_limit_with_sixteen_extensions(self):
-        names = ['extension-' + ('x' * 30) + chr(97 + i) for i in range(16)]
+        names = ['extension-' + ('x' * 31) + chr(97 + i) for i in range(16)]
         services = ['server', 'worker', 'postgres', *names]
         value = {'state': 'running', 'health': health.summarize(services, [(n, 'restarting', 'unhealthy', 2147483647) for n in services]),
                  'observedImages': {n: 'localhost:5001/gbaudrit/agentstration-' + n + '@sha256:' + 'a' * 64 for n in services[:3]},

@@ -125,7 +125,7 @@ def completed(result, operation, repository, run_url, request=None, reset_before
             lines.append('VM: **' + request['target']['vmSize'] + '**, region: **' + request['target']['region'] + '**.')
         lines.append(health_table(result, request))
         if reset_before_deploy and state == 'running':
-            lines.append('The previous preview and its application data were removed before this fresh deployment.')
+            lines.append('A fresh environment was created. This command does not preserve previous application data.')
         if state == 'running':
             if not result.get('url'):
                 lines.append('The URL is withheld: this check could not confirm protected access.')
