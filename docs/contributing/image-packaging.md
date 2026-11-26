@@ -355,3 +355,80 @@ Docker Hub publication remains deferred by maintainer decision. Do not create an
 requests Docker Hub publication. Keep #1291 open for its deferred public delivery
 criteria; the pilot does not claim a complete compatibility matrix or a published
 Docker Hub release. No extension tag or image is published merely by adding the catalogue.
+
+## OpenDal private image
+
+Related to [#1293](https://github.com/gbaudrit/agentstration/issues/1293).
+`deploy/images/extensions/opendal.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+Reuse `deploy/opendal/Dockerfile` and the existing **OpenDAL native packaging**
+workflow; there is no second native publication pipeline. Its SDK/runtime inputs
+are digest-resolved by the shared builder; the Linux runtime retains the Noble
+glibc baseline (`mcr.microsoft.com/dotnet/aspnet:10.0.8-noble`) and `linux-x64` RID.
+The image preserves Apache.OpenDAL 0.3.1 native/managed assets and the Apache,
+MPL-2.0 and CC0 license/NOTICE files. Alpine/musl is unsupported. Windows native
+qualification remains in the existing native workflow, independently from this
+Linux amd64 OCI catalogue.
+
+The real AEP identity is lowercase `agentstration.extensions.opendal`. The independent
+extension version `0.1.0` does not change `opendal.fs`, `opendal.s3`, `opendal.azblob`
+contribution/provider versions `1.0.0`, ASC identity/revision or MCP exposure.
+Mount writable local data at `/data`, configure `OpenDal__RootDirectory=/data`
+and explicit `OpenDal__AllowedClients__0` entries matching enrolled client IDs.
+The process UID must own this data; authentication keys are separate read-only
+mounts. S3/Azure credentials remain external secured bindings. The image smoke
+reuses `samples/OpenDalSmoke` to verify native assets/licenses, real ASC/MCP
+write/list/read and persisted content after restart against disposable local
+storage. Synthetic loopback S3/Azure peers stay deterministic; no real cloud
+storage or credential is needed. Snapshot retention is not added.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-opendal:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-opendal/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=opendal`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:opendal`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/opendal/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1293 open until effective private qualification is recorded; use no
+premature auto-closing keyword.

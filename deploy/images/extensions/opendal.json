@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "opendal",
+  "extensionId": "agentstration.extensions.opendal",
+  "project": "src/extensions/Agentstration.Extensions.OpenDal/Agentstration.Extensions.OpenDal.csproj",
+  "entrypoint": "Agentstration.Extensions.OpenDal.dll",
+  "dockerfile": "deploy/opendal/Dockerfile",
+  "versionFile": "src/extensions/Agentstration.Extensions.OpenDal/version.txt",
+  "testProject": "tests/Agentstration.Extensions.OpenDal.Tests/Agentstration.Extensions.OpenDal.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.Extensions.OpenDal.Tests",
+  "imageName": "extension-opendal",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "storageTypes",
+  "contributionId": "opendal.fs",
+  "contributions": {
+    "storageTypes": [
+      "opendal.fs",
+      "opendal.s3",
+      "opendal.azblob"
+    ]
+  },
+  "smokeEnvironment": {
+    "OpenDal__RootDirectory": "/tmp/opendal-packaging",
+    "OpenDal__AllowedClients__0": "packaging"
+  },
+  "runtimeImage": "mcr.microsoft.com/dotnet/aspnet:10.0.8-noble"
+}
