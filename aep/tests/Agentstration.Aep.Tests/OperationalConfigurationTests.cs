@@ -33,6 +33,8 @@ public sealed class OperationalConfigurationTests
             true, AepValueProtection.Secured, [AepConfigurationValueSource.Secret], AepConfigurationScope.Process,
             AepConfigurationApplyMode.RestartRequired);
         Assert.IsTrue(AepOperationalConfigurationDescriptor.Create("fixture/secured", "1.0.0", [option]).IsValid());
+        Assert.IsFalse(AepOperationalConfigurationDescriptor.Create("fixture/secured", "1.0.0",
+            [option with { Protection = AepValueProtection.Standard }]).IsValid());
         foreach (var source in new[] { AepConfigurationValueSource.Literal, AepConfigurationValueSource.Parameter })
             Assert.IsFalse(AepOperationalConfigurationDescriptor.Create("fixture/secured", "1.0.0", [option with { AllowedSources = [source] }]).IsValid());
     }

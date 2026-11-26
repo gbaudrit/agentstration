@@ -150,4 +150,8 @@ or restart a process. `AepClient.GetOperationalConfigurationAsync` returns null 
 legacy extensions; incompatible capability/descriptor versions fail explicitly.
 
 The OpenAPI executable supplies the first durable non-secret implementation.
+A Secret binding source requires Secured protection. Standard options cannot accept
+Secret bindings, so activation evidence cannot accidentally expose a value obtained
+through a protected grant. Secured options permit only Secret references.
+
 See [ADR-0266](../docs/decisions/0266-instance-extension-options-use-an-operational-aep-contract.md).

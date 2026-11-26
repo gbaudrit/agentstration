@@ -36,7 +36,9 @@ public sealed record AepOperationalConfigurationDescriptor(
             && Enum.IsDefined(o.Protection) && o.AllowedSources is { Count: > 0 and <= 3 }
             && o.AllowedSources.All(s => Enum.IsDefined(s))
             && o.AllowedSources.Distinct().Count() == o.AllowedSources.Count
-            && (o.Protection != AepValueProtection.Secured || o.AllowedSources.All(s => s == AepConfigurationValueSource.Secret)))
+            && (o.Protection == AepValueProtection.Secured
+                ? o.AllowedSources.All(s => s == AepConfigurationValueSource.Secret)
+                : !o.AllowedSources.Contains(AepConfigurationValueSource.Secret)))
         && SchemaDigest == AepSchemaDigest.Compute(JsonSerializer.SerializeToElement(Options, AepProtocol.JsonOptions))
         && JsonSerializer.SerializeToUtf8Bytes(this, AepProtocol.JsonOptions).Length <= AepOperationalConfigurationProtocol.MaximumBytes;
 }

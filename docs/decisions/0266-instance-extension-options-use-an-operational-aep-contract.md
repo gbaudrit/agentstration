@@ -30,7 +30,8 @@ Future work needs independent Tenant/Workspace policies and explicit cold settin
   separately owned configuration read-only. Descendant overrides are unavailable.
 - Standard values are resolved and schema-checked before delivery. Mutable bindings
   are revalidated before functional AEP/MCP use in the configuration owner's context.
-  Secret bindings use existing one-use Secret capabilities and a protected callback;
+  Options allowing Secret bindings must declare Secured protection; standard options
+  cannot accept Secret bindings. Secret bindings use existing one-use Secret capabilities and a protected callback;
   neither Secret bytes nor hashes of those bytes become ordinary persisted evidence.
 - Save desired state before attempting delivery. Record applied generation/revision
   only after matching runtime acknowledgment. A lost response leaves pending state;
