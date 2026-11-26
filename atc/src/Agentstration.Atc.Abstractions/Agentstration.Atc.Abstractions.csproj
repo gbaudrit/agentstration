@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Provider-neutral Agentstration Tracking Contract.</Description>
+  </PropertyGroup>
+</Project>

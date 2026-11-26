@@ -61,6 +61,8 @@ Packs form a distribution layer above these boundaries. The repository produces 
 
 The Agentstration Extension Protocol SDK, conformance validator, CLI, samples and standalone Inspector are staged autonomously in [`aep/`](aep/README.md). AEP gives extensions versioned discovery, capability and option contracts without leaking provider-specific concerns into portable Agentstration resources.
 
+The independent [Tracking Contract (ATC) SDK](atc/README.md) defines versioned tracking semantics over MCP, with typed client/server adapters, optional AEP declarations and deterministic conformance fixtures. It supports repository and non-repository targets without an agent or LLM; product/provider adoption is tracked separately.
+
 The ten autonomous extension executables live in [`src/extensions/`](src/extensions/),
 with their existing project names and independent packaging. Product-owned extension
 management modules remain directly under `src/`; the MAF AWP Worker is a separate

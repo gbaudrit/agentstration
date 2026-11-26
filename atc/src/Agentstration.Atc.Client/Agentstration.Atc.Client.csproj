@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Typed ATC MCP client.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Agentstration.Atc.Abstractions/Agentstration.Atc.Abstractions.csproj" />
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+</Project>

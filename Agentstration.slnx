@@ -1,4 +1,12 @@
 <Solution>
+  <Folder Name="/atc/">
+    <Project Path="atc/samples/LocalTracking/LocalTracking.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Abstractions/Agentstration.Atc.Abstractions.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Aep/Agentstration.Atc.Aep.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Client/Agentstration.Atc.Client.csproj" />
+    <Project Path="atc/src/Agentstration.Atc.Server/Agentstration.Atc.Server.csproj" />
+    <Project Path="atc/tests/Agentstration.Atc.Tests/Agentstration.Atc.Tests.csproj" />
+  </Folder>
   <Folder Name="/aep/src/" />
   <Folder Name="/asc/">
     <Project Path="asc/src/Agentstration.Asc.Abstractions/Agentstration.Asc.Abstractions.csproj" />
