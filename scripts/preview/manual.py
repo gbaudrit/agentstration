@@ -198,6 +198,9 @@ def validate_options(options):
     preview.require(options['database'] in ('sqlite', 'postgresql') and options['test_profile'] in ('none', 'readiness'), 'Unsupported database or test profile.')
     preview.require(options['data_mode'] in ('preserve', 'reset'), 'Unsupported data mode.')
     preview.require(options['operation'] == 'destroy' or options['data_mode'] == 'preserve', 'Reset is explicit destroy only; destroy with reset before deploying.')
+    preview.require(type(options.get('reset_before_deploy', False)) is bool
+                    and (not options.get('reset_before_deploy') or options['operation'] == 'deploy'),
+                    'Reset-before-deploy is a boolean available only for deployment.')
     preview.require(options['vm_size_profile'] in ('1', '2', '3', '4', '5'), 'Select a configured size slot from 1 to 5.')
     ttl = str(options['ttl_hours'])
     if type(options['ttl_hours']) is float and options['ttl_hours'].is_integer():

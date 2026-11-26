@@ -302,9 +302,23 @@ class AzureAccessTests(unittest.TestCase):
         self.assertTrue(self.cloud.leased)
         return access.Routes(request, record, save, environment(), self.api)
 
-    def execute(self, action, request=None):
+    def execute(self, action, request=None, **kwargs):
         with patch.object(access, 'probe'):
-            return azure.execute(action, request or self.request, self.cloud.factory, route_factory=self.routes)
+            return azure.execute(action, request or self.request, self.cloud.factory, route_factory=self.routes, **kwargs)
+
+    def test_explicit_redeploy_removes_old_route_and_recreates_verified_access_under_new_owner(self):
+        self.execute('deploy')
+        original = copy.deepcopy(self.cloud.record)
+        self.api.changes = []
+        self.cloud.effects = []
+        result = self.execute('deploy', reset_before_deploy=True)
+        self.assertEqual('https://dev-pr-17.agentstration.cloud', result['url'])
+        self.assertNotEqual(original['ownerId'], self.cloud.record['ownerId'])
+        self.assertEqual(1, len(self.api.tunnels))
+        self.assertEqual(1, len(self.api.dns))
+        self.assertTrue(self.cloud.record['access']['verified'])
+        self.assertTrue(any(method == 'DELETE' and path.endswith('/' + TUNNEL) for method, path, _ in self.api.changes))
+        self.assertEqual('reset', self.cloud.effects[0])
 
     def test_publish_redeploy_preserve_and_reset_share_the_provider_lease(self):
         first = self.execute('deploy')

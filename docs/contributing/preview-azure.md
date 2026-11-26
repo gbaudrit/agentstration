@@ -52,6 +52,13 @@ have been reset; deleting it loses their ownership records.
 | `destroy`, `dataMode: preserve` | Stop containers and deallocate VM; retain data, protected credentials, disks and networking |
 | `destroy`, `dataMode: reset` | Delete only owned VM/NIC/IP/VNet/NSG/data disk; OS disk deletes with VM; retain shared bootstrap account/group |
 
+The issue/PR command `/preview redeploy` requests explicit reset-before-deploy:
+validate/freeze the new image selection, remove only owned infrastructure and
+data, then recreate under one lease. The previous data is lost; a partial reset
+stops recreation. A normal `/preview` or `/preview deploy` preserves data.
+Status returns a bounded live container/health/restart snapshot even for older
+guest tooling, without exporting container configuration or health-check logs.
+
 Retries preserve the original expiry. Reset allows a new data lifecycle, including
 a database change, with a new owner/expiry. Database conversion, automatic TTL
 cleanup (#1286) and optional extension selection remain separate work. The

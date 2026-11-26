@@ -75,6 +75,7 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", source)
         self.assertNotIn('!github.event.issue.pull_request', source)
         self.assertIn('actions: write', source)
+        self.assertIn("startsWith(github.event.comment.body, '/preview')", source)
         for forbidden in ('environment:', 'secrets:', 'id-token:', 'azure/login', 'head.sha', 'head.ref', 'run: ${{'):
             self.assertNotIn(forbidden, source)
 
@@ -126,6 +127,16 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertNotIn('run-id:', download[1])
         self.assertNotIn('environment:', report)
         self.assertNotIn('id-token:', report)
+
+    def test_reset_intent_reaches_only_the_deployment_executor_without_changing_the_manual_form(self):
+        source = self.workflows()['preview-on-demand.yml']
+        self.assertIn('reset_before_deploy: ${{ fromJSON(needs.boundary.outputs.selection).reset_before_deploy || false }}', source)
+        provider = self.workflows()['preview-environment.yml']
+        manual, reusable = provider.split('  workflow_call:', 1)
+        self.assertNotIn('reset_before_deploy:', manual)
+        self.assertIn('reset_before_deploy:', reusable)
+        self.assertIn("operation == 'deploy' and request['provider'] == 'azure-vm'", provider)
+        self.assertIn('arguments+=(--reset-before-deploy)', provider)
 
 
 if __name__ == '__main__':

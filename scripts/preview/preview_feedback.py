@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import re
 
 import contract
+import container_health
 import preview
 
 OPERATIONS = {'deploy': 'Deployment', 'status': 'Preview status', 'destroy': 'Removal'}
@@ -17,7 +18,8 @@ def extension_names(values):
 
 
 def actions():
-    return ('**Commands:** `/preview status` to check the environment · `/preview deploy` to update while preserving data · '
+    return ('**Commands:** `/preview status` to check health · `/preview` to update while preserving data · '
+            '`/preview redeploy` to erase and recreate · '
             '`/preview destroy` to remove the preview **and its data**.')
 
 
@@ -40,12 +42,15 @@ def details(request):
 
 def accepted(options, repository, run_url):
     operation = options['operation']
-    lines = ['**' + OPERATIONS[operation] + ' — request received**',
+    reset = options.get('reset_before_deploy', False)
+    lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + ' — request received**',
              'Environment: `' + options['environment_id'] + '`.']
     if operation == 'deploy':
         lines += ['Server revision: ' + revision(repository, options['revision']) + '.',
                   'Database: **' + options['database'] + '**. Extensions: ' + extension_names(options.get('extensions', [])) + '.',
                   'Next: check published images and deployment settings. This request has not created a VM yet.']
+        if reset:
+            lines.append('**This command will delete the previous preview, including disks/IP and application data, then create a fresh environment.**')
     elif operation == 'destroy':
         lines.append('Full removal of this preview’s VM, disks/IP and application data has been requested.')
     else:
@@ -53,8 +58,8 @@ def accepted(options, repository, run_url):
     return '\n\n'.join([*lines, '[Follow progress](' + run_url + ').'])
 
 
-def planned(request, operation, repository, run_url):
-    lines = ['**' + OPERATIONS[operation] + ' — checks completed**',
+def planned(request, operation, repository, run_url, reset_before_deploy=False):
+    lines = ['**' + ('Redeployment' if reset_before_deploy else OPERATIONS[operation]) + ' — checks completed**',
              'Environment: `' + request['environmentId'] + '`.',
              'Server revision: ' + revision(repository, request['sourceSha']) + '.',
              'Database: **' + request['database'] + '**. Extensions: ' + extension_names(request.get('extensions', {})) + '.']
@@ -63,12 +68,36 @@ def planned(request, operation, repository, run_url):
         lines += ['VM: **' + target['vmSize'] + '**, region: **' + target['region'] + '**.',
                   'The images are available. Deployment will start when its execution slot is available.',
                   '**Recorded lifetime: ' + str(request['ttlHours']) + ' h. Automatic expiry cleanup is not implemented yet; use `/preview destroy` after testing.**']
+        if reset_before_deploy:
+            lines.append('**The checked images will be deployed after full removal of the previous preview and its application data.**')
     elif operation == 'destroy':
         lines.append('Removal will delete this preview’s owned resources and **erase its application data**.')
     return '\n\n'.join([*lines, '[Workflow execution](' + run_url + ').', details(request)])
 
 
-def completed(result, operation, repository, run_url, request=None):
+def health_table(result, request):
+    services = list(contract.images(request)) if request else list(result.get('images', {}))
+    values = result.get('health', {})
+    preview.require(isinstance(values, dict) and set(values) <= set(services), 'Unexpected container health components.')
+    lines = ['| Component | Container | Health | Restarts |', '| --- | --- | --- | --- |']
+    for name in services:
+        preview.require(isinstance(name, str) and re.fullmatch(r'server|worker|postgres|extension-[a-z][a-z0-9-]{0,31}', name),
+                        'Invalid health component.')
+        row = values.get(name)
+        if row is None:
+            lines.append('| `' + name + '` | not observed | not observed | — |')
+            continue
+        preview.require(isinstance(row, dict) and set(row) == {'state', 'health', 'restarts'}
+                        and isinstance(row['state'], str) and row['state'] in container_health.STATES
+                        and isinstance(row['health'], str) and row['health'] in container_health.HEALTH
+                        and (row['restarts'] is None or type(row['restarts']) is int and 0 <= row['restarts'] <= 2147483647),
+                        'Invalid container health snapshot.')
+        lines.append('| `' + name + '` | ' + row['state'] + ' | ' + row['health'] + ' | ' +
+                     (str(row['restarts']) if row['restarts'] is not None else '—') + ' |')
+    return '\n'.join(lines) if services else 'Container health was not observed during this check.'
+
+
+def completed(result, operation, repository, run_url, request=None, reset_before_deploy=False):
     state = result['state']
     titles = {'running': 'Preview ready', 'destroyed': 'Preview removed', 'absent': 'No active environment',
               'stopped': 'Preview stopped', 'unhealthy': 'Preview unavailable',
@@ -77,7 +106,7 @@ def completed(result, operation, repository, run_url, request=None):
         titles[state] = 'Environment running — access not confirmed'
     lines = ['**' + titles[state] + '**', 'Environment: `' + result['environmentId'] + '`.']
     if result.get('url'):
-        lines += ['[**Open Agentstration**](' + result['url'] + ')', 'Access protected by Cloudflare Access / Entra.']
+        lines += ['[**Open Agentstration**](' + result['url'] + ')']
     if state == 'destroyed':
         lines.append('This preview’s VM, disks/IP and application data have been removed. Shared services are retained.')
     elif state == 'absent':
@@ -94,6 +123,9 @@ def completed(result, operation, repository, run_url, request=None):
         lines.append('Extensions: ' + extension_names(selected) + '.')
         if request:
             lines.append('VM: **' + request['target']['vmSize'] + '**, region: **' + request['target']['region'] + '**.')
+        lines.append(health_table(result, request))
+        if reset_before_deploy and state == 'running':
+            lines.append('The previous preview and its application data were removed before this fresh deployment.')
         if state == 'running':
             if not result.get('url'):
                 lines.append('The URL is withheld: this check could not confirm protected access.')
@@ -137,7 +169,8 @@ def failed(operation, repository, run_url, stage, options, failure=None):
     elif code == 'registry-access':
         reason = 'The private GHCR package for `' + component + '` is missing or inaccessible to the workflow.'
         next_step = 'Check its **Private** visibility and **Manage Actions access → gbaudrit/agentstration → Write**, then retry the command.'
-    lines = ['**' + OPERATIONS[operation] + ' — failed**', reason]
+    reset = options.get('reset_before_deploy', False)
+    lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + ' — failed**', reason]
     if options.get('environment_id'):
         lines.append('Environment: `' + options['environment_id'] + '`.')
     if preview.SHA.fullmatch(options.get('revision') or ''):
@@ -149,4 +182,6 @@ def failed(operation, repository, run_url, stage, options, failure=None):
         lines.append('Azure deployment execution was not started by this attempt.')
     else:
         lines.append('Resources may remain after this failure; no unverified access URL is published.')
+        if reset:
+            lines.append('The previous preview and its data may already have been removed. Check `/preview status`; use `/preview` to retry deployment without another reset.')
     return '\n\n'.join([*lines, '[Inspect the failed step](' + run_url + ').'])

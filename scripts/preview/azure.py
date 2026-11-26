@@ -167,12 +167,12 @@ def validate_record(request, record, action):
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
     preview.require(previous['deliveries']['server']['repository'].lower() == request['deliveries']['server']['repository'].lower(),
                     'Azure ownership metadata belongs to another repository.')
-    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion', 'osProfile')
+    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] or action == 'redeploy' else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion', 'osProfile')
     preview.require(all(previous_target[key] == target[key] for key in fixed),
                     'Existing Azure previews cannot change location, OS image or ownership scope; reset before changing location/OS.')
-    if not record['destroyed']:
+    if not record['destroyed'] and action != 'redeploy':
         preview.require(previous['database'] == request['database'], 'Reset the Azure preview explicitly before changing databases.')
-    if action != 'deploy':
+    if action not in ('deploy', 'redeploy'):
         preview.require(contract.images(previous) == contract.images(request) and previous_target == target,
                         'Status/destroy requires the recorded Azure image and target selection.')
 
@@ -326,7 +326,12 @@ class Azure:
             lines = view.get('output', '').splitlines()
             marker = [line.removeprefix('AGENTSTRATION_RESULT=') for line in lines if line.startswith('AGENTSTRATION_RESULT=')]
             preview.require(len(marker) == 1, 'Guest returned no bounded lifecycle result.')
-            return json.loads(marker[0])
+            value = json.loads(marker[0])
+            if action == 'status':
+                health = [line.removeprefix('AGENTSTRATION_HEALTH=') for line in lines if line.startswith('AGENTSTRATION_HEALTH=')]
+                preview.require(len(health) == 1, 'Guest returned no bounded container health snapshot.')
+                value['health'] = json.loads(health[0])
+            return value
         finally:
             path.unlink(missing_ok=True)
             # Discard the protected download parameter from the ARM resource after execution.
@@ -441,14 +446,21 @@ unset BUNDLE_URL
         preview.require(re.fullmatch(r'docker.io/library/registry:3@sha256:[0-9a-f]{64}', image), 'Pin the public transfer registry image.')
         script += ' --registry-image ' + image
     script += '\n'
+    if action == 'status':
+        # Run current trusted health collection even when the existing guest tooling predates this feature.
+        script += "python3 - <<'HEALTH'\n" + (preview.ROOT / 'scripts/preview/container_health.py').read_text()
+        script += "\nprint('AGENTSTRATION_HEALTH=' + json.dumps(collect(" + repr('preview-' + request['environmentId']) + ', '
+        script += repr(list(contract.images(request))) + "), separators=(',', ':')))\nHEALTH\n"
     if action == 'deploy':
         script += 'rm -f /srv/agentstration-preview/incoming/*.oci.tar\n'
     return script
 
 
-def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes, extension_configuration=None):
+def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes, extension_configuration=None, reset_before_deploy=False):
     raw_configuration = os.environ.pop("PREVIEW_EXTENSION_CONFIGURATION", "") or "{}"
     contract.operation(action, request)
+    preview.require(type(reset_before_deploy) is bool and (not reset_before_deploy or action == 'deploy'),
+                    'Reset-before-deploy requires a deployment.')
     settings = extensions.configuration(extension_configuration if extension_configuration is not None else raw_configuration,
                                         request.get("extensions", {})) if action == "deploy" else {}
     preview.require(request['provider'] == 'azure-vm' and request['registry'] == 'ghcr.io', 'Azure consumes private GHCR deliveries only.')
@@ -458,6 +470,7 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
     with tempfile.TemporaryDirectory(prefix='agentstration-azure-') as temporary:
         client = client_factory(request, temporary)
         record = client.read()
+        existing_record = record is not None
         resources = client.resources(record)
         if record is None:
             if action != 'deploy':
@@ -468,9 +481,21 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
             client.write(record, initial=True)
         with client.lock():
             record = client.read()
-            validate_record(request, record, action)
+            validate_record(request, record, 'redeploy' if reset_before_deploy else action)
             resources = client.resources(record)
             if action == 'deploy':
+                if reset_before_deploy and existing_record and not record['destroyed']:
+                    # Keep one provider lease across reset and recreation. Never deploy after a partial reset.
+                    routes = route_factory(request, record, client.write, os.environ) if 'access' in record else None
+                    if routes:
+                        routes.withdraw()
+                    client.reset(record)
+                    resources = client.resources(record)
+                    preview.require(not resources, 'Reset is incomplete; deployment was not started.')
+                    if routes:
+                        routes.destroy()
+                    record.update(destroyed=True, initialized=False)
+                    client.write(record)
                 if record['destroyed']:
                     preview.require(not resources, 'A reset preview still has resources; finish reset before deploying.')
                     created = now or datetime.now(timezone.utc)
@@ -544,6 +569,7 @@ def azure_result(request, state, resources, record=None, guest=None):
     value = lifecycle.result(request, state)
     guest = guest or {}
     value.update(expiresAt=(record or {}).get('expiresAt'), observedImages=guest.get('observedImages', {}),
+                 health=guest.get('health', {}),
                  providerResourceIds={'subscription': request['target']['subscriptionId'], 'resourceGroup': request['target']['resourceGroup'],
                                       'resources': [r['id'] for r in resources]},
                  metrics={k: guest[k] for k in ('guestOperationSeconds', 'memoryAvailableKiB') if k in guest})
