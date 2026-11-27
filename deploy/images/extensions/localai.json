@@ -6,18 +6,11 @@
   "entrypoint": "Agentstration.Extensions.LocalAI.dll",
   "dockerfile": "Dockerfile.extension",
   "versionFile": "src/extensions/Agentstration.Extensions.LocalAI/version.txt",
-  "testProject": "tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj",
-  "testFilter": "FullyQualifiedName~LocalAi|FullyQualifiedName~LocalAI|FullyQualifiedName~InferenceTimeoutTests",
+  "testProject": "tests/Agentstration.Extensions.LocalAI.Tests/Agentstration.Extensions.LocalAI.Tests.csproj",
+  "testFilter": "FullyQualifiedName!~LocalAiIntegrationTests",
   "imageName": "extension-localai",
   "platform": "linux/amd64",
   "aepVersion": "agentstration.io/v1",
   "contributionKind": "modelProviders",
-  "contributionId": "localai",
-  "ci": {
-    "testPaths": [
-      "tests/Agentstration.ModelProviders.Tests/LocalAiProviderTests.cs",
-      "tests/Agentstration.ModelProviders.Tests/LocalAiIntegrationTests.cs",
-      "tests/Agentstration.ModelProviders.Tests/LocalAiPackagingTests.cs"
-    ]
-  }
+  "contributionId": "localai"
 }

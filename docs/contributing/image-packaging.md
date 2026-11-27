@@ -593,8 +593,11 @@ configuration, never image layers, command arguments, receipts or logs. The imag
 contains only the AEP extension, with no inference server or model. The separate
 `deploy/compose/localai.yml` source-build topology uses `localai/localai:v4.9.0`
 and an explicit model volume; its empty model catalogue does not trigger downloads.
-Deterministic HTTP fixtures cover the provider; live LocalAI/model validation is
-opt-in and is not claimed by packaging smokes.
+Deterministic HTTP fixtures and protected-discovery packaging tests run in the
+dedicated `Agentstration.Extensions.LocalAI.Tests` project. The OCI filter excludes
+`LocalAiIntegrationTests`, which requires an explicit live LocalAI/model opt-in.
+Shared product inference-timeout tests remain outside this extension validation;
+packaging smokes do not claim live-provider qualification.
 
 ### Authentication, state and publication
 
