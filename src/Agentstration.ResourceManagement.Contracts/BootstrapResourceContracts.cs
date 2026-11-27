@@ -47,7 +47,8 @@ public enum BootstrapBindingTargetKind
     [JsonStringEnumMemberName("secret")] Secret,
     [JsonStringEnumMemberName("connectedServiceType")] ConnectedServiceType,
     [JsonStringEnumMemberName("storageType")] StorageType,
-    [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile
+    [JsonStringEnumMemberName("dataSourceProfile")] DataSourceProfile,
+    [JsonStringEnumMemberName("connectedService")] ConnectedService
 }
 
 public sealed record BootstrapResourceOperationContext(string ProfileName, string ProfilePath, BootstrapProfileScope ProfileScope, BootstrapApplicationTarget? Target = null, bool WaitForDependencies = false)
@@ -61,7 +62,12 @@ public sealed record BootstrapResourceOperationContext(string ProfileName, strin
 }
 public sealed record BootstrapInputSelection(string Profile, string Configuration, string Kind,
     JsonElement? Literal = null, ScopedResourceAddress? Resource = null);
-public sealed record BootstrapResourcePlanDetail(string Kind, string Name, BootstrapResourceDisposition Disposition, string? Description = null);
+public sealed record BootstrapResourcePlanDetail(string Kind, string Name, BootstrapResourceDisposition Disposition, string? Description = null)
+{
+    public ResourceReference? Reference { get; init; }
+    public string? Contract { get; init; }
+    public string? Target { get; init; }
+}
 public sealed record BootstrapResourcePlanResult(BootstrapResourceDisposition Disposition, IReadOnlyList<BootstrapResourcePlanDetail>? Details = null);
 
 public sealed class BootstrapPlanningContext

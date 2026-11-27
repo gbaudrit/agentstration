@@ -781,6 +781,12 @@ capabilities and current grants are prerequisites. Protected relay publications 
 bindings are created through their owning services; explicit first-sync/draft-import receipts remain in
 application history. Restart still interrupts manual applications; explicit new reviewed applications
 retry create-only configuration without replacing operator edits. Sharing never auto-applies Bootstrap.
+
+Workspace seed named-connection review (#1347) reuses Bootstrap ConnectedService bindings and Work
+compatibility proofs. Application pins local assignments; first sharing handover publishes or verifies
+portable requirements with retained recovery receipts. Local services, scopes and credentials remain
+private. See [ADR-0295](../../decisions/0295-workspace-seeds-review-local-service-assignments.md).
+
 See [Workspace seeds](../../reference/workspace-seeds.md) and ADR-0281.
 
 ### Reviewed YAML Work data

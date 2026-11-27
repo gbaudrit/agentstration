@@ -321,7 +321,8 @@ public sealed class BootstrapProgressComponentTests
         var provenance = new WorkspaceSeedProvenance(Guid.NewGuid(), target, Guid.NewGuid(), "1.0.0", "release-one", new string('a', 64), "seed", "bootstrap", null, null, null, DateTimeOffset.UnixEpoch)
         { ImportPlans = [new(Guid.NewGuid(), new string('b', 64))] };
         var project = Guid.NewGuid();
-        var handover = new WorkspaceSeedHandover(provenance.Id, WorkspaceSeedHandoverStatus.Succeeded, project, "fixture", default, "revision-1", [], DateTimeOffset.UnixEpoch);
+        var handover = new WorkspaceSeedHandover(provenance.Id, WorkspaceSeedHandoverStatus.Succeeded, project, "fixture", default, "revision-1", [], DateTimeOffset.UnixEpoch)
+        { RequirementsPublicationId = Guid.NewGuid(), RequirementsDigest = new string('c', 64) };
         var cut = context.Render<WorkspaceSeedReview>(p => p.Add(x => x.Provenance, provenance).Add(x => x.Handover, handover)
             .Add(x => x.Prerequisites, [new("Worker", "coding-cli", false, "seed_native_worker_missing")]));
         Assert.Contains(title, cut.Markup); Assert.Contains(missing, cut.Markup); Assert.Contains(synchronized, cut.Markup);
@@ -330,7 +331,11 @@ public sealed class BootstrapProgressComponentTests
         Assert.Contains(provenance.ImportPlans[0].ExpectedDigest, cut.Markup);
         var labels = context.Services.GetRequiredService<Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings>>();
         Assert.AreEqual(cultureName == "fr-FR" ? "Invalide" : "Invalid", labels["Disposition.Invalid"].Value);
-        Assert.AreEqual($"/api/workspaces/{target.WorkspaceId:D}/projects/{project:D}", cut.Find("a").GetAttribute("href"));
+        Assert.AreEqual($"/api/workspaces/{target.WorkspaceId:D}/projects/{project:D}", cut.FindAll("a")[0].GetAttribute("href"));
+        Assert.AreEqual($"/api/workspaces/{target.WorkspaceId:D}/projects/{project:D}/sharing/operations/{handover.RequirementsPublicationId:D}", cut.FindAll("a")[1].GetAttribute("href"));
+        Assert.Contains(handover.RequirementsDigest, cut.Markup);
+        Assert.Contains(cultureName == "fr-FR" ? "Déclarations de connexion partagées vérifiées" : "Shared connection declarations verified", cut.Markup);
+        Assert.Contains(cultureName == "fr-FR" ? "Publication des déclarations de connexion" : "Connection declaration publication", cut.Markup);
     }
 
     [TestMethod]

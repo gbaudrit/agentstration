@@ -136,4 +136,20 @@
   <data name="Seed.PlannedImports" xml:space="preserve"><value>{0} plans to import as drafts (identities and SHA-256)</value></data>
   <data name="Seed.ResourceInvalid" xml:space="preserve"><value>Check the resource declaration, installed source, access grants and protected bindings.</value></data>
   <data name="Disposition.Invalid" xml:space="preserve"><value>Invalid</value></data>
+  <data name="BindingTargetKind.ConnectedService" xml:space="preserve"><value>Connected service</value></data>
+  <data name="Connection.Name" xml:space="preserve"><value>Connection need</value></data>
+  <data name="Connection.Contract" xml:space="preserve"><value>Required contract</value></data>
+  <data name="Connection.Target" xml:space="preserve"><value>External target</value></data>
+  <data name="Connection.Service" xml:space="preserve"><value>Local connected service</value></data>
+  <data name="Connection.Unassigned" xml:space="preserve"><value>Not assigned; configure before use</value></data>
+  <data name="Diagnostic.bootstrap_project_connections_invalid" xml:space="preserve"><value>The Project connection declarations or assignments are invalid.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_definition_invalid" xml:space="preserve"><value>Check connection names, contracts and the four export mappings.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_connection_incompatible" xml:space="preserve"><value>The selected service or adapter does not support the required contract.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_connection_target_mismatch" xml:space="preserve"><value>The selected service points to a different external target. Choose a compatible service.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_binding_denied" xml:space="preserve"><value>Access to the selected service or adapter is denied.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_binding_unavailable" xml:space="preserve"><value>The selected service or adapter is unavailable in this Workspace.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_bindings_invalid" xml:space="preserve"><value>The selected local connection references are invalid.</value></data>
+  <data name="Seed.ConnectionRequirements" xml:space="preserve"><value>Shared connection declarations verified</value></data>
+  <data name="Seed.ConnectionPublication" xml:space="preserve"><value>Connection declaration publication</value></data>
+  <data name="Diagnostic.bootstrap_work_project_contract_missing" xml:space="preserve"><value>The selected contribution does not expose the required connection contract.</value></data>
 </root>

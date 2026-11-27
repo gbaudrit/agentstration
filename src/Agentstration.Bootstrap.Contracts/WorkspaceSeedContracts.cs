@@ -61,4 +61,8 @@ public enum WorkspaceSeedHandoverStatus { Pending, Succeeded, Failed }
 
 public sealed record WorkspaceSeedHandover(Guid SeedId, WorkspaceSeedHandoverStatus Status,
     Guid ProjectId, string ProjectName, ResourceNamespace Namespace, string? Revision,
-    IReadOnlyList<Guid> ImportedPlans, DateTimeOffset UpdatedAt, string? ErrorCode = null);
+    IReadOnlyList<Guid> ImportedPlans, DateTimeOffset UpdatedAt, string? ErrorCode = null)
+{
+    public Guid? RequirementsPublicationId { get; init; }
+    public string? RequirementsDigest { get; init; }
+}

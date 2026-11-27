@@ -226,10 +226,20 @@ public sealed partial class WorkspaceSeedService(IResourceStore resources, IIden
         if (profile.Summary.Scope != BootstrapProfileScope.Workspace || profile.Resources.Any(value => value.Resource.Kind is
             "BootstrapProfile" or "Tenant" or "Workspace" or "PrincipalDefaultContext" or "ExtensionEnrollmentPolicy" or "ResourceAccessPolicy" or "ModelProvider" or "RuntimeProfile"))
             throw Invalid("seed_workspace_only");
+        foreach (var resource in profile.Resources.Where(value => value.Resource.Kind == "ProjectSharing"))
+            if (PhysicalReference(resource.Resource.Definition)) throw Invalid("seed_local_identity_forbidden");
         if (profile.Resources.Count(value => value.Resource.Kind == "ProjectSharing" && value.Resource.Metadata.Name == manifest.Project.Name
             && value.Resource.Metadata.Namespace == manifest.Project.Namespace) != 1) throw Invalid("seed_project_required");
     }
 
+    private static bool PhysicalReference(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => element.EnumerateObject().Any(property => new[] { "uid", "generation", "instanceId" }.Contains(property.Name, StringComparer.OrdinalIgnoreCase)
+            || property.Name.Equals("scopeRef", StringComparison.OrdinalIgnoreCase) && property.Value.ValueKind == JsonValueKind.String && property.Value.GetString()!.StartsWith("/workspaces/", StringComparison.Ordinal)
+            || PhysicalReference(property.Value)),
+        JsonValueKind.Array => element.EnumerateArray().Any(PhysicalReference),
+        _ => false
+    };
     private static ScopedResourceAddress Address(Guid workspace, Guid id) => ScopedResourceAddress.Create(ResourceScopeRef.Workspace(workspace),
         ResourceNamespace.Default, ReceiptKind, id.ToString("N"));
     private static WorkspaceSeedReceipt Receipt(WorkspaceSeedStoredContent value) => new(value.Provenance, value.Manifest, value.Profile);

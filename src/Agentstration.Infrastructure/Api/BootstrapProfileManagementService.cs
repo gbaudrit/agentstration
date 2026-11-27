@@ -153,6 +153,9 @@ public sealed partial class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.Tool => Options(
                 await store.ListAsync<ToolResource>(ToolResourceKinds.Tool, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
+            BootstrapBindingTargetKind.ConnectedService => Options(
+                await store.ListVisibleAsync<ConnectedServiceResource>(ResourceScopeRef.Workspace(target!.WorkspaceId!.Value), ConnectedServiceResourceKinds.ConnectedService, 0, 1000, cancellationToken),
+                resource => resource.Definition.DisplayName),
             BootstrapBindingTargetKind.ConnectedServiceType => Options(
                 await store.ListAsync<ConnectedServiceTypeResource>(ConnectedServiceResourceKinds.ConnectedServiceType, 0, 1000, cancellationToken),
                 resource => resource.Definition.DisplayName),
@@ -178,6 +181,7 @@ public sealed partial class BootstrapProfileManagementService(
             BootstrapBindingTargetKind.ExtensionRegistration => ExtensionKinds.ExtensionRegistration,
             BootstrapBindingTargetKind.Tool => ToolResourceKinds.Tool,
             BootstrapBindingTargetKind.ConnectedServiceType => ConnectedServiceResourceKinds.ConnectedServiceType,
+            BootstrapBindingTargetKind.ConnectedService => ConnectedServiceResourceKinds.ConnectedService,
             BootstrapBindingTargetKind.StorageType => StorageResourceKinds.StorageType,
             BootstrapBindingTargetKind.DataSourceProfile => DataSourceResourceKinds.DataSourceProfile,
             BootstrapBindingTargetKind.Parameter => ParameterResourceKinds.Parameter,
@@ -201,7 +205,7 @@ public sealed partial class BootstrapProfileManagementService(
                     ? ResourceScopeRef.Tenant(target.TenantId.Value)
                     : null));
         return existing.Concat(planned)
-            .GroupBy(option => (option.Namespace, option.Name))
+            .GroupBy(option => (option.Namespace, option.Name, ScopeRef: targetKind == BootstrapBindingTargetKind.ConnectedService ? option.ScopeRef : null))
             .Select(group => group.OrderBy(option => option.Planned).First())
             .OrderBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(option => option.Namespace, StringComparer.Ordinal)

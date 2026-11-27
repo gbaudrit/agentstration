@@ -1,0 +1,20 @@
+@using Agentstration.ResourceManagement.Contracts
+@using Agentstration.Web.Components.Pages
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+<dl class="resource-details" data-testid="bootstrap-connection-review">
+    <dt>@Localizer["Connection.Name"]</dt><dd><code>@Detail.Name</code></dd>
+    <dt>@Localizer["Connection.Contract"]</dt><dd><code>@Detail.Contract</code></dd>
+    @if (Detail.Target is { } target) { <dt>@Localizer["Connection.Target"]</dt><dd><code>@target</code></dd> }
+    <dt>@Localizer["Connection.Service"]</dt>
+    <dd>@if (Detail.Reference is { } reference)
+    {
+        <code>@reference.Namespace/@reference.Name</code>
+        <ResourceScopeBadge ScopeRef="@reference.ScopeRef" JoinedName />
+    }
+    else { <StatusBadge Text="@Localizer["Connection.Unassigned"]" Status="UiStatus.Warning" /> }</dd>
+</dl>
+
+@code {
+    [Parameter, EditorRequired] public BootstrapResourcePlanDetail Detail { get; set; } = default!;
+}

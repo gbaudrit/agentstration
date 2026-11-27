@@ -176,7 +176,7 @@ else
         <Information Context="item">
             <CollectionValue Label="@T("Profile")"><code>@item.Profile</code></CollectionValue>
             <CollectionValue Label="@T("Target")">@item.TargetLabel</CollectionValue>
-            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <span class="bootstrap-resource-diagnostic">@PreviewMessage(item.Message)</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li><span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@(detail.Description is null ? null : PreviewMessage(detail.Description))</small></li> }</ul> }</CollectionValue>
+            <CollectionValue Label="@T("Details")">@if (item.Message is not null) { <span class="bootstrap-resource-diagnostic">@PreviewMessage(item.Message)</span> }@if (item.Details is { Count: > 0 }) { <ul class="bootstrap-detail-list">@foreach (var detail in item.Details) { <li>@if (detail.Contract is not null) { <BootstrapConnectionReview Detail="@detail" /> } else { <span>@detail.Kind/@detail.Name</span><StatusBadge Text="@DispositionLabel(detail.Disposition)" Status="@DispositionTone(detail.Disposition)" /><small>@(detail.Description is null ? null : PreviewMessage(detail.Description))</small> }</li> }</ul> }</CollectionValue>
         </Information>
     </CollectionView>
             <CollectionPager Page="@previewPage" Total="@preview.Resources.Count" PageSize="25" HasMore="@(previewPage * 25 < preview.Resources.Count)" SupportsDirectNavigation="true" PageChanged="value => previewPage = value" />

@@ -28,6 +28,10 @@
             <StatusBadge Text="@Localizer["Seed.Handover." + handover.Status]" Status="@(handover.Status == WorkspaceSeedHandoverStatus.Succeeded ? UiStatus.Success : UiStatus.Warning)" />
             <p><a href="@($"/api/workspaces/{seed.Target.WorkspaceId:D}/projects/{handover.ProjectId:D}")" target="_blank" rel="noopener">@Localizer["Seed.ProjectRecord", handover.Namespace, handover.ProjectName]</a></p>
             @if (handover.Revision is { } revision) { <p>@Localizer["Seed.Revision"] <code style="overflow-wrap:anywhere">@revision</code></p> }
+            @if (handover.RequirementsDigest is { } requirements)
+            { <p>@Localizer["Seed.ConnectionRequirements"] <code style="overflow-wrap:anywhere">@requirements</code></p> }
+            @if (handover.RequirementsPublicationId is { } publication)
+            { <p><a href="@($"/api/workspaces/{seed.Target.WorkspaceId:D}/projects/{handover.ProjectId:D}/sharing/operations/{publication:D}")" target="_blank" rel="noopener">@Localizer["Seed.ConnectionPublication"]</a></p> }
             <p>@Localizer["Seed.ImportedPlans", handover.ImportedPlans.Count]</p>
             @if (handover.ErrorCode is not null) { <p role="alert">@Localizer["Seed.HandoverHelp"] <code>@handover.ErrorCode</code></p> }
         }

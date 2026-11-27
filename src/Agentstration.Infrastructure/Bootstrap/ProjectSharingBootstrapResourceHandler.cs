@@ -12,6 +12,8 @@ namespace Agentstration.Infrastructure.Bootstrap;
 public sealed record DeclarativeProjectSharingDefinition(WorkSharingProjectId ProjectId, WorkParticipantId ParticipantId,
     string Location, string ToolName, string? ToolNamespace = null, string? DisplayName = null, Guid? Id = null)
 {
+    public IReadOnlyList<WorkProjectConnectionRequirement> ConnectionRequirements { get; init; } = [];
+    public IReadOnlyList<WorkProjectConnectionAssignment> ConnectionAssignments { get; init; } = [];
     public string? RepositoryToolName { get; init; }
     public string? RepositoryToolNamespace { get; init; }
     public string? CodePublicationToolName { get; init; }
@@ -32,14 +34,15 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
         var workspace = WorkspaceBootstrapResource.Workspace(operation);
         var existing = await projects.FindAsync(workspace, value.Metadata.Namespace, value.Metadata.Name, token);
         if (existing.IsSuccess) return new(await ReusableAsync(workspace, existing.Value!, value.Definition, token)
-            ? BootstrapResourceDisposition.Skip : BootstrapResourceDisposition.Conflict);
+            ? BootstrapResourceDisposition.Skip : BootstrapResourceDisposition.Conflict, ConnectionDetails(value.Definition));
         var definition = await DefinitionAsync(workspace, value.Definition, token, planning);
         if (definition is not null)
         {
             var valid = await projects.ValidateAsync(workspace, definition, token);
             if (!valid.IsSuccess) throw Invalid(valid.ErrorCode!);
         }
-        return WorkspaceBootstrapResource.Created(planning, Kind, value.Metadata.Name, value.Metadata.Namespace, resource);
+        _ = WorkspaceBootstrapResource.Created(planning, Kind, value.Metadata.Name, value.Metadata.Namespace, resource);
+        return new(BootstrapResourceDisposition.Create, ConnectionDetails(value.Definition));
     }
     public async Task<BootstrapResourceApplyResult> ApplyAsync(BootstrapResourceDocument resource, BootstrapResourceOperationContext operation, CancellationToken token)
     {
@@ -68,7 +71,9 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
     {
         if (!Matches(project, value)) return false;
         var expected = (await DefinitionAsync(workspace, value, token))!;
-        if (expected.Bindings.Any(binding => !project.Definition.Bindings.Contains(binding))) return false;
+        if (expected.Bindings.Any(binding => !project.Definition.Bindings.Contains(binding))
+            || expected.ConnectionRequirements.Any(need => !project.Definition.ConnectionRequirements.Any(own => WorkPlanDefinition.Digest(own) == WorkPlanDefinition.Digest(WorkProjectConnectionRules.Normalize(need))))
+            || expected.ConnectionAssignments.Any(assignment => !project.Definition.ConnectionAssignments.Any(own => WorkPlanDefinition.Digest(own) == WorkPlanDefinition.Digest(assignment)))) return false;
         var valid = await projects.ValidateAsync(workspace, project.Definition, token);
         if (!valid.IsSuccess) throw Invalid(valid.ErrorCode!);
         return true;
@@ -97,9 +102,22 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
         return new(value.DisplayName ?? value.ProjectId.ToString(), null, [], [])
         {
             Bindings = bindings,
+            ConnectionRequirements = value.ConnectionRequirements,
+            ConnectionAssignments = value.ConnectionAssignments,
             Sharing = new(value.ProjectId, value.ParticipantId, "sharing", value.Location)
         };
     }
+    private static IReadOnlyList<BootstrapResourcePlanDetail> ConnectionDetails(DeclarativeProjectSharingDefinition value) =>
+        value.ConnectionRequirements.Select(need =>
+        {
+            var service = value.ConnectionAssignments.SingleOrDefault(assignment => assignment.Name == need.Name)?.Service;
+            return new BootstrapResourcePlanDetail("ConnectedService", need.Name, BootstrapResourceDisposition.Skip)
+            {
+                Contract = need.Contract,
+                Target = need.Target is { } target ? target.ProviderId + "/" + target.TargetId : null,
+                Reference = service is null ? null : new(service.Address.Name, service.Address.ScopeRef, service.Address.Namespace)
+            };
+        }).ToArray();
     private static IEnumerable<(string Name, WorkProjectBindingPurpose Purpose, string Tool, string? Namespace)> Targets(DeclarativeProjectSharingDefinition value)
     {
         yield return ("sharing", WorkProjectBindingPurpose.Sharing, value.ToolName, value.ToolNamespace);

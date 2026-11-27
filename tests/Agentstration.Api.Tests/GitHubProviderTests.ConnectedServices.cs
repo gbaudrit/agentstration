@@ -13,6 +13,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.ConnectedServices;
 using Agentstration.Infrastructure.Work;
 using Agentstration.ResourceManagement;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
 using Agentstration.Secrets.Abstractions;
@@ -126,7 +127,7 @@ public sealed partial class GitHubProviderTests
     }
 
     internal static async Task<WorkProjectConnectionSelection> InstallIssueServiceAsync(IServiceProvider services, RequestContext context,
-        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<GitHubExtension::Program> extension, bool alternateAccount = false)
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<GitHubExtension::Program> extension, bool alternateAccount = false, bool instanceService = false)
     {
         var resources = services.GetRequiredService<IResourceStore>(); var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
         var registration = (await resources.GetExactAsync<ExtensionRegistrationResource>(new(owner, default, ExtensionKinds.ExtensionRegistration, "github-fixture"), default))!.Value;
@@ -141,19 +142,59 @@ public sealed partial class GitHubProviderTests
             using var secret = new SecretValue(Encoding.UTF8.GetBytes(Credential + "-second"));
             await services.GetRequiredService<SecretManagementService>().SetValueExactAsync(owner, "github-token", secret, default);
         }
-        var service = await CreateGitHubServiceAsync(services, context, type, envelope, "issue-service", "github-token");
+        using var provisioning = instanceService ? services.GetRequiredService<IRequestContextScopeFactory>().PushSystem() : null;
+        if (instanceService)
+        {
+            var grant = new DescendantUsePolicy { Grants = [new(ResourceScopeRef.Workspace(context.WorkspaceId))] };
+            type = (await services.GetRequiredService<ConnectedServiceTypeManagementService>().CreateAsync(new()
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ConnectedServiceResourceKinds.ConnectedServiceType,
+                ScopeRef = ResourceScopeRef.Instance,
+                Metadata = new() { Name = "instance-github-type" },
+                Definition = type.Definition with { UsePolicy = grant }
+            }, default)).Value;
+            var secrets = services.GetRequiredService<SecretManagementService>();
+            await secrets.CreateVaultAsync(new VaultResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Vault,
+                ScopeRef = ResourceScopeRef.Instance,
+                Metadata = new() { Name = "github-instance-vault" },
+                Definition = new() { DisplayName = "Disposable instance fixture", ProviderType = "local" }
+            }, default);
+            await secrets.CreateSecretAsync(new SecretResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = SecretResourceKinds.Secret,
+                ScopeRef = ResourceScopeRef.Instance,
+                Metadata = new() { Name = "instance-github-token" },
+                Definition = new() { DisplayName = "Disposable instance fixture", Vault = new("github-instance-vault", ResourceScopeRef.Instance), Key = "token" }
+            }, default);
+            using var token = new SecretValue(Encoding.UTF8.GetBytes(Credential));
+            await secrets.SetValueExactAsync(ResourceScopeRef.Instance, "instance-github-token", token, default);
+        }
+        var service = await CreateGitHubServiceAsync(services, context, type, envelope, "issue-service",
+            instanceService ? "instance-github-token" : "github-token", serviceOwner: instanceService ? ResourceScopeRef.Instance : null);
+        if (instanceService)
+        {
+            var policies = services.GetRequiredService<IResourceAccessPolicyService>();
+            foreach (var resource in new Resource[] { type, service })
+                await policies.PutAsync(new(new(resource.Uid, ResourceScopeRef.Instance, resource.Namespace, resource.Kind, resource.Generation),
+                    [new(owner, [ResourceAccessAction.Discover, ResourceAccessAction.Use])]), null, default);
+        }
         var tool = (await services.GetRequiredService<ToolManagementService>().ListVisibleToolsAsync(owner, default))
             .Single(value => value.Value.Definition.ExternalId == "github.tracking.describe").Value;
         return new(new("issues", WorkProjectConnectionRules.Tracking, "1.0", ["read", "update"],
             new(GitHub.GitHubServiceContract.Authority("https://api.github.com"), "42")),
-            new("issues", new(new(owner, service.Namespace, service.Kind, service.Name), service.Uid, service.Generation), Pin(tool),
+            new("issues", new(new(service.ScopeRef!.Value, service.Namespace, service.Kind, service.Name), service.Uid, service.Generation), Pin(tool),
                 WorkProjectConnectionRules.TargetFields.Select(field => new WorkProjectConnectionExport(field, field)).ToArray()));
     }
 
     private static async Task<ConnectedServiceResource> CreateGitHubServiceAsync(IServiceProvider services, RequestContext context,
-        ConnectedServiceTypeResource type, GitHub.GitHubServiceEnvelope envelope, string name, string secretName, bool unsafeCredential = false)
+        ConnectedServiceTypeResource type, GitHub.GitHubServiceEnvelope envelope, string name, string secretName, bool unsafeCredential = false, ResourceScopeRef? serviceOwner = null)
     {
-        var version = type.Definition.Versions.Single(); var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var version = type.Definition.Versions.Single(); var owner = serviceOwner ?? ResourceScopeRef.Workspace(context.WorkspaceId);
         var bindings = envelope.Inputs.Where(pair => pair.Key != "credential").Select(pair => new ConnectedServiceValueBinding
         { InputId = pair.Key, Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement(pair.Value) }).ToList();
         bindings.Add(unsafeCredential ? new() { InputId = "credential", Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement(Credential) }
@@ -167,6 +208,7 @@ public sealed partial class GitHubProviderTests
             Definition = new()
             {
                 DisplayName = name,
+                UsePolicy = serviceOwner == ResourceScopeRef.Instance ? new DescendantUsePolicy { Grants = [new(ResourceScopeRef.Workspace(context.WorkspaceId))] } : new(),
                 Options = envelope.Options,
                 Bindings = bindings,
                 Type = new() { Type = new(type.Name, type.ScopeRef, type.Namespace), TypeUid = type.Uid, Version = version.Version, SchemaDigest = version.SchemaDigest }

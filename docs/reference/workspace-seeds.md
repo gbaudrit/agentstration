@@ -79,6 +79,68 @@ installed enabled extension contributions and a recent compatible `coding-cli` w
 must already exist. Worker registration follows its own local CLI/isolation prerequisite check.
 No binaries, models, providers or grants are installed by seeding.
 
+## Named connections and local review
+
+A ProjectSharing definition may declare portable `connectionRequirements` (ADR-0291). Select
+existing local services with the ordinary profile binding inputs. For example:
+
+```yaml
+# bootstrap/profile.yaml, under definition
+bindings:
+  - name: local-tracking
+    targetKind: connectedService
+    displayName: Tracking account
+    required: true
+```
+
+```yaml
+# ProjectSharing definition; repository identity is illustrative
+connectionRequirements:
+  - name: issues
+    contract: agentstration.tracking.contracts.mcp.v1
+    version: '1.0'
+    requiredOperations: [read, update]
+    target:
+      providerId: <Describe-provided authority>
+      targetId: '42'
+connectionAssignments:
+  - name: issues
+    service: { binding: local-tracking }
+    describeTool:
+      extensionContribution:
+        kind: Tool
+        extensionId: Agentstration.Extensions.GitHub
+        contributionId: github.tracking.describe
+    exports:
+      - { field: providerId, exportId: providerId }
+      - { field: targetId, exportId: targetId }
+      - { field: bindingId, exportId: bindingId }
+      - { field: revision, exportId: revision }
+```
+
+Use the contract identifier, exports and authority returned by the installed compatible adapter;
+these technical values are not inferred from an extension name or hostname. ATC and AFC needs
+are independent and can select different services. Sharing-only packages require neither.
+A semantic `service: { resourceRef: { name: local-account } }` can instead reference a service
+created earlier by its owning ConnectedService Bootstrap handler. Order that declaration first.
+Do not author service/Tool UIDs, generations, instance IDs or physical Workspace scopes in the
+shared ProjectSharing YAML. A local binding selection supplies the authorized scope.
+
+Preview identifies each named need, contract, external target and selected service's logical
+administrative scope. Existing compatibility/Describe checks verify the actual service/type,
+exports, operations, target and granted access. Their evidence participates in the reviewed
+application digest. Replacing or changing a selected resource requires a fresh preview before
+configuration writes. Missing or incompatible services never fall back to another account.
+Different installations may select different UIDs, scopes and credentials for the same target.
+
+After configuration, the handover pulls shared state and compares its canonical requirements
+with the reviewed Project. If absent, it publishes those approved requirements using a stable,
+retained operation identity, then pulls again. A mismatch fails the handover without replacing
+shared declarations or local assignments. History retains the publication receipt and verified
+metadata digest; a retry recovers the same publication before continuing. This does not activate,
+allocate or execute a plan, and later sharing pulls never reapply Bootstrap. See
+[ADR-0295](../decisions/0295-workspace-seeds-review-local-service-assignments.md).
+
 ## Minimal document and HTTP
 
 A YAML pointer is at most 64 KiB:

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.Resources;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Web.Components.Bootstrap;
 using Agentstration.Web.Components.Values;
 using Agentstration.Web.Console;
@@ -39,6 +40,29 @@ public sealed class BootstrapConfigurationInputTests
         CollectionAssert.AreEqual(new[] { ValueBindingSourceKind.Literal }, editors[1].Instance.AllowedSources.ToArray());
         StringAssert.Contains(cut.Markup, missing);
         Assert.HasCount(1, cut.FindAll("[data-testid='bootstrap-input-binding-literal']"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Connection need", "Local connected service", "Instance", "Not assigned; configure before use")]
+    [DataRow("fr-FR", "Besoin de connexion", "Service connecté local", "Instance", "Non affecté ; à configurer avant utilisation")]
+    public void ConnectionReviewLocalizesTheLogicalNeedAndAdministrativeOwnerWithoutLocalUids(string cultureName,
+        string need, string service, string owner, string unassigned)
+    {
+        using var culture = new TestCultureScope(cultureName); using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+        var detail = new BootstrapResourcePlanDetail("ConnectedService", "backend-tracking", BootstrapResourceDisposition.Skip)
+        {
+            Reference = new("local-github", ResourceScopeRef.Instance, ResourceNamespace.Default),
+            Contract = "agentstration.tracking.contracts.mcp.v1",
+            Target = "fixture-authority/42"
+        };
+        var cut = context.Render<BootstrapConnectionReview>(p => p.Add(x => x.Detail, detail));
+        Assert.Contains(need, cut.Markup); Assert.Contains(service, cut.Markup); Assert.Contains(owner, cut.Markup);
+        Assert.Contains(detail.Name, cut.Markup); Assert.Contains(detail.Contract, cut.Markup); Assert.Contains(detail.Target, cut.Markup);
+        Assert.Contains("local-github", cut.Markup); Assert.DoesNotContain("operational", cut.Markup);
+        cut.Render(p => p.Add(x => x.Detail, detail with { Reference = null }));
+        Assert.Contains(unassigned, cut.Markup); Assert.DoesNotContain("local-github", cut.Markup);
     }
 
     private sealed class EmptyCatalog : HttpMessageHandler

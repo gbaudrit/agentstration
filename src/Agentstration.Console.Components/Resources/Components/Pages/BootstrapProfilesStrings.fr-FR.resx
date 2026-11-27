@@ -136,4 +136,20 @@
   <data name="Seed.PlannedImports" xml:space="preserve"><value>{0} plans à importer comme brouillons (identifiants et SHA-256)</value></data>
   <data name="Seed.ResourceInvalid" xml:space="preserve"><value>Vérifiez la déclaration de ressource, la source installée, les autorisations et les bindings protégés.</value></data>
   <data name="Disposition.Invalid" xml:space="preserve"><value>Invalide</value></data>
+  <data name="BindingTargetKind.ConnectedService" xml:space="preserve"><value>Service connecté</value></data>
+  <data name="Connection.Name" xml:space="preserve"><value>Besoin de connexion</value></data>
+  <data name="Connection.Contract" xml:space="preserve"><value>Contrat requis</value></data>
+  <data name="Connection.Target" xml:space="preserve"><value>Cible externe</value></data>
+  <data name="Connection.Service" xml:space="preserve"><value>Service connecté local</value></data>
+  <data name="Connection.Unassigned" xml:space="preserve"><value>Non affecté ; à configurer avant utilisation</value></data>
+  <data name="Diagnostic.bootstrap_project_connections_invalid" xml:space="preserve"><value>Les déclarations ou affectations de connexion du projet sont invalides.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_definition_invalid" xml:space="preserve"><value>Vérifiez les noms, les contrats et les quatre correspondances d’exports des connexions.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_connection_incompatible" xml:space="preserve"><value>Le service ou l’adaptateur sélectionné ne prend pas en charge le contrat requis.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_connection_target_mismatch" xml:space="preserve"><value>Le service sélectionné pointe vers une autre cible externe. Choisissez un service compatible.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_binding_denied" xml:space="preserve"><value>L’accès au service ou à l’adaptateur sélectionné est refusé.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_binding_unavailable" xml:space="preserve"><value>Le service ou l’adaptateur sélectionné n’est pas disponible dans ce Workspace.</value></data>
+  <data name="Diagnostic.bootstrap_work_project_bindings_invalid" xml:space="preserve"><value>Les références locales de connexion sélectionnées sont invalides.</value></data>
+  <data name="Seed.ConnectionRequirements" xml:space="preserve"><value>Déclarations de connexion partagées vérifiées</value></data>
+  <data name="Seed.ConnectionPublication" xml:space="preserve"><value>Publication des déclarations de connexion</value></data>
+  <data name="Diagnostic.bootstrap_work_project_contract_missing" xml:space="preserve"><value>La contribution sélectionnée ne fournit pas le contrat de connexion requis.</value></data>
 </root>

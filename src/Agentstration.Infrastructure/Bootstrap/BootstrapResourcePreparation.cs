@@ -2,10 +2,12 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Agentstration.Application.Work;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.ConnectedServices;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Parameters;
+using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
 using Agentstration.Secrets;
@@ -18,7 +20,7 @@ using Microsoft.Extensions.Configuration;
 namespace Agentstration.Infrastructure.Bootstrap;
 
 /// <summary>Resolves only the typed Bootstrap initializer/reference fields; native resources never retain selectors.</summary>
-public sealed class BootstrapResourcePreparation(
+public sealed partial class BootstrapResourcePreparation(
     IConfiguration configuration,
     ConnectedServiceManagementService services,
     ConnectedServiceTypeManagementService serviceTypes,
@@ -27,7 +29,9 @@ public sealed class BootstrapResourcePreparation(
     StorageManagementService storages,
     StorageTypeManagementService storageTypes,
     SecretManagementService secrets,
-    IParameterResolver parameters)
+    IParameterResolver parameters,
+    IResourceStore resources,
+    WorkProjectContextService projectContexts)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private const string ParametersRoot = "Agentstration:Bootstrap:Parameters:";
@@ -217,6 +221,7 @@ public sealed class BootstrapResourcePreparation(
                 }
             }
         }
+        if (resource.Kind == "ProjectSharing") deferred |= await PrepareProjectConnectionsAsync(root, resource, operation, planning, applying, fingerprints, cancellationToken);
         ValidateLocalShape(resource.Kind, root);
         var result = resource with { Definition = JsonSerializer.SerializeToElement(root, Json) };
         if (deferred && resource.Kind == "ConnectedService")
