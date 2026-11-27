@@ -387,3 +387,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 290. [ADR-0290 — Work task operations adopt ATC with explicit recovery guarantees](0290-work-task-operations-adopt-atc-with-explicit-recovery-guarantees.md)
 
 291. [ADR-0291 — Projects separate portable connection needs from local services](0291-projects-separate-portable-connection-needs-from-local-services.md)
+
+292. [ADR-0292 — GitHub contracts consume protected Connected Services](0292-github-contracts-consume-protected-connected-services.md)

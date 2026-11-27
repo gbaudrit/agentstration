@@ -10,6 +10,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
@@ -21,25 +22,25 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
     AepMcpTransport transport, IToolExecutionPipeline pipeline, TimeProvider clock)
 {
     public async Task<Result<WorkProjectContractEvidence>> ResolveAsync(WorkProjectContextBinding binding, RequestContext caller,
-        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token, Func<CancellationToken, Task>? beforeInvoke = null)
+        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token, Func<CancellationToken, Task>? beforeInvoke = null, Func<CancellationToken, Task<ResolvedSecretInputs>>? headers = null)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), clock);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
-        try { return await ResolveCoreAsync(binding, caller, authorize, beforeInvoke, linked.Token); }
+        try { return await ResolveCoreAsync(binding, caller, authorize, beforeInvoke, headers, linked.Token); }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { return Failure("work_project_contract_timeout"); }
         catch (AtcException) { return Failure("work_project_contract_invalid"); }
         catch (AfcException) { return Failure("work_project_contract_invalid"); }
         catch (AepProtocolException) { return Failure("work_project_contract_unavailable"); }
         catch (ToolExecutionDeniedException) { return Failure("work_project_binding_denied"); }
         catch (ToolInputValidationException) { return Failure("work_project_contract_invalid"); }
-        catch (ToolResolutionException) { return Failure("work_project_contract_changed"); }
+        catch (ToolResolutionException error) { return Failure(error.Code is "work_project_connection_incompatible" or "work_project_connection_changed" ? error.Code : "work_project_contract_changed"); }
         catch (McpException) { return Failure("work_project_contract_unavailable"); }
         catch (HttpRequestException) { return Failure("work_project_contract_unavailable"); }
         catch (JsonException) { return Failure("work_project_contract_invalid"); }
     }
 
     private async Task<Result<WorkProjectContractEvidence>> ResolveCoreAsync(WorkProjectContextBinding binding, RequestContext caller,
-        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, Func<CancellationToken, Task>? beforeInvoke, CancellationToken token)
+        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, Func<CancellationToken, Task>? beforeInvoke, Func<CancellationToken, Task<ResolvedSecretInputs>>? headers, CancellationToken token)
     {
         var selection = binding.Contract!;
         var tracking = binding.Purpose == WorkProjectBindingPurpose.Tracking;
@@ -84,6 +85,11 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
             var tools = candidates.Where(tool => tool.Definition.ExternalId == mapping.Id).ToArray();
             if (tools.Length != 1) return Failure("work_project_contract_missing");
             var tool = tools[0];
+            var hasTransport = mapping.Metadata!.TryGetValue(WorkProjectConnectedServiceResolver.TransportMetadata, out var liveTransport);
+            var hasLocalTransport = tool.Definition.Metadata.TryGetValue(WorkProjectConnectedServiceResolver.TransportMetadata, out var localTransport);
+            if (hasTransport != hasLocalTransport || hasTransport && (liveTransport.ValueKind != JsonValueKind.Object
+                || !JsonElement.DeepEquals(localTransport, liveTransport) || binding.Target == Reference(tool) && headers is null))
+                return Failure("work_project_connection_incompatible");
             var allowed = await authorize(Reference(tool), token);
             if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
             if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true) return Failure("work_project_contract_unavailable");
@@ -106,6 +112,7 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
         var result = await pipeline.ExecuteAsync(new ToolExecutionContext
         {
             BeforeProviderInvoke = beforeInvoke,
+            ResolveProviderHeaders = headers,
             OwnerKind = ToolExecutionOwnerKind.WorkOperation,
             ToolCallId = requestId,
             InvocationId = "project-contract:" + requestId,

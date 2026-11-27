@@ -5,6 +5,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Tools;
 using Agentstration.Tools.Mcp;
 using Agentstration.Work;
@@ -14,7 +15,7 @@ namespace Agentstration.Infrastructure.Work;
 
 // The ATC SDK and wire DTOs stop here; Work persists neutral observations and receipts.
 public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
-    IToolExecutionPipeline pipeline, ICurrentRequestContext current, TimeProvider clock) : IWorkTaskProviderGateway
+    IToolExecutionPipeline pipeline, ICurrentRequestContext current, TimeProvider clock, WorkProjectConnectedServiceResolver? services = null) : IWorkTaskProviderGateway
 {
     public async Task<Result<WorkTaskProviderRoute>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, ExternalTaskOperationKind operation, CancellationToken token)
@@ -166,6 +167,8 @@ public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
                         throw new ToolResolutionException("work_project_connection_changed", "The retained connection is no longer available.");
                 }
             : null,
+            ResolveProviderHeaders = selected.Definition.Metadata.ContainsKey(WorkProjectConnectedServiceResolver.TransportMetadata) && connection.Binding.Connection is { } headerSelection && connection.Service is { } headerEvidence
+                ? ct => ResolveHeadersAsync(headerSelection, headerEvidence, ct) : null,
             OwnerKind = ToolExecutionOwnerKind.WorkOperation,
             ToolCallId = id,
             InvocationId = "work-atc:" + id,
@@ -219,6 +222,14 @@ public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         ExternalTaskOperationKind.Transition => new AtcApplyTransition(input.TaskId!, input.ExpectedRevision!, input.TransitionId!),
         _ => throw new AtcException("unsupported_operation")
     };
+    private async Task<ResolvedSecretInputs> ResolveHeadersAsync(WorkProjectConnectionSelection selection, WorkProjectConnectionEvidence evidence, CancellationToken token)
+    {
+        var fresh = await bindings.InspectConnectionAsync(new(current.Current.WorkspaceId), current.Current.PrincipalId, selection, token);
+        if (!fresh.IsSuccess || WorkPlanDefinition.Digest(fresh.Value) != WorkPlanDefinition.Digest(evidence) || services is null)
+            throw new ToolResolutionException("work_project_connection_changed", "The selected connection changed.");
+        return await services.ResolveHeadersAsync(new(current.Current.WorkspaceId), selection, evidence, token);
+    }
+
     private static string Operation(ExternalTaskOperationKind operation) => operation switch
     {
         ExternalTaskOperationKind.Read => "read",

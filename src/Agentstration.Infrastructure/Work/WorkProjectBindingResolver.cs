@@ -3,6 +3,7 @@ using Agentstration.Identity.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
+using Agentstration.Secrets.Abstractions;
 using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Work;
@@ -14,10 +15,10 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
     public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, CancellationToken token) => binding.Connection is { } selection
             ? ResolveConnectionAsync(workspaceId, principalId, selection, token)
-            : ResolveCoreAsync(workspaceId, principalId, binding, null, token);
+            : ResolveCoreAsync(workspaceId, principalId, binding, null, null, token);
 
     private async Task<Result<WorkProjectResolvedBinding>> ResolveCoreAsync(WorkspaceId workspaceId, Guid principalId,
-        WorkProjectContextBinding binding, Func<CancellationToken, Task>? beforeInvoke, CancellationToken token)
+        WorkProjectContextBinding binding, Func<CancellationToken, Task>? beforeInvoke, Func<CancellationToken, Task<ResolvedSecretInputs>>? headers, CancellationToken token)
     {
         if (current.AccessMode != ControlPlaneAccessMode.Workspace) return Failure("work_project_binding_denied");
         var caller = current.Current;
@@ -35,7 +36,7 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
             if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
         }
         var resolved = await contracts.ResolveAsync(binding, caller,
-            (reference, cancellation) => ResolveReferenceAsync(workspaceId, binding with { Target = reference, Contract = null }, cancellation), token, beforeInvoke);
+            (reference, cancellation) => ResolveReferenceAsync(workspaceId, binding with { Target = reference, Contract = null }, cancellation), token, beforeInvoke, headers);
         return resolved.IsSuccess ? Result<WorkProjectResolvedBinding>.Success(selected.Value! with { Contract = resolved.Value }) : Failure(resolved.ErrorCode!);
     }
 
@@ -54,7 +55,7 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
                 var fresh = await InspectConnectionAsync(workspaceId, principalId, selection, guardToken);
                 if (!fresh.IsSuccess || WorkPlanDefinition.Digest(fresh.Value) != WorkPlanDefinition.Digest(evidence))
                     throw new Agentstration.Tools.Mcp.ToolResolutionException("work_project_connection_changed", "The selected connection changed.");
-            }, ct), token);
+            }, headerToken => ResolveConnectionHeadersAsync(workspaceId, principalId, selection, evidence, headerToken), ct), token);
     }
 
     public async Task<Result<WorkProjectConnectionEvidence>> InspectConnectionAsync(WorkspaceId workspaceId, Guid principalId,
@@ -69,6 +70,15 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
             (reference, ct) => ResolveReferenceAsync(workspaceId, new(selection.Requirement.Name, WorkProjectBindingPurpose.Context, reference), ct), token);
         return inspected.IsSuccess ? Result<WorkProjectConnectionEvidence>.Success(inspected.Value!.Evidence)
             : Result<WorkProjectConnectionEvidence>.Failure(inspected.ErrorCode!);
+    }
+
+    public async Task<ResolvedSecretInputs> ResolveConnectionHeadersAsync(WorkspaceId workspaceId, Guid principalId,
+        WorkProjectConnectionSelection selection, WorkProjectConnectionEvidence evidence, CancellationToken token)
+    {
+        var fresh = await InspectConnectionAsync(workspaceId, principalId, selection, token);
+        if (!fresh.IsSuccess || WorkPlanDefinition.Digest(fresh.Value) != WorkPlanDefinition.Digest(evidence) || connections is null)
+            throw new Agentstration.Tools.Mcp.ToolResolutionException("work_project_connection_changed", "The selected connection changed.");
+        return await connections.ResolveHeadersAsync(workspaceId, selection, evidence, token);
     }
 
     private async Task<Result<WorkProjectResolvedBinding>> ResolveReferenceAsync(WorkspaceId workspaceId,

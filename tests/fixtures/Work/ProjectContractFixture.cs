@@ -229,9 +229,10 @@ internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentity
             var tool = Resources.Values.OfType<ToolResource>().Single(value => value.Uid == invocation.ToolUid);
             var adapter = new ToolProviderAdapter(new ResourceAepExtensionRegistrationResolver(this),
                 new ConfigurationToolProviderEnvironmentResolver(new ConfigurationBuilder().Build()), this, NullLoggerFactory.Instance);
-            try { return await adapter.InvokeAsync(provider, tool, invocation.Arguments, token, invocation.ExpectedProviderRouteDigest, invocation.ExpectedToolSchemaDigest, invocation.ExpectedProviderToolContracts, invocation.BeforeProviderInvoke); }
+            try { return await adapter.InvokeAsync(provider, tool, invocation.Arguments, token, invocation.ExpectedProviderRouteDigest, invocation.ExpectedToolSchemaDigest, invocation.ExpectedProviderToolContracts, invocation.BeforeProviderInvoke, invocation.ResolveProviderHeaders); }
             catch (Exception error) { InvocationError = error; throw; }
         }
+        using var protectedHeaders = invocation.ResolveProviderHeaders is null ? null : await invocation.ResolveProviderHeaders(token);
         if (invocation.BeforeProviderInvoke is not null) await invocation.BeforeProviderInvoke(token);
         var input = invocation.Arguments!.Value;
         var id = input.GetProperty("arguments").GetProperty("requestId").GetString()!;

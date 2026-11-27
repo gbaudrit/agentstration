@@ -1,9 +1,8 @@
 extern alias GitHubExtension;
-
 using System.Net;
-using Agentstration.Testing;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Agentstration.Testing;
 using Microsoft.Extensions.Options;
 using GitHub = GitHubExtension::Agentstration.Extensions.GitHub;
 
@@ -196,18 +195,28 @@ public sealed partial class GitHubProviderTests
         public bool IncompleteRelations { get; set; }
         public bool DenyIssueReads { get; set; }
         public CancellationTokenSource? CancelAfterIssue { get; set; }
+        public Dictionary<string, string> Subjects { get; } = new() { [Credential] = "7", [Credential + "-second"] = "8" };
         public int IssuePosts { get; private set; }
         public int PullPosts { get; private set; }
         public int LabelPosts { get; private set; }
+        public void ReplacePullBody(string body)
+        {
+            foreach (var key in pulls.Keys.ToArray())
+            {
+                var value = System.Text.Json.Nodes.JsonNode.Parse(pulls[key].GetRawText())!;
+                value["body"] = body; pulls[key] = JsonSerializer.SerializeToElement(value);
+            }
+        }
         public void AddIssue(string title) => Issues.Add(Issues.Count + 1, new(title, "Fixture body", ["unrelated"]));
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested();
-            if (request.Headers.Authorization?.Parameter != Credential) return new(HttpStatusCode.Unauthorized);
+            if (request.Headers.Authorization?.Parameter is not { } credential || !Subjects.TryGetValue(credential, out var subject)) return new(HttpStatusCode.Unauthorized);
             var parts = request.RequestUri!.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
             var body = request.Content is null ? default : await request.Content.ReadFromJsonAsync<JsonElement>(token);
             object? output = null;
-            if (parts.Length == 3) output = new { id = parts[2] == "second" ? 43 : 42, full_name = parts[1] + "/" + parts[2], default_branch = "main", clone_url = git?.Repository ?? "https://github.com/fixture/repository.git", html_url = "https://github.com/fixture/repository" };
+            if (parts is ["user"]) output = new { id = long.Parse(subject, System.Globalization.CultureInfo.InvariantCulture) };
+            else if (parts.Length == 3) output = new { id = parts[2] == "second" ? 43 : 42, full_name = parts[1] + "/" + parts[2], default_branch = "main", clone_url = git?.Repository ?? "https://github.com/fixture/repository.git", html_url = "https://github.com/fixture/repository" };
             else if (parts[3] == "commits") output = new { sha = await RevisionAsync(Uri.UnescapeDataString(parts[4]), token) };
             else if (parts[3] == "issues")
             {

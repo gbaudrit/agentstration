@@ -826,3 +826,15 @@ Unconfigured unrelated needs leave local work executable. Independent SQLite fix
 exercise different UIDs/scopes with the same portable requirement through real MCP.
 Vendor secured-configuration exchange remains #958/#959. See
 [ADR-0291](../../decisions/0291-projects-separate-portable-connection-needs-from-local-services.md).
+
+### GitHub service-backed tracking and forge contracts (#958)
+
+The optional GitHub extension contributes a governed service type and independent
+canonical ATC/AFC Tools. Named Project assignments configure per-service origin, native
+subject, repository restrictions and protected credentials. Invocation reuses existing
+service resolution, AEP protected headers and secret-output protection; no credentials
+enter contract arguments, Work snapshots or journals. Native subject/repository checks
+and connection-scoped write-ahead receipts fence recovery. Process recovery never
+authorizes blind replay after missing state. Existing native issue/delivery consumers
+await their typed adoption in #1346/#1349. See
+[ADR-0292](../../decisions/0292-github-contracts-consume-protected-connected-services.md).

@@ -96,7 +96,7 @@ public sealed class GitHubCodingOperations(GitHubConnection connections, GitHubO
             GitHubConnection.Text(pr, "state"), pr.GetProperty("draft").GetBoolean(), pr.TryGetProperty("merged", out var merged) && merged.GetBoolean(),
             GitHubConnection.Text(head, "ref"), GitHubConnection.Text(head, "sha"), GitHubConnection.Text(target, "ref"), GitHubConnection.Text(target, "sha"), GitHubConnection.Text(pr, "updated_at"));
     }
-    private static bool Branch(string? value) => value is { Length: >= 1 and <= 256 } && !value.StartsWith('-')
+    internal static bool Branch(string? value) => value is { Length: >= 1 and <= 256 } && !value.StartsWith('-')
         && value.Split('/').All(GitHubConnection.Segment);
     private sealed record RepositoryRequest(IReadOnlyList<string> Repositories);
 }

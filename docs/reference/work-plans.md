@@ -239,7 +239,7 @@ ATC v1 admits no partial item in a non-applied receipt: invalid partial evidence
 uncertain and is never presented as a successful linkage.
 
 The existing native `TaskOperations` contract and published relays remain used by
-current Coding consumers until their own ATC adoption (#958/#1346/#1349). They retain
+current Coding consumers until their own ATC adoption (#1346/#1349). They retain
 repository inputs and `agentstration.work.task-provider` metadata. A `Tracking`
 connection never falls back to that native protocol. Concrete GitHub/AFC adoption is
 separate; see [Coding GitHub connections](coding-github.md).

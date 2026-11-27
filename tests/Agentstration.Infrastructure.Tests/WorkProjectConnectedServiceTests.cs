@@ -105,6 +105,25 @@ public sealed class WorkProjectConnectedServiceTests
     }
 
     [TestMethod]
+    public async Task LocalTransportMetadataCannotAddSecretForwardingAbsentFromTheLiveManifest()
+    {
+        var fixture = new ProjectContractFixture(); using var scope = fixture.Context.Push(fixture.Caller);
+        var route = fixture.AddConnection(true, "tracking"); var selection = fixture.AddService(route);
+        var tool = (Agentstration.Tools.ToolResource)fixture.Resources[route.Target.Address];
+        fixture.Put(tool with
+        {
+            Definition = tool.Definition with
+            {
+                Metadata = new Dictionary<string, JsonElement>(tool.Definition.Metadata)
+                { [Agentstration.Infrastructure.Work.WorkProjectConnectedServiceResolver.TransportMetadata] = JsonSerializer.SerializeToElement(new { version = "1.0" }) }
+            }
+        });
+        var result = await fixture.Resolver.ResolveConnectionAsync(fixture.WorkspaceId, fixture.PrincipalId, selection, default);
+        Assert.AreEqual("work_project_connection_incompatible", result.ErrorCode);
+        Assert.HasCount(0, fixture.Calls);
+    }
+
+    [TestMethod]
     public void PortableNeedsContainNoLocalReferencesAndInvalidAssignmentsCannotBeSaved()
     {
         var fixture = new ProjectContractFixture(); var selected = fixture.AddService(fixture.AddConnection(true, "tracking"));

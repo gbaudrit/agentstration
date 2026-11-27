@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
+using Agentstration.Afc.Aep;
+using Agentstration.Atc.Aep;
 using Agentstration.Extensions.GitHub;
 using ModelContextProtocol.Server;
 
@@ -13,10 +15,21 @@ builder.Services.AddHttpClient<GitHubConnection>(client => client.Timeout = Time
 builder.Services.AddSingleton<GitHubOperationJournal>();
 builder.Services.AddTransient<GitHubIssueOperations>();
 builder.Services.AddTransient<GitHubCodingOperations>();
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<GitHubContractMcpServer>();
 builder.Services.AddAgentstrationAep(options =>
 {
     options.Extension = new("Agentstration.Extensions.GitHub", "GitHub Coding provider", "1.0.0", "Optional native GitHub repository, issue and PR operations.");
     options.McpServers.Add(new("github", "/mcp"));
+    options.ConnectedServiceTypes.Add(new(GitHubServiceContract.TypeId, "GitHub", GitHubServiceContract.Version, [GitHubServiceContract.TypeVersion]));
+    foreach (var contribution in AtcAepContributions.Create("github.tracking", "github", "github_atc")
+        .Concat(AfcAepContributions.Create("github.forge", "github", "github_afc")))
+        options.Tools.Add(contribution with
+        {
+            Metadata = new Dictionary<string, JsonElement>(contribution.Metadata!)
+            { [GitHubServiceContract.Metadata] = GitHubServiceContract.TransportDeclaration }
+        });
     options.Tools.Add(new("github.issue", "GitHub issue operations", new("github", "github_issue_operation"),
         Metadata: new Dictionary<string, JsonElement>
         {
@@ -31,7 +44,9 @@ builder.Services.AddAgentstrationAep(options =>
 });
 builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddTransient<GitHubTools>();
-builder.Services.AddMcpServer().WithHttpTransport();
+builder.Services.AddMcpServer().WithHttpTransport(options => options.SessionMode = ModelContextProtocol.AspNetCore.HttpServerSessionMode.Stateless)
+    .WithListToolsHandler((request, ct) => request.Services!.GetRequiredService<GitHubContractMcpServer>().ListAsync(request, ct))
+    .WithCallToolHandler((request, ct) => request.Services!.GetRequiredService<GitHubContractMcpServer>().CallAsync(request, ct));
 foreach (var name in new[] { nameof(GitHubTools.IssueAsync), nameof(GitHubTools.CodingAsync) })
 {
     var method = typeof(GitHubTools).GetMethod(name)!;

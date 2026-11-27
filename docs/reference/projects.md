@@ -166,8 +166,9 @@ from the local Describe Tool route rather than authored in the portable need.
 Compatibility also requires an AEP-backed typed ATC/AFC adapter, canonical declarations
 and schemas, required operations and the actual target-specific Describe reply. Equal
 vendor/type names alone are insufficient. The existing governed Tool pipeline handles
-protected transport inputs; inspection never reads service Secret values. Vendor
-provisioning and secured service-configuration exchange remain #958/#959.
+protected transport inputs; inspection never reads service Secret values. The optional
+[GitHub adapter](coding-github.md#named-connected-services-over-atcafc) supplies per-service
+configuration exchange for ATC/AFC; GitLab adoption remains #959.
 
 `GET .../projects/{projectId}/context` includes a `connections` entry for every need:
 requirement, local assignment, `available`, bounded `code`, and successful contract and

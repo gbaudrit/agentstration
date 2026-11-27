@@ -351,6 +351,8 @@ public sealed record ToolExecutionContext
     public string? ExternalToolId { get; init; }
     [System.Text.Json.Serialization.JsonIgnore]
     public Func<CancellationToken, Task>? BeforeProviderInvoke { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Func<CancellationToken, Task<ResolvedSecretInputs>>? ResolveProviderHeaders { get; init; }
     public string? ExpectedProviderRouteDigest { get; init; }
     public string? ExpectedToolSchemaDigest { get; init; }
     public IReadOnlyDictionary<string, string>? ExpectedProviderToolContracts { get; init; }

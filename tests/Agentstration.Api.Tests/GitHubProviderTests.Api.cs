@@ -47,8 +47,11 @@ public sealed partial class GitHubProviderTests
                 [new(parent, WorkTaskKind.Composite, "Delivery", "Composite work"), new(leaf, WorkTaskKind.Atomic, "Implement", "Keep child internal", parent)]));
             Assert.AreEqual(HttpStatusCode.Created, tree.StatusCode);
             using var project = await http.PostAsJsonAsync("/api/workspaces/default/projects", new CreateWorkProjectRequest(projectId, Guid.NewGuid(), "github",
-                new("GitHub fixture", null, [], [parent]) { Bindings = [new("tracker", WorkProjectBindingPurpose.TaskOperations, Pin(tracker)),
-                    new("repository", WorkProjectBindingPurpose.Repository, Pin(repository))] }));
+                new("GitHub fixture", null, [], [parent])
+                {
+                    Bindings = [new("tracker", WorkProjectBindingPurpose.TaskOperations, Pin(tracker)),
+                    new("repository", WorkProjectBindingPurpose.Repository, Pin(repository))]
+                }));
             Assert.AreEqual(HttpStatusCode.Created, project.StatusCode, await project.Content.ReadAsStringAsync());
             using var resolution = await http.PostAsJsonAsync(prefix + "/coding/repositories/resolve", new ResolveCodingRepositoriesRequest(leaf, [Repository], 1));
             Assert.AreEqual(HttpStatusCode.OK, resolution.StatusCode, await resolution.Content.ReadAsStringAsync());
@@ -98,7 +101,7 @@ public sealed partial class GitHubProviderTests
             Assert.IsTrue(specification.GetProperty("/api/workspaces/{workspaceName}/projects/{projectId}/coding/pull-requests")
                 .GetProperty("post").GetProperty("responses").TryGetProperty("202", out _));
             using var staleHead = await http.PostAsJsonAsync(prefix + "/coding/pull-requests", pullCommand with
-                { Id = Guid.NewGuid(), Input = pullCommand.Input with { ExpectedHeadRevision = new string('b', 40) } });
+            { Id = Guid.NewGuid(), Input = pullCommand.Input with { ExpectedHeadRevision = new string('b', 40) } });
             Assert.AreEqual(HttpStatusCode.Conflict, staleHead.StatusCode, await staleHead.Content.ReadAsStringAsync());
             var context = await restarted.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
             using var scope = restarted.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
@@ -129,25 +132,51 @@ public sealed partial class GitHubProviderTests
         var scope = ResourceScopeRef.Workspace(context.WorkspaceId); var store = services.GetRequiredService<IResourceStore>();
         await store.PutExactAsync(scope, new Agentstration.Extensions.Contracts.ExtensionRegistrationResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = Agentstration.Extensions.Contracts.ExtensionKinds.ExtensionRegistration, Metadata = new() { Name = "github-fixture" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "GitHub fixture", Endpoint = new("http://github-fixture/"), ExpectedExtensionId = "Agentstration.Extensions.GitHub", Enabled = true,
-                AuthenticationMode = Agentstration.Extensions.Contracts.AepTransportAuthenticationMode.None, EnrollmentMode = Agentstration.Extensions.Contracts.AepEnrollmentMode.PairingCode }
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = Agentstration.Extensions.Contracts.ExtensionKinds.ExtensionRegistration,
+            Metadata = new() { Name = "github-fixture" },
+            ScopeRef = scope,
+            Generation = 1,
+            Definition = new()
+            {
+                DisplayName = "GitHub fixture",
+                Endpoint = new("http://github-fixture/"),
+                ExpectedExtensionId = "Agentstration.Extensions.GitHub",
+                Enabled = true,
+                AuthenticationMode = Agentstration.Extensions.Contracts.AepTransportAuthenticationMode.None,
+                EnrollmentMode = Agentstration.Extensions.Contracts.AepEnrollmentMode.PairingCode
+            }
         }, null, true, default);
         var tools = services.GetRequiredService<ToolManagementService>();
         await tools.PutProviderAsync(new ToolProviderResource
         {
-            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider, Metadata = new() { Name = "github-fixture" }, ScopeRef = scope,
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ToolResourceKinds.ToolProvider,
+            Metadata = new() { Name = "github-fixture" },
+            ScopeRef = scope,
             Definition = new() { DisplayName = "GitHub fixture", ProviderType = ToolProviderType.Aep, Aep = new() { Extension = new("github-fixture", scope, default) } }
         }, null, true, default);
         await tools.RefreshDiscoveryExactAsync(scope, "github-fixture", default, default);
         var sources = (await tools.ListVisibleToolsAsync(scope, default)).Where(value => value.Value.Definition.Provider?.Name == "github-fixture").ToArray();
         foreach (var source in sources) await tools.SetToolEnabledAsync(source.Value.Name, true, source.ETag, default);
         var secrets = services.GetRequiredService<SecretManagementService>();
-        await secrets.CreateVaultAsync(new VaultResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault, Metadata = new() { Name = "github-vault" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "GitHub vault", ProviderType = "local" } }, default);
+        await secrets.CreateVaultAsync(new VaultResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Vault,
+            Metadata = new() { Name = "github-vault" },
+            ScopeRef = scope,
+            Definition = new() { DisplayName = "GitHub vault", ProviderType = "local" }
+        }, default);
         await secrets.InitializeVaultExactAsync(scope, "github-vault", default);
-        var secret = await secrets.CreateSecretAsync(new SecretResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Secret, Metadata = new() { Name = "github-token" }, ScopeRef = scope,
-            Definition = new() { DisplayName = "GitHub fixture token", Vault = new("github-vault", scope), Key = "token" } }, default);
+        var secret = await secrets.CreateSecretAsync(new SecretResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = SecretResourceKinds.Secret,
+            Metadata = new() { Name = "github-token" },
+            ScopeRef = scope,
+            Definition = new() { DisplayName = "GitHub fixture token", Vault = new("github-vault", scope), Key = "token" }
+        }, default);
         using (var value = new SecretValue(Encoding.UTF8.GetBytes(Credential))) await secrets.SetValueExactAsync(scope, secret.Value.Name, value, default);
         var result = new List<ToolResource>();
         foreach (var (id, name, capability) in new[] { ("github.issue", "github-tracker", WorkTaskProviderProtocol.MetadataKey), ("github.coding", "github-repository", CodingProviderProtocol.MetadataKey) })
@@ -162,10 +191,19 @@ public sealed partial class GitHubProviderTests
             if (id == "github.issue") bindings.Add(new LiteralToolArgumentBinding { Path = "/managedLabelPrefix", Value = JsonSerializer.SerializeToElement("agentstration:") });
             await services.GetRequiredService<ToolDefinitionService>().PutAsync(new ToolDefinitionResource
             {
-                ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolDefinition, Metadata = new() { Name = name }, ScopeRef = scope,
-                Definition = new RelayToolDefinitionProperties { DisplayName = name, Publish = true, Version = "1.0.0", Bindings = bindings,
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ToolResourceKinds.ToolDefinition,
+                Metadata = new() { Name = name },
+                ScopeRef = scope,
+                Definition = new RelayToolDefinitionProperties
+                {
+                    DisplayName = name,
+                    Publish = true,
+                    Version = "1.0.0",
+                    Bindings = bindings,
                     Metadata = source.Definition.Metadata.Where(pair => pair.Key == capability || pair.Key == CodingIssueProtocol.MetadataKey).ToDictionary(pair => pair.Key, pair => pair.Value),
-                    Target = new() { Name = source.Name, Namespace = source.Namespace, ScopeRef = scope, Uid = source.Uid, Generation = source.Generation } }
+                    Target = new() { Name = source.Name, Namespace = source.Namespace, ScopeRef = scope, Uid = source.Uid, Generation = source.Generation }
+                }
             }, null, true, default);
             result.Add((await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(scope, default, ToolResourceKinds.Tool, "agentstration." + name + ".v1.0.0"), default))!.Value);
         }

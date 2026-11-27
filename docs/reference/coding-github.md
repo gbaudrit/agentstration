@@ -4,7 +4,66 @@ The optional `Agentstration.Extensions.GitHub` executable supplies native reposi
 issue and pull-request operations through existing AEP/MCP discovery. The deterministic
 standalone server remains executable without this provider.
 
-## Configure one consumer connection
+## Named Connected Services over ATC/AFC
+
+The extension also exposes canonical ATC tracking and AFC forge Tools with independent
+AEP declarations: `github.tracking.*` → `github_atc_*` and `github.forge.*` →
+`github_afc_*`. Both use the `github` MCP server and pass the corresponding SDK schema
+checks. No vendor fields are added to canonical Tool arguments.
+
+AEP enrollment contributes ConnectedServiceType `github`, revision `1.0.0`. Configure
+one service per local account/restriction set. Options are:
+
+```yaml
+options:
+  apiBaseUrl: https://api.github.com
+  repository: owner/repository
+  managedLabelPrefix: "agentstration:"
+```
+
+Bind six required text inputs: `providerId`, `targetId`, `bindingId`, `revision`,
+`subjectId` and secured `credential`. Standard inputs may use Literals or Parameters;
+`credential` must use a Secret. Use `github.` followed by the lowercase SHA-256 of the
+normalized API base URI (including its trailing slash) for `providerId`. `targetId` is
+the repository's native numeric ID; `subjectId` is the native user ID returned by
+`GET /user`. The first account mechanism supports user/PAT credentials, not installation
+tokens. Set an explicit local binding ID and revision. The service pins the contributed
+type UID, revision and schema through the existing Connected Services API/Bootstrap.
+
+Declare [named Project needs](projects.md#named-tracking-and-forge-connections), select
+an exact service and its tracking or forge Describe Tool, and map the four target exports
+with matching IDs. Several same-contract needs may select different services; Tracking
+and Forge may share a service after independent validation. Portable needs contain the
+external authority/target when fixed, while local UIDs, scopes, accounts and Secrets
+stay in local assignments and services.
+
+During governed invocation the host validates the live transport declaration, current
+service/type proof and access, resolves protected inputs and sends a bounded private
+HTTP header. That configuration is never a Tool business argument, persisted Work
+payload or extension-wide account. Backend `/user` and exact repository-ID checks run
+even for Describe and cached recovery. Echoed credentials and configuration are redacted
+before outputs reach callers or audit. Keep HTTP header trace logging redacted.
+
+Supported ATC operations are `list`, `read`, `create`, additive `update` classifications,
+and same-target `relate` for Parent/BlockedBy. Native hierarchy/dependency completeness
+is required; foreign relations cannot silently disappear. Comments, transitions and
+title/body mutation are unsupported. AFC supports `resolve`, `read`, `create`; reviews
+and checks are not advertised. Creation checks exact head/base evidence without claiming
+GitHub atomic CAS. Explicit tracking references and nullable body survive the typed
+native footer used alongside recovery markers.
+
+Recovery is advertised as **Process**, with a 24-hour receipt window. Retained journals
+can recover original artifacts after restart, but Missing never authorizes automatic
+replay. Keys include actual authority, subject and binding configuration. Keep the state
+volume, and reconcile manually if it is lost. Credentials remain outside journals.
+
+The generic task-operation routes below accept the named ATC requirement as `bindingName`
+and a provider-qualified `input.tracking` target. Existing native Coding repository/PR
+routes retain their relay path until #1346/#1349 adopt these typed connections. Direct
+AFC operations are executable through the independent SDK and governed Tools.
+See [ADR-0292](../decisions/0292-github-contracts-consume-protected-connected-services.md).
+
+## Existing native consumer connection
 
 1. Launch the extension with a persistent `GitHub:StateDirectory`. By default only
    `https://api.github.com` is an allowed API base. For an enterprise base, configure
