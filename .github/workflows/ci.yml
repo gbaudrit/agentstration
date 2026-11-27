@@ -79,7 +79,7 @@ jobs:
           Write-Host "Run complete AEP validation: $aep"
           Write-Host "Build container: $container"
           Write-Host "Run storage smoke: $storage"
-          Write-Host "Validate Foundry image and contracts: $extensionImages"
+          Write-Host "Validate OCI images and contracts: $($classification.imageIds -join ', ')"
 
   windows-host-lifecycle:
     name: windows-host-lifecycle
@@ -226,6 +226,7 @@ jobs:
     uses: ./.github/workflows/validate-oci-image.yml
     with:
       extension: ${{ matrix.image }}
+      source-sha: ${{ github.event.pull_request.head.sha || github.sha }}
 
   # Keep the required check present for every PR and gate all selected validation.
   build-and-test:

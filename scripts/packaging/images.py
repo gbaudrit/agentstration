@@ -119,7 +119,7 @@ def build(extension, directory, repository, bases=None):
     sha = output(["git", "-C", str(ROOT), "rev-parse", "HEAD"])
     if bases is None:
         bases = {"sdk": resolve_image("mcr.microsoft.com/dotnet/sdk:10.0.300"),
-                 "runtime": resolve_image("mcr.microsoft.com/dotnet/aspnet:10.0")}
+                 "runtime": resolve_image(entry.get("runtimeImage", "mcr.microsoft.com/dotnet/aspnet:10.0"))}
     if set(bases) != {"sdk", "runtime"} or not all(
             re.fullmatch(r"[a-z0-9./_-]+@sha256:[0-9a-f]{64}", value) for value in bases.values()):
         raise ValueError("SDK and runtime build inputs must be pinned by digest.")
@@ -152,7 +152,7 @@ def private_package(repository, package):
 def copy_archive(delivery_path, destination, authfile):
     delivery = json.loads(delivery_path.read_text(encoding="utf-8"))
     archive = delivery_path.parent / delivery["archive"]
-    if archive.parent.resolve() != delivery_path.parent.resolve() or not DIGEST.fullmatch(delivery["digest"]):
+    if archive.resolve().parent != delivery_path.parent.resolve() or not DIGEST.fullmatch(delivery["digest"]):
         raise ValueError("Invalid delivery archive/digest.")
     with archive.open("rb") as stream:
         if hashlib.file_digest(stream, "sha256").hexdigest() != delivery["archiveSha256"]:

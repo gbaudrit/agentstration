@@ -133,6 +133,11 @@ jobs:
           persist-credentials: false
       - name: Check deployment and ownership contracts without cloud credentials
         run: python3 -m unittest discover -s scripts/preview -p 'test_*.py' -v
+      - name: Validate preview lifecycle and extension label definitions without mutations
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/github/apply-issue-labels.ps1 -Repository $env:GITHUB_REPOSITORY -PreviewExtensionsOnly -DryRun
       - name: Compile the Azure template without provisioning
         run: |
           az bicep install --version v0.44.1

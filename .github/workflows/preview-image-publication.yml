@@ -1,0 +1,44 @@
+name: Preview image admission
+
+on:
+  workflow_run:
+    workflows: [CI, CodeQL, Documentation, Dependency Review, Pull request metadata, Browser UX, Resource Plan UX, Preview deployment contracts, OpenDAL native packaging, Structured documents conformance]
+    types: [completed]
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft, closed]
+  workflow_dispatch:
+    inputs:
+      preview_pr:
+        description: Existing opted-in PR number (backfill or retry)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-image-admission-${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha || inputs.preview_pr }}
+  cancel-in-progress: false
+
+jobs:
+  admit:
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request') && (github.event_name != 'pull_request_target' || (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'preview:auto' || startsWith(github.event.label.name, 'preview:extension:'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: write
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Wait for PR workflows and admit publication of their validated component archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_PR: ${{ inputs.preview_pr }}
+        run: python3 scripts/preview/image_publication.py dispatch

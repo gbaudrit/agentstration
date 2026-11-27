@@ -23,5 +23,10 @@
   },
   "smokeEnvironment": {
     "PostgreSqlDocuments__AllowedClients__0": "agentstration-development"
+  },
+  "ci": {
+    "sharedPaths": [
+      "asc/**"
+    ]
   }
 }

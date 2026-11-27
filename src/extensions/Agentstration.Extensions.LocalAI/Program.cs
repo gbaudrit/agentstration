@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Reflection;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.LocalAI;
 
@@ -22,7 +23,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Extension = new(
         "Agentstration.Extensions.LocalAI",
         "LocalAI",
-        "1.0.0",
+        typeof(LocalAiAepModelProvider).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0],
         "Agentstration AEP model-provider extension for a LocalAI server.");
     options.OptionSets.Add(LocalAiOptionContracts.ModelProfile);
 });
