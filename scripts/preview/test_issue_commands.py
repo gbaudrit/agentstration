@@ -458,7 +458,7 @@ class PullRequestTests(unittest.TestCase):
             self.assertFalse(github.admit())
             self.assertFalse(any(path.endswith('/dispatches') for path, _, _ in github.calls))
 
-    def test_pr_uses_own_frozen_head_labels_and_environment_then_preserves_it_when_head_moves(self):
+    def test_pr_uses_frozen_head_and_rejects_drift_before_execution(self):
         github = self.github()
         github.issue['labels'] = [{'name': 'preview:extension:foundry'}]
         self.assertTrue(github.admit())
@@ -467,8 +467,10 @@ class PullRequestTests(unittest.TestCase):
                          (selected['environment_id'], selected['tracking_kind'], selected['revision'], selected['extensions']))
         self.assertFalse(any(path == 'graphql' or '/commits/' in path or '/pulls/123' in path for path, _, _ in github.calls))
         github.head_sha = 'b' * 40
-        self.assertEqual('17', commands.tracking(selected, REPOSITORY, github))
+        with self.assertRaisesRegex(ValueError, 'source changed'):
+            commands.tracking(selected, REPOSITORY, github)
         self.assertEqual(SHA, selected['revision'])
+        github.head_sha = SHA
         github.issue['labels'] = []
         with self.assertRaisesRegex(ValueError, 'labels changed'):
             commands.tracking(selected, REPOSITORY, github)

@@ -12,6 +12,8 @@ x-ready: &ready
 
 services:
   server:
+    read_only: true
+    tmpfs: [/tmp]
     image: ${PREVIEW_SERVER_IMAGE:?Prepare a digest-pinned preview first}
     restart: unless-stopped
     labels:

@@ -14,6 +14,7 @@ import cloudflare
 import capacity
 import contract
 import extensions
+import deployment_profiles as profiles
 import issue_commands as commands
 import manual
 import preview
@@ -72,6 +73,9 @@ class GitHub:
         sha = pull.get('head', {}).get('sha')
         preview.require(isinstance(sha, str) and preview.SHA.fullmatch(sha), 'Invalid automatic PR source SHA.')
         result = {'pullRequest': pull['number'], 'optInEvent': grant['id'], 'optInAt': grant['created_at'], 'sourceSha': sha}
+        selected_profiles = profiles.from_body(pull.get('body'))
+        if selected_profiles:
+            result['profileGuids'] = selected_profiles
         if REDEPLOY in [item.get('name') for item in pull.get('labels', [])]:
             reset = self.label_grant(pull, REDEPLOY)
             preview.require(reset is not None, 'Automatic reset requires current maintainer write access.')
@@ -140,7 +144,7 @@ def eligible_change(record, approval, selected):
     if record is None:
         return True
     previous = record.get('automation')
-    changed_intent = not previous or any(previous.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent'))
+    changed_intent = not previous or any(previous.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent', 'profileGuids'))
     if record['destroyed']:
         if previous:
             return changed_intent  # TTL/manual removal stays removed until a new head or explicit re-opt-in.
@@ -300,7 +304,8 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 any(old_intent.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent'))
                 or list(previous['request'].get('extensions', {})) != selected))
             options = {**commands.parse('/preview deploy'), 'environment_id': environment,
-                       'revision': approval['sourceSha'], 'extensions': selected}
+                       'revision': approval['sourceSha'], 'extensions': selected,
+                       'profile_guids': approval.get('profileGuids', []), 'selection_pull_request': number}
             if previous and not previous['destroyed']:
                 options['database'] = previous['request']['database']
                 options['ttl_hours'] = previous['request']['ttlHours']

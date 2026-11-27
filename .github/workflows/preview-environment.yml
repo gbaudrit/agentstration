@@ -58,6 +58,7 @@ jobs:
         id: contract
         env:
           REQUEST_JSON: ${{ inputs.request }}
+          GH_TOKEN: ${{ github.token }}
           OPERATION: ${{ inputs.operation }}
           RESET_BEFORE_DEPLOY: ${{ inputs.reset_before_deploy || false }}
           SOURCE_REPOSITORY: ${{ github.repository }}
@@ -144,6 +145,7 @@ jobs:
       - name: Execute the owned Docker lifecycle operation
         id: lifecycle
         env:
+          GH_TOKEN: ${{ github.token }}
           OPERATION: ${{ inputs.operation }}
           PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}
           STATE_ROOT: ${{ vars.PREVIEW_STATE_ROOT }}
@@ -185,6 +187,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      pull-requests: read
       id-token: write
     env:
       DOCKER_CONFIG: /tmp/agentstration-preview-auth-${{ github.run_id }}-${{ github.run_attempt }}
@@ -243,6 +246,7 @@ jobs:
       - name: Execute the owned Azure VM lifecycle operation
         id: lifecycle
         env:
+          GH_TOKEN: ${{ github.token }}
           OPERATION: ${{ inputs.operation }}
           RESET_BEFORE_DEPLOY: ${{ inputs.reset_before_deploy || false }}
           PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}

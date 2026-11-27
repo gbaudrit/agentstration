@@ -10,6 +10,7 @@ import tempfile
 
 import contract
 import extensions
+import deployment_profiles as profiles
 import manual
 import preview
 import preview_feedback as feedback
@@ -266,6 +267,8 @@ def admit(event, repository, call=api, selector=None):
                 preview.require(options['revision'] in ('', 'pr:' + str(issue)),
                                 'On a PR, use /preview deploy without ref; it deploys that PR. Use an issue or the manual form for another revision.')
                 # Use the same live PR response for ownership and SHA; no moving-ref second lookup.
+                options['profile_guids'] = profiles.from_body(pull.get('body'))
+                options['selection_pull_request'] = issue
                 options['revision'] = pull['head']['sha']
                 preview.require(isinstance(options['revision'], str) and preview.SHA.fullmatch(options['revision']), 'Invalid PR head SHA.')
             else:
@@ -299,7 +302,7 @@ def tracking(options, repository, call=api):
     repository = repository_name(repository)
     expected = {'operation', 'environment_id', 'revision', 'provider', 'database', 'vm_size_profile',
                 'ttl_hours', 'data_mode', 'test_profile', 'worker_revision'}
-    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy'}
+    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy', 'profile_guids', 'selection_pull_request'}
     preview.require(isinstance(options, dict) and expected <= set(options) <= expected | optional,
                     'Unexpected form or issue tracking fields.')
     tracked = {'tracking_issue', 'tracking_comment'} & set(options)
@@ -326,7 +329,11 @@ def tracking(options, repository, call=api):
                     'The dispatched options differ from the issue command.')
     preview.require(options['operation'] != 'deploy' or preview.SHA.fullmatch(options['revision']), 'Issue deployment source must be frozen to a full SHA.')
     current = call(f'repos/{repository}/issues/{issue}')
-    context(options, repository, int(issue), current, call)
+    pull = context(options, repository, int(issue), current, call)
+    if pull is not None and "profile_guids" in options:
+        preview.require(pull["head"]["sha"] == options["revision"]
+                        and profiles.from_body(pull.get("body")) == options["profile_guids"]
+                        and options.get("selection_pull_request") == int(issue), "PR deployment profiles or source changed after admission.")
     if kind == 'pull_request':
         preview.require(original['revision'] in ('', 'pr:' + issue), 'PR command cannot select another source.')
     if 'tracking_feedback' in options:

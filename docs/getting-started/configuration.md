@@ -290,3 +290,7 @@ Back up the PostgreSQL database and the file-backed Data Protection keys, local 
 Use `pg_dump`/`pg_restore` or the equivalent managed PostgreSQL tooling for all seven schemas. Stop writes or take a transactionally consistent database snapshot, copy the file-backed state from `Data:Directory`, and record the application version. Restore those components together before starting Agentstration. Do not restore a PostgreSQL volume by copying files between major PostgreSQL versions; use logical dump/restore or a supported PostgreSQL upgrade procedure.
 
 PostgreSQL remains single-instance in this release, and switching providers does not migrate data; a supported export/import path is future work.
+
+## Additional settings and independent Bootstrap
+
+See [Additional settings and GUID deployment profiles](../reference/additional-settings.md) for ordered JSON overlays, protected Core sections, independent profile references, activation and precedence.

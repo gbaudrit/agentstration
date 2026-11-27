@@ -101,7 +101,7 @@ def validate_state(state):
 
 
 def prepare(directory, server_delivery, worker_delivery, environment_id, port=5080, registry="ghcr.io", bootstrap=None,
-            database=None, postgres_image=None, extension_deliveries=None, extension_configuration=None):
+            database=None, postgres_image=None, extension_deliveries=None, extension_configuration=None, deployment_profiles=None):
     import extensions
     settings = extensions.configuration(extension_configuration if extension_configuration is not None else {}, extension_deliveries or {})
     require(ENVIRONMENT_ID.fullmatch(environment_id), "Environment ID must use 1–40 lowercase letters, digits or hyphens, starting with a letter.")
@@ -142,6 +142,16 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
     validate_state(state)
     if bootstrap is not None:
         configuration["Agentstration"]["Bootstrap"] = {"Path": "/app/bootstrap/profiles", **bootstrap}
+    if deployment_profiles is not None:
+        import deployment_profiles as profiles
+        profiles.validate_pins(deployment_profiles)
+        configuration['Agentstration']['AdditionalSettings'] = [profiles.settings_path(item['guid']) for item in deployment_profiles]
+        configuration['Agentstration']['Bootstrap']['InitialBootstrapEnabled'] = bool(deployment_profiles)
+        configuration['Agentstration']['Bootstrap']['EnableAdditionalSettingsBootstrap'] = bool(deployment_profiles)
+        if deployment_profiles:
+            # Retained only in the existing private configuration, never a request/result.
+            configuration['Agentstration']['Bootstrap'].setdefault('Secrets', {}).setdefault('AdminPassword', 'Aa1!' + secrets.token_urlsafe(48))
+        state['deploymentProfiles'] = deployment_profiles
     configuration["Agentstration"].update(InstanceId=state["instanceId"], AwpWorkerTrust={
         "Enabled": True, "InstanceId": state["instanceId"], "Credentials": [{"WorkerId": state["workerId"],
         "CredentialId": state["credentialId"], "SharedKeyFile": "/run/secrets/awp_key"}]})

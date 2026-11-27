@@ -12,6 +12,7 @@ import sys
 import uuid
 
 import contract
+import deployment_profiles as profiles
 import container_health
 import extensions
 import preview
@@ -65,6 +66,9 @@ def locked(root, environment_id):
 
 
 def result(request, state, resources=None, daemon=None, metadata=None):
+    if state == "running" and metadata is not None and "deploymentProfiles" in request and (
+        (metadata or {}).get("appliedDeploymentProfiles") != [item["guid"] for item in request["deploymentProfiles"]]):
+        state = "drifted"
     inspected = resources is not None
     resources = resources or {"containers": [], "volumes": [], "networks": []}
     identifiers = {kind: [item["Name"] if kind == "volumes" else item["Id"] for item in values]
@@ -81,6 +85,8 @@ def result(request, state, resources=None, daemon=None, metadata=None):
             "observedImages": {item["Config"]["Labels"].get("com.docker.compose.service", "unknown"): item["Config"]["Image"]
                                for item in resources["containers"]},
             "state": state, "url": url, "expiresAt": expiry,
+            "deploymentProfiles": (metadata or {}).get("appliedDeploymentProfiles", []),
+            "bootstrapOutcome": "ready" if state == "running" and metadata is not None else "not-confirmed",
             "health": container_health.from_containers(contract.images(request), resources["containers"]) if inspected else {},
             "providerResourceIds": {"dockerDaemon": daemon, "composeProject": "preview-" + request["environmentId"], **identifiers} if daemon else {}}
 
@@ -132,7 +138,8 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
         metadata = preview.read_json(path) if path.exists() else None
         resources = inventory(project)
         if metadata:
-            contract.fields(metadata, ("schemaVersion", "environmentId", "dockerDaemon", "ownerId", "createdAt", "request", "expiresAt"))
+            contract.fields(metadata, ("schemaVersion", "environmentId", "dockerDaemon", "ownerId", "createdAt", "request", "expiresAt",
+                                       *(["appliedDeploymentProfiles"] if "appliedDeploymentProfiles" in metadata else [])))
             preview.require(metadata["schemaVersion"] == 1 and metadata["environmentId"] == request["environmentId"]
                             and metadata["dockerDaemon"] == daemon, "Lifecycle state belongs to another environment or Docker daemon.")
             uuid.UUID(metadata["ownerId"])
@@ -144,7 +151,8 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
             owned(resources, metadata["ownerId"])
             preview.require(request["database"] == previous["database"], "An existing lifecycle cannot switch databases.")
             if action != "deploy":
-                preview.require(contract.images(request) == contract.images(previous) and request["target"] == previous["target"],
+                preview.require(contract.images(request) == contract.images(previous) and request["target"] == previous["target"]
+                                and request.get("deploymentProfiles", []) == previous.get("deploymentProfiles", []),
                                 "Status/destroy must identify the recorded deployment; stale image or target selections are rejected.")
         else:
             preview.require(not any(resources.values()), "Unmanaged project resources exist; restore their original state or choose another environment ID.")
@@ -156,7 +164,8 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
             state = preview.prepare(directory, request["deliveries"]["server"], request["deliveries"]["worker"],
                                     request["environmentId"], port=request["target"]["port"], registry=request["registry"],
                                     bootstrap=bootstrap, database=request["database"], postgres_image=request.get("postgresImage"),
-                                    extension_deliveries=request.get("extensions", {}), extension_configuration=settings)
+                                    extension_deliveries=request.get("extensions", {}), extension_configuration=settings,
+                                    deployment_profiles=request.get("deploymentProfiles"))
             if metadata is None:
                 created = now or datetime.now(timezone.utc)
                 metadata = {"schemaVersion": 1, "environmentId": request["environmentId"], "dockerDaemon": daemon,
@@ -181,12 +190,15 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
                     docker("rm", item["Id"])
             preview.compose(directory, "pull", capture=True)
             preview.compose(directory, "up", "--detach", "--wait", "--wait-timeout", "180", capture=True)
-            if request["testProfile"] == "readiness" or request.get("extensions"):
+            if request["testProfile"] == "readiness" or request.get("extensions") or request.get("deploymentProfiles"):
                 preview.verify(directory)
             resources = inventory(project)
             owned(resources, metadata["ownerId"])
             state_name = observed(request, resources)
             preview.require(state_name == "running", "Deployed resources are unhealthy or differ from the request.")
+            if "deploymentProfiles" in request:
+                metadata["appliedDeploymentProfiles"] = [item["guid"] for item in request["deploymentProfiles"]]
+                preview.private_write(path, json.dumps(metadata, indent=2) + "\n")
             return result(request, state_name, resources, daemon, metadata)
         # Only inspected, ownership-checked IDs are removed. The host itself is never removed.
         order = {"worker": 0, "server": 1, "postgres": 2}

@@ -469,7 +469,8 @@ class ReconciliationTests(unittest.TestCase):
         original = self.registry.execute
         def created_manually(action, request, **kwargs):
             cloud = self.registry.clouds.setdefault('pr-1', Cloud())
-            azure.execute('deploy', request, cloud.factory, now=NOW, route_factory=lambda *args: None)
+            azure.execute('deploy', request, cloud.factory, now=NOW, route_factory=lambda *args: None,
+                          guard=lambda _: True)
             cloud.effects.clear()
             return original(action, request, **kwargs)
         self.registry.execute = created_manually

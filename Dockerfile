@@ -9,6 +9,8 @@ FROM ${RUNTIME_IMAGE}
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=build /src/deploy/bootstrap/profiles /app/bootstrap/profiles
+COPY --from=build /src/deploy/profiles /app/deploy/profiles
+RUN chmod -R a-w /app/deploy/profiles /app/bootstrap/profiles
 COPY --from=build /src/LICENSE /src/NOTICE ./licenses/
 ENV ASPNETCORE_URLS=http://+:8080
 ENV Data__Directory=/data

@@ -144,3 +144,7 @@ Quartz hosting preserves its significant order: logging initialization, SQLite s
 Testing disables the optional application/scheduler worker set by default; `Agentstration:Testing:HostedServicesEnabled` enables it. `Agentstration:Testing:OpenTelemetryEnabled` independently controls server telemetry. The transport security audit service remains registered under either worker setting. Cleanup retains ownership of only its private paths/pools. Endpoint mapping and ordered initialization remain outside registration.
 
 Descriptor tests inspect service type, lifetime, selection and cardinality before provider construction, then validate SQLite/PostgreSQL and deterministic/Managed graphs with `ValidateOnBuild` and `ValidateScopes`. Host lifecycle tests cover workers/telemetry. New registrations belong in the appropriate owner and must update tests when these contracts change.
+
+## Additional startup configuration
+
+The authoritative host loads and validates the frozen additional-settings selection before diagnostics/options/service composition. Core and selected GUID Bootstrap applications then reuse the existing fenced phases and catalogue validation with independent directory references. See [ADR-0270](../../decisions/0270-additional-settings-compose-independent-startup-bootstrap.md).

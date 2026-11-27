@@ -2,10 +2,10 @@ name: Preview deployment contracts
 on:
   pull_request:
     branches: [main]
-    paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
+    paths: ['scripts/preview/**', 'deploy/preview/**', 'deploy/profiles/**', '.github/workflows/preview*.yml']
   push:
     branches: [main]
-    paths: ['scripts/preview/**', 'deploy/preview/**', '.github/workflows/preview*.yml']
+    paths: ['scripts/preview/**', 'deploy/preview/**', 'deploy/profiles/**', '.github/workflows/preview*.yml']
   workflow_dispatch:
     inputs:
       cloudflare_access:

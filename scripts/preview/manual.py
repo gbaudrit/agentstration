@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 import contract
 import extensions
+import deployment_profiles as profiles
 import github_request
 import preview
 from images import catalogue, DIGEST, valid_version
@@ -74,7 +75,7 @@ class PublishedImages:
         preview.require(value.get('encoding') == 'base64' and value.get('type') == 'file',
                         'The published source must contain the supported image catalogue/version file.')
         result = base64.b64decode(value['content'], validate=False)
-        preview.require(len(result) <= 65536, 'Source metadata exceeds 64 KiB.')
+        preview.require(len(result) <= 1024 * 1024, 'Source metadata exceeds one MiB.')
         return result.decode('utf-8')
 
     def component(self, identifier):
@@ -192,6 +193,7 @@ class PublishedImages:
 
 
 def validate_options(options):
+    profiles.identities(options.get("profile_guids", []))
     extensions.validate_ids(options.get('extensions', []))
     preview.require(options['operation'] in contract.OPERATIONS and options['provider'] == 'azure-vm', 'Only the Azure VM provider is available in this form.')
     preview.require(preview.ENVIRONMENT_ID.fullmatch(options['environment_id']), 'Use a lowercase environment ID, at most 40 characters.')
@@ -221,7 +223,25 @@ def resolve(options, variables, repository, selector=None):
     arguments = {'environment_id': options['environment_id'], 'database': options['database'], 'provider': options['provider'],
                  'target': target, 'ttl_hours': ttl_hours, 'data_mode': options['data_mode'], 'test_profile': options['test_profile']}
     selector = selector or PublishedImages(repository)
-    return contract.plan(selector.select('server', options['revision']), selector.select('maf-worker', options['worker_revision']),
+    revision = options['revision']
+    guids = options.get('profile_guids')
+    number = options.get('selection_pull_request')
+    if revision.startswith('pr:'):
+        number = int(revision[3:])
+    if number is not None and guids is None:
+        preview.require(type(number) is int and 1 <= number <= 9999999999, 'Invalid profile selection PR.')
+        pull = selector.api(f'repos/{selector.repository}/pulls/{number}')
+        preview.require(pull.get('state') == 'open' and (pull.get('head', {}).get('repo') or {}).get('full_name', '').lower() == selector.repository,
+                        'Profiles require an open same-repository PR.')
+        current_guids = profiles.from_body(pull.get('body'))
+        preview.require(guids is None or guids == current_guids, 'PR deployment profiles changed after admission.')
+        frozen = pull['head']['sha']
+        preview.require(revision.startswith('pr:') or revision == frozen, 'PR source changed after admission.')
+        revision, guids = frozen, current_guids
+    server = selector.select('server', revision)
+    pins = profiles.pin(selector, guids, server['sourceSha']) if guids is not None else None
+    return contract.plan(server, selector.select('maf-worker', options['worker_revision']),
+                         deployment_profiles=pins, selection_pull_request=number,
                          extension_deliveries={identifier: selector.select(identifier, 'published') for identifier in options.get('extensions', [])},
                          **arguments)
 

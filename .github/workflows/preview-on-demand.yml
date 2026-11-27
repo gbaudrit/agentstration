@@ -220,6 +220,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      pull-requests: read
       id-token: write
     uses: ./.github/workflows/preview-environment.yml
     # Required for the called job to resolve its protected environment secrets.
