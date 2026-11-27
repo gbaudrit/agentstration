@@ -1,0 +1,36 @@
+name: Preview image admission
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      preview_pr:
+        description: Existing opted-in PR number (backfill or retry)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  admit:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.action != 'labeled' || github.event.label.name == 'preview:auto')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify live maintainer opt-in and dispatch server packaging on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_PR: ${{ inputs.preview_pr }}
+        run: python3 scripts/preview/image_publication.py dispatch
