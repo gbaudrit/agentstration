@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Synchronize selectable labels from the trusted AEP image catalogue
+      - name: Synchronize preview lifecycle and selectable extension labels
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

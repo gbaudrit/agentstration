@@ -1,9 +1,13 @@
+using System.Reflection;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.OpenApi;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+var extensionVersion = typeof(OpenApiOptions).Assembly
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+    ?? throw new InvalidOperationException("The OpenAPI extension version is missing.");
 builder.Services.AddSingleton<IValidateOptions<OpenApiOptions>, OpenApiOptionsValidator>();
 builder.Services.AddOptions<OpenApiOptions>()
     .Bind(builder.Configuration.GetSection(OpenApiOptions.SectionName))
@@ -24,7 +28,7 @@ builder.Services.AddHttpClient<OpenApiService>()
 builder.Services.AddAgentstrationAep(options =>
 {
     options.Extension = new AepExtensionIdentity(
-        "Agentstration.Extensions.OpenApi", "OpenAPI Discovery and Acquisition", "1.0.0",
+        "Agentstration.Extensions.OpenApi", "OpenAPI Discovery and Acquisition", extensionVersion,
         "Bounded governed OpenAPI 3.0 and 3.1 contract discovery and explicit operation invocation.");
     options.McpServers.Add(new("openapi", "/mcp"));
     options.SchemaFormats.Add(new AepSchemaFormatContribution(

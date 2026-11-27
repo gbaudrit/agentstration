@@ -12,5 +12,11 @@
   "platform": "linux/amd64",
   "aepVersion": "agentstration.io/v1",
   "contributionKind": "modelProviders",
-  "contributionId": "microsoft-foundry"
+  "contributionId": "microsoft-foundry",
+  "ci": {
+    "testPaths": [
+      "tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs",
+      "tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs"
+    ]
+  }
 }

@@ -74,10 +74,11 @@ def _validate(request):
                 "ttlHours", "dataMode", "testProfile", "target"}
     if request.get("database") == "postgresql":
         expected.add("postgresImage")
-    if request.get("schemaVersion") == 2:
+    if request.get("schemaVersion") in (2, 4):
         expected.add("extensions")
     fields(request, expected)
-    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2), "Unsupported deployment contract version.")
+    # Version 3 is reserved by the parallel GUID deployment-profile change (#1422).
+    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2, 4), "Unsupported deployment contract version.")
     preview.require(isinstance(request["environmentId"], str) and preview.ENVIRONMENT_ID.fullmatch(request["environmentId"]),
                     "Invalid deployment environment ID.")
     preview.require(request["provider"] in PROVIDERS and request["database"] in ("sqlite", "postgresql"),
@@ -101,7 +102,9 @@ def _validate(request):
         selected = images(request)
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("Invalid image delivery metadata.") from error
-    preview.require(request["sourceSha"] == selected["server"]["sourceSha"], "Revision must equal the exact server source SHA.")
+    preview.require(isinstance(request['sourceSha'], str) and preview.SHA.fullmatch(request['sourceSha']), 'Requested revision must be an exact source SHA.')
+    if request['schemaVersion'] in (1, 2):
+        preview.require(request["sourceSha"] == selected["server"]["sourceSha"], "Legacy revision must equal the exact server source SHA.")
     worker = selected["worker"]
     preview.require(worker["runtimeKind"] == "microsoft-agent-framework" and worker["awpVersion"] == "1.0"
                     and worker["capabilityVersion"] == "1.0"
@@ -137,7 +140,7 @@ def validate(request):
 
 
 def plan(server, worker, environment_id, database="sqlite", provider="docker", target=None, ttl_hours=24,
-         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None):
+         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None, source_sha=None):
     preview.require(target is not None, "A provider-specific target is required.")
     request = {"schemaVersion": 1, "environmentId": environment_id, "provider": provider,
                "sourceSha": server["sourceSha"], "database": database, "registry": registry,
@@ -145,6 +148,8 @@ def plan(server, worker, environment_id, database="sqlite", provider="docker", t
                "dataMode": data_mode, "testProfile": test_profile, "target": target}
     if extension_deliveries:
         request.update(schemaVersion=2, extensions={key: delivery(value) for key, value in sorted(extension_deliveries.items())})
+    if source_sha is not None and source_sha != server['sourceSha']:
+        request.update(schemaVersion=4, sourceSha=source_sha, extensions=request.get('extensions', {}))
     if database == "postgresql":
         request["postgresImage"] = postgres_image or preview.read_json(preview.ROOT / "deploy/preview/postgresql.json")["reference"]
     else:

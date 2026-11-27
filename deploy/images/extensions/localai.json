@@ -12,5 +12,12 @@
   "platform": "linux/amd64",
   "aepVersion": "agentstration.io/v1",
   "contributionKind": "modelProviders",
-  "contributionId": "localai"
+  "contributionId": "localai",
+  "ci": {
+    "testPaths": [
+      "tests/Agentstration.ModelProviders.Tests/LocalAiProviderTests.cs",
+      "tests/Agentstration.ModelProviders.Tests/LocalAiIntegrationTests.cs",
+      "tests/Agentstration.ModelProviders.Tests/LocalAiPackagingTests.cs"
+    ]
+  }
 }
