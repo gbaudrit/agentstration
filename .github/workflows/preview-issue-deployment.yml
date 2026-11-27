@@ -1,10 +1,10 @@
-name: Preview issue deployment
+name: Preview command deployment
 
 on:
   workflow_dispatch:
     inputs:
       selection:
-        description: Frozen source and original issue command identifiers (no credentials)
+        description: Frozen source and original issue/PR command identifiers (no credentials)
         type: string
         required: true
 
@@ -16,6 +16,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
       packages: read
       id-token: write
     uses: ./.github/workflows/preview-on-demand.yml
