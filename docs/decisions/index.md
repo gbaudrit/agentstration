@@ -343,3 +343,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 268. [ADR-0268 — Explicit preview redeployment resets owned state](0268-explicit-preview-redeployment-resets-owned-state.md)
 
 269. [ADR-0269 — Preview reconciliation enforces owned expiry and capacity](0269-preview-reconciliation-enforces-owned-expiry-and-capacity.md)
+
+270. [ADR-0270 — Additional settings compose independent startup Bootstrap](0270-additional-settings-compose-independent-startup-bootstrap.md)

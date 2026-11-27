@@ -23,10 +23,12 @@ public sealed class BootstrapStartupCoordinator(
     IWorkspacePlatformResourceProvisioner platformResources,
     TimeProvider timeProvider,
     BootstrapStartupState startup,
-    ILogger<BootstrapStartupCoordinator> logger)
+    ILogger<BootstrapStartupCoordinator> logger,
+    AdditionalSettingsSnapshot? additionalSettings = null)
 {
     private sealed record InitialApplication(
-        IReadOnlyList<string> Profiles, string TargetLevel, IReadOnlyList<LoadedBootstrapProfile> Snapshot);
+        IReadOnlyList<string> Profiles, string TargetLevel, IReadOnlyList<LoadedBootstrapProfile> Snapshot,
+        IReadOnlyList<string> Paths);
 
     public async Task ExecuteAsync(Func<CancellationToken, Task> discoverConfiguredExtensions, CancellationToken cancellationToken)
     {
@@ -38,16 +40,30 @@ public sealed class BootstrapStartupCoordinator(
             startup.MoveTo("finalization");
             return;
         }
-        if (options.ExtensionDependencyTimeout < TimeSpan.FromSeconds(1)
-            || options.ExtensionDependencyTimeout > TimeSpan.FromMinutes(30))
-            throw new DeclarativeBootstrapException("Bootstrap ExtensionDependencyTimeout must be between one second and thirty minutes.");
-        if (options.InitialApplications.Count > 16)
-            throw new DeclarativeBootstrapException("Bootstrap supports at most sixteen additional initial applications.");
+        var blocks = new List<DeclarativeBootstrapOptions> { options };
+        if (options.EnableAdditionalSettingsBootstrap)
+            foreach (var file in additionalSettings?.Files ?? [])
+            {
+                var block = configuration.GetSection(file.Identity + ":Bootstrap").Get<DeclarativeBootstrapOptions>() ?? new();
+                if (block.InitialBootstrapEnabled) blocks.Add(block);
+            }
         var applications = new List<InitialApplication>();
-        if (options.InitialProfiles.Count > 0)
-            applications.Add(await PrepareAsync(options.InitialProfiles, "/instance", cancellationToken));
-        foreach (var application in options.InitialApplications)
-            applications.Add(await PrepareAsync(application.Profiles, application.TargetLevel, cancellationToken));
+        foreach (var block in blocks)
+        {
+            if (block.ExtensionDependencyTimeout < TimeSpan.FromSeconds(1)
+                || block.ExtensionDependencyTimeout > TimeSpan.FromMinutes(30))
+                throw new DeclarativeBootstrapException("Bootstrap ExtensionDependencyTimeout must be between one second and thirty minutes.");
+            if (block.InitialApplications.Count + block.ProfileReferences.Count > 16)
+                throw new DeclarativeBootstrapException("Bootstrap supports at most sixteen additional initial applications per source.");
+            if (block.InitialProfiles.Count > 0)
+                applications.Add(await PrepareAsync(Paths(block, block.InitialProfiles), "/instance", cancellationToken));
+            foreach (var application in block.InitialApplications)
+                applications.Add(await PrepareAsync(Paths(block, application.Profiles), application.TargetLevel, cancellationToken));
+            foreach (var reference in block.ProfileReferences)
+                applications.Add(await PrepareAsync([reference.Path], reference.TargetLevel, cancellationToken));
+        }
+        // Stable ordering preserves Core/file order inside each scope and phase.
+        applications = applications.OrderBy(value => value.Snapshot[0].Summary.Scope).ToList();
 
         foreach (var application in applications)
             foreach (var profile in application.Snapshot)
@@ -76,8 +92,8 @@ public sealed class BootstrapStartupCoordinator(
         foreach (var application in applications)
             selections.Add(await SelectAsync(application, cancellationToken));
         var requirements = new List<BootstrapExtensionRequirement>();
-        foreach (var selection in selections)
-            requirements.AddRange(await bootstrap.GetExtensionRequirementsAsync(selection, cancellationToken));
+        for (var index = 0; index < selections.Count; index++)
+            requirements.AddRange(await bootstrap.GetExtensionRequirementsAsync(selections[index], cancellationToken, applications[index].Paths));
         await WaitForContributionsAsync(requirements, options.ExtensionDependencyTimeout, cancellationToken);
         startup.MoveTo("resources");
 
@@ -85,7 +101,7 @@ public sealed class BootstrapStartupCoordinator(
         // a different file set merely because the extension took time to arrive.
         foreach (var application in applications)
         {
-            var current = await catalog.LoadAsync(application.Profiles, cancellationToken);
+            var current = await catalog.LoadDirectoriesAsync(application.Paths, cancellationToken);
             if (!current.Select(value => value.Summary.Digest)
                 .SequenceEqual(application.Snapshot.Select(value => value.Summary.Digest), StringComparer.Ordinal))
                 throw new DeclarativeBootstrapException("The Bootstrap catalog changed while waiting for extension contributions.");
@@ -106,19 +122,28 @@ public sealed class BootstrapStartupCoordinator(
         startup.MoveTo("finalization");
     }
 
+    private IReadOnlyList<string> Paths(DeclarativeBootstrapOptions options, IReadOnlyList<string> names)
+    {
+        if (string.IsNullOrWhiteSpace(options.Path))
+            throw new DeclarativeBootstrapException("Bootstrap Path is required for named profiles.");
+        foreach (var name in names) BootstrapProfileCatalog.ValidateProfileName(name);
+        return names.Select(name => System.IO.Path.Combine(options.Path, name)).ToArray();
+    }
+
     private async Task<InitialApplication> PrepareAsync(
-        IReadOnlyList<string> profiles, string level, CancellationToken cancellationToken)
+        IReadOnlyList<string> paths, string level, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(level))
             throw new DeclarativeBootstrapException("An initial application requires an explicit TargetLevel.");
         ExtensionEnrollmentPolicyService.ValidateLevel(level);
-        var loaded = await catalog.LoadAsync(profiles, cancellationToken);
+        var loaded = await catalog.LoadDirectoriesAsync(paths, cancellationToken);
         bootstrap.ValidateStartupProfiles(loaded);
         var expected = level == "/instance" ? BootstrapProfileScope.Instance
             : level.Split('/').Length == 3 ? BootstrapProfileScope.Tenant : BootstrapProfileScope.Workspace;
         if (loaded[0].Summary.Scope != expected)
             throw new DeclarativeBootstrapException($"Initial application target '{level}' does not match its profile scope.");
-        return new(profiles, level, loaded);
+        return new(loaded.Select(value => value.Summary.Name).ToArray(), level, loaded,
+            paths.Select(catalog.ResolveStartupDirectory).ToArray());
     }
 
     private async Task<BootstrapProfileSelection> SelectAsync(InitialApplication application, CancellationToken cancellationToken)
@@ -147,7 +172,8 @@ public sealed class BootstrapStartupCoordinator(
     {
         if (logger.IsEnabled(LogLevel.Information))
             logger.LogInformation("Applying Bootstrap phase {Phase} for profiles {Profiles}.", phase, string.Join(",", selection.Profiles));
-        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: targetLevel, actorPrincipalId: actorPrincipalId);
+        var result = await bootstrap.ExecutePhaseAsync(selection, phase, cancellationToken, expected.Select(profile => profile.Summary.Digest).ToArray(), startupTargetLevel: targetLevel, actorPrincipalId: actorPrincipalId,
+            startupPaths: expected.Select(profile => profile.DirectoryPath).ToArray());
         if (result.Error is not null) throw new DeclarativeBootstrapException(result.Error);
     }
 

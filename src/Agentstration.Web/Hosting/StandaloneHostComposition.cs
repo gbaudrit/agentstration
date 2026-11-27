@@ -30,6 +30,12 @@ internal sealed record StandaloneHostComposition(
 
 internal static class StandaloneHostCompositionExtensions
 {
+    internal static WebApplicationBuilder AddAgentstrationAdditionalSettings(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddSingleton(builder.Configuration.LoadAgentstrationAdditionalSettings(builder.Environment.ContentRootPath));
+        return builder;
+    }
+
     internal static StandaloneHostComposition AddAgentstrationStandaloneHost(this WebApplicationBuilder builder)
     {
         var bootstrapOptions = new LocalBootstrapOptions();

@@ -9,6 +9,12 @@ public sealed record BootstrapInitialApplication
     public string TargetLevel { get; init; } = "/instance";
 }
 
+public sealed record BootstrapInitialProfileReference
+{
+    public string Path { get; init; } = string.Empty;
+    public string TargetLevel { get; init; } = "/instance";
+}
+
 internal enum BootstrapStartupPhase { All, Topology, Policies, Resources }
 
 public sealed partial class DeclarativeBootstrapService

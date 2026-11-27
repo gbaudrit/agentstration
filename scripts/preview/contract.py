@@ -5,6 +5,7 @@ import uuid
 
 import preview
 import extensions
+import deployment_profiles as profiles
 from images import delivery_entry
 
 PROVIDERS = {"docker", "azure-vm", "ssh-docker"}
@@ -74,10 +75,16 @@ def _validate(request):
                 "ttlHours", "dataMode", "testProfile", "target"}
     if request.get("database") == "postgresql":
         expected.add("postgresImage")
-    if request.get("schemaVersion") == 2:
+    if request.get("schemaVersion") in (2, 3):
         expected.add("extensions")
+    if request.get("schemaVersion") == 3:
+        expected.update(("deploymentProfiles", "selectionPullRequest"))
     fields(request, expected)
-    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2), "Unsupported deployment contract version.")
+    if request.get("schemaVersion") == 3:
+        profiles.validate_pins(request["deploymentProfiles"])
+        number = request["selectionPullRequest"]
+        preview.require(number is None or type(number) is int and 1 <= number <= 9999999999, "Invalid profile selection PR.")
+    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2, 3), "Unsupported deployment contract version.")
     preview.require(isinstance(request["environmentId"], str) and preview.ENVIRONMENT_ID.fullmatch(request["environmentId"]),
                     "Invalid deployment environment ID.")
     preview.require(request["provider"] in PROVIDERS and request["database"] in ("sqlite", "postgresql"),
@@ -137,7 +144,7 @@ def validate(request):
 
 
 def plan(server, worker, environment_id, database="sqlite", provider="docker", target=None, ttl_hours=24,
-         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None):
+         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None, deployment_profiles=None, selection_pull_request=None):
     preview.require(target is not None, "A provider-specific target is required.")
     request = {"schemaVersion": 1, "environmentId": environment_id, "provider": provider,
                "sourceSha": server["sourceSha"], "database": database, "registry": registry,
@@ -145,6 +152,10 @@ def plan(server, worker, environment_id, database="sqlite", provider="docker", t
                "dataMode": data_mode, "testProfile": test_profile, "target": target}
     if extension_deliveries:
         request.update(schemaVersion=2, extensions={key: delivery(value) for key, value in sorted(extension_deliveries.items())})
+    if deployment_profiles is not None:
+        request.update(schemaVersion=3, deploymentProfiles=profiles.validate_pins(deployment_profiles),
+                       selectionPullRequest=selection_pull_request)
+        request.setdefault("extensions", {})
     if database == "postgresql":
         request["postgresImage"] = postgres_image or preview.read_json(preview.ROOT / "deploy/preview/postgresql.json")["reference"]
     else:

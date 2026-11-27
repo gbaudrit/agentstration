@@ -15,6 +15,7 @@ import time
 import uuid
 
 import contract
+import deployment_profiles as profiles
 import extensions
 import lifecycle
 import preview
@@ -40,7 +41,13 @@ def timestamp(value):
 
 
 def validate_automation(request, value):
-    contract.fields(value, ('pullRequest', 'optInEvent', 'optInAt', 'sourceSha', *(['redeployEvent'] if 'redeployEvent' in value else [])))
+    contract.fields(value, ('pullRequest', 'optInEvent', 'optInAt', 'sourceSha', *(['redeployEvent'] if 'redeployEvent' in value else []),
+                            *(['profileGuids'] if 'profileGuids' in value else [])))
+    if 'profileGuids' in value:
+        profiles.identities(value['profileGuids'])
+    if 'deploymentProfiles' in request:
+        preview.require(value.get('profileGuids', []) == [item['guid'] for item in request['deploymentProfiles']],
+                        'Automatic association differs from the frozen deployment profile order.')
     preview.require(type(value['pullRequest']) is int and 1 <= value['pullRequest'] <= 9999999999
                     and request['environmentId'] == 'pr-' + str(value['pullRequest'])
                     and type(value['optInEvent']) is int and 1 <= value['optInEvent'] <= 99999999999999999999
@@ -221,7 +228,7 @@ def validate_record(request, record, action):
             value = record['deletion'][key]
             preview.require(key == 'completedAt' and value is None or timestamp(value) is not None, 'Invalid deletion timestamp.')
     if 'automation' in record:
-        validate_automation(request, record['automation'])
+        validate_automation(record['request'], record['automation'])
     previous = contract.validate(record['request'])
     previous_target, target = contract.azure_target(previous), contract.azure_target(request)
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
@@ -233,7 +240,8 @@ def validate_record(request, record, action):
     if not record['destroyed'] and action != 'redeploy':
         preview.require(previous['database'] == request['database'], 'Reset the Azure preview explicitly before changing databases.')
     if action not in ('deploy', 'redeploy'):
-        preview.require(contract.images(previous) == contract.images(request) and previous_target == target,
+        preview.require(contract.images(previous) == contract.images(request) and previous_target == target
+                        and previous.get('deploymentProfiles', []) == request.get('deploymentProfiles', []),
                         'Status/destroy requires the recorded Azure image and target selection.')
 
 
@@ -589,6 +597,8 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
         client = client_factory(request, temporary)
         with client.capacity() if action == 'deploy' else nullcontext():
             record = client.read()
+            if action == 'deploy' and guard is None:
+                profiles.recheck(request)
             preview.require(record is not None or guard is None or guard(None), 'Preview request no longer authorizes creation.')
             existing_record = record is not None
             resources = client.resources(record)
@@ -601,6 +611,8 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                 client.write(record, initial=True)
             with client.lock():
                 record = client.read()
+                if action == 'deploy' and guard is None:
+                    profiles.recheck(request)
                 validate_record(request, record, 'redeploy' if reset_before_deploy else action)
                 preview.require(guard is None or guard(record), 'Preview changed after reconciliation; no mutation was authorized.')
                 resources = client.resources(record)
@@ -638,6 +650,9 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                         if request.get('extensions'):
                             preview.require(guest.get('extensionsVerified') == list(request['extensions']),
                                             'Azure guest did not confirm every selected AEP enrollment.')
+                        if request.get('deploymentProfiles'):
+                            preview.require(guest.get('deploymentProfiles') == [item['guid'] for item in request['deploymentProfiles']]
+                                and guest.get('bootstrapOutcome') == 'ready', 'Azure guest did not confirm the selected Bootstrap initialization.')
                         record['initialized'] = True
                         client.write(record)
                         url = None
@@ -682,6 +697,10 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                         routes.destroy()
                     return azure_result(request, 'stopped', resources, record, guest)
                 value = azure_result(request, guest.get('state', 'stopped' if power == 'PowerState/deallocated' else 'provisioning'), resources, record, guest)
+                if value['state'] == 'running' and request.get('deploymentProfiles') and (
+                    value['deploymentProfiles'] != [item['guid'] for item in request['deploymentProfiles']]
+                    or value['bootstrapOutcome'] != 'ready'):
+                    value['state'] = 'drifted'
                 if routes and record['access']['verified'] and value['state'] == 'running' and guest.get('accessReady'):
                     client.closed_ingress()
                     value['url'] = routes.verify()
@@ -696,6 +715,8 @@ def azure_result(request, state, resources, record=None, guest=None):
                  providerResourceIds={'subscription': request['target']['subscriptionId'], 'resourceGroup': request['target']['resourceGroup'],
                                       'resources': [r['id'] for r in resources]},
                  metrics={k: guest[k] for k in ('guestOperationSeconds', 'memoryAvailableKiB') if k in guest})
+    value['deploymentProfiles'] = guest.get('deploymentProfiles', [])
+    value['bootstrapOutcome'] = guest.get('bootstrapOutcome', 'not-confirmed')
     value['deletion'] = (record or {}).get('deletion')
     if record and 'access' in record:
         value['providerResourceIds']['cloudflare'] = {key: record['access'][key] for key in ('accountId', 'zoneId', 'tunnelId', 'dnsId')}

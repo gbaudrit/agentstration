@@ -40,7 +40,8 @@ def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=Non
                         == {k: v for k, v in contract.azure_target(request).items() if k != 'vmSize'},
                         'The guest belongs to another Azure target.')
         if action != 'deploy':
-            preview.require(contract.images(previous) == contract.images(request), 'Stale guest image selection.')
+            preview.require(contract.images(previous) == contract.images(request)
+                            and previous.get('deploymentProfiles', []) == request.get('deploymentProfiles', []), 'Stale guest image selection.')
     else:
         preview.require(action == 'deploy', 'Guest tooling is not initialized; inspect provisioning before retrying.')
     selected = local_request(request)

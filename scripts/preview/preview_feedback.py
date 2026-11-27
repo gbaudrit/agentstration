@@ -105,6 +105,12 @@ def completed(result, operation, repository, run_url, request=None, reset_before
     if state == 'running' and not result.get('url'):
         titles[state] = 'Environment running — access not confirmed'
     lines = ['**' + titles[state] + '**', 'Environment: `' + result['environmentId'] + '`.']
+    requested = [item['guid'] for item in (request or {}).get('deploymentProfiles', [])]
+    applied = result.get('deploymentProfiles', [])
+    if requested or applied:
+        lines.append('Requested profiles (ordered): ' + ', '.join('`' + item + '`' for item in requested) + '.')
+        lines.append('Applied profiles (ordered): ' + (', '.join('`' + item + '`' for item in applied) or 'none confirmed')
+                     + '; Bootstrap: **' + result.get('bootstrapOutcome', 'not-confirmed') + '**.')
     if result.get('url'):
         lines += ['[**Open Agentstration**](' + result['url'] + ')']
     if state == 'destroyed':

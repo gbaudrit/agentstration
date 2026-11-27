@@ -427,3 +427,7 @@ environment. Its target is a contract fixture, not a deployable operator request
 
 These actual GitHub/Azure checks are pending until trusted-main merge; offline
 unit tests do not establish event delivery or cloud readiness.
+
+## GUID configuration selected by a PR
+
+Use the visible ordered **Preview configuration** subsection documented in [Additional settings and GUID deployment profiles](../reference/additional-settings.md). Selection is frozen with source/image identities and saved for status/destroy. Metadata-only changes preserve data; explicit redeploy retains its reset contract.
