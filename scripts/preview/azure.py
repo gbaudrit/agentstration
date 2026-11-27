@@ -1,8 +1,9 @@
 """Azure VM adapter. ARM/OIDC and temporary OCI transport stay outside Agentstration."""
 import base64
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta, timezone
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ import extensions
 import lifecycle
 import preview
 import access
+import capacity
 
 OWNER = 'agentstration.preview.owner'
 ENVIRONMENT = 'agentstration.preview.environment'
@@ -25,6 +27,49 @@ REPOSITORY = 'agentstration.preview.repository'
 API = '2024-07-01'
 # Public infrastructure image, resolved once and pinned in the checked-in transport manifest.
 TRANSPORT = preview.ROOT / 'deploy/preview/azure/transport.json'
+DELETION_REASONS = {'manual', 'ttl', 'pr-closed', 'label-removed', 'redeploy'}
+
+
+def timestamp(value):
+    try:
+        parsed = datetime.fromisoformat(value) if isinstance(value, str) and len(value) <= 40 else None
+        preview.require(parsed is not None and parsed.tzinfo is not None, 'Invalid preview timestamp.')
+        return parsed
+    except (TypeError, ValueError):
+        raise ValueError('Invalid preview timestamp.') from None
+
+
+def validate_automation(request, value):
+    contract.fields(value, ('pullRequest', 'optInEvent', 'optInAt', 'sourceSha', *(['redeployEvent'] if 'redeployEvent' in value else [])))
+    preview.require(type(value['pullRequest']) is int and 1 <= value['pullRequest'] <= 9999999999
+                    and request['environmentId'] == 'pr-' + str(value['pullRequest'])
+                    and type(value['optInEvent']) is int and 1 <= value['optInEvent'] <= 99999999999999999999
+                    and timestamp(value['optInAt']) is not None
+                    and isinstance(value['sourceSha'], str) and preview.SHA.fullmatch(value['sourceSha']),
+                    'Invalid automatic preview association.')
+    if 'redeployEvent' in value:
+        preview.require(type(value['redeployEvent']) is int and 1 <= value['redeployEvent'] <= 99999999999999999999,
+                        'Invalid automatic reset association.')
+
+
+def reset_owned(client, request, record, routes, reason, now=None):
+    preview.require(reason in DELETION_REASONS, 'Invalid deletion reason.')
+    # Persist intent before the first deletion, and completion only after both inventories converge.
+    if not record.get('deletion') or record['deletion']['completedAt'] is not None:
+        record['deletion'] = {'requestedAt': (now or datetime.now(timezone.utc)).isoformat(),
+                              'completedAt': None, 'reason': reason}
+        client.write(record)
+    if routes:
+        routes.withdraw()
+    client.reset(record)
+    preview.require(not client.resources(record), 'Reset is incomplete; owned Azure resources remain.')
+    if routes:
+        routes.destroy()
+        preview.require(routes.tunnel() is None and routes.dns_record() is None,
+                        'Reset is incomplete; owned Cloudflare resources remain.')
+    record.update(destroyed=True, initialized=False)
+    record['deletion']['completedAt'] = (now or datetime.now(timezone.utc)).isoformat()
+    client.write(record)
 
 
 def recorded_request(environment_id, subscription, resource_group, repository, client_factory=None):
@@ -37,7 +82,9 @@ def recorded_request(environment_id, subscription, resource_group, repository, c
     with tempfile.TemporaryDirectory(prefix='agentstration-azure-lookup-') as temporary:
         client = (client_factory or Azure)(lookup, temporary)
         record = client.read()
-        preview.require(record is not None, 'No recorded preview found. Check its environment ID and configured storage scope; no resources were changed.')
+        if record is None:
+            client.resources(None)  # Refuse a false absence claim for an unmanaged namespace.
+            return None
         request = contract.loads(json.dumps(record['request']))
         preview.require(request['provider'] == 'azure-vm' and request['environmentId'] == environment_id
                         and request['target']['subscriptionId'] == subscription and request['target']['resourceGroup'] == resource_group
@@ -102,6 +149,7 @@ def resource_ids(request):
     name = prefix(request)
     return {kind: root + provider + '/' + name + suffix for kind, provider, suffix in (
         ('virtualMachine', 'Microsoft.Compute/virtualMachines', '-vm'), ('dataDisk', 'Microsoft.Compute/disks', '-data'),
+        ('osDisk', 'Microsoft.Compute/disks', '-os'),
         ('networkInterface', 'Microsoft.Network/networkInterfaces', '-nic'), ('publicIp', 'Microsoft.Network/publicIPAddresses', '-pip'),
         ('virtualNetwork', 'Microsoft.Network/virtualNetworks', '-vnet'), ('networkSecurityGroup', 'Microsoft.Network/networkSecurityGroups', '-nsg'))}
 
@@ -137,7 +185,11 @@ def inspect_owned(request, metadata, resources):
         if item['name'].lower().startswith(prefix(request)):
             # Azure creates the OS disk on behalf of the VM; verify its attachment separately.
             if item['name'].lower() == prefix(request) + '-os' and item['type'].lower() == 'microsoft.compute/disks':
-                continue
+                if metadata and (item.get('tags') or {}).get(OWNER) is not None:
+                    preview.require(all((item.get('tags') or {}).get(key) == expected[key] for key in (OWNER, ENVIRONMENT, REPOSITORY)),
+                                    'OS disk ownership differs from the preview; refusing mutation.')
+                else:
+                    continue  # Legacy disks have only attachment proof; never delete them by name after detachment.
             # Platform-installed Run Command extensions are children of the owned VM.
             if identifier.startswith((vm + '/extensions/', vm + '/runcommands/')):
                 preview.require(parent_owned, 'An Azure child resource has no verified owned VM.')
@@ -154,24 +206,33 @@ def inspect_owned(request, metadata, resources):
 
 def validate_record(request, record, action):
     contract.fields(record, ('schemaVersion', 'ownerId', 'createdAt', 'expiresAt', 'request', 'destroyed', 'initialized',
-                             *(['access'] if 'access' in record else [])))
-    preview.require(record['schemaVersion'] == 1 and type(record['destroyed']) is bool and type(record['initialized']) is bool, 'Invalid Azure ownership metadata.')
+                             *[key for key in ('access', 'deletion', 'automation') if key in record]))
+    preview.require(type(record['schemaVersion']) is int and record['schemaVersion'] == 1
+                    and type(record['destroyed']) is bool and type(record['initialized']) is bool, 'Invalid Azure ownership metadata.')
     uuid.UUID(record['ownerId'])
-    datetime.fromisoformat(record['createdAt'])
-    datetime.fromisoformat(record['expiresAt'])
+    timestamp(record['createdAt'])
+    timestamp(record['expiresAt'])
     if 'access' in record:
         access.validate(request, record)
+    if 'deletion' in record:
+        contract.fields(record['deletion'], ('requestedAt', 'completedAt', 'reason'))
+        preview.require(record['deletion']['reason'] in DELETION_REASONS, 'Invalid deletion reason.')
+        for key in ('requestedAt', 'completedAt'):
+            value = record['deletion'][key]
+            preview.require(key == 'completedAt' and value is None or timestamp(value) is not None, 'Invalid deletion timestamp.')
+    if 'automation' in record:
+        validate_automation(request, record['automation'])
     previous = contract.validate(record['request'])
     previous_target, target = contract.azure_target(previous), contract.azure_target(request)
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
     preview.require(previous['deliveries']['server']['repository'].lower() == request['deliveries']['server']['repository'].lower(),
                     'Azure ownership metadata belongs to another repository.')
-    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion', 'osProfile')
+    fixed = ('subscriptionId', 'resourceGroup') if record['destroyed'] or action == 'redeploy' else ('subscriptionId', 'resourceGroup', 'region', 'imageVersion', 'osProfile')
     preview.require(all(previous_target[key] == target[key] for key in fixed),
                     'Existing Azure previews cannot change location, OS image or ownership scope; reset before changing location/OS.')
-    if not record['destroyed']:
+    if not record['destroyed'] and action != 'redeploy':
         preview.require(previous['database'] == request['database'], 'Reset the Azure preview explicitly before changing databases.')
-    if action != 'deploy':
+    if action not in ('deploy', 'redeploy'):
         preview.require(contract.images(previous) == contract.images(request) and previous_target == target,
                         'Status/destroy requires the recorded Azure image and target selection.')
 
@@ -207,8 +268,54 @@ class Azure:
         if not self.storage('blob', 'exists', '--name', self.blob)['exists']:
             return None
         path = self.directory / 'ownership.json'
+        preview.private_write(path, '')
         self.storage('blob', 'download', '--name', self.blob, '--file', str(path), '--overwrite', 'true', '--no-progress')
-        return preview.read_json(path)
+        with path.open(encoding='utf-8') as file:
+            return contract.parse(file.read(65537))
+
+    def list_records(self):
+        blobs = self.storage('blob', 'list', '--prefix', 'pv-', '--num-results', '1001')
+        preview.require(isinstance(blobs, list) and len(blobs) <= 1000, 'Preview ownership inventory exceeds its bound.')
+        records = []
+        for blob in blobs:
+            name = blob.get('name', '')
+            if not re.fullmatch(r'pv-[0-9a-f]{20}/lifecycle\.json', name):
+                continue
+            path = self.directory / 'inventory.json'
+            preview.private_write(path, '')
+            self.storage('blob', 'download', '--name', name, '--file', str(path), '--overwrite', 'true', '--no-progress')
+            with path.open(encoding='utf-8') as file:
+                record = contract.parse(file.read(65537))
+            request = contract.validate(record['request'])
+            if any(request['target'].get(key) != self.request['target'][key] for key in ('subscriptionId', 'resourceGroup')):
+                continue
+            validate_record(request, record, 'status')
+            preview.require(name == prefix(request) + '/lifecycle.json', 'Ownership blob differs from the recorded scope.')
+            records.append({'prefix': prefix(request), 'record': record})
+        return records
+
+    @contextmanager
+    def lease_blob(self, blob):
+        lease = self.storage('blob', 'lease', 'acquire', '--blob-name', blob, '--lease-duration', '-1')
+        try:
+            yield lease
+        finally:
+            self.storage('blob', 'lease', 'release', '--blob-name', blob, '--lease-id', lease)
+
+    @contextmanager
+    def capacity(self):
+        blob = '_preview-capacity.json'
+        if not self.storage('blob', 'exists', '--name', blob)['exists']:
+            path = self.directory / 'capacity.json'
+            preview.private_write(path, '{"schemaVersion":1}\n')
+            try:
+                self.storage('blob', 'upload', '--name', blob, '--file', str(path), '--overwrite', 'false', '--no-progress')
+            except RuntimeError:
+                preview.require(self.storage('blob', 'exists', '--name', blob)['exists'], 'Capacity lock could not be initialized.')
+        with self.lease_blob(blob):
+            capacity.enforce(self.request, self.list_records(),
+                             self.az('resource', 'list', '--resource-group', self.request['target']['resourceGroup']))
+            yield
 
     def write(self, record, *, initial=False):
         path = self.directory / 'ownership.json'
@@ -234,8 +341,9 @@ class Azure:
         if os_disk:
             properties = self.az('disk', 'show', '--ids', os_disk['id'])
             vm_id = resource_ids(self.request)['virtualMachine']
-            preview.require(any(r['id'].lower() == vm_id.lower() for r in relevant)
-                            and (properties.get('managedBy') or '').lower() == vm_id.lower(),
+            owned_disk = any(r['id'].lower() == os_disk['id'].lower() for r in relevant)
+            attached = (properties.get('managedBy') or '').lower()
+            preview.require(owned_disk and not attached or any(r['id'].lower() == vm_id.lower() for r in relevant) and attached == vm_id.lower(),
                             'An unverified OS disk occupies this namespace; inspect the interrupted ARM deployment.')
         return relevant
 
@@ -258,6 +366,13 @@ class Azure:
                 '--template-file', str(preview.ROOT / 'deploy/preview/azure/main.bicep'), '--parameters', '@' + str(path), timeout=1800)
         instance = self.az('vm', 'show', '--ids', resource_ids(self.request)['virtualMachine'])
         verify_vm(self.request, instance)
+        vm_id, disk_id = resource_ids(self.request)['virtualMachine'], resource_ids(self.request)['osDisk']
+        preview.require(all((instance.get('tags') or {}).get(key) == tags(self.request, record)[key]
+                            for key in (OWNER, ENVIRONMENT, REPOSITORY)), 'Provisioned VM ownership differs from its record.')
+        preview.require(instance['storageProfile']['osDisk']['managedDisk']['id'].lower() == disk_id.lower(), 'Unexpected OS disk identity.')
+        disk = self.az('disk', 'show', '--ids', disk_id)
+        preview.require((disk.get('managedBy') or '').lower() == vm_id.lower(), 'OS disk is not attached to the owned VM.')
+        self.az('disk', 'update', '--ids', disk_id, '--set', 'tags=' + json.dumps({**(disk.get('tags') or {}), **tags(self.request, record)}))
         self.az('vm', 'start', '--ids', resource_ids(self.request)['virtualMachine'], timeout=600)
 
     def power(self):
@@ -325,19 +440,24 @@ class Azure:
             lines = view.get('output', '').splitlines()
             marker = [line.removeprefix('AGENTSTRATION_RESULT=') for line in lines if line.startswith('AGENTSTRATION_RESULT=')]
             preview.require(len(marker) == 1, 'Guest returned no bounded lifecycle result.')
-            return json.loads(marker[0])
+            value = json.loads(marker[0])
+            if action == 'status':
+                health = [line.removeprefix('AGENTSTRATION_HEALTH=') for line in lines if line.startswith('AGENTSTRATION_HEALTH=')]
+                preview.require(len(health) == 1, 'Guest returned no bounded container health snapshot.')
+                value['health'] = json.loads(health[0])
+            return value
         finally:
             path.unlink(missing_ok=True)
             # Discard the protected download parameter from the ARM resource after execution.
             self.az('rest', '--method', 'delete', '--url', endpoint)
 
     def reset(self, record):
-        for kind in ('virtualMachine', 'networkInterface', 'publicIp', 'virtualNetwork', 'networkSecurityGroup', 'dataDisk'):
+        for kind in ('virtualMachine', 'networkInterface', 'publicIp', 'virtualNetwork', 'networkSecurityGroup', 'dataDisk', 'osDisk'):
             # Re-inspect every time: never delete a resource whose ownership changed.
             resources = self.resources(record)
             identifier = resource_ids(self.request)[kind]
             if any(r['id'].lower() == identifier.lower() for r in resources):
-                api = API if kind == 'virtualMachine' else '2024-03-02' if kind == 'dataDisk' else '2024-05-01'
+                api = API if kind == 'virtualMachine' else '2024-03-02' if kind in ('dataDisk', 'osDisk') else '2024-05-01'
                 self.az('resource', 'delete', '--ids', identifier, '--api-version', api, timeout=900)
         # ARM may briefly list the last deleted disk. Do not report completion until inventory converges.
         deadline = time.monotonic() + 120
@@ -365,6 +485,7 @@ class Azure:
 
 def bundle_images(request, directory):
     """CI exports the exact registry index + attestations. No rebuild or credentials in the bundle."""
+    extensions.trusted(request.get('extensions', {}))
     path = Path(directory) / 'bundle'
     path.mkdir(mode=0o700)
     preview.private_write(path / 'request.json', json.dumps(request) + '\n')
@@ -384,7 +505,12 @@ def bundle_images(request, directory):
             archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
         for identifier in request.get('extensions', {}):
             relative = 'deploy/images/extensions/' + identifier + '.json'
-            archive.add(preview.ROOT / relative, arcname='tooling/' + relative)
+            # Carry canonical receipt data, never build files or scripts from the image source.
+            component = request['extensions'][identifier]['component']
+            raw = json.dumps({'schemaVersion': 1, **component}).encode()
+            info = tarfile.TarInfo('tooling/' + relative)
+            info.size, info.mode = len(raw), 0o600
+            archive.addfile(info, io.BytesIO(raw))
         for file in sorted((preview.ROOT / 'scripts/preview').glob('*.py')):
             if not file.name.startswith('test_'):
                 archive.add(file, arcname='tooling/scripts/preview/' + file.name)
@@ -434,14 +560,25 @@ unset BUNDLE_URL
         preview.require(re.fullmatch(r'docker.io/library/registry:3@sha256:[0-9a-f]{64}', image), 'Pin the public transfer registry image.')
         script += ' --registry-image ' + image
     script += '\n'
+    if action == 'status':
+        # Run current trusted health collection even when the existing guest tooling predates this feature.
+        script += "python3 - <<'HEALTH'\n" + (preview.ROOT / 'scripts/preview/container_health.py').read_text()
+        script += "\nprint('AGENTSTRATION_HEALTH=' + json.dumps(collect(" + repr('preview-' + request['environmentId']) + ', '
+        script += repr(list(contract.images(request))) + "), separators=(',', ':')))\nHEALTH\n"
     if action == 'deploy':
         script += 'rm -f /srv/agentstration-preview/incoming/*.oci.tar\n'
     return script
 
 
-def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes, extension_configuration=None):
+def execute(action, request, client_factory=Azure, now=None, route_factory=access.Routes, extension_configuration=None,
+            reset_before_deploy=False, deletion_reason='manual', automation_context=None, guard=None):
     raw_configuration = os.environ.pop("PREVIEW_EXTENSION_CONFIGURATION", "") or "{}"
     contract.operation(action, request)
+    preview.require(type(reset_before_deploy) is bool and (not reset_before_deploy or action == 'deploy'),
+                    'Reset-before-deploy requires a deployment.')
+    preview.require(deletion_reason in DELETION_REASONS, 'Invalid deletion reason.')
+    if automation_context is not None:
+        validate_automation(request, automation_context)
     settings = extensions.configuration(extension_configuration if extension_configuration is not None else raw_configuration,
                                         request.get("extensions", {})) if action == "deploy" else {}
     preview.require(request['provider'] == 'azure-vm' and request['registry'] == 'ghcr.io', 'Azure consumes private GHCR deliveries only.')
@@ -450,96 +587,116 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix='agentstration-azure-') as temporary:
         client = client_factory(request, temporary)
-        record = client.read()
-        resources = client.resources(record)
-        if record is None:
-            if action != 'deploy':
-                return azure_result(request, 'destroyed' if action == 'destroy' else 'absent', [])
-            created = now or datetime.now(timezone.utc)
-            record = {'schemaVersion': 1, 'ownerId': str(uuid.uuid4()), 'createdAt': created.isoformat(),
-                      'expiresAt': (created + timedelta(hours=request['ttlHours'])).isoformat(), 'request': request, 'destroyed': False, 'initialized': False}
-            client.write(record, initial=True)
-        with client.lock():
+        with client.capacity() if action == 'deploy' else nullcontext():
             record = client.read()
-            validate_record(request, record, action)
+            preview.require(record is not None or guard is None or guard(None), 'Preview request no longer authorizes creation.')
+            existing_record = record is not None
             resources = client.resources(record)
-            if action == 'deploy':
-                if record['destroyed']:
-                    preview.require(not resources, 'A reset preview still has resources; finish reset before deploying.')
-                    created = now or datetime.now(timezone.utc)
-                    record.update(ownerId=str(uuid.uuid4()), createdAt=created.isoformat(), destroyed=False, initialized=False)
-                    preview.require(not record.get('access', {}).get('tunnelId') and not record.get('access', {}).get('dnsId'),
-                                    'Finish owned route teardown before resetting its owner.')
-                    record.pop('access', None)
-                record['request'] = request
-                record['expiresAt'] = (datetime.fromisoformat(record['createdAt']) + timedelta(hours=request['ttlHours'])).isoformat()
-                client.write(record)
-                routes = route_factory(request, record, client.write, os.environ)
-                try:
-                    connector = routes.prepare() if routes else None
-                    client.provision(record)
-                    guest = client.transfer(expect_existing=record['initialized'], **({'connector': connector} if connector else {}),
-                                            **({'extension_configuration': settings} if settings else {}))
-                    preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
-                    if request.get('extensions'):
-                        preview.require(guest.get('extensionsVerified') == list(request['extensions']),
-                                        'Azure guest did not confirm every selected AEP enrollment.')
-                    record['initialized'] = True
+            if record is None:
+                if action != 'deploy':
+                    return azure_result(request, 'destroyed' if action == 'destroy' else 'absent', [])
+                created = now or datetime.now(timezone.utc)
+                record = {'schemaVersion': 1, 'ownerId': str(uuid.uuid4()), 'createdAt': created.isoformat(),
+                          'expiresAt': (created + timedelta(hours=request['ttlHours'])).isoformat(), 'request': request, 'destroyed': False, 'initialized': False}
+                client.write(record, initial=True)
+            with client.lock():
+                record = client.read()
+                validate_record(request, record, 'redeploy' if reset_before_deploy else action)
+                preview.require(guard is None or guard(record), 'Preview changed after reconciliation; no mutation was authorized.')
+                resources = client.resources(record)
+                if action == 'deploy':
+                    if reset_before_deploy and existing_record and not record['destroyed']:
+                        # Keep one provider lease across reset and recreation. Never deploy after a partial reset.
+                        routes = route_factory(request, record, client.write, os.environ)
+                        if routes:
+                            routes.audit()
+                        reset_owned(client, request, record, routes, 'redeploy', now)
+                        resources = client.resources(record)
+                    preview.require(record['destroyed'] or not record.get('deletion'),
+                                    'A previous cleanup is incomplete; finish full reset before deploying.')
+                    if record['destroyed']:
+                        preview.require(not resources, 'A reset preview still has resources; finish reset before deploying.')
+                        created = now or datetime.now(timezone.utc)
+                        record.update(ownerId=str(uuid.uuid4()), createdAt=created.isoformat(), destroyed=False, initialized=False)
+                        preview.require(not record.get('access', {}).get('tunnelId') and not record.get('access', {}).get('dnsId'),
+                                        'Finish owned route teardown before resetting its owner.')
+                        record.pop('access', None)
+                        record.pop('deletion', None)
+                        record.pop('automation', None)
+                    if automation_context is not None:
+                        record['automation'] = automation_context
+                    record['request'] = request
+                    record['expiresAt'] = (datetime.fromisoformat(record['createdAt']) + timedelta(hours=request['ttlHours'])).isoformat()
                     client.write(record)
-                    url = None
+                    routes = route_factory(request, record, client.write, os.environ)
+                    try:
+                        connector = routes.prepare() if routes else None
+                        client.provision(record)
+                        guest = client.transfer(expect_existing=record['initialized'], **({'connector': connector} if connector else {}),
+                                                **({'extension_configuration': settings} if settings else {}))
+                        preview.require(guest['state'] == 'running', 'Azure guest did not confirm healthy exact-digest containers.')
+                        if request.get('extensions'):
+                            preview.require(guest.get('extensionsVerified') == list(request['extensions']),
+                                            'Azure guest did not confirm every selected AEP enrollment.')
+                        record['initialized'] = True
+                        client.write(record)
+                        url = None
+                        if routes:
+                            preview.require(guest.get('accessReady') is True, 'The guest did not confirm its protected connector.')
+                            client.closed_ingress()
+                            url = routes.publish()
+                        value = azure_result(request, 'running', client.resources(record), record, guest)
+                        value['url'] = url
+                        value['metrics'].update(client.metrics())
+                        value['metrics']['provisionAndDeploySeconds'] = round(time.monotonic() - started, 1)
+                        return value
+                    except Exception:
+                        if routes:
+                            routes.withdraw()
+                        raise
+                routes = route_factory(request, record, client.write, os.environ) if 'access' in record else None
+                if action == 'destroy' and request['dataMode'] != 'reset' and routes:
+                    routes.withdraw()
+                if action == 'destroy' and request['dataMode'] == 'reset':
+                    if not record['destroyed'] or resources or record.get('deletion', {}).get('completedAt', True) is None or routes and (routes.tunnel() or routes.dns_record()):
+                        reset_owned(client, request, record, routes, deletion_reason, now)
+                    return azure_result(request, 'destroyed', client.resources(record), record)
+                if action == 'status' and (record['destroyed'] or record.get('deletion')):
+                    route_remains = bool(routes and (routes.tunnel() or routes.dns_record()))
+                    completed = not record.get('deletion') or record['deletion']['completedAt'] is not None
+                    state = 'destroyed' if record['destroyed'] and completed and not resources and not route_remains else 'cleanup-pending'
+                    return azure_result(request, state, resources, record)
+                vm = resource_ids(request)['virtualMachine']
+                present = any(r['id'].lower() == vm.lower() for r in resources)
+                if not present:
+                    if action == 'destroy' and routes:
+                        routes.destroy()
+                    return azure_result(request, 'stopped' if resources else 'absent', resources, record)
+                power = client.power()
+                guest = {}
+                if power == 'PowerState/running':
+                    guest = client.run_guest(action)
+                if action == 'destroy':
+                    client.az('vm', 'deallocate', '--ids', vm, timeout=900)
                     if routes:
-                        preview.require(guest.get('accessReady') is True, 'The guest did not confirm its protected connector.')
-                        client.closed_ingress()
-                        url = routes.publish()
-                    value = azure_result(request, 'running', client.resources(record), record, guest)
-                    value['url'] = url
-                    value['metrics'].update(client.metrics())
-                    value['metrics']['provisionAndDeploySeconds'] = round(time.monotonic() - started, 1)
-                    return value
-                except Exception:
-                    if routes:
-                        routes.withdraw()
-                    raise
-            routes = route_factory(request, record, client.write, os.environ) if 'access' in record else None
-            if action == 'destroy' and routes:
-                routes.withdraw()
-            if action == 'destroy' and request['dataMode'] == 'reset':
-                client.reset(record)
-                if routes:
-                    routes.destroy()
-                record['destroyed'] = True
-                record['initialized'] = False
-                client.write(record)
-                return azure_result(request, 'destroyed', client.resources(record), record)
-            vm = resource_ids(request)['virtualMachine']
-            present = any(r['id'].lower() == vm.lower() for r in resources)
-            if not present:
-                if action == 'destroy' and routes:
-                    routes.destroy()
-                return azure_result(request, 'stopped' if resources else 'absent', resources, record)
-            power = client.power()
-            guest = {}
-            if power == 'PowerState/running':
-                guest = client.run_guest(action)
-            if action == 'destroy':
-                client.az('vm', 'deallocate', '--ids', vm, timeout=900)
-                if routes:
-                    routes.destroy()
-                return azure_result(request, 'destroyed', resources, record, guest)
-            value = azure_result(request, guest.get('state', 'stopped' if power == 'PowerState/deallocated' else 'provisioning'), resources, record, guest)
-            if routes and record['access']['verified'] and value['state'] == 'running' and guest.get('accessReady'):
-                client.closed_ingress()
-                value['url'] = routes.verify()
-            return value
+                        routes.destroy()
+                    return azure_result(request, 'stopped', resources, record, guest)
+                value = azure_result(request, guest.get('state', 'stopped' if power == 'PowerState/deallocated' else 'provisioning'), resources, record, guest)
+                if routes and record['access']['verified'] and value['state'] == 'running' and guest.get('accessReady'):
+                    client.closed_ingress()
+                    value['url'] = routes.verify()
+                return value
 
 
 def azure_result(request, state, resources, record=None, guest=None):
     value = lifecycle.result(request, state)
     guest = guest or {}
     value.update(expiresAt=(record or {}).get('expiresAt'), observedImages=guest.get('observedImages', {}),
+                 health=guest.get('health', {}),
                  providerResourceIds={'subscription': request['target']['subscriptionId'], 'resourceGroup': request['target']['resourceGroup'],
                                       'resources': [r['id'] for r in resources]},
                  metrics={k: guest[k] for k in ('guestOperationSeconds', 'memoryAvailableKiB') if k in guest})
+    value['deletion'] = (record or {}).get('deletion')
     if record and 'access' in record:
         value['providerResourceIds']['cloudflare'] = {key: record['access'][key] for key in ('accountId', 'zoneId', 'tunnelId', 'dnsId')}
     # Only the caller that completed fresh protection checks may set a public URL.

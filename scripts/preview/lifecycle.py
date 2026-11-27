@@ -12,6 +12,7 @@ import sys
 import uuid
 
 import contract
+import container_health
 import extensions
 import preview
 
@@ -64,6 +65,7 @@ def locked(root, environment_id):
 
 
 def result(request, state, resources=None, daemon=None, metadata=None):
+    inspected = resources is not None
     resources = resources or {"containers": [], "volumes": [], "networks": []}
     identifiers = {kind: [item["Name"] if kind == "volumes" else item["Id"] for item in values]
                    for kind, values in resources.items()}
@@ -79,6 +81,7 @@ def result(request, state, resources=None, daemon=None, metadata=None):
             "observedImages": {item["Config"]["Labels"].get("com.docker.compose.service", "unknown"): item["Config"]["Image"]
                                for item in resources["containers"]},
             "state": state, "url": url, "expiresAt": expiry,
+            "health": container_health.from_containers(contract.images(request), resources["containers"]) if inspected else {},
             "providerResourceIds": {"dockerDaemon": daemon, "composeProject": "preview-" + request["environmentId"], **identifiers} if daemon else {}}
 
 
@@ -96,7 +99,10 @@ def observed(request, resources):
                             for item in containers) else "unhealthy"
 
 
-def execute(action, request, state_root, bootstrap=None, now=None, extension_configuration=None):
+def execute(action, request, state_root, bootstrap=None, now=None, extension_configuration=None, reset_before_deploy=False):
+    preview.require(type(reset_before_deploy) is bool and (not reset_before_deploy or
+                    action == 'deploy' and request['provider'] == 'azure-vm'),
+                    'Reset-before-deploy requires an Azure deployment.')
     raw_configuration = os.environ.pop("PREVIEW_EXTENSION_CONFIGURATION", "") or "{}"
     contract.operation(action, request)
     settings = extensions.configuration(extension_configuration if extension_configuration is not None else raw_configuration,
@@ -107,7 +113,8 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
         preview.require(state_root is None and bootstrap is None,
                         "Azure uses its private blob/disk state; Docker host state and Bootstrap files are not transferred.")
         import azure
-        return azure.execute(action, request, **({"extension_configuration": settings} if settings else {}))
+        return azure.execute(action, request, **({"extension_configuration": settings} if settings else {}),
+                             **({'reset_before_deploy': True} if reset_before_deploy else {}))
     preview.require(state_root is not None, "Docker operations require a protected persistent state root.")
     root = Path(state_root).resolve()
     directory = root / request["environmentId"]
@@ -220,6 +227,7 @@ def main():
         if action == "deploy":
             command.add_argument("--bootstrap-config", type=Path)
             command.add_argument("--extension-configuration", type=Path)
+            command.add_argument("--reset-before-deploy", action="store_true")
         command.add_argument("--output", type=Path)
     plan.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -242,7 +250,7 @@ def main():
             with configuration.open(encoding="utf-8") as stream:
                 private_settings = stream.read(16385)
         value = execute(args.operation, request, getattr(args, "state_root", None), preview.read_json(bootstrap) if bootstrap else None,
-                        extension_configuration=private_settings)
+                        extension_configuration=private_settings, reset_before_deploy=getattr(args, 'reset_before_deploy', False))
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         preview.private_write(args.output, json.dumps(value, indent=2) + "\n")

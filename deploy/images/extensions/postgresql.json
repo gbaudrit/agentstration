@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "postgresql",
+  "extensionId": "agentstration.extensions.postgresql",
+  "project": "src/extensions/Agentstration.Extensions.PostgreSql/Agentstration.Extensions.PostgreSql.csproj",
+  "entrypoint": "Agentstration.Extensions.PostgreSql.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.PostgreSql/version.txt",
+  "testProject": "tests/Agentstration.Extensions.PostgreSql.Tests/Agentstration.Extensions.PostgreSql.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.Extensions.PostgreSql.Tests",
+  "imageName": "extension-postgresql",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "storageTypes",
+  "contributionId": "postgresql.jsonb",
+  "contributions": {
+    "storageTypes": [
+      "postgresql.jsonb"
+    ],
+    "connectedServiceTypes": [
+      "postgresql"
+    ]
+  },
+  "smokeEnvironment": {
+    "PostgreSqlDocuments__AllowedClients__0": "agentstration-development"
+  },
+  "ci": {
+    "sharedPaths": [
+      "asc/**"
+    ]
+  }
+}
