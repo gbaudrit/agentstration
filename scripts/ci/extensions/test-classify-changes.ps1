@@ -34,6 +34,14 @@ try {
         Isolated @($entry.project, 'docs/contributing/testing.md') @($entry.id)
         Isolated @($entry.versionFile) @($entry.id)
         Isolated @("deploy/images/extensions/$($entry.id).json") @($entry.id)
+        $projectName = [IO.Path]::GetFileNameWithoutExtension($entry.project)
+        if ([IO.Path]::GetFileNameWithoutExtension($entry.testProject) -eq "$projectName.Tests") {
+            Isolated @($entry.testProject) @($entry.id)
+            Isolated @("$($entry.testProject.Substring(0, $entry.testProject.LastIndexOf('/')))/OwnedTests.cs") @($entry.id)
+        }
+        elseif ($entry.ContainsKey('ci')) {
+            foreach ($path in $entry.ci.testPaths) { Isolated @($path) @($entry.id) }
+        }
     }
     # New extensions are discovered without changing the central classifier or committing catalogues.
     $synthetic = [ordered]@{
@@ -124,10 +132,12 @@ try {
     Write-Catalogue $validBase
     Isolated @($validBase.project) @('broken')
     $invalidPath = Join-Path $temporary 'deploy/images/extensions/broken.json'
+    Set-Content (Join-Path $temporary 'Dockerfile.worker') 'offline unrelated recipe'
     foreach ($mutation in @(
         @{ schemaVersion = 2 }, @{ schemaVersion = $true }, @{ schemaVersion = '1' }, @{ id = 'mismatched' }, @{ kind = 'awp-worker' },
         @{ project = 'src/Agentstration.Web/Agentstration.Web.csproj' }, @{ versionFile = '../outside' },
-        @{ dockerfile = 'Dockerfile.worker' }, @{ ci = @{ testPaths = @('tests/Other.Tests/**') } }, @{ ci = @{ additionalPaths = @('src/Agentstration.Web/**') } }
+        @{ dockerfile = 'Dockerfile.worker' }, @{ ci = @{ testPaths = 'not-an-array' } }, @{ ci = @{ testPaths = @('tests/Other.Tests/**') } },
+        @{ testProject = 'tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj'; ci = @{ testPaths = @('tests/Agentstration.ModelProviders.Tests/*') } }, @{ ci = @{ additionalPaths = @('src/Agentstration.Web/**') } }
     )) {
         $invalid = $validBase.Clone()
         foreach ($key in $mutation.Keys) { $invalid[$key] = $mutation[$key] }

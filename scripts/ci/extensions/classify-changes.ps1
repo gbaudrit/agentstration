@@ -40,6 +40,12 @@ foreach ($file in Get-ChildItem -LiteralPath $catalogueDirectory -Filter '*.json
     $projectName = [IO.Path]::GetFileNameWithoutExtension($entry.project)
     $dedicatedTests = [IO.Path]::GetFileNameWithoutExtension($entry.testProject) -eq "$projectName.Tests"
     $ci = if ($entry.ContainsKey('ci')) { $entry.ci } else { @{} }
+    if ($ci -isnot [Collections.IDictionary]) { throw "Catalogue ci metadata must be an object: $($file.Name)" }
+    foreach ($field in @('testPaths', 'additionalPaths', 'sharedPaths')) {
+        if ($ci.ContainsKey($field) -and $ci[$field] -isnot [array]) {
+            throw "Catalogue ci.$field must be an array: $($file.Name)"
+        }
+    }
     $testPaths = if ($ci.ContainsKey('testPaths')) { @($ci.testPaths) } elseif ($dedicatedTests) { @("$testDirectory*") } else { @() }
     if (-not $dedicatedTests -and $testPaths.Count -eq 0) {
         throw "A shared test project requires explicit ci.testPaths: $($file.Name)"
