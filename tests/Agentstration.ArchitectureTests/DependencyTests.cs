@@ -114,7 +114,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AspireOpenApiRegistrationIsOptInAndForwardsOnlyBoundedProviderPolicy()
+    public void AspireOpenApiRegistrationIsOptInAndAllowsConfigurationAfterEnrollment()
     {
         var root = FindRepositoryRoot();
         var appHost = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "Program.cs"));
@@ -123,7 +123,7 @@ public sealed class DependencyTests
         Assert.Contains("OpenApi:Enabled", appHost, StringComparison.Ordinal);
         Assert.Contains("if (openApiEnabled)", appHost, StringComparison.Ordinal);
         Assert.Contains("AddProject<Projects.Agentstration_Extensions_OpenApi>(\"openapi-extension\")", appHost, StringComparison.Ordinal);
-        Assert.Contains("OpenApi:AllowedDomains must contain at least one domain", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("openApiEnabled && openApiAllowedDomains.Length == 0", appHost, StringComparison.Ordinal);
         Assert.Contains("OpenApi__AllowedDomains__{index}", appHost, StringComparison.Ordinal);
         Assert.Contains("Agentstration.Extensions.OpenApi\", \"openapi-extension", appHost, StringComparison.Ordinal);
         Assert.Contains("\"OpenApi\"", settings, StringComparison.Ordinal);

@@ -494,13 +494,14 @@ variables use double underscores in place of colons):
 }
 ```
 
-Start the OpenAPI extension separately with `OpenApi:AllowedDomains:0=example.invalid`,
-`Aep:EnrollmentMode=SharedKeyFile`,
+Start the OpenAPI extension separately with `Aep:EnrollmentMode=SharedKeyFile`,
 `Aep:SharedKeyFile:Path` pointing to that same key file,
 `Aep:SharedKeyFile:AuthorityUrl` pointing to the orchestrated server's HTTP
 endpoint, `Aep:SharedKeyFile:PublicEndpoint` pointing to its own reachable
 endpoint, and a durable `Aep:SharedKeyFile:StateFile`. For local HTTP, explicitly
-set `Aep:SharedKeyFile:AllowInsecureHttp=true`. Use stable externally advertised
+set `Aep:SharedKeyFile:AllowInsecureHttp=true`. `OpenApi:AllowedDomains` can remain unset
+for enrollment; a fresh installation denies outbound destinations until an allowlist
+is applied through Extensions or Bootstrap. Use stable externally advertised
 ports when retaining an installation across orchestration restarts. Start AppHost
 with a Bootstrap-enabled profile and override the ordinary profile's PairingCode
 mode with `-- --Agentstration:Aep:EnrollmentMode SharedKeyFile`. `https-NoBootstrap` continues to

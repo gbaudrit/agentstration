@@ -21,11 +21,10 @@ The Development profile listens on `http://localhost:5310`. Enroll that endpoint
 
 Enrollment installs the advertised bundle at the exact Extension Registration scope (Instance, Tenant, or Workspace), resolves and enables only its two required technical Tools, and records a durable governed inventory. Its ToolSet, published Flows, and Data Source Profile remain read-only through ordinary administration, including while the extension is offline. Identical enrollment retries are idempotent; ownership or definition drift produces a conflict. The former `openapi-testing` and `crawl4ai-testing` bootstrap profiles and temporary Tool activation bridge have been removed in favor of this lifecycle.
 
-For the Aspire development topology, set `OpenApi:Enabled=true` and provide at least one `OpenApi:AllowedDomains` entry. The flag is `false` by default, so the standalone topology remains offline and does not launch this optional extension. The AppHost forwards the configured domain, port, method, media-type and execution bounds, enrolls the extension through the selected development AEP enrollment mode, and registers it with the Console automatically.
+For the Aspire development topology, set `OpenApi:Enabled=true`. `OpenApi:AllowedDomains` is optional: on a fresh installation without an initial list, the extension starts and enrolls with all outbound destinations denied. Configure its Instance allowlist afterward from **Extensions → Installation options** or the `openapi-configuration` Bootstrap profile. The flag is `false` by default, so the standalone topology remains offline and does not launch this optional extension. The AppHost forwards the configured domain, port, method, media-type and execution bounds, enrolls the extension through the selected development AEP enrollment mode, and registers it with the Console automatically.
 
 ```powershell
 $env:OpenApi__Enabled = "true"
-$env:OpenApi__AllowedDomains__0 = "api.example.test"
 dotnet run --project src/Agentstration.AppHost
 ```
 
@@ -38,7 +37,7 @@ profile stores its pairing state under
 `.agentstration/slots/main/aep-pairing/openapi-standalone.json`.
 
 For a different local slot, supply its API URL, a separate pairing state file
-and the allowed domain for your OpenAPI documents:
+and, optionally, an initial allowed domain for your OpenAPI documents:
 
 ```powershell
 dotnet run --project src/extensions/Agentstration.Extensions.OpenApi --launch-profile existing-instance `
