@@ -17,15 +17,24 @@ Read current PR metadata and private ownership records; never consume candidate
 workflow artifacts, source scripts or a candidate checkout with cloud credentials.
 There is no `pull_request_target` deployment path or Runtime deployment service.
 
-Automatic PR creation/update requires `preview:enabled`, an open non-draft
+Automatic PR creation/update requires `preview:auto`, an open non-draft
 same-repository PR and the latest label grant by a human with current repository
 write access. Freeze the head, selected extension IDs and existing private image
 receipts with the current selector. Missing publications and full capacity wait
 without building images, allocating resources or extending expiry. Recheck live
 approval/head/labels under the provider lease before mutation. Preserve data and
-the current target/database on ordinary updates; never reset implicitly.
+the current target/database on ordinary updates. The persistent
+`preview:auto:redeploy` modifier requires its own verified human write grant and
+requests full reset for a new head, extension selection or opt-in/reset-mode grant.
+Persist that grant with the applied intent so polls and same-intent health retries
+do not repeatedly erase data. Removing the modifier restores preserving updates.
 
-Apply recorded expiry to all managed previews, including manually requested ones.
+Apply recorded expiry to all managed previews, including manually requested ones,
+unless their owning PR/issue has an authorized human `preview:keep` write grant.
+Keep suspends expiry, close and opt-out cleanup, including for closed PRs, until
+explicit destroy or removal of keep. It does not start compute, exempt capacity or
+prevent opted-in updates/reset mode. Finish already-started deletion intents;
+retention cannot roll back a partial deletion.
 Remove PR previews on close/merge and automatically managed previews on opt-out.
 Use the existing owned full reset for Azure and Cloudflare. Persist minimal
 deletion intent/completion metadata in the existing private lifecycle record.
@@ -58,14 +67,18 @@ unrecorded Azure/Cloudflare candidates for ownership recovery instead of inventi
 a new inventory service or silently deleting unknown resources.
 
 Use one bot-owned automatic feedback card per issue/PR, separate from command
-history, and bounded public workflow results. Do not export provider responses,
+history, and bounded public workflow results. Maintain `preview:deployed` as
+derived verified running/protected status from command results and periodic live
+checks, never as deployment permission. Remove it for unavailable/deleted or
+unprotected previews without changing other labels. Do not export provider responses,
 configuration, tokens, health logs or opt-in actor data. Retain main-only protected
 environment, OIDC and read-only GHCR credentials. The manual form remains unchanged.
 
 ## Consequences
 
 Expiry now causes full data/infrastructure removal, including previews created
-before this change once their recorded expiry passes. Main merge activates the
+before this change once their recorded expiry passes unless explicitly kept.
+Main merge activates the
 schedule; manual runs default to dry-run for qualification. Scheduled runs and
 required environment approvals can delay cleanup; Azure budgets remain useful.
 Existing cloud permissions suffice, including the existing disk write permission.

@@ -51,11 +51,28 @@ $labels = @()
 if (-not $PreviewExtensionsOnly) {
     $labels = @(Get-Content -LiteralPath $labelsPath -Raw | ConvertFrom-Json)
 }
-$labels += [pscustomobject]@{
-    name = 'preview:enabled'
-    color = '0E8A16'
-    description = 'Maintainer opt-in to automatic preview updates and cleanup.'
-}
+$labels += @(
+    [pscustomobject]@{
+        name = 'preview:auto'
+        color = '0E8A16'
+        description = 'Automatically deploy and update this PR preview, preserving data.'
+    }
+    [pscustomobject]@{
+        name = 'preview:auto:redeploy'
+        color = 'D93F0B'
+        description = 'With preview:auto, reset data and recreate on each requested update.'
+    }
+    [pscustomobject]@{
+        name = 'preview:keep'
+        color = 'FBCA04'
+        description = 'Retain the preview until explicit destroy, including after expiry or PR closure.'
+    }
+    [pscustomobject]@{
+        name = 'preview:deployed'
+        color = '1D76DB'
+        description = 'Automation-maintained status: a running preview has verified protected access.'
+    }
+)
 # Deployment selection follows the implemented OCI catalogue, independently of
 # extension:* backlog classification. New packaged AEP components need no new list.
 $extensionCatalogue = Join-Path $repositoryRoot 'deploy\images\extensions'

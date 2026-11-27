@@ -6,7 +6,7 @@ with the existing protected `preview-deployment` environment.
 
 ## Automatic PR opt-in
 
-1. A maintainer with repository write access adds **`preview:enabled`** to an open,
+1. A maintainer with repository write access adds **`preview:auto`** to an open,
    non-draft, same-repository PR. The existing preview-label synchronizer creates
    this label after merge. Bots and users without current write access cannot
    authorize this opt-in, even if they can apply labels.
@@ -28,7 +28,7 @@ schedule/queue and environment approval settings can delay execution. No PR even
 workflow receives cloud credentials, and candidate workflow artifacts are ignored.
 
 An unavailable image or full capacity produces a **waiting** card/result. No
-fallback image, hidden rebuild, automatic reset or expiry renewal occurs. A new
+fallback image, hidden rebuild or expiry renewal occurs. A new
 head or changed extension labels are applied after the exact images are available.
 Unchanged intent is not redeployed on every poll or independent image release.
 Active automatic previews receive a live status/protection check. Failed health,
@@ -38,15 +38,51 @@ The opt-in declares running desired state; preserve-only maintenance belongs to
 manual previews without automatic opt-in. After opt-out cleanup, an explicit new
 manual deployment clears the old automatic association.
 
+## Deployment labels
+
+| Label | Behavior |
+| --- | --- |
+| `preview:auto` | Create one PR preview, then update published new heads or changed extension selection while preserving data |
+| `preview:auto:redeploy` | In addition to `preview:auto`, fully reset and recreate the environment for each newly requested update |
+| `preview:keep` | Suspend automatic expiry, PR-close and opt-out cleanup until explicit destroy |
+| `preview:deployed` | Derived status maintained by automation after a running preview's protected access is verified |
+
+`preview:auto:redeploy` is a persistent modifier, not a standalone trigger. Adding
+it to an existing automatic preview requests one reset. Keeping it does not reset
+the preview on every poll; a new head, extension selection or opt-in/reset-label
+grant requests another update. Removing the modifier returns to data-preserving
+updates. Same-intent health/startup/access retries always preserve data, even in
+reset mode. Image selection and capacity checks finish before any reset starts.
+Both automatic and reset-mode grants require a human with current write access.
+
+`preview:keep` also requires a verified human write-access grant, and works on the
+owning PR or issue for a manually deployed preview. It does not create an
+environment, restart stopped compute, renew expiry, exempt quotas or stop opted-in
+updates/resets. It preserves the environment even after the PR is closed or
+`preview:auto` is removed. `/preview destroy` remains available. Removing keep
+immediately restores the recorded cleanup rules on the next reconciliation, so
+an already-expired preview is removed. A deletion that has already started cannot
+be rolled back by adding keep; reconciliation finishes its persisted intent.
+
+`preview:deployed` is output, never deployment authorization. Successful command
+results add/remove it immediately; reconciliation repairs it from live status,
+including manual previews and closed retained PRs. It is removed for stopped,
+unhealthy, unprotected, absent or removed previews and incomplete cleanup. A failed
+probe without a verified result leaves the label unchanged until a later check;
+the command card and workflow provide error details. Direct Actions deployments
+without command tracking are reflected on the next reconciliation. Other labels
+are preserved. Do not maintain this status label manually.
+
 ## Cleanup and deletion status
 
 Recorded expiry now applies to **all managed Azure previews**, including manually
-created environments and those created before automation merged. Expired previews
+created environments and those created before automation merged, unless retained
+by an authorized `preview:keep` grant. Expired previews
 are fully reset, including application data, VM, OS/data disks, IP and owned
 Cloudflare tunnel/DNS. Shared storage, the resource group, Access application and
 role assignments remain.
 
-PR close/merge removes its preview. Removing `preview:enabled` removes an
+Without `preview:keep`, PR close/merge removes its preview. Removing `preview:auto` removes an
 automatically managed preview. Opt-out is not inferred for an ordinary manual
 preview that never opted into automatic updates. `/preview destroy` still performs
 an immediate explicit reset; `/preview` updates while preserving data, and
@@ -67,7 +103,7 @@ New deployment creates a new owner/expiry and clears prior deletion state.
 The status path does not resolve tags or require a surviving PR head.
 
 An expired or manually removed automatic preview stays removed for unchanged
-head/opt-in intent. Push a new head or explicitly remove/re-add `preview:enabled`
+head/opt-in intent. Push a new head or explicitly remove/re-add `preview:auto`
 to request a fresh lifecycle. An old manually deleted record needs an opt-in
 newer than its known deletion time; if that historical time is unknown, create
 explicitly with `/preview` before enabling automatic updates.
@@ -126,10 +162,13 @@ pending/failure codes. It contains no startup settings, credentials or raw logs.
 
 Scheduled runs apply changes. To apply an explicit manual run, clear **dry_run**.
 The first scheduled pass can remove already-expired previews; inspect their saved
-expiry before merging/enabling this workflow if data needs to be retained.
+expiry and add `preview:keep` with a human maintainer account before merging/enabling
+this workflow if data needs to be retained. The old proposed `preview:enabled`
+name is replaced by `preview:auto`; it does not authorize automation.
 
 Qualify opted-in creation, a published new-head update with preserved data,
-close/opt-out cleanup, expiry, capacity contention and `/preview status` after
+close/opt-out cleanup, expiry, capacity contention, reset-mode updates, keep across
+closure/expiry, derived deployed labels and `/preview status` after
 deletion. Test SQLite and PostgreSQL explicitly as appropriate. Finish by confirming
 owned compute/routes are absent. #1286 remains open until that live evidence and
 its native child issue completion/waivers are recorded. Deployed Playwright remains

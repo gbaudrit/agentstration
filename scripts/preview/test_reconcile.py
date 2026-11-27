@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 import unittest
 from unittest.mock import Mock
+from unittest.mock import patch
 import capacity
 
 import azure
@@ -39,6 +40,13 @@ class API:
             return copy.deepcopy(self.events)
         if bare.endswith('/collaborators/maintainer/permission'):
             return {'permission': self.permission}
+        if bare == ROOT + '/issues/1/labels':
+            if method == 'POST':
+                self.pull['labels'] += [{'name': name} for name in body['labels']]
+            return copy.deepcopy(self.pull['labels'])
+        if bare == ROOT + '/issues/1/labels/preview%3Adeployed' and method == 'DELETE':
+            self.pull['labels'] = [item for item in self.pull['labels'] if item['name'] != 'preview:deployed']
+            return None
         if bare == ROOT + '/issues/1/comments':
             if method == 'POST':
                 self.comments.append({'id': 900, 'body': body['body'], 'issue_url': 'https://api.github.com/' + ROOT + '/issues/1',
@@ -84,6 +92,189 @@ class ReconciliationTests(unittest.TestCase):
     def execute(self, apply=True, records=None, resources=None, **kwargs):
         return reconcile.reconcile(self.github, self.registry.records() if records is None else records,
             resources or [], VARIABLES, apply=apply, execute=self.registry.execute, selector=self.selector, now=NOW, **kwargs)
+
+    def label(self, label, identifier=78):
+        self.api.pull['labels'].append({'name': label})
+        self.api.events.append({**self.api.events[0], 'id': identifier, 'label': {'name': label}})
+
+    def publish_new_head(self):
+        self.api.pull['head']['sha'] = 'b' * 40
+        image = 'ghcr.io/owner/repo-server'
+        self.metadata.configs[image]['config']['Labels']['org.opencontainers.image.revision'] = 'b' * 40
+        self.metadata.manifests[image] = json.dumps({'schemaVersion': 2, 'image': 'server', 'revision': 'b' * 40}).encode()
+
+    def test_redeploy_modifier_resets_each_new_intent_once_but_not_each_poll(self):
+        cloud = self.registry.create(self.github, automatic=True)
+        owner = cloud.record['ownerId']
+        self.label(reconcile.REDEPLOY)
+        value = self.execute()
+        self.assertEqual([], value['failures'])
+        self.assertEqual('redeploy', value['actions'][0]['operation'])
+        self.assertNotEqual(owner, cloud.record['ownerId'])
+        self.assertEqual(1, cloud.effects.count('reset'))
+        self.assertEqual([], self.execute()['actions'])
+        self.assertEqual(1, cloud.effects.count('reset'))
+        self.publish_new_head()
+        self.assertEqual('redeploy', self.execute()['actions'][0]['operation'])
+        self.assertEqual(2, cloud.effects.count('reset'))
+        self.api.pull['labels'] = [item for item in self.api.pull['labels'] if item['name'] != reconcile.REDEPLOY]
+        self.assertEqual('deploy', self.execute()['actions'][0]['operation'])
+        self.assertEqual(2, cloud.effects.count('reset'))
+
+    def test_redeploy_modifier_alone_or_unverified_grant_never_resets(self):
+        self.api.pull['labels'] = [{'name': reconcile.REDEPLOY}]
+        self.assertEqual([], self.execute()['actions'])
+        cloud = self.registry.create(self.github)
+        self.api.pull['labels'].append({'name': reconcile.LABEL})
+        value = self.execute()
+        self.assertTrue(value['failures'])
+        self.assertNotIn('reset', cloud.effects)
+
+    def test_same_intent_startup_and_health_recovery_never_reset_again(self):
+        self.label(reconcile.REDEPLOY)
+        cloud = self.registry.create(self.github, automatic=True)
+        cloud.record['initialized'] = False
+        self.assertEqual('deploy', self.execute()['actions'][0]['operation'])
+        self.assertNotIn('reset', cloud.effects)
+        original = self.registry.execute
+        def unhealthy(action, request, **kwargs):
+            return {'state': 'unhealthy'} if action == 'status' else original(action, request, **kwargs)
+        self.registry.execute = unhealthy
+        self.assertEqual('deploy', self.execute()['actions'][0]['operation'])
+        self.assertNotIn('reset', cloud.effects)
+
+    def test_reset_mode_is_rechecked_under_the_provider_lease(self):
+        cloud = self.registry.create(self.github, automatic=True)
+        self.label(reconcile.REDEPLOY)
+        original = self.registry.execute
+        def revoked(action, request, **kwargs):
+            if action == 'deploy':
+                self.api.pull['labels'] = [item for item in self.api.pull['labels'] if item['name'] != reconcile.REDEPLOY]
+            return original(action, request, **kwargs)
+        self.registry.execute = revoked
+        self.assertTrue(self.execute()['failures'])
+        self.assertNotIn('reset', cloud.effects)
+
+    def test_keep_retains_expired_closed_and_opted_out_previews_until_explicit_destroy(self):
+        for condition in ('expired', 'closed', 'opt-out'):
+            with self.subTest(condition=condition):
+                self.setUp()
+                cloud = self.registry.create(self.github, age=3 if condition == 'expired' else 0, automatic=True)
+                if condition == 'closed':
+                    self.api.pull['state'] = 'closed'
+                if condition == 'opt-out':
+                    self.api.pull['labels'] = []
+                self.label(reconcile.KEEP)
+                value = self.execute()
+                self.assertEqual([], value['failures'])
+                self.assertNotIn('reset', cloud.effects)
+                self.assertFalse(cloud.record['destroyed'])
+                self.registry.execute('destroy', {**cloud.record['request'], 'dataMode': 'reset'})
+                self.assertEqual([], self.execute()['actions'])
+                self.assertTrue(cloud.record['destroyed'])
+
+    def test_keep_does_not_create_or_resurrect_an_environment(self):
+        self.api.pull['labels'] = []
+        self.label(reconcile.KEEP)
+        self.assertEqual([], self.execute()['actions'])
+        self.assertEqual({}, self.registry.clouds)
+
+    def test_unverified_keep_cannot_bypass_expiry_and_removal_resumes_cleanup(self):
+        cloud = self.registry.create(self.github, age=3, automatic=True)
+        self.api.pull['labels'].append({'name': reconcile.KEEP})
+        self.assertEqual('destroy', self.execute()['actions'][0]['operation'])
+        self.setUp()
+        cloud = self.registry.create(self.github, age=3, automatic=True)
+        self.label(reconcile.KEEP)
+        self.assertEqual([], self.execute()['actions'])
+        self.api.pull['labels'] = [item for item in self.api.pull['labels'] if item['name'] != reconcile.KEEP]
+        self.assertEqual('ttl', self.execute()['actions'][0]['reason'])
+
+    def test_keep_added_during_cleanup_planning_blocks_the_stale_delete(self):
+        cloud = self.registry.create(self.github, age=3, automatic=True)
+        original = self.registry.execute
+        def retained(action, request, **kwargs):
+            if action == 'destroy':
+                self.label(reconcile.KEEP)
+            return original(action, request, **kwargs)
+        self.registry.execute = retained
+        self.assertTrue(self.execute()['failures'])
+        self.assertNotIn('reset', cloud.effects)
+
+    def test_pending_deletion_finishes_even_if_keep_is_added_after_deletion_started(self):
+        cloud = self.registry.create(self.github, age=3, automatic=True)
+        self.api.pull['labels'].append({'name': 'preview:deployed'})
+        with patch.object(cloud, 'reset', side_effect=RuntimeError('fixture')):
+            self.assertTrue(self.execute()['failures'])
+        self.assertNotIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.label(reconcile.KEEP)
+        self.assertEqual('destroy', self.execute()['actions'][0]['operation'])
+        self.assertTrue(cloud.record['destroyed'])
+
+    def test_retained_issue_preview_stays_reserved_and_does_not_require_an_open_pr(self):
+        cloud = self.registry.create(self.github, age=3)
+        cloud.record['request']['environmentId'] = 'issue-1'
+        value = {'number': 1, 'state': 'closed', 'labels': [{'name': reconcile.KEEP}]}
+        self.label(reconcile.KEEP)
+        original = self.api.__call__
+        def api(path, method='GET', body=None):
+            if path == ROOT + '/issues/1':
+                return copy.deepcopy(value)
+            return original(path, method, body)
+        self.github.call = api
+        self.api.pull['labels'] = []
+        self.assertIsNone(reconcile.removal_reason(cloud.record, self.github, NOW))
+        request = {**cloud.record['request'], 'environmentId': 'pr-2'}
+        with patch.dict('os.environ', {'AZURE_PREVIEW_MAX_ENVIRONMENTS': '1'}):
+            with self.assertRaises(capacity.Unavailable):
+                capacity.enforce(request, self.registry.records(), [])
+
+    def test_reset_waits_for_images_without_erasing_the_existing_preview(self):
+        cloud = self.registry.create(self.github, automatic=True)
+        self.label(reconcile.REDEPLOY)
+        self.metadata.missing_all_tags = True
+        value = self.execute()
+        self.assertEqual('image-unavailable', value['pending'][0]['code'])
+        self.assertNotIn('reset', cloud.effects)
+
+    def test_status_probe_or_label_api_failure_is_bounded_and_does_not_delete_data(self):
+        cloud = self.registry.create(self.github)
+        self.api.pull['labels'] = []
+        self.registry.execute = Mock(side_effect=RuntimeError('PRIVATE-REMOTE-CONTENT'))
+        value = self.execute()
+        self.assertEqual('status-unavailable', value['failures'][0]['code'])
+        self.assertNotIn('PRIVATE-REMOTE-CONTENT', json.dumps(value))
+        self.assertNotIn('reset', cloud.effects)
+        self.setUp()
+        cloud = self.registry.create(self.github)
+        self.api.pull['labels'] = []
+        self.github.sync_deployed = Mock(side_effect=RuntimeError('PRIVATE-REMOTE-CONTENT'))
+        value = self.execute()
+        self.assertEqual('deployed-label-failed', value['failures'][0]['code'])
+        self.assertNotIn('PRIVATE-REMOTE-CONTENT', json.dumps(value))
+        self.assertFalse(cloud.record['destroyed'])
+
+    def test_deployed_label_follows_live_status_and_is_never_an_opt_in(self):
+        cloud = self.registry.create(self.github)
+        self.api.pull['labels'] = []
+        original = self.registry.execute
+        def protected(action, request, **kwargs):
+            value = original(action, request, **kwargs)
+            if value['state'] == 'running':
+                value['url'] = 'https://dev-pr-1.agentstration.cloud'
+            return value
+        self.registry.execute = protected
+        self.assertEqual([], self.execute()['actions'])
+        self.assertIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.assertEqual([], self.execute()['actions'])
+        self.registry.execute = lambda *args, **kwargs: {'state': 'unhealthy'}
+        self.execute()
+        self.assertNotIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.registry.execute = original
+        self.registry.execute('destroy', {**cloud.record['request'], 'dataMode': 'reset'})
+        self.api.pull['labels'].append({'name': 'preview:deployed'})
+        self.execute()
+        self.assertNotIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
 
     def test_dry_run_resolves_private_images_but_never_mutates_cloud_or_comments(self):
         value = self.execute(apply=False)

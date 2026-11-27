@@ -51,6 +51,26 @@ def positive(value):
     return value
 
 
+def sync_deployed(repository, environment, result, call=api):
+    """A derived label never grants deployment permission; only verified results change it."""
+    match = re.fullmatch(r'(?:pr|issue)-([1-9][0-9]{0,9})', environment)
+    if not match:
+        return
+    preview.require(result.get('environmentId', environment) == environment, 'Observed preview targets another environment.')
+    preview.require(result.get('state') in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy',
+                                         'provisioning', 'drifted', 'cleanup-pending'), 'Invalid observed preview state.')
+    root = 'repos/' + repository_name(repository) + '/issues/' + match[1] + '/labels'
+    labels = call(root + '?per_page=100')
+    preview.require(isinstance(labels, list) and len(labels) < 100, 'Preview label inventory exceeds its bound.')
+    present = any(item.get('name') == 'preview:deployed' for item in labels)
+    ready = result['state'] == 'running' and isinstance(result.get('url'), str) and bool(
+        re.fullmatch(r'https://dev-' + re.escape(environment) + r'\.[a-z0-9.-]+', result['url']))
+    if ready and not present:
+        call(root, 'POST', {'labels': ['preview:deployed']})
+    elif not ready and present:
+        call(root + '/preview%3Adeployed', 'DELETE')
+
+
 def parse(body):
     preview.require(isinstance(body, str) and len(body) <= 512, 'Use one bounded /preview command.')
     text = body.strip()
@@ -336,7 +356,7 @@ def main():
             preview.require(options.get('tracking_issue') == issue and options.get('operation') == operation, 'Invalid feedback command context.')
             environment = options['environment_id']
             preview.require(environment == ('pr-' if options.get('tracking_kind') == 'pull_request' else 'issue-') + issue, 'Invalid feedback environment.')
-            request = None
+            request, result = None, None
             if args.mode == 'plan':
                 preview.require(tracking(options, repository, api) == issue and options['operation'] == operation,
                                 'Invalid command authorization before execution.')
@@ -373,6 +393,8 @@ def main():
                 failure = contract.parse(os.environ.get('SELECTION_FAILURE') or '{}')
                 message = feedback.failed(operation, repository, run_url, failure_stage(), options, failure)
             publish(options, repository, message, api)
+            if result is not None:
+                sync_deployed(repository, environment, result, api)
     except (ValueError, RuntimeError, KeyError, TypeError, AttributeError, OSError) as error:
         print(safe_error(error))
         return 1

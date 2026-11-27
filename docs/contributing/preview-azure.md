@@ -246,7 +246,8 @@ Deallocation stops VM compute charges but **retained data/OS disks and the publi
 IPv4 address remain billable**. Reset removes per-preview resources; the shared
 account/group are intentionally retained. Add an Azure Cost Management budget
 and alerts for the dedicated group. Scheduled reconciliation applies recorded
-expiry; queueing, required approvals or failed runs can delay cleanup. This is
+expiry unless an authorized `preview:keep` label retains the environment;
+queueing, required approvals or failed runs can delay cleanup. This is
 not an Azure currency spending cap.
 
 Before accepting B2ms capacity, run a trusted Azure trial with each database

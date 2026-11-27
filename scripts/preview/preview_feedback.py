@@ -137,7 +137,7 @@ def completed(result, operation, repository, run_url, request=None, reset_before
             if not result.get('url'):
                 lines.append('The URL is withheld: this check could not confirm protected access.')
             lines += ['Recorded expiry: **' + expiry(result.get('expiresAt')) + '**.',
-                      'Scheduled reconciliation removes expired previews, including their data. Queued or failed runs can delay cleanup.']
+                      'Scheduled reconciliation removes expired previews and their data unless an authorized `preview:keep` label retains them. Queued or failed runs can delay cleanup.']
         elif state == 'stopped':
             lines.append('Data is retained; disks/IP may still incur charges. Use `/preview destroy` to remove them.')
         elif state == 'cleanup-pending':

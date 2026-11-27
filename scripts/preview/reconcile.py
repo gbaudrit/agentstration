@@ -19,7 +19,9 @@ import manual
 import preview
 import preview_feedback as feedback
 
-LABEL = 'preview:enabled'
+LABEL = 'preview:auto'
+REDEPLOY = 'preview:auto:redeploy'
+KEEP = 'preview:keep'
 
 
 class GitHub:
@@ -44,23 +46,49 @@ class GitHub:
                         'Unexpected automatic PR context.')
         return value
 
+    def label_grant(self, pull, label):
+        if label not in [item.get('name') for item in pull.get('labels', [])]:
+            return None
+        events = self.pages('/issues/' + str(pull['number']) + '/events')
+        grants = [item for item in events if item.get('event') == 'labeled' and item.get('label', {}).get('name') == label]
+        if not grants:
+            return None
+        grant = grants[-1]
+        if not commands.authorized({'user': grant.get('actor', {})}, self.repository, self.call):
+            return None
+        preview.require(isinstance(grant.get('created_at'), str) and datetime.fromisoformat(grant['created_at']).tzinfo is not None,
+                        'Invalid preview label timestamp.')
+        commands.positive(grant['id'])
+        return grant
+
     def approval(self, pull):
         preview.require(pull.get('state') == 'open' and not pull.get('draft')
                         and (pull.get('head', {}).get('repo') or {}).get('full_name', '').lower() == self.repository,
                         'Automatic previews require open, non-draft, same-repository PRs.')
         preview.require(LABEL in [item.get('name') for item in pull.get('labels', [])], 'Automatic preview is not enabled.')
-        events = self.pages('/issues/' + str(pull['number']) + '/events')
-        grants = [item for item in events if item.get('event') == 'labeled' and item.get('label', {}).get('name') == LABEL]
-        preview.require(grants, 'No verified automatic preview opt-in event.')
-        grant = grants[-1]
-        preview.require(commands.authorized({'user': grant.get('actor', {})}, self.repository, self.call),
+        grant = self.label_grant(pull, LABEL)
+        preview.require(grant is not None,
                         'Automatic preview opt-in requires current maintainer write access.')
         sha = pull.get('head', {}).get('sha')
         preview.require(isinstance(sha, str) and preview.SHA.fullmatch(sha), 'Invalid automatic PR source SHA.')
-        preview.require(isinstance(grant.get('created_at'), str) and datetime.fromisoformat(grant['created_at']).tzinfo is not None,
-                        'Invalid opt-in timestamp.')
-        return {'pullRequest': pull['number'], 'optInEvent': commands.positive(grant['id']),
-                'optInAt': grant['created_at'], 'sourceSha': sha}
+        result = {'pullRequest': pull['number'], 'optInEvent': grant['id'], 'optInAt': grant['created_at'], 'sourceSha': sha}
+        if REDEPLOY in [item.get('name') for item in pull.get('labels', [])]:
+            reset = self.label_grant(pull, REDEPLOY)
+            preview.require(reset is not None, 'Automatic reset requires current maintainer write access.')
+            result['redeployEvent'] = reset['id']
+        return result
+
+    def kept(self, environment):
+        match = re.fullmatch(r'(?:pr|issue)-([1-9][0-9]{0,9})', environment)
+        if not match:
+            return False
+        number = int(match[1])
+        value = self.pull(number) if environment.startswith('pr-') else self.call(self.root + '/issues/' + str(number))
+        preview.require(value.get('number') == number, 'Unexpected preview retention context.')
+        return self.label_grant(value, KEEP) is not None
+
+    def sync_deployed(self, environment, result):
+        commands.sync_deployed(self.repository, environment, result, self.call)
 
     def publish(self, environment, text):
         match = re.fullmatch(r'(?:pr|issue)-([1-9][0-9]{0,9})', environment)
@@ -94,6 +122,8 @@ def removal_reason(record, github, now):
         return pending['reason']
     if record['destroyed']:
         return None
+    if github.kept(record['request']['environmentId']):
+        return None
     if datetime.fromisoformat(record['expiresAt']) <= now:
         return 'ttl'
     match = re.fullmatch(r'pr-([1-9][0-9]{0,9})', record['request']['environmentId'])
@@ -110,7 +140,7 @@ def eligible_change(record, approval, selected):
     if record is None:
         return True
     previous = record.get('automation')
-    changed_intent = not previous or any(previous[key] != approval[key] for key in ('sourceSha', 'optInEvent'))
+    changed_intent = not previous or any(previous.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent'))
     if record['destroyed']:
         if previous:
             return changed_intent  # TTL/manual removal stays removed until a new head or explicit re-opt-in.
@@ -171,7 +201,12 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
         failures.append({'code': 'unrecorded-resources', 'action': 'restore-ownership-record'})
     if unknown_routes:
         failures.append({'code': 'unrecorded-routes', 'count': unknown_routes, 'action': 'restore-ownership-record'})
-    current = {}
+    current, observed_states = {}, {}
+    def sync(environment, value):
+        try:
+            github.sync_deployed(environment, value)
+        except (ValueError, RuntimeError, KeyError, TypeError, OSError):
+            failures.append({'environmentId': environment, 'code': 'deployed-label-failed'})
     def report(environment, text):
         if apply:
             try:
@@ -190,6 +225,14 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
             if record['destroyed'] and reason is None and item['prefix'] in occupied:
                 reason = (record.get('deletion') or {}).get('reason', 'manual')
             if not reason:
+                if apply:
+                    try:
+                        value = execute('status', request) if not record['destroyed'] else {'state': 'destroyed'}
+                        observed_states[environment] = value
+                        sync(environment, value)
+                    except (ValueError, RuntimeError, KeyError, TypeError, OSError):
+                        observed_states[environment] = {'state': 'unhealthy'}
+                        failures.append({'environmentId': environment, 'code': 'status-unavailable'})
                 continue
             results.append({'environmentId': environment, 'operation': 'destroy', 'reason': reason})
             if apply:
@@ -200,9 +243,15 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 current[environment] = {**record, 'destroyed': True}
                 if value.get('deletion'):
                     current[environment]['deletion'] = value['deletion']
+                sync(environment, value)
                 report(environment, feedback.completed(value, 'destroy', github.repository, run_url, request))
         except (ValueError, RuntimeError, KeyError, TypeError, OSError):
             failures.append({'environmentId': environment, 'code': 'cleanup-failed'})
+            if apply:
+                try:
+                    sync(environment, execute('status', request))
+                except (ValueError, RuntimeError, KeyError, TypeError, OSError):
+                    pass  # Unknown status cannot justify a label change; the next reconciliation retries.
             report(environment, '**Preview cleanup incomplete**\n\nFull removal is not confirmed; owned resources may remain. '
                    'Check `/preview status` or retry `/preview destroy`.\n\n' + run_url)
     if unknown_resources:
@@ -229,7 +278,7 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 if not apply or previous['destroyed']:
                     continue
                 try:
-                    observed = execute('status', previous['request'])
+                    observed = observed_states.get(environment) or execute('status', previous['request'])
                 except (ValueError, RuntimeError, KeyError, TypeError, OSError):
                     observed = {'state': 'unhealthy'}
                 if observed['state'] == 'running' and (not previous.get('access') or observed.get('url')):
@@ -237,6 +286,11 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                     continue
                 # Restore an owned opted-in preview through ordinary deploy, never through implicit reset.
             stage = 'selection'
+            # Reset a newly requested update once. Health/startup retries of the same intent preserve data.
+            old_intent = (previous or {}).get('automation') or {}
+            reset = bool(approval.get('redeployEvent') and previous and not previous['destroyed'] and (
+                any(old_intent.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent'))
+                or list(previous['request'].get('extensions', {})) != selected))
             options = {**commands.parse('/preview deploy'), 'environment_id': environment,
                        'revision': approval['sourceSha'], 'extensions': selected}
             if previous and not previous['destroyed']:
@@ -251,7 +305,8 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
             if previous and not previous['destroyed']:
                 request['target'] = previous['request']['target']
                 contract.validate(request)
-            results.append({'environmentId': environment, 'operation': 'deploy', 'sourceSha': approval['sourceSha'], 'extensions': selected})
+            results.append({'environmentId': environment, 'operation': 'redeploy' if reset else 'deploy',
+                            'sourceSha': approval['sourceSha'], 'extensions': selected})
             if apply:
                 stage = 'deployment'
                 def guard(latest, expected=approval, ids=selected, old=previous, desired=request):
@@ -261,10 +316,12 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                         return False
                     fresh = github.pull(expected['pullRequest'])
                     return github.approval(fresh) == expected and extensions.from_labels(fresh.get('labels', [])) == ids
-                report(environment, feedback.planned(request, 'deploy', github.repository, run_url))
+                report(environment, feedback.planned(request, 'deploy', github.repository, run_url, reset))
                 value = execute('deploy', request, automation_context=approval, guard=guard,
+                                reset_before_deploy=reset,
                                 extension_configuration=variables.get('PREVIEW_EXTENSION_CONFIGURATION') or '{}')
-                report(environment, feedback.completed(value, 'deploy', github.repository, run_url, request))
+                sync(environment, value)
+                report(environment, feedback.completed(value, 'deploy', github.repository, run_url, request, reset))
         except manual.SelectionError as error:
             target = pending if error.public['code'] == 'image-unavailable' else failures
             target.append({'environmentId': environment, 'code': error.public['code'], 'component': error.public['component']})
@@ -278,7 +335,7 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
         except (ValueError, RuntimeError, KeyError, TypeError, OSError):
             failures.append({'environmentId': environment, 'code': 'deployment-not-authorized-or-failed', 'stage': stage})
             messages = {
-                'authorization': 'Check that the PR is open, non-draft and from this repository, and that the latest `preview:enabled` grant came from a human with current write access. Deployment was not started.',
+                'authorization': 'Check that the PR is open, non-draft and from this repository, and that the latest `preview:auto` and reset-mode grants came from a human with current write access. Deployment was not started.',
                 'selection': 'Image or environment setting checks failed. Check exact private image publication and the protected preview defaults. Azure deployment was not started.',
                 'deployment': 'Azure deployment or protected-access verification failed. Resources may remain; check `/preview status`, then retry `/preview` or clean up with `/preview destroy`.'}
             report(environment, '**Automatic preview not deployed**\n\n' + messages[stage] + '\n\n' + run_url)

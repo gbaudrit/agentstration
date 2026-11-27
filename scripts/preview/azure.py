@@ -40,13 +40,16 @@ def timestamp(value):
 
 
 def validate_automation(request, value):
-    contract.fields(value, ('pullRequest', 'optInEvent', 'optInAt', 'sourceSha'))
+    contract.fields(value, ('pullRequest', 'optInEvent', 'optInAt', 'sourceSha', *(['redeployEvent'] if 'redeployEvent' in value else [])))
     preview.require(type(value['pullRequest']) is int and 1 <= value['pullRequest'] <= 9999999999
                     and request['environmentId'] == 'pr-' + str(value['pullRequest'])
                     and type(value['optInEvent']) is int and 1 <= value['optInEvent'] <= 99999999999999999999
                     and timestamp(value['optInAt']) is not None
                     and isinstance(value['sourceSha'], str) and preview.SHA.fullmatch(value['sourceSha']),
                     'Invalid automatic preview association.')
+    if 'redeployEvent' in value:
+        preview.require(type(value['redeployEvent']) is int and 1 <= value['redeployEvent'] <= 99999999999999999999,
+                        'Invalid automatic reset association.')
 
 
 def reset_owned(client, request, record, routes, reason, now=None):
