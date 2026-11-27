@@ -74,14 +74,49 @@ dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration R
 ## Build once and validate
 
 Product **CI** calls the reusable **Validate OCI image** workflow for the
-implemented image catalogue entries. Foundry-only inputs select Foundry; Worker/AWP
-inputs select the Worker and the server/Worker preview validation; server-specific
-inputs select the server. Shared packaging inputs select all three. Worker product
-changes retain conservative product validation. The required `build-and-test` check includes its result;
-Foundry-only changes use this targeted validation while shared or mixed inputs
-retain the transverse checks described in [Testing](testing.md#ci-inventory-and-execution-safeguards).
-The reusable workflow has read-only repository access and contains no publication
-job. There is one PR image build, not a second independently triggered image run.
+implemented catalogue entries. A single catalogue-driven selector under
+`scripts/ci/extensions/` discovers AEP extension ownership; the central selector
+combines its result with server/Worker and product inputs. Isolated implemented
+extension inputs select only their image, while common packaging and global
+.NET/CI inputs retain their appropriate shared checks. The required
+`build-and-test` gate waits for the selected validations. See the
+[selection matrix](testing.md#catalogue-driven-extension-selection).
+
+The default source directory comes from `project`. A dedicated test project
+named `<extension project>.Tests` owns its entire directory, including its project
+file. Shared test projects require explicit file ownership, as in Foundry:
+
+```json
+"ci": {
+  "testPaths": [
+    "tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs",
+    "tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs"
+  ]
+}
+```
+
+Unlisted shared fixtures and the shared test project file continue to select
+product checks and the dependent image. `versionFile`, the catalogue itself,
+`dockerfile` and its dedicated recipe directory are also recognized. The
+conventional `scripts/packaging/test_<id>_image.py` contract uses underscores for
+hyphens in the catalogue ID.
+
+Optional `ci.additionalPaths` declares extension-owned packaging assets, for
+example `deploy/<id>/**`, `scripts/packaging/<id>_smoke.py` or a dedicated workflow
+whose filename includes the ID. Optional `ci.sharedPaths` selects the dependent
+image for shared SDK/protocol inputs **without** granting product exemptions.
+All paths are repository-relative; test patterns must stay inside the declared
+test project. This metadata does not change extension, protocol or contribution
+versions, and introduces no executable catalogue entry by itself.
+
+Only delivered catalogue entries are recognized. Unknown or removed ownership
+remains conservative, and malformed entries stop classification. The offline
+contracts create temporary catalogues to exercise all pending extension shapes;
+new packaging PRs can add their real catalogue without editing the central
+classifier. Existing packaging PRs must retain the new central selector when
+synchronizing after this refactor merges; obsolete provider-specific rules and
+central test additions should not be reintroduced. Resource Plan UX's generic
+extension exclusion also avoids per-provider workflow edits.
 
 The workflow files are `.github/workflows/oci-images.yml` (delivery) and
 `.github/workflows/validate-oci-image.yml` (reusable validation). Automation that

@@ -144,28 +144,56 @@ The autonomous AEP SDK keeps its own `aep/Aep.slnx` validation because it can be
 
 Run `./scripts/ci/test-ci-contracts.ps1` to check coverage partition completeness and path-selection regressions. The classifier also runs these checks before selecting jobs. Rename detection is disabled when gathering changed paths so both the removed and added paths contribute to validation selection. Storage/application families, including Resource Planning and Security, and every PostgreSQL project select PostgreSQL checks; Console Web, Client and Components select Browser UX on pull requests and main pushes. The required `build-and-test` check keeps its existing name and documentation-only success path.
 
-Foundry is the first independently validated extension. Changes confined to
-`src/extensions/Agentstration.Extensions.Foundry/`, its two Foundry-specific
-Model Providers test files, its image catalogue entry or shared image tooling
-select the reusable OCI validation instead of the product build, Windows lifecycle,
-server container, hosted diagnostics and functional/coverage lanes. Documentation
-may accompany those changes. The OCI workflow runs the existing offline Foundry
-tests, exports the image with attestations, stages the exact digest and checks
-protected discovery and restart. It does not publish images from CI.
+### Catalogue-driven extension selection
 
-The required `build-and-test` check waits for the selected OCI job and rejects a
-failed, cancelled or unexpectedly skipped result. Local regression checks exercise
-both selection and the same result-gate script used by Actions. Shared test
-fixtures, the Model Providers test project, AEP, build/package settings and mixed
-product changes retain transverse validation. Image inputs also select OCI
-validation. Other extensions and unknown paths keep their existing checks until
-their packaging vertical explicitly supplies equivalent validation. Manual CI
-runs select everything. CodeQL and dependency review remain independent.
+`scripts/ci/classify-changes.ps1` combines product, server/Worker and AEP extension
+selection. The single extension selector and its contracts live under
+`scripts/ci/extensions/`. Both contract suites run during the existing
+`classify-changes` job; no new publication or test pipeline is introduced.
 
-Resource Plan UX excludes isolated Foundry source changes from its `src/**`
-trigger. A simultaneous product-source change still triggers it. No new live
-model or Azure dependency is introduced; full coverage inventories and collectors
-remain unchanged when transverse validation is selected.
+Only implemented `deploy/images/extensions/*.json` entries grant extension
+ownership. The selector derives source and test directories, the independent
+version file and recipe from `project`, `testProject`, `versionFile` and
+`dockerfile`. Adding a catalogue therefore needs no provider-specific expression
+in the central classifier. Uncatalogued extensions retain product checks.
+
+| Changed inputs | Selected OCI validation | Product functional/coverage/diagnostic lanes |
+| --- | --- | --- |
+| One implemented extension's source, dedicated tests, version or catalogue | That extension | Skipped |
+| Several implemented extensions, with optional documentation | Those extensions | Skipped |
+| `scripts/ci/extensions/**` | All implemented AEP extensions | Skipped |
+| Generic AEP enrollment smoke/Compose or shared AEP protocol | All implemented AEP extensions | Protocol changes retain product/AEP checks; packaging smokes alone do not |
+| Common image builder, unknown packaging helper, generic recipe or OCI workflow | All affected image families, including server/Worker | Skipped unless a product input is also changed |
+| Shared .NET/build settings, central `scripts/ci/**` outside `extensions/`, or the main CI workflow | All implemented images | Retained |
+| Mixed product/extension changes, shared test fixtures or declared shared dependencies | Dependent images | Retained |
+| Unknown/removed catalogue or unknown source | Remaining affected images | Retained; malformed catalogues fail classification |
+| Manual CI dispatch | All implemented images | Retained |
+
+The `dotnet` result controls the full build, Windows lifecycle, Fast/Integration,
+both coverage shards/publication and both hosted-diagnostic groups. `storage` and
+`container` are independently derived from product-owned inputs: the autonomous
+PostgreSQL document extension does not select the server's PostgreSQL profile.
+Extension selector edits select AEP images without pulling in unrelated
+server/Worker images. Changes to the central selector itself deliberately retain
+the complete transverse checks.
+
+The existing `build-and-test` gate waits for the selected OCI matrix and rejects
+failed, cancelled or unexpectedly skipped validation. Test inventories, coverage
+partitioning/collectors, memory budgets, publication credentials and module
+concurrency are unchanged. Rename detection remains disabled, so removed and
+added paths both contribute. Run `./scripts/ci/extensions/test-classify-changes.ps1`
+for the focused contracts or `./scripts/ci/test-ci-contracts.ps1` for the complete
+selection/inventory/result-gate contracts. Temporary catalogues exercise the
+pending extensions without committing an unimplemented image entry.
+
+Resource Plan UX excludes autonomous `src/extensions/**` sources from its broad
+`src/**` trigger, while mixed product changes still trigger it. Editing that
+specialized workflow runs its own Playwright validation, without also selecting
+unrelated product CI. Browser UX keeps its explicit Utilities source dependency
+because its executable journeys use that extension. CodeQL, Dependency Review
+and PR metadata remain independent; documentation builds still run when the
+relevant documentation changes. These workflows are not disabled by extension
+classification. No live model, registry credential or Azure dependency is added.
 
 Coverage emits one assembly-named TRX per module. Collection and publication check each required module's TRX coverage attachment against its actual Cobertura file; missing, reused, malformed or unexpected reports fail publication; byte-identical TRX attachment copies are consolidated once. Fast and Integration remain authoritative inventories; Coverage A/B must partition Integration exactly. Performance and live-provider execution remain optional.
 
