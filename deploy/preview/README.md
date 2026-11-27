@@ -16,3 +16,5 @@ provisioner or the source-built Development topology.
 The [portable lifecycle guide](../../docs/contributing/preview-lifecycle.md)
 documents managed deploy/status/destroy, ownership, safe result JSON and reusable
 GitHub Actions entrypoints for the first #1282 increment.
+
+For ordered application settings and independent startup Bootstrap, see [GUID deployment profiles](../../docs/reference/additional-settings.md). The versioned sources live under `deploy/profiles/previews/`; only the explicit saved selection is activated.

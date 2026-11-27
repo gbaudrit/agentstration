@@ -8,18 +8,20 @@ See [ADR-0256](../decisions/0256-preview-lifecycle-binds-provider-neutral-reques
 
 ## Public request and result
 
-`scripts/preview/contract.py` is the executable request validator (v1 core-only; v2 adds selected AEP extensions). Unknown
+`scripts/preview/contract.py` is the executable request validator (v1 core-only; v2 adds selected AEP extensions; v3 freezes GUID deployment profiles). Unknown
 fields, duplicate JSON keys, input above 64 KiB, unresolved revisions, mutable
 image references and invalid provider/database combinations are rejected.
 
 | Request field | Meaning |
 | --- | --- |
-| `schemaVersion` | Integer `1` for core-only requests, or `2` with a nonempty extension selection |
+| `schemaVersion` | Integer `1` for core-only requests, `2` with selected extensions, or `3` with frozen deployment-profile metadata |
 | `environmentId` | 1–40 lowercase letters/digits/hyphens, starting with a letter |
 | `provider` | `docker`, `azure-vm` or `ssh-docker` |
 | `sourceSha` | Exact server commit; independent Worker source remains in its receipt |
 | `registry`, `deliveries` | Private GHCR and canonical server/Worker metadata, reduced from existing delivery receipts |
-| `extensions` | v2 only: sorted map of catalogue IDs to canonical AEP delivery receipts, each with its independent source/version/digest |
+| `extensions` | v2/v3: sorted map (v3 may be empty) of catalogue IDs to canonical AEP delivery receipts, each with its independent source/version/digest |
+| `deploymentProfiles` | v3: ordered `{guid, settingsSha256, contentSha256}` pins at the exact server source SHA |
+| `selectionPullRequest` | v3: the PR whose current head/order must still match before deployment, or null for explicit source-pinned requests |
 | `database`, `postgresImage` | SQLite by default; PostgreSQL selects its exact supported image digest |
 | `ttlHours` | Integer 1–168; metadata for later lifecycle/retention orchestration |
 | `dataMode` | `preserve` or explicit destroy-only `reset` |
@@ -179,3 +181,5 @@ enrollment before manual bootstrap, invalid discovery/enrollment proofs, persist
 identity on recreation/reactivation, deselection and full owned-resource cleanup.
 The deployment-contract CI builds its fixtures with the shared OCI recipes and
 pinned bases; it does not publish them or create cloud infrastructure.
+
+GUID settings, independent Bootstrap references, generated private administrator initialization, and the deterministic executable example are documented in [Additional settings and GUID deployment profiles](../reference/additional-settings.md). Status/destroy validate the saved v3 pins without looking up the current PR or source.
