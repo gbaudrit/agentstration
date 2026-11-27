@@ -149,12 +149,13 @@ try {
     $nativePath = Join-Path $temporary 'deploy/images/extensions/opendal.json'
     $native = Get-Content $nativePath -Raw | ConvertFrom-Json -AsHashtable
     $native.dockerfile = 'deploy/opendal/Dockerfile'
-    $native.ci = @{ sharedPaths = @('asc/**', 'asp/**'); additionalPaths = @('deploy/opendal/**', 'scripts/packaging/opendal_smoke.py', '.github/workflows/opendal-packaging.yml') }
+    # Keep the synthetic protocol dependency separate from real catalogue dependencies.
+    $native.ci = @{ sharedPaths = @('classifier-fixtures/native-protocol/**', 'asp/**'); additionalPaths = @('deploy/opendal/**', 'scripts/packaging/opendal_smoke.py', '.github/workflows/opendal-packaging.yml') }
     Write-Catalogue $native
     foreach ($path in @('deploy/opendal/Dockerfile', 'deploy/opendal/native/licenses/LICENSE', 'scripts/packaging/opendal_smoke.py', '.github/workflows/opendal-packaging.yml')) {
         Isolated @($path) @('opendal')
     }
-    $selection = Get-FixtureSelection @('asc/src/Contracts.cs')
+    $selection = Get-FixtureSelection @('classifier-fixtures/native-protocol/Contracts.cs')
     Require ($selection.dotnet -and ($selection.imageIds -join ',') -eq 'opendal') 'Shared native protocol changes must retain product and dependent-image checks.'
     # Deletions and renames use both paths; an absent catalogue never becomes an exemption.
     Remove-Item (Join-Path $temporary 'deploy/images/extensions/ollama.json')
