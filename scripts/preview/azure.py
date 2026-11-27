@@ -45,6 +45,9 @@ def validate_automation(request, value):
                             *(['profileGuids'] if 'profileGuids' in value else [])))
     if 'profileGuids' in value:
         profiles.identities(value['profileGuids'])
+    if 'deploymentProfiles' in request:
+        preview.require(value.get('profileGuids', []) == [item['guid'] for item in request['deploymentProfiles']],
+                        'Automatic association differs from the frozen deployment profile order.')
     preview.require(type(value['pullRequest']) is int and 1 <= value['pullRequest'] <= 9999999999
                     and request['environmentId'] == 'pr-' + str(value['pullRequest'])
                     and type(value['optInEvent']) is int and 1 <= value['optInEvent'] <= 99999999999999999999

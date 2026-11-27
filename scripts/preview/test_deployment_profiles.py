@@ -177,6 +177,14 @@ class ProfileTests(unittest.TestCase):
         self.assertNotIn('reset', cloud.effects)
         self.assertEqual([], cloud.record['request']['deploymentProfiles'])
 
+    def test_saved_automatic_association_cannot_drift_from_profile_order(self):
+        request = manual.resolve(options(revision='pr:42', environment_id='pr-42'), VARIABLES, 'owner/repo', self.selector)
+        association = {'pullRequest':42, 'optInEvent':77, 'optInAt':NOW.isoformat(), 'sourceSha':SHA, 'profileGuids':[GUID]}
+        azure.validate_automation(request, association)
+        association['profileGuids'] = []
+        with self.assertRaisesRegex(ValueError, 'profile order'):
+            azure.validate_automation(request, association)
+
     def test_stale_metadata_recheck_precedes_any_azure_mutation(self):
         request = manual.resolve(options(revision='pr:42'), VARIABLES, 'owner/repo', self.selector)
         cloud = Cloud()
