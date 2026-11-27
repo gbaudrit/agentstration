@@ -184,7 +184,7 @@ def route_inventory(records, tunnels, dns, domain):
         name = record.get('name', '').lower().rstrip('.')
         if name in hosts:
             occupied.add(hosts[name])
-        elif name.endswith('.' + domain) and record.get('comment', '').startswith('agentstration.preview.owner='):
+        elif name.endswith('.' + domain) and (record.get('comment') or '').startswith('agentstration.preview.owner='):
             unknown += 1
     return occupied, unknown
 

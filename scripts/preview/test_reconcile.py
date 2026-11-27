@@ -523,3 +523,18 @@ class ReconciliationTests(unittest.TestCase):
             [{'name': 'dev-pr-1.agentstration.cloud'}, {'name': 'dev-other.agentstration.cloud', 'comment': 'agentstration.preview.owner=fixture'}], 'agentstration.cloud')
         self.assertEqual({'pv-' + 'a' * 20}, occupied)
         self.assertEqual(2, unknown)
+
+    def test_cloudflare_optional_dns_comments_do_not_turn_unowned_records_into_orphans(self):
+        prefix = 'pv-' + 'a' * 20
+        records = [{'prefix': prefix, 'record': {'access': {
+            'tunnelName': 'owned', 'hostname': 'dev-pr-1.agentstration.cloud'}}}]
+        for comment in (None, '', 'ordinary DNS note'):
+            with self.subTest(comment=comment):
+                occupied, unknown = reconcile.route_inventory(records, [], [
+                    {'name': 'dev-unrelated.agentstration.cloud', 'comment': comment},
+                    {'name': 'dev-pr-1.agentstration.cloud', 'comment': comment},
+                    {'name': 'dev-no-comment.agentstration.cloud'},
+                    {'name': 'dev-marked.agentstration.cloud', 'comment': 'agentstration.preview.owner=fixture'}
+                ], 'agentstration.cloud')
+                self.assertEqual({prefix}, occupied)
+                self.assertEqual(1, unknown)
