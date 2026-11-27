@@ -145,7 +145,7 @@ public sealed class WorkUsageService(IWorkUsageRepository repository, IWorkProje
         }
         return WorkUsageAccounting.Summarize(records, query, legacy);
     }
-    public async Task<Result<WorkSharingOperation>> PublishAsync(WorkspaceId workspace, WorkProjectId project, WorkUsageId id, CancellationToken token)
+    public async Task<Result<WorkSharingOperation>> PublishAsync(WorkspaceId workspace, WorkProjectId project, WorkUsageId id, CancellationToken token, WorkProjectResolvedBinding? expectedBinding = null)
     {
         var owned = await OwnedAsync(workspace, project, token);
         if (owned is null) return Result<WorkSharingOperation>.Failure("work_project_not_found");
@@ -169,7 +169,8 @@ public sealed class WorkUsageService(IWorkUsageRepository repository, IWorkProje
             var portable = new WorkSharingUsage(item.Record.Id.Value, item.Record.PlanId, item.Record.TaskId, new Dictionary<string, long>()) { Accounting = item.Record };
             var operation = new WorkSharingOperationId(StableId(new { Kind = "work-usage-publication/1.0", workspace, Principal = context.PrincipalId, project, item.Record.Id, item.Digest }));
             result = await sharing.PublishAsync(workspace, project, new(operation, owned.Version,
-                [new(new(WorkSharingDomain.Usage, item.Record.Id.ToString()), 0, JsonSerializer.SerializeToElement(portable, Json))]), token);
+                [new(new(WorkSharingDomain.Usage, item.Record.Id.ToString()), 0, JsonSerializer.SerializeToElement(portable, Json))])
+            { ExpectedBinding = expectedBinding }, token);
             if (!result.IsSuccess || result.Value!.Status != WorkSharingOperationStatus.Succeeded) return result;
         }
         return result!;

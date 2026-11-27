@@ -52,10 +52,19 @@ public static class WorkProjectConnectionRules
         definition.ConnectionRequirements.Any(value => WorkPlanDefinition.Digest(value) == WorkPlanDefinition.Digest(selection.Requirement))
         && definition.ConnectionAssignments.Any(value => WorkPlanDefinition.Digest(value) == WorkPlanDefinition.Digest(selection.Assignment));
 
-    public static bool Evidence(WorkProjectResolvedBinding value) => value.Binding.Connection is not { } selection ? value.Service is null
-        : value.Service is { } service && Valid(selection) && service.Service == selection.Assignment.Service
-            && WorkProjectContextRules.Reference(service.Type, "ConnectedServiceType") && WorkProjectContextRules.Text(service.TypeVersion)
-            && service.TypeSchemaDigest.StartsWith("sha256:", StringComparison.Ordinal) && Hash(service.TypeSchemaDigest[7..]) && Hash(service.ConfigurationDigest);
+    public static bool Evidence(WorkProjectResolvedBinding value)
+    {
+        if (value.Binding.Connection is { } selection) return value.Service is { } service && value.NativeRoute is null
+            && Valid(selection) && service.Service == selection.Assignment.Service && ReferenceEvidence(service);
+        if (value.Binding.NativeService is not { } native) return value.Service is null && value.NativeRoute is null;
+        return value.Service is { } nativeEvidence && nativeEvidence.Service == native && ReferenceEvidence(nativeEvidence)
+            && value.NativeRoute is { } route && WorkProjectContextRules.Reference(route.Provider, "ToolProvider")
+            && WorkProjectContextRules.Reference(route.Extension, "ExtensionRegistration") && Hash(route.Digest);
+    }
+
+    private static bool ReferenceEvidence(WorkProjectConnectionEvidence service) => WorkProjectContextRules.Reference(service.Type, "ConnectedServiceType")
+        && WorkProjectContextRules.Text(service.TypeVersion) && service.TypeSchemaDigest.StartsWith("sha256:", StringComparison.Ordinal)
+        && Hash(service.TypeSchemaDigest[7..]) && Hash(service.ConfigurationDigest);
 
     private static bool Hash(string? value) => value is { Length: 64 } && value.All(character => char.IsAsciiHexDigitLower(character));
 }

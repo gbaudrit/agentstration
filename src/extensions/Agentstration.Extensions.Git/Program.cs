@@ -14,6 +14,7 @@ builder.Services.AddOptions<GitSourceProviderOptions>()
 builder.Services.AddOptions<GitOperationsOptions>().Bind(builder.Configuration.GetSection("GitOperations"))
     .Validate<IOptions<GitSourceProviderOptions>>((options, source) => GitRepositoryConnection.ValidOptions(options, source.Value),
         "Enabled Git operations require bounded repositories, a state directory and a valid timeout.").ValidateOnStart();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 builder.Services.AddSingleton<GitPublicationJournal>();
 builder.Services.AddSingleton<GitRepositoryOperations>();
@@ -25,10 +26,12 @@ builder.Services.AddAgentstrationAep(options =>
         "1.0.0",
         "Bounded public Git distribution for Agentstration Source Channels.");
     options.OptionSets.Add(GitSourceOptionContracts.SourceChannel);
+    options.ConnectedServiceTypes.Add(new(GitServiceContract.TypeId, "Git", GitServiceContract.Version, [GitServiceContract.TypeVersion]));
     options.McpServers.Add(new("git", "/mcp"));
     options.Tools.Add(new("git.repository", "Generic Git operations", new("git", "git_repository_operation"),
         Metadata: new Dictionary<string, JsonElement>
         {
+            [GitServiceContract.Metadata] = GitServiceContract.TransportDeclaration,
             [GitOperationProtocol.MetadataKey] = JsonSerializer.SerializeToElement(new
             { version = GitOperationProtocol.Version, operations = new[] { "resolve", "read", "diff", "publish" }, expectedBase = true, exactRevisionReads = true, historyRead = true, idempotentOperations = true, operationRecovery = true })
         }));

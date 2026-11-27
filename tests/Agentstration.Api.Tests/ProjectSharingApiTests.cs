@@ -215,6 +215,7 @@ public sealed partial class ProjectSharingApiTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ExtensionKinds.ExtensionRegistration,
             Metadata = new() { Name = "git-fixture" },
+            Generation = 1,
             ScopeRef = owner,
             Definition = new()
             {
@@ -232,6 +233,7 @@ public sealed partial class ProjectSharingApiTests
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.ToolProvider,
             Metadata = new() { Name = "git-fixture" },
+            Generation = 1,
             ScopeRef = owner,
             Definition = new() { DisplayName = "Git fixture", ProviderType = ToolProviderType.Aep, Aep = new() { Extension = new("git-fixture", owner, default) } }
         }, null, true, default);

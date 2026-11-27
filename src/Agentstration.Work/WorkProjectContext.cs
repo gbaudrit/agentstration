@@ -15,13 +15,16 @@ public sealed record WorkProjectContextBinding(string Name, WorkProjectBindingPu
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectContractSelection? Contract { get; init; }
     public WorkProjectConnectionSelection? Connection { get; init; }
+    public WorkProjectResourceReference? NativeService { get; init; }
 }
 public sealed record WorkProjectResolvedBinding(WorkProjectContextBinding Binding, string ETag, string DiscoverDecision, string UseDecision)
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectContractEvidence? Contract { get; init; }
     public WorkProjectConnectionEvidence? Service { get; init; }
+    public WorkProjectNativeRoute? NativeRoute { get; init; }
 }
+public sealed record WorkProjectNativeRoute(WorkProjectResourceReference Provider, WorkProjectResourceReference Extension, string Digest);
 public sealed record WorkProjectBindingAvailability(WorkProjectContextBinding Binding, bool Available, string Code)
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
@@ -52,6 +55,9 @@ public static class WorkProjectContextRules
             && target.Address.ScopeRef != default && target.Address.Name is { Length: > 0 and <= 512 }
             && target.Address.Kind is "ToolProvider" or "ConnectedService" or "SourceVersion" or "Tool"
             && (target.Address.Kind != "Tool" || binding.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Repository or WorkProjectBindingPurpose.Sharing or WorkProjectBindingPurpose.CodePublication or WorkProjectBindingPurpose.Tracking or WorkProjectBindingPurpose.Forge)
+            && (binding.NativeService is null || binding.Connection is null && binding.Contract is null
+                && binding.Purpose is WorkProjectBindingPurpose.Sharing or WorkProjectBindingPurpose.CodePublication
+                && target.Address.Kind == "Tool" && Reference(binding.NativeService, "ConnectedService"))
             && ValidContract(binding)
             && target.Version?.Length is not > 128
             && (binding.Purpose != WorkProjectBindingPurpose.CodePublication || target.Address.Kind == "Tool")

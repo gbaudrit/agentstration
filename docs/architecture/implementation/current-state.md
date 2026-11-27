@@ -878,3 +878,17 @@ ATC/AFC assignments or Project membership change. The original sharing connectio
 binding remain mandatory; other-domain and mixed batches retain their reviewed Project version.
 Independent participants reconstruct the same counters without copying local service configuration
 or counting an observation again. See [ADR-0296](../../decisions/0296-historical-usage-recovery-retains-its-sharing-authority.md).
+
+### Named Forge delivery (#1349)
+
+Coding delivery consumes explicit captured Tracking and Forge selections plus named protected Git
+publication and sharing bindings backed by independent Git ConnectedServices. Bootstrap resolves
+portable native service selections; attempts and sharing operations retain exact service/type/configuration
+and live AEP route proofs, revalidated before effect invocation. Git account and repository settings live
+on services, with host-level repository policy on the extension. Its Infrastructure AFC adapter verifies repository/base evidence
+and uses the governed Tool pipeline and protected local service configuration. A durable wire digest
+and single-winner first-submit reservation retain the original review effect through response loss,
+restart and concurrent recovery. Process-scoped or expired Missing cannot authorize another create.
+Shared YAML contains portable results and qualified review/Tracking identities; local service pins
+remain private. Reviewed YAML draft import and the existing native worker remain the execution path.
+See [ADR-0297](../../decisions/0297-coding-delivery-captures-named-forge-authority.md).

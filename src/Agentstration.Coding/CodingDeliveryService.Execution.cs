@@ -36,6 +36,8 @@ public sealed partial class CodingDeliveryService
             if (!owned.IsSuccess) return Failure(owned.ErrorCode!);
             if (owned.Value!.Version != operation.ProjectVersion || !SameBindings(owned.Value, operation.Intent.ProjectContext))
                 return Failure("coding_delivery_connection_changed");
+            var nativeProofError = await RevalidateNativeAsync(operation.WorkspaceId, operation.Intent.ProjectContext, token);
+            if (nativeProofError is not null) return await UncertainAsync(operation, nativeProofError, token);
             var intent = operation.Intent; Result<WorkTaskDeliveryOperation> saved;
             switch (operation.Stage)
             {
@@ -86,37 +88,15 @@ public sealed partial class CodingDeliveryService
                     saved = await SaveAsync(operation, operation with { Code = codeReceipt, Stage = WorkTaskDeliveryStage.PullRequest }, token);
                     break;
                 case WorkTaskDeliveryStage.PullRequest:
-                    if (operation.PullRequest is not null)
-                    { saved = await SaveAsync(operation, operation with { Stage = WorkTaskDeliveryStage.Contribution }, token); break; }
-                    var input = new CodingPullRequestInput(intent.Repository, Title: intent.Title, Body: intent.Body,
-                        Head: intent.HeadRef["refs/heads/".Length..], Base: intent.BaseBranch, ExpectedHeadRevision: operation.Code!.Revision)
-                    { ExpectedBaseRevision = intent.BaseRevision };
-                    var command = new InvokeCodingPullRequestRequest(Identifier(operation, "delivery-pull-request/1.0"), intent.TaskId.Value, intent.TaskVersion,
-                        CodingProviderProtocol.CreatePullRequest, input, Binding(intent.ProjectContext, WorkProjectBindingPurpose.Repository)!.Target, operation.ProjectVersion, true);
-                    var pull = await repositories.InvokePullRequestAsync(operation.WorkspaceId, operation.ProjectId, command, token);
-                    if (!pull.IsSuccess) return await UncertainAsync(operation, pull.ErrorCode!, token);
-                    if (pull.Value!.Result.Status == CodingProviderStatus.Missing)
-                    {
-                        var current = await NewMutationAuthorityAsync(operation, token);
-                        if (current is not null)
-                        { saved = await AuthorityFailureAsync(operation, current, token); if (saved.Value?.Status == WorkTaskDeliveryStatus.Uncertain) return saved; break; }
-                        pull = await repositories.InvokePullRequestAsync(operation.WorkspaceId, operation.ProjectId, command with { Recover = false }, token);
-                        if (!pull.IsSuccess) return await UncertainAsync(operation, pull.ErrorCode!, token);
-                    }
-                    if (pull.Value!.Result.Status == CodingProviderStatus.Rejected)
-                    { saved = await RejectAsync(operation, pull.Value.Result.ErrorCode ?? "coding_delivery_pull_request_rejected", token); break; }
-                    if (pull.Value.Result.Status != CodingProviderStatus.Succeeded || pull.Value.Result.PullRequest is not { } pr)
-                        return await UncertainAsync(operation, pull.Value.Result.ErrorCode ?? "coding_delivery_pull_request_uncertain", token);
-                    var receipt = new WorkPullRequestReceipt(pr.Provider, pr.Repository, pr.NativeId, pr.Number, pr.Url, pr.Head, pr.HeadRevision, pr.Base, pr.BaseRevision, pr.Draft, pr.Merged);
-                    var withPull = operation with { PullRequest = receipt, Stage = WorkTaskDeliveryStage.Contribution };
-                    if (!WorkTaskDeliveryFormat.Valid(withPull)) return await UncertainAsync(operation, "coding_delivery_pull_request_response_invalid", token);
-                    saved = await SaveAsync(operation, withPull, token);
+                    saved = await AdvanceForgeAsync(operation, token);
+                    if (saved.Value?.Status == WorkTaskDeliveryStatus.Uncertain) return saved;
                     break;
                 case WorkTaskDeliveryStage.Contribution:
                     var contribution = Contribution(operation);
                     var contributionId = new WorkSharingOperationId(Identifier(operation, "delivery-contribution-publication/1.0"));
                     var progress = await sharing.PublishAsync(operation.WorkspaceId, operation.ProjectId, new(contributionId, operation.ProjectVersion,
-                        [new(new(WorkSharingDomain.Contribution, contribution.Id.ToString("D")), 0, JsonSerializer.SerializeToElement(contribution, Json))]), token);
+                        [new(new(WorkSharingDomain.Contribution, contribution.Id.ToString("D")), 0, JsonSerializer.SerializeToElement(contribution, Json))])
+                    { ExpectedBinding = intent.ProjectContext.Bindings.SingleOrDefault(value => value.Binding.Name == intent.SharingConnection && value.Binding.NativeService is not null) }, token);
                     if (!progress.IsSuccess) return await UncertainAsync(operation, progress.ErrorCode!, token);
                     if (progress.Value!.Status != WorkSharingOperationStatus.Succeeded)
                         return await UncertainAsync(operation, progress.Value.ErrorCode ?? "coding_delivery_progress_uncertain", token);
@@ -133,7 +113,7 @@ public sealed partial class CodingDeliveryService
                     var remaining = operation.Usage.FirstOrDefault(value => value.PublicationId is null);
                     if (remaining is not null)
                     {
-                        var measured = await usage.PublishAsync(operation.WorkspaceId, operation.ProjectId, remaining.Id, token);
+                        var measured = await usage.PublishAsync(operation.WorkspaceId, operation.ProjectId, remaining.Id, token, intent.ProjectContext.Bindings.SingleOrDefault(value => value.Binding.Name == intent.SharingConnection && value.Binding.NativeService is not null));
                         if (!measured.IsSuccess) return await UncertainAsync(operation, measured.ErrorCode!, token);
                         if (measured.Value!.Status != WorkSharingOperationStatus.Succeeded)
                             return await UncertainAsync(operation, measured.Value.ErrorCode ?? "coding_delivery_usage_uncertain", token);

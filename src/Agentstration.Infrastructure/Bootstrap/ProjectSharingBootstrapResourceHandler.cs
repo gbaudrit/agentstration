@@ -9,9 +9,12 @@ using Agentstration.Work;
 
 namespace Agentstration.Infrastructure.Bootstrap;
 
+public sealed record DeclarativeProjectNativeService(string Name, WorkProjectResourceReference Service, WorkProjectResourceReference Tool);
+
 public sealed record DeclarativeProjectSharingDefinition(WorkSharingProjectId ProjectId, WorkParticipantId ParticipantId,
     string Location, string ToolName, string? ToolNamespace = null, string? DisplayName = null, Guid? Id = null)
 {
+    public IReadOnlyList<DeclarativeProjectNativeService> NativeServices { get; init; } = [];
     public IReadOnlyList<WorkProjectConnectionRequirement> ConnectionRequirements { get; init; } = [];
     public IReadOnlyList<WorkProjectConnectionAssignment> ConnectionAssignments { get; init; } = [];
     public string? RepositoryToolName { get; init; }
@@ -63,6 +66,8 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
         if (operation.ProfileScope != BootstrapProfileScope.Workspace || operation.ActorPrincipalId is { } actor && actor != context.PrincipalId
             || WorkspaceBootstrapResource.Workspace(operation) != context.WorkspaceId) throw Invalid("work_project_not_found");
         var value = WorkspaceBootstrapResource.Parse<DeclarativeResourceEnvelope<DeclarativeProjectSharingDefinition>>(resource);
+        if (value.Definition?.NativeServices is not { Count: <= 2 } nativeServices || nativeServices.Any(item => item.Name is not ("sharing" or "code-publication"))
+            || nativeServices.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count() != nativeServices.Count) throw Invalid("work_project_connections_invalid");
         if (!WorkProjectDefinition.ValidName(value.Metadata.Name) || value.Definition is null || value.Definition.Id == Guid.Empty)
             throw Invalid("sharing_connection_invalid");
         return value;
@@ -86,7 +91,8 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
         foreach (var (name, purpose, toolName, toolNamespace) in Targets(value))
         {
             if (string.IsNullOrWhiteSpace(toolName)) throw Invalid("sharing_connection_invalid");
-            var address = ScopedResourceAddress.Create(ResourceScopeRef.Workspace(workspace.Value),
+            var native = value.NativeServices.SingleOrDefault(item => item.Name == name);
+            var address = native?.Tool.Address ?? ScopedResourceAddress.Create(ResourceScopeRef.Workspace(workspace.Value),
                 ResourceNamespace.Parse(toolNamespace ?? "default"), ToolResourceKinds.Tool, toolName);
             var tool = (await resources.GetExactAsync<ToolResource>(address, token))?.Value;
             if (tool is null && planning?.Contains(ToolResourceKinds.Tool, toolName, address.Namespace.Value) == true)
@@ -95,8 +101,9 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
                 continue;
             }
             if (tool is null) throw Invalid("sharing_tool_not_found");
-            if (!tool.Definition.Metadata.ContainsKey("agentstration.toolPublicationUid")) throw Invalid("sharing_protected_relay_required");
-            bindings.Add(new(name, purpose, new(address, tool.Uid, tool.Generation)));
+            if (native is not null && (tool.Uid != native.Tool.Uid || tool.Generation != native.Tool.Generation)) throw Invalid("work_project_connection_stale");
+            if (native is null && !tool.Definition.Metadata.ContainsKey("agentstration.toolPublicationUid")) throw Invalid("sharing_protected_relay_required");
+            bindings.Add(new(name, purpose, new(address, tool.Uid, tool.Generation)) { NativeService = native?.Service });
         }
         if (deferred) return null; // Resolve and authorize the real publication identities at application time.
         return new(value.DisplayName ?? value.ProjectId.ToString(), null, [], [])
@@ -117,7 +124,8 @@ public sealed class ProjectSharingBootstrapResourceHandler(WorkProjectService pr
                 Target = need.Target is { } target ? target.ProviderId + "/" + target.TargetId : null,
                 Reference = service is null ? null : new(service.Address.Name, service.Address.ScopeRef, service.Address.Namespace)
             };
-        }).ToArray();
+        }).Concat(value.NativeServices.Select(item => new BootstrapResourcePlanDetail("ConnectedService", item.Name, BootstrapResourceDisposition.Skip)
+        { Contract = "agentstration.git.repository", Reference = new(item.Service.Address.Name, item.Service.Address.ScopeRef, item.Service.Address.Namespace) })).ToArray();
     private static IEnumerable<(string Name, WorkProjectBindingPurpose Purpose, string Tool, string? Namespace)> Targets(DeclarativeProjectSharingDefinition value)
     {
         yield return ("sharing", WorkProjectBindingPurpose.Sharing, value.ToolName, value.ToolNamespace);

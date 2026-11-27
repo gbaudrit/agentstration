@@ -12,7 +12,8 @@ namespace Agentstration.Infrastructure.Work;
 
 // Uses the delivered service inspector. Only standard, explicitly mapped target exports are read.
 public sealed partial class WorkProjectConnectedServiceResolver(IResourceStore resources, IConnectedServiceExportInspector services,
-    IParameterResolver parameters, IRequestContextScopeFactory scopes, IConnectedServiceResolver? serviceResolver = null)
+    IParameterResolver parameters, IRequestContextScopeFactory scopes, IConnectedServiceResolver? serviceResolver = null,
+    Agentstration.Tools.Mcp.IAepExtensionRegistrationResolver? nativeExtensions = null, Agentstration.Tools.Mcp.AepMcpTransport? nativeTransport = null)
 {
     public async Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspace, WorkProjectConnectionSelection selection,
         Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize,
@@ -47,21 +48,42 @@ public sealed partial class WorkProjectConnectedServiceResolver(IResourceStore r
         Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token)
     {
         if (!WorkProjectConnectionRules.Valid(selection)) return Invalid("work_project_connection_invalid");
+        var adapter = await authorize(selection.Assignment.DescribeTool, token);
+        if (!adapter.IsSuccess) return Invalid(adapter.ErrorCode!);
+        var inspected = await InspectServiceAsync(workspace, selection.Requirement.Name, selection.Assignment.Service, authorize, token);
+        if (!inspected.IsSuccess) return Invalid(inspected.ErrorCode!);
+        var (evidence, metadata, values) = inspected.Value!;
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var mapping in selection.Assignment.Exports)
+        {
+            var export = metadata.Exports.SingleOrDefault(value => value.Id == mapping.ExportId);
+            if (export is not { Type: ConnectedServiceValueType.Text, Protection: ConnectedServiceValueProtection.Standard, SourceInputId: { } input }
+                || !values.TryGetValue(input, out var value) || value.ValueKind != JsonValueKind.String
+                || !WorkProjectContextRules.Text(value.GetString())) return Invalid("work_project_connection_incompatible");
+            fields.Add(mapping.Field, value.GetString()!);
+        }
+        if (selection.Requirement.Target is { } target && (target.ProviderId != fields["providerId"] || target.TargetId != fields["targetId"]))
+            return Invalid("work_project_connection_target_mismatch");
+        return Result<Inspection>.Success(new(evidence, fields));
+    }
+
+    private async Task<Result<ServiceInspection>> InspectServiceAsync(WorkspaceId workspace, string name, WorkProjectResourceReference selectedService,
+        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token)
+    {
         try
         {
-            var assignment = selection.Assignment;
-            foreach (var reference in new[] { assignment.Service, assignment.DescribeTool })
+            foreach (var reference in new[] { selectedService })
             {
                 var permission = await authorize(reference, token);
-                if (!permission.IsSuccess) return Invalid(permission.ErrorCode!);
+                if (!permission.IsSuccess) return InvalidService(permission.ErrorCode!);
             }
-            var address = assignment.Service.Address;
+            var address = selectedService.Address;
             var metadata = await services.InspectAsync(new()
             {
                 Service = new(new(address.Namespace, address.Kind, address.Name), address.ScopeRef),
-                ServiceUid = assignment.Service.Uid,
-                Generation = assignment.Service.Generation
-            }, new(ResourceScopeRef.Workspace(workspace.Value), new(address.Namespace, "Project", selection.Requirement.Name)), token);
+                ServiceUid = selectedService.Uid,
+                Generation = selectedService.Generation
+            }, new(ResourceScopeRef.Workspace(workspace.Value), new(address.Namespace, "Project", name)), token);
             ConnectedServiceResource service;
             ConnectedServiceTypeResource type;
             using (scopes.PushSystem())
@@ -73,10 +95,10 @@ public sealed partial class WorkProjectConnectedServiceResolver(IResourceStore r
                     typeRef.Type.Namespace ?? address.Namespace, ConnectedServiceResourceKinds.ConnectedServiceType, typeRef.Type.Name), token))?.Value
                     ?? throw new ConnectedServiceExportInspectionException("storage_service_unavailable");
             }
-            if (Reference(service) != assignment.Service || service.Definition.Type != metadata.Type || type.Uid != metadata.Type.TypeUid)
-                return Invalid("work_project_connection_stale");
+            if (Reference(service) != selectedService || service.Definition.Type != metadata.Type || type.Uid != metadata.Type.TypeUid)
+                return InvalidService("work_project_connection_stale");
             var version = type.Definition.Versions.SingleOrDefault(value => value.Version == metadata.Type.Version && value.SchemaDigest == metadata.Type.SchemaDigest);
-            if (version is null) return Invalid("work_project_connection_incompatible");
+            if (version is null) return InvalidService("work_project_connection_incompatible");
             var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             foreach (var binding in service.Definition.Bindings.OrderBy(value => value.InputId, StringComparer.Ordinal))
             {
@@ -87,32 +109,21 @@ public sealed partial class WorkProjectConnectedServiceResolver(IResourceStore r
                     // The service and its input access were authorized by the inspector above.
                     using var ownerRead = scopes.PushSystem();
                     var value = await parameters.ResolveAsync(parameter, new(address.ScopeRef, service.Address), token);
-                    if (value is null) return Invalid("work_project_connection_unavailable");
+                    if (value is null) return InvalidService("work_project_connection_unavailable");
                     values.Add(binding.InputId, value.Value);
                 }
-                else return Invalid("work_project_connection_incompatible");
+                else return InvalidService("work_project_connection_incompatible");
             }
-            var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var mapping in assignment.Exports)
-            {
-                var export = metadata.Exports.SingleOrDefault(value => value.Id == mapping.ExportId);
-                if (export is not { Type: ConnectedServiceValueType.Text, Protection: ConnectedServiceValueProtection.Standard, SourceInputId: { } input }
-                    || !values.TryGetValue(input, out var value) || value.ValueKind != JsonValueKind.String
-                    || !WorkProjectContextRules.Text(value.GetString())) return Invalid("work_project_connection_incompatible");
-                fields.Add(mapping.Field, value.GetString()!);
-            }
-            if (selection.Requirement.Target is { } target && (target.ProviderId != fields["providerId"] || target.TargetId != fields["targetId"]))
-                return Invalid("work_project_connection_target_mismatch");
-            var evidence = new WorkProjectConnectionEvidence(assignment.Service, Reference(type), metadata.Type.Version, metadata.Type.SchemaDigest,
+            var evidence = new WorkProjectConnectionEvidence(selectedService, Reference(type), metadata.Type.Version, metadata.Type.SchemaDigest,
                 WorkPlanDefinition.Digest(new { service.Definition.Options, service.Definition.Type, service.Definition.Bindings, Values = values }));
-            return Result<Inspection>.Success(new(evidence, fields));
+            return Result<ServiceInspection>.Success(new(evidence, metadata, values));
         }
-        catch (ParameterAccessDeniedException) { return Invalid("work_project_binding_denied"); }
-        catch (ParameterManagementException) { return Invalid("work_project_connection_incompatible"); }
-        catch (ParameterResourceNotFoundException) { return Invalid("work_project_connection_unavailable"); }
+        catch (ParameterAccessDeniedException) { return InvalidService("work_project_binding_denied"); }
+        catch (ParameterManagementException) { return InvalidService("work_project_connection_incompatible"); }
+        catch (ParameterResourceNotFoundException) { return InvalidService("work_project_connection_unavailable"); }
         catch (ConnectedServiceExportInspectionException error)
         {
-            return Invalid(error.Code == "storage_service_access_denied" ? "work_project_binding_denied"
+            return InvalidService(error.Code == "storage_service_access_denied" ? "work_project_binding_denied"
                 : error.Code == "storage_service_stale" ? "work_project_connection_stale" : "work_project_connection_unavailable");
         }
     }
@@ -120,6 +131,8 @@ public sealed partial class WorkProjectConnectedServiceResolver(IResourceStore r
     public sealed record Inspection(WorkProjectConnectionEvidence Evidence, IReadOnlyDictionary<string, string> Fields);
     private static WorkProjectResourceReference Reference(Resource resource) => new(new(resource.ScopeRef!.Value, resource.Namespace,
         resource.Kind, resource.Name), resource.Uid, resource.Generation);
+    private sealed record ServiceInspection(WorkProjectConnectionEvidence Evidence, ConnectedServiceExportMetadata Metadata, IReadOnlyDictionary<string, JsonElement> Values);
+    private static Result<ServiceInspection> InvalidService(string code) => Result<ServiceInspection>.Failure(code);
     private static Result<Inspection> Invalid(string code) => Result<Inspection>.Failure(code);
     private static Result<WorkProjectResolvedBinding> Failure(string code) => Result<WorkProjectResolvedBinding>.Failure(code);
 }

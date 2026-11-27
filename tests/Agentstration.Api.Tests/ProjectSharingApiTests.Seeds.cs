@@ -171,6 +171,7 @@ public sealed partial class ProjectSharingApiTests
                 Kind = ToolResourceKinds.Tool,
                 ScopeRef = host.Tool.ScopeRef,
                 Metadata = new() { Name = "seed-git-source" },
+                Generation = 1,
                 Governance = authority,
                 Definition = host.Tool.Definition
             }, null, true, default);

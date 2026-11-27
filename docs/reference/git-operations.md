@@ -36,6 +36,45 @@ ref; external history removal fails explicitly. Fixed fields disappear from call
 overridden. Existing Secret resolution, Tool approval/access policy and trusted
 Workspace/Principal context remain authoritative. The extension has no ambient token.
 
+## Git Connected Services
+
+The same extension also contributes the versioned `git` ConnectedServiceType. Its options contain
+`repository`, `authentication` (`Basic` or `Bearer`), `username`, bounded `allowedRefPrefixes` and
+`allowedPathPrefixes`; optional `refName` fixes a sharing branch. The required secured `credential`
+input references a Secret. Host-level allowed repositories and execution limits still apply.
+No account, token or business repository is stored on ExtensionRegistration.
+
+A Project native `Sharing` or `CodePublication` binding selects the discovered `git.repository`
+Tool and an exact `nativeService` reference. The existing ConnectedService inspector/resolver and
+governed Tool pipeline authorize that service and its type, retain configuration and live AEP route
+proofs, then resolve secured configuration immediately before invocation. The protected HTTP envelope
+is never persisted in operation payloads or public arguments. Configuration supplied by a service
+cannot be overridden with the legacy repository/authentication/credential arguments.
+
+Portable Bootstrap Project configuration can use:
+
+```yaml
+nativeServices:
+  - name: sharing
+    service: { binding: sharing-service }
+    tool:
+      extensionContribution:
+        kind: Tool
+        extensionId: Agentstration.Extensions.Git
+        contributionId: git.repository
+  - name: code-publication
+    service: { binding: code-publication-service }
+    tool:
+      extensionContribution:
+        kind: Tool
+        extensionId: Agentstration.Extensions.Git
+        contributionId: git.repository
+```
+
+Declare both profile bindings with `targetKind: connectedService` and select each installation's
+compatible service during review. Bootstrap resolves fresh local identities rather than sharing
+UIDs, scopes or credentials. Existing relay configuration remains available to other consumers.
+
 ## Wire operations
 
 The public relay takes `operation`, `mode` (`execute` or `recover`), a stable opaque

@@ -51,10 +51,12 @@ public sealed partial class ProjectSharingApiTests
         _ = github.CreateClient();
         await using var left = await ConnectedHostAsync(native, "delivery-left", false, github, true);
         var leftSources = await DeliveryPrerequisitesAsync(left);
-        var seed = DeliverySeed(native, left.Tool, leftSources);
-        var lp = await InitializeDeliverySeedAsync(left, seed, Guid.NewGuid());
-        Assert.HasCount(4, lp.Bindings);
-        lp = await ConfigureDeliveryTrackingAsync(left, lp, github);
+        var leftConnections = await DeliveryConnectionsAsync(left, github, true, native);
+        var seed = DeliveryNamedSeed(DeliverySeed(native, left.Tool, leftSources), leftConnections);
+        var lp = await InitializeDeliverySeedAsync(left, seed, Guid.NewGuid(), leftConnections);
+        Assert.HasCount(3, lp.Bindings);
+        Assert.IsTrue(lp.Bindings.Where(value => value.Purpose is WorkProjectBindingPurpose.Sharing or WorkProjectBindingPurpose.CodePublication).All(value => value.NativeService is not null));
+        Assert.HasCount(3, lp.ConnectionRequirements); Assert.HasCount(3, lp.ConnectionAssignments);
         using (left.Scope())
         {
             var pinned = await left.Host.Services.GetRequiredService<FlowService>().ResolveAsync(new WorkspaceId(left.Context.WorkspaceId), new(new FlowId("seed-code")), default);
@@ -83,7 +85,8 @@ public sealed partial class ProjectSharingApiTests
         var attempt = executed.Attempts.Single();
         var pulled = await PullAsync(left, lp); var planRecord = pulled.Records.Single(value => value.Key == new WorkSharingRecordKey(WorkSharingDomain.Plan, target.Id.ToString("D")));
         var command = new BeginCodingDeliveryRequest(Guid.NewGuid(), target.Id, attempt.Id, lp.Version, executed.Version, executed.Tasks.Single().Version,
-            planRecord.Version, planRecord.Digest, "feat(fixture): deliver existing issue", "## Summary\nDeliver existing fixture issue.\n\n## Changes\n- Add the deterministic answer.\n\n## Validation\n- Native fixture check passed.\n\n## Breaking changes\nNone.");
+            planRecord.Version, planRecord.Digest, "feat(fixture): deliver existing issue", "## Summary\nDeliver existing fixture issue.\n\n## Changes\n- Add the deterministic answer.\n\n## Validation\n- Native fixture check passed.\n\n## Breaking changes\nNone.")
+        { TrackingConnection = "issues", ForgeConnection = "forge", CodePublicationConnection = "code-publication", SharingConnection = "sharing" };
         var deliveryUrl = left.Root(lp.Id) + "/coding/deliveries/";
         native.LoseNextWriteResponse = true;
         using var first = await left.Http.PostAsJsonAsync(deliveryUrl, command);
@@ -92,7 +95,20 @@ public sealed partial class ProjectSharingApiTests
         Assert.IsNotNull(delivery.Code, delivery.ErrorCode);
         Assert.AreEqual(WorkTaskDeliveryEffectStatus.Uncertain, delivery.Code.Status, delivery.ErrorCode);
         Assert.AreEqual(0, vendor.PullPosts);
-        native.Unavailable = false; await left.RestartAsync(); vendor.LosePullResponse = true;
+        native.Unavailable = false; await left.RestartAsync();
+        var gitService = delivery.Intent.ProjectContext.Bindings.Single(value => value.Binding.Name == "code-publication").Service!;
+        Assert.AreEqual(ResourceScopeRef.Instance, gitService.Service.Address.ScopeRef);
+        await DeliveryGitGrantAsync(left, gitService, false);
+        using (var denied = await left.Http.PostAsync(deliveryUrl + delivery.Id + "/resume", null))
+        {
+            var held = await DeliveryResponseAsync(denied);
+            Assert.AreEqual(WorkTaskDeliveryStatus.Uncertain, held.Status);
+            Assert.AreEqual(WorkTaskDeliveryStage.CodePublication, held.Stage);
+            Assert.AreEqual("work_project_binding_denied", held.ErrorCode);
+            Assert.AreEqual(0, vendor.PullPosts);
+        }
+        await DeliveryGitGrantAsync(left, gitService, true);
+        vendor.LosePullResponse = true;
         using var second = await left.Http.PostAsync(deliveryUrl + delivery.Id + "/resume", null);
         delivery = await DeliveryResponseAsync(second);
         Assert.AreEqual(WorkTaskDeliveryStage.PullRequest, delivery.Stage, delivery.ErrorCode); Assert.AreEqual(WorkTaskDeliveryStatus.Uncertain, delivery.Status);
@@ -114,6 +130,10 @@ public sealed partial class ProjectSharingApiTests
         Assert.AreEqual(WorkTaskDeliveryStatus.Delivered, delivery.Status); Assert.AreEqual(WorkTaskDeliveryStage.Finished, delivery.Stage);
         Assert.AreEqual(native.InitialRevision, delivery.Code!.BaseRevision); Assert.AreEqual(delivery.Code.Revision, delivery.PullRequest!.HeadRevision);
         Assert.AreEqual(native.InitialRevision, delivery.PullRequest.BaseRevision); Assert.IsTrue(delivery.PullRequest.Draft); Assert.IsFalse(delivery.PullRequest.Merged);
+        Assert.IsNotNull(delivery.ForgeSubmission); Assert.IsNotNull(delivery.ForgeWireIntentDigest);
+        Assert.AreEqual(lp.ConnectionAssignments.Single(value => value.Name == "forge").Service.Uid, delivery.Intent.Forge!.Connection.Service!.Service.Uid);
+        Assert.AreEqual(leftConnections.Single(value => value.Requirement.Name == "forge").Requirement.Target, delivery.PullRequest.Forge);
+        Assert.AreEqual(new WorkTrackingItem(delivery.Intent.Issue.Tracking!.ProviderId, delivery.Intent.Issue.Tracking.TargetId, "2"), delivery.PullRequest.Tracking);
         Assert.AreEqual("42\n", await native.GitAsync(native.RepositoryPath, "show", delivery.Code.Revision + ":answer.txt"));
         Assert.AreEqual("answer.txt", (await native.GitAsync(native.RepositoryPath, "diff", "--name-only", native.InitialRevision, delivery.Code.Revision!)).Trim());
         Assert.AreEqual("1", (await native.GitAsync(native.RepositoryPath, "rev-list", "--count", native.InitialRevision + ".." + delivery.Code.Revision)).Trim());
@@ -126,8 +146,20 @@ public sealed partial class ProjectSharingApiTests
         var assignment = (await registrations.GetByTargetExactAsync(ResourceScopeRef.Workspace(left.Context.WorkspaceId), RuntimeAssignmentTargetKind.FlowRun, attempt.FlowRunId, default))!.Value;
         Assert.HasCount(1, assignment.Attempts);
         await using var right = await ConnectedHostAsync(native, "delivery-right", false, github, true);
-        var rightSources = await DeliveryPrerequisitesAsync(right);
-        var rp = await InitializeDeliverySeedAsync(right, DeliverySeed(native, right.Tool, rightSources), Guid.NewGuid());
+        _ = await DeliveryPrerequisitesAsync(right);
+        var rightConnections = await DeliveryConnectionsAsync(right, github, false, native);
+        var rp = await InitializeDeliverySeedAsync(right, seed, Guid.NewGuid(), rightConnections);
+        Assert.AreEqual(ResourceScopeRef.Instance, leftConnections.Single(value => value.Requirement.Name == "forge").Assignment.Service.Address.ScopeRef);
+        Assert.AreEqual(ResourceScopeRef.Workspace(right.Context.WorkspaceId), rightConnections.Single(value => value.Requirement.Name == "forge").Assignment.Service.Address.ScopeRef);
+        Assert.AreNotEqual(lp.ConnectionAssignments.Single(value => value.Name == "forge").Service.Uid, rp.ConnectionAssignments.Single(value => value.Name == "forge").Service.Uid);
+        foreach (var name in new[] { "sharing", "code-publication" })
+        {
+            var local = lp.Bindings.Single(value => value.Name == name).NativeService!;
+            var remote = rp.Bindings.Single(value => value.Name == name).NativeService!;
+            Assert.AreEqual(ResourceScopeRef.Instance, local.Address.ScopeRef);
+            Assert.AreEqual(ResourceScopeRef.Workspace(right.Context.WorkspaceId), remote.Address.ScopeRef);
+            Assert.AreNotEqual(local.Uid, remote.Uid);
+        }
         Assert.HasCount(0, rp.PlanIds);
         var synchronized = await PullAsync(right, rp);
         Assert.AreEqual(1, synchronized.Records.Count(value => value.Key.Domain == WorkSharingDomain.Contribution));
@@ -140,6 +172,14 @@ public sealed partial class ProjectSharingApiTests
         var wire = JsonSerializer.Serialize(synchronized.Records, Json);
         Assert.IsFalse(wire.Contains(left.Context.WorkspaceId.ToString(), StringComparison.Ordinal));
         Assert.IsFalse(wire.Contains(AuthenticatedGitFixture.Credential, StringComparison.Ordinal)); Assert.IsFalse(wire.Contains(GitHubProviderTests.Credential, StringComparison.Ordinal));
+        foreach (var connection in leftConnections.Concat(rightConnections))
+            Assert.DoesNotContain(connection.Assignment.Service.Uid.ToString(), wire);
+        foreach (var captured in delivery.Intent.ProjectContext.Bindings.Where(value => value.Service is not null))
+        {
+            Assert.DoesNotContain(captured.Service!.Service.Uid.ToString(), wire);
+            Assert.DoesNotContain(captured.Service.Type.Uid.ToString(), wire);
+        }
+        Assert.DoesNotContain("connectionAssignments", wire);
         using var foreign = await right.Http.GetAsync(right.Root(lp.Id) + "/coding/deliveries/" + delivery.Id);
         Assert.AreEqual(HttpStatusCode.NotFound, foreign.StatusCode);
     }
@@ -243,7 +283,8 @@ public sealed partial class ProjectSharingApiTests
             Requirements = manifest.Requirements with
             {
                 Contributions = [.. manifest.Requirements.Contributions,
-            new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.GitHub", ContributionId = "github.issue" },
+            new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.GitHub", ContributionId = "github.tracking.describe" },
+            new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.GitHub", ContributionId = "github.forge.describe" },
             new() { Kind = "Tool", ExtensionId = "Agentstration.Extensions.GitHub", ContributionId = "github.coding" }]
             }
         };
@@ -266,7 +307,7 @@ public sealed partial class ProjectSharingApiTests
             if (binding["path"]!.GetValue<string>() == "/allowedPathPrefixes") binding["value"] = JsonSerializer.SerializeToNode(new[] { "answer.txt" }, Json);
         }
         entries["bootstrap/11-code-relay.yaml"] = ResourceManifestSerializer.ToYaml(code);
-        foreach (var (id, name, capability) in new[] { ("github.issue", "seed-issue", WorkTaskProviderProtocol.MetadataKey), ("github.coding", "seed-repository", CodingProviderProtocol.MetadataKey) })
+        foreach (var (id, name, capability) in new[] { ("github.coding", "seed-repository", CodingProviderProtocol.MetadataKey) })
         {
             var relay = JsonSerializer.SerializeToNode<ToolDefinitionProperties>(new RelayToolDefinitionProperties
             {
@@ -284,7 +325,6 @@ public sealed partial class ProjectSharingApiTests
         }
         var project = JsonNode.Parse(ResourceManifestSerializer.FromYaml<JsonElement>(entries["bootstrap/20-project.yaml"]).GetRawText())!;
         project["definition"]!["repositoryToolName"] = "agentstration.seed-repository.v1.0.0";
-        project["definition"]!["taskOperationsToolName"] = "agentstration.seed-issue.v1.0.0";
         project["definition"]!["codePublicationToolName"] = "agentstration.seed-code-publication.v1.0.0";
         entries["bootstrap/20-project.yaml"] = ResourceManifestSerializer.ToYaml(project);
         var fake = DeliveryFakeCli();
@@ -297,7 +337,7 @@ public sealed partial class ProjectSharingApiTests
         using var output = new MemoryStream(); using (var package = new ZipArchive(output, ZipArchiveMode.Create, true)) foreach (var entry in entries) WriteSeed(package, entry.Key, entry.Value);
         return output.ToArray();
     }
-    private static async Task<WorkProjectResponse> InitializeDeliverySeedAsync(SharingHost host, byte[] bytes, Guid participant)
+    private static async Task<WorkProjectResponse> InitializeDeliverySeedAsync(SharingHost host, byte[] bytes, Guid participant, IReadOnlyList<WorkProjectConnectionSelection> connections)
     {
         var target = new BootstrapApplicationTarget(host.Context.TenantId, host.Context.WorkspaceId);
         using var ingestion = await host.Http.PostAsJsonAsync("/api/bootstrap/workspace-seeds", new IngestWorkspaceSeedRequest(Guid.NewGuid(), target, Convert.ToBase64String(bytes)));
@@ -305,50 +345,48 @@ public sealed partial class ProjectSharingApiTests
         var receipt = (await ingestion.Content.ReadFromJsonAsync<WorkspaceSeedReceipt>())!;
         var selection = new WorkspaceSeedSelection(receipt.Provenance.Id, receipt.Provenance.ArchiveDigest);
         var input = new BootstrapInputSelection("seed", "Agentstration:Bootstrap:Parameters:ParticipantId", "literal", Literal: JsonSerializer.SerializeToElement(participant.ToString()));
-        var preview = await SeedPreviewAsync(host, target, selection, input); Assert.IsTrue(preview.CanApply, JsonSerializer.Serialize(preview, Json));
-        var application = await ApplySeedAsync(host, target, selection, input, preview.Digest);
+        var bindings = connections.Select(value => new BootstrapBindingSelection("seed", value.Requirement.Name + "-service",
+            new(value.Assignment.Service.Address.Name, value.Assignment.Service.Address.ScopeRef, value.Assignment.Service.Address.Namespace))).Concat(await DeliveryGitBindingsAsync(host)).ToArray();
+        var request = new BootstrapProfilePreviewRequest([], target, bindings, Inputs: [input]) { Seed = selection };
+        using var response = await host.Http.PostAsJsonAsync("/api/bootstrap/profiles/preview", request);
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode, await response.Content.ReadAsStringAsync());
+        var preview = (await response.Content.ReadFromJsonAsync<BootstrapCompositionPreview>())!;
+        Assert.IsTrue(preview.CanApply, JsonSerializer.Serialize(preview, Json));
+        var application = await ApplyNamedSeedAsync(host, request, preview.Digest);
         Assert.AreEqual(BootstrapApplicationStatus.Succeeded, application.Definition.Status, JsonSerializer.Serialize(application, Json));
         return (await host.Http.GetFromJsonAsync<WorkProjectResponse>(host.Root(application.Definition.SeedHandover!.ProjectId)))!;
     }
     private static async Task<WorkPlanResponse> DeliveryPlanAsync(SharingHost host, WorkProjectResponse project, string title)
     {
-        using var actor = host.Scope(); var workspace = new WorkspaceId(host.Context.WorkspaceId); var task = new WorkTaskId(Guid.NewGuid());
-        Assert.IsTrue((await host.Host.Services.GetRequiredService<WorkTaskTreeService>().CreateAsync(workspace, new(task, [new(task, WorkTaskKind.Atomic, title, "Produce the deterministic fixture answer.")]), default)).IsSuccess);
-        var plans = host.Host.Services.GetRequiredService<WorkPlanService>();
-        var created = await plans.CreateAsync(workspace, WorkPlanId.New(), new(Guid.NewGuid(), 0, new(title, [task], [])), default);
-        Assert.IsTrue(created.IsSuccess, created.ErrorCode); var view = created.Value!;
+        var id = WorkPlanId.New(); var task = new WorkTaskId(Guid.NewGuid()); var path = "plans/" + id.Value.ToString("N");
+        var definition = new WorkPlanDefinition(title, [task], []) { TaskConnections = [new(task, ["issues", "forge"])] };
+        var package = new WorkDataPackage(null,
+        [
+            new("catalog.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkDataCatalogDefinition>(ResourceApiVersions.CoreV1,
+                "WorkCatalog", new("delivery"), new(WorkDataFormat.Version, project.Sharing!.ProjectId, [path + "/plan.yaml"])))),
+            new(path + "/plan.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkDataPlanDefinition>(ResourceApiVersions.CoreV1,
+                "WorkPlan", new("issue-" + id.Value.ToString("N")), new(id, definition, [path + "/tree.yaml"])))),
+            new(path + "/tree.yaml", ResourceManifestSerializer.ToYaml(new WorkDataManifest<WorkTaskTreeDefinition>(ResourceApiVersions.CoreV1,
+                "WorkTaskTree", new("tree"), new(task, [new(task, WorkTaskKind.Atomic, title, "Produce the deterministic fixture answer.")]))))
+        ]);
+        using var reviewResponse = await host.Http.PostAsJsonAsync(host.Root(project.Id) + "/data/preview", new PreviewWorkDataRequest(package));
+        Assert.AreEqual(HttpStatusCode.OK, reviewResponse.StatusCode, await reviewResponse.Content.ReadAsStringAsync());
+        var review = (await reviewResponse.Content.ReadFromJsonAsync<WorkDataPreview>())!;
+        Assert.IsTrue(review.CanImport, JsonSerializer.Serialize(review, Json));
+        using var imported = await host.Http.PostAsJsonAsync(host.Root(project.Id) + "/data/imports", new ImportWorkDataRequest(Guid.NewGuid(), review.Digest!, package));
+        Assert.AreEqual(HttpStatusCode.Accepted, imported.StatusCode, await imported.Content.ReadAsStringAsync());
+        Assert.AreEqual(WorkDataImportStatus.Succeeded, (await imported.Content.ReadFromJsonAsync<WorkDataImportResponse>())!.Status);
+        using var actor = host.Scope(); var workspace = new WorkspaceId(host.Context.WorkspaceId);
+        var plans = host.Host.Services.GetRequiredService<WorkPlanService>(); var loaded = await plans.GetAsync(workspace, id, default);
+        Assert.IsTrue(loaded.IsSuccess, loaded.ErrorCode); var view = loaded.Value!;
+        Assert.AreEqual(WorkPlanStatus.Draft, view.Plan.Status); Assert.HasCount(0, view.Plan.Attempts);
         foreach (var action in new[] { WorkPlanAction.Validate, WorkPlanAction.Activate })
         {
-            var changed = await plans.TransitionAsync(workspace, view.Plan.Id, new(Guid.NewGuid(), view.Plan.Version, view.Revision.Number, view.Revision.Digest, action), default);
+            var changed = await plans.TransitionAsync(workspace, id, new(Guid.NewGuid(), view.Plan.Version, view.Revision.Number, view.Revision.Digest, action), default);
             Assert.IsTrue(changed.IsSuccess, changed.ErrorCode); view = changed.Value!;
         }
-        var projects = host.Host.Services.GetRequiredService<WorkProjectService>(); var current = (await projects.GetAsync(workspace, new(project.Id), default)).Value!;
-        var associated = await projects.UpdateAsync(workspace, current.Id, new(Guid.NewGuid(), current.Version, current.Definition with { PlanIds = [.. current.Definition.PlanIds, view.Plan.Id] }), default);
-        Assert.IsTrue(associated.IsSuccess, associated.ErrorCode);
         return WorkPlanContractMapping.ToPlanResponse(view);
     }
-    private static async Task<WorkProjectResponse> ConfigureDeliveryTrackingAsync(SharingHost host, WorkProjectResponse project,
-        WebApplicationFactory<GitHubExtension::Program> extension)
-    {
-        using var actor = host.Scope(); var workspace = new WorkspaceId(host.Context.WorkspaceId);
-        var selection = await GitHubProviderTests.InstallIssueServiceAsync(host.Host.Services, host.Context, extension);
-        var projects = host.Host.Services.GetRequiredService<WorkProjectService>();
-        var owned = (await projects.GetAsync(workspace, new(project.Id), default)).Value!;
-        var saved = await projects.UpdateAsync(workspace, owned.Id, new(Guid.NewGuid(), owned.Version, owned.Definition with
-        { ConnectionRequirements = [selection.Requirement], ConnectionAssignments = [selection.Assignment] }), default);
-        Assert.IsTrue(saved.IsSuccess, saved.ErrorCode);
-        var sharing = host.Host.Services.GetRequiredService<WorkProjectSharingService>();
-        var pulled = (await sharing.PullAsync(workspace, owned.Id, null, default)).Value!;
-        if (!pulled.Records.Any(value => value.Key == WorkSharingProjectMetadata.Key))
-        {
-            var metadata = new WorkSharingProjectMetadata("Delivery", null, [owned.Definition.Sharing!.ParticipantId]) { ConnectionRequirements = [selection.Requirement] };
-            var publication = await sharing.PublishAsync(workspace, owned.Id, new(new(Guid.NewGuid()), saved.Value!.Version,
-                [new(WorkSharingProjectMetadata.Key, 0, JsonSerializer.SerializeToElement(metadata, Json))]), default);
-            Assert.AreEqual(WorkSharingOperationStatus.Succeeded, publication.Value!.Status, publication.ErrorCode ?? publication.Value.ErrorCode);
-        }
-        return WorkProjectContractMapping.ToProjectResponse(saved.Value!);
-    }
-
     private static async Task AcknowledgeDeliveryIssueAsync(SharingHost host, WorkProjectResponse project, WorkPlanResponse plan, string issue)
     {
         using var response = await host.Http.PostAsJsonAsync(host.Root(project.Id) + "/coding/issues/acknowledge", new AcknowledgeCodingIssueRequest(Guid.NewGuid(), project.Version,

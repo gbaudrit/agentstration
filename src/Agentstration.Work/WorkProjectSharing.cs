@@ -86,13 +86,17 @@ public static class WorkSharingFormat
 public enum WorkSharingOperationStatus { Pending, Uncertain, Conflict, Succeeded, Rejected }
 public sealed record WorkSharingChange(WorkSharingRecordKey Key, long ExpectedVersion, JsonElement Content);
 public sealed record WorkSharingTransportAttempt(int Number, string OperationKey, string IntentDigest, string? ExpectedRevision,
-    WorkSharingSpace Space, IReadOnlyList<WorkSharingRecord> Records);
+    WorkSharingSpace Space, IReadOnlyList<WorkSharingRecord> Records)
+{
+    public WorkProjectResolvedBinding? BindingProof { get; init; }
+}
 public sealed record WorkSharingOperation(WorkSharingOperationId Id, WorkspaceId WorkspaceId, Guid PrincipalId, WorkProjectId ProjectId,
     long ProjectVersion, WorkProjectSharingConnection Connection, WorkProjectContextBinding Binding,
     IReadOnlyList<WorkSharingChange> Changes, string IntentDigest, WorkSharingOperationStatus Status, long Version,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<WorkSharingTransportAttempt> Attempts,
     string? RemoteRevision = null, string? ErrorCode = null)
 {
+    public WorkProjectResolvedBinding? BindingProof { get; init; }
     public IReadOnlyList<WorkSharingPlanObservation> Plans { get; init; } = [];
     public long? OrganizationStorageVersion { get; init; }
 }

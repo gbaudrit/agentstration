@@ -9,6 +9,30 @@ namespace Agentstration.Application.Tests;
 public sealed partial class WorkPlanTests
 {
     [TestMethod]
+    public void NativeGitContextRequiresTheExactServiceTypeAndRouteEvidence()
+    {
+        var workspace = ResourceScopeRef.Workspace(Guid.NewGuid());
+        var tool = new WorkProjectResourceReference(new(workspace, default, "Tool", "git"), Guid.NewGuid(), 1);
+        var service = new WorkProjectResourceReference(new(ResourceScopeRef.Instance, default, "ConnectedService", "sharing"), Guid.NewGuid(), 1);
+        var binding = new WorkProjectContextBinding("sharing", WorkProjectBindingPurpose.Sharing, tool) { NativeService = service };
+        var definition = new WorkProjectDefinition("Native Git", null, [], []) { Bindings = [binding] };
+        Assert.IsTrue(definition.Validate().IsSuccess);
+        Assert.IsFalse(WorkProjectContextRules.Valid([binding with { Purpose = WorkProjectBindingPurpose.Repository }]));
+        Assert.IsFalse(WorkProjectContextRules.Valid([binding with { NativeService = tool }]));
+        var resolved = new WorkProjectResolvedBinding(binding, "v1", "allowed", "allowed");
+        Assert.IsFalse(WorkProjectConnectionRules.Evidence(resolved));
+        resolved = resolved with
+        {
+            Service = new(service, service with { Address = service.Address with { Kind = "ConnectedServiceType" }, Uid = Guid.NewGuid() }, "1.0.0", "sha256:" + new string('a', 64), new string('b', 64)),
+            NativeRoute = new(tool with { Address = tool.Address with { Kind = "ToolProvider" } },
+                tool with { Address = tool.Address with { Kind = "ExtensionRegistration" }, Uid = Guid.NewGuid() }, new string('c', 64))
+        };
+        Assert.IsTrue(WorkProjectConnectionRules.Evidence(resolved));
+        Assert.IsFalse(WorkProjectConnectionRules.Evidence(resolved with { NativeRoute = null }));
+        Assert.IsFalse(WorkProjectConnectionRules.Evidence(resolved with { Service = resolved.Service with { Service = service with { Uid = Guid.NewGuid() } } }));
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task ActiveAttemptsKeepProjectV1WhileNewAdmissionsCaptureV2AndRevocationDoesNotRewriteEvidence(bool contracts)
@@ -195,7 +219,7 @@ public sealed partial class WorkPlanTests
         if (binding.Contract is not { } selection) return null;
         WorkProjectContributionPin[] pins = [new(binding.Target, WorkPlanDefinition.Digest(binding.Target))];
         return new(selection.Version, "tracker-fixture", "1.0.0", selection.Provider, selection.Extension,
-            WorkPlanDefinition.Digest(pins), new string('a', 64), ["list"], pins);
+            WorkPlanDefinition.Digest(pins), new string('a', 64), selection.RequiredOperations, pins);
     }
 
     private static WorkProjectContextBinding Binding(Fixture fixture) => new("sharing", WorkProjectBindingPurpose.Sharing,

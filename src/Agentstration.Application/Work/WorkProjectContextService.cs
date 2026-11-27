@@ -36,7 +36,7 @@ public sealed class WorkProjectContextService(IWorkProjectRepository projects, I
             if (!result.IsSuccess) return Result<IReadOnlyList<WorkProjectResolvedBinding>>.Failure(result.ErrorCode!);
             if (result.Value!.Binding != binding || result.Value.ETag.Length > 256
                 || result.Value.DiscoverDecision.Length > 128 || result.Value.UseDecision.Length > 128
-                || !WorkProjectContextRules.ValidEvidence(binding, result.Value.Contract))
+                || !WorkProjectContextRules.ValidEvidence(binding, result.Value.Contract) || !WorkProjectConnectionRules.Evidence(result.Value))
                 return Result<IReadOnlyList<WorkProjectResolvedBinding>>.Failure("work_project_binding_resolution_invalid");
             resolved.Add(result.Value);
         }

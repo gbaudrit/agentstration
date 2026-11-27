@@ -15,6 +15,10 @@ public sealed partial class GitWorkProjectSharingGateway
         var route = await ResolveGitAsync(workspaceId, principalId, binding, WorkProjectBindingPurpose.CodePublication, intent.HeadRef,
             intent.Changes.Select(change => change.Path).ToArray(), token);
         if (!route.IsSuccess) return Result<WorkCodePublicationReceipt>.Failure(route.ErrorCode!);
+        if (binding.NativeService is not null && (route.Value!.Connection is not { } selected
+            || !intent.ProjectContext.Bindings.Any(captured => captured.Binding.Name == intent.CodePublicationConnection
+                && WorkPlanDefinition.Digest(captured) == WorkPlanDefinition.Digest(selected))))
+            return Result<WorkCodePublicationReceipt>.Failure("coding_delivery_connection_changed");
         if (!Uri.TryCreate(route.Value!.Repository, UriKind.Absolute, out var repository) || repository != intent.RepositoryCloneUrl)
             return Result<WorkCodePublicationReceipt>.Failure("coding_delivery_repository_mismatch");
         var input = new

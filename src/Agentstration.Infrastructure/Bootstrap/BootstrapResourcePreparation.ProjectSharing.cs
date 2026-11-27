@@ -14,12 +14,13 @@ public sealed partial class BootstrapResourcePreparation
         BootstrapResourceOperationContext operation, BootstrapPlanningContext planning, bool applying,
         List<string> fingerprints, CancellationToken token)
     {
-        if (root["connectionAssignments"] is not null and not JsonArray || root["connectionRequirements"] is not null and not JsonArray)
+        if (root["connectionAssignments"] is not null and not JsonArray || root["connectionRequirements"] is not null and not JsonArray || root["nativeServices"] is not null and not JsonArray)
             throw new InvalidOperationException("bootstrap_project_connections_invalid");
         var needs = root["connectionRequirements"]?.Deserialize<WorkProjectConnectionRequirement[]>(Json) ?? [];
         var assignments = root["connectionAssignments"] as JsonArray ?? [];
-        if (needs.Length == 0 && assignments.Count == 0) return false;
-        if (operation.ProfileScope != BootstrapProfileScope.Workspace || assignments.Count > 32 || needs.Length > 32)
+        var nativeServices = root["nativeServices"] as JsonArray ?? [];
+        if (needs.Length == 0 && assignments.Count == 0 && nativeServices.Count == 0) return false;
+        if (operation.ProfileScope != BootstrapProfileScope.Workspace || assignments.Count > 32 || needs.Length > 32 || nativeServices.Count > 2)
             throw new InvalidOperationException("bootstrap_project_connections_invalid");
         var resolved = new List<WorkProjectConnectionAssignment>(); var deferred = false;
         foreach (var item in assignments)
@@ -31,13 +32,31 @@ public sealed partial class BootstrapResourcePreparation
             resolved.Add(new(Text(assignment, "name"), service, adapter,
                 assignment["exports"]?.Deserialize<WorkProjectConnectionExport[]>(Json) ?? []));
         }
+        var nativeAssignments = new List<DeclarativeProjectNativeService>();
+        foreach (var item in nativeServices)
+        {
+            if (item is not JsonObject assignment || assignment.Any(property => property.Key is not ("name" or "service" or "tool"))) throw new InvalidOperationException("bootstrap_project_connections_invalid");
+            var name = Text(assignment, "name");
+            if (name is not ("sharing" or "code-publication") || nativeAssignments.Any(value => value.Name == name)) throw new InvalidOperationException("bootstrap_project_connections_invalid");
+            var service = await PinAsync(assignment["service"], ConnectedServiceResourceKinds.ConnectedService);
+            var adapter = await PinAsync(assignment["tool"], ToolResourceKinds.Tool);
+            if (service is null || adapter is null) { deferred = true; continue; }
+            nativeAssignments.Add(new(name, service, adapter));
+        }
         var definition = new WorkProjectDefinition(document.Metadata.Name, null, [], [])
-        { ConnectionRequirements = needs, ConnectionAssignments = resolved };
+        {
+            ConnectionRequirements = needs,
+            ConnectionAssignments = resolved,
+            Bindings = nativeAssignments.Select(item => new WorkProjectContextBinding(item.Name,
+            item.Name == "sharing" ? WorkProjectBindingPurpose.Sharing : WorkProjectBindingPurpose.CodePublication, item.Tool)
+            { NativeService = item.Service }).ToArray()
+        };
         var valid = definition.Validate();
         if (!valid.IsSuccess) throw new InvalidOperationException("bootstrap_" + valid.ErrorCode);
         if (deferred) return true;
         var observed = await projectContexts.ValidateAsync(new(operation.Target!.WorkspaceId!.Value), valid.Value!, token);
         if (!observed.IsSuccess) throw new InvalidOperationException("bootstrap_" + observed.ErrorCode);
+        root["nativeServices"] = Node(nativeAssignments);
         root["connectionRequirements"] = Node(valid.Value!.ConnectionRequirements);
         root["connectionAssignments"] = Node(valid.Value.ConnectionAssignments);
         fingerprints.Add("project-connections:" + WorkPlanDefinition.Digest(new { valid.Value.ConnectionRequirements, Bindings = observed.Value }));

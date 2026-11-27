@@ -15,7 +15,18 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
     public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, CancellationToken token) => binding.Connection is { } selection
             ? ResolveConnectionAsync(workspaceId, principalId, selection, token)
+            : binding.NativeService is not null ? ResolveNativeAsync(workspaceId, principalId, binding, token)
             : ResolveCoreAsync(workspaceId, principalId, binding, null, null, token);
+
+    private async Task<Result<WorkProjectResolvedBinding>> ResolveNativeAsync(WorkspaceId workspaceId, Guid principalId,
+        WorkProjectContextBinding binding, CancellationToken token)
+    {
+        var allowed = await ResolveCoreAsync(workspaceId, principalId, binding, null, null, token);
+        if (!allowed.IsSuccess || connections is null) return allowed.IsSuccess ? Failure("work_project_connection_unsupported") : allowed;
+        if (!await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, token)) return Failure("work_project_binding_denied");
+        return await connections.ResolveNativeAsync(workspaceId, binding, allowed.Value!,
+            (reference, ct) => ResolveReferenceAsync(workspaceId, new(binding.Name, WorkProjectBindingPurpose.Context, reference), ct), token);
+    }
 
     private async Task<Result<WorkProjectResolvedBinding>> ResolveCoreAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, Func<CancellationToken, Task>? beforeInvoke, Func<CancellationToken, Task<ResolvedSecretInputs>>? headers, CancellationToken token)

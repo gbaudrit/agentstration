@@ -43,6 +43,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<IWorkPlanAdmissionGate>(provider => provider.GetRequiredService<CodingExecutionService>());
         services.AddSingleton<Agentstration.Runtime.Abstractions.IRuntimeCapabilityMaterialProvider>(provider => provider.GetRequiredService<CodingExecutionService>());
         services.AddSingleton<CodingRepositoryService>();
+        services.AddSingleton<ICodingForgeGateway, AfcCodingForgeGateway>();
         services.AddSingleton<CodingDeliveryService>();
         services.AddSingleton<CodingIssueCoordinationService>();
         services.AddSingleton<ICodingIssueBindingPolicy, CodingIssueBindingPolicy>();

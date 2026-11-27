@@ -84,6 +84,13 @@ public sealed partial class GitWorkProjectSharingGateway
     public async Task<WorkSharingProviderResult> PublishAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
         WorkProjectSharingConnection connection, WorkSharingTransportAttempt attempt, bool recover, CancellationToken token)
     {
+        if (binding.NativeService is not null)
+        {
+            var captured = attempt.BindingProof;
+            var fresh = await bindings.ResolveAsync(workspaceId, principalId, binding, token);
+            if (captured is null || !fresh.IsSuccess || WorkPlanDefinition.Digest(captured) != WorkPlanDefinition.Digest(fresh.Value))
+                return new(WorkSharingProviderStatus.Uncertain, attempt.OperationKey, attempt.IntentDigest, ErrorCode: "sharing_connection_changed");
+        }
         var changes = attempt.Records.Select(record => new
         {
             path = Path(connection, record.Key, record.Version, record.Digest),
@@ -91,7 +98,7 @@ public sealed partial class GitWorkProjectSharingGateway
         }).Append(new { path = connection.Location + "/index.yaml", contentBase64 = Convert.ToBase64String(documents.Write(attempt.Space)) }).ToArray();
         var input = new { baseRevision = attempt.ExpectedRevision, expectedRefRevision = attempt.ExpectedRevision, changes, message = "Synchronize Project sharing records" };
         var result = await InvokeAsync(workspaceId, principalId, binding, connection, "publish", recover ? "recover" : "execute",
-            attempt.OperationKey, attempt.IntentDigest, input, token);
+            attempt.OperationKey, attempt.IntentDigest, input, token, attempt.BindingProof);
         if (!result.IsSuccess) return new(WorkSharingProviderStatus.Uncertain, attempt.OperationKey, attempt.IntentDigest, ErrorCode: result.ErrorCode);
         return new(Enum.Parse<WorkSharingProviderStatus>(result.Value!.Status), attempt.OperationKey, attempt.IntentDigest, result.Value.Revision, result.Value.ErrorCode);
     }

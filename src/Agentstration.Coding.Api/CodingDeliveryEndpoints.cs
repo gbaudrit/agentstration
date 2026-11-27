@@ -14,11 +14,15 @@ public static partial class CodingApiModule
         group.MapPost("/", async (string workspaceName, Guid projectId, BeginCodingDeliveryRequest request, CodingDeliveryService service,
             ICurrentRequestContext current, CancellationToken token) => DeliveryAccepted(workspaceName, projectId,
                 await service.BeginAsync(Workspace(current), new(projectId), request, token)))
-            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(32 * 1024));
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(32 * 1024))
+            .Produces<WorkTaskDeliveryOperation>(StatusCodes.Status202Accepted).ProducesProblem(400).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409)
+            .WithSummary("Deliver retained Coding results through explicitly selected tracking, forge, Git and sharing connections");
         group.MapPost("/{deliveryId:guid}/resume", async (string workspaceName, Guid projectId, Guid deliveryId, CodingDeliveryService service,
             ICurrentRequestContext current, CancellationToken token) => DeliveryAccepted(workspaceName, projectId,
                 await service.ResumeAsync(Workspace(current), new(projectId), new(deliveryId), token)))
-            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
+            .RequireAuthorization(AgentstrationPolicies.CanExecuteRuns)
+            .Produces<WorkTaskDeliveryOperation>(StatusCodes.Status202Accepted).ProducesProblem(400).ProducesProblem(403).ProducesProblem(404).ProducesProblem(409)
+            .WithSummary("Recover original delivery effects with their captured connections and native intent");
         group.MapGet("/{deliveryId:guid}", async (Guid projectId, Guid deliveryId, CodingDeliveryService service, ICurrentRequestContext current, CancellationToken token) =>
         {
             var result = await service.GetAsync(Workspace(current), new(projectId), new(deliveryId), token);

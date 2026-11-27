@@ -5,10 +5,13 @@ using Agentstration.Work.Storage.Abstractions;
 
 namespace Agentstration.Application.Work;
 
-public sealed record PublishWorkSharingCommand(WorkSharingOperationId Id, long ExpectedProjectVersion, IReadOnlyList<WorkSharingChange> Changes);
+public sealed record PublishWorkSharingCommand(WorkSharingOperationId Id, long ExpectedProjectVersion, IReadOnlyList<WorkSharingChange> Changes)
+{
+    public WorkProjectResolvedBinding? ExpectedBinding { get; init; }
+}
 
 public sealed partial class WorkProjectSharingService(IWorkProjectSharingRepository repository, WorkProjectService projects,
-    WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingGateway gateway, IWorkplaceContext context, TimeProvider clock, IWorkDocumentCodec documents, IWorkDataRepository data)
+    WorkPlanService plans, WorkTaskTreeService trees, IWorkProjectSharingGateway gateway, IWorkplaceContext context, TimeProvider clock, IWorkDocumentCodec documents, IWorkDataRepository data, IWorkProjectBindingResolver? bindings = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     public Task InitializeAsync(CancellationToken token) => repository.InitializeAsync(token);
@@ -40,7 +43,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
             || JsonSerializer.SerializeToUtf8Bytes(changes, Json).Length > 16 * 1024) return Failure("sharing_command_invalid");
         var digest = WorkPlanDefinition.Digest(new { Project = project.Definition.Sharing!.ProjectId, Changes = changes });
         var prior = await repository.GetOperationAsync(workspaceId, context.PrincipalId, projectId, command.Id, token);
-        if (prior is not null) return prior.IntentDigest != digest ? Failure("sharing_command_conflict") : await ResumeAsync(workspaceId, projectId, command.Id, token);
+        if (prior is not null) return prior.IntentDigest != digest || command.ExpectedBinding is not null && WorkPlanDefinition.Digest(command.ExpectedBinding) != WorkPlanDefinition.Digest(prior.BindingProof) ? Failure("sharing_command_conflict") : await ResumeAsync(workspaceId, projectId, command.Id, token);
         if (project.Version != command.ExpectedProjectVersion) return Failure("work_project_conflict");
         foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.Usage))
         {
@@ -72,10 +75,18 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
                 return Failure("sharing_local_plan_changed");
             observations.Add(new(portable.PlanId, local.Value!.Version));
         }
+        WorkProjectResolvedBinding? bindingProof = null;
+        if (Binding(project).NativeService is not null)
+        {
+            var resolvedBinding = bindings is null ? null : await bindings.ResolveAsync(workspaceId, context.PrincipalId, Binding(project), token);
+            if (resolvedBinding?.IsSuccess != true) return Failure(resolvedBinding?.ErrorCode ?? "work_project_connection_unsupported");
+            bindingProof = resolvedBinding.Value!;
+        }
+        if (command.ExpectedBinding is not null && WorkPlanDefinition.Digest(command.ExpectedBinding) != WorkPlanDefinition.Digest(bindingProof)) return Failure("sharing_connection_changed");
         var now = clock.GetUtcNow();
         var operation = new WorkSharingOperation(command.Id, workspaceId, context.PrincipalId, projectId, project.Version,
             project.Definition.Sharing!, Binding(project), changes, digest, WorkSharingOperationStatus.Pending, 1, now, now, [])
-        { Plans = observations, OrganizationStorageVersion = organizationStorageVersion };
+        { Plans = observations, OrganizationStorageVersion = organizationStorageVersion, BindingProof = bindingProof };
         var saved = await repository.AdmitAsync(operation, token);
         if (saved != WorkSharingSaveStatus.Saved)
         {
@@ -99,6 +110,12 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         var usageOnly = operation.Changes is { Count: > 0 } && operation.Changes.All(change => change.Key.Domain == WorkSharingDomain.Usage);
         if (operation.ProjectVersion != project.Version && !usageOnly || operation.Connection != project.Definition.Sharing
             || WorkPlanDefinition.Digest(operation.Binding) != WorkPlanDefinition.Digest(Binding(project))) return Failure("sharing_connection_changed");
+        if (operation.Binding.NativeService is not null)
+        {
+            var resolvedBinding = bindings is null ? null : await bindings.ResolveAsync(workspaceId, context.PrincipalId, operation.Binding, token);
+            if (resolvedBinding?.IsSuccess != true || operation.BindingProof is null
+                || WorkPlanDefinition.Digest(resolvedBinding.Value) != WorkPlanDefinition.Digest(operation.BindingProof)) return Failure("sharing_connection_changed");
+        }
         if (operation.Status is WorkSharingOperationStatus.Succeeded or WorkSharingOperationStatus.Conflict or WorkSharingOperationStatus.Rejected)
             return Result<WorkSharingOperation>.Success(operation);
         // A prior attempt must be recovered before another native publication can be prepared.
@@ -115,7 +132,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
                 if (operation.Attempts.Count >= 8) return await SaveAsync(operation, WorkSharingOperationStatus.Conflict, null, "sharing_retry_limit", token);
                 var next = operation with
                 {
-                    Attempts = [.. operation.Attempts, prepared.Value],
+                    Attempts = [.. operation.Attempts, prepared.Value with { BindingProof = operation.BindingProof }],
                     Version = operation.Version + 1,
                     UpdatedAt = clock.GetUtcNow(),
                     Status = WorkSharingOperationStatus.Pending,

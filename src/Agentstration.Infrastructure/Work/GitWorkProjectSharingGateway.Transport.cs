@@ -15,7 +15,7 @@ using ModelContextProtocol;
 namespace Agentstration.Infrastructure.Work;
 
 public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingResolver bindings, IResourceStore resources, IWorkDocumentCodec documents,
-    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : IWorkProjectSharingGateway, IWorkProjectDataGateway, ICodingCodePublicationGateway
+    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock, WorkProjectConnectedServiceResolver services) : IWorkProjectSharingGateway, IWorkProjectDataGateway, ICodingCodePublicationGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, MaxDepth = 32 };
@@ -23,7 +23,7 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
     private sealed record GitResponse(string OperationKey, string IntentDigest, string Status, string RefName,
         string? Revision = null, string? BaseRevision = null, string? CurrentRevision = null,
         IReadOnlyList<GitFile>? Files = null, string? DiffBase64 = null, string? ErrorCode = null);
-    private sealed record Route(ToolResource Tool, ToolProviderResource Provider, string RefName, string Repository);
+    private sealed record Route(ToolResource Tool, ToolProviderResource Provider, string RefName, string Repository, WorkProjectResolvedBinding? Connection = null);
     private async Task<Result<Route>> ResolveAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
         WorkProjectSharingConnection connection, CancellationToken token)
     {
@@ -44,6 +44,12 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         if (!access.IsSuccess) return Failure(access.ErrorCode!);
         var tool = (await resources.GetExactAsync<ToolResource>(binding.Target.Address, token))?.Value;
         if (tool is null || tool.Uid != binding.Target.Uid || tool.Generation != binding.Target.Generation || !tool.Definition.Enabled || tool.Definition.Discovery?.Available != true) return Failure("sharing_provider_unavailable");
+        if (binding.NativeService is not null)
+        {
+            try { return await ResolveServiceGitAsync(workspaceId, principalId, access.Value!, tool, requestedRef, requestedPaths, token); }
+            catch (ToolResolutionException error) { return Failure(error.Code); }
+            catch (JsonException) { return Failure("sharing_service_incompatible"); }
+        }
         if (tool.Definition.RequiresApproval) return Failure("sharing_provider_approval_required");
         if (tool.ScopeRef is not { } scope || tool.Definition.ExternalId is not { } externalId
             || !tool.Definition.Metadata.TryGetValue("agentstration.toolPublicationUid", out var publicationId)
@@ -81,11 +87,12 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         return Result<Route>.Success(new(tool, provider, refName, repository.GetString()!));
     }
     private async Task<Result<GitResponse>> InvokeAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
-        WorkProjectSharingConnection connection, string operation, string mode, string key, string digest, object input, CancellationToken token)
+        WorkProjectSharingConnection connection, string operation, string mode, string key, string digest, object input, CancellationToken token, WorkProjectResolvedBinding? retained = null)
     {
         Result<GitResponse> Failure(string code) => Result<GitResponse>.Failure(code);
         var resolved = await ResolveAsync(workspaceId, principalId, binding, connection, token);
         if (!resolved.IsSuccess) return Failure(resolved.ErrorCode!);
+        if (retained is not null && WorkPlanDefinition.Digest(resolved.Value!.Connection) != WorkPlanDefinition.Digest(retained)) return Failure("sharing_connection_changed");
         return await ExecuteGitAsync(workspaceId, principalId, resolved.Value!, operation, mode, key, digest, input, token);
     }
     private async Task<Result<GitResponse>> ExecuteGitAsync(WorkspaceId workspaceId, Guid principalId, Route route,
@@ -95,7 +102,9 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         var tool = route.Tool; var provider = route.Provider;
         var trusted = current.Current; var scope = tool.ScopeRef!.Value; var externalId = tool.Definition.ExternalId!;
         var providerScope = provider.ScopeRef!.Value;
-        var arguments = JsonSerializer.SerializeToElement(new { operation, mode, operationKey = key, intentDigest = digest, request = input }, Json);
+        var payload = JsonSerializer.SerializeToNode(input, Json)!.AsObject();
+        if (route.Connection is not null) payload["refName"] = route.RefName;
+        var arguments = JsonSerializer.SerializeToElement(new { operation, mode, operationKey = key, intentDigest = digest, request = payload }, Json);
         if (arguments.GetRawText().Length > 60_000) return Failure("sharing_transport_payload_limit");
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), clock);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
@@ -103,6 +112,10 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         {
             var output = await pipeline.ExecuteAsync(new ToolExecutionContext
             {
+                BeforeProviderInvoke = route.Connection is { } captured ? ct => RevalidateServiceAsync(workspaceId, principalId, captured, ct) : null,
+                ResolveProviderHeaders = route.Connection is { } selected ? ct => ResolveServiceHeadersAsync(workspaceId, principalId, selected, ct) : null,
+                ExpectedProviderRouteDigest = route.Connection?.NativeRoute?.Digest,
+                ExpectedToolSchemaDigest = route.Connection is null ? null : ToolInvocationFingerprint.Schemas(tool.Definition.Schema!.Input, tool.Definition.Schema.Output),
                 OwnerKind = ToolExecutionOwnerKind.WorkOperation,
                 ToolCallId = key,
                 InvocationId = $"sharing:{key}:{mode}",

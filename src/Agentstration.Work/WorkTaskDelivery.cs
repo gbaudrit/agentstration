@@ -28,11 +28,19 @@ public sealed record WorkTaskDeliveryIntent(WorkPlanId PlanId, long PlanVersion,
     public IReadOnlyList<WorkTaskResultId> ResultIds { get; init; } = [];
     public IReadOnlyList<WorkTaskArtifactId> ArtifactIds { get; init; } = [];
     public Guid? ExistingEvidenceId { get; init; }
+    public string ForgeConnection { get; init; } = string.Empty;
+    public string CodePublicationConnection { get; init; } = string.Empty;
+    public string SharingConnection { get; init; } = string.Empty;
+    public WorkForgeDeliveryRoute? Forge { get; init; }
 }
 public sealed record WorkCodePublicationReceipt(string OperationKey, string IntentDigest, WorkTaskDeliveryEffectStatus Status,
     string RefName, string BaseRevision, string? Revision = null, string? CurrentRevision = null, string? ErrorCode = null);
 public sealed record WorkPullRequestReceipt(string Provider, string Repository, string NativeId, string Number, Uri Url,
-    string Head, string HeadRevision, string Base, string BaseRevision, bool Draft, bool Merged);
+    string Head, string HeadRevision, string Base, string BaseRevision, bool Draft, bool Merged)
+{
+    public WorkTrackingTarget? Forge { get; init; }
+    public WorkTrackingItem? Tracking { get; init; }
+}
 public sealed record WorkTaskDeliveryUsage(WorkUsageId Id, string Digest, WorkSharingOperationId? PublicationId = null);
 
 /// <summary>Private functional delivery intent and effects. Technical publication is delegated to Coding/provider ports.</summary>
@@ -42,6 +50,8 @@ public sealed record WorkTaskDeliveryOperation(WorkTaskDeliveryId Id, WorkspaceI
 {
     public WorkCodePublicationReceipt? Code { get; init; }
     public WorkPullRequestReceipt? PullRequest { get; init; }
+    public string? ForgeWireIntentDigest { get; init; }
+    public WorkForgeSubmission? ForgeSubmission { get; init; }
     public Guid? EvidenceId { get; init; }
     public WorkSharingOperationId? ContributionId { get; init; }
     public bool ContributionPublished { get; init; }
@@ -67,8 +77,15 @@ public static class WorkTaskDeliveryFormat
             && value.PullRequest.BaseRevision == value.Intent.BaseRevision && value.PullRequest.Base == value.Intent.BaseBranch
             && value.PullRequest.Head == value.Intent.HeadRef["refs/heads/".Length..] && value.PullRequest.Repository == value.Intent.Repository
             && value.PullRequest.Provider == value.Intent.Provider && value.PullRequest.Draft && !value.PullRequest.Merged
+            && Text(value.PullRequest.NativeId, 128) && Text(value.PullRequest.Number, 128)
+            && value.Intent.Forge?.Connection.Binding.Contract is { } forge
+            && value.PullRequest.Forge == new WorkTrackingTarget(forge.ProviderId, forge.TargetId)
+            && value.PullRequest.Tracking == new WorkTrackingItem(value.Intent.Issue.Tracking!.ProviderId, value.Intent.Issue.Tracking.TargetId, value.Intent.Issue.TaskId)
             && value.PullRequest.Url is { IsAbsoluteUri: true } url && url.Scheme is "https" or "http" && string.IsNullOrEmpty(url.UserInfo)
             && string.IsNullOrEmpty(url.Query) && string.IsNullOrEmpty(url.Fragment))
+        && (value.ForgeWireIntentDigest is null || WireDigest(value.ForgeWireIntentDigest) && value.Code?.Status == WorkTaskDeliveryEffectStatus.Succeeded)
+        && (value.ForgeSubmission is null || value.ForgeSubmission.Id != Guid.Empty && value.ForgeSubmission.StartedAt >= value.CreatedAt && value.ForgeSubmission.StartedAt <= value.UpdatedAt
+            && value.ForgeWireIntentDigest is not null && value.Stage >= WorkTaskDeliveryStage.PullRequest)
         && value.Usage is { Count: <= 32 } && value.Usage.All(item => item is not null && item.Id.Value != Guid.Empty && WorkSharingFormat.Digest(item.Digest))
         && value.Usage.Select(item => item.Id).Distinct().Count() == value.Usage.Count && (value.ErrorCode is null || Code(value.ErrorCode))
         && (value.Code?.Status != WorkTaskDeliveryEffectStatus.Succeeded || value.Intent.Source.Outcome == WorkPlanAttemptStatus.Completed)
@@ -91,6 +108,8 @@ public static class WorkTaskDeliveryFormat
         && previous.Status is WorkTaskDeliveryStatus.Pending or WorkTaskDeliveryStatus.Uncertain
         && (previous.Code?.Status != WorkTaskDeliveryEffectStatus.Succeeded || previous.Code == next.Code)
         && (previous.PullRequest is null || previous.PullRequest == next.PullRequest)
+        && (previous.ForgeWireIntentDigest is null || previous.ForgeWireIntentDigest == next.ForgeWireIntentDigest)
+        && (previous.ForgeSubmission is null || previous.ForgeSubmission == next.ForgeSubmission)
         && (previous.EvidenceId is null || previous.EvidenceId == next.EvidenceId)
         && (previous.ContributionId is null || previous.ContributionId == next.ContributionId)
         && (!previous.ContributionPublished || next.ContributionPublished)
@@ -101,8 +120,8 @@ public static class WorkTaskDeliveryFormat
     public static bool ValidIntent(WorkTaskDeliveryIntent? value) => value is not null && value.PlanId.Value != Guid.Empty && value.PlanVersion >= 1
         && value.PlanRevision >= 1 && WorkSharingFormat.Digest(value.PlanDigest) && value.TaskId.Value != Guid.Empty
         && value.TaskVersion >= 1 && value.AdmittedTaskVersion >= 1 && WorkSharingFormat.Digest(value.TaskDigest)
-        && value.ProjectContext is { Sharing: not null } && value.SharedPlanVersion >= 1 && WorkSharingFormat.Digest(value.SharedPlanDigest)
-        && value.Issue is not null && WorkSharingContent.ValidIssue(value.Issue) && value.Issue.Repository == value.Repository
+        && value.ProjectContext is { Sharing: not null } && value.ProjectContext.Bindings.All(WorkProjectConnectionRules.Evidence) && value.SharedPlanVersion >= 1 && WorkSharingFormat.Digest(value.SharedPlanDigest)
+        && value.Issue is not null && WorkSharingContent.ValidIssue(value.Issue)
         && value.Source is { } source && source.AttemptId != Guid.Empty && source.WorkItemId.Value != Guid.Empty
         && Text(source.FlowRunId, 200) && source.AssignmentId != Guid.Empty && source.AssignmentAttemptId != Guid.Empty && source.InvocationId != Guid.Empty
         && WorkSharingFormat.Digest(source.Digest) && source.Outcome is WorkPlanAttemptStatus.Completed or WorkPlanAttemptStatus.Failed or WorkPlanAttemptStatus.Cancelled
@@ -115,7 +134,23 @@ public static class WorkTaskDeliveryFormat
         && value.ResultIds is { Count: <= 64 } && value.ArtifactIds is { Count: <= 64 }
         && value.ResultIds.All(id => id.Value != Guid.Empty) && value.ArtifactIds.All(id => id.Value != Guid.Empty)
         && value.ResultIds.Distinct().Count() == value.ResultIds.Count && value.ArtifactIds.Distinct().Count() == value.ArtifactIds.Count
+        && WorkProjectDefinition.ValidName(value.ForgeConnection) && WorkProjectDefinition.ValidName(value.CodePublicationConnection)
+        && WorkProjectDefinition.ValidName(value.SharingConnection) && value.SharingConnection == value.ProjectContext.Sharing.BindingName
+        && value.ProjectContext.Bindings.Any(binding => binding.Binding.Name == value.CodePublicationConnection && binding.Binding.Purpose == WorkProjectBindingPurpose.CodePublication)
+        && value.ProjectContext.Bindings.Any(binding => binding.Binding.Name == value.SharingConnection && binding.Binding.Purpose == WorkProjectBindingPurpose.Sharing)
+        && value.ProjectContext.Bindings.Any(binding => binding.Binding.Connection is { } selection && selection.Requirement.Name == value.Issue.ConnectionName
+            && selection.Requirement.Contract == WorkProjectConnectionRules.Tracking && selection.Requirement.Target == value.Issue.Tracking)
+        && (value.Source.Outcome != WorkPlanAttemptStatus.Completed && value.Forge is null || ValidForge(value))
         && value.ExistingEvidenceId != Guid.Empty && JsonSerializer.SerializeToUtf8Bytes(value, Json).Length <= MaximumIntentBytes;
+    private static bool ValidForge(WorkTaskDeliveryIntent value) => value.Forge is { } route && Enum.IsDefined(route.Recovery)
+        && route.Recovery != WorkForgeRecovery.None && route.ReceiptWindowSeconds is > 0 and <= 31_536_000
+        && route.MaximumResultBytes is > 0 and <= 262_144 && route.Connection.Binding.Connection is { } selected
+        && selected.Requirement.Name == value.ForgeConnection && selected.Requirement.Contract == WorkProjectConnectionRules.Forge
+        && selected.Requirement.Target is not null && WorkProjectConnectionRules.Evidence(route.Connection)
+        && WorkProjectContextRules.ValidEvidence(route.Connection.Binding, route.Connection.Contract)
+        && new[] { "resolve", "read", "create" }.All(route.Connection.Contract!.Operations.Contains)
+        && value.ProjectContext.Bindings.Any(binding => WorkPlanDefinition.Digest(binding) == WorkPlanDefinition.Digest(route.Connection));
+    private static bool WireDigest(string value) => value.StartsWith("sha256:", StringComparison.Ordinal) && WorkSharingFormat.Digest(value[7..]);
     public static bool Revision(string? value) => value is { Length: 40 } && value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
     private static bool Text(string? value, int maximum) => value is { Length: > 0 } && value.Length <= maximum && !value.Any(char.IsControl);
     private static bool Code(string? value) => value is { Length: > 0 and <= 128 } && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '.');

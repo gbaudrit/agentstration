@@ -198,7 +198,7 @@ public sealed partial class WorkPlanTests
                 Contract = new(
                 new(address with { Kind = "ToolProvider" }, selection.Assignment.DescribeTool.Uid, 1),
                 new(address with { Kind = "ExtensionRegistration" }, selection.Assignment.DescribeTool.Uid, 1),
-                "1.0", "tracker-authority", "no-repository", "binding", "revision-1", ["list"])
+                "1.0", selection.Requirement.Target?.ProviderId ?? "tracker-authority", selection.Requirement.Target?.TargetId ?? "no-repository", "binding", "revision-1", selection.Requirement.RequiredOperations)
             };
             return Task.FromResult(Result<WorkProjectResolvedBinding>.Success(new(binding, "etag", "same_scope", "same_scope")
             {
