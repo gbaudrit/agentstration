@@ -36,10 +36,19 @@ public sealed partial class ProjectSharingApiTests
         using var lost = await left.Http.PostAsync(url, null);
         Assert.AreEqual(HttpStatusCode.Accepted, lost.StatusCode, await lost.Content.ReadAsStringAsync());
         Assert.AreEqual(WorkSharingOperationStatus.Uncertain, (await lost.Content.ReadFromJsonAsync<WorkSharingOperationResponse>())!.Status);
+        using (left.Scope())
+        {
+            var projects = left.Host.Services.GetRequiredService<WorkProjectService>();
+            var owned = (await projects.GetAsync(new(left.Context.WorkspaceId), new(lp.Id), default)).Value!;
+            var edited = await projects.UpdateAsync(owned.WorkspaceId, owned.Id, new(Guid.NewGuid(), owned.Version,
+                owned.Definition with { DisplayName = "Unrelated private Project edit" }), default);
+            Assert.IsTrue(edited.IsSuccess, edited.ErrorCode);
+        }
         native.Unavailable = false; await left.RestartAsync();
         using var recovered = await left.Http.PostAsync(url, null);
         Assert.AreEqual(HttpStatusCode.Accepted, recovered.StatusCode, await recovered.Content.ReadAsStringAsync());
         Assert.AreEqual(WorkSharingOperationStatus.Succeeded, (await recovered.Content.ReadFromJsonAsync<WorkSharingOperationResponse>())!.Status);
+        using (left.Scope()) Assert.AreEqual("Unrelated private Project edit", (await left.Host.Services.GetRequiredService<WorkProjectService>().GetAsync(new(left.Context.WorkspaceId), new(lp.Id), default)).Value!.Definition.DisplayName);
         var revision = (await native.GitAsync(native.RepositoryPath, "rev-parse", "main")).Trim();
         using var replay = await left.Http.PostAsync(url, null); Assert.AreEqual(HttpStatusCode.Accepted, replay.StatusCode);
         Assert.AreEqual(revision, (await native.GitAsync(native.RepositoryPath, "rev-parse", "main")).Trim());

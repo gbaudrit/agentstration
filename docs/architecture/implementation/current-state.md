@@ -868,3 +868,13 @@ configuration changes before operation admission; readiness requires a confirmed
 receipt and retains opaque route evidence. New explicit acknowledgment can replace a stale local
 assignment receipt while preserving history and active attempts. No new store or migration is
 introduced. See [ADR-0294](../../decisions/0294-issue-coordination-consumes-named-tracking-authority.md).
+
+### Historical Work usage recovery (#1348)
+
+Work retains terminal attempt accounting and immutable corrections before YAML sharing, with
+portable Project/participant/plan/task/observation identities (ADR-0282). Usage-only publications
+can recover their original native attempt and replay ancestor receipts after unrelated local
+ATC/AFC assignments or Project membership change. The original sharing connection and protected
+binding remain mandatory; other-domain and mixed batches retain their reviewed Project version.
+Independent participants reconstruct the same counters without copying local service configuration
+or counting an observation again. See [ADR-0296](../../decisions/0296-historical-usage-recovery-retains-its-sharing-authority.md).

@@ -394,3 +394,4 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 294. [ADR-0294 — Issue coordination consumes named tracking authority](0294-issue-coordination-consumes-named-tracking-authority.md)
 295. [ADR-0295 — Workspace seeds review local service assignments](0295-workspace-seeds-review-local-service-assignments.md)
+296. [ADR-0296 — Historical usage recovery retains its sharing authority](0296-historical-usage-recovery-retains-its-sharing-authority.md)

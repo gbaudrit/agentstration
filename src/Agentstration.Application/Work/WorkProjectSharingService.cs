@@ -94,7 +94,10 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         var project = connected.Value!;
         var operation = await repository.GetOperationAsync(workspaceId, context.PrincipalId, projectId, id, token);
         if (operation is null) return Failure("sharing_operation_not_found");
-        if (operation.ProjectVersion != project.Version || operation.Connection != project.Definition.Sharing
+        // Historical accounting is independent of today's task membership or ATC/AFC assignment.
+        // Its frozen content can resume only through the exact original sharing connection/binding.
+        var usageOnly = operation.Changes is { Count: > 0 } && operation.Changes.All(change => change.Key.Domain == WorkSharingDomain.Usage);
+        if (operation.ProjectVersion != project.Version && !usageOnly || operation.Connection != project.Definition.Sharing
             || WorkPlanDefinition.Digest(operation.Binding) != WorkPlanDefinition.Digest(Binding(project))) return Failure("sharing_connection_changed");
         if (operation.Status is WorkSharingOperationStatus.Succeeded or WorkSharingOperationStatus.Conflict or WorkSharingOperationStatus.Rejected)
             return Result<WorkSharingOperation>.Success(operation);

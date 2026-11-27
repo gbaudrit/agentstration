@@ -84,7 +84,14 @@ the same predecessor have one winner; replaying an identical command returns its
 Publication reuses protected Git compare-and-swap and its durable operation journal. An uncertain
 response is recovered through the returned sharing operation or by repeating the usage publication
 route. Neither path duplicates native effects. Each correction's ancestors are published first.
-The current portable Project/participant must match admission provenance. No automatic Bootstrap,
+The current portable Project/participant must match admission provenance. A publication containing
+only immutable Usage records may recover or replay after an unrelated local Project edit, including
+an ATC/AFC service reassignment. Its original operation identity, content and native attempt pins
+remain unchanged; the sharing connection (including Project, participant and location) and protected
+publication binding must still match exactly. Corrections can therefore reuse already published
+ancestors without creating another observation. Changing the sharing connection/binding still blocks
+recovery, and other-domain or mixed publications retain their exact reviewed Project-version check.
+See [ADR-0296](../decisions/0296-historical-usage-recovery-retains-its-sharing-authority.md). No automatic Bootstrap,
 plan activation, outcome acceptance, issue closure or pricing operation accompanies usage exchange.
 
 Pull shared state through the ordinary sharing endpoint, then request `source: "Shared"`. A second
