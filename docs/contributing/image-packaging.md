@@ -68,7 +68,7 @@ Inspect the catalogue and run the offline packaging contracts:
 ```sh
 python3 scripts/packaging/images.py describe --extension foundry
 python3 -m unittest discover -s scripts/packaging -p 'test_*.py' -v
-dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration Release --filter 'FullyQualifiedName~FoundryProviderTests' --minimum-expected-tests 1
+dotnet test --project tests/Agentstration.Extensions.Foundry.Tests --configuration Release --filter 'FullyQualifiedName!~FoundryLiveTests' --minimum-expected-tests 1
 ```
 
 ## Build once and validate
@@ -84,13 +84,18 @@ extension inputs select only their image, while common packaging and global
 
 The default source directory comes from `project`. A dedicated test project
 named `<extension project>.Tests` owns its entire directory, including its project
-file. Shared test projects require explicit file ownership, as in Foundry:
+file. Foundry now uses `Agentstration.Extensions.Foundry.Tests` and owns that
+directory. Its offline filter includes Provider, Chat and Streaming tests; live
+checks remain explicit opt-ins. See the [isolation inventory](extension-test-isolation.md)
+for the other packaging PRs' project/filter handoff.
+
+Shared test projects still require explicit file ownership, for example:
 
 ```json
 "ci": {
   "testPaths": [
-    "tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs",
-    "tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs"
+    "tests/SharedProviders.Tests/AlphaTests.cs",
+    "tests/SharedProviders.Tests/AlphaLiveTests.cs"
   ]
 }
 ```
