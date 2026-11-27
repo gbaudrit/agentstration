@@ -53,7 +53,7 @@ The default tests use fake HTTP. To run the optional real-server smoke test:
 $env:AGENTSTRATION_LOCALAI_ENDPOINT = "http://localhost:8081"
 $env:AGENTSTRATION_LOCALAI_MODEL = "your-chat-model"
 # Optional: $env:AGENTSTRATION_LOCALAI_API_KEY = "..."
-dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
+dotnet test --project tests/Agentstration.Extensions.LocalAI.Tests/Agentstration.Extensions.LocalAI.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```
 
 ## llama.cpp
@@ -124,7 +124,7 @@ The default tests use fake HTTP and require no model. To run the optional real-s
 ```powershell
 $env:AGENTSTRATION_LLAMA_CPP_ENDPOINT = "http://localhost:8080"
 $env:AGENTSTRATION_LLAMA_CPP_MODEL = "local-gguf"
-dotnet test --project tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
+dotnet test --project tests/Agentstration.Extensions.LlamaCpp.Tests/Agentstration.Extensions.LlamaCpp.Tests.csproj --filter TestCategory=Integration --minimum-expected-tests 1
 ```
 
 For other Console resource editors, see [the value-binding editor integration guide](../contributing/value-binding-editor.md). The consumer supplies compatible options and owns conversion to its resource contract; the shared component returns an exact reference or typed literal. See [ADR-0194](../decisions/0194-typed-literal-model-provider-bindings.md) for the additive Model Provider literal contract.
