@@ -135,6 +135,32 @@ public sealed class BootstrapProfileCatalog(
         return loaded;
     }
 
+    internal string ResolveStartupDirectory(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            throw new DeclarativeBootstrapException("bootstrap_profile_path_required");
+        var full = Path.GetFullPath(path, environment.ContentRootPath);
+        for (var directory = new DirectoryInfo(full); directory is not null; directory = directory.Parent)
+            RejectReparsePoint(directory, "Bootstrap startup directory");
+        return full;
+    }
+
+    internal async Task<IReadOnlyList<LoadedBootstrapProfile>> LoadDirectoriesAsync(
+        IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        if (paths.Count is < 1 or > MaximumProfilesPerApplication)
+            throw new DeclarativeBootstrapException("bootstrap_profile_count_invalid");
+        var loaded = new List<LoadedBootstrapProfile>();
+        foreach (var path in paths)
+        {
+            var full = ResolveStartupDirectory(path);
+            loaded.Add(await LoadProfileAsync(Path.GetDirectoryName(full)!, Path.GetFileName(full), cancellationToken));
+        }
+        if (loaded.Select(value => value.Summary.Name).Distinct(StringComparer.Ordinal).Count() != loaded.Count)
+            throw new DeclarativeBootstrapException("bootstrap_profile_duplicate");
+        return loaded;
+    }
+
     internal Task<LoadedBootstrapProfile> LoadFromRootAsync(
         string rootPath,
         string profile,

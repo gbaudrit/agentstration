@@ -1,0 +1,22 @@
+apiVersion: agentstration.io/v1
+kind: Flow
+metadata:
+  name: bootstrap-echo
+definition:
+  displayName: Bootstrap echo
+  version: 1.0.0
+  spec:
+    flowKind: workflow
+    entryNodeId: input
+    nodes: [{ id: input, kind: input }]
+    edges: []
+  graph:
+    entryStep: input
+    steps:
+      - { type: input, name: input }
+      - { type: output, name: completed, outcome: success, outputMapping: "${input}" }
+      - { type: output, name: error, outcome: error, code: BOOTSTRAP_ECHO_FAILED, message: The echo failed. }
+    transitions:
+      - { id: input-completed, fromStep: input, event: completed, toStep: completed }
+  publish: true
+  activate: true

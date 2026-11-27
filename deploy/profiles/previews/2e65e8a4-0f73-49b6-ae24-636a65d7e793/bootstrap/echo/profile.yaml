@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: echo
+definition:
+  displayName: GUID preview echo
+  description: Deterministic Flow and Entry in the selected Workspace.
+  targetScope: workspace

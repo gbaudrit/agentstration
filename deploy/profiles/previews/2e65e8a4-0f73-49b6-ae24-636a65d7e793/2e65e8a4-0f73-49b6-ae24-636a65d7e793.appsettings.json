@@ -1,0 +1,20 @@
+{
+  "AI": {
+    "Provider": "Deterministic"
+  },
+  "2e65e8a4-0f73-49b6-ae24-636a65d7e793": {
+    "Bootstrap": {
+      "InitialBootstrapEnabled": true,
+      "ProfileReferences": [
+        {
+          "Path": "bootstrap/profiles/development",
+          "TargetLevel": "/instance"
+        },
+        {
+          "Path": "deploy/profiles/previews/2e65e8a4-0f73-49b6-ae24-636a65d7e793/bootstrap/echo",
+          "TargetLevel": "/tenants/dev/workspaces/default"
+        }
+      ]
+    }
+  }
+}

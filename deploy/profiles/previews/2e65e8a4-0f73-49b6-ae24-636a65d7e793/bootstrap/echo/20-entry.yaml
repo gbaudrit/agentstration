@@ -1,0 +1,13 @@
+apiVersion: agentstration.io/v1
+kind: Entry
+metadata:
+  name: bootstrap-echo
+definition:
+  displayName: Bootstrap echo
+  presentation:
+    kind: prompt
+    fields:
+      - { name: request, type: prompt, label: Request, required: true, order: 0, role: primaryInput }
+  binding: { kind: flow, resourceId: bootstrap-echo }
+  behavior: { taskCreationMode: automatic, allowConversation: true, streamResponse: true }
+  publish: true
