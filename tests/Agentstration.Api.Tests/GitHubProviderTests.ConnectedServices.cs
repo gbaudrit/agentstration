@@ -125,6 +125,31 @@ public sealed partial class GitHubProviderTests
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     }
 
+    internal static async Task<WorkProjectConnectionSelection> InstallIssueServiceAsync(IServiceProvider services, RequestContext context,
+        Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<GitHubExtension::Program> extension, bool alternateAccount = false)
+    {
+        var resources = services.GetRequiredService<IResourceStore>(); var owner = ResourceScopeRef.Workspace(context.WorkspaceId);
+        var registration = (await resources.GetExactAsync<ExtensionRegistrationResource>(new(owner, default, ExtensionKinds.ExtensionRegistration, "github-fixture"), default))!.Value;
+        using var client = extension.CreateClient();
+        var manifest = await new AepClient(client, expectedExtensionId: "Agentstration.Extensions.GitHub").DiscoverAsync();
+        foreach (var provisioner in services.GetServices<IAepEnrollmentResourceProvisioner>().OfType<AepEnrollmentConnectedServiceTypeProvisioner>())
+            await provisioner.ProvisionAsync(registration, manifest, default);
+        var type = (await resources.ListAllAsync<ConnectedServiceTypeResource>(ConnectedServiceResourceKinds.ConnectedServiceType, default)).Single(value => value.Value.Name == "github").Value;
+        var envelope = alternateAccount ? ServiceEnvelope("8", Credential + "-second") : ServiceEnvelope();
+        if (alternateAccount)
+        {
+            using var secret = new SecretValue(Encoding.UTF8.GetBytes(Credential + "-second"));
+            await services.GetRequiredService<SecretManagementService>().SetValueExactAsync(owner, "github-token", secret, default);
+        }
+        var service = await CreateGitHubServiceAsync(services, context, type, envelope, "issue-service", "github-token");
+        var tool = (await services.GetRequiredService<ToolManagementService>().ListVisibleToolsAsync(owner, default))
+            .Single(value => value.Value.Definition.ExternalId == "github.tracking.describe").Value;
+        return new(new("issues", WorkProjectConnectionRules.Tracking, "1.0", ["read", "update"],
+            new(GitHub.GitHubServiceContract.Authority("https://api.github.com"), "42")),
+            new("issues", new(new(owner, service.Namespace, service.Kind, service.Name), service.Uid, service.Generation), Pin(tool),
+                WorkProjectConnectionRules.TargetFields.Select(field => new WorkProjectConnectionExport(field, field)).ToArray()));
+    }
+
     private static async Task<ConnectedServiceResource> CreateGitHubServiceAsync(IServiceProvider services, RequestContext context,
         ConnectedServiceTypeResource type, GitHub.GitHubServiceEnvelope envelope, string name, string secretName, bool unsafeCredential = false)
     {

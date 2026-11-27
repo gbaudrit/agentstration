@@ -850,3 +850,15 @@ evidence and lets existing service-backed ATC/AFC resolution validate actual tar
 Independent resource UIDs/scopes remain local; pull does not configure or provision them.
 See [ADR-0293](../../decisions/0293-sharing-carries-connection-needs-without-local-assignments.md)
 and [Project sharing](../../reference/project-sharing.md).
+
+### Named ATC issue authority (#1346)
+
+Issue intake and fresh native dependency reads select an explicit named Tracking requirement
+and local ConnectedService through canonical ATC Work operations. Shared references retain only
+the logical name and external target/item identity; metadata validation and native identity
+uniqueness remain independent of local resource UIDs and repository display names. GitHub label
+and completion interpretation belongs to Infrastructure. A verified route precondition fences
+configuration changes before operation admission; readiness requires a confirmed current local
+receipt and retains opaque route evidence. New explicit acknowledgment can replace a stale local
+assignment receipt while preserving history and active attempts. No new store or migration is
+introduced. See [ADR-0294](../../decisions/0294-issue-coordination-consumes-named-tracking-authority.md).

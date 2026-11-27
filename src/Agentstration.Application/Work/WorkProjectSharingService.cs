@@ -226,7 +226,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         if (ValidateConnections(merged.Values) is { } connectionError) return Result<WorkSharingTransportAttempt>.Failure(connectionError);
         var issuePlans = merged.Values.Where(record => record.Key.Domain == WorkSharingDomain.Plan)
             .Select(record => record.Content.Deserialize<WorkSharingPlan>(Json)!).Where(plan => plan.Issue is not null);
-        if (issuePlans.GroupBy(plan => (plan.Issue!.Provider, Repository: plan.Issue.Repository.ToUpperInvariant(), plan.Issue.TaskId))
+        if (issuePlans.GroupBy(plan => (plan.Issue!.Tracking!.ProviderId, plan.Issue.Tracking.TargetId, plan.Issue.TaskId))
             .Any(group => group.Select(plan => plan.PlanId).Distinct().Count() > 1))
             return Result<WorkSharingTransportAttempt>.Failure("sharing_issue_plan_conflict");
         var portablePlans = merged.Values.Where(record => record.Key.Domain == WorkSharingDomain.Plan)

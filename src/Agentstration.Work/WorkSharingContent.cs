@@ -66,8 +66,10 @@ public static class WorkSharingContent
         return plan with { Definition = definition.Value, Trees = trees, Allocation = plan.Allocation.OrderBy(value => value.TaskId.Value).ToArray() };
     }
     public static bool ValidIssue(WorkSharingIssueReference? issue) => issue is null || WorkProjectDefinition.ValidName(issue.Provider)
+        && WorkProjectDefinition.ValidName(issue.ConnectionName) && issue.Tracking is { } target
+        && WorkProjectContextRules.Text(target.ProviderId, 128) && WorkProjectContextRules.Text(target.TargetId, 128)
         && issue.Repository is { Length: > 0 and <= 512 } && !issue.Repository.Any(char.IsControl) && !issue.Repository.Contains('@', StringComparison.Ordinal)
-        && issue.TaskId is { Length: > 0 and <= 128 } && issue.TaskId[0] is >= '1' and <= '9' && issue.TaskId.All(char.IsAsciiDigit)
+        && WorkProjectContextRules.Text(issue.TaskId, 128)
         && Prefix(issue.PlanLabelPrefix) && Prefix(issue.ParticipantLabelPrefix)
         && !issue.PlanLabelPrefix.StartsWith(issue.ParticipantLabelPrefix, StringComparison.OrdinalIgnoreCase)
         && !issue.ParticipantLabelPrefix.StartsWith(issue.PlanLabelPrefix, StringComparison.OrdinalIgnoreCase);

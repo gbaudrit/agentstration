@@ -11,7 +11,10 @@ public sealed record CodingIssueCapabilities(string Version, string Provider, bo
     bool CompletionReason, bool ManagedLabels, bool RevisionObservation);
 public sealed record AcknowledgeCodingIssueRequest(Guid Id, long ExpectedProjectVersion, Guid PlanId, string Repository,
     string IssueId, string Provider, string PlanLabelPrefix, string ParticipantLabelPrefix,
-    long ExpectedSharedVersion, IReadOnlyList<WorkTaskAllocation> Allocation);
+    long ExpectedSharedVersion, IReadOnlyList<WorkTaskAllocation> Allocation)
+{
+    public string TrackingConnection { get; init; } = "";
+}
 public enum CodingIssueIntakeStatus { Pending, Confirmed, Conflict }
 public sealed record CodingIssueIntakeResponse(Guid Id, Guid ProjectId, Guid PlanId, CodingIssueIntakeStatus Status,
     Guid? PublicationOperationId, Guid? IssueOperationId, string? ErrorCode, string? IssueRevision, DateTimeOffset ObservedAt)
@@ -24,6 +27,7 @@ public sealed record CodingIssueReadiness(Guid ProjectId, Guid PlanId, bool Elig
     string? IssueRevision, IReadOnlyList<CodingIssueWait> Waits, DateTimeOffset ObservedAt)
 {
     public IReadOnlyList<CodingIssuePrerequisite> Prerequisites { get; init; } = [];
+    public string? ConnectionDigest { get; init; }
 }
 public sealed record CodingIssuePrerequisite(string Repository, string IssueId, Guid PlanId, string State,
     string? CompletionReason, string Revision, bool Satisfied);

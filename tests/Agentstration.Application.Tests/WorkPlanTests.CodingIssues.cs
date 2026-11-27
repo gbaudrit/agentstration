@@ -23,7 +23,7 @@ public sealed partial class WorkPlanTests
         Assert.IsTrue(acknowledged.IsSuccess, acknowledged.ErrorCode); Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, acknowledged.Value!.Status, acknowledged.Value.ErrorCode);
         var rightSharing = SharingService(second, shared);
         var projection = (await rightSharing.PullAsync(second.Workspace, rp.Id, null, default)).Value!;
-        var record = projection.Records.Single();
+        var record = projection.Records.Single(value => value.Key.Domain == WorkSharingDomain.Plan);
         Assert.IsTrue((await rightSharing.ImportPlanAsync(second.Workspace, rp.Id, plan.Plan.Id, record.Digest, default)).IsSuccess);
         var local = Success(await second.Plans().GetAsync(second.Workspace, plan.Plan.Id, default));
         var secondCommand = await IssueCommandAsync(second, rp.Id, local, "1");
@@ -160,7 +160,8 @@ public sealed partial class WorkPlanTests
         var command = await IssueCommandAsync(fixture, project.Id, a, "1");
         Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, (await Issues(fixture, shared, native).AcknowledgeAsync(fixture.Workspace, project.Id, command, default)).Value!.Status);
         var connector = SharingService(fixture, shared); var current = ProjectSuccess(await ProjectService(fixture).GetAsync(fixture.Workspace, project.Id, default));
-        var issue = new WorkSharingIssueReference("fixture", "FIXTURE/REPOSITORY", "1", command.PlanLabelPrefix, command.ParticipantLabelPrefix);
+        var issue = new WorkSharingIssueReference("fixture", "FIXTURE/REPOSITORY", "1", command.PlanLabelPrefix, command.ParticipantLabelPrefix)
+        { ConnectionName = "issues", Tracking = new("fixture", "repository") };
         var competing = (await connector.ExportPlanAsync(fixture.Workspace, b.Plan.Id,
             b.Revision.Definition.TaskIds.Select(id => new WorkTaskAllocation(id, current.Definition.Sharing!.ParticipantId)).ToArray(), default, issue)).Value!;
         var conflict = await connector.PublishAsync(fixture.Workspace, project.Id, new(new(Guid.NewGuid()), current.Version,
@@ -193,15 +194,60 @@ public sealed partial class WorkPlanTests
         Assert.AreEqual(1, native.Writes);
     }
 
+    [TestMethod]
+    public async Task CodingIssueConnectionReplacementRequiresANewAcknowledgmentAndPreservesTheOriginalReceipt()
+    {
+        await using var fixture = await Fixture.CreateAsync(); var shared = new SharingProvider(); var native = new IssueProvider(); native.Put("1");
+        var project = await IssueProjectAsync(fixture, shared, native, new(Guid.NewGuid())); var plan = await IssuePlanAsync(fixture, project.Id, "1");
+        var command = await IssueCommandAsync(fixture, project.Id, plan, "1"); var service = Issues(fixture, shared, native);
+        var first = (await service.AcknowledgeAsync(fixture.Workspace, project.Id, command, default)).Value!;
+        Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, first.Status);
+        var receipt = (await TaskProviders(fixture, native).GetAsync(fixture.Workspace, project.Id, new(first.IssueOperationId!.Value), default)).Value!;
+        var retained = JsonSerializer.Serialize(receipt);
+        project = ProjectSuccess(await ProjectService(fixture).GetAsync(fixture.Workspace, project.Id, default));
+        var old = project.Definition.ConnectionAssignments.Single();
+        ProjectSuccess(await ProjectService(fixture).UpdateAsync(fixture.Workspace, project.Id, new(Guid.NewGuid(), project.Version,
+            project.Definition with { ConnectionAssignments = [old with { Service = old.Service with { Uid = Guid.NewGuid() } }] }), default));
+        Assert.IsFalse((await service.ReadinessAsync(fixture.Workspace, project.Id, plan.Plan.Id, default)).Value!.Eligible);
+        Assert.AreEqual("coding_issue_connection_changed", (await service.AcknowledgeAsync(fixture.Workspace, project.Id, command, default)).ErrorCode);
+        Assert.AreEqual(1, native.Writes);
+        var second = await service.AcknowledgeAsync(fixture.Workspace, project.Id, await IssueCommandAsync(fixture, project.Id, plan, "1"), default);
+        Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, second.Value!.Status, second.ErrorCode ?? second.Value.ErrorCode);
+        Assert.IsTrue((await service.ReadinessAsync(fixture.Workspace, project.Id, plan.Plan.Id, default)).Value!.Eligible);
+        await fixture.ReopenAsync();
+        Assert.AreEqual(retained, JsonSerializer.Serialize((await TaskProviders(fixture, native).GetAsync(fixture.Workspace, project.Id, receipt.Id, default)).Value));
+    }
+
+    [TestMethod]
+    public async Task CodingIssueIncompleteAuthorityAndUnknownNamedConnectionsNeverUnlockAdmission()
+    {
+        await using var fixture = await Fixture.CreateAsync(); var shared = new SharingProvider(); var native = new IssueProvider(); native.Put("1");
+        var project = await IssueProjectAsync(fixture, shared, native, new(Guid.NewGuid())); var plan = await IssuePlanAsync(fixture, project.Id, "1");
+        var command = await IssueCommandAsync(fixture, project.Id, plan, "1"); var service = Issues(fixture, shared, native);
+        Assert.AreEqual("coding_issue_command_invalid", (await service.AcknowledgeAsync(fixture.Workspace, project.Id,
+            command with { TrackingConnection = "unconfigured" }, default)).ErrorCode);
+        Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, (await service.AcknowledgeAsync(fixture.Workspace, project.Id, command, default)).Value!.Status);
+        native.Incomplete = true;
+        Assert.IsFalse((await service.ReadinessAsync(fixture.Workspace, project.Id, plan.Plan.Id, default)).Value!.Eligible);
+        Assert.AreEqual(1, native.Writes);
+    }
+
     private static CodingIssueCoordinationService Issues(Fixture fixture, SharingProvider shared, IssueProvider native) => new(ProjectService(fixture), fixture.Plans(),
-        SharingService(fixture, shared), TaskProviders(fixture, native), new IssuePolicy(), new Context(fixture.Workspace, fixture.Principal), new Clock(Now));
+        SharingService(fixture, shared), TaskProviders(fixture, native), new IssuePolicy(native), new Context(fixture.Workspace, fixture.Principal), new Clock(Now));
     private static async Task<WorkProjectSnapshot> IssueProjectAsync(Fixture fixture, SharingProvider shared, IssueProvider native, WorkSharingProjectId portable)
     {
         var (_, project) = await SharingAsync(fixture, shared, portable, new(Guid.NewGuid()));
-        var binding = new WorkProjectContextBinding("issues", WorkProjectBindingPurpose.TaskOperations,
-            new(ScopedResourceAddress.Create(ResourceScopeRef.Workspace(fixture.Workspace.Value), default, "Tool", "native-issues"), Guid.NewGuid(), 1));
+        var requirement = new WorkProjectConnectionRequirement("issues", WorkProjectConnectionRules.Tracking, "1.0", ["read", "update"], new("fixture", "repository"));
         project = ProjectSuccess(await ProjectService(fixture).UpdateAsync(fixture.Workspace, project.Id, new(Guid.NewGuid(), project.Version,
-            project.Definition with { Bindings = [.. project.Definition.Bindings, binding] }), default));
+            project.Definition with { ConnectionRequirements = [requirement], ConnectionAssignments = [SharingAssignment(fixture, "issues")] }), default));
+        var connector = SharingService(fixture, shared);
+        var pulled = (await connector.PullAsync(fixture.Workspace, project.Id, null, default)).Value!;
+        if (!pulled.Records.Any(value => value.Key == WorkSharingProjectMetadata.Key))
+        {
+            var metadata = SharingMetadata([requirement], project.Definition.Sharing!.ParticipantId);
+            var published = await connector.PublishAsync(fixture.Workspace, project.Id, new(new(Guid.NewGuid()), project.Version, [metadata]), default);
+            Assert.AreEqual(WorkSharingOperationStatus.Succeeded, published.Value!.Status, published.ErrorCode ?? published.Value.ErrorCode);
+        }
         await TaskProviders(fixture, native).InitializeAsync(default); return project;
     }
     private static async Task<WorkPlanView> IssuePlanAsync(Fixture fixture, WorkProjectId projectId, string issue)
@@ -217,12 +263,18 @@ public sealed partial class WorkPlanTests
     {
         var project = ProjectSuccess(await ProjectService(fixture).GetAsync(fixture.Workspace, projectId, default));
         return new(Guid.NewGuid(), project.Version, plan.Plan.Id.Value, "fixture/repository", issue, "fixture", "agentstration:plan:", "agentstration:instance:", 0,
-            plan.Revision.Definition.TaskIds.Select(task => new WorkTaskAllocation(task, project.Definition.Sharing!.ParticipantId)).ToArray());
+            plan.Revision.Definition.TaskIds.Select(task => new WorkTaskAllocation(task, project.Definition.Sharing!.ParticipantId)).ToArray())
+        { TrackingConnection = "issues" };
     }
-    private sealed class IssuePolicy : ICodingIssueBindingPolicy
+    private sealed class IssuePolicy(IssueProvider native) : ICodingIssueBindingPolicy
     {
-        public Task<Result<CodingIssueBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
-            WorkSharingIssueReference issue, CancellationToken token) => Task.FromResult(Result<CodingIssueBinding>.Success(new(issue.Provider, "agentstration:")));
+        public async Task<Result<CodingIssueBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId, WorkProjectContextBinding binding,
+            WorkSharingIssueReference issue, CancellationToken token) => Result<CodingIssueBinding>.Success(new(issue.Provider,
+                (await native.ResolveAsync(workspaceId, principalId, binding, ExternalTaskOperationKind.Update, token)).Value!));
+        public Result<CodingIssueObservation> Observe(ExternalTaskSnapshot snapshot, WorkSharingIssueReference issue, WorkParticipantId participant) =>
+            Agentstration.Infrastructure.Work.CodingIssueBindingPolicy.GitHubIssueObservation(snapshot, issue, participant);
+        public ExternalTaskOperationInput Acknowledgment(WorkSharingIssueReference issue, WorkPlanId plan, WorkParticipantId participant, string revision) =>
+            Agentstration.Infrastructure.Work.CodingIssueBindingPolicy.GitHubAcknowledgment(issue, plan, participant, revision);
     }
     private sealed class IssueProvider : IWorkTaskProviderGateway
     {
@@ -230,6 +282,7 @@ public sealed partial class WorkPlanTests
         public HashSet<string> Denied { get; } = [];
         public int Writes { get; private set; }
         public bool LoseWriteResponse { get; set; }
+        public bool Incomplete { get; set; }
         private readonly Dictionary<string, ExternalTaskProviderResponse> receipts = [];
         public void Put(string id, IReadOnlyList<string>? labels = null, IReadOnlyList<ExternalTaskRelation>? relations = null) => Tasks[id] =
             new("fixture/repository", id, "initial", "Issue " + id, null, "open", new("https://fixture.test/issues/" + id), labels ?? [], relations ?? []);
@@ -239,7 +292,15 @@ public sealed partial class WorkPlanTests
         public Task<ExternalTaskProviderResponse> InvokeAsync(WorkTaskOperation operation, bool recover, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); var id = operation.Input.TaskId!;
-            ExternalTaskProviderResponse Response(ExternalTaskProviderStatus status, ExternalTaskSnapshot? task = null, string? error = null) => new(operation.OperationKey, operation.IntentDigest, status, task, error);
+            ExternalTaskProviderResponse Response(ExternalTaskProviderStatus status, ExternalTaskSnapshot? task = null, string? error = null) => new(operation.OperationKey, operation.IntentDigest, status,
+                task is null ? null : task with
+                {
+                    Repository = "",
+                    Tracking = new(new(operation.Input.Tracking!.ProviderId, operation.Input.Tracking.TargetId, task.TaskId), !Incomplete,
+                        task.Relations.Select(relation => new WorkTrackingRelation(relation.Kind switch
+                        { "blocked-by" => WorkTrackingRelationKind.BlockedBy, "parent" => WorkTrackingRelationKind.Parent, _ => WorkTrackingRelationKind.Child },
+                            new(operation.Input.Tracking.ProviderId, operation.Input.Tracking.TargetId, relation.TaskId))).ToArray(), [], [])
+                }, error);
             if (Denied.Contains(id) || !Tasks.TryGetValue(id, out var task)) return Task.FromResult(Response(ExternalTaskProviderStatus.Rejected, error: "native_access_denied"));
             task = task with { Revision = WorkPlanDefinition.Digest(task with { Revision = "" }) }; Tasks[id] = task;
             if (operation.Input.Operation == ExternalTaskOperationKind.Read) return Task.FromResult(Response(ExternalTaskProviderStatus.Succeeded, task));

@@ -51,6 +51,9 @@ public sealed partial class WorkPlanTests
         Assert.AreEqual("work_plan_revision_conflict", (await service.BeginAsync(fixture.Workspace, project.Id, command with { PlanRevision = 2 }, default)).ErrorCode);
         Assert.AreEqual("task_provider_command_invalid", (await service.BeginAsync(fixture.Workspace, project.Id,
             command with { Input = command.Input with { Body = new string('x', 32_769) } }, default)).ErrorCode);
+        Assert.AreEqual("task_provider_route_changed", (await service.BeginAsync(fixture.Workspace, project.Id,
+            command with { ExpectedRouteDigest = new string('0', 64) }, default)).ErrorCode);
+        Assert.AreEqual("task_provider_operation_not_found", (await service.GetAsync(fixture.Workspace, project.Id, command.Id, default)).ErrorCode);
         gateway.ResolutionError = "task_provider_capability_missing";
         Assert.AreEqual(gateway.ResolutionError, (await service.BeginAsync(fixture.Workspace, project.Id, command, default)).ErrorCode);
         Assert.AreEqual(0, gateway.Effects);

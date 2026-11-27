@@ -57,7 +57,7 @@ public sealed partial class WorkPlanTests
         var source = new WorkTaskDeliverySource(Guid.NewGuid(), WorkItemId.New(), "delivery-fixture", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             new string('b', 64), WorkPlanAttemptStatus.Completed, null);
         var intent = new WorkTaskDeliveryIntent(plan.Plan.Id, plan.Plan.Version, plan.Revision.Number, plan.Revision.Digest, task, State(plan, task).Version,
-            1, new string('c', 64), context, new("github", "fixture/repository", "1", "plan:", "participant:"), 1, new string('d', 64), source,
+            1, new string('c', 64), context, new("github", "fixture/repository", "1", "plan:", "participant:") { ConnectionName = "issues", Tracking = new("github", "42") }, 1, new string('d', 64), source,
             "fixture/repository", "github", "42", new Uri("https://github.com/fixture/repository.git"), new string('a', 40), "main", "refs/heads/agentstration/fixture", "Deliver fixture", "Reviewed fixture",
             [new("answer.txt", "NDIK", false)], [new("check", 0, true, null)]);
         var operation = new WorkTaskDeliveryOperation(new(Guid.NewGuid()), fixture.Workspace, fixture.Principal, project.Id, project.Version, intent,

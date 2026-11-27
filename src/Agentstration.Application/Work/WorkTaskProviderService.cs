@@ -15,7 +15,10 @@ public interface IWorkTaskProviderGateway
 }
 
 public sealed record BeginWorkTaskOperation(WorkTaskOperationId Id, long ExpectedProjectVersion, string BindingName,
-    ExternalTaskOperationInput Input, WorkPlanId? PlanId = null, long? PlanRevision = null, string? PlanDigest = null);
+    ExternalTaskOperationInput Input, WorkPlanId? PlanId = null, long? PlanRevision = null, string? PlanDigest = null)
+{
+    public string? ExpectedRouteDigest { get; init; }
+}
 
 public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operations, IWorkProjectRepository projects,
     WorkPlanService plans, IWorkTaskProviderGateway provider, IWorkplaceContext context,
@@ -40,6 +43,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
         if (!Owns(workspaceId) || scope is null || scope.WorkspaceId != workspaceId || scope.PrincipalId != context.PrincipalId
             || scope.TenantId == Guid.Empty) return Failure("task_provider_operation_not_found");
         if (command.Id.Value == Guid.Empty || command.ExpectedProjectVersion < 1 || !WorkProjectDefinition.ValidName(command.BindingName)
+            || command.ExpectedRouteDigest is not null && !WorkSharingFormat.Digest(command.ExpectedRouteDigest)
             || command.Input is null || !command.Input.Validate().IsSuccess
             || (command.PlanId is null ? command.PlanRevision is not null || command.PlanDigest is not null
                 : command.PlanId.Value.Value == Guid.Empty || command.PlanRevision is not >= 1 || command.PlanDigest?.Length != 64))
@@ -52,7 +56,8 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
             command.Input,
             command.PlanId,
             command.PlanRevision,
-            command.PlanDigest
+            command.PlanDigest,
+            command.ExpectedRouteDigest
         });
         var existing = await operations.GetAsync(workspaceId, context.PrincipalId, command.Id, token);
         if (existing is not null)
@@ -74,6 +79,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
         }
         var route = await provider.ResolveAsync(workspaceId, context.PrincipalId, binding, command.Input.Operation, token);
         if (!route.IsSuccess) return Failure(route.ErrorCode!);
+        if (command.ExpectedRouteDigest is { } expected && WorkPlanDefinition.Digest(route.Value) != expected) return Failure("task_provider_route_changed");
         route = await provider.PrepareAsync(route.Value!, command.Input, token);
         if (!route.IsSuccess) return Failure(route.ErrorCode!);
         var now = clock.GetUtcNow();

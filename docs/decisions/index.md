@@ -391,3 +391,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 292. [ADR-0292 — GitHub contracts consume protected Connected Services](0292-github-contracts-consume-protected-connected-services.md)
 
 293. [ADR-0293 — Sharing carries connection needs without local assignments](0293-sharing-carries-connection-needs-without-local-assignments.md)
+
+294. [ADR-0294 — Issue coordination consumes named tracking authority](0294-issue-coordination-consumes-named-tracking-authority.md)

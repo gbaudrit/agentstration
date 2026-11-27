@@ -15,7 +15,11 @@ public sealed partial class CodingIssueCoordinationService(WorkProjectService pr
     public async Task<Result<CodingIssueIntakeResponse>> AcknowledgeAsync(WorkspaceId workspaceId, WorkProjectId projectId,
         AcknowledgeCodingIssueRequest command, CancellationToken token)
     {
-        var issue = new WorkSharingIssueReference(command.Provider, command.Repository, command.IssueId, command.PlanLabelPrefix, command.ParticipantLabelPrefix);
+        var owned = await projects.GetAsync(workspaceId, projectId, token);
+        if (!owned.IsSuccess) return IntakeFailure(owned.ErrorCode!);
+        var need = owned.Value!.Definition.ConnectionRequirements.SingleOrDefault(value => value.Name == command.TrackingConnection);
+        var issue = new WorkSharingIssueReference(command.Provider, command.Repository, command.IssueId, command.PlanLabelPrefix, command.ParticipantLabelPrefix)
+        { ConnectionName = command.TrackingConnection, Tracking = need?.Target };
         if (command.Id == Guid.Empty || command.PlanId == Guid.Empty || command.ExpectedProjectVersion < 1 || command.ExpectedSharedVersion < 0
             || !WorkSharingContent.ValidIssue(issue) || command.Allocation is null || command.Allocation.Count > 100)
             return IntakeFailure("coding_issue_command_invalid");
@@ -29,17 +33,18 @@ public sealed partial class CodingIssueCoordinationService(WorkProjectService pr
         var existing = await operations.GetAsync(workspaceId, projectId, writeId, token);
         if (!existing.IsSuccess && existing.ErrorCode != "task_provider_operation_not_found") return IntakeFailure(existing.ErrorCode!);
         if (existing.Value is null && project.Version != command.ExpectedProjectVersion) return IntakeFailure("work_project_conflict");
-        var labels = new[] { issue.PlanLabelPrefix + planId, issue.ParticipantLabelPrefix + project.Definition.Sharing!.ParticipantId };
-        if (existing.Value is { } prior && (prior.PlanId != planId || prior.Input.Repository != issue.Repository || prior.Input.TaskId != issue.TaskId
-            || prior.Input.Operation != ExternalTaskOperationKind.Update || prior.Input.Labels is null
-            || !prior.Input.Labels.SequenceEqual(labels, StringComparer.Ordinal))) return IntakeFailure("coding_issue_command_conflict");
-        var native = await ReadIssueAsync(connection, issue.Repository, issue.TaskId, token);
+        var participant = project.Definition.Sharing!.ParticipantId;
+        if (existing.Value is { } prior && (prior.PlanId != planId || prior.Route.Binding.Name != issue.ConnectionName
+            || WorkPlanDefinition.Digest(prior.Input) != WorkPlanDefinition.Digest(bindings.Acknowledgment(issue, planId, participant, prior.Input.ExpectedRevision!)))) return IntakeFailure("coding_issue_command_conflict");
+        if (existing.Value is { } retained && !SameRoute(retained.Route, connection.Route)) return IntakeFailure("coding_issue_connection_changed");
+        var native = await ReadIssueAsync(connection, issue, token);
         if (!native.IsSuccess) return IntakeFailure(native.ErrorCode!);
-        var nativePlan = PlanLabel(native.Value!, issue.PlanLabelPrefix);
+        var nativePlan = (Valid: native.Value!.AssociationValid, Id: native.Value.PlanId);
         if (!nativePlan.Valid || nativePlan.Id is { } nativeId && nativeId != planId)
             return Intake(command, projectId, CodingIssueIntakeStatus.Conflict, null, existing.Value?.Id.Value, "coding_issue_plan_label_conflict", native.Value!.Revision, nativePlan.Id);
         var pulled = await sharing.PullAsync(workspaceId, projectId, null, token);
         if (!pulled.IsSuccess) return IntakeFailure(pulled.ErrorCode!);
+        if (!SharedConnectionMatches(project, pulled.Value!, issue)) return IntakeFailure("coding_issue_shared_connection_mismatch");
         var shared = SharedPlans(pulled.Value!);
         var associated = shared.Where(value => SameIssue(value.Plan.Issue, issue)).ToArray();
         if (associated.Length > 1 || associated.Length == 1 && associated[0].Plan.PlanId != planId)
@@ -75,23 +80,24 @@ public sealed partial class CodingIssueCoordinationService(WorkProjectService pr
         if (existing.Value is not null) written = await operations.ResumeAsync(workspaceId, projectId, writeId, token);
         else
         {
-            native = await ReadIssueAsync(connection, issue.Repository, issue.TaskId, token);
+            native = await ReadIssueAsync(connection, issue, token);
             if (!native.IsSuccess) return IntakeFailure(native.ErrorCode!);
-            nativePlan = PlanLabel(native.Value!, issue.PlanLabelPrefix);
+            nativePlan = (native.Value!.AssociationValid, native.Value.PlanId);
             if (!nativePlan.Valid || nativePlan.Id is { } current && current != planId)
                 return Intake(command, projectId, CodingIssueIntakeStatus.Conflict, publicationId, null, "coding_issue_plan_label_conflict", native.Value!.Revision, nativePlan.Id);
             written = await operations.BeginAsync(workspaceId, projectId, new(writeId, project.Version, connection.Binding.Name,
-                new(ExternalTaskOperationKind.Update, issue.Repository, issue.TaskId, Labels: labels, ExpectedRevision: native.Value!.Revision),
-                planId, local.Value!.Revision.Number, local.Value.Revision.Digest), token);
+                bindings.Acknowledgment(issue, planId, participant, native.Value!.Revision),
+                planId, local.Value!.Revision.Number, local.Value.Revision.Digest)
+            { ExpectedRouteDigest = WorkPlanDefinition.Digest(connection.Route) }, token);
         }
         if (!written.IsSuccess) return IntakeFailure(written.ErrorCode!);
         if (written.Value!.Status != WorkTaskOperationStatus.Succeeded)
             return Intake(command, projectId, written.Value.Status == WorkTaskOperationStatus.Rejected ? CodingIssueIntakeStatus.Conflict : CodingIssueIntakeStatus.Pending,
                 publicationId, writeId.Value, written.Value.ErrorCode, written.Value.Task?.Revision);
-        native = await ReadIssueAsync(connection, issue.Repository, issue.TaskId, token);
+        native = await ReadIssueAsync(connection, issue, token);
         if (!native.IsSuccess) return Intake(command, projectId, CodingIssueIntakeStatus.Pending, publicationId, writeId.Value, native.ErrorCode, null);
-        var confirmed = PlanLabel(native.Value!, issue.PlanLabelPrefix);
-        if (!confirmed.Valid || confirmed.Id != planId || !native.Value!.Labels.Contains(labels[1], StringComparer.OrdinalIgnoreCase))
+        var confirmed = (Valid: native.Value!.AssociationValid, Id: native.Value.PlanId);
+        if (!confirmed.Valid || confirmed.Id != planId || !native.Value!.Acknowledged)
             return Intake(command, projectId, CodingIssueIntakeStatus.Conflict, publicationId, writeId.Value, "coding_issue_acknowledgment_changed", native.Value!.Revision);
         // Recheck shared authority after the external write as another participant may have edited it.
         pulled = await sharing.PullAsync(workspaceId, projectId, null, token);
@@ -110,32 +116,41 @@ public sealed partial class CodingIssueCoordinationService(WorkProjectService pr
         if (!loaded.IsSuccess) return Result<Connection>.Failure(loaded.ErrorCode!);
         var project = loaded.Value!;
         if (project.Definition.Sharing is null) return Result<Connection>.Failure("coding_issue_sharing_required");
-        var selected = project.Definition.Bindings.Where(binding => binding.Purpose == WorkProjectBindingPurpose.TaskOperations).ToArray();
-        if (selected.Length != 1) return Result<Connection>.Failure("coding_issue_connection_ambiguous");
-        var policy = await bindings.ResolveAsync(workspaceId, context.PrincipalId, selected[0], issue, token);
-        return policy.IsSuccess ? Result<Connection>.Success(new(project, selected[0])) : Result<Connection>.Failure(policy.ErrorCode!);
+        var need = project.Definition.ConnectionRequirements.SingleOrDefault(value => value.Name == issue.ConnectionName);
+        var assignment = project.Definition.ConnectionAssignments.SingleOrDefault(value => value.Name == issue.ConnectionName);
+        if (need is null || assignment is null || need.Contract != WorkProjectConnectionRules.Tracking || need.Target != issue.Tracking
+            || !need.RequiredOperations.Contains("read") || !need.RequiredOperations.Contains("update"))
+            return Result<Connection>.Failure("coding_issue_connection_invalid");
+        var selected = WorkProjectConnectionRules.Binding(new(need, assignment));
+        var policy = await bindings.ResolveAsync(workspaceId, context.PrincipalId, selected, issue, token);
+        return policy.IsSuccess ? Result<Connection>.Success(new(project, policy.Value!.Route.Binding, policy.Value.Route)) : Result<Connection>.Failure(policy.ErrorCode!);
     }
-    private async Task<Result<ExternalTaskSnapshot>> ReadIssueAsync(Connection connection, string repository, string issueId, CancellationToken token)
+    private async Task<Result<CodingIssueObservation>> ReadIssueAsync(Connection connection, WorkSharingIssueReference issue, CancellationToken token)
     {
         var read = await operations.BeginAsync(connection.Project.WorkspaceId, connection.Project.Id,
-            new(new(Guid.NewGuid()), connection.Project.Version, connection.Binding.Name, new(ExternalTaskOperationKind.Read, repository, issueId)), token);
+            new(new(Guid.NewGuid()), connection.Project.Version, connection.Binding.Name,
+                new(ExternalTaskOperationKind.Read, TaskId: issue.TaskId) { Tracking = issue.Tracking })
+            { ExpectedRouteDigest = WorkPlanDefinition.Digest(connection.Route) }, token);
         return read is { IsSuccess: true, Value.Status: WorkTaskOperationStatus.Succeeded, Value.Task: { } task }
-            ? Result<ExternalTaskSnapshot>.Success(task) : Result<ExternalTaskSnapshot>.Failure(read.ErrorCode ?? read.Value?.ErrorCode ?? "coding_issue_authority_unavailable");
+            ? bindings.Observe(task, issue, connection.Project.Definition.Sharing!.ParticipantId)
+            : Result<CodingIssueObservation>.Failure(read.ErrorCode ?? read.Value?.ErrorCode ?? "coding_issue_authority_unavailable");
     }
-    private static (bool Valid, WorkPlanId? Id) PlanLabel(ExternalTaskSnapshot issue, string prefix)
+    private static bool SameIssue(WorkSharingIssueReference? left, WorkSharingIssueReference right) => left is not null
+        && left.Tracking == right.Tracking && left.TaskId == right.TaskId;
+    private static bool SharedConnectionMatches(WorkProjectSnapshot project, WorkProjectSharingState shared, WorkSharingIssueReference issue)
     {
-        var labels = issue.Labels.Where(label => label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (labels.Length == 0) return (true, null);
-        return labels.Length == 1 && Guid.TryParseExact(labels[0][prefix.Length..], "D", out var id) && id != Guid.Empty ? (true, new(id)) : (false, null);
+        var metadata = shared.Records.SingleOrDefault(value => value.Key == WorkSharingProjectMetadata.Key)?.Content.Deserialize<WorkSharingProjectMetadata>(Json);
+        var declared = metadata?.ConnectionRequirements.SingleOrDefault(value => value.Name == issue.ConnectionName);
+        var own = project.Definition.ConnectionRequirements.SingleOrDefault(value => value.Name == issue.ConnectionName);
+        return declared is not null && own is not null && WorkPlanDefinition.Digest(declared) == WorkPlanDefinition.Digest(own);
     }
-    private static bool SameIssue(WorkSharingIssueReference? left, WorkSharingIssueReference right) => left is not null && left.Provider == right.Provider
-        && string.Equals(left.Repository, right.Repository, StringComparison.OrdinalIgnoreCase) && left.TaskId == right.TaskId;
     private static IReadOnlyList<(WorkSharingPlan Plan, WorkSharingRecord Record)> SharedPlans(WorkProjectSharingState state) => state.Records
         .Where(record => record.Key.Domain == WorkSharingDomain.Plan).Select(record => (record.Content.Deserialize<WorkSharingPlan>(Json)!, record)).ToArray();
     private static Guid CommandId(WorkProjectId projectId, Guid id, string phase) => new(Convert.FromHexString(WorkPlanDefinition.Digest(new { projectId, id, phase })).AsSpan(0, 16));
     private Result<CodingIssueIntakeResponse> Intake(AcknowledgeCodingIssueRequest command, WorkProjectId projectId, CodingIssueIntakeStatus status,
         Guid? publicationId, Guid? operationId, string? error, string? revision, WorkPlanId? conflictingPlan = null) => Result<CodingIssueIntakeResponse>.Success(new(command.Id, projectId.Value, command.PlanId,
-            status, publicationId, operationId, error, revision, clock.GetUtcNow()) { ConflictingPlanId = conflictingPlan?.Value });
+            status, publicationId, operationId, error, revision, clock.GetUtcNow())
+        { ConflictingPlanId = conflictingPlan?.Value });
     private static Result<CodingIssueIntakeResponse> IntakeFailure(string code) => Result<CodingIssueIntakeResponse>.Failure(code);
-    private sealed record Connection(WorkProjectSnapshot Project, WorkProjectContextBinding Binding);
+    private sealed record Connection(WorkProjectSnapshot Project, WorkProjectContextBinding Binding, WorkTaskProviderRoute Route);
 }

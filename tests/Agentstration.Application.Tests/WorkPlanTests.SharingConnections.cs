@@ -187,6 +187,8 @@ public sealed partial class WorkPlanTests
             raw["connectionRequirements"]![0]![key] = "local-only";
             Assert.AreEqual("sharing_content_invalid", WorkSharingContent.Normalize(change with { Content = JsonSerializer.SerializeToElement(raw) }).ErrorCode);
         }
+        Assert.IsTrue(WorkSharingContent.ValidIssue(new("fixture", "board/project", "ENG-123", "plan:", "participant:")
+        { ConnectionName = "backend", Tracking = need.Target }), "Portable item identities must not inherit GitHub numeric-ID rules.");
         Assert.IsFalse(WorkSharingContent.Normalize(SharingMetadata([need, need], participant)).IsSuccess);
         Assert.IsFalse(WorkSharingContent.Normalize(change with { Key = new(WorkSharingDomain.ProjectMetadata, "other") }).IsSuccess);
         var task = new WorkTaskId(Guid.NewGuid());

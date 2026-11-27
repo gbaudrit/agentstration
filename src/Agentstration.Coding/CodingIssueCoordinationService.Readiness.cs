@@ -40,61 +40,66 @@ public sealed partial class CodingIssueCoordinationService
         var connected = await ConnectAsync(project.WorkspaceId, project.Id, issue, token);
         if (!connected.IsSuccess) return Readiness(project.Id, planId, issue, null, [new(issue.Repository, issue.TaskId, planId.Value, connected.ErrorCode!, null, null, null)]);
         var connection = connected.Value!;
-        var native = await ReadIssueAsync(connection, issue.Repository, issue.TaskId, token);
+        if (!SharedConnectionMatches(connection.Project, pulled.Value!, issue))
+            return Readiness(project.Id, planId, issue, null, [new(issue.Repository, issue.TaskId, planId.Value, "coding_issue_shared_connection_mismatch", null, null, null)]);
+        var native = await ReadIssueAsync(connection, issue, token);
         if (!native.IsSuccess) return Readiness(project.Id, planId, issue, null, [new(issue.Repository, issue.TaskId, planId.Value, native.ErrorCode!, null, null, null)]);
-        var source = native.Value!; var label = PlanLabel(source, issue.PlanLabelPrefix);
+        var source = native.Value!; var label = (Valid: source.AssociationValid, Id: source.PlanId);
         var acknowledgmentId = (await sharing.GetPlanOperationAsync(project.WorkspaceId, project.Id, planId, token)).Value?.OperationId;
         var acknowledgment = acknowledgmentId is { } operationId ? await operations.GetAsync(project.WorkspaceId, project.Id, operationId, token) : null;
         var waits = new List<CodingIssueWait>();
         var prerequisites = new List<CodingIssuePrerequisite>();
         if (acknowledgment is not { IsSuccess: true, Value.Status: WorkTaskOperationStatus.Succeeded, Value: { } receipt }
-            || receipt.PlanId != planId || receipt.Route.Binding != connection.Binding || receipt.Input.Repository != issue.Repository || receipt.Input.TaskId != issue.TaskId
-            || receipt.Input.Labels?.Contains(issue.PlanLabelPrefix + planId, StringComparer.OrdinalIgnoreCase) != true
-            || receipt.Input.Labels.Contains(issue.ParticipantLabelPrefix + project.Definition.Sharing!.ParticipantId, StringComparer.OrdinalIgnoreCase) != true)
+            || receipt.PlanId != planId || !SameRoute(receipt.Route, connection.Route)
+            || WorkPlanDefinition.Digest(receipt.Input) != WorkPlanDefinition.Digest(bindings.Acknowledgment(issue, planId, project.Definition.Sharing!.ParticipantId, receipt.Input.ExpectedRevision!)))
             waits.Add(new(issue.Repository, issue.TaskId, planId.Value, "intake_publication_pending", source.State, source.CompletionReason, source.Revision));
         if (!label.Valid || label.Id != planId) waits.Add(new(issue.Repository, issue.TaskId, label.Id?.Value, "issue_plan_label_conflict", source.State, source.CompletionReason, source.Revision));
-        if (!source.Labels.Contains(issue.ParticipantLabelPrefix + project.Definition.Sharing!.ParticipantId, StringComparer.OrdinalIgnoreCase))
+        if (!source.Acknowledged)
             waits.Add(new(issue.Repository, issue.TaskId, planId.Value, "participant_acknowledgment_missing", source.State, source.CompletionReason, source.Revision));
-        if (source.State != "open") waits.Add(new(issue.Repository, issue.TaskId, planId.Value, "issue_not_open", source.State, source.CompletionReason, source.Revision));
-        var dependencies = source.Relations.Where(relation => relation.Kind == "blocked-by").Distinct().ToArray();
-        if (dependencies.Length > 16) waits.Add(new(issue.Repository, issue.TaskId, planId.Value, "dependency_observation_limit", source.State, source.CompletionReason, source.Revision));
+        if (!source.Open) waits.Add(new(issue.Repository, issue.TaskId, planId.Value, "issue_not_open", source.State, source.CompletionReason, source.Revision));
+        var dependencies = source.Dependencies;
+        if (dependencies.Count > 16) waits.Add(new(issue.Repository, issue.TaskId, planId.Value, "dependency_observation_limit", source.State, source.CompletionReason, source.Revision));
         else foreach (var dependency in dependencies)
         {
             // Native hierarchy is deliberately not converted into a dependency edge.
-            var reference = issue with { Repository = dependency.Repository, TaskId = dependency.TaskId };
+            var reference = issue with { Tracking = new(dependency.ProviderId, dependency.TargetId), TaskId = dependency.ItemId };
             var upstream = shared.Where(value => SameIssue(value.Plan.Issue, reference)).ToArray();
             WorkPlanId? upstreamId = upstream.Length == 1 ? upstream[0].Plan.PlanId : null;
             var reason = upstream.Length == 0 ? "upstream_plan_missing" : upstream.Length > 1 ? "upstream_plan_conflict"
                 : upstreamId == planId ? "upstream_plan_not_distinct" : null;
             if (reason is not null)
             {
-                waits.Add(new(dependency.Repository, dependency.TaskId, upstreamId?.Value, reason, null, null, null)); continue;
+                waits.Add(new(reference.Repository, dependency.ItemId, upstreamId?.Value, reason, null, null, null)); continue;
             }
             var upstreamIssue = upstream[0].Plan.Issue!;
             // Every upstream repository must independently satisfy the protected allowlist and capability policy.
-            var access = await bindings.ResolveAsync(project.WorkspaceId, context.PrincipalId, connection.Binding, upstreamIssue, token);
+            var access = await ConnectAsync(project.WorkspaceId, project.Id, upstreamIssue, token);
             if (!access.IsSuccess)
             {
-                waits.Add(new(dependency.Repository, dependency.TaskId, upstreamId?.Value, access.ErrorCode!, null, null, null)); continue;
+                waits.Add(new(reference.Repository, dependency.ItemId, upstreamId?.Value, access.ErrorCode!, null, null, null)); continue;
             }
-            var observation = await ReadIssueAsync(connection, dependency.Repository, dependency.TaskId, token);
+            var observation = await ReadIssueAsync(access.Value!, upstreamIssue, token);
             if (!observation.IsSuccess)
             {
-                waits.Add(new(dependency.Repository, dependency.TaskId, upstreamId?.Value, observation.ErrorCode!, null, null, null)); continue;
+                waits.Add(new(reference.Repository, dependency.ItemId, upstreamId?.Value, observation.ErrorCode!, null, null, null)); continue;
             }
-            var observed = observation.Value!; var upstreamLabel = PlanLabel(observed, upstreamIssue.PlanLabelPrefix);
+            var observed = observation.Value!; var upstreamLabel = (Valid: observed.AssociationValid, Id: observed.PlanId);
             reason = !upstreamLabel.Valid || upstreamLabel.Id != upstreamId ? "upstream_plan_label_conflict"
-                : observed.State != "closed" ? "upstream_issue_open"
-                : observed.CompletionReason != "completed" ? "upstream_completion_unconfirmed" : null;
-            prerequisites.Add(new(dependency.Repository, dependency.TaskId, upstreamId!.Value.Value, observed.State, observed.CompletionReason, observed.Revision, reason is null));
-            if (reason is not null) waits.Add(new(dependency.Repository, dependency.TaskId, upstreamId?.Value, reason, observed.State, observed.CompletionReason, observed.Revision));
+                : observed.Open ? "upstream_issue_open"
+                : !observed.Completed ? "upstream_completion_unconfirmed" : null;
+            prerequisites.Add(new(reference.Repository, dependency.ItemId, upstreamId!.Value.Value, observed.State, observed.CompletionReason, observed.Revision, reason is null));
+            if (reason is not null) waits.Add(new(reference.Repository, dependency.ItemId, upstreamId?.Value, reason, observed.State, observed.CompletionReason, observed.Revision));
         }
         // Eligibility is an observation. It never cancels or retries an already admitted local attempt.
-        return Readiness(project.Id, planId, issue, source.Revision, waits, prerequisites);
+        return Readiness(project.Id, planId, issue, source.Revision, waits, prerequisites, WorkPlanDefinition.Digest(connection.Route));
     }
     private Result<CodingIssueReadiness> Readiness(WorkProjectId projectId, WorkPlanId planId, WorkSharingIssueReference? issue,
-        string? revision, IReadOnlyList<CodingIssueWait> waits, IReadOnlyList<CodingIssuePrerequisite>? prerequisites = null) => Result<CodingIssueReadiness>.Success(new(projectId.Value, planId.Value,
-            waits.Count == 0, issue?.Repository, issue?.TaskId, revision, waits, clock.GetUtcNow()) { Prerequisites = prerequisites ?? [] });
+        string? revision, IReadOnlyList<CodingIssueWait> waits, IReadOnlyList<CodingIssuePrerequisite>? prerequisites = null, string? connectionDigest = null) => Result<CodingIssueReadiness>.Success(new(projectId.Value, planId.Value,
+            waits.Count == 0, issue?.Repository, issue?.TaskId, revision, waits, clock.GetUtcNow())
+        { Prerequisites = prerequisites ?? [], ConnectionDigest = connectionDigest });
+    private static bool SameRoute(WorkTaskProviderRoute retained, WorkTaskProviderRoute current) =>
+        WorkPlanDefinition.Digest(retained with { Tracking = retained.Tracking is { } original ? original with { WireIntentDigest = null } : null })
+            == WorkPlanDefinition.Digest(current with { Tracking = current.Tracking is { } fresh ? fresh with { WireIntentDigest = null } : null });
 }
 
 public sealed class CodingIssueAdmissionGate(CodingIssueCoordinationService issues) : IWorkPlanAdmissionGate
@@ -108,6 +113,6 @@ public sealed class CodingIssueAdmissionGate(CodingIssueCoordinationService issu
         var readiness = result.Value!;
         if (!readiness.Eligible) return Result<IReadOnlyList<WorkPlanAdmissionEvidence>>.Failure("coding_issue_dependencies_blocked");
         return Result<IReadOnlyList<WorkPlanAdmissionEvidence>>.Success(readiness.IssueId is null ? [] : [new("repository-issue",
-            $"{readiness.Repository}#{readiness.IssueId}:{plan.Id}", WorkPlanDefinition.Digest(new { readiness.IssueRevision, readiness.Prerequisites }), readiness.ObservedAt)]);
+            $"{readiness.Repository}#{readiness.IssueId}:{plan.Id}", WorkPlanDefinition.Digest(new { readiness.IssueRevision, readiness.Prerequisites, readiness.ConnectionDigest }), readiness.ObservedAt)]);
     }
 }

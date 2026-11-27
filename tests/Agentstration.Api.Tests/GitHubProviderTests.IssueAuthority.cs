@@ -38,6 +38,7 @@ public sealed partial class GitHubProviderTests
         using (host.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context))
         {
             var tools = await InstallGitHubRelaysAsync(host.Services, context);
+            var selected = await InstallIssueServiceAsync(host.Services, context, extension);
             var taskService = host.Services.GetRequiredService<WorkTaskTreeService>(); var planService = host.Services.GetRequiredService<WorkPlanService>();
             async Task<WorkPlanView> PlanAsync(string title)
             {
@@ -49,16 +50,23 @@ public sealed partial class GitHubProviderTests
             upstream = await PlanAsync("Upstream"); downstream = await PlanAsync("Downstream");
             var definition = new WorkProjectDefinition("Issue API", null, [upstream.Plan.Id, downstream.Plan.Id], [])
             {
-                Bindings = [new("sharing", WorkProjectBindingPurpose.Sharing, Pin(tools.Tracker)), new("tracker", WorkProjectBindingPurpose.TaskOperations, Pin(tools.Tracker))],
+                Bindings = [new("sharing", WorkProjectBindingPurpose.Sharing, Pin(tools.Tracker))],
+                ConnectionRequirements = [selected.Requirement],
+                ConnectionAssignments = [selected.Assignment],
                 Sharing = new(new(Guid.NewGuid()), new(Guid.NewGuid()), "sharing", "fixture")
             };
             var created = await host.Services.GetRequiredService<WorkProjectService>().CreateAsync(new(context.WorkspaceId), WorkProjectId.New(), "issue-api", default, new(Guid.NewGuid(), 0, definition), default);
             Assert.IsTrue(created.IsSuccess, created.ErrorCode); project = created.Value!;
+            var metadata = new WorkSharingProjectMetadata("Issue API", null, [project.Definition.Sharing!.ParticipantId]) { ConnectionRequirements = project.Definition.ConnectionRequirements };
+            var publication = await host.Services.GetRequiredService<WorkProjectSharingService>().PublishAsync(new(context.WorkspaceId), project.Id,
+                new(new(Guid.NewGuid()), project.Version, [new(WorkSharingProjectMetadata.Key, 0, System.Text.Json.JsonSerializer.SerializeToElement(metadata, Json))]), default);
+            Assert.AreEqual(WorkSharingOperationStatus.Succeeded, publication.Value!.Status, publication.ErrorCode ?? publication.Value.ErrorCode);
         }
         var prefix = $"/api/workspaces/{context.WorkspaceId}/projects/{project.Id}/coding";
         AcknowledgeCodingIssueRequest Command(WorkPlanView plan, string number) => new(Guid.NewGuid(), project.Version, plan.Plan.Id.Value,
             Repository, number, "github", "agentstration:plan:", "agentstration:instance:", 0,
-            plan.Revision.Definition.TaskIds.Select(task => new WorkTaskAllocation(task, project.Definition.Sharing!.ParticipantId)).ToArray());
+            plan.Revision.Definition.TaskIds.Select(task => new WorkTaskAllocation(task, project.Definition.Sharing!.ParticipantId)).ToArray())
+        { TrackingConnection = "issues" };
         foreach (var (plan, number) in new[] { (upstream, "1"), (downstream, "2") })
         {
             using var response = await client.PostAsJsonAsync(prefix + "/issues/acknowledge", Command(plan, number));
@@ -75,6 +83,42 @@ public sealed partial class GitHubProviderTests
         using var foreign = await client.GetAsync($"/api/workspaces/{Guid.NewGuid()}/projects/{project.Id}/coding/plans/{downstream.Plan.Id}/issue-readiness");
         Assert.IsTrue(foreign.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden);
         Assert.AreEqual(2, fixture.Native.LabelPosts);
+        // A second SQLite instance uses another account, service UID and Workspace scope for the same native target.
+        var secondDirectory = Path.Combine(fixture.Directory, "second-coordination-host");
+        await using var second = CodingFactory(secondDirectory, extension).WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.AddSingleton<IWorkProjectSharingGateway>(remote)));
+        using var secondClient = second.CreateClient();
+        var otherContext = await second.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
+        using (second.Services.GetRequiredService<IRequestContextScopeFactory>().Push(otherContext))
+        {
+            var otherTools = await InstallGitHubRelaysAsync(second.Services, otherContext);
+            var selection = await InstallIssueServiceAsync(second.Services, otherContext, extension, true);
+            Assert.AreNotEqual(project.Definition.ConnectionAssignments.Single().Service.Uid, selection.Assignment.Service.Uid);
+            Assert.AreNotEqual(project.Definition.ConnectionAssignments.Single().Service.Address.ScopeRef, selection.Assignment.Service.Address.ScopeRef);
+            var definition = new WorkProjectDefinition("Other participant", null, [], [])
+            {
+                Bindings = [new("sharing", WorkProjectBindingPurpose.Sharing, Pin(otherTools.Tracker))],
+                ConnectionRequirements = [selection.Requirement],
+                ConnectionAssignments = [selection.Assignment],
+                Sharing = project.Definition.Sharing! with { ParticipantId = new(Guid.NewGuid()) }
+            };
+            var projects = second.Services.GetRequiredService<WorkProjectService>();
+            var other = (await projects.CreateAsync(new(otherContext.WorkspaceId), WorkProjectId.New(), "issue-api", default,
+                new(Guid.NewGuid(), 0, definition), default)).Value!;
+            var sharing = second.Services.GetRequiredService<WorkProjectSharingService>();
+            var pulled = (await sharing.PullAsync(new(otherContext.WorkspaceId), other.Id, null, default)).Value!;
+            var record = pulled.Records.Single(value => value.Key == new WorkSharingRecordKey(WorkSharingDomain.Plan, upstream.Plan.Id.ToString()));
+            var imported = await sharing.ImportPlanAsync(new(otherContext.WorkspaceId), other.Id, upstream.Plan.Id, record.Digest, default);
+            Assert.IsTrue(imported.IsSuccess, imported.ErrorCode);
+            other = (await projects.GetAsync(new(otherContext.WorkspaceId), other.Id, default)).Value!;
+            var command = Command(upstream, "1") with { Id = Guid.NewGuid(), ExpectedProjectVersion = other.Version };
+            using var acknowledged = await secondClient.PostAsJsonAsync($"/api/workspaces/{otherContext.WorkspaceId}/projects/{other.Id}/coding/issues/acknowledge", command);
+            Assert.AreEqual(HttpStatusCode.Accepted, acknowledged.StatusCode, await acknowledged.Content.ReadAsStringAsync());
+            Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, (await acknowledged.Content.ReadFromJsonAsync<CodingIssueIntakeResponse>())!.Status);
+            Assert.AreEqual(3, fixture.Native.LabelPosts);
+            Assert.AreEqual(1, fixture.Native.Issues[1].Labels.Count(value => value.StartsWith("agentstration:plan:", StringComparison.Ordinal)));
+            Assert.AreEqual(2, fixture.Native.Issues[1].Labels.Count(value => value.StartsWith("agentstration:instance:", StringComparison.Ordinal)));
+        }
     }
 
     [TestMethod]
@@ -92,8 +136,10 @@ public sealed partial class GitHubProviderTests
         var context = await host.Services.GetRequiredService<ILocalEnvironmentBootstrapper>().EnsureInitializedAsync(default);
         using var scope = host.Services.GetRequiredService<IRequestContextScopeFactory>().Push(context);
         var tools = await InstallGitHubRelaysAsync(host.Services, context);
-        var binding = new WorkProjectContextBinding("issues", WorkProjectBindingPurpose.TaskOperations, Pin(tools.Tracker));
-        var issue = new WorkSharingIssueReference("github", Repository, "1", "agentstration:plan:", "agentstration:instance:");
+        var selected = await InstallIssueServiceAsync(host.Services, context, extension);
+        var binding = WorkProjectConnectionRules.Binding(selected);
+        var issue = new WorkSharingIssueReference("github", Repository, "1", "agentstration:plan:", "agentstration:instance:")
+        { ConnectionName = "issues", Tracking = selected.Requirement.Target };
         var policy = host.Services.GetRequiredService<ICodingIssueBindingPolicy>();
         var result = await policy.ResolveAsync(new(context.WorkspaceId), context.PrincipalId, binding, issue, default);
         Assert.IsTrue(result.IsSuccess, result.ErrorCode); Assert.AreEqual("github", result.Value!.Provider);

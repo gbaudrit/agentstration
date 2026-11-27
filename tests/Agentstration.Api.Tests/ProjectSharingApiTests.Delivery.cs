@@ -54,6 +54,7 @@ public sealed partial class ProjectSharingApiTests
         var seed = DeliverySeed(native, left.Tool, leftSources);
         var lp = await InitializeDeliverySeedAsync(left, seed, Guid.NewGuid());
         Assert.HasCount(4, lp.Bindings);
+        lp = await ConfigureDeliveryTrackingAsync(left, lp, github);
         using (left.Scope())
         {
             var pinned = await left.Host.Services.GetRequiredService<FlowService>().ResolveAsync(new WorkspaceId(left.Context.WorkspaceId), new(new FlowId("seed-code")), default);
@@ -177,6 +178,7 @@ public sealed partial class ProjectSharingApiTests
             Kind = ExtensionKinds.ExtensionRegistration,
             ScopeRef = owner,
             Metadata = new() { Name = "github-fixture" },
+            Generation = 1,
             Definition = new()
             {
                 DisplayName = "GitHub fixture",
@@ -203,7 +205,7 @@ public sealed partial class ProjectSharingApiTests
         var authority = ResourceGovernance.Extension($"{owner.Value}/ExtensionRegistration/default/github-fixture", "Agentstration.Extensions.GitHub", "1.0.0");
         using (host.Host.Services.GetRequiredService<IResourceGovernanceContext>().Push(authority))
         {
-            foreach (var tool in (await tools.ListVisibleToolsAsync(owner, default)).Where(value => value.Value.Definition.Provider?.Name == "github-fixture"))
+            foreach (var tool in (await tools.ListVisibleToolsAsync(owner, default)).Where(value => value.Value.Definition.Provider?.Name == "github-fixture" && value.Value.Definition.ExternalId is "github.issue" or "github.coding"))
             {
                 var managed = await resources.PutExactAsync(owner, new ToolResource
                 {
@@ -325,11 +327,34 @@ public sealed partial class ProjectSharingApiTests
         Assert.IsTrue(associated.IsSuccess, associated.ErrorCode);
         return WorkPlanContractMapping.ToPlanResponse(view);
     }
+    private static async Task<WorkProjectResponse> ConfigureDeliveryTrackingAsync(SharingHost host, WorkProjectResponse project,
+        WebApplicationFactory<GitHubExtension::Program> extension)
+    {
+        using var actor = host.Scope(); var workspace = new WorkspaceId(host.Context.WorkspaceId);
+        var selection = await GitHubProviderTests.InstallIssueServiceAsync(host.Host.Services, host.Context, extension);
+        var projects = host.Host.Services.GetRequiredService<WorkProjectService>();
+        var owned = (await projects.GetAsync(workspace, new(project.Id), default)).Value!;
+        var saved = await projects.UpdateAsync(workspace, owned.Id, new(Guid.NewGuid(), owned.Version, owned.Definition with
+        { ConnectionRequirements = [selection.Requirement], ConnectionAssignments = [selection.Assignment] }), default);
+        Assert.IsTrue(saved.IsSuccess, saved.ErrorCode);
+        var sharing = host.Host.Services.GetRequiredService<WorkProjectSharingService>();
+        var pulled = (await sharing.PullAsync(workspace, owned.Id, null, default)).Value!;
+        if (!pulled.Records.Any(value => value.Key == WorkSharingProjectMetadata.Key))
+        {
+            var metadata = new WorkSharingProjectMetadata("Delivery", null, [owned.Definition.Sharing!.ParticipantId]) { ConnectionRequirements = [selection.Requirement] };
+            var publication = await sharing.PublishAsync(workspace, owned.Id, new(new(Guid.NewGuid()), saved.Value!.Version,
+                [new(WorkSharingProjectMetadata.Key, 0, JsonSerializer.SerializeToElement(metadata, Json))]), default);
+            Assert.AreEqual(WorkSharingOperationStatus.Succeeded, publication.Value!.Status, publication.ErrorCode ?? publication.Value.ErrorCode);
+        }
+        return WorkProjectContractMapping.ToProjectResponse(saved.Value!);
+    }
+
     private static async Task AcknowledgeDeliveryIssueAsync(SharingHost host, WorkProjectResponse project, WorkPlanResponse plan, string issue)
     {
         using var response = await host.Http.PostAsJsonAsync(host.Root(project.Id) + "/coding/issues/acknowledge", new AcknowledgeCodingIssueRequest(Guid.NewGuid(), project.Version,
             plan.Id, "fixture/repository", issue, "github", "agentstration:plan:", "agentstration:instance:", 0,
-            [new(new(plan.Tasks.Single().TaskId), project.Sharing!.ParticipantId)]));
+            [new(new(plan.Tasks.Single().TaskId), project.Sharing!.ParticipantId)])
+        { TrackingConnection = "issues" });
         Assert.AreEqual(HttpStatusCode.Accepted, response.StatusCode, await response.Content.ReadAsStringAsync());
         Assert.AreEqual(CodingIssueIntakeStatus.Confirmed, (await response.Content.ReadFromJsonAsync<CodingIssueIntakeResponse>())!.Status);
     }

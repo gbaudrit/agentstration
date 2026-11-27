@@ -35,12 +35,16 @@ public sealed partial class WorkProjectSharingService
         var values = records.ToArray();
         var requirements = values.SingleOrDefault(value => value.Key == WorkSharingProjectMetadata.Key)?
             .Content.Deserialize<WorkSharingProjectMetadata>(Json)?.ConnectionRequirements ?? [];
-        var names = values.Where(value => value.Key.Domain == WorkSharingDomain.Plan)
-            .SelectMany(value => value.Content.Deserialize<WorkSharingPlan>(Json)!.Definition.TaskConnections)
-            .SelectMany(value => value.Names).Distinct(StringComparer.Ordinal).ToArray();
+        var plans = values.Where(value => value.Key.Domain == WorkSharingDomain.Plan).Select(value => value.Content.Deserialize<WorkSharingPlan>(Json)!).ToArray();
+        var names = plans.SelectMany(value => value.Definition.TaskConnections).SelectMany(value => value.Names)
+            .Concat(plans.Where(value => value.Issue is not null).Select(value => value.Issue!.ConnectionName)).Distinct(StringComparer.Ordinal).ToArray();
         if (names.Any(name => !requirements.Any(need => need.Name == name))) return "sharing_connection_requirement_missing";
-        return names.Any(name => requirements.Single(need => need.Name == name).Target is null)
-            ? "sharing_connection_target_required" : null;
+        if (names.Any(name => requirements.Single(need => need.Name == name).Target is null)) return "sharing_connection_target_required";
+        return plans.Where(value => value.Issue is not null).Any(value =>
+        {
+            var requirement = requirements.Single(need => need.Name == value.Issue!.ConnectionName);
+            return requirement.Contract != WorkProjectConnectionRules.Tracking || requirement.Target != value.Issue!.Tracking;
+        }) ? "sharing_connection_requirement_mismatch" : null;
     }
 
     private static string? ValidateLocalConnections(WorkProjectSnapshot project, WorkSharingSnapshot snapshot,
