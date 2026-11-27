@@ -95,8 +95,11 @@ file. Shared test projects require explicit file ownership, as in Foundry:
 }
 ```
 
-Unlisted shared fixtures and the shared test project file continue to select
-product checks and the dependent image. `versionFile`, the catalogue itself,
+Files declared in `ci.testPaths` select their explicit owners rather than every
+extension using the same test project. A file may have multiple declared owners;
+explicit `ci.sharedPaths` dependencies are still included. Unlisted shared
+fixtures and the shared test project file continue to select product checks and
+every dependent image. `versionFile`, the catalogue itself,
 `dockerfile` and its dedicated recipe directory are also recognized. The
 conventional `scripts/packaging/test_<id>_image.py` contract uses underscores for
 hyphens in the catalogue ID.
