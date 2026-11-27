@@ -63,6 +63,40 @@ try {
             Isolated @($path, 'docs/contributing/image-packaging.md') @($id)
         }
     }
+    # Multiple catalogued extensions may own distinct or overlapping files in one test project.
+    $sharedProject = 'tests/SharedProviders.Tests/SharedProviders.Tests.csproj'
+    $sharedEntries = @{}
+    foreach ($name in @('Alpha', 'Beta', 'Gamma')) {
+        $id = $name.ToLowerInvariant()
+        $ownedTests = @("tests/SharedProviders.Tests/${name}Tests.cs")
+        if ($id -ne 'gamma') { $ownedTests += 'tests/SharedProviders.Tests/CoOwnedTests.cs' }
+        $entry = @{
+            schemaVersion = 1; id = $id; project = "src/extensions/Agentstration.Extensions.$name/Agentstration.Extensions.$name.csproj"
+            testProject = $sharedProject; versionFile = "src/extensions/Agentstration.Extensions.$name/version.txt"
+            dockerfile = 'Dockerfile.extension'; ci = @{ testPaths = $ownedTests }
+        }
+        Write-Catalogue $entry
+        $sharedEntries[$id] = $entry
+    }
+    foreach ($name in @('Alpha', 'Beta', 'Gamma')) {
+        Isolated @("tests/SharedProviders.Tests/${name}Tests.cs") @($name.ToLowerInvariant())
+    }
+    Isolated @('tests/SharedProviders.Tests/AlphaTests.cs', 'tests/SharedProviders.Tests/GammaTests.cs') @('alpha', 'gamma')
+    Isolated @('tests/SharedProviders.Tests/CoOwnedTests.cs') @('alpha', 'beta')
+    foreach ($path in @($sharedProject, 'tests/SharedProviders.Tests/SharedFixture.cs', 'tests/SharedProviders.Tests/UnclaimedDeletedTests.cs')) {
+        $selection = Get-FixtureSelection @($path)
+        Require $selection.dotnet "Shared or unclaimed test inputs must retain product validation: $path"
+        Require (($selection.imageIds -join ',') -ceq 'alpha,beta,gamma') "Shared test inputs must validate every dependent image: $path"
+    }
+    # Explicit shared dependencies still select an image when another extension owns the file.
+    $sharedEntries.beta.ci.sharedPaths = @('tests/SharedProviders.Tests/AlphaTests.cs')
+    Write-Catalogue $sharedEntries.beta
+    Isolated @('tests/SharedProviders.Tests/AlphaTests.cs') @('alpha', 'beta')
+    $sharedEntries.beta.ci.Remove('sharedPaths')
+    Write-Catalogue $sharedEntries.beta
+    $selection = Get-FixtureSelection @('tests/SharedProviders.Tests/AlphaTests.cs', 'src/Agentstration.Web/Program.cs')
+    Require ($selection.dotnet -and $selection.container) 'Mixed product inputs must retain transverse validation.'
+    Require (($selection.imageIds -join ',') -ceq 'alpha,server') 'Mixed product inputs must retain their selected images.'
     $all = @(Get-ChildItem (Join-Path $temporary 'deploy/images/extensions') -File -Filter '*.json' | Sort-Object Name | ForEach-Object { $_.BaseName })
     foreach ($path in @('scripts/ci/extensions/classify-changes.ps1', 'scripts/ci/extensions/test-classify-changes.ps1', 'scripts/ci/extensions/new-helper.ps1')) {
         Isolated @($path) $all
