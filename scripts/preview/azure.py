@@ -228,7 +228,7 @@ def validate_record(request, record, action):
             value = record['deletion'][key]
             preview.require(key == 'completedAt' and value is None or timestamp(value) is not None, 'Invalid deletion timestamp.')
     if 'automation' in record:
-        validate_automation(request, record['automation'])
+        validate_automation(record['request'], record['automation'])
     previous = contract.validate(record['request'])
     previous_target, target = contract.azure_target(previous), contract.azure_target(request)
     preview.require(previous['environmentId'] == request['environmentId'] and previous['provider'] == 'azure-vm', 'Azure ownership identity mismatch.')
