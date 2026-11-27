@@ -131,6 +131,12 @@ catalogue ID as a string and defaults to validation only; its existing catalogue
 validator rejects unknown IDs before any build or publication. Opting into `publish_preview`
 publishes the tested archive to private GHCR after the build/smoke job succeeds.
 
+Automatic PR previews instead promote an existing successful PR CI archive.
+Their `preview_pr`, `source_sha`, `ci_run_id` and `ci_run_attempt` inputs bind
+publication to current opt-in and exact CI provenance; this mode always skips
+the build job. PR OCI validation uses the head SHA while product functional
+checks retain GitHub's merge commit. See [selective preview images](preview-automation.md#selective-images).
+
 The build pins SDK and ASP.NET base images by digest, requires a clean source
 checkout, and emits an OCI archive, metadata and `delivery.json`. It includes OCI
 source/version/revision labels, SBOM and provenance. The delivery records the

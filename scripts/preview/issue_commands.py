@@ -272,6 +272,8 @@ def admit(event, repository, call=api, selector=None):
                 source = options['revision'] or linked_ref(repository, issue, call)
                 selector = selector or manual.PublishedImages(repository)
                 options['revision'] = selector.revision(source)
+                if source.startswith('pr:'):
+                    options['preview_pr'] = int(source[3:])
         prefix = 'pr-' if options['tracking_kind'] == 'pull_request' else 'issue-'
         options.update(environment_id=prefix + str(issue), tracking_issue=str(issue), tracking_comment=str(comment['id']))
         manual.validate_options(options)
@@ -299,7 +301,7 @@ def tracking(options, repository, call=api):
     repository = repository_name(repository)
     expected = {'operation', 'environment_id', 'revision', 'provider', 'database', 'vm_size_profile',
                 'ttl_hours', 'data_mode', 'test_profile', 'worker_revision'}
-    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy'}
+    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy', 'preview_pr'}
     preview.require(isinstance(options, dict) and expected <= set(options) <= expected | optional,
                     'Unexpected form or issue tracking fields.')
     tracked = {'tracking_issue', 'tracking_comment'} & set(options)
@@ -435,7 +437,7 @@ def main():
             else:
                 failure = contract.parse(os.environ.get('SELECTION_FAILURE') or '{}')
                 message = feedback.failed(operation, repository, run_url, failure_stage(), options, failure)
-                status_outcome = 'pending' if failure.get('code') == 'image-unavailable' and operation == 'deploy' else 'error'
+                status_outcome = 'pending' if failure.get('code') in ('image-unavailable', 'ci-pending') and operation == 'deploy' else 'error'
             publish(options, repository, message, api)
             if operation != 'validate':
                 sync_status(repository, environment, result, api, operation=operation, outcome=status_outcome)

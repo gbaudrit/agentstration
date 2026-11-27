@@ -34,9 +34,9 @@ def expiry(value):
 
 
 def details(request):
-    lines = ['<details><summary>Exact images used</summary>', '', '| Component | Version | Image by digest |', '| --- | --- | --- |']
+    lines = ['<details><summary>Exact images used</summary>', '', '| Component | Version | Build SHA | Image by digest |', '| --- | --- | --- | --- |']
     for name, image in contract.images(request).items():
-        lines.append('| ' + name + ' | ' + image.get('version', '—')[:120] + ' | `' + image['reference'] + '` |')
+        lines.append('| ' + name + ' | ' + image.get('version', '—')[:120] + ' | ' + image.get('sourceSha', '—')[:12] + ' | `' + image['reference'] + '` |')
     return '\n'.join([*lines, '', '</details>'])
 
 
@@ -46,7 +46,7 @@ def accepted(options, repository, run_url):
     lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + ' — request received**',
              'Environment: `' + options['environment_id'] + '`.']
     if operation == 'deploy':
-        lines += ['Server revision: ' + revision(repository, options['revision']) + '.',
+        lines += ['Requested revision: ' + revision(repository, options['revision']) + '.',
                   'Database: **' + options['database'] + '**. Extensions: ' + extension_names(options.get('extensions', [])) + '.',
                   'Next: check published images and deployment settings. This request has not created a VM yet.']
         if reset:
@@ -61,7 +61,7 @@ def accepted(options, repository, run_url):
 def planned(request, operation, repository, run_url, reset_before_deploy=False):
     lines = ['**' + ('Redeployment' if reset_before_deploy else OPERATIONS[operation]) + ' — checks completed**',
              'Environment: `' + request['environmentId'] + '`.',
-             'Server revision: ' + revision(repository, request['sourceSha']) + '.',
+             'Requested revision: ' + revision(repository, request['sourceSha']) + '.',
              'Database: **' + request['database'] + '**. Extensions: ' + extension_names(request.get('extensions', {})) + '.']
     if operation == 'deploy':
         target = request['target']
@@ -121,7 +121,7 @@ def completed(result, operation, repository, run_url, request=None, reset_before
     else:
         sha = result.get('sourceSha') or (request or {}).get('sourceSha')
         if sha:
-            lines.append('Server revision: ' + revision(repository, sha) + '.')
+            lines.append('Requested revision: ' + revision(repository, sha) + '.')
         if result.get('database'):
             lines.append('Database: **' + result['database'] + '**.')
         selected = (request or {}).get('extensions')
@@ -178,8 +178,13 @@ def failed(operation, repository, run_url, stage, options, failure=None):
     elif code == 'registry-access':
         reason = 'The private GHCR package for `' + component + '` is missing or inaccessible to the workflow.'
         next_step = 'Check its **Private** visibility and **Manage Actions access → gbaudrit/agentstration → Write**, then retry the command.'
+    elif code in ('ci-pending', 'ci-failed'):
+        reason = 'PR validation is still running.' if code == 'ci-pending' else 'PR validation failed or was cancelled.'
+        next_step = 'Wait for all PR workflows to succeed, then retry. Changed components require their exact CI images; unchanged components reuse published digests.'
     reset = options.get('reset_before_deploy', False)
     title = ' — waiting for images**' if code == 'image-unavailable' and operation == 'deploy' else ' — failed**'
+    if code == 'ci-pending' and operation == 'deploy':
+        title = ' — waiting for CI**'
     lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + title, reason]
     if options.get('environment_id'):
         lines.append('Environment: `' + options['environment_id'] + '`.')

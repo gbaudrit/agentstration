@@ -22,6 +22,18 @@ def request(**kwargs):
 
 
 class ContractTests(unittest.TestCase):
+    def test_v4_requested_revision_is_independent_from_reused_server_and_worker_images(self):
+        value = request(source_sha='e' * 40)
+        self.assertEqual(4, value['schemaVersion'])
+        self.assertEqual('e' * 40, value['sourceSha'])
+        self.assertEqual('a' * 40, contract.images(value)['server']['sourceSha'])
+        self.assertEqual('c' * 40, contract.images(value)['worker']['sourceSha'])
+        self.assertEqual(value, contract.loads(json.dumps(value)))
+        value['schemaVersion'] = 1
+        del value['extensions']
+        with self.assertRaises(ValueError):
+            contract.validate(value)
+
     def test_default_request_is_canonical_and_keeps_independent_image_sources(self):
         value = request()
         self.assertEqual(value, contract.loads(json.dumps(value)))

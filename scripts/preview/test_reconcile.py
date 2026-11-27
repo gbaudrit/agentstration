@@ -88,6 +88,19 @@ class Registry:
 
 
 class ReconciliationTests(unittest.TestCase):
+    def test_new_pr_revision_can_reuse_older_server_and_worker_without_inventing_image_sources(self):
+        self.metadata.ci_components = []
+        self.api.pull['head']['sha'] = 'b' * 40
+        value = self.execute()
+        self.assertEqual([], value['failures'])
+        self.assertEqual([], value['pending'])
+        request = self.registry.calls[-1][1]
+        self.assertEqual(4, request['schemaVersion'])
+        self.assertEqual('b' * 40, request['sourceSha'])
+        self.assertEqual('a' * 40, request['deliveries']['server']['sourceSha'])
+        self.assertEqual('c' * 40, request['deliveries']['worker']['sourceSha'])
+        self.assertEqual([], self.execute()['actions'])
+
     def setUp(self):
         self.api = API()
         self.github = reconcile.GitHub(REPOSITORY, self.api)
