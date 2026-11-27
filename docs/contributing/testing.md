@@ -137,6 +137,7 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Extensions.Ollama.Tests` | Integration | Ollama mapping and native streaming deadline with fake downstream transport |
 | `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
 | `Agentstration.Extensions.Git.Tests` | Integration | Extension-owned AEP contracts, real Git processes and temporary repositories |
+| `Agentstration.Extensions.Utilities.Tests` | Integration | Extension-owned AEP discovery and in-process MCP tool/schema contracts |
 | `Agentstration.Extensions.Crawl4AI.Tests` | Integration | Extension-owned acquisition contracts with fake HTTP |
 | `Agentstration.Extensions.OpenApi.Tests` | Integration | Extension-owned discovery/invocation, schema and bounded HTTP contracts |
 | `Agentstration.Extensions.PostgreSql.Tests` | Integration, provider-optional | Structured-document extension contracts and opt-in PostgreSQL checks |
@@ -231,6 +232,14 @@ direct or transitive dependency on another extension executable. The existing CI
 inventory contract rejects missing or duplicate coverage projects. A shared Ollama
 inference fixture is compiled by its extension tests and the product two-hop tests;
 changes to it retain product validation.
+
+Utilities has an independent 15-case AEP/MCP contract suite in Integration and
+Coverage B. The 13 `McpToolCatalogTests` cases remain in `Agentstration.Api.Tests`
+(44 cases total): they verify product governance, credentials, schema resolution
+and invocation through the product pipeline. Their Utilities host reference is
+still required. These are complementary consumer tests, not duplicated extension
+test sources. The dedicated project builds only Utilities and the required AEP
+SDK projects; it needs no running service, internet access or LLM.
 
 ## Management fixture boundaries and profiling
 

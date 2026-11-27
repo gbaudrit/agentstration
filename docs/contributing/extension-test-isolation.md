@@ -10,6 +10,11 @@ other extension executables or the product composition.
 The audit baseline is main `22f0cb2e`. Namespaces, test names, assertions and live
 provider opt-in guards are preserved when sources move.
 
+The Utilities follow-up starts from main `d12f7c23` after
+[PR #1432](https://github.com/gbaudrit/agentstration/pull/1432). Its existing API
+tests are consumer scenarios, so it adds native extension contracts rather than
+moving those scenarios across their product boundary.
+
 | Extension | Previous tests | Destination and dependencies |
 | --- | --- | --- |
 | Foundry | `ModelProviders.Tests/Foundry{Provider,Chat,Streaming,Live}Tests.cs` | `Extensions.Foundry.Tests`; Foundry, AEP abstractions/server, HTTP host testing |
@@ -21,7 +26,7 @@ provider opt-in guards are preserved when sources move.
 | OpenDal | `Extensions.OpenDal.Tests` | Existing project retained; OpenDal, ASC client, HTTP host testing and native OpenDAL operators |
 | PostgreSql | `Extensions.PostgreSql.Tests` | Existing project retained; PostgreSql, ASC structured-document sample, JSON fixtures and HTTP host testing |
 | Crawl4AI | `Extensions.Crawl4AI.Tests` | Existing project retained; Crawl4AI, AEP, HTTP host testing |
-| Utilities | `Api.Tests/McpToolCatalogTests.cs` | Product scenarios retained: Tool governance, schema contribution resolution, credentials and MCP transport; Utilities is their real test host |
+| Utilities | `Api.Tests/McpToolCatalogTests.cs` (13 consumer cases) | Consumer cases retained; new `Extensions.Utilities.Tests` (15 cases) depends only on Utilities, AEP abstractions/client and HTTP host testing |
 
 `ModelProviders.Tests` retains the consumer resolver, Value/Secret Binding,
 diagnostics, protocol scenarios, two-hop inference deadlines and Worker/MAF
@@ -52,6 +57,17 @@ Integration and Coverage B. Fast retains its existing project inventory. All fou
 test solutions are checked together for disjoint functional lanes and exactly one
 coverage shard per Integration project. No test class is compiled into two projects.
 
+Utilities adds one project to the root solution, Integration and Coverage B.
+Fast and Coverage A retain their inventories. Discovery grows from 5,026 to 5,041
+cases (Fast 3,278 unchanged; Integration 1,748 to 1,763); coverage expects 54
+logical module reports instead of 53. The 15 additions cover AEP identity and
+contribution mappings, the MCP catalogue, SHA-256 known-vector/JSON/uppercase
+results with and without dry-run, invariant casing, MCP error propagation, and
+schema definition/instance validation. All 44 API cases, including the 13 product
+MCP scenarios, retain their sources and assertions. No API project reference is
+removed: those scenarios still need the Utilities host. No fixture library or
+cross-project test source is added.
+
 Live Foundry, LocalAI, LlamaCpp and PostgreSQL tests retain their existing
 environment-variable prerequisites and report inconclusive in offline runs. They
 do not require network access, a model, Azure or PostgreSQL by default.
@@ -73,11 +89,17 @@ Pass these repository-relative project paths and filters to the packaging agents
 | LlamaCpp | `tests/Agentstration.Extensions.LlamaCpp.Tests/Agentstration.Extensions.LlamaCpp.Tests.csproj` | `FullyQualifiedName!~LlamaCppIntegrationTests` |
 | Ollama | `tests/Agentstration.Extensions.Ollama.Tests/Agentstration.Extensions.Ollama.Tests.csproj` | `FullyQualifiedName~Agentstration.ModelProviders.Tests` |
 | Git | `tests/Agentstration.Extensions.Git.Tests/Agentstration.Extensions.Git.Tests.csproj` | `FullyQualifiedName~GitSourceProviderTests` |
+| Utilities | `tests/Agentstration.Extensions.Utilities.Tests/Agentstration.Extensions.Utilities.Tests.csproj` | `FullyQualifiedName~Agentstration.Extensions.Utilities.Tests` |
 
 Existing OpenApi, OpenDal, PostgreSql and Crawl4AI project paths remain valid;
-their catalogues and filters are unchanged. No empty Utilities project is created:
-its existing tests exercise the product consumer rather than an isolated Utilities
-implementation contract.
+their catalogues and filters are unchanged. The Utilities follow-up leaves all
+image catalogues unchanged; its packaging owner must select the new project and
+filter above. Until a Utilities catalogue claims that directory, the classifier
+conservatively selects product checks. Synthetic-catalogue regressions verify
+the dedicated directory selects Utilities, mixed extension paths select their
+images, and the API consumer path retains transverse checks. The classifier
+implementation and the shared-project ownership regressions from #1431 remain
+unchanged.
 
 Ollama's packaging catalogue should also declare
 `ci.sharedPaths: ["tests/OllamaInferenceTestFixture.cs"]`: this fixture is truly
