@@ -235,6 +235,14 @@ def main():
             import azure
             request = azure.recorded_request(options['environment_id'], os.environ['AZURE_PREVIEW_SUBSCRIPTION_ID'],
                                              os.environ['AZURE_PREVIEW_RESOURCE_GROUP'], repository)
+            if request is None:
+                value = {'environmentId': options['environment_id'], 'state': 'absent', 'url': None,
+                         'recorded': False, 'providerResourceIds': {}}
+                with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                    output.write('result=' + json.dumps(value) + '\n')
+                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                    summary.write('No deployment is recorded for `' + options['environment_id'] + '`; no resources changed.\n')
+                return 0
             if options['operation'] == 'destroy':
                 request['dataMode'] = options['data_mode']
         else:
@@ -248,7 +256,7 @@ def main():
             summary.write('Source: `' + request['sourceSha'] + '`; database: `' + request['database'] + '`; VM: `' + request['target']['vmSize'] + '`.\n\n')
             for name, value in contract.images(request).items():
                 summary.write('- ' + name + ': `' + value['reference'] + '`\n')
-            summary.write('\nURL is returned only after protected readiness checks. TTL is recorded; automatic expiry is #1286.\n')
+            summary.write('\nURL is returned only after protected readiness checks. Scheduled reconciliation applies the recorded expiry.\n')
     except (ValueError, KeyError, TypeError, RuntimeError, ET.ParseError) as error:
         if isinstance(error, SelectionError):
             with open(os.environ['GITHUB_OUTPUT'], 'a') as output:

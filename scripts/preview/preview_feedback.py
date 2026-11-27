@@ -67,7 +67,7 @@ def planned(request, operation, repository, run_url, reset_before_deploy=False):
         target = request['target']
         lines += ['VM: **' + target['vmSize'] + '**, region: **' + target['region'] + '**.',
                   'The images are available. Deployment will start when its execution slot is available.',
-                  '**Recorded lifetime: ' + str(request['ttlHours']) + ' h. Automatic expiry cleanup is not implemented yet; use `/preview destroy` after testing.**']
+                  '**Lifetime: ' + str(request['ttlHours']) + ' h. Expired previews are selected for full cleanup by scheduled reconciliation; use `/preview destroy` to remove one earlier.**']
         if reset_before_deploy:
             lines.append('**The checked images will be deployed after full removal of the previous preview and its application data.**')
     elif operation == 'destroy':
@@ -101,7 +101,7 @@ def completed(result, operation, repository, run_url, request=None, reset_before
     state = result['state']
     titles = {'running': 'Preview ready', 'destroyed': 'Preview removed', 'absent': 'No active environment',
               'stopped': 'Preview stopped', 'unhealthy': 'Preview unavailable',
-              'provisioning': 'Preview starting', 'drifted': 'Preview configuration needs attention'}
+              'provisioning': 'Preview starting', 'drifted': 'Preview configuration needs attention', 'cleanup-pending': 'Preview cleanup incomplete'}
     if state == 'running' and not result.get('url'):
         titles[state] = 'Environment running — access not confirmed'
     lines = ['**' + titles[state] + '**', 'Environment: `' + result['environmentId'] + '`.']
@@ -109,8 +109,15 @@ def completed(result, operation, repository, run_url, request=None, reset_before
         lines += ['[**Open Agentstration**](' + result['url'] + ')']
     if state == 'destroyed':
         lines.append('This preview’s VM, disks/IP and application data have been removed. Shared services are retained.')
+        deletion = result.get('deletion') or {}
+        reasons = {'manual': 'manual command', 'ttl': 'expired lifetime', 'pr-closed': 'PR closed or merged',
+                   'label-removed': 'automatic preview label removed', 'redeploy': 'explicit redeployment'}
+        preview.require(not deletion or deletion.get('reason') in reasons, 'Invalid deletion reason.')
+        lines += ['Deleted: **' + expiry(deletion.get('completedAt')) + '**.',
+                  'Reason: ' + reasons.get(deletion.get('reason'), 'not recorded') + '.',
+                  'Use `/preview` to create a fresh environment.']
     elif state == 'absent':
-        lines.append('Use `/preview deploy` to create a preview.')
+        lines.append('No deployment is recorded for this environment. Use `/preview` to create one.')
     else:
         sha = result.get('sourceSha') or (request or {}).get('sourceSha')
         if sha:
@@ -130,9 +137,11 @@ def completed(result, operation, repository, run_url, request=None, reset_before
             if not result.get('url'):
                 lines.append('The URL is withheld: this check could not confirm protected access.')
             lines += ['Recorded expiry: **' + expiry(result.get('expiresAt')) + '**.',
-                      '**Automatic expiry cleanup is not implemented yet. Remove the preview after testing to release its resources.**']
+                      'Scheduled reconciliation removes expired previews and their data unless an authorized `preview:keep` label retains them. Queued or failed runs can delay cleanup.']
         elif state == 'stopped':
             lines.append('Data is retained; disks/IP may still incur charges. Use `/preview destroy` to remove them.')
+        elif state == 'cleanup-pending':
+            lines.append('Owned resources or a previous cleanup remain unresolved. Retry `/preview destroy`; this is not a confirmed full deletion.')
         else:
             lines.append('The URL is withheld until availability and protection are confirmed.')
         lines.append(actions())
@@ -170,7 +179,8 @@ def failed(operation, repository, run_url, stage, options, failure=None):
         reason = 'The private GHCR package for `' + component + '` is missing or inaccessible to the workflow.'
         next_step = 'Check its **Private** visibility and **Manage Actions access → gbaudrit/agentstration → Write**, then retry the command.'
     reset = options.get('reset_before_deploy', False)
-    lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + ' — failed**', reason]
+    title = ' — waiting for images**' if code == 'image-unavailable' and operation == 'deploy' else ' — failed**'
+    lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + title, reason]
     if options.get('environment_id'):
         lines.append('Environment: `' + options['environment_id'] + '`.')
     if preview.SHA.fullmatch(options.get('revision') or ''):

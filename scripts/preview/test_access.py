@@ -320,6 +320,16 @@ class AzureAccessTests(unittest.TestCase):
         self.assertTrue(any(method == 'DELETE' and path.endswith('/' + TUNNEL) for method, path, _ in self.api.changes))
         self.assertEqual('reset', self.cloud.effects[0])
 
+    def test_status_cannot_claim_full_deletion_while_owned_cloudflare_route_survives(self):
+        self.execute('deploy')
+        self.cloud.items = []
+        self.cloud.record['destroyed'] = True
+        self.assertEqual('cleanup-pending', self.execute('status')['state'])
+        result = self.execute('destroy', {**self.request, 'dataMode': 'reset'})
+        self.assertEqual('destroyed', result['state'])
+        self.assertEqual([], self.api.tunnels)
+        self.assertEqual([], self.api.dns)
+
     def test_redeploy_rechecks_shared_access_policy_before_deleting_the_old_environment(self):
         self.execute('deploy')
         original = copy.deepcopy(self.cloud.record)

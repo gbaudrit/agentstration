@@ -252,13 +252,27 @@ class RecordedSelectionTests(unittest.TestCase):
         self.assertEqual([], self.cloud.effects)
         saved['dataMode'] = 'reset'
         self.assertEqual([], azure.execute('destroy', saved, self.cloud.factory)['providerResourceIds']['resources'])
-        self.assertEqual('absent', azure.execute('status', self.recorded(), self.cloud.factory)['state'])
+        self.assertEqual('destroyed', azure.execute('status', self.recorded(), self.cloud.factory)['state'])
 
     def test_missing_record_never_reconstructs_or_adopts_resources(self):
         self.cloud.record = None
-        with self.assertRaisesRegex(ValueError, 'No recorded preview'):
+        with self.assertRaisesRegex(ValueError, 'Foreign or unmanaged'):
             self.recorded()
         self.assertEqual([], self.cloud.effects)
+
+    def test_no_record_status_returns_public_absence_without_a_synthetic_image_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, summary = Path(directory) / 'output', Path(directory) / 'summary'
+            with patch.dict(os.environ, {'SELECTION_JSON': json.dumps(options(operation='status')), 'GITHUB_REPOSITORY': 'owner/repo',
+                    'AZURE_PREVIEW_SUBSCRIPTION_ID': VARIABLES['AZURE_PREVIEW_SUBSCRIPTION_ID'],
+                    'AZURE_PREVIEW_RESOURCE_GROUP': VARIABLES['AZURE_PREVIEW_RESOURCE_GROUP'],
+                    'GITHUB_OUTPUT': str(output), 'GITHUB_STEP_SUMMARY': str(summary), 'RUNNER_TEMP': directory}, clear=True), \
+                    patch.object(azure, 'recorded_request', return_value=None):
+                self.assertEqual(0, manual.main())
+            value = json.loads(output.read_text().removeprefix('result='))
+            self.assertEqual('absent', value['state'])
+            self.assertFalse(value['recorded'])
+            self.assertFalse((Path(directory) / 'manual-request.json').exists())
 
     def test_repository_environment_and_scope_must_match(self):
         for changes in ({'repository': 'other/repo'}, {'environment_id': 'another'}, {'resource_group': 'another'},
@@ -286,7 +300,7 @@ class RecordedSelectionTests(unittest.TestCase):
         client = object.__new__(azure.Azure)
         client.request = self.value
         remaining = self.cloud.items[:1]
-        with patch.object(client, 'az'), patch.object(client, 'resources', side_effect=[[]] * 6 + [remaining, []]), patch('azure.time.sleep') as sleep:
+        with patch.object(client, 'az'), patch.object(client, 'resources', side_effect=[[]] * 7 + [remaining, []]), patch('azure.time.sleep') as sleep:
             client.reset(self.cloud.record)
             sleep.assert_called_once_with(5)
         with patch.object(client, 'az'), patch.object(client, 'resources', return_value=remaining), patch('azure.time.sleep'), \

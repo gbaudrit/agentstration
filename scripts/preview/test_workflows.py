@@ -27,6 +27,19 @@ class WorkflowSecretTests(unittest.TestCase):
     def workflows(self):
         return {path.name: path.read_text() for path in (preview.ROOT / '.github/workflows').glob('preview*.yml')}
 
+    def test_reconciliation_uses_only_trusted_main_and_no_candidate_artifacts_or_scripts(self):
+        source = self.workflows()['preview-reconcile.yml']
+        self.assertIn("github.ref == 'refs/heads/main'", source)
+        self.assertIn('ref: ${{ github.sha }}', source)
+        self.assertIn('schedule:', source)
+        self.assertIn('workflows: [OCI images]', source)
+        self.assertIn("github.event.workflow_run.event == 'workflow_dispatch'", source)
+        self.assertIn('cancel-in-progress: false', source)
+        for forbidden in ('pull_request_target:', 'pull_request:', 'workflow_run.head_sha', 'download-artifact', 'actions: write', 'packages: write'):
+            self.assertNotIn(forbidden, source)
+        self.assertIn('default: true', source)
+        self.assertIn('arguments+=(--apply)', source)
+
     def test_private_extension_configuration_is_only_available_in_protected_executors(self):
         source = self.workflows()['preview-environment.yml']
         validation = source.split('\n  execute:')[0]
@@ -118,9 +131,9 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertNotIn('id-token:', announce)
         report = source.split('\n  report:\n', 1)[1]
         self.assertIn('always()', report)
-        self.assertIn('EXECUTION_RESULT: ${{ needs.execute.result }}', report)
+        self.assertIn("EXECUTION_RESULT: ${{ needs.recorded.outputs.result != '' && 'success' || needs.execute.result }}", report)
         self.assertNotIn('RESULT_JSON: ${{ needs.execute.outputs.result }}', report)
-        self.assertIn('RESULT_FILE: ${{ runner.temp }}/preview-feedback/preview-result.json', report)
+        self.assertIn("RESULT_FILE: ${{ needs.execute.result == 'success' && format('{0}/preview-feedback/preview-result.json', runner.temp) || '' }}", report)
         download = report.split('uses: actions/download-artifact@v8', 1)
         self.assertIn("if: needs.execute.result == 'success'", download[0])
         self.assertIn('name: preview-result-${{ fromJSON(needs.boundary.outputs.selection || inputs.selection).environment_id }}-${{ github.run_id }}-${{ github.run_attempt }}', download[1])

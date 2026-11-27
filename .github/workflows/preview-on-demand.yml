@@ -165,6 +165,7 @@ jobs:
       id-token: write
     outputs:
       request: ${{ steps.recorded.outputs.request }}
+      result: ${{ steps.recorded.outputs.result }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -184,6 +185,7 @@ jobs:
           AZURE_PREVIEW_STORAGE_CONTAINER: ${{ vars.AZURE_PREVIEW_STORAGE_CONTAINER || 'previews' }}
         run: python3 scripts/preview/manual.py
       - uses: actions/upload-artifact@v7
+        if: steps.recorded.outputs.request != ''
         with:
           name: manual-preview-request-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/manual-request.json
@@ -192,7 +194,7 @@ jobs:
 
   announce:
     needs: [boundary, select, recorded]
-    if: ${{ !cancelled() && needs.boundary.outputs.issue-number != '' && (needs.select.result == 'success' || needs.recorded.result == 'success') }}
+    if: ${{ !cancelled() && needs.boundary.outputs.issue-number != '' && (needs.select.outputs.request != '' || needs.recorded.outputs.request != '') && (needs.select.result == 'success' || needs.recorded.result == 'success') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -214,7 +216,7 @@ jobs:
 
   execute:
     needs: [boundary, select, recorded, announce]
-    if: ${{ !cancelled() && (needs.select.result == 'success' || needs.recorded.result == 'success') && (needs.announce.result == 'success' || (needs.boundary.outputs.issue-number == '' && needs.announce.result == 'skipped')) }}
+    if: ${{ !cancelled() && (needs.select.outputs.request != '' || needs.recorded.outputs.request != '') && (needs.select.result == 'success' || needs.recorded.result == 'success') && (needs.announce.result == 'success' || (needs.boundary.outputs.issue-number == '' && needs.announce.result == 'skipped')) }}
     permissions:
       contents: read
       packages: read
@@ -255,6 +257,7 @@ jobs:
           REQUEST_JSON: ${{ needs.select.outputs.request || needs.recorded.outputs.request }}
           STAGE_RESULTS: ${{ toJSON(needs) }}
           SELECTION_FAILURE: ${{ needs.select.outputs.failure }}
-          EXECUTION_RESULT: ${{ needs.execute.result }}
-          RESULT_FILE: ${{ runner.temp }}/preview-feedback/preview-result.json
+          EXECUTION_RESULT: ${{ needs.recorded.outputs.result != '' && 'success' || needs.execute.result }}
+          RESULT_JSON: ${{ needs.recorded.outputs.result }}
+          RESULT_FILE: ${{ needs.execute.result == 'success' && format('{0}/preview-feedback/preview-result.json', runner.temp) || '' }}
         run: python3 scripts/preview/issue_commands.py report
