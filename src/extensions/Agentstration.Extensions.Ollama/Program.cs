@@ -1,9 +1,13 @@
+using System.Reflection;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.Ollama;
 using Microsoft.Extensions.AI;
 using OllamaSharp;
 
 var builder = WebApplication.CreateBuilder(args);
+var extensionVersion = typeof(OllamaAepModelProvider).Assembly
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+    ?? throw new InvalidOperationException("The Ollama extension version is missing.");
 var endpointText = builder.Configuration["Ollama:Endpoint"]
     ?? builder.Configuration.GetConnectionString("ollama")
     ?? "http://localhost:11434";
@@ -31,7 +35,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Extension = new(
         "Agentstration.Extensions.Ollama",
         "Ollama",
-        "1.0.0",
+        extensionVersion,
         "Agentstration AEP model-provider extension for Ollama.");
     options.OptionSets.Add(OllamaOptionContracts.ModelProfile);
 })

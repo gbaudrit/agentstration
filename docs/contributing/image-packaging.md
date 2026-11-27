@@ -68,7 +68,7 @@ Inspect the catalogue and run the offline packaging contracts:
 ```sh
 python3 scripts/packaging/images.py describe --extension foundry
 python3 -m unittest discover -s scripts/packaging -p 'test_*.py' -v
-dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration Release --filter 'FullyQualifiedName~FoundryProviderTests' --minimum-expected-tests 1
+dotnet test --project tests/Agentstration.Extensions.Foundry.Tests --configuration Release --filter 'FullyQualifiedName!~FoundryLiveTests' --minimum-expected-tests 1
 ```
 
 ## Build once and validate
@@ -84,13 +84,18 @@ extension inputs select only their image, while common packaging and global
 
 The default source directory comes from `project`. A dedicated test project
 named `<extension project>.Tests` owns its entire directory, including its project
-file. Shared test projects require explicit file ownership, as in Foundry:
+file. Foundry now uses `Agentstration.Extensions.Foundry.Tests` and owns that
+directory. Its offline filter includes Provider, Chat and Streaming tests; live
+checks remain explicit opt-ins. See the [isolation inventory](extension-test-isolation.md)
+for the other packaging PRs' project/filter handoff.
+
+Shared test projects still require explicit file ownership, for example:
 
 ```json
 "ci": {
   "testPaths": [
-    "tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs",
-    "tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs"
+    "tests/SharedProviders.Tests/AlphaTests.cs",
+    "tests/SharedProviders.Tests/AlphaLiveTests.cs"
   ]
 }
 ```
@@ -380,6 +385,109 @@ credential administration, retry/partial-publication and immutable-version confl
 criteria. Do not create `extension/openapi/v0.1.0`: the current tag path also requests
 Docker Hub publication.
 
+## Ollama AEP extension
+
+[#1298](https://github.com/gbaudrit/agentstration/issues/1298) adds the implemented
+`deploy/images/extensions/ollama.json` entry and the manual **OCI images** identifier
+`ollama`. It packages only `Agentstration.Extensions.Ollama`, using the same
+`Dockerfile.extension`, builder, publisher and generic AEP smokes as Foundry.
+No Ollama inference server, model file or model acquisition command is included.
+The existing `deploy/compose/ollama.yml` remains a separate source-build topology.
+The trusted-main preview-label synchronization from
+[#1389](https://github.com/gbaudrit/agentstration/pull/1389) derives
+`preview:extension:ollama` from this catalogue ID once the entry reaches `main`.
+It does not deploy anything or assign the label to issues. Preview deployment
+selection remains separate from packaging and requires a qualified private OCI
+delivery; see [preview on demand](preview-on-demand.md).
+
+Its own `version.txt` starts at `0.1.0` and feeds the assembly informational
+version, AEP identity `Agentstration.Extensions.Ollama` and OCI version label.
+The AEP protocol stays `agentstration.io/v1`; the model-provider contribution is
+`ollama`, and `io.agentstration.ollama/model-profile` stays at option version
+`1.0.0`. Packaging does not migrate persisted option contracts or product versions.
+Linux amd64 is the supported image platform.
+
+```sh
+python3 scripts/packaging/images.py describe --extension ollama
+python3 scripts/packaging/images.py build --extension ollama \
+  --repository gbaudrit/agentstration --directory artifacts/ollama
+dotnet test --project tests/Agentstration.Extensions.Ollama.Tests --configuration Release \
+  --filter 'FullyQualifiedName~Agentstration.ModelProviders.Tests' --minimum-expected-tests 1
+```
+
+Ollama-only source, catalogue and dedicated `Agentstration.Extensions.Ollama.Tests`
+changes select its targeted OCI validation. Changes to
+`tests/OllamaInferenceTestFixture.cs`, shared with product tests, select Ollama
+and retain transverse product validation. Shared AEP/enrollment fixtures select every implemented AEP image;
+shared packaging selects all implemented image families. Mixed product changes,
+shared test projects, SDK/package inputs and classifier changes retain transverse
+validation. Preserve the other implemented entries when integrating concurrent
+packaging changes into the selector and classifier.
+
+### Ollama container settings and state
+
+| Variable | Purpose and default |
+| --- | --- |
+| `ASPNETCORE_URLS` | Container listener, `http://+:8080` from the shared recipe. Publish it only to the intended private network. |
+| `Ollama__Endpoint` | Native inference HTTP endpoint; defaults to `http://localhost:11434`. A container normally needs the explicit DNS name of a separately operated server. Health/discovery/enrollment do not require that server. |
+| `Ollama__Inference__Timeout` | Finite chat and streaming budget, default `00:01:30`; accepted range `00:00:00.001`–`1.00:00:00`. Model listing retains the existing 90-second client budget. |
+| `Aep__EnrollmentMode` | Use `SharedKeyFile` for unattended private delivery. The executable development default is `Disabled`; do not expose that mode. |
+| `Aep__SharedKeyFile__Path` | Read-only file containing the enrollment/invocation key; required for SharedKeyFile. |
+| `Aep__SharedKeyFile__ClientId` | Technical caller identity, default `agentstration-development`; configure it for the installation. |
+| `Aep__SharedKeyFile__AuthorityUrl` | Authoritative Agentstration server URL; enables signed announcements. Use HTTPS outside isolated Development fixtures. |
+| `Aep__SharedKeyFile__PublicEndpoint` | Extension URL reachable from that authority, required when announcing. |
+| `Aep__SharedKeyFile__StateFile` | Persisted installation identity, default `/app/.aep/shared-key-instance`. Prefer an explicit file in a dedicated writable state mount. |
+| `Aep__SharedKeyFile__AllowInsecureHttp` | Default `false`; explicitly `true` only for the isolated Development smoke network. |
+
+Mount the key read-only in both the extension and authority with owner-only file
+permissions. The authority configures matching trust under
+`Agentstration__Extensions__Agentstration.Extensions.Ollama__EnrollmentMode`
+and `Agentstration__Extensions__Agentstration.Extensions.Ollama__SharedKeyFile__Path`. Give the extension only its dedicated writable instance-state mount,
+owned by its configured container UID/GID; retain it when recreating containers.
+It needs no server database, model volume or inference-server state mount. Keep
+keys, model files and generated state outside the build context and artifacts.
+
+### Ollama qualification and private delivery
+
+`OllamaPackagingTests` checks public health, rejected anonymous/invalid discovery,
+authenticated identity and independent assembly/option versions. Its in-process
+HTTP fixture returns fixed native version, model capabilities and chat results;
+unexpected routes fail, so no model download or real LLM is involved. Existing
+mapping and native streaming-timeout tests run alongside packaging tests in the
+dedicated extension project. Product reasoning and two-hop timeout tests remain
+in their product test project, outside this catalogue's offline filter.
+The Docker gates reuse generic health/discovery/restart and SQLite-authority
+SharedKeyFile enrollment, invalid-proof rejection and persistent identity checks.
+The authority and extension use the exact same source and pinned build bases.
+
+The compatibility baseline is the selected source revision with its local SQLite,
+deterministic Agentstration authority and AEP `agentstration.io/v1`. The hosted
+native fixture does not establish compatibility with every Ollama server/model.
+`delivery.json` supplies source SHA, extension version, OCI digest, pinned bases,
+archive checksum, provenance and SBOM; `enrollment-smoke.json` supplies the tested
+source/digest/authority identity combination. Validation artifacts and publication
+receipts are the evidence of checks actually completed; adding this catalogue is
+not evidence of registry publication.
+
+Before publishing, an administrator must establish
+`ghcr.io/gbaudrit/agentstration-extension-ollama` as **private** and grant
+`gbaudrit/agentstration` **Manage Actions access → Write**, following the first
+package initialization procedure above. An owner token reading metadata alone
+does not prove repository Actions access. Use the existing `oci-images.yml`
+workflow with `extension=ollama` and `publish_preview=true` only after both checks.
+The job's `GITHUB_TOKEN` publishes the validated archive under
+`sha-<full-source-sha>` and retains the immutable digest receipt. Missing,
+inaccessible or non-private package metadata stops the shared publisher before
+upload. No registry credential is passed into builds or extension settings.
+
+Keep #1298 open until effective private qualification is recorded. Docker Hub is
+explicitly deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384):
+release-tag/main-ancestry validation, same-archive promotion without rebuilding,
+public anonymous pull and lifecycle smoke, immutable digest/provenance/SBOM
+consistency, release-only credentials and retry/conflict handling remain required
+for future public qualification. Do not create `extension/ollama/v0.1.0`; the
+current tag path also invokes Docker Hub.
+
 ## MAF AWP Worker
 
 [#1300](https://github.com/gbaudrit/agentstration/issues/1300) adds `maf-worker` under
@@ -574,6 +682,215 @@ create `extension/opendal/v0.1.0`: that release path also triggers Docker Hub.
 Keep #1293 open until effective private qualification is recorded; use no
 premature auto-closing keyword.
 
+## LocalAI private image
+
+Related to [#1299](https://github.com/gbaudrit/agentstration/issues/1299).
+`deploy/images/extensions/localai.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+Set `LocalAI__Endpoint` (default `http://localhost:8081`) to an existing HTTP(S)
+LocalAI service. Supply optional `LocalAI__ApiKey` through protected runtime
+configuration, never image layers, command arguments, receipts or logs. The image
+contains only the AEP extension, with no inference server or model. The separate
+`deploy/compose/localai.yml` source-build topology uses `localai/localai:v4.9.0`
+and an explicit model volume; its empty model catalogue does not trigger downloads.
+Deterministic HTTP fixtures and protected-discovery packaging tests run in the
+dedicated `Agentstration.Extensions.LocalAI.Tests` project. The OCI filter excludes
+`LocalAiIntegrationTests`, which requires an explicit live LocalAI/model opt-in.
+Shared product inference-timeout tests remain outside this extension validation;
+packaging smokes do not claim live-provider qualification.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-localai:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-localai/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=localai`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:localai`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/localai/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1299 open until effective private qualification is recorded; use no
+premature auto-closing keyword.
+
+## Crawl4AI private image
+
+Related to [#1297](https://github.com/gbaudrit/agentstration/issues/1297).
+`deploy/images/extensions/crawl4ai.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+Set `Crawl4AI__Endpoint` to a separately operated Crawl4AI service (default
+`http://localhost:11235`). `Crawl4AI__AllowedDomains__0` and subsequent indices are
+required; preserve explicit allowed ports, private-address denial, depth/page,
+payload, timeout and spool limits. The public smoke-only domain
+`fixture.example.test` is injected by the test catalogue, not a production default.
+Provide downstream authentication with a protected `Crawl4AI__ApiTokenFile` mount
+(or protected runtime configuration); the AEP key is separate. Set
+`Crawl4AI__ContentDirectory` to an operator-owned writable volume for retained
+acquisition content and preserve the retention/quota policy. `/health` is process
+liveness; `/health/ready` deliberately depends on the upstream service and may be
+503 when it is absent. No upstream server or model is embedded or downloaded.
+External mode uses the existing endpoint. The separate Aspire companion mode uses
+`Crawl4AI:Enabled=true`, `Provisioning=Managed` and its pinned `unclecode/crawl4ai:0.9.4`
+image (override explicitly); `Provisioning=External` disables provisioning.
+Neither companion mode nor live internet acquisition is claimed as tested here;
+the existing HTTP/DNS fixtures qualify bounded provider behavior offline.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-crawl4ai:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-crawl4ai/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=crawl4ai`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:crawl4ai`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/crawl4ai/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1297 open until effective private qualification is recorded; use no
+premature auto-closing keyword.
+
+## LlamaCpp private image
+
+Related to [#1292](https://github.com/gbaudrit/agentstration/issues/1292).
+`deploy/images/extensions/llama-cpp.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+The catalogue ID is `llama-cpp`; its real model-provider contribution is `llamacpp`.
+Set `LlamaCpp__Endpoint` (default `http://localhost:8080`) to an existing HTTP(S)
+inference endpoint. The extension includes no inference executable or GGUF model.
+The existing `deploy/compose/llama-cpp.yml` is a separate source-build companion
+topology using `ghcr.io/ggml-org/llama.cpp:server-b10830`; supply the GGUF file and
+model volume explicitly. No model is downloaded implicitly. Container packaging
+qualification does not qualify that companion or real GGUF inference. The affected
+provider and protected-discovery packaging tests run in the dedicated
+`Agentstration.Extensions.LlamaCpp.Tests` project with deterministic fixtures.
+The OCI filter excludes the opt-in `LlamaCppIntegrationTests`; shared product
+inference-timeout tests remain outside this extension validation.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-llama-cpp:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-llama-cpp/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=llama-cpp`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:llama-cpp`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/llama-cpp/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1292 open until effective private qualification is recorded; use no
+premature auto-closing keyword.
+
 ## Utilities private image
 
 Related to [#1296](https://github.com/gbaudrit/agentstration/issues/1296).
@@ -586,9 +903,11 @@ The image has no provider endpoint, credential, model or external-service
 requirement. It exposes `hash.compute`, `json.compact`, `text.upper` and the existing
 `json-schema.validation` contribution through MCP server `utilities` at `/mcp`.
 The extension version is independent from schema contribution version `1.0`.
-The targeted API tests exercise real deterministic MCP discovery and invocation,
-including schema-backed tool contracts. Shared API project/dependency changes keep
-transverse validation; the owned MCP catalogue/packaging tests are targeted.
+The dedicated `Agentstration.Extensions.Utilities.Tests` project runs native
+MCP discovery/invocation, schema contracts and protected-discovery packaging tests
+without the product composition. The OCI filter selects this project namespace.
+`Agentstration.Api.Tests/McpToolCatalogTests.cs` remains product integration coverage
+and retains transverse validation; it is not claimed as extension-owned input.
 
 ### Authentication, state and publication
 
