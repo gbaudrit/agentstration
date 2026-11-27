@@ -97,6 +97,7 @@ def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=Non
         verified = verification.get('extensionsVerified', [])
     # Keep the Run Command response below its 4 KiB limit and exclude host secrets/configuration.
     return {'state': result['state'],
+            **({'health': result['health']} if action == 'deploy' else {}),
             'observedImages': {key: value for key, value in result['observedImages'].items() if not key.startswith('extension-')},
             'extensionsVerified': verified, 'expiresAt': result['expiresAt'],
             'accessReady': bool(route and action != 'destroy' and access_host.ready(route['ownerId'])),
