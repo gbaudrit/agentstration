@@ -101,6 +101,22 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertIn("os.environ['GITHUB_EVENT_NAME'] in ('workflow_dispatch', 'push')", provider)
         self.assertNotIn("'issue_comment'", provider)
 
+    def test_pr_ci_read_permission_reaches_selector_through_every_reusable_caller(self):
+        workflows = {path.name: path.read_text() for path in
+                     (preview.ROOT / '.github/workflows').glob('*.yml')}
+        selector = workflows['preview-on-demand.yml'].split('\n  select:\n', 1)[1].split('\n  recorded:\n', 1)[0]
+        self.assertRegex(selector, r'(?m)^      actions: read$')
+        callers = []
+        for filename, source in workflows.items():
+            jobs = re.split(r'(?m)^  ([A-Za-z_][A-Za-z0-9_-]*):[ \t]*\n', source.partition('\njobs:\n')[2])
+            for name, body in zip(jobs[1::2], jobs[2::2]):
+                if re.search(r'(?m)^    uses: \./\.github/workflows/preview-on-demand\.yml[ \t]*$', body):
+                    callers.append((filename, name))
+                    with self.subTest(workflow=filename, job=name):
+                        self.assertRegex(body, r'(?m)^      actions: read$',
+                                         'The caller must permit the nested selector to read PR CI provenance.')
+        self.assertIn(('preview-issue-deployment.yml', 'execute'), callers)
+
     def test_pr_comment_write_permission_reaches_writers_and_the_reusable_caller(self):
         admission = self.workflows()['preview-issue.yml']
         relay = self.workflows()['preview-issue-deployment.yml']
