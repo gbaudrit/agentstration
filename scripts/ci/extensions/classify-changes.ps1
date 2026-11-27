@@ -104,9 +104,12 @@ foreach ($path in $Paths) {
             [void]$selected.Add($entry.id)
         }
     }
+    $testOwners = @($entries | Where-Object {
+        ($_.dedicatedTests -or $path -cne $_.testProject) -and
+            @($_.testPaths | Where-Object { $path -clike $_ }).Count -gt 0
+    } | ForEach-Object { $_.id })
     foreach ($entry in $entries) {
-        $testOwned = @($entry.testPaths | Where-Object { $path -clike $_ }).Count -gt 0 -and
-            ($entry.dedicatedTests -or $path -cne $entry.testProject)
+        $testOwned = $entry.id -cin $testOwners
         $recipeOwned = $entry.recipeDirectory -ne '' -and $path.StartsWith($entry.recipeDirectory, [StringComparison]::Ordinal)
         $direct = $path.StartsWith($entry.sourceDirectory, [StringComparison]::Ordinal) -or
             $testOwned -or $recipeOwned -or $path -cin @($entry.catalogue, $entry.versionFile, $entry.dockerfile, $entry.contract) -or
@@ -115,9 +118,9 @@ foreach ($path in $Paths) {
             [void]$owned.Add($path)
             [void]$selected.Add($entry.id)
         }
-        elseif ($path.StartsWith($entry.testDirectory, [StringComparison]::Ordinal) -or
+        elseif (($testOwners.Count -eq 0 -and $path.StartsWith($entry.testDirectory, [StringComparison]::Ordinal)) -or
                 @($entry.sharedPaths | Where-Object { $path -clike $_ }).Count -gt 0) {
-            # Shared test projects/fixtures validate their image and retain product checks.
+            # Unclaimed tests/projects retain conservative coverage; explicit owners suppress directory fallback.
             [void]$selected.Add($entry.id)
         }
     }
