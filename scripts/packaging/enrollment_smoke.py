@@ -114,6 +114,9 @@ def run(delivery_path, image, authority_image, output):
             (directory / name).mkdir()
         (directory / "authority-aep.env").write_text(
             "".join(name + "=" + value + "\n" for name, value in trust.items()), encoding="utf-8")
+        (directory / "extension.env").write_text(
+            "".join(name + "=" + value + "\n" for name, value in images.smoke_environment(delivery_entry(delivery)).items()),
+            encoding="utf-8")
         key = secrets.token_urlsafe(48)
         with open(directory / "key", "w", opener=lambda path, flags: os.open(path, flags, 0o600)) as stream:
             stream.write(key)

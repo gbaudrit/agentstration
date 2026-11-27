@@ -74,14 +74,52 @@ dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration R
 ## Build once and validate
 
 Product **CI** calls the reusable **Validate OCI image** workflow for the
-implemented image catalogue entries. Foundry-only inputs select Foundry; Worker/AWP
-inputs select the Worker and the server/Worker preview validation; server-specific
-inputs select the server. Shared packaging inputs select all three. Worker product
-changes retain conservative product validation. The required `build-and-test` check includes its result;
-Foundry-only changes use this targeted validation while shared or mixed inputs
-retain the transverse checks described in [Testing](testing.md#ci-inventory-and-execution-safeguards).
-The reusable workflow has read-only repository access and contains no publication
-job. There is one PR image build, not a second independently triggered image run.
+implemented catalogue entries. A single catalogue-driven selector under
+`scripts/ci/extensions/` discovers AEP extension ownership; the central selector
+combines its result with server/Worker and product inputs. Isolated implemented
+extension inputs select only their image, while common packaging and global
+.NET/CI inputs retain their appropriate shared checks. The required
+`build-and-test` gate waits for the selected validations. See the
+[selection matrix](testing.md#catalogue-driven-extension-selection).
+
+The default source directory comes from `project`. A dedicated test project
+named `<extension project>.Tests` owns its entire directory, including its project
+file. Shared test projects require explicit file ownership, as in Foundry:
+
+```json
+"ci": {
+  "testPaths": [
+    "tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs",
+    "tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs"
+  ]
+}
+```
+
+Files declared in `ci.testPaths` select their explicit owners rather than every
+extension using the same test project. A file may have multiple declared owners;
+explicit `ci.sharedPaths` dependencies are still included. Unlisted shared
+fixtures and the shared test project file continue to select product checks and
+every dependent image. `versionFile`, the catalogue itself,
+`dockerfile` and its dedicated recipe directory are also recognized. The
+conventional `scripts/packaging/test_<id>_image.py` contract uses underscores for
+hyphens in the catalogue ID.
+
+Optional `ci.additionalPaths` declares extension-owned packaging assets, for
+example `deploy/<id>/**`, `scripts/packaging/<id>_smoke.py` or a dedicated workflow
+whose filename includes the ID. Optional `ci.sharedPaths` selects the dependent
+image for shared SDK/protocol inputs **without** granting product exemptions.
+All paths are repository-relative; test patterns must stay inside the declared
+test project. This metadata does not change extension, protocol or contribution
+versions, and introduces no executable catalogue entry by itself.
+
+Only delivered catalogue entries are recognized. Unknown or removed ownership
+remains conservative, and malformed entries stop classification. The offline
+contracts create temporary catalogues to exercise all pending extension shapes;
+new packaging PRs can add their real catalogue without editing the central
+classifier. Existing packaging PRs must retain the new central selector when
+synchronizing after this refactor merges; obsolete provider-specific rules and
+central test additions should not be reintroduced. Resource Plan UX's generic
+extension exclusion also avoids per-provider workflow edits.
 
 The workflow files are `.github/workflows/oci-images.yml` (delivery) and
 `.github/workflows/validate-oci-image.yml` (reusable validation). Automation that
@@ -92,8 +130,15 @@ artifact names remain compatible with existing result gates and delivery receipt
 
 The **OCI images** delivery workflow reuses that same validation for
 extension release tags and manual dispatch. A manual dispatch takes an implemented
-catalogue ID and defaults to validation only. Opting into `publish_preview`
+catalogue ID as a string and defaults to validation only; its existing catalogue
+validator rejects unknown IDs before any build or publication. Opting into `publish_preview`
 publishes the tested archive to private GHCR after the build/smoke job succeeds.
+
+Automatic PR previews instead promote an existing successful PR CI archive.
+Their `preview_pr`, `source_sha`, `ci_run_id` and `ci_run_attempt` inputs bind
+publication to current opt-in and exact CI provenance; this mode always skips
+the build job. PR OCI validation uses the head SHA while product functional
+checks retain GitHub's merge commit. See [selective preview images](preview-automation.md#selective-images).
 
 The build pins SDK and ASP.NET base images by digest, requires a clean source
 checkout, and emits an OCI archive, metadata and `delivery.json`. It includes OCI
@@ -121,7 +166,7 @@ version, protocol and contribution from the selected catalogue entry. It generat
 the authority's per-extension trust settings from `extensionId`, supplying only the
 SharedKeyFile mode and the mounted key path in a temporary environment file. No
 provider ID or provider-specific endpoint is embedded in the scenario. The real
-image validation currently exercises Foundry, the implemented AEP catalogue entry;
+image validation exercises implemented AEP catalogue entries, including OpenAPI;
 offline regression cases also cover other extension identities. A new AEP image
 uses this same enrollment scenario when its catalogue/build vertical is added.
 
@@ -241,6 +286,100 @@ archive checksum and refuses replacement of a tag with a different digest.
 Deployment consumers must retain the actual digest reference, not resolve a
 mutable convenience tag at deployment time.
 
+## OpenAPI extension
+
+The `openapi` catalogue entry packages the autonomous
+`Agentstration.Extensions.OpenApi` host with `Dockerfile.extension`. Its independent
+version starts at `0.1.0`; `version.txt` feeds the assembly, advertised AEP identity
+and OCI version label. AEP remains `agentstration.io/v1`; schema format
+`openapi.validation`, connected-service contracts and profile bundles retain their
+existing contribution versions (`1.0.0`, with the embedded discovery Flow at
+`1.0.2`). These versions have separate compatibility meanings.
+
+The image advertises schema validation, `openapi.contract.discover` and
+`openapi.operation.invoke`, the `openapi-governed` and `openapi-connected-services`
+profile bundles, connected-service type `openapi`, operation type
+`openapi-operation`, and the existing `/mcp` server. The generic protected AEP
+smoke checks all catalogue contribution families; the selected offline MSTest
+project also checks MCP tools, contract discovery/invocation and manifest validity.
+It uses deterministic `HttpMessageHandler` fixtures, synthetic `.example.test`
+destinations and a fake DNS resolver; no external API or downstream credential is
+required. The existing tests cover domain/address/port restrictions, explicit
+same-origin candidates, exact contract digests, reference rules, payload/media
+bounds and cancellation. Packaging does not relax those policies.
+
+```sh
+python3 scripts/packaging/images.py describe --extension openapi
+python3 scripts/packaging/images.py build --extension openapi \
+  --repository gbaudrit/agentstration --directory artifacts/openapi
+# After committing a clean source revision, through the trusted delivery workflow:
+gh workflow run oci-images.yml --ref <branch-or-main> \
+  -f extension=openapi -f publish_preview=true
+```
+
+Before that publication dispatch, an administrator must initialize
+`ghcr.io/gbaudrit/agentstration-extension-openapi` as **private** and verify
+**Manage Actions access → gbaudrit/agentstration → Write**, following
+[First package initialization](#first-package-initialization). Package linkage alone
+is insufficient. If metadata or access cannot be verified, finish code/tests/PR
+and stop before uploading the application image. The publisher verifies privacy
+again and copies the validated archive without rebuilding it. Retain
+`delivery.json`, the OCI archive (including provenance/SBOM),
+`enrollment-smoke.json` and `publication-ghcr.json`: together they identify the
+source SHA, `0.1.0` version, exact digest, pinned build bases and tested SQLite
+authority image. Use the receipt's `ghcr.io/...@sha256:...` reference for deployment.
+
+Required and optional runtime settings use standard .NET environment syntax:
+
+| Setting | Behavior |
+| --- | --- |
+| `OpenApi__AllowedDomains__0` (and subsequent indexes) | Required explicit destination allowlist; no default external destination. |
+| `OpenApi__AllowedPorts__0` (and subsequent indexes) | Defaults to `80`, `443`. |
+| `OpenApi__AllowPrivateAddresses` | Defaults to `false`; loopback/link-local remain denied. |
+| `OpenApi__MaximumCandidatePaths` / `MaximumOperations` | Defaults to `8` / `1000`. |
+| `OpenApi__MaximumDocumentBytes` / `MaximumResponseBytes` | Defaults to 2 MiB / 4 MiB. |
+| `OpenApi__MaximumReferences` / `MaximumReferenceDepth` | Defaults to `256` / `16`. |
+| `OpenApi__MaximumPages` / `TimeoutSeconds` | Defaults to `10` / `30`. |
+| `OpenApi__AllowedMethods__<index>`, `AllowedContractMediaTypes__<index>`, `AllowedResponseMediaTypes__<index>` | Preserve the explicit method and media-type policies from `OpenApiOptions`; override only for intended destinations. |
+| `Aep__EnrollmentMode` | `SharedKeyFile` for the authenticated container path. |
+| `Aep__SharedKeyFile__Path` | Read-only mounted key file, shared only with the authority. |
+| `Aep__SharedKeyFile__AuthorityUrl` / `PublicEndpoint` | Authority and extension URLs reachable from their respective hosts. |
+| `Aep__SharedKeyFile__StateFile` | Writable persisted instance file, for example `/var/lib/aep/instance`. |
+| `Aep__SharedKeyFile__AllowInsecureHttp` | Explicit `true` only for the isolated Development HTTP fixture; use HTTPS otherwise. |
+
+Mount the protected key read-only at `/run/secrets/aep-key` and a dedicated writable
+state directory at `/var/lib/aep`; preserve the instance file across container
+recreation. Match host ownership/permissions to the container user. No server
+database, downstream credential, contract payload or generated state belongs in
+the image. Prefer the existing product-managed protected value/Secret bindings
+for API credentials; do not place credential values in Docker arguments, catalogue
+settings, logs or artifacts. The catalogue's `smokeEnvironment` contains only the
+public `fixture.example.test` startup allowlist and does not enable private access
+or perform an outbound request. Both generic smokes consume those public settings.
+
+Linux amd64 is the supported image platform. A delivery qualifies only the source,
+extension digest, same-source SQLite authority and AEP combination recorded by its
+successful smoke evidence; no private publication, live API compatibility or other
+platform is implied by a catalogue entry. Generic smokes cover health, authenticated
+discovery, invalid bearer/signature rejection, SharedKeyFile enrollment, recreation
+and persisted identities. The offline OpenAPI tests cover provider behavior with
+HTTP fixtures. The catalogue ID `openapi` also derives the selectable label
+`preview:extension:openapi` through the #1389 mechanism. After this catalogue entry
+reaches `main`, `.github/workflows/preview-extension-labels.yml` synchronizes that
+label using `scripts/github/apply-issue-labels.ps1 -PreviewExtensionsOnly`.
+The label selects the extension only when applied to a preview request through
+the existing preview workflow; packaging does not assign it or trigger deployment.
+A dry run with `-DryRun -PreviewExtensionsOnly` verifies the derived name without
+changing repository labels.
+
+Related to #1290; keep it open until private qualification is recorded. Docker Hub
+is deferred to #1384, preserving official release tag/version and trusted-main
+checks, same-archive promotion with provenance/SBOM and per-registry digest receipts,
+anonymous public pull plus health/discovery/enrollment/restart qualification,
+credential administration, retry/partial-publication and immutable-version conflict
+criteria. Do not create `extension/openapi/v0.1.0`: the current tag path also requests
+Docker Hub publication.
+
 ## MAF AWP Worker
 
 [#1300](https://github.com/gbaudrit/agentstration/issues/1300) adds `maf-worker` under
@@ -355,6 +494,85 @@ Docker Hub publication remains deferred by maintainer decision. Do not create an
 requests Docker Hub publication. Keep #1291 open for its deferred public delivery
 criteria; the pilot does not claim a complete compatibility matrix or a published
 Docker Hub release. No extension tag or image is published merely by adding the catalogue.
+
+## OpenDal private image
+
+Related to [#1293](https://github.com/gbaudrit/agentstration/issues/1293).
+`deploy/images/extensions/opendal.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+Reuse `deploy/opendal/Dockerfile` and the existing **OpenDAL native packaging**
+workflow; there is no second native publication pipeline. Its SDK/runtime inputs
+are digest-resolved by the shared builder; the Linux runtime retains the Noble
+glibc baseline (`mcr.microsoft.com/dotnet/aspnet:10.0.8-noble`) and `linux-x64` RID.
+The image preserves Apache.OpenDAL 0.3.1 native/managed assets and the Apache,
+MPL-2.0 and CC0 license/NOTICE files. Alpine/musl is unsupported. Windows native
+qualification remains in the existing native workflow, independently from this
+Linux amd64 OCI catalogue.
+
+The real AEP identity is lowercase `agentstration.extensions.opendal`. The independent
+extension version `0.1.0` does not change `opendal.fs`, `opendal.s3`, `opendal.azblob`
+contribution/provider versions `1.0.0`, ASC identity/revision or MCP exposure.
+Mount writable local data at `/data`, configure `OpenDal__RootDirectory=/data`
+and explicit `OpenDal__AllowedClients__0` entries matching enrolled client IDs.
+The process UID must own this data; authentication keys are separate read-only
+mounts. S3/Azure credentials remain external secured bindings. The generic health smoke runs with the invoking UID/GID, as does the enrollment
+Compose fixture: this keeps the host-owned mode-0600 key readable without changing
+its permissions or requiring a root process. The image smoke
+reuses `samples/OpenDalSmoke` to verify native assets/licenses, real ASC/MCP
+write/list/read and persisted content after restart against disposable local
+storage. Synthetic loopback S3/Azure peers stay deterministic; no real cloud
+storage or credential is needed. Snapshot retention is not added.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-opendal:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-opendal/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=opendal`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:opendal`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/opendal/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1293 open until effective private qualification is recorded; use no
+premature auto-closing keyword.
 
 ## Utilities private image
 

@@ -22,5 +22,14 @@
     "schemaFormats": [
       "json-schema.validation"
     ]
+  },
+  "ci": {
+    "testPaths": [
+      "tests/Agentstration.Api.Tests/McpToolCatalogTests.cs",
+      "tests/Agentstration.Api.Tests/UtilitiesPackagingTests.cs"
+    ],
+    "additionalPaths": [
+      "scripts/packaging/utilities_smoke.py"
+    ]
   }
 }

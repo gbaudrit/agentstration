@@ -15,6 +15,10 @@ on:
         required: true
   workflow_call:
     inputs:
+      reset_before_deploy:
+        description: Explicitly reset the owned Azure preview before deploying the frozen selection
+        type: boolean
+        default: false
       operation:
         type: string
         required: true
@@ -55,6 +59,7 @@ jobs:
         env:
           REQUEST_JSON: ${{ inputs.request }}
           OPERATION: ${{ inputs.operation }}
+          RESET_BEFORE_DEPLOY: ${{ inputs.reset_before_deploy || false }}
           SOURCE_REPOSITORY: ${{ github.repository }}
           RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS || '["self-hosted","linux","agentstration-preview"]' }}
           CONFIGURED_RUNNER_LABELS: ${{ vars.PREVIEW_RUNNER_LABELS }}
@@ -68,6 +73,9 @@ jobs:
           request = contract.loads(os.environ['REQUEST_JSON'])
           operation = os.environ['OPERATION']
           contract.operation(operation, request)
+          preview.require(os.environ['RESET_BEFORE_DEPLOY'] != 'true'
+                          or operation == 'deploy' and request['provider'] == 'azure-vm',
+                          'Reset-before-deploy requires an Azure deployment.')
           preview.require(request['registry'] == 'ghcr.io', 'Actions deployments require private GHCR deliveries.')
           preview.require(all(item['repository'].lower() == os.environ['SOURCE_REPOSITORY'].lower()
                               for item in [*request['deliveries'].values(), *request.get('extensions', {}).values()]), 'Actions deliveries must belong to this repository.')
@@ -182,6 +190,8 @@ jobs:
       DOCKER_CONFIG: /tmp/agentstration-preview-auth-${{ github.run_id }}-${{ github.run_attempt }}
       AZURE_PREVIEW_STORAGE_ACCOUNT: ${{ vars.AZURE_PREVIEW_STORAGE_ACCOUNT }}
       AZURE_PREVIEW_STORAGE_CONTAINER: ${{ vars.AZURE_PREVIEW_STORAGE_CONTAINER || 'previews' }}
+      AZURE_PREVIEW_MAX_ENVIRONMENTS: ${{ vars.AZURE_PREVIEW_MAX_ENVIRONMENTS || '2' }}
+      AZURE_PREVIEW_MAX_VCPUS: ${{ vars.AZURE_PREVIEW_MAX_VCPUS || '4' }}
     outputs:
       result: ${{ steps.lifecycle.outputs.result }}
       state: ${{ steps.lifecycle.outputs.state }}
@@ -234,6 +244,7 @@ jobs:
         id: lifecycle
         env:
           OPERATION: ${{ inputs.operation }}
+          RESET_BEFORE_DEPLOY: ${{ inputs.reset_before_deploy || false }}
           PREVIEW_EXTENSION_CONFIGURATION: ${{ secrets.PREVIEW_EXTENSION_CONFIGURATION }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -244,7 +255,9 @@ jobs:
           CLOUDFLARE_ACCESS_CLIENT_ID: ${{ vars.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CLOUDFLARE_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
-          python3 scripts/preview/lifecycle.py "$OPERATION" --request "$RUNNER_TEMP/preview-request/preview-request.json" --output "$RUNNER_TEMP/preview-result.json"
+          arguments=("$OPERATION" --request "$RUNNER_TEMP/preview-request/preview-request.json" --output "$RUNNER_TEMP/preview-result.json")
+          if [[ "$RESET_BEFORE_DEPLOY" == true ]]; then arguments+=(--reset-before-deploy); fi
+          python3 scripts/preview/lifecycle.py "${arguments[@]}"
           python3 scripts/preview/workflow_result.py "$RUNNER_TEMP/preview-result.json"
       - uses: actions/upload-artifact@v7
         if: always()
