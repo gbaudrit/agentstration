@@ -135,6 +135,12 @@ try {
         Isolated @($path) @('foundry')
     }
     Isolated @('tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs', 'tests/Agentstration.Extensions.OpenApi.Tests/ManifestTests.cs') @('foundry', 'openapi')
+    Isolated @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs') @('utilities')
+    Isolated @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs', 'tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs') @('foundry', 'utilities')
+    $selection = Get-FixtureSelection @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs', 'tests/Agentstration.Api.Tests/McpToolCatalogTests.cs')
+    Require ($selection.dotnet -and ($selection.imageIds -join ',') -eq 'utilities,server') 'Utilities consumer scenarios must retain product checks alongside the dedicated extension tests.'
+    $selection = Get-FixtureSelection @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs', 'src/Agentstration.Web/Program.cs')
+    Require ($selection.dotnet -and $selection.container -and ($selection.imageIds -join ',') -eq 'utilities,server') 'A product entry point must retain transverse checks alongside Utilities tests.'
     $selection = Get-FixtureSelection @('tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs', 'src/Agentstration.ModelProviders/AepModelProvider.cs')
     Require ($selection.dotnet -and $selection.container -and ($selection.imageIds -join ',') -eq 'foundry,server') 'Mixed extension tests and consumer inputs must retain transverse checks.'
     Isolated @('.github/workflows/resource-plan-ux.yml') @()
