@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "openapi",
+  "extensionId": "Agentstration.Extensions.OpenApi",
+  "project": "src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj",
+  "entrypoint": "Agentstration.Extensions.OpenApi.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.OpenApi/version.txt",
+  "testProject": "tests/Agentstration.Extensions.OpenApi.Tests/Agentstration.Extensions.OpenApi.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.Extensions.OpenApi.Tests",
+  "imageName": "extension-openapi",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "schemaFormats",
+  "contributionId": "openapi.validation",
+  "contributions": {
+    "schemaFormats": [
+      "openapi.validation"
+    ],
+    "tools": [
+      "openapi.contract.discover",
+      "openapi.operation.invoke"
+    ],
+    "dataSourceProfileBundles": [
+      "openapi-governed",
+      "openapi-connected-services"
+    ],
+    "connectedServiceTypes": [
+      "openapi"
+    ],
+    "connectedServiceOperationTypes": [
+      "openapi-operation"
+    ]
+  },
+  "smokeEnvironment": {
+    "OpenApi__AllowedDomains__0": "fixture.example.test"
+  }
+}

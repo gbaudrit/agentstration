@@ -6,11 +6,16 @@
   "entrypoint": "Agentstration.Extensions.Ollama.dll",
   "dockerfile": "Dockerfile.extension",
   "versionFile": "src/extensions/Agentstration.Extensions.Ollama/version.txt",
-  "testProject": "tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj",
-  "testFilter": "FullyQualifiedName~Ollama|FullyQualifiedName~InferenceTimeoutTests",
+  "testProject": "tests/Agentstration.Extensions.Ollama.Tests/Agentstration.Extensions.Ollama.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.ModelProviders.Tests",
   "imageName": "extension-ollama",
   "platform": "linux/amd64",
   "aepVersion": "agentstration.io/v1",
   "contributionKind": "modelProviders",
-  "contributionId": "ollama"
+  "contributionId": "ollama",
+  "ci": {
+    "sharedPaths": [
+      "tests/OllamaInferenceTestFixture.cs"
+    ]
+  }
 }

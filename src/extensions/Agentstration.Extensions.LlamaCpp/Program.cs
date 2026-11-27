@@ -1,3 +1,4 @@
+using System.Reflection;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.LlamaCpp;
 
@@ -20,7 +21,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Extension = new(
         "Agentstration.Extensions.LlamaCpp",
         "llama.cpp",
-        "1.0.0",
+        typeof(LlamaCppAepModelProvider).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0],
         "Agentstration AEP model-provider extension for a local llama.cpp server.");
     options.OptionSets.Add(LlamaCppOptionContracts.ModelProfile);
 });

@@ -11,6 +11,10 @@ on:
         description: Optional image release tag to validate before delivery
         type: string
         default: ''
+      source-sha:
+        description: Optional approved PR source; this build job has no publishing or cloud credentials
+        type: string
+        default: ''
     outputs:
       image:
         description: Validated catalogue image ID
@@ -29,6 +33,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.source-sha || github.sha }}
           persist-credentials: false
       - name: Validate catalogue and release version
         id: select
@@ -96,6 +101,9 @@ jobs:
           delivery = json.load(open('artifacts/extension/delivery.json'))
           subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', 'artifacts/extension/delivery.json', '--image', 'localhost:5000/extension@' + delivery['digest']], check=True)
           PY
+      - name: Verify OpenDAL native storage in the exact delivered image
+        if: steps.select.outputs.extension == 'opendal'
+        run: python3 scripts/packaging/opendal_smoke.py
       - name: Build the SQLite authority fixture from the same source and pinned bases
         if: steps.select.outputs.kind != 'server'
         run: |

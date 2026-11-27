@@ -6,38 +6,109 @@ on:
   workflow_dispatch:
     inputs:
       extension:
-        description: Catalogue image ID (server, AEP extension or AWP Worker)
-        type: choice
-        options: [server, foundry, ollama, maf-worker]
+        description: Implemented catalogue image ID (server, AEP extension or AWP Worker)
+        type: string
         default: foundry
         required: true
       publish_preview:
         description: Publish the validated archive to private GHCR (no Docker Hub release)
         type: boolean
         default: false
+      preview_pr:
+        description: Automatic preview PR number (requires main, CI archive, publish_preview and exact source_sha)
+        type: string
+        default: ''
+      source_sha:
+        description: Exact opted-in PR head for automatic component publication
+        type: string
+        default: ''
+      ci_run_id:
+        description: Successful PR CI run supplying the existing OCI archive (automatic publication only)
+        type: string
+        default: ''
+      ci_run_attempt:
+        description: Approved CI run attempt (automatic publication only)
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: extension-image-${{ github.ref }}-${{ inputs.extension || 'foundry' }}
+  group: extension-image-${{ inputs.preview_pr != '' && format('pr-{0}-{1}', inputs.preview_pr, inputs.source_sha) || github.ref }}-${{ inputs.extension || 'foundry' }}
   cancel-in-progress: false
 
 jobs:
+  admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      packages: read
+      actions: read
+    outputs:
+      build: ${{ steps.gate.outputs.build || steps.manual.outputs.build }}
+      grant: ${{ steps.gate.outputs.grant }}
+      publish: ${{ steps.gate.outputs.publish }}
+      artifact-id: ${{ steps.gate.outputs.artifact-id }}
+      ci-run: ${{ steps.gate.outputs.ci-run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Preserve manual and official release packaging
+        id: manual
+        if: inputs.preview_pr == '' && inputs.source_sha == '' && inputs.ci_run_id == '' && inputs.ci_run_attempt == ''
+        run: echo 'build=true' >> "$GITHUB_OUTPUT"
+      - name: Check automatic component publication boundary
+        if: inputs.preview_pr != '' || inputs.source_sha != '' || inputs.ci_run_id != '' || inputs.ci_run_attempt != ''
+        env:
+          VALID: ${{ github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.extension != '' && inputs.publish_preview && inputs.preview_pr != '' && inputs.source_sha != '' && inputs.ci_run_id != '' && inputs.ci_run_attempt != '' }}
+        run: test "$VALID" = true
+      - name: Install OCI metadata tooling
+        if: inputs.preview_pr != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - uses: docker/login-action@v3
+        if: inputs.preview_pr != ''
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Verify completed PR workflows, CI archive and live publication consent
+        id: gate
+        if: inputs.preview_pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_PR: ${{ inputs.preview_pr }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          CI_RUN_ATTEMPT: ${{ inputs.ci_run_attempt }}
+          EXTENSION_ID: ${{ inputs.extension }}
+        run: python3 scripts/preview/image_publication.py gate
+
   validate-and-build:
+    needs: admission
+    if: needs.admission.outputs.build == 'true'
     uses: ./.github/workflows/validate-oci-image.yml
     with:
       extension: ${{ inputs.extension || 'foundry' }}
       release-tag: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
 
   publish:
-    needs: validate-and-build
-    if: (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview)
+    needs: [admission, validate-and-build]
+    if: always() && needs.admission.result == 'success' && ((inputs.preview_pr != '' && needs.admission.outputs.publish == 'true') || (inputs.preview_pr == '' && needs.validate-and-build.result == 'success' && ((github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_preview))))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       packages: write
+      issues: read
+      pull-requests: read
+      actions: read
     env:
       DOCKER_CONFIG: /tmp/extension-image-auth-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
@@ -45,8 +116,19 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/download-artifact@v8
+        if: inputs.preview_pr == ''
         with:
           name: oci-image-${{ needs.validate-and-build.outputs.image }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: delivery
+      - name: Download the immutable component archive from the successful PR CI run
+        if: inputs.preview_pr != ''
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.admission.outputs.ci-run }}
+          artifact-ids: ${{ needs.admission.outputs.artifact-id }}
+          merge-multiple: true
           path: delivery
       - name: Install OCI copy tooling
         run: |
@@ -58,12 +140,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
       - name: Publish the validated archive to private GHCR without rebuilding
+        if: inputs.preview_pr == ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           release_arguments=()
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then release_arguments=(--release-tag "$GITHUB_REF_NAME"); fi
           python3 scripts/packaging/images.py publish --delivery delivery/delivery.json --registry ghcr --authfile "$DOCKER_CONFIG/config.json" "${release_arguments[@]}"
+      - name: Recheck live opt-in and publish the approved PR archive using main tooling
+        if: inputs.preview_pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_PR: ${{ inputs.preview_pr }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          OPT_IN_GRANT: ${{ needs.admission.outputs.grant }}
+          CI_RUN_ID: ${{ inputs.ci_run_id }}
+          CI_RUN_ATTEMPT: ${{ inputs.ci_run_attempt }}
+          EXTENSION_ID: ${{ inputs.extension }}
+        run: python3 scripts/preview/image_publication.py publish
       - name: Log in to Docker Hub for an official image release
         if: github.event_name == 'push' && github.ref_type == 'tag'
         uses: docker/login-action@v3
@@ -88,3 +182,28 @@ jobs:
             delivery/publication-*.json
           if-no-files-found: warn
           retention-days: 30
+
+  report-publication-result:
+    needs: [admission, validate-and-build, publish]
+    if: always() && github.ref == 'refs/heads/main' && inputs.preview_pr != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      statuses: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Report publication in the PR without changing deployed availability
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_PR: ${{ inputs.preview_pr }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          OPT_IN_GRANT: ${{ needs.admission.outputs.grant }}
+          PUBLICATION_SUCCEEDED: ${{ needs.admission.result == 'success' && (needs.publish.result == 'success' || needs.admission.outputs.publish == 'false') }}
+          EXTENSION_ID: ${{ inputs.extension }}
+        run: python3 scripts/preview/image_publication.py report-result
