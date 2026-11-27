@@ -1,3 +1,4 @@
+using System.Reflection;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.Crawl4AI;
@@ -21,7 +22,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Extension = new AepExtensionIdentity(
         "Agentstration.Extensions.Crawl4AI",
         "Crawl4AI Web Acquisition",
-        "1.0.0",
+        typeof(Crawl4AiOptions).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0],
         "Bounded governed web acquisition through a self-hosted Crawl4AI service.");
     options.McpServers.Add(new AepMcpServerDescriptor("crawl4ai", "/mcp"));
     options.Tools.Add(new AepToolContribution("crawl4ai.web.fetch", "Fetch web page", new("crawl4ai", "web_fetch"), "Acquire one allowlisted web page as temporary referenced content."));
