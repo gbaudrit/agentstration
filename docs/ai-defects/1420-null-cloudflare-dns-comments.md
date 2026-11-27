@@ -2,13 +2,13 @@
 
 ## Status
 
-Open — 2026-11-27
+Prevented — 2026-11-27
 
 ## References
 
 - Issue: [#1420](https://github.com/gbaudrit/agentstration/issues/1420)
 - Introducing change: [#1418](https://github.com/gbaudrit/agentstration/pull/1418), merged as `a378862a`
-- Corrective pull request: pending creation
+- Corrective pull request: [#1421](https://github.com/gbaudrit/agentstration/pull/1421)
 - Related ADRs: [ADR-0269](../decisions/0269-preview-reconciliation-enforces-owned-expiry-and-capacity.md)
 
 ## Defect
@@ -68,5 +68,6 @@ route as an orphan. The regression fails on the introducing implementation.
 - Reproduced the live failure offline: the new test fails with `AttributeError` on `comment=None` before the correction.
 - Corrected preview suite: 325 passed, one optional Azure CLI check skipped (326 total).
 - Actionlint for the reconciler workflow and `git diff --check`: passed.
-- Full documentation build: running. Corrective CI: pending PR creation.
+- Full documentation build, 264-entry ADR index and LikeC4 validation/generation: passed.
+- GitHub Actions run 45969256290: offline provider suite, request validation, access-proxy smoke and all three portable validation lanes passed.
 - Live trusted-main dry run has not been repeated; it requires the correction to merge and remains part of #1286 qualification.
