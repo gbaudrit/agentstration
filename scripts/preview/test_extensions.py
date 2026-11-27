@@ -31,10 +31,10 @@ def selected(**kwargs):
 
 
 class SelectionTests(unittest.TestCase):
-    def test_tracking_labels_do_not_deploy_and_unknown_ids_are_refused(self):
+    def test_tracking_labels_do_not_deploy_and_invalid_or_core_ids_are_refused(self):
         self.assertEqual([], extensions.from_labels([{'name': 'extension:foundry'}]))
         self.assertEqual(['foundry'], extensions.from_labels([{'name': 'preview:extension:foundry'}]))
-        for name in ('unknown', '../foundry', 'Foundry', '', 'server'):
+        for name in ('../foundry', 'Foundry', '', 'server', 'maf-worker'):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 extensions.from_labels([{'name': extensions.PREFIX + name}])
         with self.assertRaises(ValueError):
@@ -57,11 +57,12 @@ class SelectionTests(unittest.TestCase):
             self.assertNotIn('extensions', github.selection())
             self.assertEqual('17', issue_commands.tracking(github.selection(), REPOSITORY, github))
 
-    def test_unknown_label_has_feedback_and_never_dispatches(self):
+    def test_unmerged_label_is_admitted_for_published_source_verification(self):
         github = GitHub()
         github.issue['labels'] = [{'name': extensions.PREFIX + 'unpublished'}]
-        self.assertFalse(github.admit())
-        self.assertFalse(any(path.endswith('/dispatches') for path, _, _ in github.calls))
+        self.assertTrue(github.admit())
+        self.assertEqual(['unpublished'], github.selection()['extensions'])
+        self.assertEqual('17', issue_commands.tracking(github.selection(), REPOSITORY, github))
 
     def test_independently_published_extension_uses_its_own_source_and_canonical_identity(self):
         metadata = Metadata()
@@ -88,6 +89,153 @@ class SelectionTests(unittest.TestCase):
         metadata.files['deploy/images/extensions/foundry.json'] = json.dumps({**entry, 'extensionId': 'other'})
         with self.assertRaises(ValueError):
             manual.resolve(options(extensions=['foundry']), VARIABLES, 'owner/repo', manual.PublishedImages('owner/repo', run))
+
+
+class PendingMetadata(Metadata):
+    """A private image whose bounded catalogue is present only at its published source."""
+    identifier = 'pending-aep'
+    image = 'ghcr.io/owner/repo-extension-pending-aep'
+
+    def __init__(self):
+        super().__init__()
+        self.pending = {**catalogue('foundry'), 'id': self.identifier, 'imageName': 'extension-' + self.identifier,
+                        'extensionId': 'Fixture.Pending.Extension', 'contributionKind': 'schemaFormats',
+                        'contributionId': 'fixture.schema', 'versionFile': 'src/extensions/Fixture.Pending.Extension/version.txt',
+                        'project': 'unread/project.csproj', 'dockerfile': 'unread/Dockerfile', 'testProject': 'unread/test.csproj'}
+        self.manifests[self.image] = b'public-disposable-pending-image'
+        self.configs[self.image] = {'os': 'linux', 'architecture': 'amd64', 'config': {'Labels': {
+            'org.opencontainers.image.source': 'https://github.com/owner/repo',
+            'org.opencontainers.image.revision': 'e' * 40, 'org.opencontainers.image.version': self.pending['version']}}}
+        self.files[self.path] = json.dumps(self.pending)
+        self.files[self.pending['versionFile']] = self.pending['version']
+        self.published = True
+
+    @property
+    def path(self):
+        return 'deploy/images/extensions/' + self.identifier + '.json'
+
+    def run(self, arguments):
+        if arguments[:2] == ['gh', 'api'] and '/repo-extension-pending-aep/versions?' in arguments[2]:
+            self.calls.append(arguments)
+            return json.dumps([{'name': 'sha256:' + hashlib.sha256(self.manifests[self.image]).hexdigest(),
+                                'metadata': {'container': {'tags': ['sha-' + 'e' * 40]}}}] if self.published else []).encode()
+        return super().run(arguments)
+
+    def resolve(self):
+        return manual.resolve(options(extensions=[self.identifier]), VARIABLES, 'owner/repo', manual.PublishedImages('owner/repo', self.run))
+
+
+class PendingCatalogueTests(unittest.TestCase):
+    def test_private_published_source_is_sufficient_before_catalogue_merge(self):
+        metadata = PendingMetadata()
+        self.assertFalse(extensions.catalogue_path(metadata.identifier).exists())
+        value = metadata.resolve()
+        self.assertEqual(2, value['schemaVersion'])
+        item = value['extensions'][metadata.identifier]
+        self.assertEqual(('e' * 40, metadata.pending['version']), (item['sourceSha'], item['component']['version']))
+        self.assertNotIn('versionFile', item['component'])
+        self.assertNotIn('project', item['component'])
+        contract.operation('deploy', value)
+        self.assertFalse(any('unread/' in ' '.join(call) or call[0] not in ('gh', 'skopeo') for call in metadata.calls))
+        reads = [call[2] for call in metadata.calls if call[:2] == ['gh', 'api'] and '/contents/' in call[2] and
+                 ('pending-aep' in call[2] or 'Fixture.Pending' in call[2])]
+        self.assertEqual(2, len(reads))
+        self.assertTrue(all(path.endswith('?ref=' + 'e' * 40) for path in reads))
+        with tempfile.TemporaryDirectory() as temporary:
+            state = preview.prepare(Path(temporary) / 'preview', *receipts(), 'pending-test', extension_deliveries=value['extensions'])
+            overlay = extensions.overlay(Path(temporary) / 'preview', state)
+            service = overlay['services']['extension-pending-aep']
+            self.assertEqual(['127.0.0.1::8080'], service['ports'])
+            self.assertTrue(service['read_only'])
+            self.assertNotIn('privileged', service)
+            self.assertEqual(['extension-pending-aep:/var/lib/aep'], service['volumes'])
+
+    def test_unpublished_public_and_inaccessible_images_fail_during_selection(self):
+        for change in ('unpublished', 'public', 'inaccessible', 'versions-inaccessible'):
+            metadata = PendingMetadata()
+            if change == 'unpublished':
+                metadata.published = False
+            elif change == 'public':
+                original = metadata.run
+                def public(arguments):
+                    if arguments[:2] == ['gh', 'api'] and arguments[2].endswith('/repo-extension-pending-aep'):
+                        return b'{"visibility":"public"}'
+                    return original(arguments)
+                metadata.run = public
+            else:
+                original = metadata.run
+                def inaccessible(arguments):
+                    if arguments[:2] == ['gh', 'api'] and '/repo-extension-pending-aep' in arguments[2] and (change == 'inaccessible' or '/versions?' in arguments[2]):
+                        raise manual.Unavailable('PRIVATE PROVIDER OUTPUT')
+                    return original(arguments)
+                metadata.run = inaccessible
+            with self.subTest(change=change), self.assertRaises(ValueError) as failure:
+                metadata.resolve()
+            self.assertNotIn('PRIVATE', str(failure.exception))
+            if change != 'public':
+                self.assertEqual('pending-aep', failure.exception.public['component'])
+                self.assertEqual('image-unavailable' if change == 'unpublished' else 'registry-access', failure.exception.public['code'])
+
+    def test_pending_source_cannot_change_recipe_namespace_protocol_or_version_path(self):
+        for field, invalid in (('schemaVersion', True), ('imageName', 'server'), ('id', 'foundry'), ('kind', 'awp-worker'),
+                               ('versionFile', '../../private'), ('versionFile', '.github/workflows/ci.yml'),
+                               ('versionFile', 'src/extensions/../version.txt'),
+                               ('extensionId', 'Environment__Injection'), ('aepVersion', 'unsupported'),
+                               ('contributionKind', 'hostCommands')):
+            metadata = PendingMetadata()
+            metadata.files[metadata.path] = json.dumps({**metadata.pending, field: invalid})
+            with self.subTest(field=field, invalid=invalid), self.assertRaises(ValueError):
+                metadata.resolve()
+            if field == 'versionFile':
+                self.assertFalse(any('/contents/' + invalid in ' '.join(call) for call in metadata.calls))
+        metadata = PendingMetadata()
+        metadata.configs[metadata.image]['config']['Labels']['org.opencontainers.image.source'] = 'https://github.com/foreign/repo'
+        with self.assertRaises(ValueError):
+            metadata.resolve()
+
+    def test_pending_receipt_cannot_alias_another_component_image(self):
+        value = PendingMetadata().resolve()
+        value['extensions']['pending-aep']['component']['imageName'] = 'extension-foundry'
+        with self.assertRaisesRegex(ValueError, 'namespace'):
+            contract.operation('deploy', value)
+
+    def test_pending_extension_cannot_reuse_a_deselected_extensions_identity(self):
+        value = PendingMetadata().resolve()
+        value['extensions']['pending-aep']['component']['extensionId'] = 'agentstration.extensions.foundry'
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / 'preview'
+            preview.prepare(directory, *receipts(), 'example', extension_deliveries={'foundry': receipt()})
+            original = (directory / 'extension-foundry.key').read_bytes()
+            with self.assertRaisesRegex(ValueError, 'persisted AEP identity'):
+                preview.prepare(directory, *receipts(), 'example', extension_deliveries=value['extensions'])
+            self.assertEqual(original, (directory / 'extension-foundry.key').read_bytes())
+            self.assertFalse((directory / 'extension-pending-aep.key').exists())
+
+    def test_guest_bundle_contains_only_frozen_public_metadata_and_trusted_scripts(self):
+        import azure
+        import tarfile
+        value = PendingMetadata().resolve()
+        def copy(arguments, **_kwargs):
+            Path(arguments[-1].removeprefix('oci-archive:')).write_bytes(b'public-disposable-oci-fixture')
+        with tempfile.TemporaryDirectory() as temporary, patch.object(azure, 'command', side_effect=copy):
+            bundle, _ = azure.bundle_images(value, Path(temporary))
+            with tarfile.open(bundle) as archive:
+                path = 'tooling/deploy/images/extensions/pending-aep.json'
+                raw = archive.extractfile(path).read()
+                self.assertEqual({'schemaVersion': 1, **value['extensions']['pending-aep']['component']}, json.loads(raw))
+                self.assertNotIn(b'versionFile', raw)
+                self.assertNotIn(b'unread/', raw)
+                self.assertFalse(any('src/extensions' in name or 'Dockerfile' in name for name in archive.getnames()))
+                self.assertEqual((preview.ROOT / 'scripts/preview/extensions.py').read_bytes(),
+                                 archive.extractfile('tooling/scripts/preview/extensions.py').read())
+                root = Path(temporary) / 'guest'
+                destination = root / 'deploy/images/extensions/pending-aep.json'
+                destination.parent.mkdir(parents=True)
+                destination.write_bytes(raw)
+                with patch.object(preview, 'ROOT', root):
+                    contract.operation('deploy', value)
+
+
 
 
 class ExtensionContractTests(unittest.TestCase):

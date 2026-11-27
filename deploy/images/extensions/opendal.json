@@ -24,5 +24,15 @@
     "OpenDal__RootDirectory": "/tmp/opendal-packaging",
     "OpenDal__AllowedClients__0": "packaging"
   },
-  "runtimeImage": "mcr.microsoft.com/dotnet/aspnet:10.0.8-noble"
+  "runtimeImage": "mcr.microsoft.com/dotnet/aspnet:10.0.8-noble",
+  "ci": {
+    "additionalPaths": [
+      ".github/workflows/opendal.yml",
+      "scripts/packaging/opendal_smoke.py"
+    ],
+    "sharedPaths": [
+      "scripts/opendal/**",
+      "samples/OpenDalSmoke/**"
+    ]
+  }
 }
