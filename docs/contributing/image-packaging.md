@@ -68,7 +68,7 @@ Inspect the catalogue and run the offline packaging contracts:
 ```sh
 python3 scripts/packaging/images.py describe --extension foundry
 python3 -m unittest discover -s scripts/packaging -p 'test_*.py' -v
-dotnet test --project tests/Agentstration.ModelProviders.Tests --configuration Release --filter 'FullyQualifiedName~FoundryProviderTests' --minimum-expected-tests 1
+dotnet test --project tests/Agentstration.Extensions.Foundry.Tests --configuration Release --filter 'FullyQualifiedName!~FoundryLiveTests' --minimum-expected-tests 1
 ```
 
 ## Build once and validate
@@ -84,13 +84,18 @@ extension inputs select only their image, while common packaging and global
 
 The default source directory comes from `project`. A dedicated test project
 named `<extension project>.Tests` owns its entire directory, including its project
-file. Shared test projects require explicit file ownership, as in Foundry:
+file. Foundry now uses `Agentstration.Extensions.Foundry.Tests` and owns that
+directory. Its offline filter includes Provider, Chat and Streaming tests; live
+checks remain explicit opt-ins. See the [isolation inventory](extension-test-isolation.md)
+for the other packaging PRs' project/filter handoff.
+
+Shared test projects still require explicit file ownership, for example:
 
 ```json
 "ci": {
   "testPaths": [
-    "tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs",
-    "tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs"
+    "tests/SharedProviders.Tests/AlphaTests.cs",
+    "tests/SharedProviders.Tests/AlphaLiveTests.cs"
   ]
 }
 ```
@@ -572,6 +577,74 @@ digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
 release-only credentials, retries and immutable-tag conflict behavior. Do not
 create `extension/opendal/v0.1.0`: that release path also triggers Docker Hub.
 Keep #1293 open until effective private qualification is recorded; use no
+premature auto-closing keyword.
+
+## LocalAI private image
+
+Related to [#1299](https://github.com/gbaudrit/agentstration/issues/1299).
+`deploy/images/extensions/localai.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+Set `LocalAI__Endpoint` (default `http://localhost:8081`) to an existing HTTP(S)
+LocalAI service. Supply optional `LocalAI__ApiKey` through protected runtime
+configuration, never image layers, command arguments, receipts or logs. The image
+contains only the AEP extension, with no inference server or model. The separate
+`deploy/compose/localai.yml` source-build topology uses `localai/localai:v4.9.0`
+and an explicit model volume; its empty model catalogue does not trigger downloads.
+Deterministic HTTP fixtures and protected-discovery packaging tests run in the
+dedicated `Agentstration.Extensions.LocalAI.Tests` project. The OCI filter excludes
+`LocalAiIntegrationTests`, which requires an explicit live LocalAI/model opt-in.
+Shared product inference-timeout tests remain outside this extension validation;
+packaging smokes do not claim live-provider qualification.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-localai:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-localai/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=localai`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:localai`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/localai/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1299 open until effective private qualification is recorded; use no
 premature auto-closing keyword.
 
 ## Crawl4AI private image
