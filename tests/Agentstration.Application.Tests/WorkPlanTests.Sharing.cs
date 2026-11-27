@@ -175,8 +175,11 @@ public sealed partial class WorkPlanTests
         var operation = result.Value!;
         Assert.AreEqual(WorkSharingOperationStatus.Uncertain, operation.Status);
         Assert.IsFalse(await fixture.Sharing.UpdateOperationAsync(operation with { Version = operation.Version + 1, PrincipalId = Guid.NewGuid() }, operation.Version, default));
-        Assert.IsFalse(await fixture.Sharing.UpdateOperationAsync(operation with { Version = operation.Version + 1,
-            Attempts = [operation.Attempts[0] with { ExpectedRevision = "tampered" }] }, operation.Version, default));
+        Assert.IsFalse(await fixture.Sharing.UpdateOperationAsync(operation with
+        {
+            Version = operation.Version + 1,
+            Attempts = [operation.Attempts[0] with { ExpectedRevision = "tampered" }]
+        }, operation.Version, default));
         Assert.IsNull(await fixture.Sharing.GetOperationAsync(fixture.Workspace, Guid.NewGuid(), project.Id, operation.Id, default));
         var stale = operation with { Id = new(Guid.NewGuid()), Version = 1, Status = WorkSharingOperationStatus.Pending, Attempts = [] };
         ProjectSuccess(await ProjectService(fixture).UpdateAsync(fixture.Workspace, project.Id, new(Guid.NewGuid(), project.Version,
@@ -226,8 +229,8 @@ public sealed partial class WorkPlanTests
         var value = new WorkSharingContribution(Guid.NewGuid(), null, null, "evidence", "Observed fixture result", []);
         return new(new(WorkSharingDomain.Contribution, value.Id.ToString("D")), 0, JsonSerializer.SerializeToElement(value, SharingJson));
     }
-    private static WorkProjectSharingService SharingService(Fixture fixture, SharingProvider remote, Guid? principal = null) => new(
-        fixture.Sharing, ProjectService(fixture, owner: principal), fixture.Plans(owner: principal), fixture.Trees(owner: principal), remote,
+    private static WorkProjectSharingService SharingService(Fixture fixture, SharingProvider remote, Guid? principal = null, IWorkProjectBindingResolver? bindings = null) => new(
+        fixture.Sharing, ProjectService(fixture, owner: principal, bindings: bindings), fixture.Plans(owner: principal), fixture.Trees(owner: principal), remote,
         new Context(fixture.Workspace, principal ?? fixture.Principal), new Clock(Now), new YamlWorkDocumentCodec(), fixture.Data);
     private static async Task<(WorkProjectSharingService Service, WorkProjectSnapshot Project)> SharingAsync(Fixture fixture, SharingProvider remote,
         WorkSharingProjectId portableProject, WorkParticipantId participant)

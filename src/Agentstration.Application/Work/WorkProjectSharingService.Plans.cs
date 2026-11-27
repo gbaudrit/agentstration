@@ -120,6 +120,8 @@ public sealed partial class WorkProjectSharingService
         var record = snapshot.Value!.Records.SingleOrDefault(record => record.Key == new WorkSharingRecordKey(WorkSharingDomain.Plan, plan.Id.ToString()));
         if (record is null) return AdmissionFailure("sharing_plan_required");
         var shared = record.Content.Deserialize<WorkSharingPlan>(Json)!;
+        if (ValidateLocalConnections(project.Value, snapshot.Value, shared, taskId, plan) is { } connectionError)
+            return AdmissionFailure(connectionError);
         var allocation = shared.Allocation.SingleOrDefault(value => value.TaskId == taskId);
         if (allocation?.ParticipantId != project.Value.Definition.Sharing.ParticipantId) return AdmissionFailure("sharing_task_not_allocated");
         var local = await ExportPlanAsync(scope.WorkspaceId, plan.Id, shared.Allocation, token, shared.Issue);
@@ -127,8 +129,17 @@ public sealed partial class WorkProjectSharingService
             || WorkPlanDefinition.Digest(JsonSerializer.SerializeToElement(local.Value.Plan, Json)) != record.Digest
             || WorkPlanDefinition.Digest(local.Value.Plan.Definition) != WorkPlanDefinition.Digest(revision.Definition)) return AdmissionFailure("sharing_plan_stale");
         if (!await repository.MapPlanAsync(scope.WorkspaceId, scope.PrincipalId, projectId.Value, plan.Id, token)) return AdmissionFailure("sharing_plan_project_conflict");
-        return Result<IReadOnlyList<WorkPlanAdmissionEvidence>>.Success([new("project-sharing", $"{shared.PlanId}:{taskId}:{allocation.ParticipantId}",
-            $"{snapshot.Value.Revision}:{record.Digest}", clock.GetUtcNow())]);
+        var evidence = new List<WorkPlanAdmissionEvidence>
+        {
+            new("project-sharing", $"{shared.PlanId}:{taskId}:{allocation.ParticipantId}",
+                $"{snapshot.Value.Revision}:{record.Digest}", clock.GetUtcNow())
+        };
+        if (shared.Definition.TaskConnections.Any(value => value.TaskId == taskId))
+        {
+            var metadata = snapshot.Value.Records.Single(value => value.Key == WorkSharingProjectMetadata.Key);
+            evidence.Add(new("project-sharing-connections", taskId.ToString(), $"{snapshot.Value.Revision}:{metadata.Digest}", clock.GetUtcNow()));
+        }
+        return Result<IReadOnlyList<WorkPlanAdmissionEvidence>>.Success(evidence);
     }
     private static Result<IReadOnlyList<WorkPlanAdmissionEvidence>> AdmissionFailure(string code) => Result<IReadOnlyList<WorkPlanAdmissionEvidence>>.Failure(code);
 }

@@ -48,6 +48,12 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
             if (usage.Accounting is { } accounting && (accounting.ProjectId != project.Definition.Sharing!.ProjectId
                 || accounting.ParticipantId != project.Definition.Sharing.ParticipantId)) return Failure("usage_identity_invalid");
         }
+        foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.ProjectMetadata))
+        {
+            var metadata = change.Content.Deserialize<WorkSharingProjectMetadata>(Json)!;
+            if (WorkPlanDefinition.Digest(metadata.ConnectionRequirements) != WorkPlanDefinition.Digest(project.Definition.ConnectionRequirements))
+                return Failure("sharing_local_connections_changed");
+        }
         long? organizationStorageVersion = null;
         foreach (var change in changes.Where(value => value.Key.Domain == WorkSharingDomain.Organization))
         {
@@ -187,6 +193,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         if (snapshot.Records.Where(record => record.Key.Domain == WorkSharingDomain.Organization)
             .SelectMany(record => record.Content.Deserialize<WorkOrganizationDefinition>(Json)!.Epics).SelectMany(epic => epic.PlanIds).Any(id => !knownPlans.Contains(id)))
             return Result<WorkSharingSnapshot>.Failure("sharing_organization_plan_missing");
+        if (ValidateConnections(snapshot.Records) is { } connectionError) return Result<WorkSharingSnapshot>.Failure(connectionError);
         var prior = await repository.GetStateAsync(project.WorkspaceId, context.PrincipalId, project.Id, token);
         if (revision is null && prior?.Connection == project.Definition.Sharing && prior.Records.Count > 0 && snapshot.Records.Count == 0)
             return Result<WorkSharingSnapshot>.Failure("sharing_space_reset");
@@ -216,6 +223,7 @@ public sealed partial class WorkProjectSharingService(IWorkProjectSharingReposit
         }
         var merged = snapshot.Records.ToDictionary(record => record.Key);
         foreach (var record in records) merged[record.Key] = record;
+        if (ValidateConnections(merged.Values) is { } connectionError) return Result<WorkSharingTransportAttempt>.Failure(connectionError);
         var issuePlans = merged.Values.Where(record => record.Key.Domain == WorkSharingDomain.Plan)
             .Select(record => record.Content.Deserialize<WorkSharingPlan>(Json)!).Where(plan => plan.Issue is not null);
         if (issuePlans.GroupBy(plan => (plan.Issue!.Provider, Repository: plan.Issue.Repository.ToUpperInvariant(), plan.Issue.TaskId))

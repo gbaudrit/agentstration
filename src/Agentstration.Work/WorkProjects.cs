@@ -34,7 +34,7 @@ public sealed record WorkProjectDefinition(string DisplayName, string? Descripti
             Description = Description?.Trim(),
             PlanIds = PlanIds.OrderBy(id => id.Value).ToArray(),
             TaskIds = TaskIds.OrderBy(id => id.Value).ToArray(),
-            ConnectionRequirements = ConnectionRequirements.OrderBy(value => value.Name, StringComparer.Ordinal).ToArray(),
+            ConnectionRequirements = ConnectionRequirements.Select(WorkProjectConnectionRules.Normalize).OrderBy(value => value.Name, StringComparer.Ordinal).ToArray(),
             ConnectionAssignments = ConnectionAssignments.OrderBy(value => value.Name, StringComparer.Ordinal).ToArray(),
             Bindings = Bindings.OrderBy(binding => binding.Name, StringComparer.Ordinal).ToArray()
         });

@@ -431,8 +431,8 @@ public sealed partial class WorkPlanTests
     {
         private readonly string directory = Path.Combine(Path.GetTempPath(), "agentstration-work-plan-" + Guid.NewGuid().ToString("N"));
         private ServiceProvider? provider;
-        public WorkspaceId Workspace { get; } = new(Guid.NewGuid());
-        public Guid Principal { get; } = Guid.NewGuid();
+        public WorkspaceId Workspace { get; private init; } = new(Guid.NewGuid());
+        public Guid Principal { get; private init; } = Guid.NewGuid();
         public string ConnectionString => $"Data Source={Path.Combine(directory, "work.db")};Pooling=False";
         public IWorkItemRepository Tasks => provider!.GetRequiredService<IWorkItemRepository>();
         public IWorkPlanRepository Store => provider!.GetRequiredService<IWorkPlanRepository>();
@@ -444,9 +444,9 @@ public sealed partial class WorkPlanTests
         public IWorkTaskOperationRepository Operations => provider!.GetRequiredService<IWorkTaskOperationRepository>();
         public IWorkplaceRepository Workplace => provider!.GetRequiredService<IWorkplaceRepository>();
         public Agentstration.Flows.Storage.Abstractions.IFlowRepository FlowStore => provider!.GetRequiredService<Agentstration.Flows.Storage.Abstractions.IFlowRepository>();
-        public static async Task<Fixture> CreateAsync()
+        public static async Task<Fixture> CreateAsync(WorkspaceId? workspace = null, Guid? principal = null)
         {
-            var fixture = new Fixture(); Directory.CreateDirectory(fixture.directory); await fixture.ReopenAsync(); return fixture;
+            var fixture = new Fixture { Workspace = workspace ?? WorkspaceId.New(), Principal = principal ?? Guid.NewGuid() }; Directory.CreateDirectory(fixture.directory); await fixture.ReopenAsync(); return fixture;
         }
         public WorkPlanService Plans(WorkspaceId? workspace = null, Guid? owner = null, IWorkPlanRepository? store = null, DateTimeOffset? clock = null) =>
             new(store ?? Store, Tasks, new Context(workspace ?? Workspace, owner ?? Principal), new Clock(clock ?? Now), NullLogger<WorkPlanService>.Instance);

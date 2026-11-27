@@ -28,12 +28,15 @@ public static class WorkSharingContent
                 _ => null
             };
             if (normalized is null) return Failure();
-            if (normalized is WorkOrganizationDefinition && change.Key.Name != "epics"
+            if (normalized is WorkSharingProjectMetadata && change.Key != WorkSharingProjectMetadata.Key
+                || normalized is WorkOrganizationDefinition && change.Key.Name != "epics"
                 || normalized is WorkSharingPlan plan && change.Key.Name != plan.PlanId.ToString()
                 || normalized is WorkSharingContribution contribution && change.Key.Name != contribution.Id.ToString("D")
                 || normalized is WorkSharingUsage usage && change.Key.Name != usage.Id.ToString("D")
                 || normalized is WorkSharingBootstrapProfile profile && change.Key.Name != profile.Name) return Failure();
-            return Result<WorkSharingChange>.Success(change with { Content = JsonSerializer.SerializeToElement(normalized, normalized.GetType(), Json) });
+            var content = JsonSerializer.SerializeToElement(normalized, normalized.GetType(), Json);
+            return JsonSerializer.SerializeToUtf8Bytes(content).Length <= WorkSharingFormat.MaximumRecordBytes
+                ? Result<WorkSharingChange>.Success(change with { Content = content }) : Failure();
         }
         catch (JsonException) { return Failure(); }
     }
@@ -52,6 +55,7 @@ public static class WorkSharingContent
         if (tasks.Length > 100 || tasks.Select(task => task.Id).Distinct().Count() != tasks.Length
             || definition.Value!.TaskIds.Any(id => !tasks.Any(task => task.Id == id))) return null;
         var atomic = tasks.Where(task => task.Kind == WorkTaskKind.Atomic && definition.Value.TaskIds.Contains(task.Id)).Select(task => task.Id).OrderBy(id => id.Value);
+        if (definition.Value.TaskConnections.Any(value => !atomic.Contains(value.TaskId))) return null;
         if (plan.Allocation.Any(allocation => allocation is null || allocation.ParticipantId.Value == Guid.Empty)
             || (requireAllocation ? !atomic.SequenceEqual(plan.Allocation.Select(allocation => allocation.TaskId).OrderBy(id => id.Value)) : plan.Allocation.Count != 0)) return null;
         // The same combined dependency/hierarchy graph used by WorkPlan validation must be acyclic.
@@ -73,7 +77,13 @@ public static class WorkSharingContent
         && !string.IsNullOrWhiteSpace(value.DisplayName) && value.DisplayName.Length <= 200 && value.Description?.Length is not > 4_000
         && value.Participants is { Count: > 0 and <= 64 } && value.Participants.All(id => id.Value != Guid.Empty)
         && value.Participants.Distinct().Count() == value.Participants.Count
-        ? value with { Participants = value.Participants.OrderBy(id => id.Value).ToArray() } : null;
+        && value.ConnectionRequirements is { Count: <= 32 } && value.ConnectionRequirements.All(WorkProjectConnectionRules.Valid)
+        && value.ConnectionRequirements.Select(need => need.Name).Distinct(StringComparer.Ordinal).Count() == value.ConnectionRequirements.Count
+        ? value with
+        {
+            Participants = value.Participants.OrderBy(id => id.Value).ToArray(),
+            ConnectionRequirements = value.ConnectionRequirements.Select(WorkProjectConnectionRules.Normalize).OrderBy(need => need.Name, StringComparer.Ordinal).ToArray()
+        } : null;
     private static WorkSharingContribution? Contribution(WorkSharingContribution? value) => value is not null && value.Id != Guid.Empty
         && ValidOptionalIds(value.PlanId, value.TaskId) && WorkProjectDefinition.ValidName(value.Kind)
         && value.Evidence is { Length: > 0 and <= 16_000 } && value.ArtifactReferences is { Count: <= 32 }

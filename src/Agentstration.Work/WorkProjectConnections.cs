@@ -26,6 +26,9 @@ public static class WorkProjectConnectionRules
         && assignments.All(value => requirements.Any(need => need.Name == value.Name))
         && definition.Bindings is not null && definition.Bindings.All(value => value is not null && value.Connection is null && value.Purpose is not (WorkProjectBindingPurpose.Tracking or WorkProjectBindingPurpose.Forge)) && !definition.Bindings.Any(value => value is not null && requirements.Any(need => need.Name == value.Name));
 
+    public static WorkProjectConnectionRequirement Normalize(WorkProjectConnectionRequirement value) =>
+        value with { RequiredOperations = value.RequiredOperations.Order(StringComparer.Ordinal).ToArray() };
+
     public static bool Valid(WorkProjectConnectionRequirement value) => value is not null && WorkProjectDefinition.ValidName(value.Name)
         && value.Contract is Tracking or Forge && value.Version == "1.0"
         && value.RequiredOperations is { Count: > 0 and <= 8 } && value.RequiredOperations.All(operation => WorkProjectContextRules.Text(operation, 32))

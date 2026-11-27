@@ -389,3 +389,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 291. [ADR-0291 — Projects separate portable connection needs from local services](0291-projects-separate-portable-connection-needs-from-local-services.md)
 
 292. [ADR-0292 — GitHub contracts consume protected Connected Services](0292-github-contracts-consume-protected-connected-services.md)
+
+293. [ADR-0293 — Sharing carries connection needs without local assignments](0293-sharing-carries-connection-needs-without-local-assignments.md)

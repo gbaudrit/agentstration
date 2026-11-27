@@ -10,6 +10,34 @@ namespace Agentstration.Infrastructure.Tests;
 public sealed class WorkProjectConnectedServiceTests
 {
     [TestMethod]
+    public async Task PortableRequirementsResolveIndependentLocalServicesAndScopesButRejectAnotherExternalTarget()
+    {
+        var left = new ProjectContractFixture(); var right = new ProjectContractFixture();
+        using var leftScope = left.Context.Push(left.Caller); using var rightScope = right.Context.Push(right.Caller);
+        var leftRoute = left.AddConnection(true, "tracking");
+        var rightRoute = right.AddConnection(true, "tracking", ResourceScopeRef.Instance);
+        var source = new[] { left.AddService(leftRoute, "backend"), left.AddService(leftRoute, "frontend", targetId: "frontend") };
+        var assignments = new[] { right.AddService(rightRoute, "backend", instanceService: true), right.AddService(rightRoute, "frontend", targetId: "frontend") };
+        var metadata = new WorkSharingProjectMetadata("Shared", null, [new(Guid.NewGuid())])
+        { ConnectionRequirements = source.Select(value => value.Requirement).ToArray() };
+        var codec = new Agentstration.Infrastructure.Work.YamlWorkDocumentCodec();
+        var portable = codec.Read<WorkSharingProjectMetadata>(codec.Write(metadata), WorkSharingFormat.MaximumRecordBytes).Value!;
+        foreach (var need in portable.ConnectionRequirements)
+        {
+            var own = assignments.Single(value => value.Requirement.Name == need.Name);
+            var selected = new WorkProjectConnectionSelection(need, own.Assignment);
+            var resolved = await right.Resolver.ResolveConnectionAsync(right.WorkspaceId, right.PrincipalId, selected, default);
+            Assert.IsTrue(resolved.IsSuccess, resolved.ErrorCode);
+            Assert.AreEqual(need.Target!.TargetId, resolved.Value!.Binding.Contract!.TargetId);
+            Assert.AreNotEqual(source.Single(value => value.Requirement.Name == need.Name).Assignment.Service.Uid, resolved.Value.Service!.Service.Uid);
+            var wrong = selected with { Requirement = need with { Target = new(need.Target.ProviderId, "wrong") } };
+            Assert.AreEqual("work_project_connection_target_mismatch", (await right.Resolver.ResolveConnectionAsync(right.WorkspaceId, right.PrincipalId, wrong, default)).ErrorCode);
+        }
+        Assert.AreNotEqual(source[0].Assignment.Service.Address.ScopeRef, assignments[0].Assignment.Service.Address.ScopeRef);
+        Assert.AreNotEqual(leftRoute.Contract!.Extension.Uid, rightRoute.Contract!.Extension.Uid);
+    }
+
+    [TestMethod]
     public async Task NamedRequirementsResolveMultipleServicesOfOneTypeWithoutSingletonRouting()
     {
         var fixture = new ProjectContractFixture(); using var scope = fixture.Context.Push(fixture.Caller);

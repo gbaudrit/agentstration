@@ -46,6 +46,8 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
             || command.Targets.Select(target => target.TaskId).Distinct().Count() != command.Targets.Count
             || command.Targets.Sum(target => target.Input.GetRawText().Length) > 256 * 1024)
             return Result<WorkPlanView>.Failure("work_plan_execution_invalid");
+        if (command.Targets.Any(target => target.Connections is null || target.Connections.Count > 32))
+            return Failure("work_project_connection_selection_invalid");
         var sorted = command.Targets.OrderBy(target => target.TaskId.Value).ToArray();
         var intent = command.ProjectId is null ? WorkPlanDefinition.Digest(new { command.Revision, command.RevisionDigest, Targets = sorted })
             : WorkPlanDefinition.Digest(new { command.Revision, command.RevisionDigest, Targets = sorted, command.ProjectId });
@@ -59,8 +61,20 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
         var atomic = members.Where(item => item.Value.TaskHierarchy?.Kind == WorkTaskKind.Atomic).Select(item => WorkTaskId.FromWorkItem(item.Value.Id));
         if (!atomic.OrderBy(task => task.Value).SequenceEqual(command.Targets.Select(target => target.TaskId).OrderBy(task => task.Value)))
             return Failure("work_plan_execution_targets_invalid");
-        if (command.Targets.Any(target => target.Connections is null || target.Connections.Count > 32))
-            return Failure("work_project_connection_selection_invalid");
+        foreach (var declaration in view.Revision.Definition.TaskConnections)
+        {
+            var selected = command.Targets.SingleOrDefault(target => target.TaskId == declaration.TaskId);
+            if (selected is not null && selected.Connections.Count > 0
+                && !selected.Connections.Order(StringComparer.Ordinal).SequenceEqual(declaration.Names))
+                return Failure("work_plan_connections_mismatch");
+        }
+        command = command with
+        {
+            Targets = command.Targets.Select(target => target with
+            {
+                Connections = view.Revision.Definition.TaskConnections.SingleOrDefault(value => value.TaskId == target.TaskId)?.Names ?? target.Connections
+            }).ToArray()
+        };
         var scope = Scope(workspaceId);
         await authorizer.AuthorizeAsync(scope, token);
         if (command.ProjectId is { } projectId)

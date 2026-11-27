@@ -16,6 +16,7 @@ public static partial class WorkplaceEndpoints
         sharing.MapPost("/operations/{operationId:guid}/resume", ResumeWorkSharingAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         sharing.MapGet("/operations/{operationId:guid}", GetWorkSharingOperationAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
         sharing.MapGet("/operations", ListWorkSharingOperationsAsync).RequireAuthorization(AgentstrationPolicies.CanReadRuns);
+        sharing.MapPost("/connections/import", ImportWorkSharingConnectionsAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         sharing.MapPost("/plans/{planId:guid}/import", ImportWorkSharingPlanAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
     }
     private static async Task<IResult> PullWorkSharingAsync(string workspaceName, Guid projectId, PullWorkSharingRequest request,
@@ -51,6 +52,12 @@ public static partial class WorkplaceEndpoints
         var result = await service.ImportPlanAsync(WorkspaceId(workspaceName), new(projectId), new(planId), request.ExpectedDigest, token);
         return result.IsSuccess ? Results.Ok(WorkPlanContractMapping.ToPlanResponse(result.Value!)) : SharingProblem(result.ErrorCode!);
     }
+    private static async Task<IResult> ImportWorkSharingConnectionsAsync(string workspaceName, Guid projectId, ImportWorkSharingConnectionsRequest request,
+        WorkProjectSharingService service, CancellationToken token)
+    {
+        var result = await service.ImportConnectionsAsync(WorkspaceId(workspaceName), new(projectId), request.ExpectedProjectVersion, request.ExpectedDigest, token);
+        return result.IsSuccess ? Results.Ok(WorkProjectContractMapping.ToProjectResponse(result.Value!)) : SharingProblem(result.ErrorCode!);
+    }
     private static WorkSharingOperationResponse SharingResponse(WorkSharingOperation value) => new(value.Id.Value, value.ProjectId.Value, value.ProjectVersion,
         value.Status, value.Version, value.IntentDigest, value.Attempts.Count, value.RemoteRevision, value.ErrorCode, value.CreatedAt, value.UpdatedAt);
     private static IResult SharingAccepted(string workspaceName, Guid projectId, Result<WorkSharingOperation> result)
@@ -69,7 +76,7 @@ public static partial class WorkplaceEndpoints
             "sharing_operation_not_found" => 404,
             "sharing_provider_denied" or "sharing_provider_governance_denied" => 403,
             "sharing_record_conflict" or "sharing_state_conflict" or "sharing_local_plan_conflict" or "sharing_operation_conflict"
-                or "sharing_command_conflict" or "sharing_connection_changed" or "sharing_plan_project_conflict" or "sharing_local_work_changed" => 409,
+                or "sharing_local_connections_changed" or "sharing_command_conflict" or "sharing_connection_changed" or "sharing_plan_project_conflict" or "sharing_local_work_changed" => 409,
             _ => 400
         });
 }

@@ -10,10 +10,12 @@ public enum WorkPlanTaskReadiness { Ready, Blocked, Accepted }
 public sealed record WorkTaskDependency(WorkTaskId TaskId, WorkTaskId DependsOnTaskId);
 public sealed record WorkPlanTaskReference(WorkTaskId TaskId, string CreationDigest);
 public sealed record WorkPlanTaskObservation(WorkTaskId TaskId, long Version);
+public sealed record WorkPlanTaskConnections(WorkTaskId TaskId, IReadOnlyList<string> Names);
 
 public sealed record WorkPlanDefinition(string Intent, IReadOnlyList<WorkTaskId> TaskIds,
     IReadOnlyList<WorkTaskDependency> Dependencies)
 {
+    public IReadOnlyList<WorkPlanTaskConnections> TaskConnections { get; init; } = [];
     public const int MaximumTasks = 100;
     public const int MaximumDependencies = 1_000;
     public const int MaximumIntentLength = 8_000;
@@ -33,9 +35,16 @@ public sealed record WorkPlanDefinition(string Intent, IReadOnlyList<WorkTaskId>
             return Result<WorkPlanDefinition>.Failure("work_plan_dependency_not_member");
         if (Dependencies.Distinct().Count() != Dependencies.Count)
             return Result<WorkPlanDefinition>.Failure("work_plan_dependency_duplicate");
+        if (TaskConnections is null || TaskConnections.Count > MaximumTasks
+            || TaskConnections.Any(value => value is null || !ids.Contains(value.TaskId) || value.Names is not { Count: > 0 and <= 32 }
+                || value.Names.Any(name => !WorkProjectDefinition.ValidName(name)) || value.Names.Distinct(StringComparer.Ordinal).Count() != value.Names.Count)
+            || TaskConnections.Select(value => value.TaskId).Distinct().Count() != TaskConnections.Count)
+            return Result<WorkPlanDefinition>.Failure("work_plan_connections_invalid");
         if (HasCycle(ids, Dependencies)) return Result<WorkPlanDefinition>.Failure("work_plan_dependency_cycle");
         return Result<WorkPlanDefinition>.Success(this with
         {
+            TaskConnections = TaskConnections.OrderBy(value => value.TaskId.Value)
+                .Select(value => value with { Names = value.Names.Order(StringComparer.Ordinal).ToArray() }).ToArray(),
             Intent = Intent.Trim(),
             TaskIds = ids.OrderBy(id => id.Value).ToArray(),
             Dependencies = Dependencies.OrderBy(edge => edge.TaskId.Value).ThenBy(edge => edge.DependsOnTaskId.Value).ToArray()
@@ -54,7 +63,7 @@ public sealed record WorkPlanDefinition(string Intent, IReadOnlyList<WorkTaskId>
         return false;
     }
 
-    public string ContentDigest(IReadOnlyList<WorkPlanTaskReference> tasks) => Digest(new { Intent, Tasks = tasks, Dependencies });
+    public string ContentDigest(IReadOnlyList<WorkPlanTaskReference> tasks) => Digest(new { Intent, Tasks = tasks, Dependencies, TaskConnections });
     public static string Digest<T>(T value) => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value)));
 }
 

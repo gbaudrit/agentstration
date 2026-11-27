@@ -22,6 +22,8 @@ public sealed partial class WorkPlanService
     private async Task<string?> ValidateHierarchyAsync(WorkspaceId workspaceId, WorkPlanDefinition definition,
         IReadOnlyDictionary<WorkTaskId, StoredWorkItem> members, CancellationToken token)
     {
+        if (definition.TaskConnections.Any(value => members[value.TaskId].Value.TaskHierarchy!.Kind != WorkTaskKind.Atomic))
+            return "work_plan_connections_invalid";
         var edges = definition.Dependencies.ToList();
         foreach (var treeId in members.Values.Where(item => item.Value.TaskHierarchy!.Kind == WorkTaskKind.Composite)
             .Select(item => item.Value.TaskHierarchy!.TreeId).Distinct())

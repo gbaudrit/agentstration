@@ -29,7 +29,11 @@ public sealed record WorkSharingPlan(WorkPlanId PlanId, WorkPlanDefinition Defin
 }
 public sealed record WorkSharingIssueReference(string Provider, string Repository, string TaskId,
     string PlanLabelPrefix, string ParticipantLabelPrefix);
-public sealed record WorkSharingProjectMetadata(string DisplayName, string? Description, IReadOnlyList<WorkParticipantId> Participants);
+public sealed record WorkSharingProjectMetadata(string DisplayName, string? Description, IReadOnlyList<WorkParticipantId> Participants)
+{
+    public static WorkSharingRecordKey Key { get; } = new(WorkSharingDomain.ProjectMetadata, "project");
+    public IReadOnlyList<WorkProjectConnectionRequirement> ConnectionRequirements { get; init; } = [];
+}
 public sealed record WorkSharingContribution(Guid Id, WorkPlanId? PlanId, WorkTaskId? TaskId, string Kind, string Evidence,
     IReadOnlyList<string> ArtifactReferences);
 public sealed record WorkSharingUsage(Guid Id, WorkPlanId? PlanId, WorkTaskId? TaskId, IReadOnlyDictionary<string, long> Counters)

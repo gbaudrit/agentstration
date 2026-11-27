@@ -838,3 +838,15 @@ and connection-scoped write-ahead receipts fence recovery. Process recovery neve
 authorizes blind replay after missing state. Existing native issue/delivery consumers
 await their typed adoption in #1346/#1349. See
 [ADR-0292](../../decisions/0292-github-contracts-consume-protected-connected-services.md).
+
+### Shared named connection declarations (#1345)
+
+Canonical Project metadata carries portable requirements; immutable functional WorkPlan revisions
+carry per-atomic-task logical connection names. Strict YAML reads and CAS merges validate their
+cross-record references and require an external target for consumed shared needs. Explicit
+version/digest-pinned application reuses Project validation while retaining local assignments,
+membership and execution. Shared admission compares consumed local declarations, pins metadata
+evidence and lets existing service-backed ATC/AFC resolution validate actual targets and grants.
+Independent resource UIDs/scopes remain local; pull does not configure or provision them.
+See [ADR-0293](../../decisions/0293-sharing-carries-connection-needs-without-local-assignments.md)
+and [Project sharing](../../reference/project-sharing.md).

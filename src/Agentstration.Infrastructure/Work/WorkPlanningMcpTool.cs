@@ -201,7 +201,7 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
                 break;
         }
         Add<bool>(ToolDryRunContract.ParameterName, true);
-        return new(name, name, "Governed local Work planning in the authenticated Workspace and Principal. Uses canonical Work services, including optional capability-described tracking connections; no template required. Mutations replay by trusted Tool call identity. Dry runs validate structure without effects.",
+        return new(name, name, "Governed local Work planning in the authenticated Workspace and Principal. Uses canonical Work services, including optional capability-described tracking connections. Plan definitions retain portable taskConnections names; omitted local execution selections use those declarations. No template required. Mutations replay by trusted Tool call identity. Dry runs validate structure without effects.",
             JsonSerializer.SerializeToElement(new { type = "object", properties, required, additionalProperties = false }, Json),
             JsonSerializer.SerializeToElement(new { type = "object" }, Json),
             InitialCategory: new("work-planning", "Work planning", "Local Project, task and WorkPlan operations."));

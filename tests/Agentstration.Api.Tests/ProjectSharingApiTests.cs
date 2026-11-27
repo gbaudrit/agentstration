@@ -37,6 +37,11 @@ public sealed partial class ProjectSharingApiTests
         var portable = new WorkSharingProjectId(Guid.NewGuid()); var participant = new WorkParticipantId(Guid.NewGuid());
         var lp = await CreateProjectAsync(left, portable, participant);
         var rp = await CreateProjectAsync(right, portable, new(Guid.NewGuid()));
+        var needs = new[]
+        {
+            new WorkProjectConnectionRequirement("backend", WorkProjectConnectionRules.Tracking, "1.0", ["list"], new("tracker", "backend")),
+            new WorkProjectConnectionRequirement("frontend", WorkProjectConnectionRules.Tracking, "1.0", ["list"], new("tracker", "frontend"))
+        };
         var root = new WorkTaskId(Guid.NewGuid());
         var tree = new WorkTaskTreeDefinition(root, [new(root, WorkTaskKind.Atomic, "Implement", "Produce deterministic evidence")]);
         WorkPlanView local;
@@ -44,25 +49,35 @@ public sealed partial class ProjectSharingApiTests
         {
             Assert.IsTrue((await left.Host.Services.GetRequiredService<WorkTaskTreeService>().CreateAsync(new(left.Context.WorkspaceId), tree, default)).IsSuccess);
             var plans = left.Host.Services.GetRequiredService<WorkPlanService>();
-            var created = await plans.CreateAsync(new(left.Context.WorkspaceId), WorkPlanId.New(), new(Guid.NewGuid(), 0, new("Deliver fixture", [root], [])), default);
+            var created = await plans.CreateAsync(new(left.Context.WorkspaceId), WorkPlanId.New(), new(Guid.NewGuid(), 0, new("Deliver fixture", [root], []) { TaskConnections = [new(root, ["frontend", "backend"])] }), default);
             Assert.IsTrue(created.IsSuccess, created.ErrorCode); local = created.Value!;
             var projects = left.Host.Services.GetRequiredService<WorkProjectService>();
             var project = (await projects.GetAsync(new(left.Context.WorkspaceId), new(lp.Id), default)).Value!;
             var updated = await projects.UpdateAsync(new(left.Context.WorkspaceId), project.Id, new(Guid.NewGuid(), project.Version,
-                project.Definition with { PlanIds = [local.Plan.Id] }), default);
+                project.Definition with { PlanIds = [local.Plan.Id], ConnectionRequirements = needs }), default);
             Assert.IsTrue(updated.IsSuccess, updated.ErrorCode); lp = WorkProjectContractMapping.ToProjectResponse(updated.Value!);
         }
         var plan = new WorkSharingPlan(local.Plan.Id, local.Revision.Definition, [tree], [new(root, participant)]);
         var planChange = new WorkSharingChange(new(WorkSharingDomain.Plan, local.Plan.Id.ToString()), 0, JsonSerializer.SerializeToElement(plan, Json));
-        var published = await PublishAsync(left, lp, [planChange]);
+        var metadata = new WorkSharingProjectMetadata("Shared", null, [participant, rp.Sharing!.ParticipantId]) { ConnectionRequirements = needs };
+        var published = await PublishAsync(left, lp, [planChange, new(WorkSharingProjectMetadata.Key, 0, JsonSerializer.SerializeToElement(metadata, Json))]);
         Assert.AreEqual(WorkSharingOperationStatus.Succeeded, published.Status, published.ErrorCode);
-        var pulled = await PullAsync(right, rp); var record = pulled.Records.Single();
+        var pulled = await PullAsync(right, rp); var record = pulled.Records.Single(value => value.Key.Domain == WorkSharingDomain.Plan);
+        Assert.HasCount(0, (await right.Http.GetFromJsonAsync<WorkProjectResponse>(right.Root(rp.Id)))!.ConnectionRequirements);
+        using (var apply = await right.Http.PostAsJsonAsync(right.Root(rp.Id) + "/sharing/connections/import",
+            new ImportWorkSharingConnectionsRequest(rp.Version, pulled.Records.Single(value => value.Key == WorkSharingProjectMetadata.Key).Digest)))
+        {
+            Assert.AreEqual(HttpStatusCode.OK, apply.StatusCode, await apply.Content.ReadAsStringAsync());
+            rp = (await apply.Content.ReadFromJsonAsync<WorkProjectResponse>())!;
+            Assert.HasCount(2, rp.ConnectionRequirements); Assert.HasCount(0, rp.ConnectionAssignments);
+        }
         Assert.AreEqual(local.Plan.Id, record.Content.Deserialize<WorkSharingPlan>(Json)!.PlanId);
         using (var import = await right.Http.PostAsJsonAsync(right.Root(rp.Id) + $"/sharing/plans/{local.Plan.Id}/import", new ImportWorkSharingPlanRequest(record.Digest)))
         {
             Assert.AreEqual(HttpStatusCode.OK, import.StatusCode, await import.Content.ReadAsStringAsync());
             var draft = (await import.Content.ReadFromJsonAsync<WorkPlanResponse>())!;
             Assert.AreEqual(WorkPlanStatus.Draft, draft.Status); Assert.HasCount(0, draft.Attempts);
+            CollectionAssert.AreEqual(new[] { "backend", "frontend" }, draft.Revision.TaskConnections.Single().Names.ToArray());
         }
         // Membership changed when importing; use the current Project configuration version.
         rp = (await right.Http.GetFromJsonAsync<WorkProjectResponse>(right.Root(rp.Id)))!;
@@ -91,13 +106,20 @@ public sealed partial class ProjectSharingApiTests
         Assert.AreEqual(1, current.Records.Count(value => value.Key.Domain == WorkSharingDomain.Usage));
         Assert.AreEqual(2, current.Records.Count(value => value.Key.Domain == WorkSharingDomain.Contribution));
         var historical = await PullAsync(right, rp, published.Revision);
-        Assert.HasCount(1, historical.Records);
+        Assert.HasCount(2, historical.Records);
         using var foreign = await right.Http.PostAsJsonAsync($"/api/workspaces/{Guid.NewGuid()}/projects/{rp.Id}/sharing/pull", new PullWorkSharingRequest());
         Assert.IsTrue(foreign.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound);
         var raw = (await native.GitAsync(native.RepositoryPath, "show", "main:shared/index.yaml"));
         Assert.AreEqual("2.0", ResourceManifestSerializer.FromYamlStrict<WorkSharingSpace>(raw).FormatVersion);
         Assert.IsFalse(raw.Contains(left.Context.WorkspaceId.ToString(), StringComparison.Ordinal));
         Assert.IsFalse(raw.Contains(AuthenticatedGitFixture.Credential, StringComparison.Ordinal));
+        var paths = (await native.GitAsync(native.RepositoryPath, "ls-tree", "-r", "--name-only", "main", "shared")).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var yaml = string.Join("\n", await Task.WhenAll(paths.Where(path => path.EndsWith(".yaml", StringComparison.Ordinal))
+            .Select(path => native.GitAsync(native.RepositoryPath, "show", "main:" + path))));
+        Assert.Contains("connectionRequirements:", yaml); Assert.Contains("taskConnections:", yaml);
+        foreach (var excluded in new[] { left.Context.WorkspaceId.ToString(), left.Context.PrincipalId.ToString(), left.Tool.Uid.ToString(),
+            right.Context.WorkspaceId.ToString(), right.Context.PrincipalId.ToString(), right.Tool.Uid.ToString(), AuthenticatedGitFixture.Credential, "connectionAssignments:", "scopeRef:" })
+            Assert.DoesNotContain(excluded, yaml);
     }
 
     [TestMethod]

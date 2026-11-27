@@ -54,6 +54,7 @@ and current binding Discover/Use authorization.
 | `GET /operations` | Explicit `skip`/`take` (1–100), stable chronological ordering and `hasMore`. |
 | `GET /operations/{id}` | Pending, uncertain, conflict, rejected or succeeded state; no credentials or local provider arguments. |
 | `POST /operations/{id}/resume` | Recovers the saved native attempt first, then resumes only when its outcome permits it. |
+| `POST /connections/import` | Body `{ "expectedProjectVersion": 1, "expectedDigest": "<metadata-sha256>" }`; explicitly applies portable requirements while preserving local assignments and execution. |
 | `POST /plans/{planId}/import` | Body `{ "expectedDigest": "<sha256>" }`; explicitly imports current shared declarations into ordinary local draft Work. |
 
 A change is `{ "key": { "domain": "Contribution", "name": "<uuid>" }, "expectedVersion": 0,
@@ -73,6 +74,60 @@ Current limits are 64 records, 16 KiB content per record, 1 MiB per snapshot, 32
 16 KiB of changes per publication command, with a 40 KiB index/record publication envelope. The Git transport also enforces the protected relay's
 input limit. Split independent record additions into separate identified commands when necessary.
 Versions of changed records and Git history are retained; there is no delete/GC endpoint.
+
+## Portable named connection needs
+
+`ProjectMetadata` uses the canonical record name `project`. Its content can declare several
+needs using the same contract; neither a contract nor an extension name selects a service:
+
+```yaml
+displayName: Shared application
+description: null
+participants:
+  - value: 22222222-2222-4222-8222-222222222222
+connectionRequirements:
+  - name: backend-tracking
+    contract: agentstration.tracking.contracts.mcp.v1
+    version: '1.0'
+    requiredOperations: [list]
+    target:
+      providerId: tracker-authority
+      targetId: backend
+```
+
+Publish the local Project's approved `connectionRequirements`; different requirements are
+rejected. Requirement/operation ordering is normalized. Shared plan definitions carry
+`taskConnections`, for example:
+
+```yaml
+taskConnections:
+  - taskId:
+      value: 10000000-0000-0000-0000-000000000002
+    names: [backend-tracking]
+```
+
+Each entry must name an atomic plan member and unique declared needs. A consumed shared
+need must specify its external provider and target. Publish metadata before its consuming
+plan, or in the same command. A missing declaration, missing target or removal of a consumed
+need is rejected on both snapshot validation and publication merge.
+
+After pull, review the `ProjectMetadata/project` record and explicitly call
+`POST /connections/import` with its digest and the current local Project version. This changes
+only requirement declarations. It preserves local ConnectedService assignments, Tool bindings,
+sharing identity, membership and admitted attempts. An incompatible or removed assigned need
+fails validation; edit the local assignment explicitly before retrying. Repeating a completed
+exact digest/version application after restart acknowledges it without reverting subsequent edits.
+
+Assign each name through ordinary Project authoring to a compatible service in this installation.
+The selected local UIDs/scopes may differ between instances; actual external provider/target
+identity must match. No assignment, service/type/extension UID, scope path, credential or resolved
+route is admitted in the metadata or functional plan definition. Pull never provisions these.
+
+At execution start omitted local selections use the immutable plan's declared names; an explicit
+different selection is rejected. Shared admission checks consumed declarations against the local
+Project and retains shared metadata revision/digest evidence. The existing service resolver
+validates actual target-specific Describe proof and current access. Unrelated unconfigured needs
+remain optional. See [ADR-0293](../decisions/0293-sharing-carries-connection-needs-without-local-assignments.md).
 
 ## Concurrency and local authority
 

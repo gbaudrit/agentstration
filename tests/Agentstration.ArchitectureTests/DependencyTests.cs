@@ -1597,9 +1597,9 @@ public sealed class DependencyTests
                         or "Agentstration.Api.DataSources.Rss.Tests") continue;
 
                 // Project contract fixtures belong to the test root and are shared
-                // only by the policy and real-MCP integration test processes.
+                // only by the policy, SQLite application and real-MCP integration test processes.
                 if (include.Replace('\\', '/') == "../fixtures/Work/ProjectContractFixture.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Infrastructure.Tests" or "Agentstration.Api.Execution.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Infrastructure.Tests" or "Agentstration.Application.Tests" or "Agentstration.Api.Execution.Tests") continue;
 
                 // The native Git HTTP fixture is owned by the test root and reused
                 // only by its provider and governed transport integration modules.

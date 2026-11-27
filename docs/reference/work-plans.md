@@ -34,6 +34,21 @@ Success returns `201 Created`, a `Location` for the plan, lifecycle `status`, op
 
 A selected composite is a derived checkpoint, not a dispatchable task. All its direct required children must also be plan members; the rule applies recursively to selected composites. Optional children can remain outside the plan. Validation checks the combined completion constraints for cycles: a child cannot wait on a parent that requires that same child to finish. The stored `dependencies` remain exactly the explicit plan edges.
 
+## Declare portable task connection names
+
+An optional `definition.taskConnections` array associates an atomic member task with the
+logical Project needs it consumes: `{ "taskId": "<uuid>", "names": ["backend-tracking"] }`.
+Entries and names are unique and normalized; they participate in immutable revision identity.
+This contract is shared by REST, Work planning MCP and authored/imported YAML plans. Portable
+YAML uses the existing typed `{ value: <uuid> }` task identity representation.
+
+These declarations contain no local Flow, input or service assignment. At execution start,
+omitted local target selections use the declaration. An explicit different selection fails;
+consuming any need requires a Project and its locally assigned compatible ConnectedService.
+[Project sharing](project-sharing.md#portable-named-connection-needs) additionally validates
+shared declarations and target identity before new admission. Empty declarations keep ordinary
+local plans provider-optional.
+
 ## Validate and activate an exact revision
 
 Read `GET /api/workspaces/{workspaceName}/work-plans/{planId}` with run-read permission. Copy its current `version`, revision number and revision `digest` into a lifecycle command:
