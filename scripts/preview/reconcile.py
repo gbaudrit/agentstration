@@ -300,7 +300,7 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 any(old_intent.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent'))
                 or list(previous['request'].get('extensions', {})) != selected))
             options = {**commands.parse('/preview deploy'), 'environment_id': environment,
-                       'revision': approval['sourceSha'], 'extensions': selected}
+                       'revision': approval['sourceSha'], 'extensions': selected, 'preview_pr': number}
             if previous and not previous['destroyed']:
                 options['database'] = previous['request']['database']
                 options['ttl_hours'] = previous['request']['ttlHours']
@@ -331,7 +331,7 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 sync(environment, value, operation='deploy', outcome='success')
                 report(environment, feedback.completed(value, 'deploy', github.repository, run_url, request, reset))
         except manual.SelectionError as error:
-            target = pending if error.public['code'] == 'image-unavailable' else failures
+            target = pending if error.public['code'] in ('image-unavailable', 'ci-pending') else failures
             target.append({'environmentId': environment, 'code': error.public['code'], 'component': error.public['component']})
             text = feedback.failed('deploy', github.repository, run_url, 'select', options, error.public)
             sync(environment, operation='deploy', outcome='pending' if target is pending else 'error')
