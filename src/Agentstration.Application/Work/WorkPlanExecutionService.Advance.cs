@@ -42,7 +42,7 @@ public sealed partial class WorkPlanExecutionService
             WorkProjectContextSnapshot? projectContext = null;
             if (view.Plan.Execution.ProjectId is { } projectId)
             {
-                var captured = await projectContexts.CaptureAsync(workspaceId, projectId, id, token);
+                var captured = await projectContexts.CaptureAsync(workspaceId, projectId, id, token, target.Connections);
                 if (!captured.IsSuccess) return Failure(captured.ErrorCode!);
                 projectContext = captured.Value!;
             }
@@ -68,7 +68,8 @@ public sealed partial class WorkPlanExecutionService
                 .Select(edge => observations.Single(item => item.TaskId == edge.DependsOnTaskId)).ToArray();
             var attempt = new WorkPlanAttempt(attemptId, target.TaskId, view.Revision.Number, view.Revision.Digest,
                 task.Version, task.TaskHierarchy!.CreationDigest, workId, $"flowrun-root-{workId.Value:N}", target.Flow,
-                target.Input, dependencies, WorkPlanAttemptStatus.Admitted, false, now, now) { AdmissionEvidence = evidence, ProjectContext = projectContext };
+                target.Input, dependencies, WorkPlanAttemptStatus.Admitted, false, now, now)
+            { AdmissionEvidence = evidence, ProjectContext = projectContext };
             var version = task.Version;
             task.AdmitPlanAttempt(id, attemptId, new(attemptId), now);
             var admitted = await SaveObservedAsync(view, view.Plan with { Attempts = [.. view.Plan.Attempts, attempt] }, attemptId,
@@ -86,8 +87,10 @@ public sealed partial class WorkPlanExecutionService
     {
         var metadata = new Dictionary<string, string>
         {
-            ["workPlan.id"] = plan.Id.ToString(), ["workPlan.revision"] = attempt.PlanRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            ["workPlan.attemptId"] = attempt.Id.ToString("D"), ["workplace.taskId"] = attempt.TaskId.ToString()
+            ["workPlan.id"] = plan.Id.ToString(),
+            ["workPlan.revision"] = attempt.PlanRevision.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["workPlan.attemptId"] = attempt.Id.ToString("D"),
+            ["workplace.taskId"] = attempt.TaskId.ToString()
         };
         if (attempt.ProjectContext is { } context)
         {

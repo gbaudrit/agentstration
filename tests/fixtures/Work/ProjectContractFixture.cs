@@ -7,10 +7,13 @@ using Agentstration.Afc.Aep;
 using Agentstration.Application.Work;
 using Agentstration.Atc.Abstractions;
 using Agentstration.Atc.Aep;
+using Agentstration.ConnectedServices;
+using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Extensions.Contracts;
 using Agentstration.Identity;
 using Agentstration.Identity.Contracts;
 using Agentstration.Infrastructure.Work;
+using Agentstration.Parameters;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
 using Agentstration.Resources;
@@ -26,7 +29,7 @@ namespace Agentstration.Tests.Work;
 
 internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentityCatalog, IResourceScopeResolver,
     IResourceAccessPolicyService, Agentstration.Identity.Contracts.IAuthorizationService, IWorkplaceContext,
-    IHttpMessageHandlerFactory, IToolInvoker
+    IHttpMessageHandlerFactory, IToolInvoker, IParameterResolver
 {
     public WorkspaceId WorkspaceId { get; } = WorkspaceId.New();
     public Guid PrincipalId => Caller.PrincipalId;
@@ -48,6 +51,7 @@ internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentity
     public int DiscoveryCalls { get; private set; }
     public int MetadataReads { get; private set; }
     public List<ToolExecutionContext> Calls { get; } = [];
+    public Dictionary<ParameterReference, JsonElement> ParameterValues { get; } = [];
     public WorkProjectBindingResolver Resolver { get; }
     public WorkProjectContextService Contexts { get; }
 
@@ -56,13 +60,15 @@ internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentity
         Caller = new(Guid.NewGuid(), Guid.NewGuid(), WorkspaceId.Value);
         var contracts = new WorkProjectContractResolver(this, new ResourceAepExtensionRegistrationResolver(this),
             new AepMcpTransport(this, NullLoggerFactory.Instance), new ToolExecutionPipeline(this), TimeProvider.System);
-        Resolver = new(this, this, new DescendantResourceUseAuthorizer(this), Context, Context, this, contracts);
+        var inspector = new ConnectedServiceManagementService(this, null!, new DescendantResourceUseAuthorizer(this), [], this, null!, this, TimeProvider.System, Context);
+        var connections = new WorkProjectConnectedServiceResolver(this, inspector, this, Context);
+        Resolver = new(this, this, new DescendantResourceUseAuthorizer(this), Context, Context, this, contracts, connections);
         Contexts = new(null!, Resolver, this, TimeProvider.System);
     }
 
-    public WorkProjectContextBinding AddConnection(bool tracking, string name)
+    public WorkProjectContextBinding AddConnection(bool tracking, string name, ResourceScopeRef? owner = null)
     {
-        var scope = ResourceScopeRef.Workspace(WorkspaceId.Value);
+        var scope = owner ?? ResourceScopeRef.Workspace(WorkspaceId.Value);
         var extension = new ExtensionRegistrationResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
@@ -123,6 +129,91 @@ internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentity
         };
     }
 
+    public WorkProjectConnectionSelection AddService(WorkProjectContextBinding route, string? name = null,
+        bool instanceService = false, bool ancestorType = false, bool parameterRevision = false,
+        string? providerId = null, string? targetId = null)
+    {
+        var scope = instanceService ? ResourceScopeRef.Instance : ResourceScopeRef.Workspace(WorkspaceId.Value);
+        var typeScope = ancestorType ? ResourceScopeRef.Instance : scope;
+        var schema = JsonSerializer.SerializeToElement(new { type = "object", additionalProperties = false });
+        var names = WorkProjectConnectionRules.TargetFields;
+        var version = new ConnectedServiceTypeVersionDescriptor("1.0.0", AepSchemaDigest.Compute(schema), schema,
+            names.Select(value => new ConnectedServiceInputDescriptor(value, true, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Standard)).ToArray(),
+            names.Select(value => new ConnectedServiceExportDescriptor(value, ConnectedServiceValueType.Text, ConnectedServiceValueProtection.Standard, SourceInputId: value)).ToArray());
+        var grants = new DescendantUsePolicy { Grants = [new(ResourceScopeRef.Workspace(WorkspaceId.Value))] };
+        var type = Resources.Values.OfType<ConnectedServiceTypeResource>().SingleOrDefault(value => value.ScopeRef == typeScope && value.Name == route.Name + "-type")
+            ?? new ConnectedServiceTypeResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ConnectedServiceResourceKinds.ConnectedServiceType,
+                Uid = Guid.NewGuid(),
+                Generation = 1,
+                ScopeRef = typeScope,
+                Metadata = new() { Name = route.Name + "-type" },
+                Definition = new() { DisplayName = "Contract target", PreferredVersion = version.Version, Versions = [version], UsePolicy = grants }
+            };
+        Put(type);
+        var selection = route.Contract!;
+        var fields = new Dictionary<string, string>
+        {
+            ["providerId"] = providerId ?? selection.ProviderId,
+            ["targetId"] = targetId ?? selection.TargetId,
+            ["bindingId"] = selection.BindingId,
+            ["revision"] = selection.Revision
+        };
+        var bindings = fields.Select(value => new ConnectedServiceValueBinding
+        { InputId = value.Key, Kind = ConnectedServiceBindingKind.Literal, Literal = JsonSerializer.SerializeToElement(value.Value) }).ToArray();
+        if (parameterRevision)
+        {
+            var parameter = new ParameterResource
+            {
+                ApiVersion = ResourceApiVersions.CoreV1,
+                Kind = ParameterResourceKinds.Parameter,
+                ScopeRef = scope,
+                Uid = Guid.NewGuid(),
+                Generation = 1,
+                Metadata = new() { Name = route.Name + "-revision" },
+                Definition = new() { DisplayName = "Revision", ValueType = ParameterValueType.Text, Value = JsonSerializer.SerializeToElement(selection.Revision) }
+            };
+            Put(parameter); var reference = new ParameterReference(parameter.Address, scope); ParameterValues[reference] = parameter.Definition.Value;
+            bindings[3] = new() { InputId = "revision", Kind = ConnectedServiceBindingKind.Parameter, Parameter = reference };
+        }
+        var service = new ConnectedServiceResource
+        {
+            ApiVersion = ResourceApiVersions.CoreV1,
+            Kind = ConnectedServiceResourceKinds.ConnectedService,
+            Uid = Guid.NewGuid(),
+            Generation = 1,
+            ScopeRef = scope,
+            Metadata = new() { Name = (name ?? route.Name) + "-service" },
+            Definition = new()
+            {
+                DisplayName = "Configured contract target",
+                Type = new()
+                {
+                    Type = new(type.Name, typeScope, type.Namespace),
+                    TypeUid = type.Uid,
+                    Version = version.Version,
+                    SchemaDigest = version.SchemaDigest
+                },
+                Options = JsonSerializer.SerializeToElement(new { }),
+                Bindings = bindings,
+                UsePolicy = grants
+            },
+            ObservedState = new() { Availability = ConnectedServiceAvailability.Ready, ObservedAt = DateTimeOffset.UnixEpoch }
+        };
+        Put(service);
+        return new(new(name ?? route.Name, route.Purpose == WorkProjectBindingPurpose.Tracking ? WorkProjectConnectionRules.Tracking : WorkProjectConnectionRules.Forge,
+            "1.0", selection.RequiredOperations, new(fields["providerId"], fields["targetId"])),
+            new(name ?? route.Name, Reference(service), route.Target, names.Select(value => new WorkProjectConnectionExport(value, value)).ToArray()));
+    }
+
+    public Task<ResolvedParameter?> ResolveAsync(ParameterReference parameter, ParameterResolutionContext context, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        return Task.FromResult(ParameterValues.TryGetValue(parameter, out var value) ? new ResolvedParameter(parameter.Address, value) : null);
+    }
+
     public void Put(Resource resource) => Resources[Reference(resource).Address] = resource;
     public static WorkProjectResourceReference Reference(Resource resource) => new(new(resource.ScopeRef!.Value, resource.Namespace, resource.Kind, resource.Name), resource.Uid, resource.Generation);
     public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkProjectContextBinding binding, CancellationToken token = default) => Resolver.ResolveAsync(WorkspaceId, PrincipalId, binding, token);
@@ -138,9 +229,10 @@ internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentity
             var tool = Resources.Values.OfType<ToolResource>().Single(value => value.Uid == invocation.ToolUid);
             var adapter = new ToolProviderAdapter(new ResourceAepExtensionRegistrationResolver(this),
                 new ConfigurationToolProviderEnvironmentResolver(new ConfigurationBuilder().Build()), this, NullLoggerFactory.Instance);
-            try { return await adapter.InvokeAsync(provider, tool, invocation.Arguments, token, invocation.ExpectedProviderRouteDigest, invocation.ExpectedToolSchemaDigest, invocation.ExpectedProviderToolContracts); }
+            try { return await adapter.InvokeAsync(provider, tool, invocation.Arguments, token, invocation.ExpectedProviderRouteDigest, invocation.ExpectedToolSchemaDigest, invocation.ExpectedProviderToolContracts, invocation.BeforeProviderInvoke); }
             catch (Exception error) { InvocationError = error; throw; }
         }
+        if (invocation.BeforeProviderInvoke is not null) await invocation.BeforeProviderInvoke(token);
         var input = invocation.Arguments!.Value;
         var id = input.GetProperty("arguments").GetProperty("requestId").GetString()!;
         var target = input.GetProperty("target");
@@ -184,13 +276,22 @@ internal sealed class ProjectContractFixture : IResourceStore, IResourceIdentity
         return Task.FromResult(value is null ? null : new ResourceIdentitySnapshot(value.Uid, value.ScopeRef!.Value, value.Namespace, value.Kind, value.Name, value.Generation, null, "etag-" + value.Uid + "-" + value.Generation));
     }
     public Task<ResolvedResourceScope?> ResolveAsync(ResourceScopeRef scope, CancellationToken token) => Task.FromResult<ResolvedResourceScope?>(
-        scope == ResourceScopeRef.Workspace(WorkspaceId.Value) ? new(new(1, scope, ResourceScopeKind.Workspace, "workspace", null), []) : null);
+        Scope(scope));
+    private ResolvedResourceScope? Scope(ResourceScopeRef scope)
+    {
+        var instance = new ResourceScope(1, ResourceScopeRef.Instance, ResourceScopeKind.Instance, "instance", null);
+        var tenant = new ResourceScope(2, ResourceScopeRef.Tenant(Caller.TenantId), ResourceScopeKind.Tenant, "tenant", 1);
+        return scope == instance.Ref ? new(instance, []) : scope == tenant.Ref ? new(tenant, [instance])
+            : scope == ResourceScopeRef.Workspace(WorkspaceId.Value) ? new(new(3, scope, ResourceScopeKind.Workspace, "workspace", 2), [tenant, instance]) : null;
+    }
     public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource, ResourceScopeRef consumer, ResourceAccessAction action, CancellationToken token) =>
         Task.FromResult(new ResourceAccessDecision(!Denied.Contains(resource.Uid), "fixture_grant"));
     public Task<bool> HasPermissionAsync(RequestContext context, string permission, CancellationToken token) => Task.FromResult(Allowed && !DeniedPermissions.Contains(permission));
     public Task<StoredResource<T>?> GetExactAsync<T>(ScopedResourceAddress address, CancellationToken token) where T : Resource
     {
-        token.ThrowIfCancellationRequested(); Assert.AreEqual(ControlPlaneAccessMode.Workspace, Context.AccessMode);
+        token.ThrowIfCancellationRequested();
+        Assert.IsTrue(Context.AccessMode == ControlPlaneAccessMode.Workspace || Context.AccessMode == ControlPlaneAccessMode.System
+            && address.Kind is "ConnectedService" or "ConnectedServiceType" or "Parameter" or "Secret");
         return Task.FromResult(Resources.TryGetValue(address, out var value) ? new StoredResource<T>((T)value, "etag", DateTimeOffset.UnixEpoch) : null);
     }
     public Task<IReadOnlyList<StoredResource<T>>> ListExactAsync<T>(ResourceScopeRef scope, string kind, int skip, int take, CancellationToken token) where T : Resource

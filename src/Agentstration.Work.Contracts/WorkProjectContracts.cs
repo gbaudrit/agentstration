@@ -1,11 +1,13 @@
-using Agentstration.Resources;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Work.Contracts;
 
 public sealed record WorkProjectDefinitionRequest(string DisplayName, string? Description, IReadOnlyList<Guid>? PlanIds, IReadOnlyList<Guid>? TaskIds)
 {
     public IReadOnlyList<WorkProjectContextBinding>? Bindings { get; init; }
+    public IReadOnlyList<WorkProjectConnectionRequirement>? ConnectionRequirements { get; init; }
+    public IReadOnlyList<WorkProjectConnectionAssignment>? ConnectionAssignments { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectSharingConnection? Sharing { get; init; }
 }
@@ -19,10 +21,15 @@ public sealed record WorkProjectResponse(Guid Id, Guid WorkspaceId, string Name,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
 {
     public IReadOnlyList<WorkProjectContextBinding> Bindings { get; init; } = [];
+    public IReadOnlyList<WorkProjectConnectionRequirement> ConnectionRequirements { get; init; } = [];
+    public IReadOnlyList<WorkProjectConnectionAssignment> ConnectionAssignments { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectSharingConnection? Sharing { get; init; }
 }
-public sealed record WorkProjectContextResponse(Guid ProjectId, long ProjectVersion, IReadOnlyList<WorkProjectBindingAvailability> Bindings);
+public sealed record WorkProjectContextResponse(Guid ProjectId, long ProjectVersion, IReadOnlyList<WorkProjectBindingAvailability> Bindings)
+{
+    public IReadOnlyList<WorkProjectConnectionAvailability> Connections { get; init; } = [];
+}
 public sealed record WorkProjectContextSnapshotResponse(Guid ProjectId, long ProjectVersion, string Digest,
     IReadOnlyList<WorkProjectResolvedBinding> Bindings, DateTimeOffset CapturedAt);
 public sealed record WorkProjectPageResponse(IReadOnlyList<WorkProjectResponse> Items, bool HasMore, int Skip, int Take);

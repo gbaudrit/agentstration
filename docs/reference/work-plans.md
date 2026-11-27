@@ -140,7 +140,7 @@ Send `POST .../work-plans/{planId}/execution` with execution permission, the cur
 
 The response is `202 Accepted` with a plan `Location`. Targets resolve to exact published versions and are checked again at admission. Inputs must be JSON objects, at most 64 KiB each and 256 KiB combined; request bodies are limited to 1 MiB. Inputs are explicit: prerequisite outputs are retained as evidence and are not implicitly interpolated into another task's input.
 
-An optional `projectId` selects an associated private Project. Its authorized exact [context references](projects.md#capture-context-for-execution) are captured independently for each admitted attempt; later Project edits never rewrite an existing attempt. Omit it for generic standalone execution.
+An optional `projectId` selects an associated private Project. Each execution target can list `connections: [name]` to consume named Project requirements; omitted lists consume none. An unknown or unconfigured selected name fails explicitly, while unrelated unconfigured needs do not block local execution. Its authorized exact [context references](projects.md#capture-context-for-execution) are captured independently for each admitted attempt; later Project edits never rewrite an existing attempt. Omit it for generic standalone execution.
 
 The hosted control-plane scheduler checks configured plans every two seconds in bounded pages. `POST .../execution/advance` also runs the same service for deterministic administration. Every attempt exposes its immutable plan/task pins, dependency versions, admission evidence, execution WorkItem ID, root Flow Run ID, lifecycle status and bounded diagnostic code. Admission and its task claim commit before submission; a failed/uncertain handoff reuses these exact identities on restart. Completed/failed/cancelled Flow state is projected durably into the attempt and task. It never substitutes for reviewed functional acceptance.
 
@@ -181,9 +181,10 @@ writes and reports that canonical execution validation is still required.
 
 ## Optional external task operations
 
-A Project can select one explicit `Tracking` connection using the exact Describe Tool,
-ToolProvider, ExtensionRegistration and configured provider/target/binding/revision
-introduced by [Project contexts](projects.md). ATC targets need no repository.
+A Project can declare several named Tracking requirements and explicitly assign each
+to a compatible local ConnectedService, as described in [Project contexts](projects.md).
+`bindingName` selects that logical requirement; exact service/type and derived
+Describe Tool/provider/registration evidence are retained. ATC targets need no repository.
 Local plans and internal child tasks continue to work without a tracking connection.
 External writes retain their own private receipts and never activate or accept a plan.
 

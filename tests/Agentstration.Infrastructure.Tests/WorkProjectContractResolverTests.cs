@@ -136,6 +136,6 @@ public sealed class WorkProjectContractResolverTests
             binding with { Contract = binding.Contract! with { ProviderId = "" } },
             binding with { Contract = binding.Contract! with { Extension = binding.Contract.Extension with { Uid = Guid.Empty } } }
         }) Assert.IsFalse(WorkProjectContextRules.Valid([invalid]));
-        Assert.IsFalse(WorkProjectContextRules.Valid([binding, binding with { Name = "other" }]));
+        Assert.IsTrue(WorkProjectContextRules.Valid([binding, binding with { Name = "other" }]));
     }
 }

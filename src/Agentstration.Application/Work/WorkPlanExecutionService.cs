@@ -59,13 +59,20 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
         var atomic = members.Where(item => item.Value.TaskHierarchy?.Kind == WorkTaskKind.Atomic).Select(item => WorkTaskId.FromWorkItem(item.Value.Id));
         if (!atomic.OrderBy(task => task.Value).SequenceEqual(command.Targets.Select(target => target.TaskId).OrderBy(task => task.Value)))
             return Failure("work_plan_execution_targets_invalid");
+        if (command.Targets.Any(target => target.Connections is null || target.Connections.Count > 32))
+            return Failure("work_project_connection_selection_invalid");
         var scope = Scope(workspaceId);
         await authorizer.AuthorizeAsync(scope, token);
         if (command.ProjectId is { } projectId)
         {
-            var project = await projectContexts.CaptureAsync(workspaceId, projectId, id, token);
-            if (!project.IsSuccess) return Failure(project.ErrorCode!);
+            foreach (var target in command.Targets)
+            {
+                var project = await projectContexts.CaptureAsync(workspaceId, projectId, id, token, target.Connections);
+                if (!project.IsSuccess) return Failure(project.ErrorCode!);
+            }
         }
+        if (command.ProjectId is null && command.Targets.Any(target => target.Connections.Count > 0))
+            return Failure("work_project_connection_selection_invalid");
         var resolved = new List<WorkPlanTaskTarget>();
         foreach (var target in command.Targets.OrderBy(target => target.TaskId.Value))
         {
@@ -88,8 +95,11 @@ public sealed partial class WorkPlanExecutionService(IWorkPlanRepository plans, 
         if (command.CommandId == Guid.Empty || command.TaskId is not null) return Failure("work_plan_execution_invalid");
         if (view.Plan.Version != command.ExpectedVersion) return Failure("work_plan_conflict");
         if (view.Plan.Execution is null) return Failure("work_plan_execution_transition_invalid");
-        var plan = view.Plan with { Execution = view.Plan.Execution with { Enabled = false },
-            Attempts = view.Plan.Attempts.Select(attempt => IsOpen(attempt) ? attempt with { CancellationRequested = true } : attempt).ToArray() };
+        var plan = view.Plan with
+        {
+            Execution = view.Plan.Execution with { Enabled = false },
+            Attempts = view.Plan.Attempts.Select(attempt => IsOpen(attempt) ? attempt with { CancellationRequested = true } : attempt).ToArray()
+        };
         return await SaveAsync(view, plan, command.CommandId, WorkPlanAction.CancelExecution, intent, await MembersAsync(view, token), [], token);
     }
 

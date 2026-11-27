@@ -21,11 +21,11 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
     AepMcpTransport transport, IToolExecutionPipeline pipeline, TimeProvider clock)
 {
     public async Task<Result<WorkProjectContractEvidence>> ResolveAsync(WorkProjectContextBinding binding, RequestContext caller,
-        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token)
+        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token, Func<CancellationToken, Task>? beforeInvoke = null)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), clock);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
-        try { return await ResolveCoreAsync(binding, caller, authorize, linked.Token); }
+        try { return await ResolveCoreAsync(binding, caller, authorize, beforeInvoke, linked.Token); }
         catch (OperationCanceledException) when (!token.IsCancellationRequested) { return Failure("work_project_contract_timeout"); }
         catch (AtcException) { return Failure("work_project_contract_invalid"); }
         catch (AfcException) { return Failure("work_project_contract_invalid"); }
@@ -39,7 +39,7 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
     }
 
     private async Task<Result<WorkProjectContractEvidence>> ResolveCoreAsync(WorkProjectContextBinding binding, RequestContext caller,
-        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token)
+        Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, Func<CancellationToken, Task>? beforeInvoke, CancellationToken token)
     {
         var selection = binding.Contract!;
         var tracking = binding.Purpose == WorkProjectBindingPurpose.Tracking;
@@ -105,6 +105,7 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
             : JsonSerializer.SerializeToElement(new AfcInvocation<AfcDescribeRequest>(new(selection.ProviderId, selection.TargetId, selection.BindingId, selection.Revision), new(requestId)), AfcContract.Json);
         var result = await pipeline.ExecuteAsync(new ToolExecutionContext
         {
+            BeforeProviderInvoke = beforeInvoke,
             OwnerKind = ToolExecutionOwnerKind.WorkOperation,
             ToolCallId = requestId,
             InvocationId = "project-contract:" + requestId,

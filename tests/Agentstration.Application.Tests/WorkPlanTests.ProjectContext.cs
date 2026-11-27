@@ -17,10 +17,15 @@ public sealed partial class WorkPlanTests
         var tree = await fixture.CreateTreeAsync(); var plan = await ActiveAsync(fixture, tree);
         var bindings = new ProjectBindings { Evidence = ContractEvidence }; var projects = ProjectService(fixture, bindings: bindings); await projects.InitializeAsync(default);
         var initialBinding = contracts ? ContractBinding(fixture) : Binding(fixture);
+        var requirement = new WorkProjectConnectionRequirement("tracking", WorkProjectConnectionRules.Tracking, "1.0", ["list"]);
+        var assignment = new WorkProjectConnectionAssignment("tracking", initialBinding.Target with { Address = initialBinding.Target.Address with { Kind = "ConnectedService" } },
+            initialBinding.Target, WorkProjectConnectionRules.TargetFields.Select(field => new WorkProjectConnectionExport(field, field)).ToArray());
         var project = ProjectSuccess(await projects.CreateAsync(fixture.Workspace, WorkProjectId.New(), "coding", default,
-            new(Guid.NewGuid(), 0, new("Coding", null, [plan.Plan.Id], []) { Bindings = [initialBinding] }), default));
+            new(Guid.NewGuid(), 0, new("Coding", null, [plan.Plan.Id], []) { Bindings = contracts ? [] : [initialBinding], ConnectionRequirements = contracts ? [requirement] : [], ConnectionAssignments = contracts ? [assignment] : [] }), default));
         var harness = new ExecutionHarness(fixture) { Bindings = bindings }; await harness.InitializeAsync();
-        plan = Success(await harness.Service().StartAsync(fixture.Workspace, plan.Plan.Id, Start(plan, tree) with { ProjectId = project.Id }, default));
+        var start = Start(plan, tree) with { ProjectId = project.Id };
+        if (contracts) start = start with { Targets = start.Targets.Select(target => target with { Connections = ["tracking"] }).ToArray() };
+        plan = Success(await harness.Service().StartAsync(fixture.Workspace, plan.Plan.Id, start, default));
         plan = Success(await harness.AdvanceAsync(plan));
         var first = plan.Plan.Attempts.Single(); var original = JsonSerializer.Serialize(first.ProjectContext);
         Assert.AreEqual(1, first.ProjectContext!.ProjectVersion);
@@ -29,11 +34,12 @@ public sealed partial class WorkPlanTests
         var work = (await fixture.Tasks.GetAsync(fixture.Workspace, fixture.Principal, first.WorkItemId, default))!.Value;
         Assert.AreEqual(first.ProjectContext.Digest, work.Metadata["workProject.contextDigest"]);
         bindings.RequiredGeneration = 2;
-        Assert.AreEqual("work_project_binding_stale", (await ProjectContexts(fixture, bindings).GetAvailabilityAsync(fixture.Workspace, project.Id, default)).Value!.Bindings.Single().Code);
+        var availability = (await ProjectContexts(fixture, bindings).GetAvailabilityAsync(fixture.Workspace, project.Id, default)).Value!;
+        Assert.AreEqual("work_project_binding_stale", contracts ? availability.Connections.Single().Code : availability.Bindings.Single().Code);
         Assert.IsTrue((await harness.AdvanceAsync(plan)).IsSuccess, "A changed resource does not retarget or readmit an active attempt.");
-        var target = project.Definition.Bindings.Single();
-        project = ProjectSuccess(await projects.UpdateAsync(fixture.Workspace, project.Id, new(Guid.NewGuid(), project.Version,
-            project.Definition with { Bindings = [target with { Target = target.Target with { Generation = 2 } }] }), default));
+        var nextDefinition = contracts ? project.Definition with { ConnectionAssignments = [assignment with { DescribeTool = assignment.DescribeTool with { Generation = 2 } }] }
+            : project.Definition with { Bindings = [initialBinding with { Target = initialBinding.Target with { Generation = 2 } }] };
+        project = ProjectSuccess(await projects.UpdateAsync(fixture.Workspace, project.Id, new(Guid.NewGuid(), project.Version, nextDefinition), default));
         await fixture.ReopenAsync();
         harness = new(fixture) { Bindings = bindings }; await harness.InitializeAsync();
         plan = Success(await harness.AdvanceAsync(plan));
@@ -54,8 +60,8 @@ public sealed partial class WorkPlanTests
         }
         bindings.Failure = "work_project_binding_denied";
         var available = (await ProjectContexts(fixture, bindings).GetAvailabilityAsync(fixture.Workspace, project.Id, default)).Value!;
-        Assert.IsFalse(available.Bindings.Single().Available);
-        Assert.AreEqual("work_project_binding_denied", available.Bindings.Single().Code);
+        Assert.IsFalse(contracts ? available.Connections.Single().Available : available.Bindings.Single().Available);
+        Assert.AreEqual("work_project_binding_denied", contracts ? available.Connections.Single().Code : available.Bindings.Single().Code);
         var saved = JsonSerializer.Serialize(plan.Plan.Attempts.Select(attempt => attempt.ProjectContext));
         plan = Success(await harness.AdvanceAsync(plan));
         Assert.AreEqual(saved, JsonSerializer.Serialize(plan.Plan.Attempts.Select(attempt => attempt.ProjectContext)));

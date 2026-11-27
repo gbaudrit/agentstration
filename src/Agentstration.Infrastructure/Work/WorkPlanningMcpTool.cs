@@ -131,7 +131,7 @@ public sealed class WorkPlanningMcpTool : IInternalMcpToolHandler
                         operation == WorkPlanningOperation.Validate ? WorkPlanAction.Validate : WorkPlanAction.Activate), cancellationToken))),
                 WorkPlanningOperation.Start => ToPlanResponse(Value(await execution.StartAsync(workspace, planId,
                     new(commandId, version, Read<long>(arguments, "revision"), Read<string>(arguments, "revisionDigest"),
-                        Read<WorkPlanExecutionTargetRequest[]>(arguments, "targets").Select(target => target is null ? null! : new WorkPlanTaskTarget(new(target.TaskId), target.Flow, target.Input)).ToArray())
+                        Read<WorkPlanExecutionTargetRequest[]>(arguments, "targets").Select(target => target is null ? null! : new WorkPlanTaskTarget(new(target.TaskId), target.Flow, target.Input) { Connections = target.Connections }).ToArray())
                     { ProjectId = arguments.TryGetProperty("projectId", out _) ? new WorkProjectId(Read<Guid>(arguments, "projectId")) : null }, cancellationToken))),
                 WorkPlanningOperation.Advance => ToPlanResponse(Value(await execution.AdvanceAsync(workspace, planId, cancellationToken))),
                 _ => throw new InvalidOperationException("Unsupported Work planning operation.")

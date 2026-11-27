@@ -36,19 +36,19 @@ public static partial class WorkplaceEndpoints
     private static async Task<IResult> GetWorkProjectContextAsync(string workspaceName, Guid projectId, WorkProjectContextService service, CancellationToken token)
     {
         var result = await service.GetAvailabilityAsync(WorkspaceId(workspaceName), new(projectId), token);
-        return result.IsSuccess ? Results.Ok(new WorkProjectContextResponse(projectId, result.Value!.ProjectVersion, result.Value.Bindings)) : WorkProjectProblem(result.ErrorCode!);
+        return result.IsSuccess ? Results.Ok(new WorkProjectContextResponse(projectId, result.Value!.ProjectVersion, result.Value.Bindings) { Connections = result.Value.Connections }) : WorkProjectProblem(result.ErrorCode!);
     }
 
     private static WorkProjectDefinition ToProjectDefinition(WorkProjectDefinitionRequest? request) => request is null ? null!
         : new(request.DisplayName, request.Description, request.PlanIds?.Select(id => new WorkPlanId(id)).ToArray() ?? [], request.TaskIds?.Select(id => new WorkTaskId(id)).ToArray() ?? [])
-        { Bindings = request.Bindings?.ToArray() ?? [], Sharing = request.Sharing };
+        { Bindings = request.Bindings?.ToArray() ?? [], Sharing = request.Sharing, ConnectionRequirements = request.ConnectionRequirements?.ToArray() ?? [], ConnectionAssignments = request.ConnectionAssignments?.ToArray() ?? [] };
     private static IResult WorkProjectProblem(string code) => Results.Problem(title: code, statusCode: code switch
     {
         "work_project_not_found" or "work_project_work_not_found" => StatusCodes.Status404NotFound,
         "work_project_conflict" or "work_project_command_conflict" or "work_project_work_changed" or "work_project_history_limit" or "work_project_binding_stale"
-            or "work_project_context_changed" or "work_project_plan_not_associated" or "work_project_contract_changed" => StatusCodes.Status409Conflict,
+            or "work_project_context_changed" or "work_project_plan_not_associated" or "work_project_contract_changed" or "work_project_connection_changed" or "work_project_connection_stale" => StatusCodes.Status409Conflict,
         "work_project_contract_timeout" or "work_project_contract_unavailable" => StatusCodes.Status503ServiceUnavailable,
-        "work_project_binding_unavailable" => StatusCodes.Status404NotFound,
+        "work_project_binding_unavailable" or "work_project_connection_unavailable" or "work_project_connection_adapter_unavailable" => StatusCodes.Status404NotFound,
         "work_project_binding_denied" => StatusCodes.Status403Forbidden,
         _ => StatusCodes.Status400BadRequest
     });

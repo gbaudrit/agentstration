@@ -90,6 +90,28 @@ public sealed class WorkProjectApiTests
             Name = "missing-contract-target",
             Definition = create.Definition! with { Bindings = [tracking] }
         });
-        Assert.AreEqual(HttpStatusCode.NotFound, missingTarget.StatusCode, await missingTarget.Content.ReadAsStringAsync());
+        Assert.AreEqual(HttpStatusCode.BadRequest, missingTarget.StatusCode, await missingTarget.Content.ReadAsStringAsync());
     }
+    [TestMethod]
+    public async Task ProjectApiPersistsPortableNeedsAndReportsUnconfiguredWithoutProviderDiscovery()
+    {
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Testing"));
+        using var client = factory.CreateClient();
+        var need = new WorkProjectConnectionRequirement("backend", WorkProjectConnectionRules.Forge, "1.0", ["read"], new("authority", "backend"));
+        var id = Guid.NewGuid();
+        var create = new CreateWorkProjectRequest(id, Guid.NewGuid(), "portable", new("Portable project", null, [], []) { ConnectionRequirements = [need, need with { Name = "frontend" }] });
+        using var created = await client.PostAsJsonAsync("/api/workspaces/default/projects", create);
+        Assert.AreEqual(HttpStatusCode.Created, created.StatusCode, await created.Content.ReadAsStringAsync());
+        var project = (await created.Content.ReadFromJsonAsync<WorkProjectResponse>())!;
+        Assert.HasCount(2, project.ConnectionRequirements); Assert.HasCount(0, project.ConnectionAssignments);
+        var context = (await client.GetFromJsonAsync<WorkProjectContextResponse>($"/api/workspaces/default/projects/{id}/context"))!;
+        Assert.HasCount(2, context.Connections);
+        Assert.IsTrue(context.Connections.All(value => !value.Available && value.Code == "work_project_connection_unconfigured" && value.Service is null));
+        using var replayConflict = await client.PostAsJsonAsync("/api/workspaces/default/projects", create with { Definition = create.Definition! with { ConnectionRequirements = [need] } });
+        Assert.AreEqual(HttpStatusCode.Conflict, replayConflict.StatusCode);
+        using var duplicate = await client.PutAsJsonAsync($"/api/workspaces/default/projects/{id}", new UpdateWorkProjectRequest(Guid.NewGuid(), project.Version,
+            create.Definition! with { ConnectionRequirements = [need, need] }));
+        Assert.AreEqual(HttpStatusCode.BadRequest, duplicate.StatusCode);
+    }
+
 }

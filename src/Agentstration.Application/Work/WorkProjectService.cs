@@ -34,7 +34,7 @@ public sealed class WorkProjectService(IWorkProjectRepository projects, IWorkPla
         name = create ? name! : current!.Name;
         resourceNamespace = create ? resourceNamespace : current!.Namespace;
         // Preserve receipt digests for pre-binding Projects whose original definition had these four fields only.
-        object intentDefinition = definition.Bindings.Count == 0
+        object intentDefinition = definition.Bindings.Count == 0 && definition.ConnectionRequirements.Count == 0 && definition.ConnectionAssignments.Count == 0
             ? new { definition.DisplayName, definition.Description, definition.PlanIds, definition.TaskIds } : definition;
         var intent = WorkPlanDefinition.Digest(new { Action = create ? "create" : "update", Name = name, Namespace = resourceNamespace, Definition = intentDefinition });
         var replay = current?.Commands.SingleOrDefault(receipt => receipt.CommandId == command.CommandId);

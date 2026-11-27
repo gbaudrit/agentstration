@@ -1,5 +1,5 @@
-using Agentstration.Resources;
 using System.Text.Json.Serialization;
+using Agentstration.Resources;
 
 namespace Agentstration.Work;
 
@@ -13,6 +13,8 @@ public sealed record WorkProjectDefinition(string DisplayName, string? Descripti
     IReadOnlyList<WorkPlanId> PlanIds, IReadOnlyList<WorkTaskId> TaskIds)
 {
     public IReadOnlyList<WorkProjectContextBinding> Bindings { get; init; } = [];
+    public IReadOnlyList<WorkProjectConnectionRequirement> ConnectionRequirements { get; init; } = [];
+    public IReadOnlyList<WorkProjectConnectionAssignment> ConnectionAssignments { get; init; } = [];
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectSharingConnection? Sharing { get; init; }
     public const int MaximumMembers = 100;
@@ -24,11 +26,18 @@ public sealed record WorkProjectDefinition(string DisplayName, string? Descripti
             || PlanIds is null || TaskIds is null || PlanIds.Count > MaximumMembers || TaskIds.Count > MaximumMembers
             || PlanIds.Any(id => id.Value == Guid.Empty) || TaskIds.Any(id => id.Value == Guid.Empty)
             || PlanIds.Distinct().Count() != PlanIds.Count || TaskIds.Distinct().Count() != TaskIds.Count
-            || !WorkProjectContextRules.Valid(Bindings) || !WorkSharingFormat.ValidConnection(Sharing, Bindings))
+            || !WorkProjectConnectionRules.Valid(this) || !WorkProjectContextRules.Valid(Bindings) || !WorkSharingFormat.ValidConnection(Sharing, Bindings))
             return Result<WorkProjectDefinition>.Failure("work_project_definition_invalid");
-        return Result<WorkProjectDefinition>.Success(this with { DisplayName = DisplayName.Trim(), Description = Description?.Trim(),
-            PlanIds = PlanIds.OrderBy(id => id.Value).ToArray(), TaskIds = TaskIds.OrderBy(id => id.Value).ToArray(),
-            Bindings = Bindings.OrderBy(binding => binding.Name, StringComparer.Ordinal).ToArray() });
+        return Result<WorkProjectDefinition>.Success(this with
+        {
+            DisplayName = DisplayName.Trim(),
+            Description = Description?.Trim(),
+            PlanIds = PlanIds.OrderBy(id => id.Value).ToArray(),
+            TaskIds = TaskIds.OrderBy(id => id.Value).ToArray(),
+            ConnectionRequirements = ConnectionRequirements.OrderBy(value => value.Name, StringComparer.Ordinal).ToArray(),
+            ConnectionAssignments = ConnectionAssignments.OrderBy(value => value.Name, StringComparer.Ordinal).ToArray(),
+            Bindings = Bindings.OrderBy(binding => binding.Name, StringComparer.Ordinal).ToArray()
+        });
     }
 
     public static bool ValidName(string? name) => name is { Length: >= 1 and <= 128 }

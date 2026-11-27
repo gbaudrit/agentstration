@@ -19,7 +19,7 @@ public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
     public async Task<Result<WorkTaskProviderRoute>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, ExternalTaskOperationKind operation, CancellationToken token)
     {
-        if (binding.Purpose != WorkProjectBindingPurpose.Tracking || binding.Contract is null || !Enum.IsDefined(operation))
+        if (binding.Purpose != WorkProjectBindingPurpose.Tracking || (binding.Contract is null && binding.Connection is null) || !Enum.IsDefined(operation))
             return Failure("task_provider_binding_invalid");
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), clock);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, deadline.Token);
@@ -28,6 +28,8 @@ public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
             var allowed = await bindings.ResolveAsync(workspaceId, principalId, binding, linked.Token);
             if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
             var connection = allowed.Value!;
+            binding = connection.Binding;
+            if (binding.Contract is null) return Failure("task_provider_contract_missing");
             if (connection.Contract is null) return Failure("task_provider_contract_missing");
             var description = await CallAsync<AtcDescribeRequest, AtcDescription>(connection, "describe",
                 id => new(id), AtcContract.MaximumResultBytes, linked.Token);
@@ -156,6 +158,14 @@ public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         var caller = current.Current;
         var result = await pipeline.ExecuteAsync(new ToolExecutionContext
         {
+            BeforeProviderInvoke = connection.Binding.Connection is { } selection && connection.Service is { } captured
+                ? async ct =>
+                {
+                    var inspected = await bindings.InspectConnectionAsync(new(current.Current.WorkspaceId), current.Current.PrincipalId, selection, ct);
+                    if (!inspected.IsSuccess || WorkPlanDefinition.Digest(inspected.Value) != WorkPlanDefinition.Digest(captured))
+                        throw new ToolResolutionException("work_project_connection_changed", "The retained connection is no longer available.");
+                }
+            : null,
             OwnerKind = ToolExecutionOwnerKind.WorkOperation,
             ToolCallId = id,
             InvocationId = "work-atc:" + id,

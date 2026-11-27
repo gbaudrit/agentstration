@@ -149,6 +149,59 @@ public sealed class AtcWorkTaskProviderTests
         Assert.AreEqual("task_provider_recovery_unavailable", resumed.ErrorCode); Assert.AreEqual(1, host.Provider.Effects);
     }
 
+    [TestMethod]
+    public async Task IndependentSqliteInstancesUseEqualPortableNeedsAndDifferentLocalScopesAfterRestart()
+    {
+        await using var first = await Host.CreateAsync(true); await using var second = await Host.CreateAsync();
+        Assert.AreEqual(WorkPlanDefinition.Digest(first.Project.Definition.ConnectionRequirements),
+            WorkPlanDefinition.Digest(second.Project.Definition.ConnectionRequirements));
+        Assert.AreNotEqual(first.Project.Definition.ConnectionAssignments[0].Service.Uid, second.Project.Definition.ConnectionAssignments[0].Service.Uid);
+        Assert.AreNotEqual(first.Project.Definition.ConnectionAssignments[0].Service.Address.ScopeRef, second.Project.Definition.ConnectionAssignments[0].Service.Address.ScopeRef);
+        foreach (var host in new[] { first, second })
+        {
+            using var caller = host.Fixture.Context.Push(host.Fixture.Caller);
+            var item = await host.PerformAsync(new(ExternalTaskOperationKind.Publish, Title: "Portable target") { Tracking = host.Target });
+            await host.ReopenAsync();
+            var read = await host.PerformAsync(new(ExternalTaskOperationKind.Read, TaskId: item.TaskId) { Tracking = host.Target });
+            Assert.AreEqual(item.TaskId, read.TaskId);
+            var receipts = (await host.Service.ListAsync(host.Fixture.WorkspaceId, host.Project.Id, 0, 100, default)).Value!.Items;
+            Assert.IsTrue(receipts.All(value => value.Route.Tracking!.Connection.Service is not null));
+            Assert.AreEqual(host.Project.Definition.ConnectionAssignments[0].Service.Uid,
+                receipts[0].Route.Tracking!.Connection.Service!.Service.Uid);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task UncertainOperationRetainsItsServicePinsWhenConfigurationOrLocalAssignmentChanges(bool replaceAssignment)
+    {
+        await using var host = await Host.CreateAsync(parameterRevision: true); using var caller = host.Fixture.Context.Push(host.Fixture.Caller);
+        host.Provider.LoseResponse = true;
+        var command = host.Command(new(ExternalTaskOperationKind.Publish, Title: "Original service") { Tracking = host.Target });
+        var operation = Success(await host.Service.BeginAsync(host.Fixture.WorkspaceId, host.Project.Id, command, default));
+        Assert.AreEqual(WorkTaskOperationStatus.Uncertain, operation.Status); var original = JsonSerializer.Serialize(operation.Route);
+        if (replaceAssignment)
+        {
+            var assignment = host.Project.Definition.ConnectionAssignments.Single();
+            var receipt = new WorkProjectCommandReceipt(Guid.NewGuid(), "explicit-replacement", 2, host.Clock.GetUtcNow());
+            var changed = host.Project with
+            {
+                Version = 2,
+                Definition = host.Project.Definition with
+                { ConnectionAssignments = [assignment with { Service = assignment.Service with { Uid = Guid.NewGuid() } }] },
+                Commands = [.. host.Project.Commands, receipt]
+            };
+            Assert.AreEqual(WorkProjectSaveStatus.Saved, await host.Projects.TrySaveAsync(new(changed, 1, receipt, [], []), default));
+        }
+        else host.Fixture.ParameterValues[host.Fixture.ParameterValues.Keys.Single()] = JsonSerializer.SerializeToElement("revision-2");
+        await host.ReopenAsync();
+        Assert.IsFalse((await host.Service.ResumeAsync(host.Fixture.WorkspaceId, host.Project.Id, command.Id, default)).IsSuccess);
+        var retained = Success(await host.Service.GetAsync(host.Fixture.WorkspaceId, host.Project.Id, command.Id, default));
+        Assert.AreEqual(original, JsonSerializer.Serialize(retained.Route));
+        Assert.AreEqual(WorkTaskOperationStatus.Uncertain, retained.Status); Assert.AreEqual(1, host.Provider.Effects);
+    }
+
     private static WorkTaskOperation Success(Result<WorkTaskOperation> result)
     { Assert.IsTrue(result.IsSuccess, result.ErrorCode); return result.Value!; }
 
@@ -177,10 +230,10 @@ public sealed class AtcWorkTaskProviderTests
             Assert.AreEqual(WorkTaskOperationStatus.Succeeded, result.Status, result.ErrorCode + ": " + Fixture.InvocationError);
             return result.Task!;
         }
-        public static async Task<Host> CreateAsync()
+        public static async Task<Host> CreateAsync(bool instanceService = false, bool parameterRevision = false)
         {
             var host = new Host(); Directory.CreateDirectory(host.directory);
-            host.Binding = host.Fixture.AddConnection(true, "tracking");
+            host.Binding = host.Fixture.AddConnection(true, "tracking", instanceService ? ResourceScopeRef.Instance : null);
             var selection = host.Binding.Contract!; var target = new AtcTargetRef(selection.ProviderId, selection.TargetId, selection.BindingId, selection.Revision);
             var server = new AtcMcpServer([new(target, host.Provider, (_, _) => ValueTask.FromResult(
                 new AtcAccessContext(target, "fixture", "grant-1", AtcContract.Operations, [])))]);
@@ -192,8 +245,9 @@ public sealed class AtcWorkTaskProviderTests
             host.Fixture.McpHandler = host.app.GetTestServer().CreateHandler();
             await host.ReopenAsync();
             var now = TimeProvider.System.GetUtcNow(); var receipt = new WorkProjectCommandReceipt(Guid.NewGuid(), "digest", 1, now);
+            var connection = host.Fixture.AddService(host.Binding, instanceService: instanceService, parameterRevision: parameterRevision);
             host.Project = new(WorkProjectId.New(), host.Fixture.WorkspaceId, host.Fixture.PrincipalId, "tracking", default,
-                new("Tracking", null, [], []) { Bindings = [host.Binding] }, 1, "digest", now, now, [receipt]);
+                new("Tracking", null, [], []) { ConnectionRequirements = [connection.Requirement], ConnectionAssignments = [connection.Assignment] }, 1, "digest", now, now, [receipt]);
             Assert.AreEqual(WorkProjectSaveStatus.Saved, await host.Projects.TrySaveAsync(new(host.Project, 0, receipt, [], []), default));
             return host;
         }

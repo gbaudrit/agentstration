@@ -9,10 +9,15 @@ namespace Agentstration.Infrastructure.Work;
 
 public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resources, IResourceAccessPolicyService access,
     DescendantResourceUseAuthorizer ancestry, ICurrentRequestContext current, IRequestContextScopeFactory scopes,
-    Agentstration.Identity.Contracts.IAuthorizationService authorization, WorkProjectContractResolver? contracts = null) : IWorkProjectBindingResolver
+    Agentstration.Identity.Contracts.IAuthorizationService authorization, WorkProjectContractResolver? contracts = null, WorkProjectConnectedServiceResolver? connections = null) : IWorkProjectBindingResolver
 {
-    public async Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
-        WorkProjectContextBinding binding, CancellationToken token)
+    public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
+        WorkProjectContextBinding binding, CancellationToken token) => binding.Connection is { } selection
+            ? ResolveConnectionAsync(workspaceId, principalId, selection, token)
+            : ResolveCoreAsync(workspaceId, principalId, binding, null, token);
+
+    private async Task<Result<WorkProjectResolvedBinding>> ResolveCoreAsync(WorkspaceId workspaceId, Guid principalId,
+        WorkProjectContextBinding binding, Func<CancellationToken, Task>? beforeInvoke, CancellationToken token)
     {
         if (current.AccessMode != ControlPlaneAccessMode.Workspace) return Failure("work_project_binding_denied");
         var caller = current.Current;
@@ -30,8 +35,40 @@ public sealed class WorkProjectBindingResolver(IResourceIdentityCatalog resource
             if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
         }
         var resolved = await contracts.ResolveAsync(binding, caller,
-            (reference, cancellation) => ResolveReferenceAsync(workspaceId, binding with { Target = reference, Contract = null }, cancellation), token);
+            (reference, cancellation) => ResolveReferenceAsync(workspaceId, binding with { Target = reference, Contract = null }, cancellation), token, beforeInvoke);
         return resolved.IsSuccess ? Result<WorkProjectResolvedBinding>.Success(selected.Value! with { Contract = resolved.Value }) : Failure(resolved.ErrorCode!);
+    }
+
+    public async Task<Result<WorkProjectResolvedBinding>> ResolveConnectionAsync(WorkspaceId workspaceId, Guid principalId,
+        WorkProjectConnectionSelection selection, CancellationToken token)
+    {
+        if (current.AccessMode != ControlPlaneAccessMode.Workspace || current.Current.WorkspaceId != workspaceId.Value
+            || current.Current.PrincipalId != principalId || !await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsRead, token)
+            || !await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, token))
+            return Failure("work_project_binding_denied");
+        if (connections is null) return Failure("work_project_connection_unsupported");
+        return await connections.ResolveAsync(workspaceId, selection,
+            (reference, ct) => ResolveReferenceAsync(workspaceId, new(selection.Requirement.Name, WorkProjectBindingPurpose.Context, reference), ct),
+            (binding, evidence, ct) => ResolveCoreAsync(workspaceId, principalId, binding, async guardToken =>
+            {
+                var fresh = await InspectConnectionAsync(workspaceId, principalId, selection, guardToken);
+                if (!fresh.IsSuccess || WorkPlanDefinition.Digest(fresh.Value) != WorkPlanDefinition.Digest(evidence))
+                    throw new Agentstration.Tools.Mcp.ToolResolutionException("work_project_connection_changed", "The selected connection changed.");
+            }, ct), token);
+    }
+
+    public async Task<Result<WorkProjectConnectionEvidence>> InspectConnectionAsync(WorkspaceId workspaceId, Guid principalId,
+        WorkProjectConnectionSelection selection, CancellationToken token)
+    {
+        if (current.AccessMode != ControlPlaneAccessMode.Workspace || current.Current.WorkspaceId != workspaceId.Value
+            || current.Current.PrincipalId != principalId || !await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsRead, token)
+            || !await authorization.HasPermissionAsync(current.Current, AuthorizationPermissions.RunsExecute, token))
+            return Result<WorkProjectConnectionEvidence>.Failure("work_project_binding_denied");
+        if (connections is null) return Result<WorkProjectConnectionEvidence>.Failure("work_project_connection_unsupported");
+        var inspected = await connections.InspectAsync(workspaceId, selection,
+            (reference, ct) => ResolveReferenceAsync(workspaceId, new(selection.Requirement.Name, WorkProjectBindingPurpose.Context, reference), ct), token);
+        return inspected.IsSuccess ? Result<WorkProjectConnectionEvidence>.Success(inspected.Value!.Evidence)
+            : Result<WorkProjectConnectionEvidence>.Failure(inspected.ErrorCode!);
     }
 
     private async Task<Result<WorkProjectResolvedBinding>> ResolveReferenceAsync(WorkspaceId workspaceId,

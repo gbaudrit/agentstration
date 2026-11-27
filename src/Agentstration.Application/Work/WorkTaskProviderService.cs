@@ -28,7 +28,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
     {
         var project = Owns(workspaceId) ? await projects.GetAsync(workspaceId, context.PrincipalId, projectId, token) : null;
         if (project is null) return Result<WorkTaskProviderRoute>.Failure("work_project_not_found");
-        var binding = project.Definition.Bindings.SingleOrDefault(value => value.Name == bindingName && value.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Tracking);
+        var binding = SelectBinding(project.Definition, bindingName);
         return binding is null ? Result<WorkTaskProviderRoute>.Failure("task_provider_binding_missing")
             : await provider.ResolveAsync(workspaceId, context.PrincipalId, binding, operation, token);
     }
@@ -60,7 +60,7 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
         var project = await projects.GetAsync(workspaceId, context.PrincipalId, projectId, token);
         if (project is null) return Failure("work_project_not_found");
         if (project.Version != command.ExpectedProjectVersion) return Failure("work_project_conflict");
-        var binding = project.Definition.Bindings.SingleOrDefault(value => value.Name == command.BindingName && value.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Tracking);
+        var binding = SelectBinding(project.Definition, command.BindingName);
         if (binding is null) return Failure("task_provider_binding_missing");
         WorkProjectPlanObservation? planObservation = null;
         if (command.PlanId is { } planId)
@@ -116,7 +116,9 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
     {
         if (operation.Status is WorkTaskOperationStatus.Succeeded or WorkTaskOperationStatus.Rejected) return Result<WorkTaskOperation>.Success(operation);
         var project = await projects.GetAsync(operation.WorkspaceId, context.PrincipalId, operation.ProjectId, token);
-        if (project?.Definition.Bindings.Any(binding => WorkPlanDefinition.Digest(binding) == WorkPlanDefinition.Digest(operation.Route.Binding)) != true) return Failure("task_provider_binding_changed");
+        if (project is null || (operation.Route.Binding.Connection is { } selection
+            ? !WorkProjectConnectionRules.Contains(project.Definition, selection)
+            : !project.Definition.Bindings.Any(binding => WorkPlanDefinition.Digest(binding) == WorkPlanDefinition.Digest(operation.Route.Binding)))) return Failure("task_provider_binding_changed");
         var route = await provider.ResolveAsync(operation.WorkspaceId, context.PrincipalId, operation.Route.Binding, operation.Input.Operation, token);
         if (!route.IsSuccess) return Failure(route.ErrorCode!);
         if (route.Value!.Tool != operation.Route.Tool || route.Value.Provider != operation.Route.Provider
@@ -177,6 +179,19 @@ public sealed class WorkTaskProviderService(IWorkTaskOperationRepository operati
         if (logger.IsEnabled(LogLevel.Information)) logger.LogInformation("Task provider operation {OperationId} for Project {ProjectId} in Workspace {WorkspaceId} is {Status}",
             changed.Id.Value, changed.ProjectId.Value, changed.WorkspaceId.Value, status);
         return Result<WorkTaskOperation>.Success(changed);
+    }
+
+    private static WorkProjectContextBinding? SelectBinding(WorkProjectDefinition definition, string name)
+    {
+        var need = definition.ConnectionRequirements.SingleOrDefault(value => value.Name == name);
+        if (need is not null)
+        {
+            var assignment = definition.ConnectionAssignments.SingleOrDefault(value => value.Name == name);
+            return assignment is null || need.Contract != WorkProjectConnectionRules.Tracking ? null
+                : WorkProjectConnectionRules.Binding(new(need, assignment));
+        }
+        return definition.Bindings.SingleOrDefault(value => value.Name == name
+            && value.Purpose is WorkProjectBindingPurpose.TaskOperations or WorkProjectBindingPurpose.Tracking);
     }
 
     private static bool ValidSnapshot(ExternalTaskSnapshot? task, ExternalTaskOperationInput input) => task is not null

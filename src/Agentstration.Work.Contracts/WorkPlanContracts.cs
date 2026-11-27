@@ -20,7 +20,10 @@ public sealed record WorkPlanResponse(Guid Id, Guid WorkspaceId, WorkPlanStatus 
     public IReadOnlyList<WorkPlanAttemptResponse> Attempts { get; init; } = [];
 }
 
-public sealed record WorkPlanExecutionTargetRequest(Guid TaskId, Agentstration.Flows.FlowReference Flow, System.Text.Json.JsonElement Input);
+public sealed record WorkPlanExecutionTargetRequest(Guid TaskId, Agentstration.Flows.FlowReference Flow, System.Text.Json.JsonElement Input)
+{
+    public IReadOnlyList<string> Connections { get; init; } = [];
+}
 public sealed record StartWorkPlanExecutionRequest(Guid CommandId, long ExpectedVersion, long Revision, string RevisionDigest,
     IReadOnlyList<WorkPlanExecutionTargetRequest> Targets)
 {

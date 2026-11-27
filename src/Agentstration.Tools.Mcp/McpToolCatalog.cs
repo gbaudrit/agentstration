@@ -191,7 +191,8 @@ public sealed class ToolProviderAdapter(
         CancellationToken cancellationToken,
         string? expectedProviderRouteDigest = null,
         string? expectedToolSchemaDigest = null,
-        IReadOnlyDictionary<string, string>? expectedProviderToolContracts = null)
+        IReadOnlyDictionary<string, string>? expectedProviderToolContracts = null,
+        Func<CancellationToken, Task>? beforeProviderInvoke = null)
     {
         McpClient client;
         string externalId;
@@ -238,6 +239,7 @@ public sealed class ToolProviderAdapter(
             var values = arguments is { ValueKind: JsonValueKind.Object }
                 ? arguments.Value.EnumerateObject().ToDictionary(value => value.Name, value => (object?)value.Value.Clone(), StringComparer.Ordinal)
                 : new Dictionary<string, object?>();
+            if (beforeProviderInvoke is not null) await beforeProviderInvoke(cancellationToken);
             var result = JsonSerializer.SerializeToElement(
                 await native.InvokeAsync(new Microsoft.Extensions.AI.AIFunctionArguments(values), cancellationToken));
             if (result.ValueKind == JsonValueKind.Object
@@ -509,7 +511,7 @@ public sealed class McpToolInvoker(
             }
             return new ToolInvocationResult(resolved.Protect(result.Output), receipt);
         }
-        return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken, context.ExpectedProviderRouteDigest, context.ExpectedToolSchemaDigest, context.ExpectedProviderToolContracts)), null);
+        return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken, context.ExpectedProviderRouteDigest, context.ExpectedToolSchemaDigest, context.ExpectedProviderToolContracts, context.BeforeProviderInvoke)), null);
     }
 
     public async ValueTask<ToolInvocationResult> SimulateDetailedAsync(ToolExecutionContext context, CancellationToken cancellationToken = default)
@@ -519,7 +521,7 @@ public sealed class McpToolInvoker(
         using var resolved = await ResolveInputsAsync(context, cancellationToken);
         ToolInputSchemaValidator.Validate(tool.Definition.Schema?.Input, resolved.Value);
         if (provider.Definition.Mcp?.Internal != true)
-            return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken, context.ExpectedProviderRouteDigest, context.ExpectedToolSchemaDigest, context.ExpectedProviderToolContracts)), null);
+            return new ToolInvocationResult(resolved.Protect(await providers.InvokeAsync(provider, tool, resolved.Value, cancellationToken, context.ExpectedProviderRouteDigest, context.ExpectedToolSchemaDigest, context.ExpectedProviderToolContracts, context.BeforeProviderInvoke)), null);
 
         if (context.TenantId is not { } tenantId || context.WorkspaceId is not { } workspaceId || context.PrincipalId is not { } principalId)
             throw new ToolResolutionException("tool_execution_scope_required", "An internal Tool invocation requires trusted Tenant, Workspace, and Principal scope.");

@@ -385,3 +385,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 289. [ADR-0289 — Project connections pin tracking and forge contract evidence](0289-project-connections-pin-tracking-and-forge-contract-evidence.md)
 
 290. [ADR-0290 — Work task operations adopt ATC with explicit recovery guarantees](0290-work-task-operations-adopt-atc-with-explicit-recovery-guarantees.md)
+
+291. [ADR-0291 — Projects separate portable connection needs from local services](0291-projects-separate-portable-connection-needs-from-local-services.md)

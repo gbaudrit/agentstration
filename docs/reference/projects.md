@@ -92,11 +92,11 @@ Create/update definitions can include `bindings`. Every reference is explicit an
 }
 ```
 
-Identity-only purposes include `Context = 0`, `Sharing = 1`, `Repository = 2`, `TaskOperations = 3` and `CodePublication = 4`; explicit contract selections use `Tracking = 5` and `Forge = 6` as described below. Up to 32 unique names are supported. Sharing has at most one binding and selects a ToolProvider; Repository has at most one and selects a ToolProvider or ConnectedService. Context may also select an immutable SourceVersion. Supply the exact UID/generation and `version` when the resource identity has one. No credentials, arbitrary provider options or Secret targets are accepted. Ordinary Bootstrap Project manifests accept the same bindings, with camel-case purpose names such as `sharing` in YAML.
+Identity-only purposes include `Context = 0`, `Sharing = 1`, `Repository = 2`, `TaskOperations = 3` and `CodePublication = 4`. Tracking and Forge use named requirements and local service assignments below; authored entries with those purposes in `bindings` are rejected. Up to 32 unique names are supported. Sharing has at most one binding and selects a ToolProvider; Repository has at most one and selects a ToolProvider or ConnectedService. Context may also select an immutable SourceVersion. Supply the exact UID/generation and `version` when the resource identity has one. No credentials, arbitrary provider options or Secret targets are accepted. Ordinary Bootstrap Project manifests accept the same bindings, with camel-case purpose names such as `sharing` in YAML.
 
 Create/update validates the selected ownership tree, current resource identity, Discover permission and Use permission. Missing or undiscoverable references return `work_project_binding_unavailable` (`404`); denied Use is `403`, and an accessible stale identity is `409`. Invalid reference shape/purpose is `400`. Removing or explicitly replacing a broken binding remains possible through the usual version-checked edit; no template or automatic retargeting updates it.
 
-`GET .../projects/{projectId}/context` returns the current Project version and per-binding `available`/`code` diagnostics. A resolved reference has code `resolved`. For ordinary bindings, availability describes current identity/access metadata, not remote connectivity, health or supported operations. Explicit Tracking/Forge bindings additionally negotiate their declared contract as described below. Actual consumers retain their normal capability, health and authorization checks. Resource bodies and protected values are never included.
+`GET .../projects/{projectId}/context` returns the current Project version and per-binding `available`/`code` diagnostics. A resolved reference has code `resolved`. For ordinary bindings, availability describes current identity/access metadata, not remote connectivity, health or supported operations. Named Tracking/Forge connections additionally negotiate their declared contract as described below. Actual consumers retain their normal capability, health and authorization checks. Resource bodies and protected values are never included.
 
 ## Capture context for execution
 
@@ -108,57 +108,89 @@ Changing Project v1 to v2 does not alter an existing attempt. Later admissions a
 
 Old Projects with no bindings and standalone plans with no Project remain valid and replay their existing commands. These optional JSON fields require no new SQLite or PostgreSQL migration.
 
-## Explicit tracking and forge connections
+## Named tracking and forge connections
 
-`Tracking = 5` and `Forge = 6` select independent logical authorities through the ATC
-and AFC contracts. They can coexist with different providers; a tracking target does
-not require a repository. `TaskOperations = 3` and `CodePublication = 4` retain their
-current native consumer semantics until their owning adoption increments.
+Declare portable business needs in `connectionRequirements`; keep local configuration
+in `connectionAssignments`. Both collections have at most 32 unique Project-scoped
+names. Several needs may use the same contract, type or service. A requirement may
+remain unassigned; resolution never picks a service implicitly.
 
-For either new purpose, `target` is the exact materialized Describe Tool reference.
-A required `contract` object supplies:
+Bootstrap YAML and the REST definition accept the same model:
 
-- `provider` and `extension`: exact scoped resource references (address, UID and
-  generation), of kinds `ToolProvider` and `ExtensionRegistration` respectively;
-- `version`: the precise contract revision, currently `1.0`, independently of package,
-  AEP and MCP protocol versions;
-- `providerId`, `targetId`, `bindingId`, `revision`: the configured logical authority
-  and target tuple advertised by the remote contract, not a vendor name or URL;
-- `requiredOperations`: a nonempty unique bounded list of functional operations,
-  such as `["list", "read"]` for tracking or `["resolve", "read"]` for forge.
+```yaml
+connectionRequirements:
+  - name: backend
+    contract: agentstration.forge.contracts.mcp.v1
+    version: "1.0"
+    requiredOperations: [resolve, read]
+    target:
+      providerId: example-authority
+      targetId: backend
+  - name: frontend
+    contract: agentstration.forge.contracts.mcp.v1
+    version: "1.0"
+    requiredOperations: [read]
+```
 
-Do not put credentials, raw MCP names or schemas in this selection. The AEP
-contributions carry `agentstration.tracking.contracts.mcp.v1` or
-`agentstration.forge.contracts.mcp.v1` metadata and exact MCP mappings. The first
-product adapter supports AEP-backed ToolProviders. It does not infer a contract
-from a raw GitHub/GitLab MCP endpoint or from repository access.
+`target` is optional; when present it must match the actual provider-qualified target.
+Use `agentstration.tracking.contracts.mcp.v1` for independent ATC needs, including a
+tracker without a repository. Requirements contain no local UIDs, scopes, extension
+registrations, server/account options or credentials. Different installations reuse
+these declarations while providing different local assignments.
 
-Resolution requires run-read and run-execute permissions and current Discover/Use
-access to the selected resources and all mapped Tools. All mapped Tools must be
-enabled and available; a Describe Tool requiring human approval fails explicitly.
-The existing protected AEP connection handles credentials in the caller's context.
-A fresh descriptor, canonical declaration/schemas and target-specific Describe
-reply must match the selection. All live native MCP Tool schemas and an opaque
-registration/manifest/mapping fingerprint are rechecked immediately before invocation.
-The only remote functional operation issued by this increment is Describe.
+Each assignment has the corresponding `name`, an exact `service` resource reference,
+an exact `describeTool` adapter reference and explicit `exports` mappings. References
+use the `address`, `uid`, `generation` and optional `version` shape shown above.
+The initial typed adapter requires four standard text exports:
 
-Successful context availability includes `contract` evidence: implementation identity
-and version, provider/extension references, operation names, contribution references
-and mapping/capability digests. Schemas, native MCP names, headers and credentials are
-not copied into Work. The same evidence becomes part of each admitted attempt's
-immutable `projectContext`, persists across restart and contributes to its digest.
+```yaml
+exports:
+  - field: providerId
+    exportId: tracker-authority
+  - field: targetId
+    exportId: tracker-target
+  - field: bindingId
+    exportId: tracker-binding
+  - field: revision
+    exportId: tracker-revision
+```
 
-`WorkProjectContextService.RevalidateAsync` authorizes the retained binding again and
-rejects changed resource, mapping, implementation or capability evidence. It never
-replaces a retained route with the current Project selection. Future admissions use
-their explicit current selections; active attempts keep their original snapshots.
+Export IDs must exist on the service's pinned ConnectedServiceType revision and map
+to configured standard inputs. Business options and Literal/Parameter/Secret bindings
+belong to that service. Never put secret values in standard target exports. The
+service export inspector checks readiness, current rights, UID/generation and exact
+type/schema. A Workspace service may use an ancestor-owned type or adapter when the
+existing descendant-use policies allow it. Provider and registration pins are derived
+from the local Describe Tool route rather than authored in the portable need.
 
-Missing/incompatible declarations and unsupported required operations fail with
-bounded `work_project_contract_*` diagnostics (`400`). Resource authorization retains
-`403`/`404`, stale resources or changed captured routes return `409`, and timeout or
-remote unavailability returns `503` on authoring. Availability queries retain their
-per-binding diagnostic shape and omit contract evidence on failure.
+Compatibility also requires an AEP-backed typed ATC/AFC adapter, canonical declarations
+and schemas, required operations and the actual target-specific Describe reply. Equal
+vendor/type names alone are insufficient. The existing governed Tool pipeline handles
+protected transport inputs; inspection never reads service Secret values. Vendor
+provisioning and secured service-configuration exchange remain #958/#959.
 
-This increment negotiates connections. #955 and #958 own task/forge operation adoption;
-#1346/#1349 own their coordination/delivery consumers. See
-[ADR-0289](../decisions/0289-project-connections-pin-tracking-and-forge-contract-evidence.md).
+`GET .../projects/{projectId}/context` includes a `connections` entry for every need:
+requirement, local assignment, `available`, bounded `code`, and successful contract and
+service evidence. Unassigned needs report `work_project_connection_unconfigured`.
+Other failures distinguish unknown selection, denied/unavailable/stale resources,
+incompatible exports, target mismatch and changed contract evidence. No fallback to
+another service occurs. Successful evidence contains exact service/type pins and
+configuration/schema digests, plus implementation, route and capability proof. Options,
+resolved Parameter values, Secret values and native schemas are not returned.
+
+To consume a need, each execution target supplies `connections: [backend]`. Omitting
+the list captures no named connection, so an unrelated unconfigured need cannot block
+local work. Ordinary context bindings retain their existing admission behavior.
+The immutable attempt snapshot captures only the selected needs and local evidence.
+`WorkProjectContextService.RevalidateAsync` reauthorizes retained selections and rejects
+changed configuration or routes. A final guard reinspects the service immediately
+before native MCP invocation. Project edits never rewrite an active attempt or
+redirect an uncertain operation; new admissions use the explicit current assignment.
+
+Deterministic task operations select the logical name through `bindingName`. ATC read,
+create, update, comment, relate and transition operations retain the existing #955
+recovery rules. Local plan activation and functional acceptance remain independent.
+The older native TaskOperations/CodePublication consumers await their adoption issues.
+
+These additions use existing SQLite/PostgreSQL JSON payloads; no relational migration
+is needed. See [ADR-0291](../decisions/0291-projects-separate-portable-connection-needs-from-local-services.md).

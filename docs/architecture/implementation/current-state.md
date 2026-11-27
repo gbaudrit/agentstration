@@ -691,7 +691,7 @@ and digests in the existing immutable per-attempt Project context; consumers rea
 captured evidence without retargeting it. The offline fixtures cover separate authorities,
 tracking without a repository, SQLite restart and negative mapping/schema cases.
 Task/provider and delivery adoption retain their owning increments. See
-[Projects](../../reference/projects.md#explicit-tracking-and-forge-connections) and
+[Projects](../../reference/projects.md#named-tracking-and-forge-connections) and
 [ADR-0289](../../decisions/0289-project-connections-pin-tracking-and-forge-contract-evidence.md).
 
 ## Coding repository boundary
@@ -812,3 +812,17 @@ observations remain uncertain. Local plans remain provider-optional. Offline rea
 and SQLite restart tests exercise this service path without agents or LLMs. Existing
 Coding native consumers await #958/#1346/#1349; this is not vendor adoption.
 See [ADR-0290](../../decisions/0290-work-task-operations-adopt-atc-with-explicit-recovery-guarantees.md).
+
+### Named Project connection needs and local services (#951)
+
+Projects separate portable named ATC/AFC requirements from explicit local
+ConnectedService assignments and Describe adapter/export mappings. Multiple needs
+may share a contract or service; selection never uses a first-match fallback. Existing
+service/type inspection and descendant governance provide exact revision checks without
+reading Secret values. Typed target-specific Describe adds route/schema/capability
+proof. Per-task selections capture immutable evidence in existing Work JSON payloads;
+late MCP guards detect Parameter/configuration changes and revoked access before effects.
+Unconfigured unrelated needs leave local work executable. Independent SQLite fixtures
+exercise different UIDs/scopes with the same portable requirement through real MCP.
+Vendor secured-configuration exchange remains #958/#959. See
+[ADR-0291](../../decisions/0291-projects-separate-portable-connection-needs-from-local-services.md).

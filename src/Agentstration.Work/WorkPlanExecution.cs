@@ -5,7 +5,10 @@ namespace Agentstration.Work;
 
 public enum WorkPlanAttemptStatus { Admitted, Submitted, Completed, Failed, Cancelled }
 
-public sealed record WorkPlanTaskTarget(WorkTaskId TaskId, FlowReference Flow, JsonElement Input);
+public sealed record WorkPlanTaskTarget(WorkTaskId TaskId, FlowReference Flow, JsonElement Input)
+{
+    public IReadOnlyList<string> Connections { get; init; } = [];
+}
 
 public sealed record WorkPlanExecution(FlowRunScope Scope, long Revision, string RevisionDigest,
     bool Enabled, IReadOnlyList<WorkPlanTaskTarget> Targets)

@@ -14,18 +14,23 @@ public sealed record WorkProjectContextBinding(string Name, WorkProjectBindingPu
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectContractSelection? Contract { get; init; }
+    public WorkProjectConnectionSelection? Connection { get; init; }
 }
 public sealed record WorkProjectResolvedBinding(WorkProjectContextBinding Binding, string ETag, string DiscoverDecision, string UseDecision)
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectContractEvidence? Contract { get; init; }
+    public WorkProjectConnectionEvidence? Service { get; init; }
 }
 public sealed record WorkProjectBindingAvailability(WorkProjectContextBinding Binding, bool Available, string Code)
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WorkProjectContractEvidence? Contract { get; init; }
 }
-public sealed record WorkProjectContextView(WorkProjectId ProjectId, long ProjectVersion, IReadOnlyList<WorkProjectBindingAvailability> Bindings);
+public sealed record WorkProjectContextView(WorkProjectId ProjectId, long ProjectVersion, IReadOnlyList<WorkProjectBindingAvailability> Bindings)
+{
+    public IReadOnlyList<WorkProjectConnectionAvailability> Connections { get; init; } = [];
+}
 public sealed record WorkProjectContextSnapshot(WorkProjectId ProjectId, long ProjectVersion, string Digest,
     IReadOnlyList<WorkProjectResolvedBinding> Bindings, DateTimeOffset CapturedAt)
 {
@@ -41,8 +46,6 @@ public static class WorkProjectContextRules
         && bindings.Count <= MaximumBindings && bindings.Select(binding => binding?.Name).Distinct(StringComparer.Ordinal).Count() == bindings.Count
         && bindings.Count(binding => binding?.Purpose == WorkProjectBindingPurpose.Sharing) <= 1
         && bindings.Count(binding => binding?.Purpose == WorkProjectBindingPurpose.Repository) <= 1
-        && bindings.Count(binding => binding?.Purpose == WorkProjectBindingPurpose.Tracking) <= 1
-        && bindings.Count(binding => binding?.Purpose == WorkProjectBindingPurpose.Forge) <= 1
         && bindings.Count(binding => binding?.Purpose == WorkProjectBindingPurpose.CodePublication) <= 1
         && bindings.All(binding => binding is not null && WorkProjectDefinition.ValidName(binding.Name) && Enum.IsDefined(binding.Purpose)
             && binding.Target is { Uid: var uid, Generation: >= 1 } target && uid != Guid.Empty
@@ -76,6 +79,9 @@ public static class WorkProjectContextRules
 
     private static bool ValidContract(WorkProjectContextBinding binding)
     {
+        if (binding.Connection is { } connection) return WorkProjectConnectionRules.Valid(connection)
+            && binding.Name == connection.Requirement.Name && binding.Target == connection.Assignment.DescribeTool
+            && binding.Purpose == (connection.Requirement.Contract == WorkProjectConnectionRules.Tracking ? WorkProjectBindingPurpose.Tracking : WorkProjectBindingPurpose.Forge);
         if (binding.Purpose is not (WorkProjectBindingPurpose.Tracking or WorkProjectBindingPurpose.Forge)) return binding.Contract is null;
         return binding.Target.Address.Kind == "Tool" && binding.Contract is { } selection
             && Reference(selection.Provider, "ToolProvider") && Reference(selection.Extension, "ExtensionRegistration")

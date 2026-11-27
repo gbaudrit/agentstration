@@ -186,8 +186,31 @@ public sealed partial class WorkPlanTests
         public string? Failure { get; set; }
         public long? RequiredGeneration { get; set; }
         public Func<WorkProjectContextBinding, WorkProjectContractEvidence?>? Evidence { get; set; }
+        public List<string> ConnectionCalls { get; } = [];
+        public Task<Result<WorkProjectResolvedBinding>> ResolveConnectionAsync(WorkspaceId workspace, Guid owner, WorkProjectConnectionSelection selection, CancellationToken token)
+        {
+            ConnectionCalls.Add(selection.Requirement.Name);
+            var failure = Failure ?? (RequiredGeneration is { } generation && selection.Assignment.DescribeTool.Generation != generation ? "work_project_binding_stale" : null);
+            if (failure is not null) return Task.FromResult(Result<WorkProjectResolvedBinding>.Failure(failure));
+            var address = selection.Assignment.DescribeTool.Address;
+            var binding = WorkProjectConnectionRules.Binding(selection) with
+            {
+                Contract = new(
+                new(address with { Kind = "ToolProvider" }, selection.Assignment.DescribeTool.Uid, 1),
+                new(address with { Kind = "ExtensionRegistration" }, selection.Assignment.DescribeTool.Uid, 1),
+                "1.0", "tracker-authority", "no-repository", "binding", "revision-1", ["list"])
+            };
+            return Task.FromResult(Result<WorkProjectResolvedBinding>.Success(new(binding, "etag", "same_scope", "same_scope")
+            {
+                Contract = ContractEvidence(binding),
+                Service = new(selection.Assignment.Service,
+                selection.Assignment.Service with { Address = selection.Assignment.Service.Address with { Kind = "ConnectedServiceType" } },
+                "1.0.0", "sha256:" + new string('a', 64), WorkPlanDefinition.Digest(selection.Assignment))
+            }));
+        }
         public Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspace, Guid owner, WorkProjectContextBinding binding, CancellationToken token)
         {
+            if (binding.Connection is { } selection) return ResolveConnectionAsync(workspace, owner, selection, token);
             var failure = Failure ?? (RequiredGeneration is { } generation && binding.Target.Generation != generation ? "work_project_binding_stale" : null);
             return Task.FromResult(failure is null ? Result<WorkProjectResolvedBinding>.Success(new(binding, "\"binding-" + binding.Target.Generation + "\"", "same_scope", "same_scope") { Contract = Evidence?.Invoke(binding) })
                 : Result<WorkProjectResolvedBinding>.Failure(failure));

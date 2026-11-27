@@ -53,6 +53,7 @@ internal static class WorkPlaneServiceCollectionExtensions
         services.AddSingleton<WorkProjectContextService>();
         services.AddSingleton<IWorkProjectBindingResolver, WorkProjectBindingResolver>();
         services.AddSingleton<WorkProjectContractResolver>();
+        services.AddSingleton<WorkProjectConnectedServiceResolver>();
         services.AddSingleton<WorkPlanExecutionService>();
         services.AddSingleton<WorkTaskExecutionEvidenceService>();
         services.AddSingleton<WorkUsageService>();
