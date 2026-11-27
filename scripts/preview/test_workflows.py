@@ -27,6 +27,19 @@ class WorkflowSecretTests(unittest.TestCase):
     def workflows(self):
         return {path.name: path.read_text() for path in (preview.ROOT / '.github/workflows').glob('preview*.yml')}
 
+    def test_reconciliation_uses_only_trusted_main_and_no_candidate_artifacts_or_scripts(self):
+        source = self.workflows()['preview-reconcile.yml']
+        self.assertIn("github.ref == 'refs/heads/main'", source)
+        self.assertIn('ref: ${{ github.sha }}', source)
+        self.assertIn('schedule:', source)
+        self.assertIn('workflows: [OCI images]', source)
+        self.assertIn("github.event.workflow_run.event == 'workflow_dispatch'", source)
+        self.assertIn('cancel-in-progress: false', source)
+        for forbidden in ('pull_request_target:', 'pull_request:', 'workflow_run.head_sha', 'download-artifact', 'actions: write', 'packages: write'):
+            self.assertNotIn(forbidden, source)
+        self.assertIn('default: true', source)
+        self.assertIn('arguments+=(--apply)', source)
+
     def test_private_extension_configuration_is_only_available_in_protected_executors(self):
         source = self.workflows()['preview-environment.yml']
         validation = source.split('\n  execute:')[0]
@@ -73,8 +86,9 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertIn('issue_comment:', source)
         self.assertIn('types: [created]', source)
         self.assertIn("github.ref == 'refs/heads/main'", source)
-        self.assertIn('!github.event.issue.pull_request', source)
+        self.assertNotIn('!github.event.issue.pull_request', source)
         self.assertIn('actions: write', source)
+        self.assertIn("startsWith(github.event.comment.body, '/preview')", source)
         for forbidden in ('environment:', 'secrets:', 'id-token:', 'azure/login', 'head.sha', 'head.ref', 'run: ${{'):
             self.assertNotIn(forbidden, source)
 
@@ -86,6 +100,23 @@ class WorkflowSecretTests(unittest.TestCase):
         provider = self.workflows()['preview-environment.yml']
         self.assertIn("os.environ['GITHUB_EVENT_NAME'] in ('workflow_dispatch', 'push')", provider)
         self.assertNotIn("'issue_comment'", provider)
+
+    def test_pr_comment_write_permission_reaches_writers_and_the_reusable_caller(self):
+        admission = self.workflows()['preview-issue.yml']
+        relay = self.workflows()['preview-issue-deployment.yml']
+        source = self.workflows()['preview-on-demand.yml']
+        for writer in (admission, relay, source.split('\n  announce:\n', 1)[1].split('\n  execute:\n', 1)[0],
+                       source.split('\n  report:\n', 1)[1]):
+            self.assertIn('issues: write', writer)
+            self.assertIn('pull-requests: write', writer)
+        boundary = source.split('\n  boundary:\n', 1)[1].split('\n  select:\n', 1)[0]
+        self.assertIn('pull-requests: read', boundary)
+        self.assertNotIn('pull-requests: write', boundary)
+        report = source.split('\n  report:\n', 1)[1]
+        self.assertIn('fromJSON(inputs.selection).tracking_feedback', report)
+        self.assertIn('SELECTION_JSON: ${{ needs.boundary.outputs.selection || inputs.selection }}', report)
+        self.assertIn('STAGE_RESULTS: ${{ toJSON(needs) }}', report)
+        self.assertIn('SELECTION_FAILURE: ${{ needs.select.outputs.failure }}', report)
 
     def test_issue_execution_is_gated_by_successful_publication_and_failures_are_reported(self):
         source = self.workflows()['preview-on-demand.yml']
@@ -100,8 +131,25 @@ class WorkflowSecretTests(unittest.TestCase):
         self.assertNotIn('id-token:', announce)
         report = source.split('\n  report:\n', 1)[1]
         self.assertIn('always()', report)
-        self.assertIn('EXECUTION_RESULT: ${{ needs.execute.result }}', report)
-        self.assertIn('RESULT_JSON: ${{ needs.execute.outputs.result }}', report)
+        self.assertIn("EXECUTION_RESULT: ${{ needs.recorded.outputs.result != '' && 'success' || needs.execute.result }}", report)
+        self.assertNotIn('RESULT_JSON: ${{ needs.execute.outputs.result }}', report)
+        self.assertIn("RESULT_FILE: ${{ needs.execute.result == 'success' && format('{0}/preview-feedback/preview-result.json', runner.temp) || '' }}", report)
+        download = report.split('uses: actions/download-artifact@v8', 1)
+        self.assertIn("if: needs.execute.result == 'success'", download[0])
+        self.assertIn('name: preview-result-${{ fromJSON(needs.boundary.outputs.selection || inputs.selection).environment_id }}-${{ github.run_id }}-${{ github.run_attempt }}', download[1])
+        self.assertNotIn('run-id:', download[1])
+        self.assertNotIn('environment:', report)
+        self.assertNotIn('id-token:', report)
+
+    def test_reset_intent_reaches_only_the_deployment_executor_without_changing_the_manual_form(self):
+        source = self.workflows()['preview-on-demand.yml']
+        self.assertIn('reset_before_deploy: ${{ fromJSON(needs.boundary.outputs.selection).reset_before_deploy || false }}', source)
+        provider = self.workflows()['preview-environment.yml']
+        manual, reusable = provider.split('  workflow_call:', 1)
+        self.assertNotIn('reset_before_deploy:', manual)
+        self.assertIn('reset_before_deploy:', reusable)
+        self.assertIn("operation == 'deploy' and request['provider'] == 'azure-vm'", provider)
+        self.assertIn('arguments+=(--reset-before-deploy)', provider)
 
 
 if __name__ == '__main__':

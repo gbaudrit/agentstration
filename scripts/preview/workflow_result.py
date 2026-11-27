@@ -11,6 +11,11 @@ def render(result):
              'Expiry: ' + (result['expiresAt'] or '(none)'),
              'URL: ' + (result['url'] or 'withheld — Azure ingress is closed until protected access (#1285).')]
     lines += [name + ': `' + image['reference'] + '`' for name, image in result['images'].items()]
+    if result.get('deletion'):
+        deletion = result['deletion']
+        lines += ['Deletion requested: ' + deletion['requestedAt'],
+                  'Deletion completed: ' + (deletion['completedAt'] or '(pending)'),
+                  'Deletion reason: ' + deletion['reason']]
     identifiers = result['providerResourceIds']
     lines += [name + ': `' + identifiers[name] + '`' for name in ('subscription', 'resourceGroup') if name in identifiers]
     lines += ['Resource: `' + identifier + '`' for identifier in identifiers.get('resources', [])]

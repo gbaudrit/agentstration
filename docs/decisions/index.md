@@ -336,4 +336,12 @@ Use **Proposed** when implementation or repository evidence does not establish a
 
 265. [ADR-0265 — Preview labels select independently delivered AEP extensions](0265-preview-labels-select-independently-delivered-aep-extensions.md)
 
-266. [ADR-0266 — Instance extension options use a separate operational AEP contract](0266-instance-extension-options-use-an-operational-aep-contract.md)
+266. [ADR-0266 — PR preview commands use frozen heads and owned feedback](0266-pr-preview-commands-use-frozen-heads-and-owned-feedback.md)
+
+267. [ADR-0267 — Pre-merge AEP previews consume published catalogue data](0267-pre-merge-aep-previews-consume-published-catalogue-data.md)
+
+268. [ADR-0268 — Explicit preview redeployment resets owned state](0268-explicit-preview-redeployment-resets-owned-state.md)
+
+269. [ADR-0269 — Preview reconciliation enforces owned expiry and capacity](0269-preview-reconciliation-enforces-owned-expiry-and-capacity.md)
+
+270. [ADR-0270 — Instance extension options use a separate operational AEP contract](0270-instance-extension-options-use-an-operational-aep-contract.md)

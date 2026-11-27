@@ -154,4 +154,4 @@ A Secret binding source requires Secured protection. Standard options cannot acc
 Secret bindings, so activation evidence cannot accidentally expose a value obtained
 through a protected grant. Secured options permit only Secret references.
 
-See [ADR-0266](../docs/decisions/0266-instance-extension-options-use-an-operational-aep-contract.md).
+See [ADR-0270](../docs/decisions/0270-instance-extension-options-use-an-operational-aep-contract.md).

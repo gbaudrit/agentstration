@@ -48,6 +48,13 @@ the `destroyed` operation outcome. The reusable workflow reports `failed` for
 failed operations; it does not substitute a successful validation result for a
 failed deployment. Validation returns no provider resources.
 
+The public `health` snapshot maps selected components to normalized container
+state, Docker health and restart count. It contains no raw inspect/configuration
+or health-log content. Missing observations do not imply healthy containers.
+The Azure comment-level `/preview redeploy` command composes an owned full reset
+and fresh deploy under one provider lease; the portable request still uses
+`deploy` with `dataMode: preserve`, and ordinary deploy preserves data.
+
 ## Run against a trusted Docker host
 
 Requirements are Linux, Python 3 and Docker Compose v2. Use a trusted Docker CLI
@@ -111,7 +118,9 @@ host configuration/keys remain available for a deliberate redeployment. No host
 or infrastructure is deleted, and no database-provider conversion is performed.
 
 Expiry is anchored to the first managed deployment; a retry does not renew it.
-Changing TTL recalculates from that anchor. Automatic expiration/cleanup is #1286.
+Changing TTL recalculates from that anchor. [Azure reconciliation](preview-automation.md)
+enforces that expiry with full cleanup and persists deletion completion/reason.
+The standalone Docker CLI still records expiry without scheduling a host worker.
 
 ## GitHub Actions entrypoint
 
