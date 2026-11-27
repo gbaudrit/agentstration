@@ -47,8 +47,9 @@ class GitHub:
         if re.fullmatch(re.escape(PREFIX) + r'/issues/[0-9]+/labels', path) and method == 'POST':
             self.labels += [{'name': name} for name in body['labels']]
             return copy.deepcopy(self.labels)
-        if path.endswith('/labels/preview%3Adeployed') and method == 'DELETE':
-            self.labels = [item for item in self.labels if item['name'] != 'preview:deployed']
+        if '/labels/' in path and method == 'DELETE':
+            label = path.split('/labels/', 1)[1].replace('%3A', ':')
+            self.labels = [item for item in self.labels if item['name'] != label]
             return None
         if method == 'POST' and path != 'graphql':
             if path.endswith('/comments'):
@@ -101,25 +102,30 @@ class GitHub:
 
 class AdmissionTests(unittest.TestCase):
     def test_deployed_label_uses_only_verified_status_without_changing_selection_labels(self):
+        controls = [{'name': 'preview:auto'}, {'name': 'preview:extension:foundry'}]
         github = GitHub()
-        github.labels = [{'name': 'preview:auto'}, {'name': 'preview:extension:foundry'}]
+        github.labels = copy.deepcopy(controls)
         ready = {'state': 'running', 'url': 'https://dev-pr-17.agentstration.cloud'}
-        commands.sync_deployed(REPOSITORY, 'pr-17', ready, github)
+        commands.sync_status(REPOSITORY, 'pr-17', ready, github)
         self.assertEqual(3, len(github.labels))
-        commands.sync_deployed(REPOSITORY, 'pr-17', ready, github)
+        commands.sync_status(REPOSITORY, 'pr-17', ready, github)
         self.assertEqual(3, len(github.labels))
         for state in ('absent', 'destroyed', 'stopped', 'cleanup-pending', 'unhealthy', 'drifted', 'provisioning'):
-            github.labels.append({'name': 'preview:deployed'})
-            commands.sync_deployed(REPOSITORY, 'pr-17', {'state': state}, github)
-            self.assertEqual(['preview:auto', 'preview:extension:foundry'], [item['name'] for item in github.labels])
+            github.labels = copy.deepcopy(controls) + [{'name': 'preview:status:deployed'}]
+            commands.sync_status(REPOSITORY, 'pr-17', {'state': state}, github)
+            self.assertNotIn({'name': 'preview:status:deployed'}, github.labels)
+            for label in controls:
+                self.assertIn(label, github.labels)
         for url in (None, 'https://dev-pr-18.agentstration.cloud', 'http://dev-pr-17.agentstration.cloud'):
-            commands.sync_deployed(REPOSITORY, 'pr-17', {'state': 'running', 'url': url}, github)
-            self.assertEqual(2, len(github.labels))
+            github.labels = copy.deepcopy(controls)
+            commands.sync_status(REPOSITORY, 'pr-17', {'state': 'running', 'url': url}, github)
+            self.assertEqual(3, len(github.labels))
+            self.assertIn({'name': 'preview:status:error'}, github.labels)
 
     def test_deployed_label_is_not_changed_on_unverified_failure_or_unknown_state(self):
         github = GitHub()
         with self.assertRaises(ValueError):
-            commands.sync_deployed(REPOSITORY, 'pr-17', {'state': 'unknown'}, github)
+            commands.sync_status(REPOSITORY, 'pr-17', {'state': 'unknown'}, github)
         self.assertEqual([], github.mutations())
 
     def test_bare_preview_is_a_deploy_alias_with_identical_defaults_and_source_freeze(self):
@@ -508,7 +514,7 @@ class PullRequestTests(unittest.TestCase):
         result = {'environmentId': 'pr-17', 'state': 'running', 'url': 'https://dev-pr-17.agentstration.cloud',
                   'sourceSha': SHA, 'database': 'sqlite', 'images': contract.images(request), 'expiresAt': '2026-11-26T18:30:00+00:00'}
         self.assertEqual(0, self.run_mode('report', {**variables, 'EXECUTION_RESULT': 'success', 'RESULT_JSON': json.dumps(result)}, github)[0])
-        self.assertIn({'name': 'preview:deployed'}, github.labels)
+        self.assertIn({'name': 'preview:status:deployed'}, github.labels)
         posts = [path for path, method, _ in github.calls if method == 'POST' and path.endswith('/comments')]
         patches = [path for path, method, _ in github.calls if method == 'PATCH']
         self.assertEqual([PREFIX + '/issues/17/comments'], posts)

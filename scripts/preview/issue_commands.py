@@ -51,24 +51,59 @@ def positive(value):
     return value
 
 
-def sync_deployed(repository, environment, result, call=api):
-    """A derived label never grants deployment permission; only verified results change it."""
+def sync_status(repository, environment, result=None, call=api, *, operation='status', outcome=None):
+    """Reconcile derived availability and sticky operation diagnostics without granting permissions."""
     match = re.fullmatch(r'(?:pr|issue)-([1-9][0-9]{0,9})', environment)
     if not match:
         return
-    preview.require(result.get('environmentId', environment) == environment, 'Observed preview targets another environment.')
-    preview.require(result.get('state') in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy',
-                                         'provisioning', 'drifted', 'cleanup-pending'), 'Invalid observed preview state.')
+    preview.require(operation in ('deploy', 'destroy', 'status') and outcome in (None, 'pending', 'error', 'success'),
+                    'Invalid preview status transition.')
+    if result is not None:
+        preview.require(result.get('environmentId', environment) == environment, 'Observed preview targets another environment.')
+        preview.require(result.get('state') in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy',
+                                             'provisioning', 'drifted', 'cleanup-pending'), 'Invalid observed preview state.')
     root = 'repos/' + repository_name(repository) + '/issues/' + match[1] + '/labels'
     labels = call(root + '?per_page=100')
     preview.require(isinstance(labels, list) and len(labels) < 100, 'Preview label inventory exceeds its bound.')
-    present = any(item.get('name') == 'preview:deployed' for item in labels)
-    ready = result['state'] == 'running' and isinstance(result.get('url'), str) and bool(
-        re.fullmatch(r'https://dev-' + re.escape(environment) + r'\.[a-z0-9.-]+', result['url']))
-    if ready and not present:
-        call(root, 'POST', {'labels': ['preview:deployed']})
-    elif not ready and present:
-        call(root + '/preview%3Adeployed', 'DELETE')
+    present = {item['name'] for item in labels}
+    desired = present & {'preview:status:deployed', 'preview:status:pending', 'preview:status:error'}
+    if result is not None:
+        state = result['state']
+        ready = state == 'running' and isinstance(result.get('url'), str) and bool(
+            re.fullmatch(r'https://dev-' + re.escape(environment) + r'\.[a-z0-9.-]+', result['url']))
+        if ready:
+            desired.add('preview:status:deployed')
+        else:
+            desired.discard('preview:status:deployed')
+        if state in ('unhealthy', 'drifted', 'cleanup-pending') or state == 'running' and not ready:
+            desired.add('preview:status:error')
+        if (operation == 'deploy' and outcome == 'success' and ready
+                or state == 'destroyed' and not result.get('providerResourceIds', {}).get('resources')
+                or operation == 'destroy' and state == 'absent'):
+            desired.discard('preview:status:error')
+            desired.discard('preview:status:pending')
+    if outcome == 'pending':
+        desired.add('preview:status:pending')
+    elif outcome == 'error':
+        desired.add('preview:status:error')
+        desired.discard('preview:status:pending')
+    # Add before removing, so partial API failures remain repairable and never replace unrelated labels.
+    added = sorted(desired - present)
+    if added:
+        call(root, 'POST', {'labels': added})
+    removed = (present & {'preview:status:deployed', 'preview:status:pending', 'preview:status:error'}) - desired
+    if 'preview:deployed' in present:
+        removed.add('preview:deployed')
+    for label in sorted(removed):
+        call(root + '/' + label.replace(':', '%3A'), 'DELETE')
+
+
+def try_status(repository, environment, call, **kwargs):
+    # A feedback outage must not suppress an authorized command or claim dispatch failed after it succeeded.
+    try:
+        sync_status(repository, environment, call=call, **kwargs)
+    except (ValueError, RuntimeError, KeyError, TypeError, AttributeError, OSError):
+        print('Preview status labels could not be updated; reconciliation will retry.')
 
 
 def parse(body):
@@ -217,7 +252,7 @@ def admit(event, repository, call=api, selector=None):
     # No feedback or dispatch on behalf of untrusted users; association labels are not permissions.
     if not authorized(comment, repository, call):
         return False
-    options = None
+    options, admitted = None, False
     try:
         preview.require(comment.get('body') == body and comment.get('user', {}).get('id') == event['comment'].get('user', {}).get('id'),
                         'The command changed after its event; post a new comment.')
@@ -240,6 +275,9 @@ def admit(event, repository, call=api, selector=None):
         prefix = 'pr-' if options['tracking_kind'] == 'pull_request' else 'issue-'
         options.update(environment_id=prefix + str(issue), tracking_issue=str(issue), tracking_comment=str(comment['id']))
         manual.validate_options(options)
+        admitted = True
+        if options['operation'] in ('deploy', 'destroy'):
+            try_status(repository, options['environment_id'], call, operation=options['operation'], outcome='pending')
         run_url = 'https://github.com/' + repository + '/actions/workflows/preview-issue-deployment.yml'
         card = reply(repository, issue, marker(options) + '\n' + feedback.accepted(options, repository, run_url), call)
         options['tracking_feedback'] = str(positive(card['id']))
@@ -247,6 +285,8 @@ def admit(event, repository, call=api, selector=None):
              {'ref': 'main', 'inputs': {'selection': json.dumps(options)}})
         return True
     except (ValueError, RuntimeError, KeyError, TypeError, AttributeError) as error:
+        if admitted:
+            try_status(repository, options['environment_id'], call, operation=options['operation'], outcome='error')
         message = '**Command not executed**\n\n' + safe_error(error)
         if options and options.get('tracking_feedback'):
             publish(options, repository, message + '\n\nWorkflow dispatch failed. Check Actions permissions and post a new command.', call)
@@ -356,7 +396,7 @@ def main():
             preview.require(options.get('tracking_issue') == issue and options.get('operation') == operation, 'Invalid feedback command context.')
             environment = options['environment_id']
             preview.require(environment == ('pr-' if options.get('tracking_kind') == 'pull_request' else 'issue-') + issue, 'Invalid feedback environment.')
-            request, result = None, None
+            request, result, status_outcome = None, None, None
             if args.mode == 'plan':
                 preview.require(tracking(options, repository, api) == issue and options['operation'] == operation,
                                 'Invalid command authorization before execution.')
@@ -369,6 +409,8 @@ def main():
                     preview.require(list(request.get('extensions', {})) == options.get('extensions', []),
                                     'Frozen extension deliveries differ from the issue labels.')
                 message = plan_message(request, operation, run_url, repository, options.get('reset_before_deploy', False))
+                if operation in ('deploy', 'destroy'):
+                    status_outcome = 'pending'
             elif os.environ['EXECUTION_RESULT'] == 'success':
                 result = report_result()
                 preview.require(result['environmentId'] == environment, 'Result targets another environment.')
@@ -389,12 +431,14 @@ def main():
                     preview.require(result.get('sourceSha') == request['sourceSha'] and result.get('database') == request['database']
                                     and result.get('images') == contract.images(request), 'Result differs from the frozen request.')
                 message = feedback.completed(result, operation, repository, run_url, request, options.get('reset_before_deploy', False))
+                status_outcome = 'success'
             else:
                 failure = contract.parse(os.environ.get('SELECTION_FAILURE') or '{}')
                 message = feedback.failed(operation, repository, run_url, failure_stage(), options, failure)
+                status_outcome = 'pending' if failure.get('code') == 'image-unavailable' and operation == 'deploy' else 'error'
             publish(options, repository, message, api)
-            if result is not None:
-                sync_deployed(repository, environment, result, api)
+            if operation != 'validate':
+                sync_status(repository, environment, result, api, operation=operation, outcome=status_outcome)
     except (ValueError, RuntimeError, KeyError, TypeError, AttributeError, OSError) as error:
         print(safe_error(error))
         return 1

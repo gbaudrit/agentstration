@@ -67,10 +67,17 @@ unrecorded Azure/Cloudflare candidates for ownership recovery instead of inventi
 a new inventory service or silently deleting unknown resources.
 
 Use one bot-owned automatic feedback card per issue/PR, separate from command
-history, and bounded public workflow results. Maintain `preview:deployed` as
+history, and bounded public workflow results. Maintain `preview:status:deployed` as
 derived verified running/protected status from command results and periodic live
 checks, never as deployment permission. Remove it for unavailable/deleted or
-unprotected previews without changing other labels. Do not export provider responses,
+unprotected previews without changing other labels. Track queued/missing-image/capacity
+waits with `preview:status:pending` and operation/probe/health failures with
+`preview:status:error`. Availability can coexist with waiting/failure of an update.
+A healthy status read does not clear an unresolved operation error. Verified
+deployment clears waiting/error and confirmed full removal clears all status
+labels. Reuse bounded GitHub label transitions rather than adding Runtime state
+or an event-history subsystem. Migrate the original derived label name while
+preserving assignments. Do not export provider responses,
 configuration, tokens, health logs or opt-in actor data. Retain main-only protected
 environment, OIDC and read-only GHCR credentials. The manual form remains unchanged.
 

@@ -87,8 +87,8 @@ class GitHub:
         preview.require(value.get('number') == number, 'Unexpected preview retention context.')
         return self.label_grant(value, KEEP) is not None
 
-    def sync_deployed(self, environment, result):
-        commands.sync_deployed(self.repository, environment, result, self.call)
+    def sync_status(self, environment, result=None, **kwargs):
+        commands.sync_status(self.repository, environment, result, self.call, **kwargs)
 
     def publish(self, environment, text):
         match = re.fullmatch(r'(?:pr|issue)-([1-9][0-9]{0,9})', environment)
@@ -202,11 +202,13 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
     if unknown_routes:
         failures.append({'code': 'unrecorded-routes', 'count': unknown_routes, 'action': 'restore-ownership-record'})
     current, observed_states = {}, {}
-    def sync(environment, value):
+    def sync(environment, value=None, *, operation='status', outcome=None):
+        if not apply:
+            return
         try:
-            github.sync_deployed(environment, value)
+            github.sync_status(environment, value, operation=operation, outcome=outcome)
         except (ValueError, RuntimeError, KeyError, TypeError, OSError):
-            failures.append({'environmentId': environment, 'code': 'deployed-label-failed'})
+            failures.append({'environmentId': environment, 'code': 'status-labels-failed'})
     def report(environment, text):
         if apply:
             try:
@@ -233,20 +235,23 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                     except (ValueError, RuntimeError, KeyError, TypeError, OSError):
                         observed_states[environment] = {'state': 'unhealthy'}
                         failures.append({'environmentId': environment, 'code': 'status-unavailable'})
+                        sync(environment, outcome='error')
                 continue
             results.append({'environmentId': environment, 'operation': 'destroy', 'reason': reason})
             if apply:
                 def guard(latest, old=record, expected=reason):
                     return latest['ownerId'] == old['ownerId'] and (latest['destroyed'] or removal_reason(latest, github, now) == expected)
                 # Rechecking the owner and reason under the lease prevents deleting a newly recreated preview.
+                sync(environment, operation='destroy', outcome='pending')
                 value = execute('destroy', {**request, 'dataMode': 'reset'}, deletion_reason=reason, guard=guard)
                 current[environment] = {**record, 'destroyed': True}
                 if value.get('deletion'):
                     current[environment]['deletion'] = value['deletion']
-                sync(environment, value)
+                sync(environment, value, operation='destroy', outcome='success')
                 report(environment, feedback.completed(value, 'destroy', github.repository, run_url, request))
         except (ValueError, RuntimeError, KeyError, TypeError, OSError):
             failures.append({'environmentId': environment, 'code': 'cleanup-failed'})
+            sync(environment, operation='destroy', outcome='error')
             if apply:
                 try:
                     sync(environment, execute('status', request))
@@ -286,6 +291,7 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                     continue
                 # Restore an owned opted-in preview through ordinary deploy, never through implicit reset.
             stage = 'selection'
+            sync(environment, operation='deploy', outcome='pending')
             # Reset a newly requested update once. Health/startup retries of the same intent preserve data.
             old_intent = (previous or {}).get('automation') or {}
             reset = bool(approval.get('redeployEvent') and previous and not previous['destroyed'] and (
@@ -320,20 +326,23 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 value = execute('deploy', request, automation_context=approval, guard=guard,
                                 reset_before_deploy=reset,
                                 extension_configuration=variables.get('PREVIEW_EXTENSION_CONFIGURATION') or '{}')
-                sync(environment, value)
+                sync(environment, value, operation='deploy', outcome='success')
                 report(environment, feedback.completed(value, 'deploy', github.repository, run_url, request, reset))
         except manual.SelectionError as error:
             target = pending if error.public['code'] == 'image-unavailable' else failures
             target.append({'environmentId': environment, 'code': error.public['code'], 'component': error.public['component']})
             text = feedback.failed('deploy', github.repository, run_url, 'select', options, error.public)
+            sync(environment, operation='deploy', outcome='pending' if target is pending else 'error')
             if target is pending:
                 text = text.replace('**Deployment — failed**', '**Automatic preview — waiting for images**')
             report(environment, text)
         except capacity.Unavailable:
             pending.append({'environmentId': environment, 'code': 'capacity'})
+            sync(environment, operation='deploy', outcome='pending')
             report(environment, '**Automatic preview — waiting for capacity**\n\nRemove an unused preview or wait for scheduled cleanup.\n\n' + run_url)
         except (ValueError, RuntimeError, KeyError, TypeError, OSError):
             failures.append({'environmentId': environment, 'code': 'deployment-not-authorized-or-failed', 'stage': stage})
+            sync(environment, operation='deploy', outcome='error')
             messages = {
                 'authorization': 'Check that the PR is open, non-draft and from this repository, and that the latest `preview:auto` and reset-mode grants came from a human with current write access. Deployment was not started.',
                 'selection': 'Image or environment setting checks failed. Check exact private image publication and the protected preview defaults. Azure deployment was not started.',

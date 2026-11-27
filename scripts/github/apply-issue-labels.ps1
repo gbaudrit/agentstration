@@ -68,9 +68,19 @@ $labels += @(
         description = 'Retain the preview until explicit destroy, including after expiry or PR closure.'
     }
     [pscustomobject]@{
-        name = 'preview:deployed'
+        name = 'preview:status:deployed'
         color = '1D76DB'
         description = 'Automation-maintained status: a running preview has verified protected access.'
+    }
+    [pscustomobject]@{
+        name = 'preview:status:pending'
+        color = 'FBCA04'
+        description = 'Automation-maintained status: a preview operation is waiting for prerequisites.'
+    }
+    [pscustomobject]@{
+        name = 'preview:status:error'
+        color = 'B60205'
+        description = 'Automation-maintained status: an operation failed or verified preview health is bad.'
     }
 )
 # Deployment selection follows the implemented OCI catalogue, independently of
@@ -123,6 +133,17 @@ if ($DryRun) {
     Write-Host 'No label changes were made.'
     $labels | Format-Table -Property name, color, description
     return
+}
+
+# Preserve assignments when migrating the original derived label. Never rename a control label.
+$existingNames = @((
+    Invoke-GitHubCli -Arguments @('label', 'list', '--repo', $Repository, '--limit', '1000', '--json', 'name')
+    | ConvertFrom-Json
+) | ForEach-Object { $_.name })
+if ($existingNames -contains 'preview:deployed' -and $existingNames -notcontains 'preview:status:deployed' -and
+    $PSCmdlet.ShouldProcess($Repository, 'rename preview:deployed to preview:status:deployed')) {
+    Invoke-GitHubCli -Arguments @('label', 'edit', 'preview:deployed', '--repo', $Repository,
+                                 '--name', 'preview:status:deployed') | Out-Null
 }
 
 foreach ($label in $labels) {

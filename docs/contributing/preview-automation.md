@@ -45,7 +45,9 @@ manual deployment clears the old automatic association.
 | `preview:auto` | Create one PR preview, then update published new heads or changed extension selection while preserving data |
 | `preview:auto:redeploy` | In addition to `preview:auto`, fully reset and recreate the environment for each newly requested update |
 | `preview:keep` | Suspend automatic expiry, PR-close and opt-out cleanup until explicit destroy |
-| `preview:deployed` | Derived status maintained by automation after a running preview's protected access is verified |
+| `preview:status:deployed` | A running preview has verified protected access |
+| `preview:status:pending` | An admitted operation is queued or waits for images/capacity |
+| `preview:status:error` | An operation failed, a probe failed or preview health/protection is bad |
 
 `preview:auto:redeploy` is a persistent modifier, not a standalone trigger. Adding
 it to an existing automatic preview requests one reset. Keeping it does not reset
@@ -64,14 +66,33 @@ immediately restores the recorded cleanup rules on the next reconciliation, so
 an already-expired preview is removed. A deletion that has already started cannot
 be rolled back by adding keep; reconciliation finishes its persisted intent.
 
-`preview:deployed` is output, never deployment authorization. Successful command
+`preview:status:*` labels are output, never deployment authorization. The three
+signals are independent: an old version can remain deployed while its requested
+update is pending or failed. A waiting attempt does not introduce an error.
+Pending/error updates without a new observation preserve last verified availability.
+
+`preview:status:deployed` reflects verified availability. Successful command
 results add/remove it immediately; reconciliation repairs it from live status,
 including manual previews and closed retained PRs. It is removed for stopped,
 unhealthy, unprotected, absent or removed previews and incomplete cleanup. A failed
 probe without a verified result leaves the label unchanged until a later check;
 the command card and workflow provide error details. Direct Actions deployments
 without command tracking are reflected on the next reconciliation. Other labels
-are preserved. Do not maintain this status label manually.
+are preserved. Do not maintain status labels manually.
+
+A successful deployment clears pending and error; confirmed full cleanup clears
+all status labels. A healthy `/preview status` does not erase an unresolved
+operation error or a waiting update. Health-only errors are repaired by a verified
+redeployment (automatic when opted in). A new waiting request can coexist with a
+previous unresolved error until deployment or cleanup confirms recovery. A failed
+probe adds error while retaining last verified availability until a fresh result
+is obtained. Command cards retain operation, requested revision, phase/reason and
+next action; use `/preview status` for the currently observed version.
+
+The label synchronizer renames the old `preview:deployed` repository label when
+its replacement does not exist, preserving assignments. If both names already
+exist, per-environment reconciliation removes the legacy assignment after a
+verified transition. Neither status label triggers deployment or extension selection.
 
 ## Cleanup and deletion status
 

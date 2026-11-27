@@ -44,8 +44,9 @@ class API:
             if method == 'POST':
                 self.pull['labels'] += [{'name': name} for name in body['labels']]
             return copy.deepcopy(self.pull['labels'])
-        if bare == ROOT + '/issues/1/labels/preview%3Adeployed' and method == 'DELETE':
-            self.pull['labels'] = [item for item in self.pull['labels'] if item['name'] != 'preview:deployed']
+        if '/labels/' in bare and method == 'DELETE':
+            label = bare.split('/labels/', 1)[1].replace('%3A', ':')
+            self.pull['labels'] = [item for item in self.pull['labels'] if item['name'] != label]
             return None
         if bare == ROOT + '/issues/1/comments':
             if method == 'POST':
@@ -67,7 +68,11 @@ class Registry:
     def execute(self, action, request, **kwargs):
         self.calls.append((action, copy.deepcopy(request), kwargs))
         cloud = self.clouds.setdefault(request['environmentId'], Cloud())
-        return azure.execute(action, request, cloud.factory, now=NOW, route_factory=lambda *args: None, **kwargs)
+        value = azure.execute(action, request, cloud.factory, now=NOW, route_factory=lambda *args: None, **kwargs)
+        # This provider fixture simulates successful protection; real Routes verification has its own tests.
+        if value['state'] == 'running':
+            value['url'] = 'https://dev-' + request['environmentId'] + '.agentstration.cloud'
+        return value
 
     def create(self, github, age=0, automatic=False):
         request = azure_request()
@@ -203,10 +208,10 @@ class ReconciliationTests(unittest.TestCase):
 
     def test_pending_deletion_finishes_even_if_keep_is_added_after_deletion_started(self):
         cloud = self.registry.create(self.github, age=3, automatic=True)
-        self.api.pull['labels'].append({'name': 'preview:deployed'})
+        self.api.pull['labels'].append({'name': 'preview:status:deployed'})
         with patch.object(cloud, 'reset', side_effect=RuntimeError('fixture')):
             self.assertTrue(self.execute()['failures'])
-        self.assertNotIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.assertNotIn('preview:status:deployed', [item['name'] for item in self.api.pull['labels']])
         self.label(reconcile.KEEP)
         self.assertEqual('destroy', self.execute()['actions'][0]['operation'])
         self.assertTrue(cloud.record['destroyed'])
@@ -248,9 +253,9 @@ class ReconciliationTests(unittest.TestCase):
         self.setUp()
         cloud = self.registry.create(self.github)
         self.api.pull['labels'] = []
-        self.github.sync_deployed = Mock(side_effect=RuntimeError('PRIVATE-REMOTE-CONTENT'))
+        self.github.sync_status = Mock(side_effect=RuntimeError('PRIVATE-REMOTE-CONTENT'))
         value = self.execute()
-        self.assertEqual('deployed-label-failed', value['failures'][0]['code'])
+        self.assertEqual('status-labels-failed', value['failures'][0]['code'])
         self.assertNotIn('PRIVATE-REMOTE-CONTENT', json.dumps(value))
         self.assertFalse(cloud.record['destroyed'])
 
@@ -265,16 +270,50 @@ class ReconciliationTests(unittest.TestCase):
             return value
         self.registry.execute = protected
         self.assertEqual([], self.execute()['actions'])
-        self.assertIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.assertIn('preview:status:deployed', [item['name'] for item in self.api.pull['labels']])
         self.assertEqual([], self.execute()['actions'])
         self.registry.execute = lambda *args, **kwargs: {'state': 'unhealthy'}
         self.execute()
-        self.assertNotIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.assertNotIn('preview:status:deployed', [item['name'] for item in self.api.pull['labels']])
         self.registry.execute = original
         self.registry.execute('destroy', {**cloud.record['request'], 'dataMode': 'reset'})
-        self.api.pull['labels'].append({'name': 'preview:deployed'})
+        self.api.pull['labels'].append({'name': 'preview:status:deployed'})
         self.execute()
-        self.assertNotIn('preview:deployed', [item['name'] for item in self.api.pull['labels']])
+        self.assertNotIn('preview:status:deployed', [item['name'] for item in self.api.pull['labels']])
+
+    def test_waiting_update_keeps_old_availability_and_success_clears_pending(self):
+        self.registry.create(self.github, automatic=True)
+        self.publish_new_head()
+        self.metadata.missing_all_tags = True
+        value = self.execute()
+        self.assertEqual([], value['failures'])
+        labels = {item['name'] for item in self.api.pull['labels']}
+        self.assertTrue({'preview:status:deployed', 'preview:status:pending'} <= labels)
+        self.assertNotIn('preview:status:error', labels)
+        self.metadata.missing_all_tags = False
+        self.assertEqual([], self.execute()['failures'])
+        labels = {item['name'] for item in self.api.pull['labels']}
+        self.assertIn('preview:status:deployed', labels)
+        self.assertFalse({'preview:status:pending', 'preview:status:error'} & labels)
+
+    def test_failed_update_keeps_old_availability_and_recovery_clears_error(self):
+        self.registry.create(self.github, automatic=True)
+        self.publish_new_head()
+        original = self.registry.execute
+        def failed(action, request, **kwargs):
+            if action == 'deploy':
+                raise RuntimeError('PRIVATE')
+            return original(action, request, **kwargs)
+        self.registry.execute = failed
+        self.assertTrue(self.execute()['failures'])
+        labels = {item['name'] for item in self.api.pull['labels']}
+        self.assertTrue({'preview:status:deployed', 'preview:status:error'} <= labels)
+        self.assertNotIn('preview:status:pending', labels)
+        self.registry.execute = original
+        self.assertEqual([], self.execute()['failures'])
+        labels = {item['name'] for item in self.api.pull['labels']}
+        self.assertIn('preview:status:deployed', labels)
+        self.assertFalse({'preview:status:pending', 'preview:status:error'} & labels)
 
     def test_dry_run_resolves_private_images_but_never_mutates_cloud_or_comments(self):
         value = self.execute(apply=False)

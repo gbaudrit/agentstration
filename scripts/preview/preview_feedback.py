@@ -179,7 +179,8 @@ def failed(operation, repository, run_url, stage, options, failure=None):
         reason = 'The private GHCR package for `' + component + '` is missing or inaccessible to the workflow.'
         next_step = 'Check its **Private** visibility and **Manage Actions access → gbaudrit/agentstration → Write**, then retry the command.'
     reset = options.get('reset_before_deploy', False)
-    lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + ' — failed**', reason]
+    title = ' — waiting for images**' if code == 'image-unavailable' and operation == 'deploy' else ' — failed**'
+    lines = ['**' + ('Redeployment' if reset else OPERATIONS[operation]) + title, reason]
     if options.get('environment_id'):
         lines.append('Environment: `' + options['environment_id'] + '`.')
     if preview.SHA.fullmatch(options.get('revision') or ''):
