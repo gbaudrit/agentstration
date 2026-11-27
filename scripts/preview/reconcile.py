@@ -287,7 +287,9 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                 except (ValueError, RuntimeError, KeyError, TypeError, OSError):
                     observed = {'state': 'unhealthy'}
                 if observed['state'] == 'running' and (not previous.get('access') or observed.get('url')):
-                    report(environment, feedback.completed(observed, 'status', github.repository, run_url, previous['request']))
+                    diagnostics = {'preview:status:pending', 'preview:status:error'}
+                    if not diagnostics.intersection(item.get('name') for item in pull.get('labels', [])):
+                        report(environment, feedback.completed(observed, 'status', github.repository, run_url, previous['request']))
                     continue
                 # Restore an owned opted-in preview through ordinary deploy, never through implicit reset.
             stage = 'selection'

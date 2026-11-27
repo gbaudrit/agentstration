@@ -82,7 +82,9 @@ are preserved. Do not maintain status labels manually.
 
 A successful deployment clears pending and error; confirmed full cleanup clears
 all status labels. A healthy `/preview status` does not erase an unresolved
-operation error or a waiting update. Health-only errors are repaired by a verified
+operation error or a waiting update. Automatic healthy polls also retain the
+existing waiting/error card and its remediation link until a verified operation
+resolves it. Health-only errors are repaired by a verified
 redeployment (automatic when opted in). A new waiting request can coexist with a
 previous unresolved error until deployment or cleanup confirms recovery. A failed
 probe adds error while retaining last verified availability until a fresh result

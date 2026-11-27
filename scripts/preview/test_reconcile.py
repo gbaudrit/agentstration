@@ -315,6 +315,19 @@ class ReconciliationTests(unittest.TestCase):
         self.assertIn('preview:status:deployed', labels)
         self.assertFalse({'preview:status:pending', 'preview:status:error'} & labels)
 
+    def test_healthy_poll_keeps_unresolved_error_and_its_actionable_card(self):
+        self.registry.create(self.github, automatic=True)
+        self.github.publish('pr-1', '**Automatic preview not deployed**\n\nRetry the failed update.')
+        original = self.api.comments[0]['body']
+        self.api.pull['labels'].append({'name': 'preview:status:error'})
+        self.assertEqual([], self.execute()['actions'])
+        self.assertEqual(original, self.api.comments[0]['body'])
+        self.assertIn('preview:status:error', {item['name'] for item in self.api.pull['labels']})
+        self.publish_new_head()
+        self.assertEqual([], self.execute()['failures'])
+        self.assertNotIn('preview:status:error', {item['name'] for item in self.api.pull['labels']})
+        self.assertIn('Preview ready', self.api.comments[0]['body'])
+
     def test_dry_run_resolves_private_images_but_never_mutates_cloud_or_comments(self):
         value = self.execute(apply=False)
         self.assertTrue(value['dryRun'])
