@@ -119,7 +119,7 @@ def build(extension, directory, repository, bases=None):
     sha = output(["git", "-C", str(ROOT), "rev-parse", "HEAD"])
     if bases is None:
         bases = {"sdk": resolve_image("mcr.microsoft.com/dotnet/sdk:10.0.300"),
-                 "runtime": resolve_image("mcr.microsoft.com/dotnet/aspnet:10.0")}
+                 "runtime": resolve_image(entry.get("runtimeImage", "mcr.microsoft.com/dotnet/aspnet:10.0"))}
     if set(bases) != {"sdk", "runtime"} or not all(
             re.fullmatch(r"[a-z0-9./_-]+@sha256:[0-9a-f]{64}", value) for value in bases.values()):
         raise ValueError("SDK and runtime build inputs must be pinned by digest.")

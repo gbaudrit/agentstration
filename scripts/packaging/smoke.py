@@ -63,7 +63,8 @@ def main():
         for setting, value in smoke_environment(delivery_entry(delivery)).items():
             configuration.extend(["--env", setting + "=" + value])
         try:
-            subprocess.run(["docker", "run", "--detach", "--name", name, "--publish", "127.0.0.1::8080",
+            subprocess.run(["docker", "run", "--detach", "--name", name,
+                            "--user", f"{os.getuid()}:{os.getgid()}", "--publish", "127.0.0.1::8080",
                             "--mount", f"type=bind,source={key_path},target=/run/secrets/aep-key,readonly",
                             "--env", "Aep__EnrollmentMode=SharedKeyFile",
                             "--env", "Aep__SharedKeyFile__Path=/run/secrets/aep-key", *configuration, args.image], check=True)
