@@ -163,7 +163,7 @@ version, protocol and contribution from the selected catalogue entry. It generat
 the authority's per-extension trust settings from `extensionId`, supplying only the
 SharedKeyFile mode and the mounted key path in a temporary environment file. No
 provider ID or provider-specific endpoint is embedded in the scenario. The real
-image validation currently exercises Foundry, the implemented AEP catalogue entry;
+image validation exercises implemented AEP catalogue entries, including OpenAPI;
 offline regression cases also cover other extension identities. A new AEP image
 uses this same enrollment scenario when its catalogue/build vertical is added.
 
@@ -282,6 +282,100 @@ cannot preserve the artifact fails publication. The publisher validates the
 archive checksum and refuses replacement of a tag with a different digest.
 Deployment consumers must retain the actual digest reference, not resolve a
 mutable convenience tag at deployment time.
+
+## OpenAPI extension
+
+The `openapi` catalogue entry packages the autonomous
+`Agentstration.Extensions.OpenApi` host with `Dockerfile.extension`. Its independent
+version starts at `0.1.0`; `version.txt` feeds the assembly, advertised AEP identity
+and OCI version label. AEP remains `agentstration.io/v1`; schema format
+`openapi.validation`, connected-service contracts and profile bundles retain their
+existing contribution versions (`1.0.0`, with the embedded discovery Flow at
+`1.0.2`). These versions have separate compatibility meanings.
+
+The image advertises schema validation, `openapi.contract.discover` and
+`openapi.operation.invoke`, the `openapi-governed` and `openapi-connected-services`
+profile bundles, connected-service type `openapi`, operation type
+`openapi-operation`, and the existing `/mcp` server. The generic protected AEP
+smoke checks all catalogue contribution families; the selected offline MSTest
+project also checks MCP tools, contract discovery/invocation and manifest validity.
+It uses deterministic `HttpMessageHandler` fixtures, synthetic `.example.test`
+destinations and a fake DNS resolver; no external API or downstream credential is
+required. The existing tests cover domain/address/port restrictions, explicit
+same-origin candidates, exact contract digests, reference rules, payload/media
+bounds and cancellation. Packaging does not relax those policies.
+
+```sh
+python3 scripts/packaging/images.py describe --extension openapi
+python3 scripts/packaging/images.py build --extension openapi \
+  --repository gbaudrit/agentstration --directory artifacts/openapi
+# After committing a clean source revision, through the trusted delivery workflow:
+gh workflow run oci-images.yml --ref <branch-or-main> \
+  -f extension=openapi -f publish_preview=true
+```
+
+Before that publication dispatch, an administrator must initialize
+`ghcr.io/gbaudrit/agentstration-extension-openapi` as **private** and verify
+**Manage Actions access → gbaudrit/agentstration → Write**, following
+[First package initialization](#first-package-initialization). Package linkage alone
+is insufficient. If metadata or access cannot be verified, finish code/tests/PR
+and stop before uploading the application image. The publisher verifies privacy
+again and copies the validated archive without rebuilding it. Retain
+`delivery.json`, the OCI archive (including provenance/SBOM),
+`enrollment-smoke.json` and `publication-ghcr.json`: together they identify the
+source SHA, `0.1.0` version, exact digest, pinned build bases and tested SQLite
+authority image. Use the receipt's `ghcr.io/...@sha256:...` reference for deployment.
+
+Required and optional runtime settings use standard .NET environment syntax:
+
+| Setting | Behavior |
+| --- | --- |
+| `OpenApi__AllowedDomains__0` (and subsequent indexes) | Required explicit destination allowlist; no default external destination. |
+| `OpenApi__AllowedPorts__0` (and subsequent indexes) | Defaults to `80`, `443`. |
+| `OpenApi__AllowPrivateAddresses` | Defaults to `false`; loopback/link-local remain denied. |
+| `OpenApi__MaximumCandidatePaths` / `MaximumOperations` | Defaults to `8` / `1000`. |
+| `OpenApi__MaximumDocumentBytes` / `MaximumResponseBytes` | Defaults to 2 MiB / 4 MiB. |
+| `OpenApi__MaximumReferences` / `MaximumReferenceDepth` | Defaults to `256` / `16`. |
+| `OpenApi__MaximumPages` / `TimeoutSeconds` | Defaults to `10` / `30`. |
+| `OpenApi__AllowedMethods__<index>`, `AllowedContractMediaTypes__<index>`, `AllowedResponseMediaTypes__<index>` | Preserve the explicit method and media-type policies from `OpenApiOptions`; override only for intended destinations. |
+| `Aep__EnrollmentMode` | `SharedKeyFile` for the authenticated container path. |
+| `Aep__SharedKeyFile__Path` | Read-only mounted key file, shared only with the authority. |
+| `Aep__SharedKeyFile__AuthorityUrl` / `PublicEndpoint` | Authority and extension URLs reachable from their respective hosts. |
+| `Aep__SharedKeyFile__StateFile` | Writable persisted instance file, for example `/var/lib/aep/instance`. |
+| `Aep__SharedKeyFile__AllowInsecureHttp` | Explicit `true` only for the isolated Development HTTP fixture; use HTTPS otherwise. |
+
+Mount the protected key read-only at `/run/secrets/aep-key` and a dedicated writable
+state directory at `/var/lib/aep`; preserve the instance file across container
+recreation. Match host ownership/permissions to the container user. No server
+database, downstream credential, contract payload or generated state belongs in
+the image. Prefer the existing product-managed protected value/Secret bindings
+for API credentials; do not place credential values in Docker arguments, catalogue
+settings, logs or artifacts. The catalogue's `smokeEnvironment` contains only the
+public `fixture.example.test` startup allowlist and does not enable private access
+or perform an outbound request. Both generic smokes consume those public settings.
+
+Linux amd64 is the supported image platform. A delivery qualifies only the source,
+extension digest, same-source SQLite authority and AEP combination recorded by its
+successful smoke evidence; no private publication, live API compatibility or other
+platform is implied by a catalogue entry. Generic smokes cover health, authenticated
+discovery, invalid bearer/signature rejection, SharedKeyFile enrollment, recreation
+and persisted identities. The offline OpenAPI tests cover provider behavior with
+HTTP fixtures. The catalogue ID `openapi` also derives the selectable label
+`preview:extension:openapi` through the #1389 mechanism. After this catalogue entry
+reaches `main`, `.github/workflows/preview-extension-labels.yml` synchronizes that
+label using `scripts/github/apply-issue-labels.ps1 -PreviewExtensionsOnly`.
+The label selects the extension only when applied to a preview request through
+the existing preview workflow; packaging does not assign it or trigger deployment.
+A dry run with `-DryRun -PreviewExtensionsOnly` verifies the derived name without
+changing repository labels.
+
+Related to #1290; keep it open until private qualification is recorded. Docker Hub
+is deferred to #1384, preserving official release tag/version and trusted-main
+checks, same-archive promotion with provenance/SBOM and per-registry digest receipts,
+anonymous public pull plus health/discovery/enrollment/restart qualification,
+credential administration, retry/partial-publication and immutable-version conflict
+criteria. Do not create `extension/openapi/v0.1.0`: the current tag path also requests
+Docker Hub publication.
 
 ## MAF AWP Worker
 

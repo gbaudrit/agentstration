@@ -56,7 +56,21 @@ def catalogue(extension):
         version = (ROOT / entry["versionFile"]).read_text(encoding="utf-8").strip()
     if not valid_version(version):
         raise ValueError("Extension version must be SemVer without build metadata.")
+    smoke_environment(entry)
     return {**entry, "version": version}
+
+
+def smoke_environment(entry):
+    """Public fixture settings only; authentication stays in isolated generated mounts."""
+    values = entry.get("smokeEnvironment", {})
+    if not isinstance(values, dict) or any(
+            not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name)
+            or name.lower().startswith(("aep__", "aspnetcore_", "dotnet_"))
+            or re.search(r"credential|secret|password|token|key", name, re.IGNORECASE)
+            or not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9./,:_-]+", value)
+            for name, value in values.items()):
+        raise ValueError("Smoke environment must contain only public, literal fixture settings.")
+    return values
 
 
 def release_tag(entry, tag):
