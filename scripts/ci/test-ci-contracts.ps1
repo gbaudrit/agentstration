@@ -75,6 +75,7 @@ Require ($ci.Contains('run: ./scripts/ci/assert-validation-results.ps1')) 'CI mu
 Require ($ci.Contains('matrix: ${{ fromJSON(needs.changes.outputs.image-matrix) }}') -and $ci.Contains('extension: ${{ matrix.image }}')) 'Image validation must consume the classified matrix.'
 $delivery = Get-Content (Join-Path $root '.github/workflows/oci-images.yml') -Raw
 Require (-not $delivery.Contains('pull_request:')) 'PR images must not build a second time in the delivery workflow.'
+Require ($delivery -match '(?s)extension:\s+description:[^\n]+\s+type: string' -and -not $delivery.Contains('options:')) 'Manual delivery must accept implemented catalogue IDs without a provider list.'
 foreach ($workflow in @($ci, $delivery)) {
     Require ($workflow.Contains('uses: ./.github/workflows/validate-oci-image.yml')) 'CI and delivery must share the same OCI validation.'
 }

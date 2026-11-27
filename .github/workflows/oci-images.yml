@@ -6,9 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       extension:
-        description: Catalogue image ID (server, AEP extension or AWP Worker)
-        type: choice
-        options: [server, foundry, maf-worker]
+        description: Implemented catalogue image ID (server, AEP extension or AWP Worker)
+        type: string
         default: foundry
         required: true
       publish_preview:

@@ -127,7 +127,8 @@ artifact names remain compatible with existing result gates and delivery receipt
 
 The **OCI images** delivery workflow reuses that same validation for
 extension release tags and manual dispatch. A manual dispatch takes an implemented
-catalogue ID and defaults to validation only. Opting into `publish_preview`
+catalogue ID as a string and defaults to validation only; its existing catalogue
+validator rejects unknown IDs before any build or publication. Opting into `publish_preview`
 publishes the tested archive to private GHCR after the build/smoke job succeeds.
 
 The build pins SDK and ASP.NET base images by digest, requires a clean source
