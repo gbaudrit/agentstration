@@ -1050,3 +1050,74 @@ provenance/SBOM, anonymous public pull and health/discovery/enrollment/restart
 criteria. Do not create `extension/postgresql/v0.1.0`: the current release path
 also requests Docker Hub publication. Preview extension selection is a separate
 workstream.
+
+## Git private image
+
+Related to [#1295](https://github.com/gbaudrit/agentstration/issues/1295).
+`deploy/images/extensions/git.json` is an implemented AEP catalogue entry with
+independent version `0.1.0`. Its version file drives the project assembly, protected
+AEP discovery identity and OCI metadata. AEP protocol and contribution versions
+remain independent.
+
+The image installs the Git executable through the shared Dockerfile's opt-in
+`INSTALL_GIT` build argument. Other catalogue entries retain their existing image
+contents. `GitSourceProvider__GitExecutable` defaults to `git`;
+`MaximumRepositoryBytes` defaults to 536870912 and `ResolveTimeoutSeconds` to 60.
+Set `GitSourceProvider__TemporaryDirectory` to a bounded writable scratch mount
+owned by the process UID. Public HTTPS repositories and explicit refs remain the
+normal policy; repository credentials/private repositories are unsupported.
+`AllowLocalRepositories` stays false outside deterministic tests. The image
+boundary smoke explicitly enables it for a disposable read-only local repository,
+limits scratch to a 32 MiB tmpfs and repository materialization to 1 MiB, and checks
+AEP resolve/materialize before and after restart without internet.
+The catalogue selects `Agentstration.Extensions.Git.Tests`, including the existing
+provider tests and protected-discovery packaging test. Their preserved
+`Agentstration.SourceProviders.Git.Tests` namespace remains the offline filter.
+
+### Authentication, state and publication
+
+Use the existing AEP SharedKeyFile settings: `Aep__EnrollmentMode=SharedKeyFile`,
+`Aep__SharedKeyFile__Path`, `AuthorityUrl`, `PublicEndpoint`, and `StateFile`.
+Persist the extension state file in its own writable directory, owned by the
+process UID; mount the per-installation shared key read-only, mode 0600. The
+authority has its own database/state mount and the matching per-extension trust.
+Do not share server data volumes or put secrets in the image. HTTP requires an
+explicit isolated Development allowance; use HTTPS for normal remote traffic.
+
+The generic smokes check liveness, protected discovery, invalid bearer/proof
+rejection, real SharedKeyFile enrollment, idempotent reannouncement, restart and
+identity retention after recreation of both extension and SQLite authority.
+The qualification baseline is Linux amd64, .NET 10, current source/server revision,
+SQLite and deterministic fixtures. Actual source/digests, pinned bases and smoke
+results are retained in `delivery.json`, `*-smoke.json` and the PR/FR; platform or
+live-service combinations without a successful run are not claimed as tested.
+
+Private destination: `ghcr.io/gbaudrit/agentstration-extension-git:sha-<full-source-sha>`.
+Before application publication, use a package-owner identity with verified
+read/write package access to initialize a missing destination only with an empty
+`FROM scratch` image and reserved `registry-init-*` tag. A 404 alone does not prove
+absence. Verify **Private** before and after repository association, and grant
+**Manage Actions access → gbaudrit/agentstration → Write** at
+[package settings](https://github.com/users/gbaudrit/packages/container/agentstration-extension-git/settings).
+The bootstrap secret is confined to this initialization; normal
+`oci-images.yml` dispatch uses `extension=git`, `publish_preview=true` and
+job-scoped `GITHUB_TOKEN`. The publisher verifies privacy before/after copying the
+same tested archive with digests and provenance/SBOM attestations preserved.
+If package administration is missing, complete code/tests/PR first and record that
+remaining step rather than attempting an application push.
+
+Deployment selector label: `preview:extension:git`. Reuse
+`preview-extension-labels.yml` and `apply-issue-labels.ps1 -PreviewExtensionsOnly`;
+the main workflow derives the label after catalogue merge, while the same script
+can provision it from this implemented branch beforehand. Preserve work-tracking
+`extension:*` labels. Label existence does not publish an image or deploy anything;
+deployment requires a privately published, resolvable digest. Do not automatically
+assign the label to issues or trigger deployment during packaging qualification.
+
+Docker Hub is deferred to [#1384](https://github.com/gbaudrit/agentstration/issues/1384),
+including matching release-version/tag and main ancestry, same-archive promotion,
+digest/provenance/SBOM receipts, anonymous pull and lifecycle qualification,
+release-only credentials, retries and immutable-tag conflict behavior. Do not
+create `extension/git/v0.1.0`: that release path also triggers Docker Hub.
+Keep #1295 open until effective private qualification is recorded; use no
+premature auto-closing keyword.

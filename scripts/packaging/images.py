@@ -98,7 +98,7 @@ def resolve_image(reference):
 
 
 def build_command(entry, archive, metadata, bases, sha, repository):
-    return ["docker", "buildx", "build", "--file", str(ROOT / entry["dockerfile"]),
+    return ["docker", "buildx", "build", *(["--build-arg", "INSTALL_GIT=true"] if entry.get("installGit", False) else []), "--file", str(ROOT / entry["dockerfile"]),
             "--platform", entry["platform"], "--output", f"type=oci,dest={archive}",
             "--metadata-file", str(metadata), "--provenance=true", "--sbom=true",
             "--build-arg", f"SDK_IMAGE={bases['sdk']}", "--build-arg", f"RUNTIME_IMAGE={bases['runtime']}",
