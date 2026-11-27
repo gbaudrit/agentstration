@@ -160,6 +160,7 @@ in the central classifier. Uncatalogued extensions retain product checks.
 | Changed inputs | Selected OCI validation | Product functional/coverage/diagnostic lanes |
 | --- | --- | --- |
 | One implemented extension's source, dedicated tests, version or catalogue | That extension | Skipped |
+| Explicitly owned files in a shared test project (`ci.testPaths`) | Declared owners and explicit shared dependencies | Skipped unless another input requires product checks |
 | Several implemented extensions, with optional documentation | Those extensions | Skipped |
 | `scripts/ci/extensions/**` | All implemented AEP extensions | Skipped |
 | Generic AEP enrollment smoke/Compose or shared AEP protocol | All implemented AEP extensions | Protocol changes retain product/AEP checks; packaging smokes alone do not |
