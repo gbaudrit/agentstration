@@ -1,7 +1,7 @@
 using Agentstration.Http.Diagnostics;
 using Agentstration.Web.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args).AddAgentstrationAdditionalSettings();
 builder.AddAgentstrationHttpDiagnostics();
 var composition = builder.AddAgentstrationStandaloneHost();
 var app = builder.Build();
