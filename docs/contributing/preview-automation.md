@@ -13,13 +13,13 @@ with the existing protected `preview-deployment` environment.
 2. Select optional AEP extensions using the existing **`preview:extension:<id>`**
    labels. SQLite and size profile 1 are the fresh-environment defaults. Existing
    active previews retain their recorded database, target, data and expiry anchor.
-3. **Preview image admission** automatically dispatches **OCI images** on `main`
-   with `extension=server`, `publish_preview=true` and the exact approved PR head.
-   Adding `preview:auto` after a push also triggers publication. New commits,
-   reopening and leaving draft mode recheck eligibility. Selected independent
-   Worker/AEP images must already be privately published through their own flows.
-   The candidate build has read-only permissions; publication uses main tooling in
-   a separate job, without Azure credentials. Reconciliation itself never builds.
+3. CI builds only catalogue-selected affected images, using the exact PR head.
+   **Preview image admission** waits for successful CI and completion of the other
+   PR workflows, then promotes those existing archives through **OCI images** on
+   `main`. Automatic promotion skips its build job. Adding `preview:auto` or an
+   extension label after CI can reuse its archives. Candidate builds have read-only
+   permissions; publication uses main tooling without Azure credentials.
+   Reconciliation itself never builds.
 4. Reconciliation creates/updates stable `pr-N`, using frozen private image
    receipts and exact digests. Live opt-in approval/head/labels are checked again
    under the provider lease. A single automatic feedback card reports the result;
@@ -32,14 +32,45 @@ workflow receives cloud credentials, and reconciliation ignores candidate artifa
 
 For an existing opt-in predating this automation, or after correcting a packaging
 failure, run **Actions → Preview image admission → Run workflow**, select `main`
-and enter the PR number in `preview_pr`. A verified image for the exact head is
-reused without rebuilding. Missing package access fails instead of publishing to
-a public registry. No new PAT or secret is needed: the private server package must
+and enter the PR number in `preview_pr`. Existing PRs must first synchronize main
+so their OCI archives identify the PR head instead of the merge commit. Missing
+or expired artifacts require rerunning CI; publication never rebuilds them.
+Missing package access fails instead of publishing to a public registry.
+No new PAT or secret is needed: each required private component package must
 already grant this repository **Manage Actions access → Write**. Removing opt-in,
 closing the PR or changing its head before publication stops the stale attempt.
-On packaging/publication failure, the automatic card links the failed run and
+Per-component `preview/publication/<id>` statuses appear in the PR. They wait for
+all PR workflows, link publication progress and distinguish reused components.
+On publication failure, the automatic card links the failed run and
 `preview:status:error` is set without removing a previous deployed status.
-See [ADR-0271](../decisions/0271-opted-in-prs-publish-server-images-through-main.md).
+See [ADR-0272](../decisions/0272-preview-publication-promotes-selective-ci-archives.md).
+
+### Selective images
+
+The same rule applies to server, MAF Worker and selected AEP extensions:
+
+| PR inputs | New delivery images | Reused deployment images |
+| --- | --- | --- |
+| One extension changes | That extension's CI archive | Server, Worker and other selected extensions |
+| Several extensions change | Each affected selected extension's CI archive | Server, Worker and unaffected selected extensions |
+| Server changes | Server CI archive | Worker and unaffected selected extensions |
+| Worker changes | Worker CI archive, plus any server dependency selected by CI | Other unaffected components |
+| Shared build/protocol inputs change | Every affected component selected by CI | Remaining unaffected components |
+
+Unchanged components use the **newest tagged private publication**, not a mutable
+`latest` deployment reference or the highest SemVer by numerical order. The
+selector ignores untagged attestations and freezes the chosen digest. It checks
+each image's own source, version and platform. A changed component requires an
+image of the exact requested head; a missing publication never silently selects
+an older version. Unselected extensions are not deployed or automatically published.
+CI's existing source-built integration-test fixtures remain in the smoke checks.
+
+The deployment request records the requested PR revision separately from every
+image's source SHA. Version 4 supports an older published server with a new PR
+extension; versions 1/2 remain readable. The feedback card shows both identities.
+PR comment deployments use the same selection; automatic publication still
+requires `preview:auto`. Explicit non-PR manual selections retain their exact
+server-revision behavior.
 
 An unavailable image or full capacity produces a **waiting** card/result. No
 fallback image, hidden rebuild or expiry renewal occurs. A new

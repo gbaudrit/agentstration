@@ -115,6 +115,7 @@ jobs:
     permissions:
       contents: read
       packages: read
+      actions: read
     outputs:
       request: ${{ steps.select.outputs.request }}
       failure: ${{ steps.select.outputs.failure }}
