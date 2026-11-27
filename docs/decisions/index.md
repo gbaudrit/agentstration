@@ -345,3 +345,7 @@ Use **Proposed** when implementation or repository evidence does not establish a
 269. [ADR-0269 — Preview reconciliation enforces owned expiry and capacity](0269-preview-reconciliation-enforces-owned-expiry-and-capacity.md)
 
 270. [ADR-0270 — Instance extension options use a separate operational AEP contract](0270-instance-extension-options-use-an-operational-aep-contract.md)
+
+271. [ADR-0271 — Opted-in PRs publish server images through main](0271-opted-in-prs-publish-server-images-through-main.md)
+
+272. [ADR-0272 — Preview publication promotes selective CI archives](0272-preview-publication-promotes-selective-ci-archives.md)

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "utilities",
+  "extensionId": "Agentstration.Extensions.Utilities",
+  "project": "src/extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj",
+  "entrypoint": "Agentstration.Extensions.Utilities.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.Utilities/version.txt",
+  "testProject": "tests/Agentstration.Extensions.Utilities.Tests/Agentstration.Extensions.Utilities.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.Extensions.Utilities.Tests",
+  "imageName": "extension-utilities",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "tools",
+  "contributionId": "hash.compute",
+  "contributions": {
+    "tools": [
+      "hash.compute",
+      "json.compact",
+      "text.upper"
+    ],
+    "schemaFormats": [
+      "json-schema.validation"
+    ]
+  },
+  "ci": {
+    "additionalPaths": [
+      "scripts/packaging/utilities_smoke.py"
+    ]
+  }
+}

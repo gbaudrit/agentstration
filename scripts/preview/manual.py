@@ -141,7 +141,6 @@ class PublishedImages:
         image = f'ghcr.io/{self.owner}/{self.name}-{trusted["imageName"]}'
         sha = None
         if ref == 'published':
-            preview.require(trusted.get('kind', 'aep-extension') in ('awp-worker', 'aep-extension'), 'Only independently versioned Workers and extensions accept published.')
             try:
                 digest = self.latest_tagged(package)
             except Unavailable as error:
@@ -190,9 +189,19 @@ class PublishedImages:
                 break
         raise ValueError('No tagged component image found. Publish the component or select its explicit published revision.')
 
+    def preview_revisions(self, number, sha, components):
+        import ci_images
+        try:
+            value = ci_images.context(self.repository, self.api, number, sha)
+        except ci_images.Waiting as error:
+            raise SelectionError('ci-failed' if error.failed else 'ci-pending', 'ci', str(error)) from error
+        return {name: sha if name in value['components'] else 'published' for name in components}
+
 
 def validate_options(options):
     extensions.validate_ids(options.get('extensions', []))
+    preview.require('preview_pr' not in options or type(options['preview_pr']) is int and 1 <= options['preview_pr'] <= 9999999999,
+                    'Invalid preview PR identity.')
     preview.require(options['operation'] in contract.OPERATIONS and options['provider'] == 'azure-vm', 'Only the Azure VM provider is available in this form.')
     preview.require(preview.ENVIRONMENT_ID.fullmatch(options['environment_id']), 'Use a lowercase environment ID, at most 40 characters.')
     preview.require(options['database'] in ('sqlite', 'postgresql') and options['test_profile'] in ('none', 'readiness'), 'Unsupported database or test profile.')
@@ -221,9 +230,20 @@ def resolve(options, variables, repository, selector=None):
     arguments = {'environment_id': options['environment_id'], 'database': options['database'], 'provider': options['provider'],
                  'target': target, 'ttl_hours': ttl_hours, 'data_mode': options['data_mode'], 'test_profile': options['test_profile']}
     selector = selector or PublishedImages(repository)
-    return contract.plan(selector.select('server', options['revision']), selector.select('maf-worker', options['worker_revision']),
-                         extension_deliveries={identifier: selector.select(identifier, 'published') for identifier in options.get('extensions', [])},
-                         **arguments)
+    selected = options.get('extensions', [])
+    number = options.get('preview_pr')
+    if not number and options.get('tracking_kind') == 'pull_request':
+        number = int(options['tracking_issue'])
+    if not number and options['revision'].startswith('pr:'):
+        number = int(options['revision'][3:])
+    refs = {'server': options['revision'], 'maf-worker': options['worker_revision'], **{name: 'published' for name in selected}}
+    if number:
+        preview.require(type(number) is int and 1 <= number <= 9999999999, 'Invalid preview PR number.')
+        sha = selector.revision(options['revision'])
+        refs = selector.preview_revisions(number, sha, list(refs))
+        arguments['source_sha'] = sha
+    return contract.plan(selector.select('server', refs['server']), selector.select('maf-worker', refs['maf-worker']),
+                         extension_deliveries={identifier: selector.select(identifier, refs[identifier]) for identifier in selected}, **arguments)
 
 
 def main():

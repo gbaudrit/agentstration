@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/version.txt').Trim())</Version>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../asc/src/Agentstration.Asc.Aep/Agentstration.Asc.Aep.csproj" />
     <ProjectReference Include="../../../asc/src/Agentstration.Asc.OData/Agentstration.Asc.OData.csproj" />

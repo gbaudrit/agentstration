@@ -45,6 +45,8 @@ class Metadata:
         self.entries = {name: catalogue(name) for name in ('server', 'maf-worker')}
         self.configs, self.manifests, self.files = {}, {}, {}
         self.versions = []
+        self.ci_components = ['server']
+        self.ci_sha = 'a' * 40
         for component, sha in (('server', 'a' * 40), ('maf-worker', 'c' * 40)):
             entry = self.entries[component]
             image = 'ghcr.io/owner/repo-' + entry['imageName']
@@ -64,6 +66,12 @@ class Metadata:
         self.calls.append(arguments)
         if arguments[:2] == ['gh', 'api']:
             path = arguments[2]
+            if '/actions/' in path:
+                from urllib.parse import parse_qs, urlsplit
+                from test_ci_images import fixture, read
+                query = parse_qs(urlsplit(path).query)
+                self.ci_sha = query.get('head_sha', [self.ci_sha])[0]
+                return json.dumps(read(fixture(self.ci_sha, self.ci_components), path)).encode()
             if path == 'repos/owner/repo':
                 value = {'owner': {'type': 'User'}}
             elif '/commits/' in path:
@@ -79,7 +87,12 @@ class Metadata:
                 name = path.split('/contents/')[1].split('?')[0]
                 value = {'type': 'file', 'encoding': 'base64', 'content': base64.b64encode(self.files[name].encode()).decode()}
             elif '/versions?' in path:
-                value = self.versions
+                if '/repo-server/' in path:
+                    image = 'ghcr.io/owner/repo-server'
+                    value = [{'name': 'sha256:' + hashlib.sha256(self.manifests[image]).hexdigest(),
+                              'metadata': {'container': {'tags': ['sha-' + self.configs[image]['config']['Labels']['org.opencontainers.image.revision']]}}}]
+                else:
+                    value = self.versions
             else:
                 value = {'visibility': 'private' if self.private else 'public'}
             return json.dumps(value).encode()
@@ -93,6 +106,27 @@ class Metadata:
 
 
 class ManualTests(unittest.TestCase):
+    def test_pr_reuses_published_server_and_worker_when_neither_changed(self):
+        metadata = Metadata()
+        metadata.ci_components = []
+        selector = manual.PublishedImages('owner/repo', metadata.run)
+        value = manual.resolve(options(revision='b' * 40, preview_pr=1), VARIABLES, 'owner/repo', selector)
+        self.assertEqual('b' * 40, value['sourceSha'])
+        self.assertEqual(4, value['schemaVersion'])
+        self.assertEqual('a' * 40, value['deliveries']['server']['sourceSha'])
+        self.assertEqual('c' * 40, value['deliveries']['worker']['sourceSha'])
+
+    def test_pr_worker_change_requires_that_pr_worker_and_reuses_the_server(self):
+        metadata = Metadata()
+        metadata.ci_components = ['maf-worker']
+        selector = manual.PublishedImages('owner/repo', metadata.run)
+        with self.assertRaises(manual.SelectionError):
+            manual.resolve(options(revision='b' * 40, preview_pr=1), VARIABLES, 'owner/repo', selector)
+        metadata.configs['ghcr.io/owner/repo-worker-maf']['config']['Labels']['org.opencontainers.image.revision'] = 'b' * 40
+        value = manual.resolve(options(revision='b' * 40, preview_pr=1), VARIABLES, 'owner/repo', selector)
+        self.assertEqual('a' * 40, value['deliveries']['server']['sourceSha'])
+        self.assertEqual('b' * 40, value['deliveries']['worker']['sourceSha'])
+
     def setUp(self):
         self.metadata = Metadata()
         self.selector = manual.PublishedImages('owner/repo', self.metadata.run)

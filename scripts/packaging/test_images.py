@@ -41,6 +41,31 @@ class ImageContracts(unittest.TestCase):
             with self.subTest(extension=extension), self.assertRaises(ValueError):
                 images.catalogue(extension)
 
+    def test_smoke_settings_are_public_literal_configuration_and_cannot_override_authentication(self):
+        self.assertEqual({}, images.smoke_environment(self.entry))
+        self.assertEqual({"Fixture__AllowedDomains__0": "fixture.example.test"}, images.smoke_environment(
+            {"smokeEnvironment": {"Fixture__AllowedDomains__0": "fixture.example.test"}}))
+        for environment in ([], {"Aep__EnrollmentMode": "None"}, {"aep__EnrollmentMode": "None"},
+                            {"AspNetCore_Urls": "http://+:8080"}, {"Api__Secret": "value"},
+                            {"DOTNET_STARTUP_HOOKS": "hook"}, {"Api__AllowedDomain": "x\nOTHER=value"},
+                            {"Api__AllowedDomain": "${HOME}"}, {"Api__Port": 8080}):
+            with self.subTest(environment=environment), self.assertRaises(ValueError):
+                images.smoke_environment({"smokeEnvironment": environment})
+
+    def test_all_declared_contribution_families_are_required(self):
+        entry = {**self.entry, "contributions": {"tools": ["fixture.discover", "fixture.invoke"],
+                                                  "schemaFormats": ["fixture.validation"]}}
+        manifest = {"protocolVersion": entry["aepVersion"],
+                    "extension": {"id": entry["extensionId"], "version": entry["version"]},
+                    "contributions": {kind: [{"id": identity} for identity in identities]
+                                      for kind, identities in entry["contributions"].items()}}
+        smoke.check_manifest(manifest, {"extension": entry})
+        for kind in entry["contributions"]:
+            invalid = copy.deepcopy(manifest)
+            invalid["contributions"][kind].pop()
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                smoke.check_manifest(invalid, {"extension": entry})
+
     def test_awp_worker_has_an_independent_catalogue_and_release_namespace(self):
         worker = images.catalogue("maf-worker")
         self.assertEqual("awp-worker", worker["kind"])
@@ -138,6 +163,19 @@ class ImageContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 images.copy_archive(path, "example/image:1.0.0", self.directory / "auth.json")
             run.assert_not_called()
+
+    def test_archive_symlink_cannot_escape_the_delivery_directory(self):
+        path, _ = self.delivery()
+        with tempfile.TemporaryDirectory() as outside:
+            target = Path(outside) / 'image.oci.tar'
+            target.write_bytes(b'offline-archive-fixture')
+            archive = self.directory / 'image.oci.tar'
+            archive.unlink()
+            archive.symlink_to(target)
+            with patch.object(images.subprocess, 'run') as run:
+                with self.assertRaises(ValueError):
+                    images.copy_archive(path, 'example/image:1.0.0', self.directory / 'auth.json')
+                run.assert_not_called()
 
     def test_copy_preserves_all_manifests_without_rebuilding_or_passing_credentials(self):
         path, _ = self.delivery()

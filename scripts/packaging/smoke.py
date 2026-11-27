@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 import uuid
 
-from images import delivery_entry
+from images import delivery_entry, smoke_environment
 
 
 def check_manifest(manifest, delivery):
@@ -22,9 +22,11 @@ def check_manifest(manifest, delivery):
     identity = manifest["extension"]
     if identity["id"] != entry["extensionId"] or identity["version"] != entry["version"]:
         raise ValueError("Published AEP identity/version does not match the extension release.")
-    contributions = manifest.get("contributions", {}).get(entry["contributionKind"], [])
-    if entry["contributionId"] not in {contribution["id"] for contribution in contributions}:
-        raise ValueError("Expected extension contribution is missing.")
+    expected = entry.get("contributions", {entry["contributionKind"]: [entry["contributionId"]]})
+    for kind, identities in expected.items():
+        actual = {contribution["id"] for contribution in manifest.get("contributions", {}).get(kind, [])}
+        if not set(identities).issubset(actual):
+            raise ValueError("Expected extension contribution is missing.")
 
 
 def wait_for_health(base, timeout_seconds=60):
@@ -57,11 +59,15 @@ def main():
         key_path = Path(temporary) / "key"
         with open(key_path, "w", opener=lambda path, flags: os.open(path, flags, 0o600)) as output:
             output.write(key)
+        configuration = []
+        for setting, value in smoke_environment(delivery_entry(delivery)).items():
+            configuration.extend(["--env", setting + "=" + value])
         try:
-            subprocess.run(["docker", "run", "--detach", "--name", name, "--publish", "127.0.0.1::8080",
+            subprocess.run(["docker", "run", "--detach", "--name", name,
+                            "--user", f"{os.getuid()}:{os.getgid()}", "--publish", "127.0.0.1::8080",
                             "--mount", f"type=bind,source={key_path},target=/run/secrets/aep-key,readonly",
                             "--env", "Aep__EnrollmentMode=SharedKeyFile",
-                            "--env", "Aep__SharedKeyFile__Path=/run/secrets/aep-key", args.image], check=True)
+                            "--env", "Aep__SharedKeyFile__Path=/run/secrets/aep-key", *configuration, args.image], check=True)
             for iteration in range(2):
                 # Docker can allocate a new ephemeral host port when the container restarts.
                 container = json.loads(subprocess.check_output(["docker", "inspect", name], text=True))[0]
