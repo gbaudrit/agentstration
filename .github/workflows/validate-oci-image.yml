@@ -101,6 +101,9 @@ jobs:
           delivery = json.load(open('artifacts/extension/delivery.json'))
           subprocess.run(['python3', 'scripts/packaging/smoke.py', '--delivery', 'artifacts/extension/delivery.json', '--image', 'localhost:5000/extension@' + delivery['digest']], check=True)
           PY
+      - name: Verify deterministic Utilities MCP tools in the exact delivered image
+        if: steps.select.outputs.extension == 'utilities'
+        run: python3 scripts/packaging/utilities_smoke.py
       - name: Verify OpenDAL native storage in the exact delivered image
         if: steps.select.outputs.extension == 'opendal'
         run: python3 scripts/packaging/opendal_smoke.py
