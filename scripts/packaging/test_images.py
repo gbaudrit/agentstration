@@ -139,6 +139,19 @@ class ImageContracts(unittest.TestCase):
                 images.copy_archive(path, "example/image:1.0.0", self.directory / "auth.json")
             run.assert_not_called()
 
+    def test_archive_symlink_cannot_escape_the_delivery_directory(self):
+        path, _ = self.delivery()
+        with tempfile.TemporaryDirectory() as outside:
+            target = Path(outside) / 'image.oci.tar'
+            target.write_bytes(b'offline-archive-fixture')
+            archive = self.directory / 'image.oci.tar'
+            archive.unlink()
+            archive.symlink_to(target)
+            with patch.object(images.subprocess, 'run') as run:
+                with self.assertRaises(ValueError):
+                    images.copy_archive(path, 'example/image:1.0.0', self.directory / 'auth.json')
+                run.assert_not_called()
+
     def test_copy_preserves_all_manifests_without_rebuilding_or_passing_credentials(self):
         path, _ = self.delivery()
         missing = subprocess.CompletedProcess([], 1, stdout=b"", stderr=b"manifest unknown")

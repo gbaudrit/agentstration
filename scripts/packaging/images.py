@@ -138,7 +138,7 @@ def private_package(repository, package):
 def copy_archive(delivery_path, destination, authfile):
     delivery = json.loads(delivery_path.read_text(encoding="utf-8"))
     archive = delivery_path.parent / delivery["archive"]
-    if archive.parent.resolve() != delivery_path.parent.resolve() or not DIGEST.fullmatch(delivery["digest"]):
+    if archive.resolve().parent != delivery_path.parent.resolve() or not DIGEST.fullmatch(delivery["digest"]):
         raise ValueError("Invalid delivery archive/digest.")
     with archive.open("rb") as stream:
         if hashlib.file_digest(stream, "sha256").hexdigest() != delivery["archiveSha256"]:

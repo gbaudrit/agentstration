@@ -13,19 +13,33 @@ with the existing protected `preview-deployment` environment.
 2. Select optional AEP extensions using the existing **`preview:extension:<id>`**
    labels. SQLite and size profile 1 are the fresh-environment defaults. Existing
    active previews retain their recorded database, target, data and expiry anchor.
-3. Publish the server image for the PR's exact head using **OCI images**,
-   `extension=server`, `publish_preview=true`. Selected independent Worker/AEP
-   images must also be privately published. Reconciliation does not build images
-   or publish untrusted PR code with cloud credentials.
+3. **Preview image admission** automatically dispatches **OCI images** on `main`
+   with `extension=server`, `publish_preview=true` and the exact approved PR head.
+   Adding `preview:auto` after a push also triggers publication. New commits,
+   reopening and leaving draft mode recheck eligibility. Selected independent
+   Worker/AEP images must already be privately published through their own flows.
+   The candidate build has read-only permissions; publication uses main tooling in
+   a separate job, without Azure credentials. Reconciliation itself never builds.
 4. Reconciliation creates/updates stable `pr-N`, using frozen private image
    receipts and exact digests. Live opt-in approval/head/labels are checked again
    under the provider lease. A single automatic feedback card reports the result;
    command-specific cards remain historical records of their own commands.
 
-Reconciliation runs at minutes 7, 22, 37 and 52 of each hour. A successful manual
+Reconciliation runs at minutes 7, 22, 37 and 52 of each hour. A successful dispatched
 **OCI images** workflow run from this repository also triggers it. GitHub's
 schedule/queue and environment approval settings can delay execution. No PR event
-workflow receives cloud credentials, and candidate workflow artifacts are ignored.
+workflow receives cloud credentials, and reconciliation ignores candidate artifacts.
+
+For an existing opt-in predating this automation, or after correcting a packaging
+failure, run **Actions → Preview image admission → Run workflow**, select `main`
+and enter the PR number in `preview_pr`. A verified image for the exact head is
+reused without rebuilding. Missing package access fails instead of publishing to
+a public registry. No new PAT or secret is needed: the private server package must
+already grant this repository **Manage Actions access → Write**. Removing opt-in,
+closing the PR or changing its head before publication stops the stale attempt.
+On packaging/publication failure, the automatic card links the failed run and
+`preview:status:error` is set without removing a previous deployed status.
+See [ADR-0271](../decisions/0271-opted-in-prs-publish-server-images-through-main.md).
 
 An unavailable image or full capacity produces a **waiting** card/result. No
 fallback image, hidden rebuild or expiry renewal occurs. A new
