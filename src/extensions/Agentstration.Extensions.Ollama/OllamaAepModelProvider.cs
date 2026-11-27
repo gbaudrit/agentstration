@@ -75,11 +75,15 @@ public sealed class OllamaAepModelProvider(IChatClient chatClient, OllamaApiClie
             catch (Exception exception) { throw new AepServerException("request_failed", "Ollama rejected the streaming request.", innerException: exception); }
             if (!hasNext) yield break;
             var update = updates.Current;
+            UsageDetails? usage = null;
+            foreach (var content in update.Contents.OfType<UsageContent>())
+                (usage ??= new UsageDetails()).Add(content.Details);
             yield return new AepChatUpdate(
                 MapContents(update.Contents),
                 MapRole(update.Role),
                 update.ModelId ?? request.Model,
-                MapFinishReason(update.FinishReason));
+                MapFinishReason(update.FinishReason),
+                usage is null ? null : new AepUsage(usage.InputTokenCount, usage.OutputTokenCount, usage.TotalTokenCount));
         }
     }
 

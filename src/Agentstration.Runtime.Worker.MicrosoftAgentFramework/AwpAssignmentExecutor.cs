@@ -189,7 +189,14 @@ internal sealed partial class AwpAssignmentExecutor(
                             output = completed.Result.Output,
                             turns = completed.Result.Turns.Count,
                             agentResourceId = completed.Result.AgentResourceId,
-                            agentVersion = completed.Result.AgentVersion
+                            agentVersion = completed.Result.AgentVersion,
+                            modelProfileResourceId = completed.Result.ModelProfileResourceId,
+                            usage = completed.Result.Usage is null ? null : new
+                            {
+                                inputTokens = completed.Result.Usage.InputTokens,
+                                outputTokens = completed.Result.Usage.OutputTokens,
+                                totalTokens = completed.Result.Usage.TotalTokens
+                            }
                         }), null, cancellationToken);
                     break;
                 case FlowExternalInputRequested input:

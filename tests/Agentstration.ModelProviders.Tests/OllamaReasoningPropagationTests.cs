@@ -25,6 +25,57 @@ namespace Agentstration.ModelProviders.Tests;
 public sealed class OllamaReasoningPropagationTests
 {
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task NativeTokenUsageReachesResolvedClientAndWorker(bool streaming)
+    {
+        using var capture = new NativeRequestHandler(reportUsage: true);
+        await using var extension = new OllamaExtensionFactory(capture);
+        using var http = extension.CreateClient();
+        var resolver = CreateResolver(http, new ModelReasoningOptions { Mode = ReasoningMode.Disabled });
+        using var client = await resolver.ResolveAsync("profile");
+        UsageDetails? usage;
+        if (streaming)
+        {
+            var updates = new List<ChatResponseUpdate>();
+            await foreach (var update in client.GetStreamingResponseAsync([new ChatMessage(ChatRole.User, "Hello")]))
+                updates.Add(update);
+            Assert.AreEqual("OK", string.Concat(updates.Select(update => update.Text)));
+            usage = updates.SelectMany(update => update.Contents).OfType<UsageContent>().SingleOrDefault()?.Details;
+        }
+        else
+        {
+            var response = await client.GetResponseAsync([new ChatMessage(ChatRole.User, "Hello")]);
+            Assert.AreEqual("OK", response.Text);
+            usage = response.Usage;
+        }
+
+        Assert.IsNotNull(usage);
+        Assert.AreEqual(12L, usage.InputTokenCount);
+        Assert.AreEqual(7L, usage.OutputTokenCount);
+        Assert.AreEqual(19L, usage.TotalTokenCount);
+
+        var gateway = CreateGateway(resolver);
+        if (streaming)
+        {
+            var updates = new List<RuntimeGovernedModelUpdate>();
+            await foreach (var update in gateway.StreamModelAsync(WorkerRequest(), default))
+                updates.Add(update);
+            var reported = updates.Single(update => update.InputTokens is not null);
+            Assert.AreEqual(12, reported.InputTokens);
+            Assert.AreEqual(7, reported.OutputTokens);
+            Assert.AreEqual(19, reported.TotalTokens);
+        }
+        else
+        {
+            var response = await gateway.InvokeModelAsync(WorkerRequest(), default);
+            Assert.AreEqual(12, response.InputTokens);
+            Assert.AreEqual(7, response.OutputTokens);
+            Assert.AreEqual(19, response.TotalTokens);
+        }
+    }
+
+    [TestMethod]
     [DataRow(ReasoningMode.Disabled, null, null, "false")]
     [DataRow(ReasoningMode.Disabled, ReasoningEffort.High, null, "false")]
     [DataRow(ReasoningMode.Automatic, null, null, null)]
@@ -307,7 +358,7 @@ public sealed class OllamaReasoningPropagationTests
         });
     }
 
-    private sealed class NativeRequestHandler : HttpMessageHandler
+    private sealed class NativeRequestHandler(bool reportUsage = false) : HttpMessageHandler
     {
         public JsonElement LastRequest { get; private set; }
         public int RequestCount { get; private set; }
@@ -318,13 +369,20 @@ public sealed class OllamaReasoningPropagationTests
             Assert.AreEqual(HttpMethod.Post, request.Method);
             LastRequest = JsonSerializer.Deserialize<JsonElement>(await request.Content!.ReadAsStringAsync(cancellationToken));
             RequestCount++;
+            var response = reportUsage
+                ? """
+                    {"model":"qwen3.5:4b","message":{"role":"assistant","content":"OK"},"done":false}
+                    {"model":"qwen3.5:4b","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":12,"eval_count":7}
+
+                    """
+                : """
+                    {"model":"qwen3.5:4b","message":{"role":"assistant","content":"OK"},"done":true,"done_reason":"stop"}
+
+                    """;
             // OllamaSharp aggregates streamed NDJSON for ordinary chat as well as streaming.
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("""
-                    {"model":"qwen3.5:4b","message":{"role":"assistant","content":"OK"},"done":true,"done_reason":"stop"}
-
-                    """, Encoding.UTF8, "application/x-ndjson")
+                Content = new StringContent(response, Encoding.UTF8, "application/x-ndjson")
             };
         }
     }
