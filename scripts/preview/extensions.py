@@ -66,13 +66,18 @@ def prepare_configuration(directory, state, settings):
 def validate_ids(values):
     preview.require(isinstance(values, list) and len(values) <= 16
                     and all(isinstance(value, str) and ID.fullmatch(value) for value in values)
-                    and values == sorted(set(values)), 'Extensions must be a sorted unique list of up to 16 catalogue IDs.')
+                    and values == sorted(set(values)) and not {'server', 'maf-worker'} & set(values),
+                    'Extensions must be a sorted unique list of up to 16 non-core catalogue IDs.')
     return values
 
 
-def entry(identifier):
+def catalogue_path(identifier):
     validate_ids([identifier])
-    path = preview.ROOT / 'deploy/images/extensions' / (identifier + '.json')
+    return preview.ROOT / 'deploy/images/extensions' / (identifier + '.json')
+
+
+def entry(identifier):
+    path = catalogue_path(identifier)
     preview.require(path.is_file(), 'Extension has no implemented image catalogue: ' + identifier + '.')
     value = preview.read_json(path)
     preview.require(value.get('schemaVersion') == 1 and value.get('kind', 'aep-extension') == 'aep-extension'
@@ -90,8 +95,7 @@ def from_labels(labels):
         if name.startswith(PREFIX):
             selected.append(name[len(PREFIX):])
     validate_ids(sorted(selected))
-    for identifier in selected:
-        entry(identifier)
+    # Admission freezes intent; the selector verifies the published source catalogue.
     return sorted(selected)
 
 
@@ -100,9 +104,13 @@ def trusted(receipts):
     identities = set()
     for identifier, receipt in receipts.items():
         component = preview.delivery_entry(receipt)
-        expected = entry(identifier)
-        preview.require(all(component.get(key) == expected.get(key) for key in METADATA),
-                        'Extension delivery differs from the trusted deployment catalogue.')
+        preview.image_record(receipt, 'aep-extension', 'ghcr.io')
+        preview.require(component['id'] == identifier and component['imageName'] == 'extension-' + identifier,
+                        'Extension delivery differs from its catalogue ID/image namespace.')
+        if catalogue_path(identifier).exists():
+            expected = entry(identifier)
+            preview.require(all(component.get(key) == expected.get(key) for key in METADATA),
+                            'Extension delivery differs from the trusted deployment catalogue.')
         preview.require(component['extensionId'].casefold() not in identities, 'Duplicate AEP extension identity.')
         identities.add(component['extensionId'].casefold())
 
@@ -127,6 +135,8 @@ def prepare(directory, state, configuration, receipts):
     for identifier, receipt in receipts.items():
         identity = preview.delivery_entry(receipt)['extensionId']
         preview.require(identifier not in known or known[identifier] == identity, 'An extension catalogue ID cannot change its persisted AEP identity.')
+        preview.require(not any(other != identifier and previous.casefold() == identity.casefold() for other, previous in known.items()),
+                        'An extension cannot alias another persisted AEP identity.')
         if identifier not in known:
             preview.require(not (directory / ('extension-' + identifier + '.key')).exists(),
                             'An unrecorded extension key exists; restore matching host state before retrying.')

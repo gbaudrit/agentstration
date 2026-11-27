@@ -1,3 +1,4 @@
+using System.Reflection;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Asc.Aep;
@@ -21,7 +22,7 @@ public static class OpenDalHosting
         services.AddSingleton<IAscAepBindingFactory, OpenDalBindingFactory>();
         services.AddAgentstrationAep(options =>
         {
-            options.Extension = new(OpenDalStorageTypes.ExtensionId, "OpenDAL Storage", OpenDalStorageTypes.Version);
+            options.Extension = new(OpenDalStorageTypes.ExtensionId, "OpenDAL Storage", typeof(OpenDalProgram).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0]);
             options.Capabilities[AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion);
             options.Capabilities[AepCapabilityNames.SecretAccess] = new(AepProtocol.SecretAccessVersion);
             options.McpServers.Add(new("content", "/mcp"));

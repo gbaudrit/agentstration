@@ -52,9 +52,16 @@ have been reset; deleting it loses their ownership records.
 | `destroy`, `dataMode: preserve` | Stop containers and deallocate VM; retain data, protected credentials, disks and networking |
 | `destroy`, `dataMode: reset` | Delete only owned VM/NIC/IP/VNet/NSG/data disk; OS disk deletes with VM; retain shared bootstrap account/group |
 
+The issue/PR command `/preview redeploy` requests explicit reset-before-deploy:
+validate/freeze the new image selection, remove only owned infrastructure and
+data, then recreate under one lease. The previous data is lost; a partial reset
+stops recreation. A normal `/preview` or `/preview deploy` preserves data.
+Status returns a bounded live container/health/restart snapshot even for older
+guest tooling, without exporting container configuration or health-check logs.
+
 Retries preserve the original expiry. Reset allows a new data lifecycle, including
-a database change, with a new owner/expiry. Database conversion, automatic TTL
-cleanup (#1286) and optional extension selection remain separate work. The
+a database change, with a new owner/expiry. [Scheduled reconciliation](preview-automation.md)
+enforces expiry, capacity and opted-in PR lifecycle; database conversion remains separate work. The
 protected route's live qualification remains #1285. A reset removes the
 environment's server and Worker identities; preserve-destroy retains them.
 
@@ -238,7 +245,10 @@ the fallback storage lifecycle rule handles terminated uploads.
 Deallocation stops VM compute charges but **retained data/OS disks and the public
 IPv4 address remain billable**. Reset removes per-preview resources; the shared
 account/group are intentionally retained. Add an Azure Cost Management budget
-and alerts for the dedicated group. TTL is currently metadata, not a cost guard.
+and alerts for the dedicated group. Scheduled reconciliation applies recorded
+expiry unless an authorized `preview:keep` label retains the environment;
+queueing, required approvals or failed runs can delay cleanup. This is
+not an Azure currency spending cap.
 
 Before accepting B2ms capacity, run a trusted Azure trial with each database
 profile, record `provisionAndDeploySeconds`, guest memory and Azure Monitor
@@ -287,7 +297,9 @@ mistake deletion from the active blob list for immediate capacity reclamation.
 Budget alerts do not stop resources. The maintainer verified **10 regional vCPUs
 and 10 BS-family vCPUs available** before these trials; B2ms uses two and B4ms four.
 SKU restrictions were empty for B2ms in West Europe. Recheck quota/SKU availability
-when changing region or adding parallel previews. TTL enforcement remains #1286.
+when changing region or adding parallel previews. The independent
+[preview capacity limits](preview-automation.md) default to two reserved environments
+and four vCPU; these do not replace Azure quota or spending controls.
 
 ## Live qualification — 2026-11-24
 
