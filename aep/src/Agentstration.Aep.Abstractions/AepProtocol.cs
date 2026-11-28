@@ -430,7 +430,8 @@ public sealed record AepContributions(
     IReadOnlyList<AepSchemaFormatContribution>? SchemaFormats = null,
     IReadOnlyList<AepConnectedServiceTypeContribution>? ConnectedServiceTypes = null,
     IReadOnlyList<AepConnectedServiceOperationTypeContribution>? ConnectedServiceOperationTypes = null,
-    IReadOnlyList<AepStorageTypeContribution>? StorageTypes = null);
+    IReadOnlyList<AepStorageTypeContribution>? StorageTypes = null,
+    IReadOnlyList<AepToolSetContribution>? ToolSets = null);
 
 [JsonConverter(typeof(JsonStringEnumConverter<AepConnectedServiceOperationInteraction>))]
 public enum AepConnectedServiceOperationInteraction
@@ -677,6 +678,7 @@ public static class AepDescriptorValidator
             errors.Add($"Schema formats capability version '{schemaCapability.Version}' is not supported.");
         if (hasSchemaCapability && !hasSchemaFormats)
             errors.Add("The aep.schema-formats capability needs at least one Schema format contribution.");
+        errors.AddRange(AepToolSetDescriptorValidator.Validate(descriptor));
         ValidateConnectedServiceOperationTypes(descriptor, errors);
         ValidateConnectedServiceTypes(descriptor, errors);
         errors.AddRange(AepStorageDescriptorValidator.Validate(descriptor));

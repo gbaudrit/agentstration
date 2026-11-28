@@ -332,7 +332,8 @@ public sealed partial class AepEnrollmentTests
         string extensionId,
         bool advertiseTool = false,
         bool advertiseBundle = false,
-        AepDataSourceProfileBundleContribution? bundleOverride = null) : HttpMessageHandler
+        AepDataSourceProfileBundleContribution? bundleOverride = null,
+        bool advertiseToolSet = false) : HttpMessageHandler
     {
         public AepCredentialRotation? Rotation { get; private set; }
         public int PreviousRevocationCount { get; private set; }
@@ -372,8 +373,8 @@ public sealed partial class AepEnrollmentTests
             return new AepManifest(
                 AepProtocol.Version,
                 new(extensionId, "Pairing test", "1.0.0"),
-                new Dictionary<string, AepCapabilityDescriptor>(),
-                new AepContributions([], tools, DataSourceProfileBundles: bundleOverride is not null ? [bundleOverride] : advertiseBundle ? [Crawl4AiDataSourceProfileBundle.Create()] : []),
+                advertiseToolSet ? new Dictionary<string, AepCapabilityDescriptor> { [AepToolSetDescriptorValidator.Capability] = new("1.0") } : [],
+                new AepContributions([], tools, ToolSets: advertiseToolSet ? [new("tools", "Extension tools", "1.0.0", [new("lookup", "lookup")])] : [], DataSourceProfileBundles: bundleOverride is not null ? [bundleOverride] : advertiseBundle ? [Crawl4AiDataSourceProfileBundle.Create()] : []),
                 advertiseTool || advertiseBundle || bundleOverride is not null ? new AepMcpDescriptor([new AepMcpServerDescriptor("main", "/mcp")]) : null);
         }
     }
