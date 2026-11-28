@@ -123,7 +123,14 @@ public sealed class ContributionAccessAdministrationTests
                 await policies.PutAsync(new(new(replacement.Value.Uid, ResourceScopeRef.Instance, replacement.Value.Namespace, replacement.Value.Kind), []) { AllDescendantActions = Actions }, null, default);
                 Assert.IsEmpty((await related.GetAsync(replacement.Value.Uid, default)).Resources);
             }
-            using (scopeFactory.Push(consumer)) Assert.IsFalse((await access.CanUseAsync(fixture.Tool, consumerScope, default)).Allowed);
+            using (scopeFactory.Push(consumer))
+            {
+                Assert.IsFalse((await access.CanUseAsync(fixture.Tool, consumerScope, default)).Allowed);
+                var flow = await policies.EvaluateAsync(new(fixture.FlowUid, ResourceScopeRef.Instance, ResourceNamespace.Default, "Flow"),
+                    consumerScope, ResourceAccessAction.Use, default);
+                Assert.IsFalse(flow.Allowed, "A deleted/recreated source must not revive a standalone Flow grant.");
+                Assert.AreEqual(ResourceAccessDecisionReasons.RelationshipInvalid, flow.ReasonCode);
+            }
         }
         finally { SqliteConnection.ClearAllPools(); Directory.Delete(directory, recursive: true); }
     }

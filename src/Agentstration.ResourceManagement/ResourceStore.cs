@@ -53,7 +53,8 @@ public interface IResourceIdentityCatalog
 public sealed class ResourceIdentityCatalog(
     IResourceStore resources,
     IEnumerable<IResourceIdentityContributor> contributors,
-    IResourceAccessPolicyStore? accessPolicies = null) : IResourceIdentityCatalog, IResourceAccessGraphReader
+    IResourceAccessPolicyStore? accessPolicies = null,
+    IEnumerable<IResourceAccessRelationshipProvider>? relationships = null) : IResourceIdentityCatalog, IResourceAccessGraphReader
 {
     public async Task<ResourceAccessGraph?> GetAccessGraphAsync(Guid resourceUid, CancellationToken cancellationToken)
     {
@@ -65,8 +66,12 @@ public sealed class ResourceIdentityCatalog(
             foreach (var contributor in contributors.OfType<IResourceAccessGraphContributor>())
                 if (await contributor.GetAccessDocumentAsync(resourceUid, cancellationToken) is { } document)
                 { external = document; break; }
-            if (external?.Governance.Origin.ResourceUid is not { } sourceUid) return null;
-            graph = await reader.GetAccessGraphAsync(sourceUid, cancellationToken);
+            if (external?.Governance.Origin.Kind != ResourceOriginKind.Extension) return null;
+            graph = external.Governance.Origin.ResourceUid is { } sourceUid
+                ? await reader.GetAccessGraphAsync(sourceUid, cancellationToken) : null;
+            // A missing source must never fall back to a standalone direct grant on a governed Flow.
+            if (graph is null) return new ResourceAccessGraph(new Dictionary<Guid, ResourceAccessDocument>
+                { [external.Identity.Uid] = external with { Policy = null } }, relationships ?? []);
         }
         if (graph is null) return null;
         var scope = external?.Identity.ScopeRef ?? graph.Documents[resourceUid].Identity.ScopeRef;
