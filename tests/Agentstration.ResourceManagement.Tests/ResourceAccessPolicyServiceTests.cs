@@ -40,6 +40,25 @@ public sealed class ResourceAccessPolicyServiceTests
     }
 
     [TestMethod]
+    public async Task TrustedOwnerEvaluationValidatesHiddenIdentityAgainstSavedGraph()
+    {
+        var fixture = CreateFixture(ResourceScopeRef.Instance, generation: 7);
+        var saved = fixture.Resources.Current!;
+        fixture.Resources.Current = null;
+        fixture.Resources.Graph = new(new Dictionary<Guid, ResourceAccessDocument>
+        {
+            [saved.Uid] = new(saved, ResourceGovernance.User,
+                System.Text.Json.JsonSerializer.SerializeToElement(new { }), null)
+        }, []);
+        AssertDecision(await fixture.Service.EvaluateAsync(fixture.Identity(7), ResourceScopeRef.Instance,
+            ResourceAccessAction.Use, default), true, ResourceAccessDecisionReasons.SameScope);
+        AssertDecision(await fixture.Service.EvaluateAsync(fixture.Identity(8), ResourceScopeRef.Instance,
+            ResourceAccessAction.Use, default), false, ResourceAccessDecisionReasons.ResourceIdentityStale);
+        AssertDecision(await fixture.Service.EvaluateAsync(fixture.Identity(7), WorkspaceA,
+            ResourceAccessAction.Use, default), false, ResourceAccessDecisionReasons.PolicyMissing);
+    }
+
+    [TestMethod]
     public async Task MissingAndStalePoliciesFailClosed()
     {
         var fixture = CreateFixture(TenantA, generation: 2);
@@ -112,9 +131,12 @@ public sealed class ResourceAccessPolicyServiceTests
         public ResourceAccessIdentity Identity(long generation) => new(Uid, Owner, new("team"), "Agent", generation);
     }
 
-    private sealed class ResourcesStore : IResourceStore
+    private sealed class ResourcesStore : IResourceStore, IResourceAccessGraphReader
     {
         public ResourceIdentitySnapshot? Current { get; set; }
+        public ResourceAccessGraph? Graph { get; set; }
+        public Task<ResourceAccessGraph?> GetAccessGraphAsync(Guid resourceUid, CancellationToken cancellationToken) =>
+            Task.FromResult(Graph);
         public Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(Guid uid, CancellationToken cancellationToken) =>
             Task.FromResult(Current?.Uid == uid ? Current : null);
         public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;

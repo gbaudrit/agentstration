@@ -89,13 +89,17 @@ public sealed class ResourceAccessPolicyService(
         if (consumerScopeRef == resource.OwnerScopeRef)
         {
             var owned = await resources.GetIdentityByUidAsync(resource.Uid, cancellationToken);
-            var ownerScope = await scopes.ResolveAsync(consumerScopeRef, cancellationToken);
-            var reason = owned is null ? ResourceAccessDecisionReasons.ResourceNotFound
-                : !Matches(resource, owned) ? ResourceAccessDecisionReasons.ResourceIdentityStale
-                : ownerScope is null ? ResourceAccessDecisionReasons.ConsumerOutsideOwnerTree
-                : ResourceAccessDecisionReasons.SameScope;
-            return await DecisionAsync(reason == ResourceAccessDecisionReasons.SameScope, reason,
-                resource.OwnerScopeRef, cancellationToken);
+            // Identity discovery is filtered by the ambient caller. Private service dependencies
+            // can use a different trusted authorization scope and still require graph validation.
+            if (owned is not null)
+            {
+                var ownerScope = await scopes.ResolveAsync(consumerScopeRef, cancellationToken);
+                var reason = !Matches(resource, owned) ? ResourceAccessDecisionReasons.ResourceIdentityStale
+                    : ownerScope is null ? ResourceAccessDecisionReasons.ConsumerOutsideOwnerTree
+                    : ResourceAccessDecisionReasons.SameScope;
+                return await DecisionAsync(reason == ResourceAccessDecisionReasons.SameScope, reason,
+                    resource.OwnerScopeRef, cancellationToken);
+            }
         }
         if (resources is IResourceAccessGraphReader reader
             && await reader.GetAccessGraphAsync(resource.Uid, cancellationToken) is { } graph)
