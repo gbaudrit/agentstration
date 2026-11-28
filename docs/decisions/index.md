@@ -376,4 +376,6 @@ Use **Proposed** when implementation or repository evidence does not establish a
 304. [ADR-0304 — Governed Work planning Tools reuse Work services](0304-governed-work-planning-tools-reuse-work-services.md)
 305. [ADR-0305 — Task providers use Project bindings and durable operation receipts](0305-task-providers-use-project-bindings-and-durable-operation-receipts.md)
 
+308. [ADR-0308 — Resource access composes descendant rules and verified contributions](0308-resource-access-composes-descendant-rules-and-verified-contributions.md)
+
 Integration note: the Work ADRs originally numbered 0265–0272 on `codex/946-durable-task-trees` were renumbered 0298–0305 when merging main to resolve identifier collisions. Their decisions are unchanged; main retains its existing ADR identifiers.

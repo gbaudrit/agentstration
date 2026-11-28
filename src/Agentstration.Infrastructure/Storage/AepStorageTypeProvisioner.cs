@@ -21,7 +21,7 @@ public sealed class AepStorageTypeProvisioner(StorageTypeManagementService types
         var provider = new ScopedResourceAddress(scope, registration.Namespace, registration.Kind, registration.Name);
         using var authority = governance.Push(ResourceGovernance.Extension(
             $"{scope.Value}/{registration.Kind}/{registration.Namespace}/{registration.Name}",
-            authenticatedManifest.Extension.Id, authenticatedManifest.Extension.Version));
+            authenticatedManifest.Extension.Id, authenticatedManifest.Extension.Version, registration.Uid));
         foreach (var contribution in contributions)
         {
             var ns = ResourceNamespace.Parse(authenticatedManifest.Extension.Id);

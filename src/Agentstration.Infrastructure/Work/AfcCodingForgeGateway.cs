@@ -17,7 +17,7 @@ namespace Agentstration.Infrastructure.Work;
 // AFC wire types and native states stop at this adapter. The durable delivery owns effect identity.
 public sealed partial class AfcCodingForgeGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
     IToolExecutionPipeline pipeline, ICurrentRequestContext current, TimeProvider clock,
-    WorkProjectConnectedServiceResolver services) : ICodingForgeGateway
+    WorkProjectConnectedServiceResolver services, ToolAccessService? toolAccess = null) : ICodingForgeGateway
 {
     public async Task<Result<WorkForgeDeliveryRoute>> InspectAsync(WorkspaceId workspace, Guid principal,
         WorkProjectResolvedBinding connection, CodingRepositoryIdentity repository, CancellationToken token)

@@ -18,7 +18,8 @@ public sealed class DataSourceAcquisitionCompositionResolver(
     IResourceReferenceResolver references,
     IResourceAccessPolicyService accessPolicies,
     ICurrentRequestContext requestContext,
-    IRequestContextScopeFactory requestScopes) : IDataSourceAcquisitionCompositionResolver
+    IRequestContextScopeFactory requestScopes,
+    ToolAccessService? toolAccess = null) : IDataSourceAcquisitionCompositionResolver
 {
     public async Task<ResolvedDataSourceFlowBinding> ResolveOperationAsync(ResourceScopeRef consumerScope,
         Agentstration.ConnectedServices.Contracts.ConnectedServiceDiscoveryFlowReference reference,
@@ -147,7 +148,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
             var toolScope = tool.ScopeRef
                 ?? throw Error($"data_source_{purpose}_tool_scope_missing", $"Tool '{tool.Address}' has no ownership scope.");
             await EnsureUseAsync(tool, toolScope, ownerScope, ToolResourceKinds.Tool, cancellationToken);
-            if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
+            if (!(toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, cancellationToken)) || tool.Definition.Discovery?.Available != true)
                 throw Error($"data_source_{purpose}_tool_unavailable", $"Tool '{tool.Address}' is unavailable.");
             var providerReference = tool.Definition.Provider
                 ?? throw Error($"data_source_{purpose}_provider_missing", $"Tool '{tool.Address}' has no provider.");
@@ -241,7 +242,7 @@ public sealed class DataSourceAcquisitionCompositionResolver(
                 throw Error($"data_source_{purpose}_tool_stale", $"Pinned Tool binding '{binding.BindingName}' is stale.");
             await EnsureUseAsync(tool.Value, binding.ToolScopeRef, consumerScope,
                 ToolResourceKinds.Tool, cancellationToken);
-            if (!tool.Value.Definition.Enabled || tool.Value.Definition.Discovery?.Available != true
+            if (!(toolAccess is null ? tool.Value.Definition.Enabled : await toolAccess.IsEnabledAsync(tool.Value, cancellationToken)) || tool.Value.Definition.Discovery?.Available != true
                 || !string.Equals(tool.Value.Definition.ExternalId, binding.ExternalToolId, StringComparison.Ordinal))
                 throw Error($"data_source_{purpose}_tool_unavailable", $"Pinned Tool binding '{binding.BindingName}' is unavailable.");
 

@@ -15,6 +15,7 @@ internal sealed class ResourceAccessPolicyRow
     public long? Generation { get; set; }
     public string? Version { get; set; }
     public required string GrantsJson { get; set; }
+    public string AllDescendantActionsJson { get; set; } = "[]";
     public required string ETag { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
@@ -75,6 +76,7 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
                 Generation = policy.Resource.Generation,
                 Version = policy.Resource.Version,
                 GrantsJson = Serialize(policy.Grants),
+                AllDescendantActionsJson = JsonSerializer.Serialize(policy.AllDescendantActions, JsonOptions),
                 ETag = etag,
                 UpdatedAt = now
             };
@@ -87,6 +89,7 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
             row.Generation = policy.Resource.Generation;
             row.Version = policy.Resource.Version;
             row.GrantsJson = Serialize(policy.Grants);
+            row.AllDescendantActionsJson = JsonSerializer.Serialize(policy.AllDescendantActions, JsonOptions);
             row.ETag = etag;
             row.UpdatedAt = now;
         }
@@ -147,7 +150,8 @@ public sealed class PostgreSqlResourceAccessPolicyStore(
     private static StoredResourceAccessPolicy Map(ResourceAccessPolicyRow row) => new(
         new(new(row.ResourceUid, ResourceScopeRef.Parse(row.OwnerScopeRef), ResourceNamespace.Parse(row.Namespace),
             row.Kind, row.Generation, row.Version),
-            JsonSerializer.Deserialize<ResourceAccessGrant[]>(row.GrantsJson, JsonOptions) ?? []),
+            JsonSerializer.Deserialize<ResourceAccessGrant[]>(row.GrantsJson, JsonOptions) ?? [])
+            { AllDescendantActions = JsonSerializer.Deserialize<ResourceAccessAction[]>(row.AllDescendantActionsJson, JsonOptions) ?? [] },
         row.ETag, row.UpdatedAt);
     private static string Serialize(IReadOnlyList<ResourceAccessGrant> grants) =>
         JsonSerializer.Serialize(grants, JsonOptions);

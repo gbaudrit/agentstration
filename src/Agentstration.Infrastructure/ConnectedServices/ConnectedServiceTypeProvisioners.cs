@@ -133,7 +133,7 @@ public sealed class AepEnrollmentConnectedServiceTypeProvisioner(
         using var governanceScope = governance.Push(ResourceGovernance.Extension(
             installationReference,
             authenticatedManifest.Extension.Id,
-            authenticatedManifest.Extension.Version));
+            authenticatedManifest.Extension.Version, registration.Uid));
         var @namespace = ResourceNamespace.Parse(authenticatedManifest.Extension.Id);
         foreach (var contribution in contributions)
         {
@@ -260,7 +260,7 @@ public sealed class AepEnrollmentConnectedServiceOperationTypeProvisioner(
                 "The Extension Registration has no ownership scope.");
         var installationReference = $"{scopeRef.Value}/{registration.Kind}/{registration.Namespace}/{registration.Name}";
         using var governanceScope = governance.Push(ResourceGovernance.Extension(
-            installationReference, authenticatedManifest.Extension.Id, authenticatedManifest.Extension.Version));
+            installationReference, authenticatedManifest.Extension.Id, authenticatedManifest.Extension.Version, registration.Uid));
         var @namespace = ResourceNamespace.Parse(authenticatedManifest.Extension.Id);
         foreach (var contribution in contributions)
         {

@@ -15,7 +15,7 @@ namespace Agentstration.Infrastructure.Work;
 
 // The ATC SDK and wire DTOs stop here; Work persists neutral observations and receipts.
 public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
-    IToolExecutionPipeline pipeline, ICurrentRequestContext current, TimeProvider clock, WorkProjectConnectedServiceResolver? services = null) : IWorkTaskProviderGateway
+    IToolExecutionPipeline pipeline, ICurrentRequestContext current, TimeProvider clock, WorkProjectConnectedServiceResolver? services = null, ToolAccessService? toolAccess = null) : IWorkTaskProviderGateway
 {
     public async Task<Result<WorkTaskProviderRoute>> ResolveAsync(WorkspaceId workspaceId, Guid principalId,
         WorkProjectContextBinding binding, ExternalTaskOperationKind operation, CancellationToken token)
@@ -145,7 +145,7 @@ public sealed class AtcWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         {
             var tool = (await resources.GetExactAsync<ToolResource>(pin.Resource.Address, token))?.Value;
             AtcValidation.Require(tool is not null && tool.Uid == pin.Resource.Uid && tool.Generation == pin.Resource.Generation
-                && tool.Definition.Enabled && tool.Definition.Discovery?.Available == true, "connection_changed");
+                && (toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) && tool.Definition.Discovery?.Available == true, "connection_changed");
             if (tool.Definition.Schema is { Output: { } output } schema
                 && JsonElement.DeepEquals(schema.Input, AtcSchemas.Input(operation)) && JsonElement.DeepEquals(output, AtcSchemas.Output(operation)))
                 tools.Add((tool, pin));

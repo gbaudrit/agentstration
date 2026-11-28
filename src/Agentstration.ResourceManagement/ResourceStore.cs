@@ -52,8 +52,35 @@ public interface IResourceIdentityCatalog
 
 public sealed class ResourceIdentityCatalog(
     IResourceStore resources,
-    IEnumerable<IResourceIdentityContributor> contributors) : IResourceIdentityCatalog
+    IEnumerable<IResourceIdentityContributor> contributors,
+    IResourceAccessPolicyStore? accessPolicies = null) : IResourceIdentityCatalog, IResourceAccessGraphReader
 {
+    public async Task<ResourceAccessGraph?> GetAccessGraphAsync(Guid resourceUid, CancellationToken cancellationToken)
+    {
+        if (resources is not IResourceAccessGraphReader reader) return null;
+        var graph = await reader.GetAccessGraphAsync(resourceUid, cancellationToken);
+        ResourceAccessDocument? external = null;
+        if (graph is null)
+        {
+            foreach (var contributor in contributors.OfType<IResourceAccessGraphContributor>())
+                if (await contributor.GetAccessDocumentAsync(resourceUid, cancellationToken) is { } document)
+                { external = document; break; }
+            if (external?.Governance.Origin.ResourceUid is not { } sourceUid) return null;
+            graph = await reader.GetAccessGraphAsync(sourceUid, cancellationToken);
+        }
+        if (graph is null) return null;
+        var scope = external?.Identity.ScopeRef ?? graph.Documents[resourceUid].Identity.ScopeRef;
+        var additional = new List<ResourceAccessDocument>();
+        foreach (var contributor in contributors.OfType<IResourceAccessGraphContributor>())
+        {
+            foreach (var document in await contributor.ListAccessDocumentsAsync(scope, cancellationToken))
+            {
+                var policy = accessPolicies is null ? null : await accessPolicies.GetAsync(document.Identity.Uid, scope, cancellationToken);
+                additional.Add(document with { Policy = policy?.Policy, PolicyETag = policy?.ETag, PolicyUpdatedAt = policy?.UpdatedAt ?? default });
+            }
+        }
+        return graph.WithDocuments(additional);
+    }
     public async Task<ResourceIdentitySnapshot?> GetIdentityByUidAsync(
         Guid uid,
         CancellationToken cancellationToken)

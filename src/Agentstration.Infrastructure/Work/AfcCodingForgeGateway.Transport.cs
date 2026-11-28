@@ -21,7 +21,7 @@ public sealed partial class AfcCodingForgeGateway
         {
             var tool = (await resources.GetExactAsync<ToolResource>(pin.Resource.Address, token))?.Value;
             AfcValidation.Require(tool is not null && tool.Uid == pin.Resource.Uid && tool.Generation == pin.Resource.Generation
-                && tool.Definition.Enabled && tool.Definition.Discovery?.Available == true, "connection_changed");
+                && (toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) && tool.Definition.Discovery?.Available == true, "connection_changed");
             if (tool.Definition.Schema is { Output: { } output } schema
                 && JsonElement.DeepEquals(schema.Input, AfcSchemas.Input(operation)) && JsonElement.DeepEquals(output, AfcSchemas.Output(operation)))
                 tools.Add((tool, pin));

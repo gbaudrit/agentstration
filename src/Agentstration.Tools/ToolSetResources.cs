@@ -5,6 +5,8 @@ namespace Agentstration.Tools;
 
 public sealed record ToolSetMember
 {
+    public Guid? ToolUid { get; init; }
+    public long? ToolGeneration { get; init; }
     public required ResourceReference Tool { get; init; }
     public required string Capability { get; init; }
     public required string Route { get; init; }

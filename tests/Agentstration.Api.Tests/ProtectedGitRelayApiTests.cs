@@ -59,7 +59,7 @@ public sealed class ProtectedGitRelayApiTests
         }, null, true, default);
         await tools.RefreshDiscoveryExactAsync(owner, "git-fixture", default, default);
         var discovered = (await tools.ListVisibleToolsAsync(owner, default)).Single(value => value.Value.Definition.ExternalId == "git.repository");
-        await tools.SetToolEnabledAsync(discovered.Value.Name, true, discovered.ETag, default);
+        await tools.SetToolEnabledAsync(discovered.Value.Name, true, (await tools.GetToolOperationalStateAsync(discovered.Value, default))?.ETag, default);
         var source = (await tools.ListVisibleToolsAsync(owner, default)).Single(value => value.Value.Definition.ExternalId == "git.repository").Value;
         var secrets = host.Services.GetRequiredService<SecretManagementService>();
         await secrets.CreateVaultAsync(new VaultResource { ApiVersion = ResourceApiVersions.CoreV1, Kind = SecretResourceKinds.Vault, Metadata = new() { Name = "git-vault" }, ScopeRef = owner,

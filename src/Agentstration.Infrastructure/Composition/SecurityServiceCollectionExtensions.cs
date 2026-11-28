@@ -30,6 +30,7 @@ internal static class SecurityServiceCollectionExtensions
         services.AddSingleton<IResourceIdentityContributor, FlowResourceIdentityContributor>();
         services.AddSingleton<IResourceIdentityCatalog, ResourceIdentityCatalog>();
         services.AddSingleton<ResourceAccessPolicyService>();
+        services.AddSingleton<ResourceRelatedAccessService>();
         services.AddSingleton<IResourceAccessPolicyService>(provider => provider.GetRequiredService<ResourceAccessPolicyService>());
         services.AddSingleton<ParameterManagementService>();
         services.AddSingleton<IParameterResolver>(provider => provider.GetRequiredService<ParameterManagementService>());

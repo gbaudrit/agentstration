@@ -158,7 +158,7 @@ public sealed partial class GitHubProviderTests
         }, null, true, default);
         await tools.RefreshDiscoveryExactAsync(scope, "github-fixture", default, default);
         var sources = (await tools.ListVisibleToolsAsync(scope, default)).Where(value => value.Value.Definition.Provider?.Name == "github-fixture").ToArray();
-        foreach (var source in sources) await tools.SetToolEnabledAsync(source.Value.Name, true, source.ETag, default);
+        foreach (var source in sources) await tools.SetToolEnabledAsync(source.Value.Name, true, (await tools.GetToolOperationalStateAsync(source.Value, default))?.ETag, default);
         var secrets = services.GetRequiredService<SecretManagementService>();
         await secrets.CreateVaultAsync(new VaultResource
         {

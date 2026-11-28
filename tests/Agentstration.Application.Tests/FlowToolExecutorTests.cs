@@ -2,6 +2,8 @@ using System.Text.Json;
 using Agentstration.Flows;
 using Agentstration.Flows.Application;
 using Agentstration.Infrastructure.Flows;
+using Agentstration.Identity.Contracts;
+using Agentstration.ResourceManagement.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 using Agentstration.Runtime.Abstractions;
@@ -117,6 +119,53 @@ public sealed class FlowToolExecutorTests
         var context = pipeline.Contexts.Single();
         Assert.AreEqual(ResourceScopeRef.Instance, context.ToolScopeRef);
         Assert.AreEqual(ResourceScopeRef.Instance, context.ToolProviderScopeRef);
+    }
+
+    [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    public async Task PrivateCoreDelegationPreservesExplicitDenialsAndNeverBypassesExtensionAccess(bool extension, bool deny)
+    {
+        var store = await StoreAsync(scopeRef: ResourceScopeRef.Instance);
+        await store.PutAsync(Tool(scopeRef: ResourceScopeRef.Instance) with
+        {
+            Governance = extension ? ResourceGovernance.Extension("fixture", "tests.fixture", "1.0.0", Guid.NewGuid())
+                : ResourceGovernance.Core("private-fixture")
+        }, null, false, default);
+        var pipeline = new RecordingPipeline();
+        var access = new ToolAccessService(new NoOperationalState(), new DependencyPolicies(deny), new UnavailableRequestContext());
+        var executor = new ManagedFlowToolExecutor(store, pipeline, access: access);
+        var request = Request(JsonSerializer.SerializeToElement(new { message = "hello" }), 1) with
+        { Tool = new FlowToolReference("notification.send", ScopeRef: ResourceScopeRef.Instance) };
+        if (extension || deny)
+        {
+            var error = await Assert.ThrowsExactlyAsync<FlowValidationException>(() => executor.ExecuteAsync(request, default));
+            Assert.AreEqual("tool_access_denied", error.Code);
+            Assert.IsEmpty(pipeline.Contexts);
+        }
+        else
+        {
+            _ = await executor.ExecuteAsync(request, default);
+            Assert.AreEqual(ResourceScopeRef.Instance, pipeline.Contexts.Single().AuthorizationScopeRef);
+            Assert.IsFalse(JsonSerializer.SerializeToElement(pipeline.Contexts.Single()).TryGetProperty("AuthorizationScopeRef", out _));
+        }
+    }
+
+    private sealed class NoOperationalState : IResourceOperationalStateStore
+    {
+        public Task<ResourceOperationalState?> GetAsync(ResourceAccessIdentity resource, CancellationToken cancellationToken) => Task.FromResult<ResourceOperationalState?>(null);
+        public Task<ResourceOperationalState> PutAsync(ResourceAccessIdentity resource, bool enabled, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+    private sealed class DependencyPolicies(bool deny) : IResourceAccessPolicyService
+    {
+        public Task<ResourceAccessDecision> EvaluateAsync(ResourceAccessIdentity resource, ResourceScopeRef consumer, ResourceAccessAction action, CancellationToken cancellationToken) =>
+            Task.FromResult(consumer == resource.OwnerScopeRef ? new ResourceAccessDecision(true, ResourceAccessDecisionReasons.SameScope)
+                : new(false, deny ? ResourceAccessDecisionReasons.ExplicitDeny : ResourceAccessDecisionReasons.PolicyMissing));
+        public Task<ResourceAccessPolicyResponse?> GetAsync(Guid uid, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ResourceAccessPolicyResponse>> ListAsync(ResourceScopeRef owner, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ResourceAccessPolicyResponse> PutAsync(ResourceAccessPolicy policy, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task DeleteAsync(Guid uid, string? ifMatch, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private static readonly FlowRunScope Scope = new(

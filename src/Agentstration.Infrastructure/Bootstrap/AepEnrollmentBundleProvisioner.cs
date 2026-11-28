@@ -57,12 +57,12 @@ public sealed class AepEnrollmentBundleProvisioner(
         var authority = ResourceGovernance.Extension(
             installationReference,
             manifest.Extension.Id,
-            manifest.Extension.Version);
+            manifest.Extension.Version, registration.Uid);
         var digest = Digest(bundle);
         var bindings = await ResolveToolBindingsAsync(registration, bundle, scopeRef, cancellationToken);
         var existing = await store.GetExactAsync<ExtensionBundleInstallationResource>(address, cancellationToken);
         if (existing is not null && existing.Value.Governance != ResourceGovernance.Extension(installationReference,
-                existing.Value.Definition.ExtensionId, existing.Value.Definition.ExtensionVersion))
+                existing.Value.Definition.ExtensionId, existing.Value.Definition.ExtensionVersion, registration.Uid))
             throw Conflict("owner_conflict", $"Installation '{name}' has another management authority.");
 
         using var authorityScope = governance.Push(authority);

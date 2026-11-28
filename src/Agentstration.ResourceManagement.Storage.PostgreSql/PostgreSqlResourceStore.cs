@@ -78,6 +78,14 @@ public sealed class ResourceManagementDbContext(DbContextOptions<ResourceManagem
         accessPolicy.Property(value => value.Version).HasMaxLength(128);
         accessPolicy.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
         accessPolicy.HasIndex(value => value.OwnerScopeRef);
+        var operationalState = modelBuilder.Entity<ResourceOperationalStateRow>();
+        operationalState.ToTable("ResourceOperationalStates");
+        operationalState.HasKey(value => value.ResourceUid);
+        operationalState.Property(value => value.OwnerScopeRef).HasMaxLength(128);
+        operationalState.Property(value => value.Namespace).HasMaxLength(128);
+        operationalState.Property(value => value.Kind).HasMaxLength(256);
+        operationalState.Property(value => value.ETag).HasMaxLength(64).IsConcurrencyToken();
+        operationalState.HasIndex(value => value.OwnerScopeRef);
         modelBuilder.ConfigureIdentityModel();
     }
 }
@@ -107,7 +115,8 @@ public sealed class PostgreSqlResourceStore(
     TimeProvider timeProvider,
     ICurrentRequestContext requestContext,
     IResourceGovernanceContext governanceContext,
-    ISecurityAuditWriter? audit = null) : IResourceStore, IAgentResourceQueries, IResourceScopeResolver, IModelProfileLookupQueries, IAgentProfileUsageQueries
+    ISecurityAuditWriter? audit = null,
+    IEnumerable<IResourceAccessRelationshipProvider>? accessRelationships = null) : IResourceStore, IResourceAccessGraphReader, IAgentResourceQueries, IResourceScopeResolver, IModelProfileLookupQueries, IAgentProfileUsageQueries
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -448,6 +457,9 @@ public sealed class PostgreSqlResourceStore(
         var accessPolicy = await context.ResourceAccessPolicies
             .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
         if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
+        var operationalState = await context.Set<ResourceOperationalStateRow>()
+            .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
+        if (operationalState is not null) context.Remove(operationalState);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
         await AuditReconciliationAsync(governance, cancellationToken);
@@ -467,6 +479,9 @@ public sealed class PostgreSqlResourceStore(
         var accessPolicy = await context.ResourceAccessPolicies
             .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
         if (accessPolicy is not null) context.ResourceAccessPolicies.Remove(accessPolicy);
+        var operationalState = await context.Set<ResourceOperationalStateRow>()
+            .SingleOrDefaultAsync(value => value.ResourceUid == existing.Uid, cancellationToken);
+        if (operationalState is not null) context.Remove(operationalState);
         context.Documents.Remove(existing);
         await SaveAsync(context, cancellationToken);
         await AuditReconciliationAsync(governance, cancellationToken);
@@ -690,23 +705,61 @@ public sealed class PostgreSqlResourceStore(
             _ => default
         };
         if (targetRef == default) return candidates;
-        var tenantRef = ResourceScopeRef.Tenant(requestContext.Current.TenantId);
-        var sources = await LoadOperationAccessSourcesAsync(context,
-            candidates.Where(value => value.Scope.Ref != targetRef.Value), cancellationToken);
-        var ancestorUids = candidates.Where(value => value.Scope.Ref != targetRef.Value)
-            .Select(value => sources.TryGetValue(value.Uid, out var source) ? source.Document.Uid : value.Uid)
-            .Distinct().ToArray();
+        var resolved = await ResolveAsync(targetRef, cancellationToken);
+        if (resolved is null) return [];
+        var graph = await LoadAccessGraphAsync(context, candidates.Select(value => value.ScopeId).Distinct().ToArray(), cancellationToken);
+        var ancestors = resolved.Ancestors.Select(value => value.Ref).ToArray();
+        return candidates.Where(value => graph.Evaluate(new(value.Uid, ResourceScopeRef.Parse(value.Scope.Ref),
+            ResourceNamespace.Parse(value.Namespace), value.Kind), targetRef, ancestors, ResourceAccessAction.Discover).Allowed).ToArray();
+    }
+
+    public async Task<ResourceAccessGraph?> GetAccessGraphAsync(Guid resourceUid, CancellationToken cancellationToken)
+    {
+        await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var document = await context.Documents.AsNoTracking().Include(value => value.Scope)
+            .SingleOrDefaultAsync(value => value.Uid == resourceUid, cancellationToken);
+        if (document is null || !await CanReadAsync(context, document.Scope, cancellationToken)) return null;
+        return await LoadAccessGraphAsync(context, [document.ScopeId], cancellationToken);
+    }
+
+    private async Task<ResourceAccessGraph> LoadAccessGraphAsync(ResourceManagementDbContext context,
+        long[] scopeIds, CancellationToken cancellationToken)
+    {
+        const int maximumDocuments = 10000;
+        var documents = await context.Documents.AsNoTracking().Include(value => value.Scope)
+            .Where(value => scopeIds.Contains(value.ScopeId)).OrderBy(value => value.StorageKey)
+            .Take(maximumDocuments + 1).ToArrayAsync(cancellationToken);
+        if (documents.Length > maximumDocuments)
+            throw new ResourceAccessPolicyException("access_inventory_limit", "The access inventory exceeds the bounded scope limit.");
+        var uids = documents.Select(value => value.Uid).ToArray();
         var policies = await context.ResourceAccessPolicies.AsNoTracking()
-            .Where(value => ancestorUids.Contains(value.ResourceUid))
-            .ToDictionaryAsync(value => value.ResourceUid, cancellationToken);
-        return candidates.Where(value =>
+            .Where(value => uids.Contains(value.ResourceUid)).ToDictionaryAsync(value => value.ResourceUid, cancellationToken);
+        var sources = await LoadOperationAccessSourcesAsync(context, documents, cancellationToken);
+        var operationalStates = await context.Set<ResourceOperationalStateRow>().AsNoTracking()
+            .Where(value => uids.Contains(value.ResourceUid)).ToDictionaryAsync(value => value.ResourceUid, cancellationToken);
+        var nodes = new Dictionary<Guid, ResourceAccessDocument>();
+        foreach (var document in documents)
         {
-            var source = sources.TryGetValue(value.Uid, out var inherited) ? inherited.Document : value;
-            return value.Scope.Ref == targetRef.Value
-                || policies.TryGetValue(source.Uid, out var policy)
-                && MatchesAccessIdentity(policy, source)
-                && GrantsDiscover(policy.GrantsJson, targetRef, tenantRef);
-        }).ToArray();
+            using var payload = JsonDocument.Parse(document.Payload);
+            var root = payload.RootElement;
+            var generation = root.TryGetProperty("generation", out var g) ? g.GetInt64() : 0;
+            var version = root.TryGetProperty("version", out var v) ? v.GetString() : null;
+            var identity = new ResourceIdentitySnapshot(document.Uid, ResourceScopeRef.Parse(document.Scope.Ref),
+                ResourceNamespace.Parse(document.Namespace), document.Kind, document.Name, generation, version, document.ETag);
+            var governance = root.TryGetProperty("governance", out var evidence)
+                ? evidence.Deserialize<ResourceGovernance>(JsonOptions) ?? ResourceGovernance.User : ResourceGovernance.User;
+            ResourceAccessPolicy? policy = null;
+            if (policies.TryGetValue(document.Uid, out var row))
+                policy = new(new(row.ResourceUid, ResourceScopeRef.Parse(row.OwnerScopeRef), ResourceNamespace.Parse(row.Namespace),
+                    row.Kind, row.Generation, row.Version), JsonSerializer.Deserialize<ResourceAccessGrant[]>(row.GrantsJson, JsonOptions) ?? [])
+                { AllDescendantActions = JsonSerializer.Deserialize<ResourceAccessAction[]>(row.AllDescendantActionsJson, JsonOptions) ?? [] };
+            nodes.Add(document.Uid, new(identity, governance, root.Clone(), policy)
+            { PolicySourceUid = sources.GetValueOrDefault(document.Uid).Identity?.Uid,
+                PolicyETag = row?.ETag, PolicyUpdatedAt = row?.UpdatedAt ?? default,
+                OperationalEnabled = operationalStates.TryGetValue(document.Uid, out var state)
+                    && state.OwnerScopeRef == document.Scope.Ref && state.Namespace == document.Namespace && state.Kind == document.Kind ? state.Enabled : null });
+        }
+        return new(nodes, accessRelationships ?? []);
     }
 
     private static async Task<Dictionary<Guid, (ControlPlaneDocument Document, ResourceAccessIdentity Identity)>>
@@ -730,27 +783,6 @@ public sealed class PostgreSqlResourceStore(
         }
         return result;
     }
-
-    private static bool MatchesAccessIdentity(ResourceAccessPolicyRow policy, ControlPlaneDocument document)
-    {
-        if (policy.OwnerScopeRef != document.Scope.Ref || policy.Namespace != document.Namespace
-            || policy.Kind != document.Kind) return false;
-        if (policy.Generation is null && policy.Version is null) return true;
-        using var payload = JsonDocument.Parse(document.Payload);
-        var root = payload.RootElement;
-        var generation = root.TryGetProperty("generation", out var generationValue)
-            && generationValue.TryGetInt64(out var parsed) ? parsed : 0;
-        var version = root.TryGetProperty("version", out var versionValue)
-            && versionValue.ValueKind == JsonValueKind.String ? versionValue.GetString() : null;
-        return (policy.Generation is null || policy.Generation == generation)
-            && (policy.Version is null || policy.Version == version);
-    }
-
-    private static bool GrantsDiscover(string grantsJson, ResourceScopeRef targetRef, ResourceScopeRef tenantRef) =>
-        (JsonSerializer.Deserialize<ResourceAccessGrant[]>(grantsJson, JsonOptions) ?? []).Any(grant =>
-            grant.Actions.Contains(ResourceAccessAction.Discover)
-            && (grant.TargetScopeRef == targetRef
-                || grant.TargetScopeRef == tenantRef && grant.IncludeDescendants));
 
     private async Task EnsureCanReadInventoryAsync(ResourceManagementDbContext context, ResourceScopeRow scope, CancellationToken cancellationToken)
     {
@@ -846,6 +878,7 @@ public static class PostgreSqlResourceManagementServiceCollectionExtensions
         services.AddSingleton<IAgentProfileUsageQueries>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceScopeResolver>(provider => (PostgreSqlResourceStore)provider.GetRequiredService<IResourceStore>());
         services.AddSingleton<IResourceAccessPolicyStore, PostgreSqlResourceAccessPolicyStore>();
+        services.AddSingleton<IResourceOperationalStateStore, PostgreSqlResourceOperationalStateStore>();
         services.AddSingleton<ITriggerOccurrenceStore, PostgreSqlTriggerOccurrenceStore>();
         services.AddSingleton<PostgreSqlIdentityStore>();
         services.AddSingleton<IIdentityStore>(provider => provider.GetRequiredService<PostgreSqlIdentityStore>());

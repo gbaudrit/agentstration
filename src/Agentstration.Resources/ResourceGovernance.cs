@@ -21,6 +21,8 @@ public enum ResourceManagementAuthorityKind
 
 public sealed record ResourceOrigin
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? ResourceUid { get; init; }
     public required ResourceOriginKind Kind { get; init; }
     public string? Reference { get; init; }
     public string? Version { get; init; }
@@ -78,10 +80,11 @@ public sealed record ResourceGovernance
         }
     };
 
-    public static ResourceGovernance Extension(string installationReference, string extensionReference, string? version) => new()
+    public static ResourceGovernance Extension(string installationReference, string extensionReference, string? version, Guid? sourceUid = null) => new()
     {
         Origin = new ResourceOrigin
         {
+            ResourceUid = sourceUid,
             Kind = ResourceOriginKind.Extension,
             Reference = extensionReference,
             Version = version
@@ -176,6 +179,7 @@ public static class ResourceGovernanceEnforcement
         if (!governance.IsManaged) return;
         if (authority?.ManagedBy is not { } manager
             || manager.Kind != governance.ManagedBy!.Kind
+            || authority.Origin.ResourceUid != governance.Origin.ResourceUid
             || !string.Equals(manager.Reference, governance.ManagedBy.Reference, StringComparison.Ordinal))
             throw Violation("resource_managed", $"Resource content and lifecycle are managed by '{governance.ManagedBy!.Reference}'.");
     }
@@ -188,6 +192,7 @@ public static class ResourceGovernanceEnforcement
 
     private static bool SameIdentity(ResourceGovernance left, ResourceGovernance right) =>
         left.Origin.Kind == right.Origin.Kind
+        && left.Origin.ResourceUid == right.Origin.ResourceUid
         && string.Equals(left.Origin.Reference, right.Origin.Reference, StringComparison.Ordinal)
         && left.ManagedBy?.Kind == right.ManagedBy?.Kind
         && string.Equals(left.ManagedBy?.Reference, right.ManagedBy?.Reference, StringComparison.Ordinal);

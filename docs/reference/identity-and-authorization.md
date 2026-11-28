@@ -491,3 +491,7 @@ Tests require no Internet connection, external IdP, live model, or cloud service
 - [ADR-0046 — Platform administration is explicitly transferable](../decisions/0046-platform-administration-is-explicitly-transferable.md)
 - [ADR-0047 — External identities are explicitly linked to Principals](../decisions/0047-external-identities-are-explicitly-linked-to-principals.md)
 - [ADR-0070 — Personal access tokens are revocable Workspace delegations](../decisions/0070-personal-access-tokens-are-revocable-workspace-delegations.md)
+
+## Resource consumption and governed contributions
+
+Resource consumption policies are separate from identity roles and administrative RBAC. See [Resource and contribution access administration](resource-access-administration.md) for durable descendant rules, explicit exceptions, verified ToolSet inheritance, Extension eligibility and managed Tool activation.

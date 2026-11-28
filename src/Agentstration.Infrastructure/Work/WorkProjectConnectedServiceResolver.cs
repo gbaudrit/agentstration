@@ -13,7 +13,7 @@ namespace Agentstration.Infrastructure.Work;
 // Uses the delivered service inspector. Only standard, explicitly mapped target exports are read.
 public sealed partial class WorkProjectConnectedServiceResolver(IResourceStore resources, IConnectedServiceExportInspector services,
     IParameterResolver parameters, IRequestContextScopeFactory scopes, IConnectedServiceResolver? serviceResolver = null,
-    Agentstration.Tools.Mcp.IAepExtensionRegistrationResolver? nativeExtensions = null, Agentstration.Tools.Mcp.AepMcpTransport? nativeTransport = null)
+    Agentstration.Tools.Mcp.IAepExtensionRegistrationResolver? nativeExtensions = null, Agentstration.Tools.Mcp.AepMcpTransport? nativeTransport = null, ToolAccessService? toolAccess = null)
 {
     public async Task<Result<WorkProjectResolvedBinding>> ResolveAsync(WorkspaceId workspace, WorkProjectConnectionSelection selection,
         Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize,

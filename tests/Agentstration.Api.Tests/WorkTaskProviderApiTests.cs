@@ -112,7 +112,7 @@ public sealed class WorkTaskProviderApiTests
                 await tools.RefreshDiscoveryExactAsync(ResourceScopeRef.Workspace(context.WorkspaceId), "task-fixture", default, default);
                 var duplicate = (await tools.ListVisibleToolsAsync(ResourceScopeRef.Workspace(context.WorkspaceId), default))
                     .Single(value => value.Value.Definition.ExternalId == "task.duplicate");
-                await tools.SetToolEnabledAsync(duplicate.Value.Name, true, duplicate.ETag, default);
+                await tools.SetToolEnabledAsync(duplicate.Value.Name, true, (await tools.GetToolOperationalStateAsync(duplicate.Value, default))?.ETag, default);
                 using var stale = await http.GetAsync(prefix + "/task-provider?bindingName=tracker&operation=Publish");
                 Assert.AreEqual(HttpStatusCode.Conflict, stale.StatusCode);
                 var provider = (await tools.GetProviderExactAsync(ResourceScopeRef.Workspace(context.WorkspaceId), "task-fixture", default, default))!.Value;
@@ -173,7 +173,7 @@ public sealed class WorkTaskProviderApiTests
         }, null, true, default);
         await tools.RefreshDiscoveryExactAsync(scope, "task-fixture", default, default);
         var tool = (await tools.ListVisibleToolsAsync(scope, default)).Single(value => value.Value.Definition.ExternalId == "task.operations");
-        await tools.SetToolEnabledAsync(tool.Value.Name, true, tool.ETag, default);
+        await tools.SetToolEnabledAsync(tool.Value.Name, true, (await tools.GetToolOperationalStateAsync(tool.Value, default))?.ETag, default);
         return (await tools.GetProviderExactAsync(scope, "task-fixture", default, default))!.Value;
     }
 

@@ -16,7 +16,7 @@ using ModelContextProtocol;
 namespace Agentstration.Infrastructure.Work;
 
 public sealed class McpCodingProviderGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
-    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock) : ICodingProviderGateway
+    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock, ToolAccessService? toolAccess = null) : ICodingProviderGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, MaxDepth = 16 };
@@ -32,7 +32,7 @@ public sealed class McpCodingProviderGateway(IWorkProjectBindingResolver binding
         var access = await bindings.ResolveAsync(workspaceId, principalId, binding, token);
         if (!access.IsSuccess) return Failure(access.ErrorCode!);
         var tool = (await resources.GetExactAsync<ToolResource>(binding.Target.Address, token))?.Value;
-        if (tool is null || tool.Uid != binding.Target.Uid || tool.Generation != binding.Target.Generation || !tool.Definition.Enabled || tool.Definition.Discovery?.Available != true) return Failure("coding_provider_unavailable");
+        if (tool is null || tool.Uid != binding.Target.Uid || tool.Generation != binding.Target.Generation || !(toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) || tool.Definition.Discovery?.Available != true) return Failure("coding_provider_unavailable");
         if (tool.Definition.RequiresApproval) return Failure("coding_provider_approval_required");
         if (tool.ScopeRef is not { } scope || tool.Definition.ExternalId is not { } externalId
             || !tool.Definition.Metadata.TryGetValue("agentstration.toolPublicationUid", out var publicationId)

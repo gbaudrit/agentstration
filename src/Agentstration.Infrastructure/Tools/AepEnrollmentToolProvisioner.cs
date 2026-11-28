@@ -25,7 +25,7 @@ public sealed class AepEnrollmentToolProvisioner(
         using var governanceScope = governance.Push(ResourceGovernance.Extension(
             $"{scopeRef.Value}/{registration.Kind}/{registration.Namespace}/{registration.Name}",
             extensionId,
-            authenticatedManifest?.Extension.Version));
+            authenticatedManifest?.Extension.Version, registration.Uid));
         var extensionReference = new ResourceReference(registration.Name, scopeRef, registration.Namespace);
         var provider = new ToolProviderResource
         {

@@ -20,10 +20,13 @@ internal static class ToolProviderEndpoints
         providers.MapPut("/{providerName}", PutProviderAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         providers.MapPost("/{providerName}/test", TestAsync).RequireAuthorization(AgentstrationPolicies.CanExecuteRuns);
         providers.MapPost("/{providerName}/refresh", RefreshAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+        providers.MapGet("/{providerName}/administration", ProviderAdministrationAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         providers.MapGet("/{providerName}/tools", ListProviderToolsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
 
         var tools = endpoints.MapGroup("/api/tools");
         tools.MapGet("/", ListToolsAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        tools.MapGet("/{toolName}/activation", GetActivationAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        tools.MapPut("/administration/{parentUid:guid}/enabled", SetCollectionEnabledAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         tools.MapGet("/{toolName}", GetToolAsync).RequireAuthorization(AgentstrationPolicies.CanReadResources);
         tools.MapPut("/{toolName}/enabled", SetEnabledAsync).RequireAuthorization(AgentstrationPolicies.CanWriteResources);
         tools.MapPost("/{toolName}/run", RunToolAsync)
@@ -126,7 +129,17 @@ internal static class ToolProviderEndpoints
                         .Where(value => value.ScopeRef == workspace && names.Contains((value.Namespace, value.Name)))).DistinctBy(value => (value.ScopeRef, value.Address));
                 }
             }
-            if (enabled.HasValue) values = values.Where(value => value.Definition.Enabled == enabled.Value);
+            if (enabled.HasValue)
+            {
+                var matching = new List<ToolResource>();
+                foreach (var tool in values)
+                {
+                    using var stateScope = ToolsApiHttp.EnterOperationalWorkspace(tool.ScopeRef, current, scopes);
+                    var state = await service.GetToolOperationalStateAsync(tool, cancellationToken);
+                    if ((state?.Enabled ?? tool.Definition.Enabled) == enabled.Value) matching.Add(tool);
+                }
+                values = matching;
+            }
             if (available.HasValue) values = values.Where(value => value.Definition.Discovery?.Available == available.Value);
             return Results.Ok(new ValueResponse<ToolResource>(values.ToArray()));
         });
@@ -147,9 +160,30 @@ internal static class ToolProviderEndpoints
             return ToolsApiHttp.ResourceResult(stored, response, 200);
         });
 
-    private static Task<IResult> SetEnabledAsync(string toolName, string? @namespace, SetToolEnabledRequest body, HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
+    private static Task<IResult> ProviderAdministrationAsync(string providerName, string? scopeRef, string? resourceNamespace,
+        ToolManagementService service, ToolAdministrationService administration, CancellationToken token) =>
+        ToolsApiHttp.ExecuteAsync(async () => Results.Ok(await administration.GetProviderAsync(
+            (await FindProviderAsync(providerName, scopeRef, resourceNamespace, service, token)).Value, token)));
+
+    private static Task<IResult> GetActivationAsync(string toolName, string? scopeRef, string? @namespace,
+        ToolManagementService service, ToolAdministrationService administration, ICurrentRequestContext current, IRequestContextScopeFactory scopes, CancellationToken token) => ToolsApiHttp.ExecuteAsync(async () =>
+    {
+        using var operationalScope = ToolsApiHttp.EnterOperationalWorkspace(string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef), current, scopes);
+        var tool = string.IsNullOrWhiteSpace(scopeRef) ? await service.GetToolAsync(toolName, ResourceNamespace.Parse(@namespace), token)
+            : await service.GetToolExactAsync(ResourceScopeRef.Parse(scopeRef), toolName, ResourceNamespace.Parse(@namespace), token);
+        if (tool is null) throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, toolName));
+        return Results.Ok(await administration.GetAsync(tool.Value, token));
+    });
+
+    private static Task<IResult> SetCollectionEnabledAsync(Guid parentUid, SetToolCollectionEnabledRequest body,
+        ToolAdministrationService administration, CancellationToken token) => ToolsApiHttp.ExecuteAsync(async () =>
+        Results.Ok(await administration.SetCollectionEnabledAsync(parentUid, body.MembershipToken, body.Enabled, body.StateETags, body.ToolUids, token)));
+
+    private static Task<IResult> SetEnabledAsync(string toolName, string? @namespace, string? scopeRef, SetToolEnabledRequest body,
+        HttpRequest request, HttpResponse response, ToolManagementService service, CancellationToken cancellationToken) =>
         ToolsApiHttp.ExecuteAsync(async () => ToolsApiHttp.ResourceResult(
-            await service.SetToolEnabledAsync(ToolManagementService.ToolId(toolName), ResourceNamespace.Parse(@namespace), body.Enabled, ToolsApiHttp.IfMatch(request), cancellationToken), response, 200));
+            await service.SetToolEnabledExactAsync(string.IsNullOrWhiteSpace(scopeRef) ? null : ResourceScopeRef.Parse(scopeRef),
+                ToolManagementService.ToolId(toolName), ResourceNamespace.Parse(@namespace), body.Enabled, ToolsApiHttp.IfMatch(request), cancellationToken), response, 200));
 
     private static Task<IResult> RunToolAsync(
         string toolName,
