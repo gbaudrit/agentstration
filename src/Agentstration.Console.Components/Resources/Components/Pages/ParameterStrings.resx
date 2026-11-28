@@ -5,4 +5,5 @@
 <data name="RefreshDraftConflict"><value>The saved Parameter changed. Your draft and its original version are retained; discard the draft to load the newer saved value.</value></data>
 <data name="IdentityMismatch"><value>The returned Parameter does not match the requested identity.</value></data>
 <data name="YamlExport"><value>This YAML view exports the saved Parameter. Edit its definition through the form.</value></data>
+  <data name="ValueType.Array" xml:space="preserve"><value>JSON array</value></data>
 </root>

@@ -12,6 +12,8 @@ builder.Services.AddSingleton<IValidateOptions<OpenApiOptions>, OpenApiOptionsVa
 builder.Services.AddOptions<OpenApiOptions>()
     .Bind(builder.Configuration.GetSection(OpenApiOptions.SectionName))
     .ValidateOnStart();
+builder.Services.AddSingleton<OpenApiOperationalConfiguration>();
+builder.Services.AddSingleton<IAepOperationalConfiguration>(sp => sp.GetRequiredService<OpenApiOperationalConfiguration>());
 builder.Services.AddSingleton<IOpenApiAddressResolver, SystemOpenApiAddressResolver>();
 builder.Services.AddSingleton<OpenApiDestinationPolicy>();
 builder.Services.AddSingleton<OpenApiContractParser>();
@@ -27,6 +29,7 @@ builder.Services.AddHttpClient<OpenApiService>()
     });
 builder.Services.AddAgentstrationAep(options =>
 {
+    options.OperationalConfigurationEnabled = true;
     options.Extension = new AepExtensionIdentity(
         "Agentstration.Extensions.OpenApi", "OpenAPI Discovery and Acquisition", extensionVersion,
         "Bounded governed OpenAPI 3.0 and 3.1 contract discovery and explicit operation invocation.");

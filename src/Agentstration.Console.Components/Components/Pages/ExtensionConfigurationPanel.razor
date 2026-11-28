@@ -1,0 +1,181 @@
+@using Microsoft.AspNetCore.Components.Sections
+@using Agentstration.Models
+@using Agentstration.Parameters
+@using Agentstration.Secrets
+@using Agentstration.Secrets.Contracts
+@using Agentstration.Secrets.Abstractions
+@using Agentstration.Web.Components.Values
+@implements IDisposable
+@inject IExtensionsClient Client
+@inject IParametersClient ParametersClient
+@inject ISecretsClient SecretsClient
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ExtensionStrings> Localizer
+
+<section class="panel resource-section" data-testid="extension-installation-configuration">
+    <div class="panel-header"><div><h2>@T("Installation.Title")</h2><p>@T("Installation.Description")</p></div></div>
+    @if (error is not null) { <div class="form-alert form-alert-danger" role="alert">@error</div> }
+    @if (loading) { <p role="status">@T("Installation.Loading")</p> }
+    else if (view?.Contract is not { } contract)
+    {
+        <p>@T(view?.Supported == true ? "Installation.Unavailable" : "Installation.Unsupported")</p>
+        <button type="button" class="button-secondary" @onclick="ReloadAsync" disabled="@busy">@T("Installation.Refresh")</button>
+    }
+    else
+    {
+        <dl class="resource-details">
+            <dt>@T("Installation.Contract")</dt><dd><code>@contract.Id@@@contract.Version</code></dd>
+            <dt>@T("Installation.State")</dt><dd role="status">@T(view.Configuration is null ? view.Ready ? "Installation.HostDefaults" : "Installation.Unconfigured" : "Installation.State." + view.Configuration.Observation.State)</dd>
+            <dt>@T("Installation.Readiness")</dt><dd>@T(view.Ready ? "Installation.Ready" : "Installation.NotReady")</dd>
+            <dt>@T("Installation.DesiredRevision")</dt><dd>@(view.Configuration?.Generation.ToString() ?? "—")</dd>
+            <dt>@T("Installation.AppliedRevision")</dt><dd>@(view.Configuration?.Observation.AppliedGeneration?.ToString() ?? "—")</dd>
+        </dl>
+        @if (view.Configuration?.Observation.Diagnostic is not null) { <p class="inline-warning">@T("Installation.DeliveryPending")</p> }
+        <UnsavedNavigationGuard IsDirty="@Dirty" />
+        <EditForm Model="selections" OnValidSubmit="SaveAsync" FormName="extension-installation-options">
+            <ValidationSummary />
+            <div class="binding-requirements">
+                @foreach (var option in contract.Options)
+                {
+                    <div @key="option.Id">
+                        <p><strong>@option.Id</strong> · @T("Installation.Scope." + option.Scope) · @T("Installation.Apply." + option.ApplyMode)</p>
+                        @if (!option.Secured && view.AppliedValues.TryGetValue(option.Id, out var applied))
+                        { <p>@T("Installation.AppliedValue"): <code>@applied.GetRawText()</code></p> }
+                        <ValueBindingRequirementEditor Requirement="@Requirement(option)" AllowedSources="@Sources(option)" Options="@Options(option)"
+                            Selection="@selections[option.Id]" SelectionChanged="value => ChangedAsync(option.Id, value)"
+                            CreationContext="@CreationContext(option)" ResourceCreated="ValueCreatedAsync"
+                            ValidationField="@(new FieldIdentifier(selections, option.Id))" Disabled="@(!CanManage || busy || !SupportedMode(option))"
+                            TestIdPrefix="@("extension-option-" + option.Id)" DialogSectionId="@option" />
+                    </div>
+                }
+            </div>
+            <FormActions>
+                <button type="button" class="button-secondary" @onclick="DiscardAsync" disabled="@busy">@T("Installation.Discard")</button>
+                <button type="submit" class="button-primary" disabled="@(!CanManage || busy || contract.Options.Any(o => !SupportedMode(o)))">@T("Installation.Save")</button>
+                @if (view.Configuration is not null && !Dirty)
+                { <button type="button" class="button-secondary" @onclick="ApplyAsync" disabled="@(!CanManage || busy)">@T("Installation.Apply")</button> }
+            </FormActions>
+        </EditForm>
+        @foreach (var option in contract.Options) { <SectionOutlet SectionId="@option" /> }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string RegistrationName { get; set; } = string.Empty;
+    [Parameter] public ResourceNamespace ResourceNamespace { get; set; } = ResourceNamespace.Default;
+    [Parameter] public Guid RegistrationUid { get; set; }
+    [Parameter] public string? ContextKey { get; set; }
+    [Parameter] public bool CanManage { get; set; }
+    [Parameter] public EventCallback<bool> DraftChanged { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private ExtensionConfigurationView? view;
+    private IReadOnlyList<ParameterResource> parameters = [];
+    private IReadOnlyList<SecretResponse> secrets = [];
+    private Dictionary<string, ValueBindingSelection> selections = new(StringComparer.Ordinal);
+    private string? loadedKey, baseline, error;
+    private bool loading, busy, disposed;
+    private long epoch;
+    private string Key => $"{RegistrationUid}|{ResourceNamespace}|{RegistrationName}|{ContextKey}|{CanManage}";
+    private string Fingerprint => JsonSerializer.Serialize(selections);
+    private bool Dirty => baseline is not null && baseline != Fingerprint;
+    private string T(string key) => Localizer[key].Value;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedKey == Key) return;
+        loadedKey = Key;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var request = ++epoch;
+        var key = Key;
+        view = null; selections.Clear(); baseline = null; error = null; busy = false; loading = true;
+        await DraftChanged.InvokeAsync(false);
+        try
+        {
+            var snapshot = await Client.GetConfigurationAsync(ResourceNamespace, RegistrationName, lifetime.Token);
+            if (!Current(request, key)) return;
+            if (snapshot.Configuration is { } resource && (resource.ScopeRef != ResourceScopeRef.Instance
+                || resource.Definition.RegistrationUid != RegistrationUid || resource.Namespace != ResourceNamespace))
+                throw new InvalidOperationException();
+            view = snapshot;
+            if (snapshot.Contract is not null) { await LoadValuesAsync(); if (!Current(request, key)) return; Adopt(); }
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception) { if (Current(request, key)) { view = null; error = T("Installation.LoadFailed"); } }
+        finally { if (Current(request, key)) loading = false; }
+    }
+    private bool Current(long request, string key) => !disposed && request == epoch && key == Key;
+    private async Task LoadValuesAsync()
+    {
+        var request = epoch; var key = Key;
+        var includeSecrets = view?.Contract?.Options.Any(o => o.AllowedSources.Contains("Secret")) == true;
+        var loadedParameters = await ParametersClient.GetParametersAsync(ResourceScopeRef.Instance, lifetime.Token);
+        var loadedSecrets = includeSecrets ? await SecretsClient.GetSecretsAsync(ResourceScopeRef.Instance, lifetime.Token) : [];
+        if (!Current(request, key)) return;
+        parameters = loadedParameters; secrets = loadedSecrets;
+    }
+    private void Adopt()
+    {
+        selections = new(StringComparer.Ordinal);
+        foreach (var option in view!.Contract!.Options)
+        {
+            var binding = view.Configuration?.Definition.Bindings.SingleOrDefault(b => b.RequirementId == option.Id);
+            selections[option.Id] = binding is null
+                ? new(!option.Required && !view.AppliedValues.ContainsKey(option.Id) ? ValueBindingSourceKind.Omitted : Sources(option).First(), Literal: !option.Secured && view.AppliedValues.TryGetValue(option.Id, out var initial) ? initial : null)
+                : binding.Kind switch
+                {
+                    ModelProviderValueBindingKind.Parameter => new(ValueBindingSourceKind.Parameter,
+                        new(binding.Parameter!.ScopeRef, binding.Parameter.Address.Namespace, binding.Parameter.Address.Kind, binding.Parameter.Address.Name)),
+                    ModelProviderValueBindingKind.Secret => new(ValueBindingSourceKind.Secret,
+                        new(binding.Secret!.ScopeRef!.Value, binding.Secret.Address.Namespace, binding.Secret.Address.Kind, binding.Secret.Address.Name)),
+                    _ => new(ValueBindingSourceKind.Literal, Literal: binding.Literal)
+                };
+        }
+        baseline = Fingerprint;
+    }
+    private async Task ChangedAsync(string id, ValueBindingSelection value)
+    { selections[id] = value; await DraftChanged.InvokeAsync(Dirty); }
+    private static bool SupportedMode(ExtensionConfigurationOption option) => option.Scope == "Process" && option.ApplyMode == "Immediate";
+    private static string Type(ExtensionConfigurationOption option) => option.Schema.TryGetProperty("type", out var type) ? type.GetString()! : "string";
+    private static ValueBindingRequirement Requirement(ExtensionConfigurationOption option) => new(option.Id, option.Required, Type(option), option.Secured, LiteralSchema: option.Schema);
+    private static IReadOnlyList<ValueBindingSourceKind> Sources(ExtensionConfigurationOption option) => option.AllowedSources
+        .Select(s => Enum.Parse<ValueBindingSourceKind>(s)).Where(s => !option.Secured || s == ValueBindingSourceKind.Secret)
+        .Concat(option.Required ? [] : new[] { ValueBindingSourceKind.Omitted }).ToArray();
+    private IReadOnlyList<ValueBindingOption> Options(ExtensionConfigurationOption option) => parameters
+        .Where(p => p.ScopeRef == ResourceScopeRef.Instance && p.Definition.ValueType == ParameterType(Type(option)))
+        .Select(p => new ValueBindingOption(ValueBindingSourceKind.Parameter, new(ResourceScopeRef.Instance, p.Namespace, p.Kind, p.Name), p.Definition.DisplayName))
+        .Concat(secrets.Where(s => s.Resource.ScopeRef == ResourceScopeRef.Instance).Select(s => new ValueBindingOption(ValueBindingSourceKind.Secret,
+            new(ResourceScopeRef.Instance, s.Resource.Namespace, s.Resource.Kind, s.Resource.Name), s.Resource.Definition.DisplayName))).ToArray();
+    private static ParameterValueType? ParameterType(string type) => type switch
+    { "array" => ParameterValueType.Array, "string" => ParameterValueType.Text, "integer" => ParameterValueType.WholeNumber, "number" => ParameterValueType.DecimalNumber, "boolean" => ParameterValueType.Logical, _ => null };
+    private ContextualValueCreationContext CreationContext(ExtensionConfigurationOption option) => new(ResourceScopeRef.Instance,
+        SecretEditorModel.IdentifierFromDisplayName($"ext-{RegistrationName}-{option.Id}"), option.Id,
+        ValueType: ParameterType(Type(option)), Namespace: ResourceNamespace.Default);
+    private async Task ValueCreatedAsync(ScopedResourceAddress address) => await LoadValuesAsync();
+    private async Task DiscardAsync() { Adopt(); error = null; await DraftChanged.InvokeAsync(false); }
+    private Task SaveAsync() => CommandAsync(false);
+    private Task ApplyAsync() => CommandAsync(true);
+    private async Task CommandAsync(bool apply)
+    {
+        if (busy || !CanManage || view?.Contract is not { } contract) return;
+        var request = epoch; var key = Key; busy = true; error = null;
+        try
+        {
+            var bindings = selections.Where(p => p.Value.Kind != ValueBindingSourceKind.Omitted).Select(p => p.Value.Kind switch
+            {
+                ValueBindingSourceKind.Literal when p.Value.Literal is { } literal => ModelProviderValueBinding.FromLiteral(p.Key, literal),
+                ValueBindingSourceKind.Parameter when p.Value.Resource is { } parameter => ModelProviderValueBinding.FromParameter(p.Key, new(parameter.Address, parameter.ScopeRef)),
+                ValueBindingSourceKind.Secret when p.Value.Resource is { } secret => ModelProviderValueBinding.FromSecret(p.Key, new(secret.Address, secret.ScopeRef)),
+                _ => throw new InvalidOperationException()
+            }).ToArray();
+            var saved = apply ? await Client.ApplyConfigurationAsync(ResourceNamespace, RegistrationName, view.ETag!, lifetime.Token)
+                : await Client.PutConfigurationAsync(ResourceNamespace, RegistrationName, new(contract.Id, contract.Version, contract.SchemaDigest, bindings), view.ETag, lifetime.Token);
+            if (!Current(request, key)) return;
+            view = saved; Adopt(); await DraftChanged.InvokeAsync(false);
+        }
+        catch (Exception) { if (Current(request, key)) error = T("Installation.SaveFailed"); }
+        finally { if (Current(request, key)) busy = false; }
+    }
+    public void Dispose() { disposed = true; lifetime.Cancel(); lifetime.Dispose(); }
+}

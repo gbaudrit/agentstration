@@ -5,6 +5,7 @@ namespace Agentstration.Extensions.Contracts;
 
 public static class ExtensionKinds
 {
+    public const string ExtensionConfiguration = "ExtensionConfiguration";
     public const string ExtensionRegistration = "ExtensionRegistration";
     public const string ExtensionBundleInstallation = "ExtensionBundleInstallation";
     public const string AepEnrollmentSettings = "AepEnrollmentSettings";

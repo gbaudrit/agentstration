@@ -37,15 +37,16 @@ public sealed class RegistrationContractTests
         var contributions = new Dictionary<Type, (int Count, ServiceLifetime Lifetime)>
         {
             [typeof(ISecretVaultProvider)] = (2, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Secrets.ISecretUsageProvider)] = (2, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = (2, ServiceLifetime.Singleton),
             [typeof(IBootstrapContributionResourceResolver)] = (4, ServiceLifetime.Singleton),
-            [typeof(IBootstrapResourceHandler)] = (30, ServiceLifetime.Scoped),
+            [typeof(IBootstrapResourceHandler)] = (31, ServiceLifetime.Scoped),
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = (7, ServiceLifetime.Singleton),
             [typeof(Agentstration.Schemas.ISchemaFormatHandler)] = (3, ServiceLifetime.Singleton),
             [typeof(IPackResourceHandler)] = (11, ServiceLifetime.Singleton),
             [typeof(IAepEnrollmentResourceProvisioner)] = (5, ServiceLifetime.Singleton),
-            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (3, ServiceLifetime.Singleton),
+            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = (4, ServiceLifetime.Singleton),
             [typeof(IToolExecutionEventSink)] = (2, ServiceLifetime.Singleton),
             [typeof(IInternalMcpToolDefinitionProvider)] = (56, ServiceLifetime.Singleton),
             [typeof(IInternalMcpToolHandler)] = (56, ServiceLifetime.Singleton),

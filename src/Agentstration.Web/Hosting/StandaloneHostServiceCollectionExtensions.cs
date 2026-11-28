@@ -1,6 +1,7 @@
 using Agentstration.Application.Work;
 using Agentstration.Extensions;
 using Agentstration.Extensions.Aep;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Flows.Application;
 using Agentstration.Http.Diagnostics;
 using Agentstration.Identity;
@@ -55,6 +56,12 @@ internal static class StandaloneHostServiceCollectionExtensions
         services.AddSingleton<ResourceScopeInventoryService>();
         services.AddSingleton<ExtensionManagementService>();
         services.AddSingleton<ExtensionInventoryService>();
+        services.AddSingleton<ExtensionConfigurationService>();
+        services.AddSingleton<IExtensionConfigurationService>(sp => sp.GetRequiredService<ExtensionConfigurationService>());
+        services.AddSingleton<IExtensionConfigurationSynchronizer>(sp => sp.GetRequiredService<ExtensionConfigurationService>());
+        services.AddHttpClient("agentstration-aep-configuration", client => client.Timeout = TimeSpan.FromSeconds(30))
+            .ConfigurePrimaryHttpMessageHandler(sp => Agentstration.Aep.Client.AepSecureHttpMessageHandler.Create(
+                sp.GetRequiredService<Agentstration.Aep.Client.AepTransportSecurityOptions>()));
         var policyOptions = configuration
             .GetSection(AepEnrollmentPolicyOptions.SectionName)
             .Get<AepEnrollmentPolicyOptions>() ?? new();

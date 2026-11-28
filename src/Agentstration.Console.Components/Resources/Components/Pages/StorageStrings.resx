@@ -258,4 +258,5 @@
   <data name="DescendantUsePolicy" xml:space="preserve"><value>Descendant use policy</value></data>
   <data name="Availability.Unknown" xml:space="preserve"><value>Not observed</value></data>
   <data name="Type.Browse" xml:space="preserve"><value>Storage types</value></data>
+  <data name="ValueType.Array" xml:space="preserve"><value>JSON array</value></data>
 </root>

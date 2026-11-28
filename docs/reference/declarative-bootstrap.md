@@ -494,13 +494,14 @@ variables use double underscores in place of colons):
 }
 ```
 
-Start the OpenAPI extension separately with `OpenApi:AllowedDomains:0=example.invalid`,
-`Aep:EnrollmentMode=SharedKeyFile`,
+Start the OpenAPI extension separately with `Aep:EnrollmentMode=SharedKeyFile`,
 `Aep:SharedKeyFile:Path` pointing to that same key file,
 `Aep:SharedKeyFile:AuthorityUrl` pointing to the orchestrated server's HTTP
 endpoint, `Aep:SharedKeyFile:PublicEndpoint` pointing to its own reachable
 endpoint, and a durable `Aep:SharedKeyFile:StateFile`. For local HTTP, explicitly
-set `Aep:SharedKeyFile:AllowInsecureHttp=true`. Use stable externally advertised
+set `Aep:SharedKeyFile:AllowInsecureHttp=true`. `OpenApi:AllowedDomains` can remain unset
+for enrollment; a fresh installation denies outbound destinations until an allowlist
+is applied through Extensions or Bootstrap. Use stable externally advertised
 ports when retaining an installation across orchestration restarts. Start AppHost
 with a Bootstrap-enabled profile and override the ordinary profile's PairingCode
 mode with `-- --Agentstration:Aep:EnrollmentMode SharedKeyFile`. `https-NoBootstrap` continues to
@@ -1058,3 +1059,50 @@ the existing discovery boundary. Stable instruction keys reconnect to unfinished
 runs or reuse completed evidence. Process restarts retain existing Interrupted
 semantics; there is no automatic replay, rollback, consumer repinning or operation
 reactivation.
+
+## Instance extension configuration
+
+An Instance profile can configure an authenticated installation using its public
+extension selector. Existing extension-reference preparation and bounded waits resolve
+it to the exact registration. Multiple installations require an explicit installation
+selector; no name fallback is allowed. The option contract id/version are authored;
+its actual descriptor digest is pinned at application (an optional explicit
+`schemaDigest` can require an exact known contract).
+
+```yaml
+apiVersion: agentstration.io/v1
+kind: ExtensionConfiguration
+metadata:
+  name: openapi-options
+  namespace: default
+definition:
+  extension:
+    id: Agentstration.Extensions.OpenApi
+  optionSet: io.agentstration.openapi/installation
+  version: 1.0.0
+  bindings:
+    - requirementId: AllowedDomains
+      kind: literal
+      literal:
+        - data.nantesmetropole.fr
+```
+
+Use the existing `ExtensionEnrollmentPolicy` earlier in the Instance topology phase
+when automatic SharedKeyFile enrollment is wanted. This resource does not establish
+trust from an arbitrary endpoint or bypass PairingCode authentication. Its handler
+is Instance-only. Preview discovers/validates the contract but never applies settings;
+existing infrastructure reports unresolved extension dependencies before application.
+
+`kind: parameter` uses an exact `parameter` reference (`address` with namespace/kind/name,
+plus `scopeRef: /instance`); the Parameter's `valueType: array` stores a JSON list,
+limited to 128 elements and the normal 65,536-byte bound. `kind: secret` uses an exact
+`secret` reference for options that permit it. Secured options cannot use literal
+values. Create protected inputs through existing Secret/configuration initializers;
+never embed Secret values in `ExtensionConfiguration` documents.
+
+Application delegates to the same configuration service as Extensions. A repeat keeps
+existing operator-edited desired values and Secret versions; it does not overwrite
+configuration with the profile defaults. Pending delivery is retried using the saved
+configuration. Unconfirmed activation reports a failure/pending diagnostic rather
+than allowing the profile to claim activation. This handler does not restart an
+extension or implement the later multi-scope enrollment orchestration from #1396.

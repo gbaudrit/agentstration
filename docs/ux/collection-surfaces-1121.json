@@ -18510,6 +18510,11 @@
       "reason": "Functional collections are enumerated in the surface entries, including the compact-rollout reconciliation. Fixed navigation, tabs, enum options and schema-generated form fields remain controls, not extra collections."
     },
     {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ExtensionConfigurationPanel.razor",
+      "classification": "non-collection-control",
+      "reason": "Installation option fields generated from the extension contract and their contextual value-creation dialog outlets belong to one configuration form."
+    },
+    {
       "source": "src/Agentstration.Console.Components/Components/Pages/SourceProviderDetails.razor",
       "classification": "inventoried",
       "reason": "Functional collections are mapped above; surrounding fixed form/enum/navigation options retain native semantics."

@@ -1,13 +1,15 @@
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.Client;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Resources;
 using Agentstration.Secrets.Abstractions;
 using Agentstration.Sources.Contracts;
 
 namespace Agentstration.ModelProviders;
 
 public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients, ISecretResolver? secrets = null,
-    IRequestContextScopeFactory? requestScopes = null) : ISourceProviderMaterializer
+    IRequestContextScopeFactory? requestScopes = null, IExtensionConfigurationSynchronizer? configurationSynchronizer = null) : ISourceProviderMaterializer
 {
     public async Task<ResolvedSourceRevision> ResolveAsync(
         SourceProviderInvocation invocation,
@@ -15,6 +17,8 @@ public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients
     {
         try
         {
+            if (configurationSynchronizer is not null && !string.IsNullOrWhiteSpace(invocation.ExtensionName))
+                await configurationSynchronizer.EnsureAsync(new ResourceReference(invocation.ExtensionName, invocation.ExtensionScopeRef), invocation.Namespace, cancellationToken);
             var result = await Client(invocation).ResolveAsync(
                 new(Map(invocation.Configuration)), cancellationToken);
             return new(result.Revision, new(result.Integrity.Algorithm, result.Integrity.Digest));
@@ -33,6 +37,8 @@ public sealed class AepSourceProviderMaterializer(IHttpClientFactory httpClients
     {
         try
         {
+            if (configurationSynchronizer is not null && !string.IsNullOrWhiteSpace(invocation.ExtensionName))
+                await configurationSynchronizer.EnsureAsync(new ResourceReference(invocation.ExtensionName, invocation.ExtensionScopeRef), invocation.Namespace, cancellationToken);
             var result = await Client(invocation).MaterializeAsync(new(
                 Map(invocation.Configuration),
                 revision,

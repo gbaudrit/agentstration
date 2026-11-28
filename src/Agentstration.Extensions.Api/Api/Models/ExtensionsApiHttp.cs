@@ -1,4 +1,6 @@
+using Agentstration.Aep.Client;
 using Agentstration.Extensions;
+using Agentstration.Extensions.Contracts;
 using Agentstration.ResourceManagement;
 using Agentstration.Resources;
 
@@ -15,6 +17,8 @@ internal static class ExtensionsApiHttp
         catch (ExtensionRegistrationValidationException exception) { return Results.Problem(statusCode: 422, title: "extension-registration-invalid", detail: exception.Message); }
         catch (ResourceNotFoundException exception) { return Results.Problem(statusCode: 404, title: "resource-not-found", detail: exception.Message); }
         catch (ResourceConcurrencyException exception) { return Results.Problem(statusCode: 409, title: "resource-version-conflict", detail: exception.Message); }
+        catch (ExtensionConfigurationException exception) { return Results.Problem(statusCode: 422, title: exception.Code); }
+        catch (AepProtocolException) { return Results.Problem(statusCode: 503, title: "configuration_extension_unavailable"); }
         catch (ArgumentException exception) { return Results.Problem(statusCode: 400, title: "validation-failed", detail: exception.Message); }
     }
 

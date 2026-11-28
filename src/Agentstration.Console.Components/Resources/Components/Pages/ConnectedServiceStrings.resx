@@ -176,4 +176,5 @@
   <data name="OperationServiceRevision" xml:space="preserve"><value>Saved Connected Service revision</value></data>
   <data name="OperationDefinitionDigest" xml:space="preserve"><value>Definition digest</value></data>
   <data name="OperationProvenance" xml:space="preserve"><value>Discovery manifest and timestamp</value></data>
+  <data name="ValueType.Array" xml:space="preserve"><value>JSON array</value></data>
 </root>
