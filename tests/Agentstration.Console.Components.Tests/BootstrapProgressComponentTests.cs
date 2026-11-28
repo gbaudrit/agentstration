@@ -237,8 +237,8 @@ public sealed class BootstrapProgressComponentTests
     }
 
     [TestMethod]
-    [DataRow("en-US", "Remote bootstrap")]
-    [DataRow("fr-FR", "Amorçage distant")]
+    [DataRow("en-US", "Remote bootstrapping")]
+    [DataRow("fr-FR", "Bootstraping distant")]
     public void RemoteBootstrapOpensFromTheCatalogHeaderAndKeepsInspectionSeparateFromApplication(string cultureName, string action)
     {
         using var culture = new TestCultureScope(cultureName);

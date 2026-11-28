@@ -15,9 +15,18 @@
             <ClearableText Type="url" @bind-Value="url" @bind-Value:after="InputChanged" maxlength="2048" Disabled="@(Busy || reading)" data-testid="workspace-seed-url" />
         </FormField>
         <FormField Label="@Localizer["Seed.Archive"]" Id="@(id + "-archive")">
-            <InputFile id="@(id + "-archive")" OnChange="ReadArchiveAsync" accept=".zip,application/zip" disabled="@(Busy || reading)" />
+            <div class="remote-bootstrap-upload @(Busy || reading ? "is-disabled" : null)">
+                <InputFile id="@(id + "-archive")" OnChange="ReadArchiveAsync" accept=".zip,application/zip" disabled="@(Busy || reading)" aria-describedby="@(id + "-archive-help")" />
+                <span class="remote-bootstrap-upload-icon" aria-hidden="true"><UiIcon Name="upload" /></span>
+                <span class="remote-bootstrap-upload-copy" aria-hidden="true">
+                    <strong>@Localizer["Remote.ChooseArchive"]</strong>
+                    @if (archiveName is not null) { <span class="remote-bootstrap-file">@archiveName</span> }
+                    else { <span>@Localizer["Remote.NoArchive"]</span> }
+                </span>
+                <span class="remote-bootstrap-upload-format" aria-hidden="true">ZIP</span>
+            </div>
+            <small id="@(id + "-archive-help")" class="remote-bootstrap-upload-help">@Localizer["Remote.ArchiveLimit", WorkspaceSeedFormat.MaximumArchiveBytes / (1024 * 1024)]</small>
         </FormField>
-        @if (archiveName is not null) { <p class="remote-bootstrap-file">@archiveName</p> }
         @if (inputError || Error is not null) { <p class="error-panel" role="alert">@(inputError ? Localizer["Seed.InputInvalid"].Value : Error)</p> }
         <FormActions>
             <button type="button" class="button-secondary" disabled="@(Busy || reading)" @onclick="OnClose">@Localizer["Cancel"]</button>

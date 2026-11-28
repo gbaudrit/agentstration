@@ -105,15 +105,15 @@
   <data name="SourceFile" xml:space="preserve"><value>Fichier du profil</value></data>
   <data name="Seed.Help" xml:space="preserve"><value>Sélectionnez un Workspace existant et fournissez une seule entrée : un paquet ZIP (4 Mio maximum), un document pointeur YAML brut ou son URL HTTPS publique. Les capacités installées et les autorisations doivent être disponibles.</value></data>
   <data name="Seed.Workspace" xml:space="preserve"><value>Workspace cible</value></data>
-  <data name="Seed.Document" xml:space="preserve"><value>Document d’amorce brut (YAML)</value></data>
-  <data name="Seed.Url" xml:space="preserve"><value>URL du document d’amorce (HTTPS .yaml/.yml)</value></data>
-  <data name="Seed.Archive" xml:space="preserve"><value>Paquet d’amorce complet (.zip)</value></data>
-  <data name="Seed.Ingest" xml:space="preserve"><value>Inspecter l’amorce</value></data>
-  <data name="Seed.Clear" xml:space="preserve"><value>Changer d’amorce</value></data>
+  <data name="Seed.Document" xml:space="preserve"><value>Document de bootstrap (YAML)</value></data>
+  <data name="Seed.Url" xml:space="preserve"><value>URL du document de bootstrap (HTTPS .yaml/.yml)</value></data>
+  <data name="Seed.Archive" xml:space="preserve"><value>Paquet de bootstrap (.zip)</value></data>
+  <data name="Seed.Ingest" xml:space="preserve"><value>Inspecter le bootstrap</value></data>
+  <data name="Seed.Clear" xml:space="preserve"><value>Changer de bootstrap</value></data>
   <data name="Seed.Pinned" xml:space="preserve"><value>Version {0} · révision du fournisseur {1}</value></data>
   <data name="Seed.InputInvalid" xml:space="preserve"><value>Sélectionnez un Workspace et fournissez une entrée valide respectant la taille maximale documentée.</value></data>
-  <data name="Seed.Failed" xml:space="preserve"><value>L’amorce n’a pas pu être inspectée ou appliquée. Vérifiez son contenu, sa cible et ses prérequis, puis réessayez.</value></data>
-  <data name="Seed.Review" xml:space="preserve"><value>Provenance de l’amorce et synchronisation</value></data>
+  <data name="Seed.Failed" xml:space="preserve"><value>Le bootstrap n’a pas pu être inspecté ou appliqué. Vérifiez son contenu, sa cible et ses prérequis, puis réessayez.</value></data>
+  <data name="Seed.Review" xml:space="preserve"><value>Provenance du bootstrap et synchronisation</value></data>
   <data name="Seed.ArchiveDigest" xml:space="preserve"><value>SHA-256 de l’archive</value></data>
   <data name="Seed.Prerequisites" xml:space="preserve"><value>Prérequis installés</value></data>
   <data name="Seed.Available" xml:space="preserve"><value>Disponible</value></data>
@@ -151,7 +151,10 @@
   <data name="Seed.ConnectionRequirements" xml:space="preserve"><value>Déclarations de connexion partagées vérifiées</value></data>
   <data name="Seed.ConnectionPublication" xml:space="preserve"><value>Publication des déclarations de connexion</value></data>
   <data name="Diagnostic.bootstrap_work_project_contract_missing" xml:space="preserve"><value>La contribution sélectionnée ne fournit pas le contrat de connexion requis.</value></data>
-  <data name="Remote.Title" xml:space="preserve"><value>Amorçage distant</value></data>
+  <data name="Remote.Title" xml:space="preserve"><value>Bootstraping distant</value></data>
   <data name="Remote.Inspecting" xml:space="preserve"><value>Inspection…</value></data>
-  <data name="Remote.Selected" xml:space="preserve"><value>Amorce distante sélectionnée</value></data>
+  <data name="Remote.Selected" xml:space="preserve"><value>Paquet de bootstrap distant sélectionné</value></data>
+  <data name="Remote.ChooseArchive" xml:space="preserve"><value>Choisir un paquet ZIP</value></data>
+  <data name="Remote.NoArchive" xml:space="preserve"><value>Aucun paquet sélectionné</value></data>
+  <data name="Remote.ArchiveLimit" xml:space="preserve"><value>Fichier .zip · {0} Mio maximum</value></data>
 </root>

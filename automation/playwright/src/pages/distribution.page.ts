@@ -37,6 +37,11 @@ export class DistributionPage {
     const dialog = this.page.getByRole('dialog', { name: labels.title, exact: true });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole('textbox', { name: labels.document, exact: true })).toBeVisible();
+    const archive = dialog.getByLabel(labels.archive, { exact: true });
+    await archive.focus();
+    await expect(archive).toBeFocused();
+    await archive.press('Tab');
+    await expect(dialog.getByRole('button', { name: labels.cancel, exact: true })).toBeFocused();
     const bounds = await dialog.boundingBox();
     const viewport = this.page.viewportSize();
     expect(bounds && viewport && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width).toBeTruthy();

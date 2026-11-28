@@ -8,8 +8,8 @@ namespace Agentstration.Web.Tests;
 public sealed class RemoteBootstrapDialogTests
 {
     [TestMethod]
-    [DataRow("en-US", "Remote bootstrap", "Instance")]
-    [DataRow("fr-FR", "Amorçage distant", "Tenant")]
+    [DataRow("en-US", "Remote bootstrapping", "Instance")]
+    [DataRow("fr-FR", "Bootstraping distant", "Tenant")]
     public void HostSuppliesTheTargetWithoutAWorkspaceAssumption(string cultureName, string title, string target)
     {
         using var culture = new TestCultureScope(cultureName);
@@ -20,6 +20,23 @@ public sealed class RemoteBootstrapDialogTests
         Assert.Contains(target, cut.Markup);
         Assert.HasCount(0, cut.FindAll("select"));
         Assert.IsTrue(cut.Find("button.button-primary").HasAttribute("disabled"));
+    }
+
+    [TestMethod]
+    [DataRow("en-US", "Choose a ZIP package", "No package selected", ".zip file · up to 4 MiB")]
+    [DataRow("fr-FR", "Choisir un paquet ZIP", "Aucun paquet sélectionné", "Fichier .zip · 4 Mio maximum")]
+    public void ArchiveCardLocalizesItsActionAndKeepsTheNativeInputLabelled(string cultureName, string action, string empty, string limit)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        using var context = Context();
+        var cut = context.Render<RemoteBootstrapDialog>(p => p.Add(x => x.IsOpen, true)
+            .Add(x => x.TargetSelector, "<p>Instance</p>"));
+        Assert.Contains(action, cut.Find(".remote-bootstrap-upload").TextContent);
+        Assert.Contains(empty, cut.Find(".remote-bootstrap-upload").TextContent);
+        var input = cut.Find("input[type='file']");
+        Assert.HasCount(1, cut.FindAll($"label[for='{input.Id}']"));
+        Assert.AreEqual(limit, cut.Find($"[id='{input.GetAttribute("aria-describedby")}']").TextContent);
+        Assert.AreEqual(".zip,application/zip", input.GetAttribute("accept"));
     }
 
     [TestMethod]
@@ -84,6 +101,7 @@ public sealed class RemoteBootstrapDialogTests
             .Add(x => x.OnInspect, input => requests.Add(input)));
         var upload = cut.FindComponent<Microsoft.AspNetCore.Components.Forms.InputFile>();
         upload.UploadFiles(InputFileContent.CreateFromBinary([1, 2, 3], "seed.zip", contentType: "application/zip"));
+        Assert.AreEqual("seed.zip", cut.Find(".remote-bootstrap-file").TextContent);
         cut.Find("button.button-primary").Click();
         Assert.HasCount(1, requests);
         Assert.AreEqual("AQID", requests[0].ArchiveBase64);

@@ -1,7 +1,7 @@
 # Workspace seeds
 
 An installed instance can initialize an **existing Workspace** without a preconfigured Source or
-Project connector. Under **System > Bootstrap profiles** (`/settings/bootstrap`), open **Remote bootstrap**
+Project connector. Under **System > Bootstrap profiles** (`/settings/bootstrap`), open **Remote bootstrapping**
 from the page header, select the Workspace and supply exactly one ZIP package, raw YAML pointer
 document, or public HTTPS URL to that YAML in the dialog.
 Inspect the content, resolve local inputs, review prerequisites and the exact preview, then apply.

@@ -2,8 +2,8 @@ export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
 export const RemoteBootstrapTextByLocale = {
-  'en-US': { title: 'Remote bootstrap', document: 'Raw seed document (YAML)', cancel: 'Cancel' },
-  'fr-FR': { title: 'Amorçage distant', document: 'Document d’amorce brut (YAML)', cancel: 'Annuler' },
+  'en-US': { title: 'Remote bootstrapping', document: 'Raw seed document (YAML)', archive: 'Complete seed package (.zip)', cancel: 'Cancel' },
+  'fr-FR': { title: 'Bootstraping distant', document: 'Document de bootstrap (YAML)', archive: 'Paquet de bootstrap (.zip)', cancel: 'Annuler' },
 } as const;
 
 export const AgentOverviewMetricsByLocale = {

@@ -151,7 +151,10 @@
   <data name="Seed.ConnectionRequirements" xml:space="preserve"><value>Shared connection declarations verified</value></data>
   <data name="Seed.ConnectionPublication" xml:space="preserve"><value>Connection declaration publication</value></data>
   <data name="Diagnostic.bootstrap_work_project_contract_missing" xml:space="preserve"><value>The selected contribution does not expose the required connection contract.</value></data>
-  <data name="Remote.Title" xml:space="preserve"><value>Remote bootstrap</value></data>
+  <data name="Remote.Title" xml:space="preserve"><value>Remote bootstrapping</value></data>
   <data name="Remote.Inspecting" xml:space="preserve"><value>Inspecting…</value></data>
   <data name="Remote.Selected" xml:space="preserve"><value>Selected remote bootstrap</value></data>
+  <data name="Remote.ChooseArchive" xml:space="preserve"><value>Choose a ZIP package</value></data>
+  <data name="Remote.NoArchive" xml:space="preserve"><value>No package selected</value></data>
+  <data name="Remote.ArchiveLimit" xml:space="preserve"><value>.zip file · up to {0} MiB</value></data>
 </root>
