@@ -103,7 +103,6 @@
   <data name="ReloadSourceFiles" xml:space="preserve"><value>Reload files</value></data>
   <data name="LoadingSourceFiles" xml:space="preserve"><value>Loading profile files…</value></data>
   <data name="SourceFile" xml:space="preserve"><value>Profile file</value></data>
-  <data name="Seed.Title" xml:space="preserve"><value>Initialize a Workspace from a seed</value></data>
   <data name="Seed.Help" xml:space="preserve"><value>Select an existing Workspace and supply exactly one input: a ZIP package (up to 4 MiB), a raw YAML pointer document, or its public HTTPS URL. Installed capabilities and access grants must already be available.</value></data>
   <data name="Seed.Workspace" xml:space="preserve"><value>Target Workspace</value></data>
   <data name="Seed.Document" xml:space="preserve"><value>Raw seed document (YAML)</value></data>
@@ -152,4 +151,7 @@
   <data name="Seed.ConnectionRequirements" xml:space="preserve"><value>Shared connection declarations verified</value></data>
   <data name="Seed.ConnectionPublication" xml:space="preserve"><value>Connection declaration publication</value></data>
   <data name="Diagnostic.bootstrap_work_project_contract_missing" xml:space="preserve"><value>The selected contribution does not expose the required connection contract.</value></data>
+  <data name="Remote.Title" xml:space="preserve"><value>Remote bootstrap</value></data>
+  <data name="Remote.Inspecting" xml:space="preserve"><value>Inspecting…</value></data>
+  <data name="Remote.Selected" xml:space="preserve"><value>Selected remote bootstrap</value></data>
 </root>

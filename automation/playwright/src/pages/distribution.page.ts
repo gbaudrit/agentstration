@@ -2,7 +2,7 @@ import { FlowCollectionPage } from './flow-collection.page.js';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { TestIds } from '../contracts/test-ids.js';
 import { fillAndCommit } from './controls.js';
-import { CollectionVersionTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
+import { CollectionVersionTextByLocale, RemoteBootstrapTextByLocale, type SupportedTestLocale } from '../locales/expected-text.js';
 
 type DistributionMarker = keyof Pick<typeof TestIds.distribution,
   'extensions' | 'extensionDetails' | 'sourceProviders' | 'sourceProviderDetails' |
@@ -27,6 +27,24 @@ export class DistributionPage {
     const response = await this.page.goto(`${consoleUrl}${path}`, { waitUntil: 'domcontentloaded' });
     if (!response?.ok()) throw new Error(`Distribution route '${path}' returned HTTP ${response?.status() ?? 'no response'}.`);
     await this.page.getByTestId(TestIds.distribution[marker]).waitFor({ state: 'visible' });
+  }
+
+  public async inspectRemoteBootstrapEntry(locale: SupportedTestLocale, screenshotPath: string): Promise<void> {
+    const labels = RemoteBootstrapTextByLocale[locale];
+    const action = this.page.getByRole('button', { name: labels.title, exact: true });
+    await expect(this.page.getByRole('textbox', { name: labels.document, exact: true })).toHaveCount(0);
+    await action.click();
+    const dialog = this.page.getByRole('dialog', { name: labels.title, exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('textbox', { name: labels.document, exact: true })).toBeVisible();
+    const bounds = await dialog.boundingBox();
+    const viewport = this.page.viewportSize();
+    expect(bounds && viewport && bounds.x >= 0 && bounds.x + bounds.width <= viewport.width).toBeTruthy();
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await this.page.screenshot({ path: screenshotPath, fullPage: true });
+    await dialog.getByRole('button', { name: labels.cancel, exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(action).toBeFocused();
   }
 
   public async inspectVersionPlacement(consoleUrl: string, route: string, locale: SupportedTestLocale): Promise<void> {

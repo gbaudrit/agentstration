@@ -98,13 +98,23 @@ test('a pasted Source manifest is imported without Internet and opens its detail
   await expect(pages.distribution.sourceDetails('playwright', 'offline-source')).toBeVisible();
 });
 
-test('Bootstrap catalog and resource ownership scopes render deterministic local state @smoke', async ({ page, product }) => {
-  const pages = new ProductPages(page);
-  const context = { ...product, pages, checkpoint: ignoreCheckpoints };
-  await authenticateConsole(context, {});
-  await pages.distribution.open(product.consoleUrl, '/settings/bootstrap', 'bootstrapProfiles');
-  await pages.distribution.open(product.consoleUrl, '/settings/resource-scopes', 'resourceScopes');
-});
+for (const variant of [
+  { locale: 'en-US', width: 1440 },
+  { locale: 'fr-FR', width: 390 },
+] as const) {
+  test(`Bootstrap catalog and resource ownership scopes render deterministic local state ${variant.locale} ${variant.width === 390 ? '@responsive' : ''} @smoke`, async ({ page, product }, testInfo) => {
+    const pages = new ProductPages(page);
+    const context = { ...product, pages, checkpoint: ignoreCheckpoints };
+    await authenticateConsole(context, {});
+    await page.setViewportSize({ width: variant.width, height: variant.width === 390 ? 844 : 1000 });
+    await pages.consoleAdministration.restoreLanguage(product.consoleUrl, variant.locale);
+    await pages.distribution.open(product.consoleUrl, '/settings/bootstrap', 'bootstrapProfiles');
+    const screenshot = testInfo.outputPath('remote-bootstrap.png');
+    await pages.distribution.inspectRemoteBootstrapEntry(variant.locale, screenshot);
+    await testInfo.attach('Remote bootstrap', { path: screenshot, contentType: 'image/png' });
+    await pages.distribution.open(product.consoleUrl, '/settings/resource-scopes', 'resourceScopes');
+  });
+}
 
 test('a Pack Project can be composed from local resources and built @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);

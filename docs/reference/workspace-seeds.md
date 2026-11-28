@@ -1,10 +1,22 @@
 # Workspace seeds
 
 An installed instance can initialize an **existing Workspace** without a preconfigured Source or
-Project connector. Under **System > Bootstrap profiles** (`/settings/bootstrap`), select the Workspace
-and supply exactly one ZIP package, raw YAML pointer document, or public HTTPS URL to that YAML.
+Project connector. Under **System > Bootstrap profiles** (`/settings/bootstrap`), open **Remote bootstrap**
+from the page header, select the Workspace and supply exactly one ZIP package, raw YAML pointer
+document, or public HTTPS URL to that YAML in the dialog.
 Inspect the content, resolve local inputs, review prerequisites and the exact preview, then apply.
 This uses the ordinary administrative Bootstrap application worker and history.
+
+The catalog and application history remain visible without an inline ingestion form. Cancelling the
+dialog preserves its draft during the current page session. A failed inspection keeps the input and
+request identity for retry; changing the input or target starts a new request identity. Successful
+inspection closes the dialog and selects the pinned seed for the existing review/application flow.
+
+`RemoteBootstrapDialog` is a reusable Console component. Its host supplies the authorized target
+selector, format guidance and inspection callback; the component does not assume Workspace ownership
+or perform authorization. Other hosts can compose Instance or Tenant target selection when their
+application service and package format support it. The Workspace seed adapter on this page continues
+to enforce its Workspace-only contract. No additional scope support is implied by the dialog.
 
 ## Accepted package
 

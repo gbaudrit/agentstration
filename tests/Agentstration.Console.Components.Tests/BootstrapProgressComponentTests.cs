@@ -237,6 +237,30 @@ public sealed class BootstrapProgressComponentTests
     }
 
     [TestMethod]
+    [DataRow("en-US", "Remote bootstrap")]
+    [DataRow("fr-FR", "Amorçage distant")]
+    public void RemoteBootstrapOpensFromTheCatalogHeaderAndKeepsInspectionSeparateFromApplication(string cultureName, string action)
+    {
+        using var culture = new TestCultureScope(cultureName);
+        var client = new StubClient { MixedCatalog = true };
+        using var context = Context(client, application: false);
+        var cut = context.Render<BootstrapProfiles>();
+        Assert.HasCount(0, cut.FindAll("textarea"));
+        cut.FindAll(".page-header button").Single(button => button.TextContent == action).Click();
+        Assert.HasCount(1, cut.FindAll("[data-testid='remote-bootstrap-dialog']"));
+        cut.Find("[data-testid='remote-bootstrap-target']").Change(StubClient.WorkspaceId.ToString());
+        cut.Find("textarea").Change("formatVersion: '2.0'");
+        cut.Find("dialog button.button-primary").Click();
+        cut.WaitForAssertion(() => Assert.HasCount(0, cut.FindAll("dialog")));
+        Assert.AreEqual(new BootstrapApplicationTarget(StubClient.TenantId, StubClient.WorkspaceId), client.LastSeedRequest!.Target);
+        Assert.AreEqual("formatVersion: '2.0'", client.LastSeedRequest.Document);
+        Assert.HasCount(1, cut.FindAll("[data-testid='workspace-seed-selection']"));
+        Assert.AreEqual(0, client.Previews);
+        Assert.AreEqual(0, client.Submissions);
+        Assert.Contains("seedId=", context.Services.GetRequiredService<NavigationManager>().Uri);
+    }
+
+    [TestMethod]
     public void CatalogUsesTheSharedListAndPreviewStillPrecedesConfirmedSubmission()
     {
         using var culture = new TestCultureScope("en-US");
@@ -366,7 +390,14 @@ public sealed class BootstrapProgressComponentTests
 
     private sealed class StubClient : IBootstrapProfilesApiClient
     {
-        public Task<WorkspaceSeedReceipt> IngestSeedAsync(IngestWorkspaceSeedRequest request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public IngestWorkspaceSeedRequest? LastSeedRequest { get; private set; }
+        public Task<WorkspaceSeedReceipt> IngestSeedAsync(IngestWorkspaceSeedRequest request, CancellationToken cancellationToken)
+        {
+            LastSeedRequest = request;
+            return Task.FromResult(new WorkspaceSeedReceipt(new(request.RequestId, request.Target, Guid.NewGuid(), "2.1.0", "fixture", new string('a', 64), "workspace", "bootstrap", null, null, null, DateTimeOffset.UnixEpoch),
+                new(WorkspaceSeedFormat.Version, "2.1.0", "fixture", "workspace", "bootstrap", new("fixture", default), new([], [], [], new("coding-cli", "1.0", "1.0"))),
+                MixedProfiles.Single(profile => profile.Name == "workspace")));
+        }
         public Task<WorkspaceSeedReceipt> GetSeedAsync(Guid id, BootstrapApplicationTarget target, CancellationToken cancellationToken) => throw new NotSupportedException();
         public BootstrapProfileFilesRequest? LastFileRequest { get; private set; }
         public int FileReads { get; private set; }

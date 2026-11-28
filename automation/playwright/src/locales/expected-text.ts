@@ -1,6 +1,11 @@
 export const SupportedTestLocales = ['en-US', 'fr-FR'] as const;
 export type SupportedTestLocale = typeof SupportedTestLocales[number];
 
+export const RemoteBootstrapTextByLocale = {
+  'en-US': { title: 'Remote bootstrap', document: 'Raw seed document (YAML)', cancel: 'Cancel' },
+  'fr-FR': { title: 'Amorçage distant', document: 'Document d’amorce brut (YAML)', cancel: 'Annuler' },
+} as const;
+
 export const AgentOverviewMetricsByLocale = {
   'en-US': ['Desired generation', 'Active generation', 'Deployment'],
   'fr-FR': ['Génération souhaitée', 'Génération active', 'Déploiement'],

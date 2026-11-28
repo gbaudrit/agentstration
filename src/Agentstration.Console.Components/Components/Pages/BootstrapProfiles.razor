@@ -25,6 +25,7 @@
             <MetricCard Label="@T("Applications")" Value="@view.Applications.Count.ToString()" Detail="@T("LatestRetainedRuns")" Status="@(view.Applications.Any(item => item.Definition.Status is BootstrapApplicationStatus.Failed or BootstrapApplicationStatus.PartiallyApplied or BootstrapApplicationStatus.Interrupted) ? UiStatus.Warning : UiStatus.Success)" />
         }
     </Metrics>
+    <PrimaryActions><button type="button" class="button-primary" disabled="@(!interactive || busy)" @onclick="OpenRemoteBootstrap">@T("Remote.Title")</button></PrimaryActions>
     <Actions><button type="button" class="button-secondary" @onclick="() => configurationOpen = true">@T("CatalogConfiguration")</button></Actions>
     <Feedback>
         @if (view is not null && !denied && error is not null) { <p class="error-panel" role="alert">@error</p> }
@@ -44,27 +45,14 @@ else
     <div class="bootstrap-workflow">
     @if (screen == BootstrapScreen.Prepare)
     {
-        <FormSection Title="@T("Seed.Title")" TestId="workspace-seed-input"><ChildContent>
-            <p>@T("Seed.Help")</p>
-            <FormField Label="@T("Seed.Workspace")"><ClearableSelect TValue="string" @bind-Value="seedWorkspace" disabled="@(busy || seedReceipt is not null)">
-                <option value="">@T("SelectWorkspace")</option>
-                @foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId.ToString()">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName</option> }
-            </ClearableSelect></FormField>
-            @if (seedReceipt is null)
-            {
-                <FormField Label="@T("Seed.Document")" Id="workspace-seed-document"><ClearableText Multiline rows="5" @bind-Value="seedDocument" @bind-Value:after="ResetSeedRequest" maxlength="65536" Disabled="@busy" data-testid="workspace-seed-document" /></FormField>
-                <FormField Label="@T("Seed.Url")" Id="workspace-seed-url"><ClearableText Type="url" @bind-Value="seedUrl" @bind-Value:after="ResetSeedRequest" maxlength="2048" Disabled="@busy" data-testid="workspace-seed-url" /></FormField>
-                <FormField Label="@T("Seed.Archive")" Id="workspace-seed-archive"><InputFile id="workspace-seed-archive" OnChange="ReadSeedArchiveAsync" accept=".zip,application/zip" disabled="@busy" /></FormField>
-                @if (seedArchiveName is not null) { <p>@seedArchiveName</p> }
-                <FormActions><button type="button" class="button-secondary" disabled="@(busy || string.IsNullOrEmpty(seedWorkspace))" @onclick="IngestSeedAsync">@T("Seed.Ingest")</button></FormActions>
-            }
-            else
-            {
+        @if (seedReceipt is not null)
+        {
+            <FormSection Title="@T("Remote.Selected")" TestId="workspace-seed-selection"><ChildContent>
                 <p>@T("Seed.Pinned", seedReceipt.Provenance.Version, seedReceipt.Provenance.ProviderRevision)</p>
-                <code style="overflow-wrap:anywhere">@seedReceipt.Provenance.ArchiveDigest</code>
+                <code class="bootstrap-resource-diagnostic">@seedReceipt.Provenance.ArchiveDigest</code>
                 <FormActions><button type="button" class="button-secondary" disabled="@busy" @onclick="ClearSeed">@T("Seed.Clear")</button></FormActions>
-            }
-        </ChildContent></FormSection>
+            </ChildContent></FormSection>
+        }
         @if (selectedProfiles.Count > 0)
         {
             <FormSection Title="@T("SelectProfiles")" Class="bootstrap-preparation"><ChildContent><div class="bootstrap-preparation-content">
@@ -225,6 +213,22 @@ else
     }
     </div>
 }
+@if (view is not null && !denied)
+{
+    <RemoteBootstrapDialog IsOpen="@remoteBootstrapOpen" Busy="@busy" CanInspect="@(!string.IsNullOrEmpty(seedWorkspace))"
+                           TargetKey="@seedWorkspace" CompletedRequestId="@seedReceipt?.Provenance.Id" Error="@seedError"
+                           OnInspect="IngestSeedAsync" OnClose="() => remoteBootstrapOpen = false">
+        <Guidance><p>@T("Seed.Help")</p></Guidance>
+        <TargetSelector>
+            <FormField Label="@T("Seed.Workspace")">
+                <ClearableSelect TValue="string" @bind-Value="seedWorkspace" disabled="@busy" data-testid="remote-bootstrap-target">
+                    <option value="">@T("SelectWorkspace")</option>
+                    @foreach (var workspace in view.Workspaces) { <option value="@workspace.WorkspaceId.ToString()">@workspace.TenantDisplayName / @workspace.WorkspaceDisplayName</option> }
+                </ClearableSelect>
+            </FormField>
+        </TargetSelector>
+    </RemoteBootstrapDialog>
+}
 <ModalFrame IsOpen="@configurationOpen" TitleId="bootstrap-catalog-settings-title" OnClose="() => configurationOpen = false">
     <h2 id="bootstrap-catalog-settings-title">@T("CatalogConfiguration")</h2>
     @if (view is not null)
@@ -260,39 +264,23 @@ else
     private WorkspaceSeedReceipt? seedReceipt;
     private WorkspaceSeedSelection? SeedPin => seedReceipt is { } receipt ? new(receipt.Provenance.Id, receipt.Provenance.ArchiveDigest) : null;
     private string seedWorkspace = string.Empty;
-    private string? seedDocument = string.Empty, seedUrl = string.Empty;
-    private string? seedArchive, seedArchiveName;
-    private Guid seedRequest = Guid.NewGuid();
-    private void ResetSeedRequest() => seedRequest = Guid.NewGuid();
-    private async Task ReadSeedArchiveAsync(InputFileChangeEventArgs args)
-    {
-        try
-        {
-            await using var stream = args.File.OpenReadStream(WorkspaceSeedFormat.MaximumArchiveBytes, lifetime.Token);
-            using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory, lifetime.Token);
-            seedArchive = Convert.ToBase64String(memory.ToArray()); seedArchiveName = args.File.Name;
-            seedRequest = Guid.NewGuid();
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException) { seedArchive = null; seedArchiveName = null; error = T("Seed.InputInvalid"); }
-    }
-    private async Task IngestSeedAsync()
+    private bool remoteBootstrapOpen;
+    private bool interactive;
+    private string? seedError;
+    private void OpenRemoteBootstrap() { seedError = null; remoteBootstrapOpen = true; }
+    private async Task IngestSeedAsync(RemoteBootstrapInput input)
     {
         var target = view?.Workspaces.SingleOrDefault(item => item.WorkspaceId.ToString() == seedWorkspace);
-        if (target is null) { error = T("Seed.InputInvalid"); return; }
-        var document = string.IsNullOrWhiteSpace(seedDocument) ? null : seedDocument.Trim();
-        var url = string.IsNullOrWhiteSpace(seedUrl) ? null : Uri.TryCreate(seedUrl.Trim(), UriKind.Absolute, out var parsed) ? parsed : null;
-        if (!string.IsNullOrWhiteSpace(seedUrl) && url is null || new[] { document is not null, url is not null, seedArchive is not null }.Count(value => value) != 1)
-        { error = T("Seed.InputInvalid"); return; }
-        busy = true; error = null;
+        if (target is null) { seedError = T("Seed.InputInvalid"); return; }
+        busy = true; seedError = null;
         try
         {
-            var receipt = await Client.IngestSeedAsync(new(seedRequest, new(target.TenantId, target.WorkspaceId), seedArchive, document, url), lifetime.Token);
-            SelectSeed(receipt); seedDocument = seedUrl = string.Empty; seedArchive = null;
+            var receipt = await Client.IngestSeedAsync(new(input.RequestId, new(target.TenantId, target.WorkspaceId), input.ArchiveBase64, input.Document, input.DocumentUrl), lifetime.Token);
+            SelectSeed(receipt); remoteBootstrapOpen = false;
             Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["seedId"] = receipt.Provenance.Id,
                 ["seedTenantId"] = target.TenantId, ["seedWorkspaceId"] = target.WorkspaceId, ["stage"] = null, ["applicationId"] = null }), replace: true);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException) { error = ApplicationError(exception.Message); }
+        catch (Exception exception) when (exception is not OperationCanceledException) { seedError = ApplicationError(exception.Message); }
         finally { busy = false; }
     }
     private void SelectSeed(WorkspaceSeedReceipt receipt)
@@ -306,7 +294,7 @@ else
     private void ClearSeed()
     {
         seedReceipt = null; sourceProfile = null; selectedProfiles.Clear(); targetChoices.Clear(); bindingTargets.Clear();
-        preview = null; previewSelection = null; seedRequest = Guid.NewGuid(); seedArchiveName = null; inputSelections = [];
+        preview = null; previewSelection = null; inputSelections = [];
         Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["seedId"] = null, ["seedTenantId"] = null, ["seedWorkspaceId"] = null, ["stage"] = null }), replace: true);
     }
     [SupplyParameterFromQuery(Name = "stage")] public string? Stage { get; set; }
@@ -388,6 +376,13 @@ else
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender) return;
+        interactive = true;
+        StateHasChanged();
+    }
+
     protected override async Task OnParametersSetAsync()
     {
         screen = ApplicationId is not null ? BootstrapScreen.Application : Stage == "preview" && preview is not null ? BootstrapScreen.Preview : BootstrapScreen.Prepare;
@@ -434,7 +429,7 @@ else
     private void Deny()
     {
         denied = true; view = null; selectedApplication = lastApplication = null; sourceProfile = null; sourceSelection = null; seedReceipt = null; preview = null;
-        selectedProfiles.Clear(); targetChoices.Clear(); bindingTargets.Clear(); bindingOptions.Clear(); confirmApply = configurationOpen = false; screen = BootstrapScreen.Prepare;
+        selectedProfiles.Clear(); targetChoices.Clear(); bindingTargets.Clear(); bindingOptions.Clear(); confirmApply = configurationOpen = remoteBootstrapOpen = false; seedError = null; screen = BootstrapScreen.Prepare;
     }
 
     private bool CanSelect(BootstrapProfileSummary profile) => seedReceipt is null && sourceSelection is null && profile.Valid && (selectedProfiles.Contains(profile.Name) || selectedProfiles.Count < 16);

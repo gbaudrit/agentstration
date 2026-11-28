@@ -1,0 +1,86 @@
+@using Agentstration.Bootstrap.Contracts
+@using Agentstration.Web.Components.Pages
+@implements IDisposable
+@inject Microsoft.Extensions.Localization.IStringLocalizer<BootstrapProfilesStrings> Localizer
+
+<ModalFrame IsOpen="@IsOpen" Busy="@(Busy || reading)" TitleId="@(id + "-title")" OnClose="OnClose">
+    <div class="remote-bootstrap-content" data-testid="remote-bootstrap-dialog">
+        <h2 id="@(id + "-title")">@Localizer["Remote.Title"]</h2>
+        @Guidance
+        <fieldset class="remote-bootstrap-target" disabled="@(Busy || reading)">@TargetSelector</fieldset>
+        <FormField Label="@Localizer["Seed.Document"]" Id="@(id + "-document")">
+            <ClearableText Multiline rows="5" @bind-Value="document" @bind-Value:after="InputChanged" maxlength="65536" Disabled="@(Busy || reading)" data-testid="workspace-seed-document" />
+        </FormField>
+        <FormField Label="@Localizer["Seed.Url"]" Id="@(id + "-url")">
+            <ClearableText Type="url" @bind-Value="url" @bind-Value:after="InputChanged" maxlength="2048" Disabled="@(Busy || reading)" data-testid="workspace-seed-url" />
+        </FormField>
+        <FormField Label="@Localizer["Seed.Archive"]" Id="@(id + "-archive")">
+            <InputFile id="@(id + "-archive")" OnChange="ReadArchiveAsync" accept=".zip,application/zip" disabled="@(Busy || reading)" />
+        </FormField>
+        @if (archiveName is not null) { <p class="remote-bootstrap-file">@archiveName</p> }
+        @if (inputError || Error is not null) { <p class="error-panel" role="alert">@(inputError ? Localizer["Seed.InputInvalid"].Value : Error)</p> }
+        <FormActions>
+            <button type="button" class="button-secondary" disabled="@(Busy || reading)" @onclick="OnClose">@Localizer["Cancel"]</button>
+            <button type="button" class="button-primary" disabled="@(!CanInspect || Busy || reading)" @onclick="InspectAsync">@Localizer[Busy ? "Remote.Inspecting" : "Seed.Ingest"]</button>
+        </FormActions>
+    </div>
+</ModalFrame>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool CanInspect { get; set; }
+    [Parameter] public string? Error { get; set; }
+    // Hosts supply their authorized Instance, Tenant or Workspace selector and format-specific guidance.
+    [Parameter, EditorRequired] public RenderFragment TargetSelector { get; set; } = default!;
+    [Parameter] public RenderFragment? Guidance { get; set; }
+    [Parameter] public string? TargetKey { get; set; }
+    [Parameter] public Guid? CompletedRequestId { get; set; }
+    [Parameter] public EventCallback<RemoteBootstrapInput> OnInspect { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly string id = "remote-bootstrap-" + Guid.NewGuid().ToString("N");
+    private Guid requestId = Guid.NewGuid();
+    private Guid? completed;
+    private string? targetKey, document, url, archive, archiveName;
+    private bool inputError, reading;
+
+    protected override void OnParametersSet()
+    {
+        if (completed != CompletedRequestId)
+        {
+            completed = CompletedRequestId;
+            document = url = archive = archiveName = null;
+            InputChanged();
+        }
+        if (targetKey != TargetKey) { targetKey = TargetKey; InputChanged(); }
+    }
+
+    private void InputChanged() { requestId = Guid.NewGuid(); inputError = false; }
+
+    private async Task ReadArchiveAsync(InputFileChangeEventArgs args)
+    {
+        reading = true; InputChanged(); archive = archiveName = null;
+        try
+        {
+            await using var stream = args.File.OpenReadStream(WorkspaceSeedFormat.MaximumArchiveBytes, lifetime.Token);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory, lifetime.Token);
+            archive = Convert.ToBase64String(memory.ToArray()); archiveName = args.File.Name;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException) { inputError = true; }
+        finally { reading = false; }
+    }
+
+    private Task InspectAsync()
+    {
+        if (!CanInspect || Busy || reading) return Task.CompletedTask;
+        var text = string.IsNullOrWhiteSpace(document) ? null : document.Trim();
+        var address = string.IsNullOrWhiteSpace(url) ? null : Uri.TryCreate(url.Trim(), UriKind.Absolute, out var parsed) ? parsed : null;
+        inputError = !string.IsNullOrWhiteSpace(url) && address is null
+            || new[] { text is not null, address is not null, archive is not null }.Count(value => value) != 1;
+        return inputError ? Task.CompletedTask : OnInspect.InvokeAsync(new(requestId, archive, text, address));
+    }
+
+    public void Dispose() { lifetime.Cancel(); lifetime.Dispose(); }
+}

@@ -1,0 +1,5 @@
+.remote-bootstrap-content { display: grid; gap: var(--space-4); min-width: 0; }
+.remote-bootstrap-content h2, .remote-bootstrap-content p { margin: 0; }
+.remote-bootstrap-file { overflow-wrap: anywhere; }
+.remote-bootstrap-target { min-width: 0; margin: 0; padding: 0; border: 0; }
+.remote-bootstrap-content ::deep input[type="file"] { width: 100%; max-width: 100%; min-width: 0; }
