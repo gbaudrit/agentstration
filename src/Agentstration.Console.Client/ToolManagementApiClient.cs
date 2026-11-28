@@ -9,6 +9,10 @@ namespace Agentstration.Web.Console;
 
 public interface IToolsClient
 {
+    Task<ToolOperationalStatus> GetOperationalStateAsync(ToolResource tool, CancellationToken token) => Task.FromResult(new ToolOperationalStatus(tool.Uid, tool.Definition.Enabled, null));
+    Task<ToolProviderAdministration> GetProviderAdministrationAsync(ToolProviderResource provider, CancellationToken token) => Task.FromResult(new ToolProviderAdministration([], []));
+    Task<IReadOnlyList<Agentstration.ResourceManagement.Contracts.ResourceRelatedAccessResult>> SetCollectionEnabledAsync(Guid parentUid, SetToolCollectionEnabledRequest request, CancellationToken token) => throw new NotSupportedException();
+    Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, bool enabled, string? etag, CancellationToken token) => SetEnabledAsync(ns, name, enabled, etag, token);
     Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(string name, CancellationToken cancellationToken);
     Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(ResourceScopeRef scopeRef, ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
@@ -45,6 +49,33 @@ public sealed class ToolsApiClient(HttpClient httpClient) : IToolsClient
     public Task<ResourceSnapshot<ToolProviderResource>> GetProviderAsync(ResourceScopeRef scopeRef,
         ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         ReadProviderAsync(HttpMethod.Get, ProviderPath(name) + $"?resourceNamespace={Uri.EscapeDataString(@namespace.Value)}&scopeRef={Uri.EscapeDataString(scopeRef.Value)}", null, null, cancellationToken);
+    public async Task<ToolOperationalStatus> GetOperationalStateAsync(ToolResource tool, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"api/tools/{Uri.EscapeDataString(tool.Name)}/activation?namespace={Uri.EscapeDataString(tool.Namespace.Value)}&scopeRef={Uri.EscapeDataString(tool.ScopeRef!.Value.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<ToolOperationalStatus>(token) ?? throw new InvalidOperationException("The Tool operational state is empty.");
+    }
+    public async Task<ToolProviderAdministration> GetProviderAdministrationAsync(ToolProviderResource provider, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"api/toolproviders/{Uri.EscapeDataString(provider.Name)}/administration?resourceNamespace={Uri.EscapeDataString(provider.Namespace.Value)}&scopeRef={Uri.EscapeDataString(provider.ScopeRef!.Value.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<ToolProviderAdministration>(token) ?? throw new InvalidOperationException("The Tool provider administration response is empty.");
+    }
+    public async Task<IReadOnlyList<Agentstration.ResourceManagement.Contracts.ResourceRelatedAccessResult>> SetCollectionEnabledAsync(Guid parentUid, SetToolCollectionEnabledRequest body, CancellationToken token)
+    {
+        using var response = await httpClient.PutAsJsonAsync($"api/tools/administration/{parentUid:D}/enabled", body, token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<Agentstration.ResourceManagement.Contracts.ResourceRelatedAccessResult[]>(token) ?? [];
+    }
+    public async Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(ResourceScopeRef scope, ResourceNamespace ns, string name, bool enabled, string? etag, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/tools/{Uri.EscapeDataString(name)}/enabled?namespace={Uri.EscapeDataString(ns.Value)}&scopeRef={Uri.EscapeDataString(scope.Value)}") { Content = JsonContent.Create(new SetToolEnabledRequest(enabled)) };
+        if (etag is not null) request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(request, token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await ReadToolAsync(response, token);
+    }
+
     public async Task<IReadOnlyList<ToolProviderResource>> GetProvidersAsync(CancellationToken cancellationToken) =>
         (await ApiResponse.ReadAsync<ValueResponse<ToolProviderResource>>(httpClient, "api/toolproviders", cancellationToken)).Value;
 

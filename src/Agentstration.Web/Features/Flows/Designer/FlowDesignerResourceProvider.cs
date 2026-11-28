@@ -71,19 +71,22 @@ public sealed class FlowDesignerResourceProvider(
         var tools = await toolsTask;
         var definitions = (await definitionsTask).ToDictionary(
             definition => (definition.Namespace, definition.Name));
-        return tools.Where(tool => tool.Definition.Schema is not null && tool.ScopeRef is not null).Select(tool => new FlowDesignerTool(
+        var result = new List<FlowDesignerTool>();
+        foreach (var batch in tools.Where(tool => tool.Definition.Schema is not null && tool.ScopeRef is not null).Chunk(32))
+            result.AddRange(await Task.WhenAll(batch.Select(async tool => new FlowDesignerTool(
             tool.Metadata.Name,
             tool.Definition.DisplayName,
             tool.Metadata.Namespace,
             tool.Definition.Schema!.Input.Clone(),
             InvocationOutputSchema(tool, providers),
-            tool.Definition.Enabled,
+            (await toolsClient.GetOperationalStateAsync(tool, cancellationToken)).Enabled,
             tool.Definition.Discovery?.Available == true,
             tool.Definition.RequiresApproval,
             tool.ScopeRef!.Value)
         {
             InputSchemaReference = ToolInputSchemaReference(tool, definitions)
-        }).ToArray();
+        })));
+        return result;
     }
 
     private static System.Text.Json.JsonElement? InvocationOutputSchema(ToolResource tool, IReadOnlyList<ToolProviderResource> providers)

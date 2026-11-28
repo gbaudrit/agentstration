@@ -16,7 +16,7 @@ namespace Agentstration.Infrastructure.Work;
 
 public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindings, IResourceStore resources,
     IResourceAccessPolicyService access, IToolExecutionPipeline pipeline, ICurrentRequestContext current,
-    IAuthorizationService authorization, TimeProvider clock, AtcWorkTaskProviderGateway? tracking = null) : IWorkTaskProviderGateway
+    IAuthorizationService authorization, TimeProvider clock, AtcWorkTaskProviderGateway? tracking = null, ToolAccessService? toolAccess = null) : IWorkTaskProviderGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, MaxDepth = 16 };
@@ -64,7 +64,7 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
             if (tool.Definition.Provider is not { } reference || reference.Name != provider.Value.Name
                 || (reference.ScopeRef ?? tool.ScopeRef) != provider.Value.ScopeRef
                 || (reference.Namespace ?? tool.Namespace) != provider.Value.Namespace
-                || !tool.Definition.Enabled || tool.Definition.Discovery?.Available != true
+                || !(toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) || tool.Definition.Discovery?.Available != true
                 || !tool.Definition.Metadata.TryGetValue(WorkTaskProviderProtocol.MetadataKey, out var metadata)) continue;
             WorkTaskProviderCapabilities? capabilities;
             try { capabilities = metadata.Deserialize<WorkTaskProviderCapabilities>(Json); }
@@ -77,7 +77,7 @@ public sealed class McpWorkTaskProviderGateway(IWorkProjectBindingResolver bindi
         }
         if (candidates.Count != 1) return Failure(candidates.Count == 0 ? "task_provider_capability_missing" : "task_provider_capability_ambiguous");
         var selected = candidates[0];
-        if (!selected.Tool.Definition.Enabled || selected.Tool.Definition.Discovery?.Available != true) return Failure("task_provider_tool_unavailable");
+        if (!(toolAccess is null ? selected.Tool.Definition.Enabled : await toolAccess.IsEnabledAsync(selected.Tool, token)) || selected.Tool.Definition.Discovery?.Available != true) return Failure("task_provider_tool_unavailable");
         if (selected.Tool.Definition.RequiresApproval) return Failure("task_provider_approval_required");
         if (selected.Tool.ScopeRef is not { } owner) return Failure("task_provider_tool_unavailable");
         if (provider.Value.Definition.Mcp?.Internal == true && !await IsPublishedRelayAsync(selected.Tool, selected.Capabilities, token))

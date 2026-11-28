@@ -15,7 +15,7 @@ using ModelContextProtocol;
 namespace Agentstration.Infrastructure.Work;
 
 public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingResolver bindings, IResourceStore resources, IWorkDocumentCodec documents,
-    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock, WorkProjectConnectedServiceResolver services) : IWorkProjectSharingGateway, IWorkProjectDataGateway, ICodingCodePublicationGateway
+    IToolExecutionPipeline pipeline, ICurrentRequestContext current, IAuthorizationService authorization, TimeProvider clock, WorkProjectConnectedServiceResolver services, ToolAccessService? toolAccess = null) : IWorkProjectSharingGateway, IWorkProjectDataGateway, ICodingCodePublicationGateway
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow, MaxDepth = 32 };
@@ -43,7 +43,7 @@ public sealed partial class GitWorkProjectSharingGateway(IWorkProjectBindingReso
         var access = await bindings.ResolveAsync(workspaceId, principalId, binding, token);
         if (!access.IsSuccess) return Failure(access.ErrorCode!);
         var tool = (await resources.GetExactAsync<ToolResource>(binding.Target.Address, token))?.Value;
-        if (tool is null || tool.Uid != binding.Target.Uid || tool.Generation != binding.Target.Generation || !tool.Definition.Enabled || tool.Definition.Discovery?.Available != true) return Failure("sharing_provider_unavailable");
+        if (tool is null || tool.Uid != binding.Target.Uid || tool.Generation != binding.Target.Generation || !(toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) || tool.Definition.Discovery?.Available != true) return Failure("sharing_provider_unavailable");
         if (binding.NativeService is not null)
         {
             try { return await ResolveServiceGitAsync(workspaceId, principalId, access.Value!, tool, requestedRef, requestedPaths, token); }

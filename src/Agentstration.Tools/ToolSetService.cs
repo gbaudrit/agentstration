@@ -15,7 +15,8 @@ public sealed class ToolSetService(
     ISecurityAuditWriter audit,
     TimeProvider timeProvider,
     IEnumerable<IToolSetDeletionGuard>? deletionGuards = null,
-    IResourceGovernanceContext? governanceContext = null)
+    IResourceGovernanceContext? governanceContext = null,
+    ToolAccessService? access = null)
 {
     public async Task<IReadOnlyList<StoredResource<ToolSetResource>>> ListAsync(CancellationToken cancellationToken)
     {
@@ -319,7 +320,7 @@ public sealed class ToolSetService(
             var tool = stored.Value;
             var toolScopeRef = tool.ScopeRef
                 ?? throw new ToolSetValidationException("tool_set_member_scope_missing", $"Tool member '{tool.Address}' has no ownership scope.");
-            if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
+            if (!(access is null ? tool.Definition.Enabled : await access.IsEnabledAsync(tool, cancellationToken)) || tool.Definition.Discovery?.Available != true)
                 throw new ToolSetValidationException("tool_set_member_unavailable", $"Tool member '{tool.Address}' is unavailable.");
             var providerReference = tool.Definition.Provider
                 ?? throw new ToolSetValidationException("tool_set_member_provider_missing", $"Tool member '{tool.Address}' has no provider mapping.");
@@ -361,7 +362,7 @@ public sealed class ToolSetService(
             selected.ToolScopeRef, selected.ToolNamespace, ToolResourceKinds.Tool, selected.ToolName), cancellationToken);
         if (current is null || current.Value.Uid != selected.ToolUid || current.Value.Generation != selected.ToolGeneration)
             throw new ToolSetValidationException("tool_set_member_stale", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' no longer matches its pinned revision.");
-        if (!current.Value.Definition.Enabled || current.Value.Definition.Discovery?.Available != true)
+        if (!(access is null ? current.Value.Definition.Enabled : await access.IsEnabledAsync(current.Value, cancellationToken)) || current.Value.Definition.Discovery?.Available != true)
             throw new ToolSetValidationException("tool_set_member_unavailable", $"Published Tool member '{selected.ToolNamespace}/{selected.ToolName}' is unavailable.");
         var provider = await store.GetExactAsync<ToolProviderResource>(ScopedResourceAddress.Create(
             selected.ProviderScopeRef, selected.ProviderNamespace, ToolResourceKinds.ToolProvider, selected.ProviderName), cancellationToken);

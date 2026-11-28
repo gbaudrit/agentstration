@@ -10,11 +10,11 @@
     @if (resource is null) { <ResourceLoadFeedback State="loadState" OnRetry="LoadAsync" RetryTestId="tool-preview-retry" /> }
     else
     {
-        <ToolResourceSummary Resource="resource" ReadOnly="@(resource.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false">
+        <ToolResourceSummary Resource="resource" OperationalEnabled="operational?.Enabled" ReadOnly="@(resource.ScopeRef?.Value != Context.Current?.SelectedScopeRef)" ConfigurationInitiallyCollapsed="false" ShowConfigurationViewSwitch="false">
             <QuickActions>
                 <a class="button-secondary" href="@OverviewHref" data-testid="tool-preview-open"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a>
                 @if (CanEdit) { <a class="button-secondary" href="@DefinitionHref" data-testid="tool-preview-edit"><UiIcon Name="pencil" />@Shared["EditDefinition"]</a> }
-                @if (resource.Definition.Enabled && resource.Definition.Discovery?.Available == true && Context.HasPermission(AuthorizationPermissions.RunsExecute)) { <a class="button-primary" href="@(OverviewHref.Split('#')[0] + "#execution")" data-testid="tool-preview-run"><UiIcon Name="play-circle" />@Localizer["RunTool"]</a> }
+                @if ((operational?.Enabled ?? resource.Definition.Enabled) && resource.Definition.Discovery?.Available == true && Context.HasPermission(AuthorizationPermissions.RunsExecute)) { <a class="button-primary" href="@(OverviewHref.Split('#')[0] + "#execution")" data-testid="tool-preview-run"><UiIcon Name="play-circle" />@Localizer["RunTool"]</a> }
 
             </QuickActions>
         </ToolResourceSummary>
@@ -26,6 +26,7 @@
     [Parameter, EditorRequired] public string OverviewHref { get; set; } = string.Empty;
     [Parameter, EditorRequired] public string DefinitionHref { get; set; } = string.Empty;
     private ToolResource? resource;
+    private ToolOperationalStatus? operational;
     private ResourceLoadState loadState = new(ResourceLoadStatus.Loading);
     private CancellationTokenSource? pending;
     private string? requestedKey;
@@ -44,7 +45,7 @@
         var requestRevision = ++revision;
         pending?.Cancel(); pending?.Dispose(); pending = new();
         var token = pending.Token;
-        resource = null; loadState = new(ResourceLoadStatus.Loading);
+        resource = null; operational = null; loadState = new(ResourceLoadStatus.Loading);
         if (Context.Error is not null || !Context.HasPermission(AuthorizationPermissions.ResourcesRead)) { loadState = new(ResourceLoadStatus.Forbidden); return; }
         if (target.Kind != ToolResourceKinds.Tool || target.ScopeRef == default) { loadState = new(ResourceLoadStatus.Failed); return; }
         try
@@ -53,7 +54,9 @@
             if (!IsCurrent(requestRevision, key)) return;
             if (snapshot.Value.Kind != target.Kind || snapshot.Value.ScopeRef != target.ScopeRef || snapshot.Value.Namespace != target.Namespace || snapshot.Value.Name != target.Name)
             { loadState = new(ResourceLoadStatus.Forbidden); return; }
-            resource = snapshot.Value; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            var state = await Client.GetOperationalStateAsync(snapshot.Value, token);
+            if (!IsCurrent(requestRevision, key)) return;
+            resource = snapshot.Value; operational = state; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (Exception error) when (error is HttpRequestException or AgentstrationApiException or OperationCanceledException)

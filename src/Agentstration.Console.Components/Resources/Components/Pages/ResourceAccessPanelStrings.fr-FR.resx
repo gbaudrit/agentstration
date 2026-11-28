@@ -81,4 +81,48 @@
   <data name="ReviewedPolicy" xml:space="preserve"><value>Comparez ces autorisations enregistrées avec votre saisie conservée. Un nouvel enregistrement remplace les autorisations enregistrées par votre saisie.</value></data>
   <data name="CurrentPolicy" xml:space="preserve"><value>Autorisations actuellement enregistrées</value></data>
   <data name="ExactTargetOnly" xml:space="preserve"><value>Cible exacte uniquement</value></data>
+  <data name="AllDescendants" xml:space="preserve"><value>Autoriser tous les périmètres descendants</value></data>
+  <data name="AllDescendantsHelp" xml:space="preserve"><value>Accorder la découverte et l’utilisation aux descendants actuels et futurs. Les exceptions explicites restent effectives.</value></data>
+  <data name="AllDescendantsOffHelp" xml:space="preserve"><value>Désactiver cette règle conserve les accès ciblés.</value></data>
+  <data name="PartialAccess" xml:space="preserve"><value>Accès partiel</value></data>
+  <data name="DenyDiscover" xml:space="preserve"><value>Interdire la découverte</value></data>
+  <data name="DenyUse" xml:space="preserve"><value>Interdire l’utilisation</value></data>
+  <data name="RelatedTitle" xml:space="preserve"><value>Accès aux ressources liées</value></data>
+  <data name="RelatedHelp" xml:space="preserve"><value>Accordez la découverte et l’utilisation à la collection vérifiée. Les périmètres éligibles proviennent des accès enregistrés du parent.</value></data>
+  <data name="RelatedSearch" xml:space="preserve"><value>Rechercher un tenant ou un workspace</value></data>
+  <data name="RelatedResources" xml:space="preserve"><value>{0} ressources liées</value></data>
+  <data name="RelatedInherited" xml:space="preserve"><value>Hérité</value></data>
+  <data name="RelatedException" xml:space="preserve"><value>Exception</value></data>
+  <data name="RelatedRestore" xml:space="preserve"><value>Rétablir l’héritage</value></data>
+  <data name="RelatedEmpty" xml:space="preserve"><value>Aucun périmètre descendant éligible. Enregistrez d’abord les accès du parent.</value></data>
+  <data name="RelatedFailures" xml:space="preserve"><value>{0} modifications n’ont pas été appliquées. Vérifiez les exceptions ou rechargez après un conflit.</value></data>
+  <data name="RelatedDetails" xml:space="preserve"><value>Ressources et exceptions</value></data>
+  <data name="RelatedUsage" xml:space="preserve"><value>{0}/{1} autorisées</value></data>
+  <data name="RelatedNoMembers" xml:space="preserve"><value>Aucune ressource liée vérifiée n’est disponible.</value></data>
+  <data name="AccessRefreshed" xml:space="preserve"><value>Accès mis à jour.</value></data>
+  <data name="Rule.explicit_deny" xml:space="preserve"><value>Refus explicite</value></data>
+  <data name="Rule.parent_access_denied" xml:space="preserve"><value>Accès au parent refusé</value></data>
+  <data name="Rule.all_descendants" xml:space="preserve"><value>Règle pour tous les descendants</value></data>
+  <data name="Rule.toolset_inherited" xml:space="preserve"><value>Hérité d’un toolset</value></data>
+  <data name="Rule.access_relationship_invalid" xml:space="preserve"><value>Preuve d’appartenance invalide</value></data>
+  <data name="RelatedTenantRule" xml:space="preserve"><value>Règle du tenant</value></data>
+  <data name="RelatedSelectionHelp" xml:space="preserve"><value>Sélectionnez des ressources pour limiter la prochaine action de périmètre. Sans sélection, elle s’applique à toute la collection.</value></data>
+  <data name="SelectResource" xml:space="preserve"><value>Sélectionner {0}</value></data>
+  <data name="Kind.Tool" xml:space="preserve"><value>Outil</value></data>
+  <data name="Kind.ToolSet" xml:space="preserve"><value>Toolset</value></data>
+  <data name="Kind.ToolSetVersion" xml:space="preserve"><value>Version publiée de toolset</value></data>
+  <data name="Kind.ToolProvider" xml:space="preserve"><value>Fournisseur d’outils</value></data>
+  <data name="Kind.ToolDefinition" xml:space="preserve"><value>Définition d’outil</value></data>
+  <data name="Kind.ToolDefinitionVersion" xml:space="preserve"><value>Définition d’outil publiée</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Kind.DataSourceProfile" xml:space="preserve"><value>Profil de source de données</value></data>
+  <data name="Kind.ConnectedServiceType" xml:space="preserve"><value>Type de service connecté</value></data>
+  <data name="Kind.ConnectedServiceOperationType" xml:space="preserve"><value>Type d’opération</value></data>
+  <data name="Kind.StorageType" xml:space="preserve"><value>Type de stockage</value></data>
+  <data name="Kind.ExtensionBundleInstallation" xml:space="preserve"><value>Installation de bundle</value></data>
+  <data name="AccessToResource" xml:space="preserve"><value>Accès à cette ressource</value></data>
+  <data name="TargetedAccess" xml:space="preserve"><value>Exceptions et accès ciblés</value></data>
+  <data name="RelatedRefresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="RelatedUnavailable" xml:space="preserve"><value>{0} inactives ou indisponibles</value></data>
+  <data name="RelatedExceptionCount" xml:space="preserve"><value>{0} exceptions sur les ressources</value></data>
 </root>

@@ -32,11 +32,16 @@ internal static class AgentstrationMcpHandlers
             .Select(value => value.Value)
             .Where(value => value.Namespace.IsDefault && value.Definition.Provider?.Name == AgentstrationToolProvider.Name)
             .ToDictionary(value => value.Definition.ExternalId ?? string.Empty, StringComparer.Ordinal);
+        var toolAccess = services.GetRequiredService<ToolAccessService>();
+        var operationalEnabled = new HashSet<Guid>();
+        foreach (var tool in projected.Values)
+            if (await toolAccess.IsEnabledAsync(tool, cancellationToken)
+                && (await toolAccess.CanUseAsync(tool, workspaceScope, cancellationToken)).Allowed) operationalEnabled.Add(tool.Uid);
         var builtIns = services.GetServices<IInternalMcpToolDefinitionProvider>()
             .Select(value => value.Definition)
             .Where(value => value.ExposeThroughMcp)
             .Where(value => projected.TryGetValue(value.Name, out var tool)
-                && tool.Definition.Enabled
+                && operationalEnabled.Contains(tool.Uid)
                 && tool.Definition.Discovery?.Available == true)
             .Select(value => new Tool
             {

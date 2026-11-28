@@ -122,6 +122,26 @@ public sealed class ToolDetailsComponentTests
     }
 
     [TestMethod]
+    public async Task ManagedToolHeaderAllowsOperationalActivationWhileDefinitionRemainsReadOnly()
+    {
+        using var context = CreateContext(new ToolSchema { Input = JsonSerializer.SerializeToElement(new { type = "object" }) });
+        var client = context.Services.GetRequiredService<ToolClient>();
+        client.Resource = client.Resource with
+        {
+            Governance = ResourceGovernance.Extension("fixture", "tests.fixture", "1.0.0", Guid.NewGuid())
+        };
+        var original = client.Resource;
+        var cut = context.Render<ToolDetails>(p => p.Add(c => c.Name, original.Name));
+        var toggle = cut.Find("[data-testid=tool-enabled-toggle]");
+        Assert.IsFalse(toggle.HasAttribute("disabled"));
+        await toggle.ChangeAsync(new ChangeEventArgs { Value = false });
+        Assert.AreEqual(false, client.EnabledRequest);
+        Assert.AreEqual("\"state-etag\"", client.LastEtag);
+        Assert.AreEqual(original, client.Resource);
+        Assert.IsTrue(cut.FindComponent<ResourceDetailsTemplate>().Instance.DefinitionReadOnlyReason is not null);
+    }
+
+    [TestMethod]
     public async Task ExecutionTabReusesSchemaEditorAndSimulatesByDefault()
     {
         using var culture = new CultureScope("en-US");
@@ -210,7 +230,7 @@ public sealed class ToolDetailsComponentTests
         var cut = context.Render<ToolDetails>(p => p.Add(c => c.Name, "create-notification"));
         cut.Find(".resource-header input[role=switch]").Change(false);
         cut.WaitForAssertion(() => Assert.AreEqual(false, client.EnabledRequest));
-        Assert.AreEqual("\"etag\"", client.LastEtag);
+        Assert.AreEqual("\"state-etag\"", client.LastEtag);
         Assert.IsFalse(cut.Find(".resource-header input[role=switch]").HasAttribute("checked"));
         Assert.Contains("No", cut.Find(".resource-configuration-summary").TextContent);
     }
@@ -272,7 +292,7 @@ public sealed class ToolDetailsComponentTests
         await cut.InvokeAsync(() => cut.FindComponent<ResourceNavigation>().Instance.NavigateSection("execution"));
         cut.Find("[data-testid=schema-raw-mode]").Click(); cut.Find("textarea.runner-json").Input("{ invalid json"); var editor = cut.FindComponent<JsonSchemaInputEditor>().Instance;
         cut.Find(".resource-header input[role=switch]").Change(false);
-        Assert.AreEqual("\"etag\"", client.LastEtag); Assert.AreEqual(false, client.EnabledRequest);
+        Assert.AreEqual("\"state-etag\"", client.LastEtag); Assert.AreEqual(false, client.EnabledRequest);
         Assert.AreSame(editor, cut.FindComponent<JsonSchemaInputEditor>().Instance); Assert.AreEqual("{ invalid json", cut.Find("textarea.runner-json").GetAttribute("value"));
         Assert.IsTrue(cut.Find("[data-testid=tool-run-submit]").HasAttribute("disabled"));
     }
@@ -395,6 +415,8 @@ public sealed class ToolDetailsComponentTests
         public Exception? ReadError { get; set; }
         public string? LastEtag { get; private set; }
         public bool? EnabledRequest { get; private set; }
+        public Task<ToolOperationalStatus> GetOperationalStateAsync(ToolResource value, CancellationToken token) =>
+            Task.FromResult(new ToolOperationalStatus(value.Uid, EnabledRequest ?? value.Definition.Enabled, "\"state-etag\""));
         public List<RunToolRequest> RunRequests { get; } = [];
         public ResourceScopeRef? ExecutionScope { get; private set; }
         public JsonElement? ExecutionOutput { get; set; }
@@ -408,8 +430,7 @@ public sealed class ToolDetailsComponentTests
         public Task<ResourceSnapshot<ToolResource>> SetEnabledAsync(string name, bool enabled, string? etag, CancellationToken cancellationToken)
         {
             LastEtag = etag; EnabledRequest = enabled;
-            Resource = Resource with { Definition = Resource.Definition with { Enabled = enabled } };
-            return Task.FromResult(new ResourceSnapshot<ToolResource>(Resource, "\"etag-2\""));
+            return Task.FromResult(new ResourceSnapshot<ToolResource>(Resource, ReadEtag));
         }
 
         public Task<IReadOnlyList<ToolResource>> GetToolsAsync(string? provider = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();

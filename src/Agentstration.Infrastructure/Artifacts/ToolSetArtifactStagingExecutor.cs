@@ -2,6 +2,8 @@ using System.Text.Json;
 using Agentstration.Artifacts.Contracts;
 using Agentstration.Identity.Contracts;
 using Agentstration.Runtime.Abstractions;
+using Agentstration.ResourceManagement;
+using Agentstration.Resources;
 using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Artifacts;
@@ -9,7 +11,8 @@ namespace Agentstration.Infrastructure.Artifacts;
 public sealed class ToolSetArtifactStagingExecutor(
     ToolSetService toolSets,
     IToolExecutionPipeline pipeline,
-    IRequestContextScopeFactory requestScopes) : IArtifactStagingToolExecutor
+    IRequestContextScopeFactory requestScopes,
+    IResourceStore store) : IArtifactStagingToolExecutor
 {
     public async Task ValidateAsync(ArtifactStagingBindingResource binding, ArtifactBackendCommandContext context, CancellationToken cancellationToken)
     {
@@ -59,9 +62,22 @@ public sealed class ToolSetArtifactStagingExecutor(
     {
         var selected = await ResolveAsync(binding, capability, cancellationToken);
         var member = selected.Member;
+        ResourceScopeRef? authorizationScope = null;
+        using (requestScopes.PushSystem())
+        {
+            var saved = await store.GetExactAsync<ToolResource>(ScopedResourceAddress.Create(
+                member.ToolScopeRef, member.ToolNamespace, ToolResourceKinds.Tool, member.ToolName), cancellationToken);
+            // Built-in staging is a private service dependency, never an exposed consumer Tool.
+            // External/extension backends retain the actual consumer policy check in the invoker.
+            if (saved?.Value is { Governance.Origin.Kind: ResourceOriginKind.BuiltIn,
+                Governance.ManagedBy.Kind: ResourceManagementAuthorityKind.Core } tool
+                && tool.Uid == member.ToolUid && tool.Generation == member.ToolGeneration
+                && ArtifactCapabilities.All.Contains(member.ExternalToolId)) authorizationScope = member.ToolScopeRef;
+        }
         var result = await pipeline.ExecuteAsync(new ToolExecutionContext
         {
             OwnerKind = ToolExecutionOwnerKind.ArtifactService,
+            AuthorizationScopeRef = authorizationScope,
             ToolCallId = context.CallId,
             InvocationId = $"{context.CallId}:attempt:1",
             ToolId = member.ToolName,

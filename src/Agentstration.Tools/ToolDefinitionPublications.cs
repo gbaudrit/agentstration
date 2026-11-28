@@ -248,7 +248,7 @@ public sealed partial class ToolDefinitionService
                 target.Namespace, ToolResourceKinds.Tool, target.Name), cancellationToken) : null;
         if (tool is null || tool.Value.Uid != target.Uid || tool.Value.Generation != target.Generation)
             throw new ToolDefinitionValidationException("tool_definition_target_stale", "The source Tool no longer matches the selected exact identity and revision.");
-        if (!tool.Value.Definition.Enabled || tool.Value.Definition.Discovery?.Available != true || tool.Value.Definition.Schema is null)
+        if (!(toolAccess is null ? tool.Value.Definition.Enabled : await toolAccess.IsEnabledAsync(tool.Value, cancellationToken)) || tool.Value.Definition.Discovery?.Available != true || tool.Value.Definition.Schema is null)
             throw new ToolDefinitionValidationException("tool_definition_target_unavailable", "The source Tool is disabled, unavailable or has no contract.");
         var providerReference = tool.Value.Definition.Provider
             ?? throw new ToolDefinitionValidationException("tool_definition_target_invalid", "The source Tool has no provider.");

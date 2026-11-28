@@ -212,7 +212,7 @@ public sealed partial class ProjectSharingApiTests
     {
         using var actor = host.Scope(); await SeedPrerequisitesAsync(host);
         var owner = ResourceScopeRef.Workspace(host.Context.WorkspaceId); var resources = host.Host.Services.GetRequiredService<IResourceStore>();
-        await resources.PutExactAsync(owner, new ExtensionRegistrationResource
+        var registration = await resources.PutExactAsync(owner, new ExtensionRegistrationResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ExtensionKinds.ExtensionRegistration,
@@ -240,9 +240,9 @@ public sealed partial class ProjectSharingApiTests
         }, null, true, default);
         await tools.RefreshDiscoveryExactAsync(owner, "github-fixture", default, default);
         var selected = (await tools.ListVisibleToolsAsync(owner, default)).Where(value => value.Value.Definition.Provider?.Name == "github-fixture").ToArray();
-        foreach (var tool in selected) await tools.SetToolEnabledAsync(tool.Value.Name, true, tool.ETag, default);
+        foreach (var tool in selected) await tools.SetToolEnabledAsync(tool.Value.Name, true, (await tools.GetToolOperationalStateAsync(tool.Value, default))?.ETag, default);
         var result = new Dictionary<string, ToolResource>();
-        var authority = ResourceGovernance.Extension($"{owner.Value}/ExtensionRegistration/default/github-fixture", "Agentstration.Extensions.GitHub", "1.0.0");
+        var authority = ResourceGovernance.Extension($"{owner.Value}/ExtensionRegistration/default/github-fixture", "Agentstration.Extensions.GitHub", "1.0.0", registration.Value.Uid);
         using (host.Host.Services.GetRequiredService<IResourceGovernanceContext>().Push(authority))
         {
             foreach (var tool in (await tools.ListVisibleToolsAsync(owner, default)).Where(value => value.Value.Definition.Provider?.Name == "github-fixture" && value.Value.Definition.ExternalId is "github.issue" or "github.coding"))
@@ -256,6 +256,7 @@ public sealed partial class ProjectSharingApiTests
                     Metadata = new() { Name = "seed-" + tool.Value.Definition.ExternalId!.Replace('.', '-') },
                     Definition = tool.Value.Definition
                 }, null, true, default);
+                await tools.SetToolEnabledExactAsync(owner, managed.Value.Name, managed.Value.Namespace, true, null, default);
                 result.Add(tool.Value.Definition.ExternalId!, managed.Value);
             }
         }

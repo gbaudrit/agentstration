@@ -19,7 +19,7 @@ using ModelContextProtocol;
 namespace Agentstration.Infrastructure.Work;
 
 public sealed class WorkProjectContractResolver(IResourceStore resources, IAepExtensionRegistrationResolver extensions,
-    AepMcpTransport transport, IToolExecutionPipeline pipeline, TimeProvider clock)
+    AepMcpTransport transport, IToolExecutionPipeline pipeline, TimeProvider clock, ToolAccessService? toolAccess = null)
 {
     public async Task<Result<WorkProjectContractEvidence>> ResolveAsync(WorkProjectContextBinding binding, RequestContext caller,
         Func<WorkProjectResourceReference, CancellationToken, Task<Result<WorkProjectResolvedBinding>>> authorize, CancellationToken token, Func<CancellationToken, Task>? beforeInvoke = null, Func<CancellationToken, Task<ResolvedSecretInputs>>? headers = null)
@@ -92,7 +92,7 @@ public sealed class WorkProjectContractResolver(IResourceStore resources, IAepEx
                 return Failure("work_project_connection_incompatible");
             var allowed = await authorize(Reference(tool), token);
             if (!allowed.IsSuccess) return Failure(allowed.ErrorCode!);
-            if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true) return Failure("work_project_contract_unavailable");
+            if (!(toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) || tool.Definition.Discovery?.Available != true) return Failure("work_project_contract_unavailable");
             if (!tool.Definition.Metadata.TryGetValue(contractId, out var advertised)
                 || !mapping.Metadata!.TryGetValue(contractId, out var mapped)
                 || !JsonElement.DeepEquals(advertised, declaration) || !JsonElement.DeepEquals(mapped, declaration)

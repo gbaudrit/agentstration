@@ -1,0 +1,40 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceAccessPanelStrings> Localizer
+
+<section data-testid="governed-resource-inventory" data-parent-uid="@ParentUid">
+    @if (loading) { <LoadingState Message="@Localizer["Loading"]" /> }
+    else if (failed) { <p role="alert">@Localizer["UnableToLoadMessage"]</p> }
+    else if (snapshot is not null)
+    {
+        <p>@Localizer["RelatedResources", snapshot.Resources.Count]</p>
+        <CollectionView TItem="ResourceRelatedAccessItem" Items="snapshot.Resources" IdentityLabel="@Localizer["ResourceIdentity"]" InformationLabels="@(new[] { Localizer["Scope"].Value })">
+            <Identity Context="item"><CollectionIdentity DisplayName="@(item.DisplayName ?? item.Name)" Name="@item.Name" Namespace="@item.Resource.Namespace.Value" Href="@RelatedResourcePresentation.Href(Services, item.Resource.Kind, item.Name, item.Resource.Namespace, item.Resource.OwnerScopeRef)" IconName="layers"><Badges><small>@KindLabel(item.Resource.Kind)</small></Badges></CollectionIdentity></Identity>
+            <Information Context="item"><ResourceScopeBadge ScopeRef="item.Resource.OwnerScopeRef" /></Information>
+        </CollectionView>
+    }
+</section>
+
+@code {
+    private IResourceAccessPolicyClient Policies => Services.GetService<IResourceAccessPolicyClient>() ?? throw new InvalidOperationException("Resource access services are unavailable.");
+    private IResourceScopeInventoryClient Scopes => Services.GetService<IResourceScopeInventoryClient>() ?? throw new InvalidOperationException("Scope inventory services are unavailable.");
+    [Parameter, EditorRequired] public Guid ParentUid { get; set; }
+    private string KindLabel(string kind) { var label = Localizer["Kind." + kind]; return label.ResourceNotFound ? kind : label.Value; }
+    private Guid loadedUid;
+    private readonly CancellationTokenSource cancellation = new();
+    private ResourceRelatedAccessSnapshot? snapshot;
+    private bool loading, failed;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedUid == ParentUid) return;
+        var uid = ParentUid; loadedUid = uid; snapshot = null; loading = true; failed = false;
+        try
+        {
+            var result = await Policies.GetRelatedAsync(uid, cancellation.Token);
+            if (loadedUid == uid) snapshot = result;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException) { if (loadedUid == uid) failed = true; }
+        finally { if (loadedUid == uid) loading = false; }
+    }
+    public void Dispose() { loadedUid = Guid.Empty; cancellation.Cancel(); cancellation.Dispose(); }
+}

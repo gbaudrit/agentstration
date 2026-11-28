@@ -17,7 +17,8 @@ public sealed class ToolManagementService(
     IResourceReferenceResolver references,
     IResourceScopeOperations scopeOperations,
     IEnumerable<IToolProviderDiscovery> discoveries,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IResourceOperationalStateStore? operationalStates = null)
 {
     public static string ToolProviderId(string name) => name;
     public static string ToolId(string name) => name;
@@ -210,14 +211,25 @@ public sealed class ToolManagementService(
     public async Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, bool enabled, string? ifMatch, CancellationToken cancellationToken)
         => await SetToolEnabledAsync(name, default, enabled, ifMatch, cancellationToken);
 
-    public async Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string? ifMatch, CancellationToken cancellationToken)
+    public Task<StoredResource<ToolResource>> SetToolEnabledAsync(string name, ResourceNamespace @namespace, bool enabled, string? ifMatch, CancellationToken cancellationToken) =>
+        SetToolEnabledExactAsync(null, name, @namespace, enabled, ifMatch, cancellationToken);
+
+    public async Task<StoredResource<ToolResource>> SetToolEnabledExactAsync(ResourceScopeRef? owner, string name, ResourceNamespace @namespace, bool enabled, string? ifMatch, CancellationToken cancellationToken)
     {
-        var stored = await GetToolAsync(name, @namespace, cancellationToken) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, name, @namespace));
+        var stored = await (owner is { } exact ? GetToolExactAsync(exact, name, @namespace, cancellationToken) : GetToolAsync(name, @namespace, cancellationToken)) ?? throw new ResourceNotFoundException(new(ToolResourceKinds.Tool, name, @namespace));
         var scopeRef = stored.Value.ScopeRef
             ?? throw new ToolResourceValidationException("The Tool has no ownership scope.");
-        return await scopeOperations.WriteAsync(stored.Value, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
-            await store.PutExactAsync(scopeRef, stored.Value with { Generation = checked(stored.Value.Generation + 1), Definition = stored.Value.Definition with { Enabled = enabled } }, ifMatch ?? stored.ETag, false, token), cancellationToken);
+        if (operationalStates is null) throw new InvalidOperationException("Operational state storage is unavailable.");
+        var identity = ToolAccessService.Identity(stored.Value);
+        return await scopeOperations.WriteAsync(stored.Value.Kind, scopeRef, AuthorizationPermissions.ResourcesWrite, async token =>
+        {
+            await operationalStates.PutAsync(identity, enabled, ifMatch, token);
+            return stored;
+        }, cancellationToken);
     }
+
+    public async Task<ResourceOperationalState?> GetToolOperationalStateAsync(ToolResource tool, CancellationToken cancellationToken) =>
+        operationalStates is null ? null : await operationalStates.GetAsync(ToolAccessService.Identity(tool), cancellationToken);
 
     public async Task<StoredResource<ToolResource>> PutToolAsync(ToolResource resource, string? ifMatch, bool ifNoneMatch, CancellationToken cancellationToken)
     {

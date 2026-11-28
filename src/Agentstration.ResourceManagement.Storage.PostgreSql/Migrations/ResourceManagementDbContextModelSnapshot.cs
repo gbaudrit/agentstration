@@ -75,6 +75,49 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
                     b.ToTable("ControlPlaneResources", "management");
                 });
 
+            modelBuilder.Entity("Agentstration.ResourceManagement.Storage.PostgreSql.ResourceOperationalStateRow", b =>
+                {
+                    b.Property<Guid>("ResourceUid")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ETag")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+
+
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Namespace")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("OwnerScopeRef")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+
+                    b.Property<bool>("Enabled").HasColumnType("boolean");
+
+                    b.HasKey("ResourceUid");
+
+                    b.HasIndex("OwnerScopeRef");
+
+                    b.ToTable("ResourceOperationalStates", "management");
+                });
+
             modelBuilder.Entity("Agentstration.ResourceManagement.Storage.PostgreSql.ResourceAccessPolicyRow", b =>
                 {
                     b.Property<Guid>("ResourceUid")
@@ -89,6 +132,8 @@ namespace Agentstration.ResourceManagement.Storage.PostgreSql.Migrations
 
                     b.Property<long?>("Generation")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("AllDescendantActionsJson").IsRequired().HasColumnType("text");
 
                     b.Property<string>("GrantsJson")
                         .IsRequired()

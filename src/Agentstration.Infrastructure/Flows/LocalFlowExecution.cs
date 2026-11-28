@@ -145,7 +145,8 @@ public sealed class ManagementFlowResourceReferenceResolver(
     IResourceStore store,
     IFlowRepository flows,
     ToolSetService? toolSets = null,
-    IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null) : IFlowResourceReferenceResolver
+    IEnumerable<IFlowScopeHierarchy>? scopeHierarchies = null,
+    ToolAccessService? access = null) : IFlowResourceReferenceResolver
 {
     public async Task<bool> ExistsAsync(string resourceId, ResourceNamespace? @namespace, CancellationToken cancellationToken) =>
         await store.GetAsync<AgentResource>(new ResourceKey(AgentResourceKinds.Agent, resourceId, @namespace ?? ResourceNamespace.Default), cancellationToken) is not null;
@@ -291,7 +292,7 @@ public sealed class ManagementFlowResourceReferenceResolver(
             tool.Metadata.Namespace,
             tool.Definition.Schema.Input.Clone(),
             tool.Definition.Schema.Output?.Clone(),
-            tool.Definition.Enabled,
+            access is null ? tool.Definition.Enabled : await access.IsEnabledAsync(tool, cancellationToken),
             tool.Definition.Discovery?.Available == true,
             tool.Definition.RequiresApproval);
     }
@@ -508,7 +509,8 @@ public sealed class ToolSetDeletionGuard(
 public sealed class ManagedFlowToolExecutor(
     IResourceStore store,
     IToolExecutionPipeline pipeline,
-    IRequestContextScopeFactory? requestScopes = null) : IFlowToolExecutor
+    IRequestContextScopeFactory? requestScopes = null,
+    ToolAccessService? access = null) : IFlowToolExecutor
 {
     public async Task<FlowToolExecutionResult> ExecuteAsync(
         FlowToolExecutionRequest request,
@@ -526,7 +528,21 @@ public sealed class ManagedFlowToolExecutor(
         if (request.Route is { } pinnedTool
             && (tool.Uid != pinnedTool.ToolUid || tool.Generation != pinnedTool.ToolGeneration))
             throw Error("tool_set_member_stale", $"Tool resource '{tool.Address}' no longer matches the published ToolSet member.");
-        if (!tool.Definition.Enabled)
+        var privateCore = tool.Governance is { Origin.Kind: ResourceOriginKind.BuiltIn,
+            ManagedBy.Kind: ResourceManagementAuthorityKind.Core };
+        var authorizationScope = tool.Governance.Origin.Kind == ResourceOriginKind.Extension
+            ? request.Scope.AccessScopeRef : privateCore ? toolScope : request.DefinitionScopeRef;
+        if (privateCore && access is not null && authorizationScope != request.Scope.AccessScopeRef
+            && (await access.CanUseAsync(tool, request.Scope.AccessScopeRef, cancellationToken)).ReasonCode
+                == Agentstration.ResourceManagement.Contracts.ResourceAccessDecisionReasons.ExplicitDeny)
+            throw Error("tool_access_denied", "The consumer has an explicit denial on this private Core Tool.");
+        if (access is not null)
+        {
+            var decision = await access.CanUseAsync(tool, authorizationScope, cancellationToken);
+            if (!decision.Allowed) throw Error("tool_access_denied",
+                $"Consumer '{authorizationScope}' cannot use Tool '{tool.ScopeRef}/{tool.Namespace}/{tool.Name}': {decision.ReasonCode}.");
+        }
+        if (!(access is null ? tool.Definition.Enabled : await access.IsEnabledAsync(tool, cancellationToken)))
             throw Error("tool_disabled", $"Tool resource '{tool.Address}' is disabled.");
         if (tool.Definition.Discovery?.Available != true)
             throw Error("tool_unavailable", $"Tool resource '{tool.Address}' is no longer available from its provider.");
@@ -586,6 +602,7 @@ public sealed class ManagedFlowToolExecutor(
         {
             var result = await pipeline.ExecuteAsync(new ToolExecutionContext
             {
+                AuthorizationScopeRef = authorizationScope,
                 OwnerKind = ToolExecutionOwnerKind.FlowRun,
                 ToolCallId = logicalCallId,
                 InvocationId = invocationId,

@@ -18,11 +18,13 @@ export class ResourceAccessPage {
   public async openVaultAccess(): Promise<void> {
     await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
+    await this.revealTargetedAccess();
   }
 
   public async openSecretAccess(): Promise<void> {
     await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
+    await this.revealTargetedAccess();
   }
 
   public async ensureManagedUtilitiesTool(consoleUrl: string): Promise<string> {
@@ -101,12 +103,20 @@ export class ResourceAccessPage {
       expect(response?.status(), `Managed Tool route '${route.toString()}'`).toBe(200);
       await this.page.getByTestId(TestIds.resourceAdministration.toolDetails).waitFor({ state: 'visible' });
     }).toPass({ timeout: 30_000 });
-    await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeDisabled();
+    await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeEnabled();
     await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
+    await this.revealTargetedAccess();
     await expect(this.panel).toHaveAttribute('data-resource-managed', 'true');
     await expect(this.panel).toHaveAttribute('data-resource-origin', 'Extension');
     return this.identity();
+  }
+
+  private async revealTargetedAccess(): Promise<void> {
+    const toggle = this.panel.getByTestId(TestIds.resourceAccess.targetedToggle);
+    await toggle.waitFor({ state: 'visible' });
+    if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   }
 
   public async addGrant(scopeRef: string): Promise<void> {

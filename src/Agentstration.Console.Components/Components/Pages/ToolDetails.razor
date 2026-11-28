@@ -12,13 +12,13 @@
 @{ var presentations = Presentations; }
 <ConsoleResourceDetailsTemplate Resource="tool" Name="@(tool?.Definition.DisplayName ?? Name)" ResourceType="@T("Tool")" Domain="tool" IconName="wrench" Description="@tool?.Definition.Description" CollectionHref="@ResourceOwnershipContext.PreserveNavigation("/tools", Services)" CollectionLabel="@ToolLabels["Title"]"
     StatusText="@(tool?.Definition.Discovery is { } discovery ? AvailabilityLabel(discovery.Available) : null)" Status="@(tool?.Definition.Discovery?.Available == true ? UiStatus.Success : tool?.Definition.Discovery is null ? UiStatus.Neutral : UiStatus.Warning)"
-    Enabled="tool?.Definition.Enabled" EnabledChanged="ToggleAsync" EnabledDisabled="@(!CanWrite || tool?.Governance.IsManaged != false || toggling || refreshing)" EnabledTestId="tool-enabled-toggle"
+    Enabled="@(operational?.Enabled ?? tool?.Definition.Enabled)" EnabledChanged="ToggleAsync" EnabledDisabled="@(!CanWrite || toggling || refreshing)" OperationalActivation="true" EnabledTestId="tool-enabled-toggle"
     ResourceIdentity="@(loadedKey ?? Name)" SectionState="sectionState" SectionPresentations="presentations" AdditionalSections="AdditionalSections" SelectionChanged="SelectSection"
     LoadState="loadState" OnRetry="RetryAsync" OnRefresh="RefreshAsync" Busy="@(toggling || submitting)" Yaml="@SavedYaml" TestId="resource-tool-details" SectionTestIdPrefix="tool">
     <Actions>@if (CanWrite) { <a class="button-secondary" href="@NewDefinitionUrl">@T("NewDefinition")</a> }</Actions>
     <Feedback>@if (commandError is not null) { <p class="error-panel" role="alert">@commandError</p> }@if (InputContractChanged) { <div class="form-alert form-alert-warning" role="status">@T("InputContractChanged")</div> }</Feedback>
     <OverviewMetrics>@if (tool?.Definition.Discovery is { } observed) { <MetricCard Label="@T("LastSeen")" Value="@observed.LastSeenAt.ToString("g")" /> }</OverviewMetrics>
-    <OverviewSummary Context="identity">@if (tool is not null) { <ToolResourceSummary Resource="tool" Identity="identity" Provider="provider" ManagingExtension="managingExtension" /> }</OverviewSummary>
+    <OverviewSummary Context="identity">@if (tool is not null) { <ToolResourceSummary Resource="tool" OperationalEnabled="operational?.Enabled" Identity="identity" Provider="provider" ManagingExtension="managingExtension" /> }</OverviewSummary>
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="tool-inspection-form" FormName="tool-inspection"
         SectionState="sectionState" Sections="presentations" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
     <AdditionalContent Context="path">@Execution</AdditionalContent>
@@ -57,9 +57,9 @@
                 {
                     <p class="tool-run-mode-unavailable" role="status">@T("SimulationUnavailableHelp")</p>
                 }
-                @if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
+                @if (!(operational?.Enabled ?? tool.Definition.Enabled) || tool.Definition.Discovery?.Available != true)
                 {
-                    <p class="inline-warning" role="status">@T(!tool.Definition.Enabled ? "ToolDisabledHelp" : "ToolUnavailableHelp")</p>
+                    <p class="inline-warning" role="status">@T(!(operational?.Enabled ?? tool.Definition.Enabled) ? "ToolDisabledHelp" : "ToolUnavailableHelp")</p>
                 }
                 @if (runMode == ToolRunMode.Execute && tool.Definition.RequiresApproval)
                 {
@@ -170,6 +170,7 @@
     }
     private RenderFragment ResetInputsAction => @<button type="button" class="button-secondary" disabled="@(submitting || toggling || refreshing)" @onclick="ResetRunInput">@T("ResetRunInput")</button>;
     private ToolResource? tool;
+    private ToolOperationalStatus? operational;
     private ToolProviderResource? provider;
     private ExtensionInventoryItemResponse? managingExtension;
     private string? etag;
@@ -193,7 +194,7 @@
         }
     }
     private IReadOnlyDictionary<string, JsonElement>? ManagedRunValues => runMode == ToolRunMode.Simulate ? DryRunEnabled : null;
-    private bool CanSubmit => tool is { Definition.Enabled: true }
+    private bool CanSubmit => tool is not null && (operational?.Enabled ?? tool.Definition.Enabled)
         && tool.Definition.Discovery?.Available == true
         && runInputValid
         && !InputContractChanged
@@ -252,7 +253,7 @@
             var saved = snapshot.Value;
             if (saved.Name != requestedName || saved.Namespace != ns || saved.ScopeRef is null || requestedOwner is { } owner && saved.ScopeRef != owner) throw new InvalidOperationException(T("ResourceIdentityMismatch"));
             var source = await LoadSourceAsync(saved); if (request != loadVersion) return;
-            Apply(snapshot); provider = source.Provider; managingExtension = source.Extension;
+            Apply(snapshot); operational = await Client.GetOperationalStateAsync(saved, cancellation.Token); if (request != loadVersion) return; provider = source.Provider; managingExtension = source.Extension;
             runMode = CanSimulate ? ToolRunMode.Simulate : ToolRunMode.Execute;
             runInput = CanSimulate ? ToolDryRunContract.Enable(JsonSerializer.SerializeToElement(new { })) : JsonSerializer.SerializeToElement(new { });
             loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
@@ -290,7 +291,7 @@
             var next = snapshot.Value;
             if (next.Uid != current.Uid || next.ScopeRef != owner || next.Address != current.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
             var source = await LoadSourceAsync(next); if (request != loadVersion) return;
-            Apply(snapshot); provider = source.Provider; managingExtension = source.Extension; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
+            Apply(snapshot); operational = await Client.GetOperationalStateAsync(next, cancellation.Token); if (request != loadVersion) return; provider = source.Provider; managingExtension = source.Extension; loadState = new(ResourceLoadStatus.Ready) { HasContent = true };
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { if (request == loadVersion) { var failure = Failure(exception); if (failure.Status is ResourceLoadStatus.NotFound or ResourceLoadStatus.Forbidden) Clear(); loadState = failure with { HasContent = tool is not null }; } }
@@ -303,14 +304,15 @@
 
     private async Task ToggleAsync(bool enabled)
     {
-        if (!CanWrite || tool!.Governance.IsManaged || toggling || refreshing) return;
+        if (!CanWrite || tool is null || toggling || refreshing) return;
         toggling = true; commandError = null; var request = loadVersion;
         try
         {
-            var value = await Client.SetEnabledAsync(tool.Namespace, tool.Name, enabled, etag, cancellation.Token);
+            var value = await Client.SetEnabledAsync(tool.ScopeRef!.Value, tool.Namespace, tool.Name, enabled, operational?.ETag, cancellation.Token);
+            var state = await Client.GetOperationalStateAsync(tool, cancellation.Token);
             if (request != loadVersion) return;
             if (value.Value.Uid != tool.Uid || value.Value.ScopeRef != tool.ScopeRef || value.Value.Address != tool.Address) { Clear(); loadState = new(ResourceLoadStatus.NotFound); return; }
-            Apply(value);
+            Apply(value); operational = state;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
         catch (Exception exception) { if (request == loadVersion) commandError = exception.Message; }

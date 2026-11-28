@@ -8,6 +8,7 @@ using Agentstration.Application.Work;
 using Agentstration.Bootstrap.Contracts;
 using Agentstration.ConnectedServices.Contracts;
 using Agentstration.Identity.Contracts;
+using Agentstration.Extensions.Contracts;
 using Agentstration.Tools;
 using Agentstration.ResourceManagement;
 using Agentstration.ResourceManagement.Contracts;
@@ -163,15 +164,19 @@ public sealed partial class ProjectSharingApiTests
         using var actor = host.Scope();
         var store = host.Host.Services.GetRequiredService<IResourceStore>();
         var owner = ResourceScopeRef.Workspace(host.Context.WorkspaceId);
-        var authority = ResourceGovernance.Extension($"{owner.Value}/ExtensionRegistration/default/github-fixture", "Agentstration.Extensions.GitHub", "1.0.0");
+        var registration = (await store.GetExactAsync<ExtensionRegistrationResource>(new(owner, ResourceNamespace.Default,
+            ExtensionKinds.ExtensionRegistration, "github-fixture"), default))!.Value;
+        var authority = ResourceGovernance.Extension($"{owner.Value}/ExtensionRegistration/default/github-fixture", "Agentstration.Extensions.GitHub", "1.0.0", registration.Uid);
         using var governance = host.Host.Services.GetRequiredService<IResourceGovernanceContext>().Push(authority);
-        var sources = await host.Host.Services.GetRequiredService<ToolManagementService>().ListVisibleToolsAsync(owner, default);
+        var tools = host.Host.Services.GetRequiredService<ToolManagementService>();
+        var sources = await tools.ListVisibleToolsAsync(owner, default);
         foreach (var source in sources.Where(value => value.Value.Definition.ExternalId is "github.tracking.describe" or "github.forge.describe"))
         {
             // Replace the legacy unmanaged fixture projection with the same public contribution's
             // normal enrollment-owned identity, without creating a second mapping for the operation.
             await store.DeleteExactAsync(new(owner, source.Value.Namespace, ToolResourceKinds.Tool, source.Value.Name), source.ETag, default);
-            await store.PutExactAsync(owner, source.Value with { Governance = authority, Generation = 1 }, null, true, default);
+            var managed = await store.PutExactAsync(owner, source.Value with { Governance = authority, Generation = 1 }, null, true, default);
+            await tools.SetToolEnabledExactAsync(owner, managed.Value.Name, managed.Value.Namespace, true, null, default);
         }
     }
 

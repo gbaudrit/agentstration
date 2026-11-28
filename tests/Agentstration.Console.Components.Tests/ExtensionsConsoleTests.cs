@@ -873,6 +873,7 @@ public sealed partial class ExtensionsConsoleTests
 
         public static ToolResource Tool(string externalId) => new()
         {
+            Uid = Guid.NewGuid(),
             ApiVersion = ResourceApiVersions.CoreV1,
             Kind = ToolResourceKinds.Tool,
             Metadata = new ResourceMetadata { Name = $"paired-crawl4ai.{externalId}" },

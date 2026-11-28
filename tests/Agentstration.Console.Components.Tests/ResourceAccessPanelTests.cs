@@ -166,6 +166,26 @@ public sealed class ResourceAccessPanelTests
         Assert.AreEqual(0, policies.GetCalls);
     }
 
+    [TestMethod]
+    public void AllDescendantsSwitchPreservesTargetedDenialsWhenEnabledAndDisabled()
+    {
+        var uid = Guid.NewGuid(); var tenant = ResourceScopeRef.Tenant(Guid.NewGuid());
+        var identity = new ResourceAccessIdentity(uid, ResourceScopeRef.Instance, ResourceNamespace.Default, "Agent");
+        var policies = new FakePolicies { Existing = new(new(identity,
+            [new(tenant, []) { DeniedActions = [ResourceAccessAction.Use] }]), "\"existing\"") };
+        using var context = Context(policies, new FakeScopes(uid, tenant));
+        var cut = RenderPanel(context);
+        cut.Find("[data-testid=resource-access-all-descendants] input[role=switch]").Change(true);
+        cut.Find("[data-testid=resource-access-save]").Click();
+        Assert.IsNotNull(policies.Saved);
+        Assert.HasCount(2, policies.Saved.AllDescendantActions);
+        Assert.AreEqual(ResourceAccessAction.Use, policies.Saved.Grants.Single().DeniedActions.Single());
+        cut.Find("[data-testid=resource-access-all-descendants] input[role=switch]").Change(false);
+        cut.Find("[data-testid=resource-access-save]").Click();
+        Assert.IsEmpty(policies.Saved.AllDescendantActions);
+        Assert.AreEqual(ResourceAccessAction.Use, policies.Saved.Grants.Single().DeniedActions.Single());
+    }
+
     private static IRenderedComponent<ResourceAccessPanel> RenderPanel(BunitContext context) => context.Render<ResourceAccessPanel>(parameters => parameters
         .Add(value => value.OwnerScopeRef, ResourceScopeRef.Instance)
         .Add(value => value.Namespace, ResourceNamespace.Default)

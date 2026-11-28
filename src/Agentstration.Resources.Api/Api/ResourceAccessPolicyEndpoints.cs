@@ -11,6 +11,10 @@ internal static class ResourceAccessPolicyEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var policies = endpoints.MapGroup("/api/resource-access-policies");
+        policies.MapGet("/{resourceUid:guid}/related", RelatedAsync).Produces<ResourceRelatedAccessSnapshot>().WithSummary("Inspect verified resources related to an exact parent").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        policies.MapGet("/{resourceUid:guid}/related/evaluate", EvaluateRelatedAsync).Produces<ResourceRelatedAccessEvaluation>().WithSummary("Evaluate related resources in an exact consumer scope").RequireAuthorization(AgentstrationPolicies.CanReadResources);
+        policies.MapPost("/{resourceUid:guid}/related", ApplyRelatedAsync).Produces<ResourceRelatedAccessResult[]>().WithSummary("Administer access for reviewed related resources").RequireAuthorization(AgentstrationPolicies.CanWriteResources);
+
         policies.MapGet("/", ListAsync)
             .Produces<ValueResponse<ResourceAccessPolicyResponse>>()
             .WithSummary("List access policies owned by an exact resource scope")
@@ -32,6 +36,13 @@ internal static class ResourceAccessPolicyEndpoints
             .WithSummary("Evaluate an exact resource access decision")
             .RequireAuthorization(AgentstrationPolicies.CanReadResources);
     }
+
+    private static Task<IResult> RelatedAsync(Guid resourceUid, ResourceRelatedAccessService service, CancellationToken token) =>
+        ExecuteAsync(async () => Results.Ok(await service.GetAsync(resourceUid, token)));
+    private static Task<IResult> EvaluateRelatedAsync(Guid resourceUid, string consumerScopeRef, ResourceRelatedAccessService service, CancellationToken token) =>
+        ExecuteAsync(async () => Results.Ok(await service.EvaluateAsync(resourceUid, ResourceScopeRef.Parse(consumerScopeRef), token)));
+    private static Task<IResult> ApplyRelatedAsync(Guid resourceUid, ResourceRelatedAccessRequest body, ResourceRelatedAccessService service, CancellationToken token) =>
+        ExecuteAsync(async () => Results.Ok(await service.ApplyAsync(resourceUid, body, token)));
 
     private static Task<IResult> ListAsync(string ownerScopeRef, IResourceAccessPolicyService service,
         CancellationToken token) => ExecuteAsync(async () => Results.Ok(
@@ -81,7 +92,8 @@ internal static class ResourceAccessPolicyEndpoints
         catch (ResourceAccessPolicyException exception)
         {
             var status = exception.Code is "resource_not_found" or "policy_not_found"
-                ? StatusCodes.Status404NotFound : StatusCodes.Status422UnprocessableEntity;
+                ? StatusCodes.Status404NotFound : exception.Code == "parent_access_denied"
+                    ? StatusCodes.Status403Forbidden : StatusCodes.Status422UnprocessableEntity;
             return Results.Problem(statusCode: status, title: "Resource access policy error",
                 detail: exception.Message, extensions: new Dictionary<string, object?> { ["code"] = exception.Code });
         }

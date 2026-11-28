@@ -7502,6 +7502,35 @@
         "domainSemantics": "Saved Parameter type and public configuration value. These are settings without resource identity, state, owner or row commands.",
         "evidenceStatus": "Current source and component checks; historical captures do not certify the new layout."
       }
+    },
+    {
+      "id": "extension-governed-resource-inventory",
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceRelatedInventoryPanel.razor",
+      "line": 14,
+      "host": "console",
+      "routes": [
+        "/extensions/{RegistrationName}",
+        "/extensions/enrollment/{EnrollmentInstanceId:guid}"
+      ],
+      "renderer": "CollectionView",
+      "itemType": "ResourceRelatedAccessItem",
+      "identityLabel": "ResourceIdentity",
+      "scope": true,
+      "state": false,
+      "actions": false,
+      "informationKeys": [
+        "Scope"
+      ],
+      "validation": "source-reviewed-ux-scenario-blocked",
+      "trackingIssue": 1437,
+      "verification": {
+        "sourceReviewed": true,
+        "sharedContract": "CollectionPresentationTests / collection-ui.test.ts",
+        "domainSpecifications": [
+          "tests/governed-extension-inventory.spec.ts"
+        ],
+        "interpretation": "Shared collection renderer and exact-governor inventory are source-reviewed and smoke-inspected for #1436. Reusable combined journey/catalog coverage remains deferred to #1437 after maintainer UX approval and implementation merge; no new scenario coverage is claimed."
+      }
     }
   ],
   "specialized": [
@@ -19178,6 +19207,16 @@
       "source": "src/Agentstration.Console.Components/Components/DataSourceQueryResourceSummary.razor",
       "classification": "inventoried",
       "reason": "Saved Data Source Query configuration is shared by the native embedded query overview and exact-address Preview. Draft JSON remains in the existing native editor."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Pages/ResourceRelatedAccessPanel.razor",
+      "classification": "non-collection-control",
+      "reason": "Tenant/Workspace permission switches and reviewed member-selection fields are embedded access-administration controls, not a resource list screen. The combined reusable UX journey is blocked in #1437 pending UX approval and merge."
+    },
+    {
+      "source": "src/Agentstration.Console.Components/Components/Bootstrap/WorkspaceSeedReview.razor",
+      "classification": "non-collection-control",
+      "reason": "Embedded Bootstrap seed review displays a prerequisite checklist and pinned import-plan summary as read-only form review controls, not a standalone collection. Reconciled while validating #1436 against the shared #1347 baseline; the component and Bootstrap journey are unchanged."
     }
   ],
   "reconciliation": {

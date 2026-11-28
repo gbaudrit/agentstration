@@ -22,7 +22,7 @@ public sealed partial class WorkProjectConnectedServiceResolver
         try
         {
             var tool = (await resources.GetExactAsync<ToolResource>(binding.Target.Address, token))?.Value;
-            if (tool?.Definition.Provider is not { } providerRef || !tool.Definition.Enabled || tool.Definition.RequiresApproval
+            if (tool?.Definition.Provider is not { } providerRef || !(toolAccess is null ? tool.Definition.Enabled : await toolAccess.IsEnabledAsync(tool, token)) || tool.Definition.RequiresApproval
                 || tool.Definition.Discovery?.Available != true || !GitWorkProjectSharingGateway.HasRequiredCapabilities(tool)
                 || !tool.Definition.Metadata.TryGetValue(TransportMetadata, out var declaration)) return Failure("work_project_connection_incompatible");
             _ = await ValidateTransportAsync(declaration, inspected.Value!.Evidence, token);

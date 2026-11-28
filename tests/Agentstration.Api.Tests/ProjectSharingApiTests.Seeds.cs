@@ -163,9 +163,12 @@ public sealed partial class ProjectSharingApiTests
         var resources = host.Host.Services.GetRequiredService<IResourceStore>();
         // The legacy provider fixture also projects an unmanaged Tool. Model an installed public
         // extension contribution with its normal immutable manager identity for seed resolution.
-        var authority = ResourceGovernance.Extension($"{host.Tool.ScopeRef!.Value.Value}/ExtensionRegistration/default/git-fixture", "Agentstration.Extensions.Git", "1.0.0");
+        var registration = (await resources.GetExactAsync<ExtensionRegistrationResource>(new(host.Tool.ScopeRef!.Value,
+            ResourceNamespace.Default, ExtensionKinds.ExtensionRegistration, "git-fixture"), default))!.Value;
+        var authority = ResourceGovernance.Extension($"{host.Tool.ScopeRef.Value.Value}/ExtensionRegistration/default/git-fixture", "Agentstration.Extensions.Git", "1.0.0", registration.Uid);
         using (host.Host.Services.GetRequiredService<IResourceGovernanceContext>().Push(authority))
-            await resources.PutExactAsync(host.Tool.ScopeRef.Value, new ToolResource
+        {
+            var source = await resources.PutExactAsync(host.Tool.ScopeRef.Value, new ToolResource
             {
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ToolResourceKinds.Tool,
@@ -175,6 +178,10 @@ public sealed partial class ProjectSharingApiTests
                 Governance = authority,
                 Definition = host.Tool.Definition
             }, null, true, default);
+            var tools = host.Host.Services.GetRequiredService<ToolManagementService>();
+            await tools.SetToolEnabledExactAsync(host.Tool.ScopeRef.Value, source.Value.Name, source.Value.Namespace,
+                true, (await tools.GetToolOperationalStateAsync(source.Value, default))?.ETag, default);
+        }
         var runtime = (await resources.PutExactAsync(ResourceScopeRef.Instance, new RuntimeProfileResource
         {
             ApiVersion = ResourceApiVersions.CoreV1,

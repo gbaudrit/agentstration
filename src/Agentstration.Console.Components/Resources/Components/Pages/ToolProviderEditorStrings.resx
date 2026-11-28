@@ -58,4 +58,14 @@
   <data name="MissingResourceOwner"><value>The resource link must specify its exact ownership scope.</value></data>
   <data name="ResourceIdentityMismatch"><value>The returned resource does not match the requested identity.</value></data>
   <data name="ResourceYamlExport"><value>YAML shows the saved definition. Edit the form to change this resource.</value></data>
+  <data name="ToolsWithoutToolSet" xml:space="preserve"><value>Tools without a ToolSet</value></data>
+  <data name="EnableGroup" xml:space="preserve"><value>Activate group</value></data>
+  <data name="DisableGroup" xml:space="preserve"><value>Deactivate group</value></data>
+  <data name="EnableSelected" xml:space="preserve"><value>Activate selected tools</value></data>
+  <data name="DisableSelected" xml:space="preserve"><value>Deactivate selected tools</value></data>
+  <data name="ManageGroupAccess" xml:space="preserve"><value>Manage group access</value></data>
+  <data name="SelectTool" xml:space="preserve"><value>Select {0}</value></data>
+  <data name="GroupActivationPartial" xml:space="preserve"><value>Some activation changes were not applied. Refresh and review the current state.</value></data>
+  <data name="GroupActivationSaved" xml:space="preserve"><value>Administrative activation updated.</value></data>
+  <data name="MembershipUnverified" xml:space="preserve"><value>The saved membership no longer matches the materialized Tools. Refresh the extension before administering this group.</value></data>
 </root>

@@ -330,6 +330,9 @@ public sealed record ToolExecutionScope
 
 public sealed record ToolExecutionContext
 {
+    // Trusted owner-side dependency authorization, never accepted from MCP arguments.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public ResourceScopeRef? AuthorizationScopeRef { get; init; }
     public IReadOnlyCollection<ResourceReference>? ExposedTools { get; init; }
     public bool TransientPayloads { get; init; }
     public IReadOnlyList<SecretInputReference> SecretInputs { get; init; } = [];

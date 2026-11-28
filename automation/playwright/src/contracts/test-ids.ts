@@ -413,6 +413,7 @@ export const TestIds = {
   },
   resourceAccess: {
     panel: 'resource-access-panel',
+    targetedToggle: 'resource-access-targeted-toggle',
     grant: 'resource-access-grant',
     openAdd: 'resource-access-open-add',
     target: 'resource-access-target',

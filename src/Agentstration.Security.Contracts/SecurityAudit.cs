@@ -102,6 +102,7 @@ public static class SecurityAuditActions
     public const string SchemaCreated = "schema.created";
     public const string SchemaUpdated = "schema.updated";
     public const string SchemaVersionPublished = "schema.version-published";
+    public const string ResourceOperationalStateSet = "resource.operational-state-set";
     public const string ResourceAccessPolicySet = "resource-access.policy-set";
     public const string ResourceAccessPolicyDeleted = "resource-access.policy-deleted";
     public const string ResourceAccessEvaluated = "resource-access.evaluated";

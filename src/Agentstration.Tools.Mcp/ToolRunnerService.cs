@@ -17,7 +17,8 @@ public sealed class ToolRunnerService(
     IResourceStore store,
     IToolExecutionPipeline executionPipeline,
     ICurrentRequestContext? current = null,
-    IRequestContextScopeFactory? requestScopes = null)
+    IRequestContextScopeFactory? requestScopes = null,
+    ToolAccessService? access = null)
 {
     public Task<RunToolResponse> RunAsync(
         ResourceNamespace toolNamespace,
@@ -179,7 +180,7 @@ public sealed class ToolRunnerService(
                 || AgentstrationToolProvider.ToolResourceName(definition.Value.Name) != tool.Name)
                 throw new ToolRunException("tool_scope_mismatch", 403, "The Tool does not support administrative execution.");
         }
-        if (!tool.Definition.Enabled)
+        if (!(access is null ? tool.Definition.Enabled : await access.IsEnabledAsync(tool, cancellationToken)))
             throw new ToolRunException("tool_disabled", 409, $"Tool '{tool.Address}' is disabled.");
         if (tool.Definition.Discovery?.Available != true)
             throw new ToolRunException("tool_unavailable", 409, $"Tool '{tool.Address}' is unavailable.");

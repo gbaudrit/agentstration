@@ -10,18 +10,21 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Bootstrap;
 
-public sealed class BootstrapToolContributionResolver(IResourceStore store) : IBootstrapContributionResourceResolver
+public sealed class BootstrapToolContributionResolver(IResourceStore store, ToolAccessService? access = null) : IBootstrapContributionResourceResolver
 {
     public string Kind => ToolResourceKinds.Tool;
     public async Task<BootstrapResolvedReference> ResolveAsync(
         ExtensionRegistrationResource registration, BootstrapContributionSelector selector, CancellationToken cancellationToken)
     {
         var tools = await store.ListExactAsync<ToolResource>(registration.ScopeRef!.Value, Kind, 0, 1001, cancellationToken);
+        var enabledUids = new HashSet<Guid>();
+        foreach (var tool in tools)
+            if (access is null ? tool.Value.Definition.Enabled : await access.IsEnabledAsync(tool.Value, cancellationToken)) enabledUids.Add(tool.Value.Uid);
         if (tools.Any(value => value.Value.Definition.ExternalId == selector.ContributionId
-            && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration) && !value.Value.Definition.Enabled))
+            && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration) && !enabledUids.Contains(value.Value.Uid)))
             throw new BootstrapDependencyException("contribution_disabled", $"Required Tool '{selector.ContributionId}' is disabled. Bootstrap preserves its enablement decision.");
         var matches = tools.Where(value => value.Value.Definition.ExternalId == selector.ContributionId
-            && value.Value.Definition.Enabled && value.Value.Definition.Discovery?.Available == true
+            && enabledUids.Contains(value.Value.Uid) && value.Value.Definition.Discovery?.Available == true
             && value.Value.Definition.Provider?.Name == registration.Name
             && value.Value.Definition.Provider.ScopeRef == registration.ScopeRef
             && BootstrapExtensionReferenceResolver.IsOwnedBy(value.Value, registration)

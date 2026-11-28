@@ -22,7 +22,8 @@ public sealed class ToolDiscoveryTests
             [Descriptor("a", "A"), Descriptor("b", "B"), Descriptor("c", "C")],
             [Descriptor("a", "A changed"), Descriptor("b", "B"), Descriptor("d", "D")],
             [Descriptor("a", "A changed"), Descriptor("b", "B"), Descriptor("c", "C"), Descriptor("d", "D")]);
-        var service = new ToolManagementService(store, new UnusedReferenceResolver(), new TestScopeOperations(), [discovery], new FixedTimeProvider());
+        var states = new OperationalStates();
+        var service = new ToolManagementService(store, new UnusedReferenceResolver(), new TestScopeOperations(), [discovery], new FixedTimeProvider(), states);
 
         var first = await service.RefreshDiscoveryAsync(provider.Metadata.Name, default);
         var tools = await service.ListToolsAsync(default);
@@ -30,12 +31,15 @@ public sealed class ToolDiscoveryTests
         Assert.IsTrue(tools.All(value => !value.Value.Definition.Enabled && value.Value.Definition.Discovery?.Available == true));
 
         var b = tools.Single(value => value.Value.Definition.ExternalId == "b");
-        await service.SetToolEnabledAsync(b.Value.Metadata.Name, true, b.ETag, default);
+        await service.SetToolEnabledAsync(b.Value.Metadata.Name, true, null, default);
+        Assert.IsTrue((await service.GetToolOperationalStateAsync(b.Value, default))!.Enabled);
+        Assert.AreEqual(b.Value.Generation, (await service.GetToolAsync(b.Value.Name, default))!.Value.Generation);
         var second = await service.RefreshDiscoveryAsync(provider.Metadata.Name, default);
         tools = await service.ListToolsAsync(default);
 
         Assert.AreEqual(new ToolDiscoveryDiff(1, 1, 1, 1, 3), second);
-        Assert.IsTrue(tools.Single(value => value.Value.Definition.ExternalId == "b").Value.Definition.Enabled);
+        Assert.IsFalse(tools.Single(value => value.Value.Definition.ExternalId == "b").Value.Definition.Enabled);
+        Assert.IsTrue((await service.GetToolOperationalStateAsync(b.Value, default))!.Enabled);
         Assert.IsFalse(tools.Single(value => value.Value.Definition.ExternalId == "c").Value.Definition.Discovery!.Available);
         Assert.AreEqual("A changed", tools.Single(value => value.Value.Definition.ExternalId == "a").Value.Definition.DisplayName);
 
@@ -306,4 +310,15 @@ public sealed class ToolDiscoveryTests
         public Task<T> WriteAsync<T>(Resource resource, ResourceScopeRef scopeRef, string permission, Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) => operation(cancellationToken);
         public Task<T> WriteAsync<T>(string kind, ResourceScopeRef scopeRef, string permission, Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken) => operation(cancellationToken);
     }
+    private sealed class OperationalStates : IResourceOperationalStateStore
+    {
+        private readonly Dictionary<Guid, ResourceOperationalState> values = [];
+        public Task<ResourceOperationalState?> GetAsync(Agentstration.ResourceManagement.Contracts.ResourceAccessIdentity resource, CancellationToken cancellationToken) => Task.FromResult(values.GetValueOrDefault(resource.Uid));
+        public Task<ResourceOperationalState> PutAsync(Agentstration.ResourceManagement.Contracts.ResourceAccessIdentity resource, bool enabled, string? ifMatch, CancellationToken cancellationToken)
+        {
+            var stored = new ResourceOperationalState(resource, enabled, "\"state\"", DateTimeOffset.UnixEpoch);
+            values[resource.Uid] = stored; return Task.FromResult(stored);
+        }
+    }
+
 }

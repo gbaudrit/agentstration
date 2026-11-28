@@ -56,6 +56,9 @@ public sealed class ResourceAccessPolicyService(
         ArgumentNullException.ThrowIfNull(policy);
         var current = await RequireCurrentIdentityAsync(policy.Resource, cancellationToken);
         await ValidateGrantsAsync(current.ScopeRef, policy.Grants, cancellationToken);
+        ValidateActions(policy.AllDescendantActions, allowEmpty: true);
+        if (current.ScopeRef.Kind == ResourceScopeKind.Workspace && policy.AllDescendantActions.Count != 0)
+            throw Invalid("access_descendants_unavailable", "A Workspace has no descendant scopes.");
         var canonical = policy with { Resource = CanonicalIdentity(policy.Resource, current) };
         var stored = await scopeOperations.WriteAsync(current.Kind, current.ScopeRef,
             ResourcesWritePermission,
@@ -83,6 +86,31 @@ public sealed class ResourceAccessPolicyService(
         if (!IsValidIdentity(resource) || consumerScopeRef == default || !Enum.IsDefined(action))
             return await DecisionAsync(false, ResourceAccessDecisionReasons.RequestInvalid,
                 resource.OwnerScopeRef, cancellationToken);
+        if (consumerScopeRef == resource.OwnerScopeRef)
+        {
+            var owned = await resources.GetIdentityByUidAsync(resource.Uid, cancellationToken);
+            // Identity discovery is filtered by the ambient caller. Private service dependencies
+            // can use a different trusted authorization scope and still require graph validation.
+            if (owned is not null)
+            {
+                var ownerScope = await scopes.ResolveAsync(consumerScopeRef, cancellationToken);
+                var reason = !Matches(resource, owned) ? ResourceAccessDecisionReasons.ResourceIdentityStale
+                    : ownerScope is null ? ResourceAccessDecisionReasons.ConsumerOutsideOwnerTree
+                    : ResourceAccessDecisionReasons.SameScope;
+                return await DecisionAsync(reason == ResourceAccessDecisionReasons.SameScope, reason,
+                    resource.OwnerScopeRef, cancellationToken);
+            }
+        }
+        if (resources is IResourceAccessGraphReader reader
+            && await reader.GetAccessGraphAsync(resource.Uid, cancellationToken) is { } graph)
+        {
+            var graphConsumer = await scopes.ResolveAsync(consumerScopeRef, cancellationToken);
+            if (graphConsumer is null) return await DecisionAsync(false, ResourceAccessDecisionReasons.ConsumerOutsideOwnerTree,
+                resource.OwnerScopeRef, cancellationToken);
+            var evaluated = graph.Evaluate(resource, consumerScopeRef,
+                graphConsumer.Ancestors.Select(value => value.Ref).ToArray(), action);
+            return await DecisionAsync(evaluated.Allowed, evaluated.ReasonCode, resource.OwnerScopeRef, cancellationToken);
+        }
         var current = await resources.GetIdentityByUidAsync(resource.Uid, cancellationToken);
         if (current is null)
             return await DecisionAsync(false, ResourceAccessDecisionReasons.ResourceNotFound,
@@ -116,18 +144,9 @@ public sealed class ResourceAccessPolicyService(
             return await DecisionAsync(false, ResourceAccessDecisionReasons.PolicyIdentityStale,
                 current.ScopeRef, cancellationToken);
 
-        foreach (var grant in stored.Policy.Grants.Where(value => value.Actions.Contains(action)))
-        {
-            if (grant.TargetScopeRef == consumerScopeRef)
-                return await DecisionAsync(true, ResourceAccessDecisionReasons.ExactGrant,
-                    current.ScopeRef, cancellationToken);
-            if (grant.IncludeDescendants
-                && consumer.Ancestors.Any(value => value.Ref == grant.TargetScopeRef))
-                return await DecisionAsync(true, ResourceAccessDecisionReasons.PropagatedGrant,
-                    current.ScopeRef, cancellationToken);
-        }
-        return await DecisionAsync(false, ResourceAccessDecisionReasons.GrantMissing,
-            current.ScopeRef, cancellationToken);
+        var result = ResourceAccessRules.Evaluate(stored.Policy, consumerScopeRef,
+            consumer.Ancestors.Select(value => value.Ref).ToArray(), action);
+        return await DecisionAsync(result.Allowed, result.ReasonCode, current.ScopeRef, cancellationToken);
     }
 
     private async Task<ResourceIdentitySnapshot> RequireCurrentIdentityAsync(ResourceAccessIdentity identity,
@@ -155,11 +174,11 @@ public sealed class ResourceAccessPolicyService(
                 throw Invalid("grant_target_required", "An access grant requires a target scope.");
             if (!seen.Add(grant.TargetScopeRef))
                 throw Invalid("grant_target_duplicate", $"Duplicate access grant for scope '{grant.TargetScopeRef}'.");
-            if (grant.Actions is null || grant.Actions.Count == 0
-                || grant.Actions.Count > Enum.GetValues<ResourceAccessAction>().Length
-                || grant.Actions.Distinct().Count() != grant.Actions.Count
-                || grant.Actions.Any(action => !Enum.IsDefined(action)))
-                throw Invalid("grant_actions_invalid", "An access grant requires unique supported actions.");
+            ValidateActions(grant.Actions, allowEmpty: true);
+            ValidateActions(grant.DeniedActions, allowEmpty: true);
+            if (grant.Actions.Count + grant.DeniedActions.Count == 0
+                || grant.Actions.Intersect(grant.DeniedActions).Any())
+                throw Invalid("grant_actions_invalid", "A grant requires disjoint allow/deny actions.");
             var target = await scopes.ResolveAsync(grant.TargetScopeRef, cancellationToken)
                 ?? throw Invalid("grant_target_not_found", $"Resource scope '{grant.TargetScopeRef}' was not found.");
             if (target.Scope.Ref == owner.Scope.Ref
@@ -167,6 +186,14 @@ public sealed class ResourceAccessPolicyService(
                 throw Invalid("grant_target_outside_owner_tree",
                     $"Scope '{grant.TargetScopeRef}' is not a descendant of '{ownerScopeRef}'.");
         }
+    }
+
+    private static void ValidateActions(IReadOnlyList<ResourceAccessAction> actions, bool allowEmpty)
+    {
+        if (actions is null || !allowEmpty && actions.Count == 0
+            || actions.Count > Enum.GetValues<ResourceAccessAction>().Length
+            || actions.Distinct().Count() != actions.Count || actions.Any(value => !Enum.IsDefined(value)))
+            throw Invalid("grant_actions_invalid", "Actions must be unique supported values.");
     }
 
     private static void ValidateIdentity(ResourceAccessIdentity identity)

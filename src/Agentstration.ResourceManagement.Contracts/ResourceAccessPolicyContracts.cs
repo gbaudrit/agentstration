@@ -23,11 +23,18 @@ public sealed record ResourceAccessIdentity(
 public sealed record ResourceAccessGrant(
     ResourceScopeRef TargetScopeRef,
     IReadOnlyList<ResourceAccessAction> Actions,
-    bool IncludeDescendants = false);
+    bool IncludeDescendants = false)
+{
+    public IReadOnlyList<ResourceAccessAction> DeniedActions { get; init; } = [];
+    public Guid? SourceResourceUid { get; init; }
+}
 
 public sealed record ResourceAccessPolicy(
     ResourceAccessIdentity Resource,
-    IReadOnlyList<ResourceAccessGrant> Grants);
+    IReadOnlyList<ResourceAccessGrant> Grants)
+{
+    public IReadOnlyList<ResourceAccessAction> AllDescendantActions { get; init; } = [];
+}
 
 public sealed record ResourceAccessPolicyResponse(
     ResourceAccessPolicy Policy,
@@ -55,6 +62,11 @@ public static class ResourceAccessDecisionReasons
     public const string ResourceIdentityStale = "resource_identity_stale";
     public const string PolicyIdentityStale = "policy_identity_stale";
     public const string RequestInvalid = "request_invalid";
+    public const string ExplicitDeny = "explicit_deny";
+    public const string AllDescendants = "all_descendants";
+    public const string ParentAccessDenied = "parent_access_denied";
+    public const string ToolSetInherited = "toolset_inherited";
+    public const string RelationshipInvalid = "access_relationship_invalid";
 }
 
 public interface IResourceAccessPolicyService

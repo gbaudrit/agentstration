@@ -24,7 +24,8 @@
     <DefinitionContent Context="path"><ResourceDefinitionForm @key="model" EditContext="FormContext" FieldLabels="FieldLabels" Id="toolset-inspection-form" FormName="toolset-inspection"
         Sections="presentations" SectionState="sectionState" SectionContent="DefinitionSection" ReadOnly="true" /></DefinitionContent>
     <AdditionalContent Context="path">@Versions</AdditionalContent>
-</ConsoleResourceDetailsTemplate>
+<RelatedAccessContent>@if (toolSet is not null) { <ResourceRelatedAccessPanel ParentUid="toolSet.Uid" /> }</RelatedAccessContent>
+    </ConsoleResourceDetailsTemplate>
 <ConfirmationDialog IsOpen="confirmDelete" Title="@T("DeleteTitle")" Message="@T("DeleteHelp")" ConfirmLabel="@T("ConfirmDelete")" OnConfirm="DeleteAsync" OnCancel="() => confirmDelete = false" />
 
 @code {

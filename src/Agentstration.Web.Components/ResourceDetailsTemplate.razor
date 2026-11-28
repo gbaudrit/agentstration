@@ -7,7 +7,7 @@
                     Description="@Description" TechnicalName="@TechnicalName" Namespace="@Namespace" ScopeRef="ScopeRef" ResourceUid="@(BlocksContent ? null : ResourceUid)"
                     Version="@Version" VersionDescription="@VersionDescription" StatusText="@StatusText" Status="Status" Metadata="@Metadata"
                     CollectionHref="@CollectionHref" CollectionLabel="@CollectionLabel" ShowTechnicalIdentity="false" IdentityAvailable="@(!BlocksContent)" IdentityLabels="IdentityLabels" IdentityDetails="IdentityDetails"
-                    Enabled="@(BlocksContent ? null : Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(EnabledDisabled || DefinitionReadOnlyReason is not null)" EnabledTestId="@EnabledTestId"
+                    Enabled="@(BlocksContent ? null : Enabled)" EnabledChanged="EnabledChanged" EnabledDisabled="@(EnabledDisabled || !OperationalActivation && DefinitionReadOnlyReason is not null)" EnabledTestId="@EnabledTestId"
                     PrimaryActions="@(BlocksContent ? null : PrimaryActions)" Actions="@(BlocksContent ? null : Actions)" MoreActions="@(BlocksContent ? null : HeaderMoreActions)" NavigationActions="@(ShowNavigation ? HeaderNavigation() : null)" />
     @if (LoadState is { BlocksContent: false, Status: ResourceLoadStatus.Refreshing or ResourceLoadStatus.Failed } refreshState)
     {
@@ -113,6 +113,7 @@
     [Parameter] public bool? Enabled { get; set; }
     [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
     [Parameter] public bool EnabledDisabled { get; set; }
+    [Parameter] public bool OperationalActivation { get; set; }
     [Parameter] public string? EnabledTestId { get; set; }
     [Parameter] public RenderFragment? Metadata { get; set; }
     [Parameter] public RenderFragment? PrimaryActions { get; set; }

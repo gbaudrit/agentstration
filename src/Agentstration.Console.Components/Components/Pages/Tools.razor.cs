@@ -11,6 +11,8 @@ public partial class Tools
     private readonly CancellationTokenSource cancellation = new();
     private CancellationTokenSource? pending;
     private IReadOnlyList<ToolResource>? items;
+    private IReadOnlyDictionary<Guid, bool> operational = new Dictionary<Guid, bool>();
+    private bool IsEnabled(ToolResource tool) => operational.GetValueOrDefault(tool.Uid, tool.Definition.Enabled);
     private IReadOnlyList<ExtensionInventoryItemResponse> extensions = [];
     private IReadOnlyList<ToolProviderResource> providers = [];
     private bool interactive;
@@ -22,11 +24,11 @@ public partial class Tools
     private bool disposed;
     private string CurrentContextKey => $"{Context.Current?.UserId:D}|{Context.Current?.SelectedScopeRef}|{Context.Current?.WorkspaceId:D}";
 
-    // The existing endpoint returns the complete authorized catalog in one array. No additional reads are introduced.
+    // The catalog is complete; separate operational projections feed the local activation filter.
     private IReadOnlyList<ToolResource> Filtered => (items ?? []).Where(tool =>
         (string.IsNullOrWhiteSpace(query.Search) || new[] { tool.Name, tool.Namespace.Value, tool.Definition.DisplayName, tool.Definition.ExternalId, ProviderDisplayName(tool) }.Any(value => value?.Contains(query.Search, StringComparison.OrdinalIgnoreCase) == true))
         && (query.Filter("availability").Value.Length == 0 || (tool.Definition.Discovery?.Available == true) == (query.Filter("availability").Value == "available"))
-        && (query.Filter("enabled").Value.Length == 0 || tool.Definition.Enabled.ToString().Equals(query.Filter("enabled").Value, StringComparison.OrdinalIgnoreCase))
+        && (query.Filter("enabled").Value.Length == 0 || IsEnabled(tool).ToString().Equals(query.Filter("enabled").Value, StringComparison.OrdinalIgnoreCase))
         && (query.Filter("namespace").Value.Length == 0 || tool.Namespace.Value == query.Filter("namespace").Value)
         && (query.Filter("scope").Value.Length == 0 || tool.ScopeRef?.Value == query.Filter("scope").Value)).ToArray();
     private IReadOnlyList<ToolResource> PageItems => Filtered.Skip(checked((query.Page - 1) * query.PageSize)).Take(query.PageSize).ToArray();
@@ -96,6 +98,10 @@ public partial class Tools
                 }
             }
             if (!IsCurrent(requestRevision, scope)) return;
+            var states = new List<ToolOperationalStatus>();
+            foreach (var batch in result.Chunk(32)) states.AddRange(await Task.WhenAll(batch.Select(tool => Client.GetOperationalStateAsync(tool, token))));
+            if (!IsCurrent(requestRevision, scope)) return;
+            operational = states.ToDictionary(value => value.ToolUid, value => value.Enabled);
             items = result;
             providers = providerCatalog;
             extensions = inventory;

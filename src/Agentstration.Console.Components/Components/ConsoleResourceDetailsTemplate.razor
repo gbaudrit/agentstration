@@ -10,7 +10,7 @@
                          TechnicalName="@(Resource?.Name ?? RequestedAddress?.Name)" Namespace="@(Resource?.Namespace.Value ?? RequestedAddress?.Namespace.Value)" ScopeRef="@(PresentationScopeRef ?? Resource?.ScopeRef)" Description="@Description"
                          Version="@Version" VersionDescription="@VersionDescription" StatusText="@StatusText" Status="Status" Metadata="@Metadata" PrimaryActions="@PrimaryActions" Actions="@Actions" MoreActions="@MoreActions"
                          CollectionHref="@CollectionHref" CollectionLabel="@CollectionLabel" ShowRefreshAction="ShowRefreshAction"
-                         Enabled="Enabled" EnabledChanged="EnabledChanged" EnabledDisabled="EnabledDisabled" EnabledTestId="@EnabledTestId"
+                         Enabled="Enabled" EnabledChanged="EnabledChanged" EnabledDisabled="EnabledDisabled" OperationalActivation="OperationalActivation" EnabledTestId="@EnabledTestId"
                          Feedback="@Feedback" State="@State" LoadState="EffectiveLoadState" OnRetry="OnRetry" OnRefresh="OnRefresh" HasDraft="HasDraft" DraftActions="@DraftActions" Busy="Busy"
                          DefinitionReadOnlyReason="EffectiveReadOnlyReason" ReadOnlyContextActions="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? OwnerContextAction : null)"
                          ReadOnlyTestId="@(EffectiveReadOnlyReason == ResourceReadOnlyReason.Inherited ? "inherited-resource-notice" : null)"
@@ -49,6 +49,7 @@
     [Parameter] public bool? Enabled { get; set; }
     [Parameter] public EventCallback<bool> EnabledChanged { get; set; }
     [Parameter] public bool EnabledDisabled { get; set; }
+    [Parameter] public bool OperationalActivation { get; set; }
     [Parameter] public string? EnabledTestId { get; set; }
     [Parameter] public RenderFragment? Feedback { get; set; }
     [Parameter] public RenderFragment? State { get; set; }
@@ -74,6 +75,8 @@
     [Parameter] public ResourceScopeRef? DefinitionContextScope { get; set; }
     [Parameter] public ResourceScopeRef? PresentationScopeRef { get; set; }
     [Parameter] public RenderFragment? AccessContent { get; set; }
+    [Parameter] public RenderFragment? RelatedAccessContent { get; set; }
+    private int accessRevision;
     [Parameter] public bool AllowAccess { get; set; } = true;
     [Parameter] public string? AccessVersion { get; set; }
     [Parameter] public bool EvaluateSavedAccess { get; set; }
@@ -111,9 +114,11 @@
         {
             var identity = EffectiveIdentity;
             var resource = Resource ?? throw new InvalidOperationException("Access requires a saved resource.");
-            return @<ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace"
+            return @<div><ResourceAccessPanel OwnerScopeRef="resource.ScopeRef!.Value" Namespace="resource.Namespace"
                 Kind="@resource.Kind" Name="@resource.Name" ResourceUid="resource.Uid" Generation="resource.Generation" Version="@AccessVersion"
-                Governance="resource.Governance" EvaluateSavedAccess="EvaluateSavedAccess" DraftChanged="value => AccessDraftChanged(identity, value)" />;
+                Governance="resource.Governance" EvaluateSavedAccess="EvaluateSavedAccess" DraftChanged="value => AccessDraftChanged(identity, value)" PolicySaved="() => accessRevision++" />
+                @if (RelatedAccessContent is not null) { <div @key="accessRevision">@RelatedAccessContent</div> }
+            </div>;
         }
     }
     private void AccessDraftChanged(string identity, bool value)

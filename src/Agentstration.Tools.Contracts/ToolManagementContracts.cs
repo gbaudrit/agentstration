@@ -8,6 +8,7 @@ namespace Agentstration.Tools.Contracts;
 public sealed record CreateToolProviderRequest(string Name, ToolProviderProperties Properties, ResourceScopeRef? ScopeRef = null);
 public sealed record PutToolProviderRequest(ToolProviderProperties Properties);
 public sealed record SetToolEnabledRequest(bool Enabled);
+public sealed record SetToolCollectionEnabledRequest(string MembershipToken, bool Enabled, IReadOnlyDictionary<Guid, string?> StateETags, IReadOnlyList<Guid>? ToolUids = null);
 public sealed record CreateToolCategoryRequest(string Name, ToolCategoryProperties Properties, string? Namespace = null, ResourceScopeRef? ScopeRef = null);
 public sealed record PutToolCategoryRequest(ToolCategoryProperties Properties);
 public sealed record CreateToolSetRequest(string Name, ToolSetProperties Properties, string? Namespace = null);

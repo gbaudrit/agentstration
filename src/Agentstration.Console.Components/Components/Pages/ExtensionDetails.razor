@@ -41,6 +41,7 @@
                 OnValidSubmit="SaveAsync" InvalidInputChanged="value => invalidInput = value" Busy="Busy" ReadOnly="@(!CanEditRegistration)" data-testid="extension-registration-form" />
         </DefinitionContent>
         <DraftActions><button class="text-button" type="button" @onclick="Discard" disabled="@Busy">@Shared["Discard"]</button><button type="submit" form="extension-registration-form" class="button-primary" disabled="@Busy">@T("SaveChanges")</button></DraftActions>
+    <RelatedAccessContent>@if (SavedResource is not null) { <ResourceRelatedAccessPanel ParentUid="SavedResource.Uid" /> }</RelatedAccessContent>
     </ConsoleResourceDetailsTemplate>
 }
 else
@@ -247,6 +248,7 @@ else
     {
         <section class="panel resource-section extension-managed-resources" data-testid="extension-governed-inventory">
             <div class="panel-header"><div><p class="eyebrow">@T("ManagedResources")</p><h2>@T("ManagedResources")</h2><p>@T("ManagedResources.Description")</p></div><span>@(item.Extension?.BundleInstallations is { } installations ? T("InstallationCount", installations.Count) : "—")</span></div>
+            @if (SavedResource is not null) { <ResourceRelatedInventoryPanel ParentUid="SavedResource.Uid" /> }
             @if (item.Extension?.BundleInstallations?.Count > 0)
             {
                 @foreach (var installation in item.Extension.BundleInstallations)

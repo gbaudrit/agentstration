@@ -9,6 +9,9 @@ public sealed record ResourceAccessPolicySnapshot(ResourceAccessPolicy Policy, s
 
 public interface IResourceAccessPolicyClient
 {
+    Task<ResourceRelatedAccessSnapshot> GetRelatedAsync(Guid uid, CancellationToken token) => throw new NotSupportedException();
+    Task<ResourceRelatedAccessEvaluation> EvaluateRelatedAsync(Guid uid, Agentstration.Resources.ResourceScopeRef consumer, CancellationToken token) => throw new NotSupportedException();
+    Task<IReadOnlyList<ResourceRelatedAccessResult>> ApplyRelatedAsync(Guid uid, ResourceRelatedAccessRequest request, CancellationToken token) => throw new NotSupportedException();
     Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request, CancellationToken cancellationToken);
     Task<ResourceAccessPolicySnapshot?> GetAsync(Guid resourceUid, CancellationToken cancellationToken);
     Task<ResourceAccessPolicySnapshot> PutAsync(ResourceAccessPolicy policy, string? etag,
@@ -17,6 +20,28 @@ public interface IResourceAccessPolicyClient
 
 public sealed class ResourceAccessPolicyApiClient(HttpClient httpClient) : IResourceAccessPolicyClient
 {
+    public async Task<ResourceRelatedAccessSnapshot> GetRelatedAsync(Guid uid, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"{Path(uid)}/related", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<ResourceRelatedAccessSnapshot>(token)
+            ?? throw new InvalidOperationException("The related access response is empty.");
+    }
+    public async Task<ResourceRelatedAccessEvaluation> EvaluateRelatedAsync(Guid uid, Agentstration.Resources.ResourceScopeRef consumer, CancellationToken token)
+    {
+        using var response = await httpClient.GetAsync($"{Path(uid)}/related/evaluate?consumerScopeRef={Uri.EscapeDataString(consumer.Value)}", token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<ResourceRelatedAccessEvaluation>(token)
+            ?? throw new InvalidOperationException("The related access evaluation is empty.");
+    }
+    public async Task<IReadOnlyList<ResourceRelatedAccessResult>> ApplyRelatedAsync(Guid uid, ResourceRelatedAccessRequest body, CancellationToken token)
+    {
+        using var response = await httpClient.PostAsJsonAsync($"{Path(uid)}/related", body, token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<ResourceRelatedAccessResult[]>(token)
+            ?? throw new InvalidOperationException("The related access result is empty.");
+    }
+
     public async Task<ResourceAccessDecision> EvaluateAsync(EvaluateResourceAccessRequest request,
         CancellationToken cancellationToken)
     {

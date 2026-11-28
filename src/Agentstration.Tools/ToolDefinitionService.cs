@@ -24,7 +24,8 @@ public sealed partial class ToolDefinitionService(
     IToolDefinitionUsageReader? usages = null,
     IParameterResolver? parameters = null,
     ISecretAccessAuthorizer? secretAccess = null,
-    IResourceScopeOperations? scopeOperations = null)
+    IResourceScopeOperations? scopeOperations = null,
+    ToolAccessService? toolAccess = null)
 {
     private const string JsonSchemaFormat = "json-schema";
 

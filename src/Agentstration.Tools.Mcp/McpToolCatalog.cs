@@ -276,7 +276,7 @@ public sealed class ToolProviderAdapter(
     }
 }
 
-public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter providers) : IToolCatalog
+public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter providers, ToolAccessService? access = null) : IToolCatalog
 {
     public async ValueTask<IReadOnlyCollection<IAgentTool>> ResolveAsync(IEnumerable<string> toolIds, CancellationToken cancellationToken = default)
     {
@@ -285,9 +285,11 @@ public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter pro
         {
             var identity = ToolResourceIdentity.ParseCatalogId(id);
             var tool = await store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, identity.Name, identity.Namespace), cancellationToken) ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{id}' was not found.");
-            if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{id}' is disabled.");
+            if (!(access is null ? tool.Value.Definition.Enabled : await access.IsEnabledAsync(tool.Value, cancellationToken))) throw new ToolResolutionException("tool_disabled", $"Tool resource '{id}' is disabled.");
             if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{id}' is no longer available from its provider.");
             if (tool.Value.Definition.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{id}' has no ToolProvider mapping.");
+            if (access is not null && !(await access.CanUseAsync(tool.Value, access.ConsumerScope, cancellationToken)).Allowed)
+                throw new ToolResolutionException("tool_access_denied", "The consumer scope is not authorized to use this Tool.");
             resources.Add(tool.Value);
         }
 
@@ -307,9 +309,11 @@ public sealed class McpToolCatalog(IResourceStore store, ToolProviderAdapter pro
                 ?? throw new ToolResolutionException("tool_not_found", $"Tool resource '{reference.Id}' was not found.");
             if (tool.Value.Uid != reference.Uid || tool.Value.Generation != reference.Generation)
                 throw new ToolResolutionException("tool_stale", $"Tool resource '{reference.Id}' no longer matches the Agent revision.");
-            if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{reference.Id}' is disabled.");
+            if (!(access is null ? tool.Value.Definition.Enabled : await access.IsEnabledAsync(tool.Value, cancellationToken))) throw new ToolResolutionException("tool_disabled", $"Tool resource '{reference.Id}' is disabled.");
             if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{reference.Id}' is no longer available from its provider.");
             if (tool.Value.Definition.Provider is null) throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{reference.Id}' has no ToolProvider mapping.");
+            if (access is not null && !(await access.CanUseAsync(tool.Value, access.ConsumerScope, cancellationToken)).Allowed)
+                throw new ToolResolutionException("tool_access_denied", "The consumer scope is not authorized to use this Tool.");
             resources.Add(tool.Value);
         }
 
@@ -419,7 +423,8 @@ public sealed class McpToolInvoker(
     Lazy<IEnumerable<IInternalMcpToolHandler>>? builtInTools = null,
     ICurrentRequestContext? requestContext = null,
     Lazy<ISecretInputResolver>? secretInputs = null,
-    AepMcpTransport? aepTransport = null) : IToolInvoker
+    AepMcpTransport? aepTransport = null,
+    ToolAccessService? access = null) : IToolInvoker
 {
     public async ValueTask<JsonElement?> InvokeAsync(ToolExecutionContext context, CancellationToken cancellationToken = default) =>
         (await InvokeDetailedAsync(context, cancellationToken)).Output;
@@ -564,6 +569,14 @@ public sealed class McpToolInvoker(
         ToolExecutionContext context,
         CancellationToken cancellationToken)
     {
+        var consumerScope = context.AuthorizationScopeRef ?? access?.ConsumerScope;
+        if (access is not null && consumerScope is { } pinnedConsumer && context.ToolUid is { } pinnedUid
+            && context.ToolScopeRef is { } pinnedScope)
+        {
+            var decision = await access.CanUseAsync(new Agentstration.ResourceManagement.Contracts.ResourceAccessIdentity(pinnedUid, pinnedScope, context.ToolNamespace ?? default,
+                ToolResourceKinds.Tool, context.ToolGeneration), pinnedConsumer, cancellationToken);
+            if (!decision.Allowed) throw new ToolResolutionException("tool_access_denied", $"Tool access denied: {decision.ReasonCode}.");
+        }
         using var exactResolutionScope = ExactResolutionScope(context);
         var toolNamespace = context.ToolNamespace ?? default;
         var tool = context.ToolScopeRef is { } toolScopeRef
@@ -572,10 +585,13 @@ public sealed class McpToolInvoker(
             : await store.GetAsync<ToolResource>(new ResourceKey(ToolResourceKinds.Tool, context.ToolId, toolNamespace), cancellationToken);
         if (tool is null)
             throw new ToolResolutionException("tool_not_found", $"Tool resource '{context.ToolId}' was not found.");
+        if (access is not null && consumerScope is { } consumer
+            && !(await access.CanUseAsync(tool.Value, consumer, cancellationToken)).Allowed)
+            throw new ToolResolutionException("tool_access_denied", "The consumer scope is not authorized to use this Tool.");
         if (context.ToolUid is { } toolUid && tool.Value.Uid != toolUid
             || context.ToolGeneration is { } toolGeneration && tool.Value.Generation != toolGeneration)
             throw new ToolResolutionException("tool_stale", $"Tool resource '{context.ToolId}' no longer matches the resolved execution material.");
-        if (!tool.Value.Definition.Enabled) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
+        if (!(access is null ? tool.Value.Definition.Enabled : await access.IsEnabledAsync(tool.Value, cancellationToken))) throw new ToolResolutionException("tool_disabled", $"Tool resource '{context.ToolId}' is disabled.");
         if (tool.Value.Definition.Discovery?.Available != true) throw new ToolResolutionException("tool_unavailable", $"Tool resource '{context.ToolId}' is no longer available from its provider.");
         var providerId = tool.Value.Definition.Provider?.Name
             ?? throw new ToolResolutionException("tool_mapping_invalid", $"Tool resource '{context.ToolId}' has no ToolProvider mapping.");

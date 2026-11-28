@@ -81,4 +81,48 @@
   <data name="ReviewedPolicy" xml:space="preserve"><value>Compare these saved grants with your retained draft. Saving again replaces the saved grants with your draft.</value></data>
   <data name="CurrentPolicy" xml:space="preserve"><value>Current saved grants</value></data>
   <data name="ExactTargetOnly" xml:space="preserve"><value>Exact target only</value></data>
+  <data name="AllDescendants" xml:space="preserve"><value>Allow all descendant scopes</value></data>
+  <data name="AllDescendantsHelp" xml:space="preserve"><value>Grant discovery and use to current and future descendants. Explicit exceptions remain effective.</value></data>
+  <data name="AllDescendantsOffHelp" xml:space="preserve"><value>Turning this rule off preserves targeted access rules.</value></data>
+  <data name="PartialAccess" xml:space="preserve"><value>Partial access</value></data>
+  <data name="DenyDiscover" xml:space="preserve"><value>Deny discovery</value></data>
+  <data name="DenyUse" xml:space="preserve"><value>Deny use</value></data>
+  <data name="RelatedTitle" xml:space="preserve"><value>Access to related resources</value></data>
+  <data name="RelatedHelp" xml:space="preserve"><value>Grant discovery and use to the verified collection. Eligible scopes come from the parent’s saved access.</value></data>
+  <data name="RelatedSearch" xml:space="preserve"><value>Search a Tenant or Workspace</value></data>
+  <data name="RelatedResources" xml:space="preserve"><value>{0} related resources</value></data>
+  <data name="RelatedInherited" xml:space="preserve"><value>Inherited</value></data>
+  <data name="RelatedException" xml:space="preserve"><value>Exception</value></data>
+  <data name="RelatedRestore" xml:space="preserve"><value>Restore inheritance</value></data>
+  <data name="RelatedEmpty" xml:space="preserve"><value>No eligible descendant scope. Save parent access first.</value></data>
+  <data name="RelatedFailures" xml:space="preserve"><value>{0} changes were not applied. Review exceptions or reload after a conflict.</value></data>
+  <data name="RelatedDetails" xml:space="preserve"><value>Resources and exceptions</value></data>
+  <data name="RelatedUsage" xml:space="preserve"><value>{0}/{1} authorized</value></data>
+  <data name="RelatedNoMembers" xml:space="preserve"><value>No verified related resources are available.</value></data>
+  <data name="AccessRefreshed" xml:space="preserve"><value>Access updated.</value></data>
+  <data name="Rule.explicit_deny" xml:space="preserve"><value>Explicit denial</value></data>
+  <data name="Rule.parent_access_denied" xml:space="preserve"><value>Parent access denied</value></data>
+  <data name="Rule.all_descendants" xml:space="preserve"><value>All descendants rule</value></data>
+  <data name="Rule.toolset_inherited" xml:space="preserve"><value>Inherited from a ToolSet</value></data>
+  <data name="Rule.access_relationship_invalid" xml:space="preserve"><value>Invalid membership evidence</value></data>
+  <data name="RelatedTenantRule" xml:space="preserve"><value>Tenant rule</value></data>
+  <data name="RelatedSelectionHelp" xml:space="preserve"><value>Select resources to limit the next scope action. With no selection, the action applies to the whole collection.</value></data>
+  <data name="SelectResource" xml:space="preserve"><value>Select {0}</value></data>
+  <data name="Kind.Tool" xml:space="preserve"><value>Tool</value></data>
+  <data name="Kind.ToolSet" xml:space="preserve"><value>ToolSet</value></data>
+  <data name="Kind.ToolSetVersion" xml:space="preserve"><value>Published ToolSet version</value></data>
+  <data name="Kind.ToolProvider" xml:space="preserve"><value>Tool provider</value></data>
+  <data name="Kind.ToolDefinition" xml:space="preserve"><value>Tool definition</value></data>
+  <data name="Kind.ToolDefinitionVersion" xml:space="preserve"><value>Published Tool definition</value></data>
+  <data name="Kind.Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Kind.DataSourceProfile" xml:space="preserve"><value>Data Source profile</value></data>
+  <data name="Kind.ConnectedServiceType" xml:space="preserve"><value>Connected Service type</value></data>
+  <data name="Kind.ConnectedServiceOperationType" xml:space="preserve"><value>Operation type</value></data>
+  <data name="Kind.StorageType" xml:space="preserve"><value>Storage type</value></data>
+  <data name="Kind.ExtensionBundleInstallation" xml:space="preserve"><value>Bundle installation</value></data>
+  <data name="AccessToResource" xml:space="preserve"><value>Access to this resource</value></data>
+  <data name="TargetedAccess" xml:space="preserve"><value>Exceptions and targeted access</value></data>
+  <data name="RelatedRefresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="RelatedUnavailable" xml:space="preserve"><value>{0} inactive or unavailable</value></data>
+  <data name="RelatedExceptionCount" xml:space="preserve"><value>{0} resource exceptions</value></data>
 </root>
