@@ -103,7 +103,7 @@ export class ResourceAccessPage {
       expect(response?.status(), `Managed Tool route '${route.toString()}'`).toBe(200);
       await this.page.getByTestId(TestIds.resourceAdministration.toolDetails).waitFor({ state: 'visible' });
     }).toPass({ timeout: 30_000 });
-    await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeDisabled();
+    await expect(this.page.getByTestId(TestIds.toolExecution.enabledToggle)).toBeEnabled();
     await selectResourceSection(this.page, 'access');
     await this.panel.waitFor({ state: 'visible' });
     await this.revealTargetedAccess();
@@ -113,9 +113,10 @@ export class ResourceAccessPage {
   }
 
   private async revealTargetedAccess(): Promise<void> {
-    const toggle = this.panel.getByTestId('resource-access-targeted-toggle');
+    const toggle = this.panel.getByTestId(TestIds.resourceAccess.targetedToggle);
     await toggle.waitFor({ state: 'visible' });
     if (await toggle.getAttribute('aria-expanded') === 'false') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   }
 
   public async addGrant(scopeRef: string): Promise<void> {

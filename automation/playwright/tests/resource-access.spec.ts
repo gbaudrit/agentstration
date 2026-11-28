@@ -4,7 +4,7 @@ import { ignoreCheckpoints } from '../src/journeys/journey.js';
 import { ProductPages } from '../src/pages/product.pages.js';
 import { expect, test } from '../src/fixtures/test.js';
 
-test('Console administers exact descendant access independently from governed definitions @smoke', async ({ page, product }) => {
+test('Console opens targeted rules and administers exact descendant access independently from governed definitions @smoke', async ({ page, product }) => {
   const pages = new ProductPages(page);
   const context = { ...product, pages, checkpoint: ignoreCheckpoints };
   await createWorkspace(context, { name: 'resource-access-authorized', displayName: 'Resource access authorized' });
