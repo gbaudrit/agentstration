@@ -1,0 +1,7 @@
+apiVersion: agentstration.io/v1
+kind: ExtensionEnrollmentPolicy
+metadata:
+  name: openapi-instance-configuration
+definition:
+  extensionId: Agentstration.Extensions.OpenApi
+  autoEnrollmentLevel: /instance

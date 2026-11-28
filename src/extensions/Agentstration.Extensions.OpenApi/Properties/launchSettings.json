@@ -7,8 +7,7 @@
       "launchBrowser": false,
       "applicationUrl": "http://localhost:5310",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "OpenApi__AllowedDomains__0": "example.test"
+        "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
     "existing-instance": {
@@ -22,8 +21,7 @@
         "Aep__PairingCode__AuthorityUrl": "http://localhost:5100",
         "Aep__PairingCode__PublicEndpoint": "http://localhost:5311",
         "Aep__PairingCode__StateFile": "../../../.agentstration/slots/main/aep-pairing/openapi-standalone.json",
-        "Aep__PairingCode__AllowInsecureHttp": "true",
-        "OpenApi__AllowedDomains__0": "example.test"
+        "Aep__PairingCode__AllowInsecureHttp": "true"
       }
     }
   }

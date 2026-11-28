@@ -42,6 +42,7 @@ public sealed class ParameterEditorModel
 
     private JsonElement ParseValue() => ValueType switch
     {
+        ParameterValueType.Array => ParseArray(),
         ParameterValueType.Text => JsonSerializer.SerializeToElement(Value),
         ParameterValueType.WholeNumber when long.TryParse(Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer) =>
             JsonSerializer.SerializeToElement(integer),
@@ -54,4 +55,14 @@ public sealed class ParameterEditorModel
     private static string DisplayValue(JsonElement value) => value.ValueKind == JsonValueKind.String
         ? value.GetString() ?? string.Empty
         : value.GetRawText();
+    private JsonElement ParseArray()
+    {
+        try
+        {
+            var value = JsonSerializer.Deserialize<JsonElement>(Value);
+            if (value.ValueKind == JsonValueKind.Array && value.GetArrayLength() <= 128) return value;
+        }
+        catch (JsonException) { }
+        throw new ArgumentException("The Parameter value must be a JSON array with at most 128 items.");
+    }
 }
