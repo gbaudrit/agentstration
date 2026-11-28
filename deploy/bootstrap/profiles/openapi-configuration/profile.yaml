@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: openapi-configuration
+definition:
+  displayName: OpenAPI installation configuration
+  description: Opt-in Instance enrollment and a deny-safe example domain allowlist. Requires an independently started trusted OpenAPI extension.
+  targetScope: instance

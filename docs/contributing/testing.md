@@ -130,9 +130,17 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Management.Bootstrap.Plans.Tests` | Integration | Ordered multi-target plans, future targets, producer bindings, cancellation and deferred validation |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
-| `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
+| `Agentstration.ModelProviders.Tests` | Integration | Product model consumers, AEP/Value/Secret bindings and Worker/MAF/two-hop inference scenarios |
+| `Agentstration.Extensions.Foundry.Tests` | Integration, provider-optional | Foundry discovery, chat, streaming, security and opt-in live checks |
+| `Agentstration.Extensions.LocalAI.Tests` | Integration, provider-optional | LocalAI adapter and opt-in live checks |
+| `Agentstration.Extensions.LlamaCpp.Tests` | Integration, provider-optional | llama.cpp adapter and opt-in live checks |
+| `Agentstration.Extensions.Ollama.Tests` | Integration | Ollama mapping and native streaming deadline with fake downstream transport |
 | `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
-| `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
+| `Agentstration.Extensions.Git.Tests` | Integration | Extension-owned AEP contracts, real Git processes and temporary repositories |
+| `Agentstration.Extensions.Utilities.Tests` | Integration | Extension-owned AEP discovery and in-process MCP tool/schema contracts |
+| `Agentstration.Extensions.Crawl4AI.Tests` | Integration | Extension-owned acquisition contracts with fake HTTP |
+| `Agentstration.Extensions.OpenApi.Tests` | Integration | Extension-owned discovery/invocation, schema and bounded HTTP contracts |
+| `Agentstration.Extensions.PostgreSql.Tests` | Integration, provider-optional | Structured-document extension contracts and opt-in PostgreSQL checks |
 | `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem/S3/Azure operators, real ASC/MCP, isolation, progressive transfer and restart |
 | `Agentstration.Web.Tests` | Integration | Combined standalone composition, startup, storage profiles, workers, and lifecycle |
 | `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
@@ -160,6 +168,7 @@ in the central classifier. Uncatalogued extensions retain product checks.
 | Changed inputs | Selected OCI validation | Product functional/coverage/diagnostic lanes |
 | --- | --- | --- |
 | One implemented extension's source, dedicated tests, version or catalogue | That extension | Skipped |
+| Explicitly owned files in a shared test project (`ci.testPaths`) | Declared owners and explicit shared dependencies | Skipped unless another input requires product checks |
 | Several implemented extensions, with optional documentation | Those extensions | Skipped |
 | `scripts/ci/extensions/**` | All implemented AEP extensions | Skipped |
 | Generic AEP enrollment smoke/Compose or shared AEP protocol | All implemented AEP extensions | Protocol changes retain product/AEP checks; packaging smokes alone do not |
@@ -206,6 +215,31 @@ AEP tests remain in coverage shard B based on retained collection timings (A/B: 
 Compare candidate workflow runs with the retained baseline runs 41668461593, 41646766981 and 41498304716 (17m30, 20m and 17m40 elapsed respectively). Retain source SHA, runner/runtime, job and step durations, test totals, coverage, diagnostic memory, complete elapsed time and total runner minutes. These historical runs use different revisions; they establish costs, not a controlled percentage improvement. Candidate measurements are required before claiming a speedup.
 
 Browser UX runs Desktop Chromium in two Playwright shards on separate runners; Mobile Chromium and locale contracts each use one runner. Every runner retains one Playwright worker and isolated product hosts/data. The required `browser-ux` check waits for all four matrix jobs to succeed, and evidence artifacts include the project and shard index. Each runner restores the NuGet package cache using the same key and OS fallback as the main build job; `dotnet restore` and NuGet auditing still run on cache hits. The npm cache remains keyed by the browser workspace's lockfile. Compare complete elapsed time and total runner minutes against Browser UX runs 41733014469 and 41734413136 before claiming a measured speedup; the latter includes a mobile rerun tracked in #997.
+
+## Extension-owned test projects
+
+See the [extension isolation inventory](extension-test-isolation.md) for source
+movements, retained consumer scenarios, dependency boundaries, lane/shard mapping
+and project/filter handoff to packaging PRs. Run one extension independently, for
+example:
+
+```powershell
+dotnet test --project tests/Agentstration.Extensions.Ollama.Tests --configuration Release --minimum-expected-tests 2
+```
+
+The architecture suite traverses dedicated test project references and rejects a
+direct or transitive dependency on another extension executable. The existing CI
+inventory contract rejects missing or duplicate coverage projects. A shared Ollama
+inference fixture is compiled by its extension tests and the product two-hop tests;
+changes to it retain product validation.
+
+Utilities has an independent 15-case AEP/MCP contract suite in Integration and
+Coverage B. The 13 `McpToolCatalogTests` cases remain in `Agentstration.Api.Tests`
+(44 cases total): they verify product governance, credentials, schema resolution
+and invocation through the product pipeline. Their Utilities host reference is
+still required. These are complementary consumer tests, not duplicated extension
+test sources. The dedicated project builds only Utilities and the required AEP
+SDK projects; it needs no running service, internet access or LLM.
 
 ## Management fixture boundaries and profiling
 

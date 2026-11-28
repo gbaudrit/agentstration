@@ -20,7 +20,7 @@ public sealed class AepModelProvider(
     IParameterResolver? parameters = null,
     IConfiguration? configuration = null,
     AepInferenceOptions? inferenceOptions = null,
-    IRequestContextScopeFactory? requestScopes = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
+    IRequestContextScopeFactory? requestScopes = null, IExtensionConfigurationSynchronizer? configurationSynchronizer = null) : IModelProvider, IModelProviderOptionsValidator, IModelProviderDiscovery, IModelProviderCapabilitiesResolver, IExtensionInspector, IExtensionOptionsMigrator
 {
     public const string AdapterType = "aep";
     public string ProviderType => AdapterType;
@@ -51,6 +51,8 @@ public sealed class AepModelProvider(
         AepManifest? discoveredManifest,
         CancellationToken cancellationToken)
     {
+        if (configurationSynchronizer is not null)
+            await configurationSynchronizer.EnsureAsync(provider.Extension with { ScopeRef = provider.ExtensionScopeRef ?? provider.Extension.ScopeRef }, provider.Namespace, cancellationToken);
         var manifest = discoveredManifest ?? await client.DiscoverAsync(cancellationToken);
         var providerIssues = ModelProviderValueBindingValidator.Validate(
             provider.ValueBindings,

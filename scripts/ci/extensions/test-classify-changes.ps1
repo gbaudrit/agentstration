@@ -63,6 +63,40 @@ try {
             Isolated @($path, 'docs/contributing/image-packaging.md') @($id)
         }
     }
+    # Multiple catalogued extensions may own distinct or overlapping files in one test project.
+    $sharedProject = 'tests/SharedProviders.Tests/SharedProviders.Tests.csproj'
+    $sharedEntries = @{}
+    foreach ($name in @('Alpha', 'Beta', 'Gamma')) {
+        $id = $name.ToLowerInvariant()
+        $ownedTests = @("tests/SharedProviders.Tests/${name}Tests.cs")
+        if ($id -ne 'gamma') { $ownedTests += 'tests/SharedProviders.Tests/CoOwnedTests.cs' }
+        $entry = @{
+            schemaVersion = 1; id = $id; project = "src/extensions/Agentstration.Extensions.$name/Agentstration.Extensions.$name.csproj"
+            testProject = $sharedProject; versionFile = "src/extensions/Agentstration.Extensions.$name/version.txt"
+            dockerfile = 'Dockerfile.extension'; ci = @{ testPaths = $ownedTests }
+        }
+        Write-Catalogue $entry
+        $sharedEntries[$id] = $entry
+    }
+    foreach ($name in @('Alpha', 'Beta', 'Gamma')) {
+        Isolated @("tests/SharedProviders.Tests/${name}Tests.cs") @($name.ToLowerInvariant())
+    }
+    Isolated @('tests/SharedProviders.Tests/AlphaTests.cs', 'tests/SharedProviders.Tests/GammaTests.cs') @('alpha', 'gamma')
+    Isolated @('tests/SharedProviders.Tests/CoOwnedTests.cs') @('alpha', 'beta')
+    foreach ($path in @($sharedProject, 'tests/SharedProviders.Tests/SharedFixture.cs', 'tests/SharedProviders.Tests/UnclaimedDeletedTests.cs')) {
+        $selection = Get-FixtureSelection @($path)
+        Require $selection.dotnet "Shared or unclaimed test inputs must retain product validation: $path"
+        Require (($selection.imageIds -join ',') -ceq 'alpha,beta,gamma') "Shared test inputs must validate every dependent image: $path"
+    }
+    # Explicit shared dependencies still select an image when another extension owns the file.
+    $sharedEntries.beta.ci.sharedPaths = @('tests/SharedProviders.Tests/AlphaTests.cs')
+    Write-Catalogue $sharedEntries.beta
+    Isolated @('tests/SharedProviders.Tests/AlphaTests.cs') @('alpha', 'beta')
+    $sharedEntries.beta.ci.Remove('sharedPaths')
+    Write-Catalogue $sharedEntries.beta
+    $selection = Get-FixtureSelection @('tests/SharedProviders.Tests/AlphaTests.cs', 'src/Agentstration.Web/Program.cs')
+    Require ($selection.dotnet -and $selection.container) 'Mixed product inputs must retain transverse validation.'
+    Require (($selection.imageIds -join ',') -ceq 'alpha,server') 'Mixed product inputs must retain their selected images.'
     $all = @(Get-ChildItem (Join-Path $temporary 'deploy/images/extensions') -File -Filter '*.json' | Sort-Object Name | ForEach-Object { $_.BaseName })
     foreach ($path in @('scripts/ci/extensions/classify-changes.ps1', 'scripts/ci/extensions/test-classify-changes.ps1', 'scripts/ci/extensions/new-helper.ps1')) {
         Isolated @($path) $all
@@ -91,25 +125,37 @@ try {
     Isolated @('src/extensions/Agentstration.Extensions.PostgreSql/Program.cs') @('postgresql')
     $selection = Get-FixtureSelection @('src/Agentstration.Management.Storage.PostgreSql/Migration.cs')
     Require ($selection.dotnet -and $selection.storage -and $selection.container) 'Server PostgreSQL lost product validation.'
-    foreach ($path in @('tests/Agentstration.ModelProviders.Tests/ProviderFixture.cs', 'tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj')) {
+    foreach ($path in @('tests/Agentstration.ModelProviders.Tests/ProviderFixture.cs', 'tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj', 'tests/AepEnrollmentTestFixture.cs', 'tests/OllamaInferenceTestFixture.cs')) {
         $selection = Get-FixtureSelection @($path)
-        Require ($selection.dotnet -and 'foundry' -in $selection.imageIds) "Shared provider fixture/project was exempted: $path"
+        Require ($selection.dotnet -and 'foundry' -notin $selection.imageIds) "Product fixtures must retain product checks without the isolated Foundry dependency: $path"
     }
-    foreach ($path in @('tests/Agentstration.ModelProviders.Tests/FoundryProviderTests.cs', 'tests/Agentstration.ModelProviders.Tests/FoundryLiveTests.cs')) {
+    foreach ($path in @('tests/Agentstration.Extensions.Foundry.Tests/Agentstration.Extensions.Foundry.Tests.csproj',
+            'tests/Agentstration.Extensions.Foundry.Tests/FoundryProviderTests.cs', 'tests/Agentstration.Extensions.Foundry.Tests/FoundryLiveTests.cs',
+            'tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs', 'tests/Agentstration.Extensions.Foundry.Tests/FoundryStreamingTests.cs')) {
         Isolated @($path) @('foundry')
     }
+    Isolated @('tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs', 'tests/Agentstration.Extensions.OpenApi.Tests/ManifestTests.cs') @('foundry', 'openapi')
+    Isolated @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs') @('utilities')
+    Isolated @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs', 'tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs') @('foundry', 'utilities')
+    $selection = Get-FixtureSelection @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs', 'tests/Agentstration.Api.Tests/McpToolCatalogTests.cs')
+    Require ($selection.dotnet -and ($selection.imageIds -join ',') -eq 'utilities,server') 'Utilities consumer scenarios must retain product checks alongside the dedicated extension tests.'
+    $selection = Get-FixtureSelection @('tests/Agentstration.Extensions.Utilities.Tests/UtilitiesExtensionTests.cs', 'src/Agentstration.Web/Program.cs')
+    Require ($selection.dotnet -and $selection.container -and ($selection.imageIds -join ',') -eq 'utilities,server') 'A product entry point must retain transverse checks alongside Utilities tests.'
+    $selection = Get-FixtureSelection @('tests/Agentstration.Extensions.Foundry.Tests/FoundryChatTests.cs', 'src/Agentstration.ModelProviders/AepModelProvider.cs')
+    Require ($selection.dotnet -and $selection.container -and ($selection.imageIds -join ',') -eq 'foundry,server') 'Mixed extension tests and consumer inputs must retain transverse checks.'
     Isolated @('.github/workflows/resource-plan-ux.yml') @()
     Isolated @('src/extensions/Agentstration.Extensions.OpenApi/Program.cs', '.github/workflows/resource-plan-ux.yml') @('openapi')
     # Extension-owned native assets and dedicated packaging workflows are explicit metadata.
     $nativePath = Join-Path $temporary 'deploy/images/extensions/opendal.json'
     $native = Get-Content $nativePath -Raw | ConvertFrom-Json -AsHashtable
     $native.dockerfile = 'deploy/opendal/Dockerfile'
-    $native.ci = @{ sharedPaths = @('asc/**', 'asp/**'); additionalPaths = @('deploy/opendal/**', 'scripts/packaging/opendal_smoke.py', '.github/workflows/opendal-packaging.yml') }
+    # Keep the synthetic protocol dependency separate from real catalogue dependencies.
+    $native.ci = @{ sharedPaths = @('classifier-fixtures/native-protocol/**', 'asp/**'); additionalPaths = @('deploy/opendal/**', 'scripts/packaging/opendal_smoke.py', '.github/workflows/opendal-packaging.yml') }
     Write-Catalogue $native
     foreach ($path in @('deploy/opendal/Dockerfile', 'deploy/opendal/native/licenses/LICENSE', 'scripts/packaging/opendal_smoke.py', '.github/workflows/opendal-packaging.yml')) {
         Isolated @($path) @('opendal')
     }
-    $selection = Get-FixtureSelection @('asc/src/Contracts.cs')
+    $selection = Get-FixtureSelection @('classifier-fixtures/native-protocol/Contracts.cs')
     Require ($selection.dotnet -and ($selection.imageIds -join ',') -eq 'opendal') 'Shared native protocol changes must retain product and dependent-image checks.'
     # Deletions and renames use both paths; an absent catalogue never becomes an exemption.
     Remove-Item (Join-Path $temporary 'deploy/images/extensions/ollama.json')

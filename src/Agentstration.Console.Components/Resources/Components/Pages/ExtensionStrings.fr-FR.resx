@@ -68,4 +68,36 @@
   <data name="DurationMinutes" xml:space="preserve"><value>{0} min</value></data>
 <data name="ManageEnrollmentAction" xml:space="preserve"><value>Gérer</value></data>
 <data name="CloseEnrollmentAction" xml:space="preserve"><value>Fermer</value></data>
+  <data name="Installation.Title" xml:space="preserve"><value>Options de l’installation</value></data>
+  <data name="Installation.Description" xml:space="preserve"><value>Configurez cette installation Instance. L’enrôlement et la disponibilité de la configuration sont indépendants.</value></data>
+  <data name="Installation.Loading" xml:space="preserve"><value>Chargement de la configuration…</value></data>
+  <data name="Installation.Unsupported" xml:space="preserve"><value>Cette extension ne prend pas en charge la configuration de l’installation.</value></data>
+  <data name="Installation.Unavailable" xml:space="preserve"><value>Le contrat de configuration de l’extension est actuellement indisponible.</value></data>
+  <data name="Installation.Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="Installation.Contract" xml:space="preserve"><value>Contrat</value></data>
+  <data name="Installation.State" xml:space="preserve"><value>État de la configuration</value></data>
+  <data name="Installation.HostDefaults" xml:space="preserve"><value>Valeurs initiales du déploiement actives</value></data>
+  <data name="Installation.Unconfigured" xml:space="preserve"><value>Non configurée — accès sortant refusé</value></data>
+  <data name="Installation.State.applied" xml:space="preserve"><value>Appliquée</value></data>
+  <data name="Installation.State.pending" xml:space="preserve"><value>Enregistrée — en attente d’application</value></data>
+  <data name="Installation.DesiredRevision" xml:space="preserve"><value>Génération souhaitée</value></data>
+  <data name="Installation.AppliedRevision" xml:space="preserve"><value>Génération appliquée</value></data>
+  <data name="Installation.DeliveryPending" xml:space="preserve"><value>La configuration souhaitée est enregistrée, mais son application n’est pas confirmée. Réessayez l’application ou actualisez avant de modifier.</value></data>
+  <data name="Installation.Scope.Process" xml:space="preserve"><value>Processus de l’extension</value></data>
+  <data name="Installation.Scope.ConsumerContext" xml:space="preserve"><value>Contexte d’utilisation</value></data>
+  <data name="Installation.Scope.Binding" xml:space="preserve"><value>Liaison</value></data>
+  <data name="Installation.Apply.Immediate" xml:space="preserve"><value>Application immédiate</value></data>
+  <data name="Installation.Apply.NewBinding" xml:space="preserve"><value>Nouvelles liaisons ou nouveaux clients</value></data>
+  <data name="Installation.Apply.RestartRequired" xml:space="preserve"><value>Redémarrage de l’extension requis</value></data>
+  <data name="Installation.AppliedValue" xml:space="preserve"><value>Valeur actuellement appliquée</value></data>
+  <data name="Installation.Discard" xml:space="preserve"><value>Annuler les modifications</value></data>
+  <data name="Installation.Save" xml:space="preserve"><value>Enregistrer et appliquer</value></data>
+  <data name="Installation.Apply" xml:space="preserve"><value>Réessayer l’application</value></data>
+  <data name="Installation.LoadFailed" xml:space="preserve"><value>Impossible de charger la configuration de l’installation. Actualisez pour réessayer.</value></data>
+  <data name="Installation.SaveFailed" xml:space="preserve"><value>Impossible d’enregistrer ou d’appliquer la configuration. Vérifiez les liaisons et les droits ; actualisez si un autre administrateur a modifié la configuration.</value></data>
+  <data name="Installation.InstanceOnly" xml:space="preserve"><value>La configuration de l’installation s’administre dans le contexte Instance. Les personnalisations descendantes ne sont pas encore disponibles.</value></data>
+<data name="Installation.State.incompatible" xml:space="preserve"><value>Contrat de configuration incompatible</value></data>
+<data name="Installation.Readiness" xml:space="preserve"><value>Disponibilité fonctionnelle</value></data>
+<data name="Installation.Ready" xml:space="preserve"><value>Prête</value></data>
+<data name="Installation.NotReady" xml:space="preserve"><value>Non prête pour une utilisation fonctionnelle</value></data>
 </root>

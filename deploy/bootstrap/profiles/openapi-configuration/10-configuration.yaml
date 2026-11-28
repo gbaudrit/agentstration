@@ -1,0 +1,14 @@
+apiVersion: agentstration.io/v1
+kind: ExtensionConfiguration
+metadata:
+  name: openapi-options
+definition:
+  extension:
+    id: Agentstration.Extensions.OpenApi
+  optionSet: io.agentstration.openapi/installation
+  version: 1.0.0
+  bindings:
+    - requirementId: AllowedDomains
+      kind: literal
+      literal:
+        - example.invalid

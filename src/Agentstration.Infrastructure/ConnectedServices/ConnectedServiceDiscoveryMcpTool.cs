@@ -22,7 +22,7 @@ internal sealed class ConnectedServiceDiscoveryExecutor(
     ISecretResolver secrets,
     ICurrentRequestContext current,
     IHttpClientFactory clients,
-    BuiltinHttpOperationExecutor httpOperations)
+    BuiltinHttpOperationExecutor httpOperations, IExtensionConfigurationSynchronizer? configurationSynchronizer = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -75,6 +75,7 @@ internal sealed class ConnectedServiceDiscoveryExecutor(
         if (!registration.Definition.Enabled || registration.Definition.ExpectedExtensionId != type.Governance!.Origin.Reference)
             throw Error("connected_service_discovery_provider_unavailable");
         var credentials = AepExtensionCredentials.Create(registration, secrets);
+        if (configurationSynchronizer is not null) await configurationSynchronizer.EnsureAsync(registration, cancellationToken);
         using var http = clients.CreateClient("agentstration-aep");
         http.BaseAddress = registration.Definition.Endpoint;
         var client = new AepClient(http, credentials, expectedExtensionId: registration.Definition.ExpectedExtensionId);

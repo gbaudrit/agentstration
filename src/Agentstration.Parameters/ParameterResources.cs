@@ -16,7 +16,8 @@ public enum ParameterValueType
     [JsonStringEnumMemberName("string")] Text,
     [JsonStringEnumMemberName("integer")] WholeNumber,
     [JsonStringEnumMemberName("number")] DecimalNumber,
-    [JsonStringEnumMemberName("boolean")] Logical
+    [JsonStringEnumMemberName("boolean")] Logical,
+    [JsonStringEnumMemberName("array")] Array
 }
 
 public sealed record ParameterProperties

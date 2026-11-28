@@ -66,7 +66,7 @@ The required suite is fully offline. Intentional Azure validation uses an existi
 Run:
 
 ```powershell
-dotnet test tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj --filter FullyQualifiedName~FoundryLiveTests
+dotnet test --project tests/Agentstration.Extensions.Foundry.Tests/Agentstration.Extensions.Foundry.Tests.csproj --filter FullyQualifiedName~FoundryLiveTests
 ```
 
 No live test creates, updates or deletes a Foundry resource.

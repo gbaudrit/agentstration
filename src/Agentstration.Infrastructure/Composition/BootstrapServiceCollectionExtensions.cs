@@ -20,6 +20,7 @@ internal static class BootstrapServiceCollectionExtensions
         services.AddSingleton<IBootstrapContributionResourceResolver, BootstrapStorageTypeContributionResolver>();
         services.AddSingleton<IBootstrapContributionResourceResolver, BootstrapDataSourceProfileContributionResolver>();
         services.AddScoped<IBootstrapResourceHandler, ExtensionEnrollmentPolicyBootstrapHandler>();
+        services.AddScoped<IBootstrapResourceHandler, ExtensionConfigurationBootstrapHandler>();
         services.AddScoped<IBootstrapResourceHandler, ResourceAccessPolicyBootstrapHandler>();
         services.AddScoped<IBootstrapResourceHandler, TenantBootstrapResourceHandler>();
         services.AddScoped<IBootstrapResourceHandler, WorkspaceBootstrapResourceHandler>();

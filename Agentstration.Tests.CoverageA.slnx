@@ -13,6 +13,10 @@
     <Project Path="tests/Agentstration.Management.Bootstrap.Progress.Tests/Agentstration.Management.Bootstrap.Progress.Tests.csproj" />
     <Project Path="tests/Agentstration.Management.Bootstrap.Plans.Tests/Agentstration.Management.Bootstrap.Plans.Tests.csproj" />
     <Project Path="tests/Agentstration.ModelProviders.Tests/Agentstration.ModelProviders.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.Foundry.Tests/Agentstration.Extensions.Foundry.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.LocalAI.Tests/Agentstration.Extensions.LocalAI.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.LlamaCpp.Tests/Agentstration.Extensions.LlamaCpp.Tests.csproj" />
+    <Project Path="tests/Agentstration.Extensions.Ollama.Tests/Agentstration.Extensions.Ollama.Tests.csproj" />
     <Project Path="tests/Agentstration.Workplace.Web.Tests/Agentstration.Workplace.Web.Tests.csproj" />
     <Project Path="tests/Agentstration.Console.Web.Tests/Agentstration.Console.Web.Tests.csproj" />
   </Folder>

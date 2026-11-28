@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "git",
+  "extensionId": "Agentstration.Extensions.Git",
+  "project": "src/extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj",
+  "entrypoint": "Agentstration.Extensions.Git.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.Git/version.txt",
+  "testProject": "tests/Agentstration.Extensions.Git.Tests/Agentstration.Extensions.Git.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.SourceProviders.Git.Tests",
+  "imageName": "extension-git",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "sourceProviders",
+  "contributionId": "git",
+  "installGit": true,
+  "ci": {
+    "additionalPaths": [
+      "scripts/packaging/git_smoke.py"
+    ]
+  }
+}

@@ -53,6 +53,13 @@ public interface IModelsClient
 
 public interface IExtensionsClient
 {
+    Task<ExtensionConfigurationView> GetConfigurationAsync(ResourceNamespace ns, string name, CancellationToken token) =>
+        Task.FromResult(new ExtensionConfigurationView(false, null, null, null, false, new Dictionary<string, System.Text.Json.JsonElement>()));
+    Task<ExtensionConfigurationView> PutConfigurationAsync(ResourceNamespace ns, string name, PutExtensionConfigurationRequest body, string? etag, CancellationToken token) =>
+        throw new NotSupportedException();
+    Task<ExtensionConfigurationView> ApplyConfigurationAsync(ResourceNamespace ns, string name, string etag, CancellationToken token) =>
+        throw new NotSupportedException();
+
     Task<IReadOnlyList<ExtensionResponse>> GetExtensionsAsync(CancellationToken cancellationToken);
     async Task<IReadOnlyList<ExtensionInventoryItemResponse>> GetExtensionInventoryAsync(CancellationToken cancellationToken) =>
         (await GetExtensionsAsync(cancellationToken)).Select(value => new ExtensionInventoryItemResponse(
@@ -127,6 +134,25 @@ public interface IExtensionsClient
 
 public sealed class ExtensionsApiClient(HttpClient httpClient) : IExtensionsClient
 {
+    public Task<ExtensionConfigurationView> GetConfigurationAsync(ResourceNamespace ns, string name, CancellationToken token) =>
+        ApiResponse.ReadAsync<ExtensionConfigurationView>(httpClient, $"api/extensionregistrations/{Uri.EscapeDataString(name)}/configuration?resourceNamespace={Uri.EscapeDataString(ns.Value)}", token);
+    public Task<ExtensionConfigurationView> PutConfigurationAsync(ResourceNamespace ns, string name, PutExtensionConfigurationRequest body, string? etag, CancellationToken token) =>
+        ConfigurationCommandAsync(HttpMethod.Put, ns, name, body, etag, false, token);
+    public Task<ExtensionConfigurationView> ApplyConfigurationAsync(ResourceNamespace ns, string name, string etag, CancellationToken token) =>
+        ConfigurationCommandAsync(HttpMethod.Post, ns, name, null, etag, true, token);
+    private async Task<ExtensionConfigurationView> ConfigurationCommandAsync(HttpMethod method, ResourceNamespace ns, string name,
+        PutExtensionConfigurationRequest? body, string? etag, bool apply, CancellationToken token)
+    {
+        var path = $"api/extensionregistrations/{Uri.EscapeDataString(name)}/configuration{(apply ? "/apply" : "")}?resourceNamespace={Uri.EscapeDataString(ns.Value)}";
+        using var request = new HttpRequestMessage(method, path);
+        if (body is not null) request.Content = JsonContent.Create(body);
+        if (etag is not null) request.Headers.IfMatch.Add(EntityTagHeaderValue.Parse(etag));
+        using var response = await httpClient.SendAsync(request, token);
+        await ApiResponse.EnsureSuccessAsync(response, token);
+        return await response.Content.ReadFromJsonAsync<ExtensionConfigurationView>(cancellationToken: token)
+            ?? throw new InvalidOperationException("The configuration response is empty.");
+    }
+
     public Task<ResourceSnapshot<ExtensionRegistrationResource>> GetRegistrationAsync(ResourceScopeRef scopeRef,
         ResourceNamespace @namespace, string name, CancellationToken cancellationToken) =>
         ReadRegistrationAsync(HttpMethod.Get,
