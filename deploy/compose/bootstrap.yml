@@ -19,7 +19,6 @@ services:
         PROJECT: src/extensions/Agentstration.Extensions.OpenApi/Agentstration.Extensions.OpenApi.csproj
         ENTRYPOINT_DLL: Agentstration.Extensions.OpenApi.dll
     environment:
-      OpenApi__AllowedDomains__0: example.invalid
       Aep__EnrollmentMode: SharedKeyFile
       Aep__SharedKeyFile__Path: /run/aep-key/token
       Aep__SharedKeyFile__AuthorityUrl: http://agentstration:8080

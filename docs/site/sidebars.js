@@ -181,6 +181,7 @@ const sidebars = {
         'contributing/preview-lifecycle',
         'contributing/preview-azure',
         'contributing/preview-on-demand',
+        'contributing/preview-automation',
         'contributing/preview-access',
         'contributing/documentation',
         'contributing/github-governance',

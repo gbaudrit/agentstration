@@ -33,6 +33,7 @@ public partial class ExtensionDetails
     private ResourceSnapshot<ExtensionRegistrationResource>? registration;
     private ExtensionBundle? newerBundle;
     private string? commandError, loadedKey, baseline, observedPermissions;
+    private bool installationDraft;
     private bool refreshing, saving, migrating, invalidInput, confirmDelete, confirmUnenroll, disposed;
     private long loadVersion;
     private IReadOnlyList<ToolResource> extensionTools = [];
@@ -82,7 +83,7 @@ public partial class ExtensionDetails
     };
     private IReadOnlyList<ResourceNavigationItem> AdditionalSections =>
     [
-        new("enrollment", T("DetailTab.Enrollment"), "key"), new("contributions", T("DetailTab.Contributions"), "puzzle"),
+        new("installation", T("Installation.Title"), "adjustments"), new("enrollment", T("DetailTab.Enrollment"), "key"), new("contributions", T("DetailTab.Contributions"), "puzzle"),
         new("resources", T("DetailTab.Resources"), "stack"), new("options", T("DetailTab.Options"), "adjustments"), new("usages", T("DetailTab.Usages"), "list")
     ];
     private IReadOnlyList<ResourceNavigationItem> OperationalSections => [new("overview", Shared["Overview"], "layout-dashboard"), .. AdditionalSections];
@@ -259,6 +260,7 @@ public partial class ExtensionDetails
     }
     private void ClearPrivate()
     {
+        installationDraft = false;
         item = null; registration = null; enrollment = null; enrollmentLoadState = null; newerBundle = null; migrationPreview = null; extensionTools = []; extensionToolProvider = null;
         form = new(); editContext = null; baseline = null; invalidInput = false; confirmDelete = confirmUnenroll = false; saving = migrating = false;
     }

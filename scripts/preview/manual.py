@@ -12,6 +12,7 @@ from urllib.parse import quote
 import xml.etree.ElementTree as ET
 
 import contract
+import extensions
 import github_request
 import preview
 from images import catalogue, DIGEST, valid_version
@@ -19,6 +20,13 @@ from images import catalogue, DIGEST, valid_version
 
 class Unavailable(ValueError):
     """A registry/API read failed; its potentially sensitive output is withheld."""
+
+
+class SelectionError(ValueError):
+    """Controlled diagnosis suitable for a public operator comment."""
+    def __init__(self, code, component, message):
+        super().__init__(message)
+        self.public = {'code': code, 'component': component}
 
 
 def command(arguments):
@@ -69,14 +77,30 @@ class PublishedImages:
         preview.require(len(result) <= 65536, 'Source metadata exceeds 64 KiB.')
         return result.decode('utf-8')
 
+    def component(self, identifier):
+        if identifier in ('server', 'maf-worker'):
+            return catalogue(identifier)
+        extensions.validate_ids([identifier])
+        if extensions.catalogue_path(identifier).exists():
+            return extensions.entry(identifier)
+        # Only the fixed AEP recipe/namespace is available before catalogue merge.
+        return {'id': identifier, 'kind': 'aep-extension', 'imageName': 'extension-' + identifier, 'platform': 'linux/amd64'}
+
     def entry(self, component, sha):
-        trusted = catalogue(component)
-        family = 'applications' if component == 'server' else 'workers'
+        trusted = self.component(component)
+        family = 'applications' if component == 'server' else 'workers' if trusted.get('kind') == 'awp-worker' else 'extensions'
         entry = contract.parse(self.source_file(f'deploy/images/{family}/{component}.json', sha))
-        preview.require(isinstance(entry, dict) and entry.get('schemaVersion') == 1
-                        and all(entry.get(key) == trusted[key] for key in ('id', 'kind', 'imageName', 'platform', 'versionFile')),
+        preview.require(isinstance(entry, dict) and type(entry.get('schemaVersion')) is int and entry['schemaVersion'] == 1
+                        and entry.get('kind', 'aep-extension') == trusted.get('kind', 'aep-extension')
+                        and all(entry.get(key) == trusted[key] for key in ('id', 'imageName', 'platform'))
+                        and ('versionFile' not in trusted or entry.get('versionFile') == trusted['versionFile'])
+                        and (family != 'extensions' or all(entry.get(key) == trusted[key] for key in extensions.METADATA if key in trusted)),
                         'Published source does not match the supported component catalogue.')
-        text = self.source_file(trusted['versionFile'], sha)
+        if family == 'extensions':
+            preview.require(isinstance(entry.get('versionFile'), str)
+                            and re.fullmatch(r'src/extensions/[A-Za-z][A-Za-z0-9_.-]*/version\.txt', entry['versionFile']),
+                            'Extension versions must use a bounded source version.txt path.')
+        text = self.source_file(entry['versionFile'], sha)
         if component == 'server':
             preview.require('<!DOCTYPE' not in text.upper() and '<!ENTITY' not in text.upper(), 'XML entities are not source version metadata.')
             properties = ET.fromstring(text)
@@ -86,7 +110,11 @@ class PublishedImages:
         else:
             version = text.strip()
         preview.require(valid_version(version), 'Published source has no supported SemVer version.')
-        return {**entry, 'version': version}
+        value = {**entry, 'version': version}
+        if family == 'extensions':
+            preview.image_record({'schemaVersion': 1, 'component': value, 'repository': self.repository,
+                                  'sourceSha': sha, 'digest': 'sha256:' + '0' * 64}, 'aep-extension', 'ghcr.io')
+        return value
 
     def private_package(self, image_name):
         if self.package_root is None:
@@ -105,13 +133,20 @@ class PublishedImages:
                                    'inspect', '--config', 'docker://' + reference]))
 
     def select(self, component, ref):
-        trusted = catalogue(component)
-        package = self.private_package(trusted['imageName'])
+        trusted = self.component(component)
+        try:
+            package = self.private_package(trusted['imageName'])
+        except Unavailable as error:
+            raise SelectionError('registry-access', component, 'Private GHCR package metadata is unavailable.') from error
         image = f'ghcr.io/{self.owner}/{self.name}-{trusted["imageName"]}'
         sha = None
         if ref == 'published':
-            preview.require(component == 'maf-worker', 'Only the independently versioned Worker accepts published.')
-            digest = self.latest_tagged(package)
+            try:
+                digest = self.latest_tagged(package)
+            except Unavailable as error:
+                raise SelectionError('registry-access', component, 'Private GHCR image versions are unavailable.') from error
+            except ValueError as error:
+                raise SelectionError('image-unavailable', component, 'No tagged component image found. Publish the component or select its explicit published revision.') from error
         else:
             sha = self.revision(ref)
             entry = self.entry(component, sha)
@@ -122,7 +157,7 @@ class PublishedImages:
                 try:
                     manifest = self.raw(image + ':' + entry['version'])
                 except Unavailable as error:
-                    raise ValueError('No published image for the selected revision. Publish this component with OCI images, then retry; deployment never builds images.') from error
+                    raise SelectionError('image-unavailable', component, 'No published image for the selected revision. Publish this component with OCI images, then retry; deployment never builds images.') from error
             digest = 'sha256:' + hashlib.sha256(manifest).hexdigest()
         preview.require(isinstance(digest, str) and DIGEST.fullmatch(digest), 'Package version is not an exact OCI digest.')
         reference = image + '@' + digest
@@ -131,8 +166,8 @@ class PublishedImages:
         config = self.inspect(reference)
         labels = config.get('config', {}).get('Labels') or {}
         actual_sha = labels.get('org.opencontainers.image.revision', '')
-        preview.require(preview.SHA.fullmatch(actual_sha) and (sha is None or sha == actual_sha),
-                        'Published image source SHA differs from the requested revision; publish that exact revision.')
+        if not preview.SHA.fullmatch(actual_sha) or sha is not None and sha != actual_sha:
+            raise SelectionError('image-unavailable', component, 'Published image source SHA differs from the requested revision; publish that exact revision.')
         entry = self.entry(component, actual_sha) if sha is None else entry
         preview.require(config.get('os') == 'linux' and config.get('architecture') == 'amd64'
                         and labels.get('org.opencontainers.image.source', '').lower() == 'https://github.com/' + self.repository
@@ -152,15 +187,29 @@ class PublishedImages:
                     return version['name']
             if len(versions) < 100:
                 break
-        raise ValueError('No tagged Worker image found. Publish the Worker or select its explicit published revision.')
+        raise ValueError('No tagged component image found. Publish the component or select its explicit published revision.')
+
+    def preview_revisions(self, number, sha, components):
+        import ci_images
+        try:
+            value = ci_images.context(self.repository, self.api, number, sha)
+        except ci_images.Waiting as error:
+            raise SelectionError('ci-failed' if error.failed else 'ci-pending', 'ci', str(error)) from error
+        return {name: sha if name in value['components'] else 'published' for name in components}
 
 
 def validate_options(options):
+    extensions.validate_ids(options.get('extensions', []))
+    preview.require('preview_pr' not in options or type(options['preview_pr']) is int and 1 <= options['preview_pr'] <= 9999999999,
+                    'Invalid preview PR identity.')
     preview.require(options['operation'] in contract.OPERATIONS and options['provider'] == 'azure-vm', 'Only the Azure VM provider is available in this form.')
     preview.require(preview.ENVIRONMENT_ID.fullmatch(options['environment_id']), 'Use a lowercase environment ID, at most 40 characters.')
     preview.require(options['database'] in ('sqlite', 'postgresql') and options['test_profile'] in ('none', 'readiness'), 'Unsupported database or test profile.')
     preview.require(options['data_mode'] in ('preserve', 'reset'), 'Unsupported data mode.')
     preview.require(options['operation'] == 'destroy' or options['data_mode'] == 'preserve', 'Reset is explicit destroy only; destroy with reset before deploying.')
+    preview.require(type(options.get('reset_before_deploy', False)) is bool
+                    and (not options.get('reset_before_deploy') or options['operation'] == 'deploy'),
+                    'Reset-before-deploy is a boolean available only for deployment.')
     preview.require(options['vm_size_profile'] in ('1', '2', '3', '4', '5'), 'Select a configured size slot from 1 to 5.')
     ttl = str(options['ttl_hours'])
     if type(options['ttl_hours']) is float and options['ttl_hours'].is_integer():
@@ -181,7 +230,20 @@ def resolve(options, variables, repository, selector=None):
     arguments = {'environment_id': options['environment_id'], 'database': options['database'], 'provider': options['provider'],
                  'target': target, 'ttl_hours': ttl_hours, 'data_mode': options['data_mode'], 'test_profile': options['test_profile']}
     selector = selector or PublishedImages(repository)
-    return contract.plan(selector.select('server', options['revision']), selector.select('maf-worker', options['worker_revision']), **arguments)
+    selected = options.get('extensions', [])
+    number = options.get('preview_pr')
+    if not number and options.get('tracking_kind') == 'pull_request':
+        number = int(options['tracking_issue'])
+    if not number and options['revision'].startswith('pr:'):
+        number = int(options['revision'][3:])
+    refs = {'server': options['revision'], 'maf-worker': options['worker_revision'], **{name: 'published' for name in selected}}
+    if number:
+        preview.require(type(number) is int and 1 <= number <= 9999999999, 'Invalid preview PR number.')
+        sha = selector.revision(options['revision'])
+        refs = selector.preview_revisions(number, sha, list(refs))
+        arguments['source_sha'] = sha
+    return contract.plan(selector.select('server', refs['server']), selector.select('maf-worker', refs['maf-worker']),
+                         extension_deliveries={identifier: selector.select(identifier, refs[identifier]) for identifier in selected}, **arguments)
 
 
 def main():
@@ -193,6 +255,14 @@ def main():
             import azure
             request = azure.recorded_request(options['environment_id'], os.environ['AZURE_PREVIEW_SUBSCRIPTION_ID'],
                                              os.environ['AZURE_PREVIEW_RESOURCE_GROUP'], repository)
+            if request is None:
+                value = {'environmentId': options['environment_id'], 'state': 'absent', 'url': None,
+                         'recorded': False, 'providerResourceIds': {}}
+                with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                    output.write('result=' + json.dumps(value) + '\n')
+                with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+                    summary.write('No deployment is recorded for `' + options['environment_id'] + '`; no resources changed.\n')
+                return 0
             if options['operation'] == 'destroy':
                 request['dataMode'] = options['data_mode']
         else:
@@ -206,8 +276,11 @@ def main():
             summary.write('Source: `' + request['sourceSha'] + '`; database: `' + request['database'] + '`; VM: `' + request['target']['vmSize'] + '`.\n\n')
             for name, value in contract.images(request).items():
                 summary.write('- ' + name + ': `' + value['reference'] + '`\n')
-            summary.write('\nURL is returned only after protected readiness checks. TTL is recorded; automatic expiry is #1286.\n')
+            summary.write('\nURL is returned only after protected readiness checks. Scheduled reconciliation applies the recorded expiry.\n')
     except (ValueError, KeyError, TypeError, RuntimeError, ET.ParseError) as error:
+        if isinstance(error, SelectionError):
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                output.write('failure=' + json.dumps(error.public) + '\n')
         # Only controlled validation messages may be shown; remote JSON/key/parser errors are not echoed.
         print(str(error) if isinstance(error, (ValueError, RuntimeError)) and not isinstance(error, (json.JSONDecodeError, ET.ParseError, UnicodeError))
               else 'Invalid published metadata or manual selection; check the supported catalogue and form inputs.', file=sys.stderr)

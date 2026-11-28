@@ -64,7 +64,6 @@ def main():
     }
     extension = environment | {
         "ASPNETCORE_ENVIRONMENT": "Development", "ASPNETCORE_URLS": endpoint,
-        "OpenApi__AllowedDomains__0": "example.invalid",
         "Aep__EnrollmentMode": "SharedKeyFile", "Aep__SharedKeyFile__Path": str(key),
         "Aep__SharedKeyFile__AuthorityUrl": authority, "Aep__SharedKeyFile__PublicEndpoint": endpoint,
         "Aep__SharedKeyFile__StateFile": str(root / "extension-instance"),
@@ -127,7 +126,6 @@ def main():
         upstream = http.server.ThreadingHTTPServer(("127.0.0.1", 0), OllamaFixture)
         threading.Thread(target=upstream.serve_forever, daemon=True).start()
         extension["Ollama__Endpoint"] = f"http://127.0.0.1:{upstream.server_port}"
-        del extension["OpenApi__AllowedDomains__0"]
     processes = []
 
     def start(project, settings, log_name):

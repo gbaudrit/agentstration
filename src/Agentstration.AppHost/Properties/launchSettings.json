@@ -89,8 +89,7 @@
         "Agentstration__Bootstrap__InitialProfiles__1": "bootstrap-openapi",
         "Agentstration__Bootstrap__InitialApplications__0__Profiles__0": "bootstrap-workspace-example",
         "Agentstration__Bootstrap__InitialApplications__0__TargetLevel": "/tenants/dev/workspaces/default",
-        "OpenApi__Enabled": "true",
-        "OpenApi__AllowedDomains__0": "example.invalid"
+        "OpenApi__Enabled": "true"
       }
     },
     "https-BootstrapOllama": {

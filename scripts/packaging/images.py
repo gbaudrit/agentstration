@@ -56,7 +56,21 @@ def catalogue(extension):
         version = (ROOT / entry["versionFile"]).read_text(encoding="utf-8").strip()
     if not valid_version(version):
         raise ValueError("Extension version must be SemVer without build metadata.")
+    smoke_environment(entry)
     return {**entry, "version": version}
+
+
+def smoke_environment(entry):
+    """Public fixture settings only; authentication stays in isolated generated mounts."""
+    values = entry.get("smokeEnvironment", {})
+    if not isinstance(values, dict) or any(
+            not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", name)
+            or name.lower().startswith(("aep__", "aspnetcore_", "dotnet_"))
+            or re.search(r"credential|secret|password|token|key", name, re.IGNORECASE)
+            or not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9./,:_-]+", value)
+            for name, value in values.items()):
+        raise ValueError("Smoke environment must contain only public, literal fixture settings.")
+    return values
 
 
 def release_tag(entry, tag):
@@ -84,7 +98,7 @@ def resolve_image(reference):
 
 
 def build_command(entry, archive, metadata, bases, sha, repository):
-    return ["docker", "buildx", "build", "--file", str(ROOT / entry["dockerfile"]),
+    return ["docker", "buildx", "build", *(["--build-arg", "INSTALL_GIT=true"] if entry.get("installGit", False) else []), "--file", str(ROOT / entry["dockerfile"]),
             "--platform", entry["platform"], "--output", f"type=oci,dest={archive}",
             "--metadata-file", str(metadata), "--provenance=true", "--sbom=true",
             "--build-arg", f"SDK_IMAGE={bases['sdk']}", "--build-arg", f"RUNTIME_IMAGE={bases['runtime']}",
@@ -105,7 +119,7 @@ def build(extension, directory, repository, bases=None):
     sha = output(["git", "-C", str(ROOT), "rev-parse", "HEAD"])
     if bases is None:
         bases = {"sdk": resolve_image("mcr.microsoft.com/dotnet/sdk:10.0.300"),
-                 "runtime": resolve_image("mcr.microsoft.com/dotnet/aspnet:10.0")}
+                 "runtime": resolve_image(entry.get("runtimeImage", "mcr.microsoft.com/dotnet/aspnet:10.0"))}
     if set(bases) != {"sdk", "runtime"} or not all(
             re.fullmatch(r"[a-z0-9./_-]+@sha256:[0-9a-f]{64}", value) for value in bases.values()):
         raise ValueError("SDK and runtime build inputs must be pinned by digest.")
@@ -138,7 +152,7 @@ def private_package(repository, package):
 def copy_archive(delivery_path, destination, authfile):
     delivery = json.loads(delivery_path.read_text(encoding="utf-8"))
     archive = delivery_path.parent / delivery["archive"]
-    if archive.parent.resolve() != delivery_path.parent.resolve() or not DIGEST.fullmatch(delivery["digest"]):
+    if archive.resolve().parent != delivery_path.parent.resolve() or not DIGEST.fullmatch(delivery["digest"]):
         raise ValueError("Invalid delivery archive/digest.")
     with archive.open("rb") as stream:
         if hashlib.file_digest(stream, "sha256").hexdigest() != delivery["archiveSha256"]:

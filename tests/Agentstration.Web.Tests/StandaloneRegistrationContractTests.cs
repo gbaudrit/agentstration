@@ -122,7 +122,8 @@ public sealed class StandaloneRegistrationContractTests
     {
         var contributions = new Dictionary<Type, int>
         {
-            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 3,
+            [typeof(Agentstration.Parameters.IParameterUsageProvider)] = 4,
+            [typeof(Agentstration.Secrets.ISecretUsageProvider)] = 2,
             [typeof(ISecretVaultProvider)] = 2,
             [typeof(Agentstration.Storage.Contracts.IStorageUsageProvider)] = 4,
             [typeof(Agentstration.Storage.Contracts.IStorageDefinitionValidator)] = 2,
@@ -130,7 +131,7 @@ public sealed class StandaloneRegistrationContractTests
             [typeof(Agentstration.Application.Work.IWorkPlanAdmissionGate)] = 3,
             [typeof(Agentstration.Flows.Application.IFlowRuntimeDefinitionResolver)] = 1,
             [typeof(Agentstration.Runtime.Abstractions.IRuntimeCapabilityMaterialProvider)] = 1,
-            [typeof(IBootstrapResourceHandler)] = 36,
+            [typeof(IBootstrapResourceHandler)] = 37,
             [typeof(Agentstration.Functions.Abstractions.INativeTransformationFunction)] = 7,
             [typeof(Agentstration.Schemas.ISchemaFormatHandler)] = 3,
             [typeof(IPackResourceHandler)] = 11,

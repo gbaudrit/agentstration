@@ -62,7 +62,7 @@ definition:
 
 Optional `definition.id` supplies a portable Project UUID; `planIds` and `taskIds` associate existing work. Otherwise Bootstrap derives a stable local ID. Reapplication skips an existing private name, preserving edits. An explicit ID different from that existing Project conflicts. Instance/Tenant profiles and foreign targets are rejected. Planning and application both use the Project service, and ordinary Bootstrap planning references can resolve the namespaced Project.
 
-Grouping and Bootstrap creation are #950; context references and admission snapshots are #951. Project sharing and Workspace seed ingestion remain #1345/#1347. See [ADR-0269](../decisions/0269-projects-group-private-work-without-changing-workspace-ownership.md) and [ADR-0270](../decisions/0270-project-context-is-authorized-and-captured-at-task-admission.md).
+Grouping and Bootstrap creation are #950; context references and admission snapshots are #951. Project sharing and Workspace seed ingestion remain #1345/#1347. See [ADR-0302](../decisions/0302-projects-group-private-work-without-changing-workspace-ownership.md) and [ADR-0303](../decisions/0303-project-context-is-authorized-and-captured-at-task-admission.md).
 
 ## Bind exact context references
 

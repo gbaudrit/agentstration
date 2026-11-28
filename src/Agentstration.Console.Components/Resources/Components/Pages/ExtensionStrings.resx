@@ -68,4 +68,36 @@
   <data name="DurationMinutes" xml:space="preserve"><value>{0} min</value></data>
 <data name="ManageEnrollmentAction" xml:space="preserve"><value>Manage</value></data>
 <data name="CloseEnrollmentAction" xml:space="preserve"><value>Close</value></data>
+  <data name="Installation.Title" xml:space="preserve"><value>Installation options</value></data>
+  <data name="Installation.Description" xml:space="preserve"><value>Configure this Instance installation. Enrollment trust and configuration readiness are independent.</value></data>
+  <data name="Installation.Loading" xml:space="preserve"><value>Loading installation configuration…</value></data>
+  <data name="Installation.Unsupported" xml:space="preserve"><value>This extension does not support operational configuration.</value></data>
+  <data name="Installation.Unavailable" xml:space="preserve"><value>The extension configuration contract is currently unavailable.</value></data>
+  <data name="Installation.Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Installation.Contract" xml:space="preserve"><value>Contract</value></data>
+  <data name="Installation.State" xml:space="preserve"><value>Configuration state</value></data>
+  <data name="Installation.HostDefaults" xml:space="preserve"><value>Host defaults active</value></data>
+  <data name="Installation.Unconfigured" xml:space="preserve"><value>Not configured — outbound access denied</value></data>
+  <data name="Installation.State.applied" xml:space="preserve"><value>Applied</value></data>
+  <data name="Installation.State.pending" xml:space="preserve"><value>Saved — awaiting application</value></data>
+  <data name="Installation.DesiredRevision" xml:space="preserve"><value>Desired generation</value></data>
+  <data name="Installation.AppliedRevision" xml:space="preserve"><value>Applied generation</value></data>
+  <data name="Installation.DeliveryPending" xml:space="preserve"><value>The desired configuration is saved, but activation was not confirmed. Retry application or refresh before editing.</value></data>
+  <data name="Installation.Scope.Process" xml:space="preserve"><value>Entire extension process</value></data>
+  <data name="Installation.Scope.ConsumerContext" xml:space="preserve"><value>Consumer context</value></data>
+  <data name="Installation.Scope.Binding" xml:space="preserve"><value>Binding</value></data>
+  <data name="Installation.Apply.Immediate" xml:space="preserve"><value>Immediate application</value></data>
+  <data name="Installation.Apply.NewBinding" xml:space="preserve"><value>New bindings or clients</value></data>
+  <data name="Installation.Apply.RestartRequired" xml:space="preserve"><value>Extension restart required</value></data>
+  <data name="Installation.AppliedValue" xml:space="preserve"><value>Currently applied</value></data>
+  <data name="Installation.Discard" xml:space="preserve"><value>Discard changes</value></data>
+  <data name="Installation.Save" xml:space="preserve"><value>Save and apply</value></data>
+  <data name="Installation.Apply" xml:space="preserve"><value>Retry application</value></data>
+  <data name="Installation.LoadFailed" xml:space="preserve"><value>Installation configuration could not be loaded. Refresh to retry.</value></data>
+  <data name="Installation.SaveFailed" xml:space="preserve"><value>Configuration could not be saved or applied. Check the bindings and permissions; refresh if another administrator changed the configuration.</value></data>
+  <data name="Installation.InstanceOnly" xml:space="preserve"><value>Installation configuration is administered in the Instance context. Descendant overrides are not available yet.</value></data>
+<data name="Installation.State.incompatible" xml:space="preserve"><value>Incompatible configuration contract</value></data>
+<data name="Installation.Readiness" xml:space="preserve"><value>Functional readiness</value></data>
+<data name="Installation.Ready" xml:space="preserve"><value>Ready</value></data>
+<data name="Installation.NotReady" xml:space="preserve"><value>Not ready for functional use</value></data>
 </root>

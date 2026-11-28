@@ -7,7 +7,7 @@ Proposed — implementation for [#956](https://github.com/gbaudrit/agentstration
 ## Context
 
 A stable atomic task may have several explicit execution attempts. The current task result can
-change on retry, and global Run enumeration cannot establish complete task history. ADR-0268
+change on retry, and global Run enumeration cannot establish complete task history. ADR-0301
 already owns durable admission and #129 supplies indexed task-specific Flow history.
 
 ## Decision

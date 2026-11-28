@@ -4,6 +4,7 @@ import re
 import uuid
 
 import preview
+import extensions
 from images import delivery_entry
 
 PROVIDERS = {"docker", "azure-vm", "ssh-docker"}
@@ -21,10 +22,12 @@ def fields(value, expected):
 
 
 def _delivery(receipt):
-    entry = delivery_entry(receipt)
+    entry = {"kind": "aep-extension", **delivery_entry(receipt)}
     keys = ["id", "kind", "imageName", "platform", "version"]
     if entry.get("kind") == "awp-worker":
         keys += ["runtimeKind", "capabilityVersion", "executionMaterialVersions", "awpVersion"]
+    if entry["kind"] == "aep-extension":
+        keys += ["extensionId", "aepVersion", "contributionKind", "contributionId"]
     return {"schemaVersion": 1, "component": {key: entry[key] for key in keys},
             **{key: receipt[key] for key in ("repository", "sourceSha", "digest")}}
 
@@ -39,6 +42,8 @@ def delivery(receipt):
 def images(request):
     selected = {"server": preview.image_record(request["deliveries"]["server"], "server", request["registry"]),
                 "worker": preview.image_record(request["deliveries"]["worker"], "awp-worker", request["registry"])}
+    for identifier, receipt in request.get("extensions", {}).items():
+        selected[extensions.service(identifier)] = preview.image_record(receipt, "aep-extension", request["registry"])
     if request["database"] == "postgresql":
         selected["postgres"] = {"reference": request["postgresImage"], "platform": "linux/amd64"}
     return selected
@@ -69,8 +74,11 @@ def _validate(request):
                 "ttlHours", "dataMode", "testProfile", "target"}
     if request.get("database") == "postgresql":
         expected.add("postgresImage")
+    if request.get("schemaVersion") in (2, 4):
+        expected.add("extensions")
     fields(request, expected)
-    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] == 1, "Unsupported deployment contract version.")
+    # Version 3 is reserved by the parallel GUID deployment-profile change (#1422).
+    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2, 4), "Unsupported deployment contract version.")
     preview.require(isinstance(request["environmentId"], str) and preview.ENVIRONMENT_ID.fullmatch(request["environmentId"]),
                     "Invalid deployment environment ID.")
     preview.require(request["provider"] in PROVIDERS and request["database"] in ("sqlite", "postgresql"),
@@ -79,14 +87,24 @@ def _validate(request):
     preview.require(request["dataMode"] in ("preserve", "reset") and request["testProfile"] in ("none", "readiness"),
                     "Unsupported data mode or test profile.")
     fields(request["deliveries"], ("server", "worker"))
+    optional = request.get("extensions", {})
+    preview.require(isinstance(optional, dict) and (request["schemaVersion"] != 2 or bool(optional)), "Version 2 requires selected extensions.")
+    extensions.validate_ids(list(optional))
+    identities = []
+    for identifier, receipt in optional.items():
+        preview.require(receipt["component"]["id"] == identifier, "Extension key differs from delivery ID.")
+        identities.append(receipt["component"]["extensionId"].casefold())
+    preview.require(len(identities) == len(set(identities)), "Duplicate AEP identities.")
     try:
-        for receipt in request["deliveries"].values():
+        for receipt in [*request["deliveries"].values(), *optional.values()]:
             preview.require(type(receipt.get("schemaVersion")) is int and receipt == delivery(receipt),
                             "Deployment requests accept only canonical public delivery metadata.")
         selected = images(request)
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError("Invalid image delivery metadata.") from error
-    preview.require(request["sourceSha"] == selected["server"]["sourceSha"], "Revision must equal the exact server source SHA.")
+    preview.require(isinstance(request['sourceSha'], str) and preview.SHA.fullmatch(request['sourceSha']), 'Requested revision must be an exact source SHA.')
+    if request['schemaVersion'] in (1, 2):
+        preview.require(request["sourceSha"] == selected["server"]["sourceSha"], "Legacy revision must equal the exact server source SHA.")
     worker = selected["worker"]
     preview.require(worker["runtimeKind"] == "microsoft-agent-framework" and worker["awpVersion"] == "1.0"
                     and worker["capabilityVersion"] == "1.0"
@@ -122,12 +140,16 @@ def validate(request):
 
 
 def plan(server, worker, environment_id, database="sqlite", provider="docker", target=None, ttl_hours=24,
-         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None):
+         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None, source_sha=None):
     preview.require(target is not None, "A provider-specific target is required.")
     request = {"schemaVersion": 1, "environmentId": environment_id, "provider": provider,
                "sourceSha": server["sourceSha"], "database": database, "registry": registry,
                "deliveries": {"server": delivery(server), "worker": delivery(worker)}, "ttlHours": ttl_hours,
                "dataMode": data_mode, "testProfile": test_profile, "target": target}
+    if extension_deliveries:
+        request.update(schemaVersion=2, extensions={key: delivery(value) for key, value in sorted(extension_deliveries.items())})
+    if source_sha is not None and source_sha != server['sourceSha']:
+        request.update(schemaVersion=4, sourceSha=source_sha, extensions=request.get('extensions', {}))
     if database == "postgresql":
         request["postgresImage"] = postgres_image or preview.read_json(preview.ROOT / "deploy/preview/postgresql.json")["reference"]
     else:
@@ -138,6 +160,8 @@ def plan(server, worker, environment_id, database="sqlite", provider="docker", t
 def operation(action, request):
     preview.require(action in OPERATIONS, "Unsupported lifecycle operation.")
     validate(request)
+    if action in ("deploy", "validate"):
+        extensions.trusted(request.get("extensions", {}))
     preview.require(action != "deploy" or request["dataMode"] == "preserve", "Reset is explicit destroy only; destroy with reset before redeploying.")
     preview.require(action == "validate" or request["provider"] in ("docker", "azure-vm"),
                     "SSH execution remains #1288; it never falls back to another provider.")

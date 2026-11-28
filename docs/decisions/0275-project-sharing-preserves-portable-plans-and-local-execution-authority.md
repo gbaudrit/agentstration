@@ -3,7 +3,7 @@
 - Status: Proposed — implementation for #1345
 - Date: 2026-11-25
 - Owners: Work Plane
-- Related: [#1345](https://github.com/gbaudrit/agentstration/issues/1345), ADR-0269, ADR-0270, ADR-0274
+- Related: [#1345](https://github.com/gbaudrit/agentstration/issues/1345), ADR-0302, ADR-0303, ADR-0274
 
 ## Context
 

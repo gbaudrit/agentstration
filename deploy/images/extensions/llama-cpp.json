@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "llama-cpp",
+  "extensionId": "Agentstration.Extensions.LlamaCpp",
+  "project": "src/extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj",
+  "entrypoint": "Agentstration.Extensions.LlamaCpp.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.LlamaCpp/version.txt",
+  "testProject": "tests/Agentstration.Extensions.LlamaCpp.Tests/Agentstration.Extensions.LlamaCpp.Tests.csproj",
+  "testFilter": "FullyQualifiedName!~LlamaCppIntegrationTests",
+  "imageName": "extension-llama-cpp",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "modelProviders",
+  "contributionId": "llamacpp"
+}

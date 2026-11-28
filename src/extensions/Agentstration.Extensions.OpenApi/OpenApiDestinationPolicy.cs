@@ -15,7 +15,7 @@ public sealed class SystemOpenApiAddressResolver : IOpenApiAddressResolver
         await Dns.GetHostAddressesAsync(host, cancellationToken);
 }
 
-public sealed class OpenApiDestinationPolicy(IOptions<OpenApiOptions> options, IOpenApiAddressResolver resolver)
+public sealed class OpenApiDestinationPolicy(IOptions<OpenApiOptions> options, IOpenApiAddressResolver resolver, OpenApiOperationalConfiguration? configuration = null)
 {
     private readonly OpenApiOptions options = options.Value;
 
@@ -45,7 +45,7 @@ public sealed class OpenApiDestinationPolicy(IOptions<OpenApiOptions> options, I
         && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase)
         && left.Port == right.Port;
 
-    private bool AllowedDomain(string host) => options.AllowedDomains.Any(value =>
+    private bool AllowedDomain(string host) => (configuration?.AllowedDomains ?? options.AllowedDomains).Any(value =>
     {
         var allowed = value.Trim().Trim('.');
         var normalized = host.TrimEnd('.');

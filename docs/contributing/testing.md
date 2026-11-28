@@ -130,9 +130,17 @@ The AEP budget was recalibrated during #916 after the hosted enrollment and bund
 | `Agentstration.Management.Bootstrap.Plans.Tests` | Integration | Ordered multi-target plans, future targets, producer bindings, cancellation and deferred validation |
 | `Agentstration.Management.Security.Tests` | Integration | Identity, authorization, local-account, and interactive Security boundaries |
 | `Agentstration.Management.Aep.Tests` | Integration | AEP enrollment lifecycle and extension inventory boundaries using the API-only test profile |
-| `Agentstration.ModelProviders.Tests` | Integration, provider-optional | AEP test hosts plus opt-in live-provider checks |
+| `Agentstration.ModelProviders.Tests` | Integration | Product model consumers, AEP/Value/Secret bindings and Worker/MAF/two-hop inference scenarios |
+| `Agentstration.Extensions.Foundry.Tests` | Integration, provider-optional | Foundry discovery, chat, streaming, security and opt-in live checks |
+| `Agentstration.Extensions.LocalAI.Tests` | Integration, provider-optional | LocalAI adapter and opt-in live checks |
+| `Agentstration.Extensions.LlamaCpp.Tests` | Integration, provider-optional | llama.cpp adapter and opt-in live checks |
+| `Agentstration.Extensions.Ollama.Tests` | Integration | Ollama mapping and native streaming deadline with fake downstream transport |
 | `Agentstration.Runtime.Tests` | Integration | Runtime business behavior and SQLite reconstruction without the executable host |
-| `Agentstration.SourceProviders.Git.Tests` | Integration | Real Git processes and file-system repositories |
+| `Agentstration.Extensions.Git.Tests` | Integration | Extension-owned AEP contracts, real Git processes and temporary repositories |
+| `Agentstration.Extensions.Utilities.Tests` | Integration | Extension-owned AEP discovery and in-process MCP tool/schema contracts |
+| `Agentstration.Extensions.Crawl4AI.Tests` | Integration | Extension-owned acquisition contracts with fake HTTP |
+| `Agentstration.Extensions.OpenApi.Tests` | Integration | Extension-owned discovery/invocation, schema and bounded HTTP contracts |
+| `Agentstration.Extensions.PostgreSql.Tests` | Integration, provider-optional | Structured-document extension contracts and opt-in PostgreSQL checks |
 | `Agentstration.Extensions.OpenDal.Tests` | Integration | Official native OpenDAL filesystem/S3/Azure operators, real ASC/MCP, isolation, progressive transfer and restart |
 | `Agentstration.Web.Tests` | Integration | Combined standalone composition, startup, storage profiles, workers, and lifecycle |
 | `Agentstration.Performance.Tests` | Performance, opt-in | SQLite/PostgreSQL relational storage concurrency workloads and machine-readable reports |
@@ -144,28 +152,57 @@ The autonomous AEP SDK keeps its own `aep/Aep.slnx` validation because it can be
 
 Run `./scripts/ci/test-ci-contracts.ps1` to check coverage partition completeness and path-selection regressions. The classifier also runs these checks before selecting jobs. Rename detection is disabled when gathering changed paths so both the removed and added paths contribute to validation selection. Storage/application families, including Resource Planning and Security, and every PostgreSQL project select PostgreSQL checks; Console Web, Client and Components select Browser UX on pull requests and main pushes. The required `build-and-test` check keeps its existing name and documentation-only success path.
 
-Foundry is the first independently validated extension. Changes confined to
-`src/extensions/Agentstration.Extensions.Foundry/`, its two Foundry-specific
-Model Providers test files, its image catalogue entry or shared image tooling
-select the reusable OCI validation instead of the product build, Windows lifecycle,
-server container, hosted diagnostics and functional/coverage lanes. Documentation
-may accompany those changes. The OCI workflow runs the existing offline Foundry
-tests, exports the image with attestations, stages the exact digest and checks
-protected discovery and restart. It does not publish images from CI.
+### Catalogue-driven extension selection
 
-The required `build-and-test` check waits for the selected OCI job and rejects a
-failed, cancelled or unexpectedly skipped result. Local regression checks exercise
-both selection and the same result-gate script used by Actions. Shared test
-fixtures, the Model Providers test project, AEP, build/package settings and mixed
-product changes retain transverse validation. Image inputs also select OCI
-validation. Other extensions and unknown paths keep their existing checks until
-their packaging vertical explicitly supplies equivalent validation. Manual CI
-runs select everything. CodeQL and dependency review remain independent.
+`scripts/ci/classify-changes.ps1` combines product, server/Worker and AEP extension
+selection. The single extension selector and its contracts live under
+`scripts/ci/extensions/`. Both contract suites run during the existing
+`classify-changes` job; no new publication or test pipeline is introduced.
 
-Resource Plan UX excludes isolated Foundry source changes from its `src/**`
-trigger. A simultaneous product-source change still triggers it. No new live
-model or Azure dependency is introduced; full coverage inventories and collectors
-remain unchanged when transverse validation is selected.
+Only implemented `deploy/images/extensions/*.json` entries grant extension
+ownership. The selector derives source and test directories, the independent
+version file and recipe from `project`, `testProject`, `versionFile` and
+`dockerfile`. Adding a catalogue therefore needs no provider-specific expression
+in the central classifier. Uncatalogued extensions retain product checks.
+
+| Changed inputs | Selected OCI validation | Product functional/coverage/diagnostic lanes |
+| --- | --- | --- |
+| One implemented extension's source, dedicated tests, version or catalogue | That extension | Skipped |
+| Explicitly owned files in a shared test project (`ci.testPaths`) | Declared owners and explicit shared dependencies | Skipped unless another input requires product checks |
+| Several implemented extensions, with optional documentation | Those extensions | Skipped |
+| `scripts/ci/extensions/**` | All implemented AEP extensions | Skipped |
+| Generic AEP enrollment smoke/Compose or shared AEP protocol | All implemented AEP extensions | Protocol changes retain product/AEP checks; packaging smokes alone do not |
+| Common image builder, unknown packaging helper, generic recipe or OCI workflow | All affected image families, including server/Worker | Skipped unless a product input is also changed |
+| Shared .NET/build settings, central `scripts/ci/**` outside `extensions/`, or the main CI workflow | All implemented images | Retained |
+| Mixed product/extension changes, shared test fixtures or declared shared dependencies | Dependent images | Retained |
+| Unknown/removed catalogue or unknown source | Remaining affected images | Retained; malformed catalogues fail classification |
+| Manual CI dispatch | All implemented images | Retained |
+
+The `dotnet` result controls the full build, Windows lifecycle, Fast/Integration,
+both coverage shards/publication and both hosted-diagnostic groups. `storage` and
+`container` are independently derived from product-owned inputs: the autonomous
+PostgreSQL document extension does not select the server's PostgreSQL profile.
+Extension selector edits select AEP images without pulling in unrelated
+server/Worker images. Changes to the central selector itself deliberately retain
+the complete transverse checks.
+
+The existing `build-and-test` gate waits for the selected OCI matrix and rejects
+failed, cancelled or unexpectedly skipped validation. Test inventories, coverage
+partitioning/collectors, memory budgets, publication credentials and module
+concurrency are unchanged. Rename detection remains disabled, so removed and
+added paths both contribute. Run `./scripts/ci/extensions/test-classify-changes.ps1`
+for the focused contracts or `./scripts/ci/test-ci-contracts.ps1` for the complete
+selection/inventory/result-gate contracts. Temporary catalogues exercise the
+pending extensions without committing an unimplemented image entry.
+
+Resource Plan UX excludes autonomous `src/extensions/**` sources from its broad
+`src/**` trigger, while mixed product changes still trigger it. Editing that
+specialized workflow runs its own Playwright validation, without also selecting
+unrelated product CI. Browser UX keeps its explicit Utilities source dependency
+because its executable journeys use that extension. CodeQL, Dependency Review
+and PR metadata remain independent; documentation builds still run when the
+relevant documentation changes. These workflows are not disabled by extension
+classification. No live model, registry credential or Azure dependency is added.
 
 Coverage emits one assembly-named TRX per module. Collection and publication check each required module's TRX coverage attachment against its actual Cobertura file; missing, reused, malformed or unexpected reports fail publication; byte-identical TRX attachment copies are consolidated once. Fast and Integration remain authoritative inventories; Coverage A/B must partition Integration exactly. Performance and live-provider execution remain optional.
 
@@ -178,6 +215,31 @@ AEP tests remain in coverage shard B based on retained collection timings (A/B: 
 Compare candidate workflow runs with the retained baseline runs 41668461593, 41646766981 and 41498304716 (17m30, 20m and 17m40 elapsed respectively). Retain source SHA, runner/runtime, job and step durations, test totals, coverage, diagnostic memory, complete elapsed time and total runner minutes. These historical runs use different revisions; they establish costs, not a controlled percentage improvement. Candidate measurements are required before claiming a speedup.
 
 Browser UX runs Desktop Chromium in two Playwright shards on separate runners; Mobile Chromium and locale contracts each use one runner. Every runner retains one Playwright worker and isolated product hosts/data. The required `browser-ux` check waits for all four matrix jobs to succeed, and evidence artifacts include the project and shard index. Each runner restores the NuGet package cache using the same key and OS fallback as the main build job; `dotnet restore` and NuGet auditing still run on cache hits. The npm cache remains keyed by the browser workspace's lockfile. Compare complete elapsed time and total runner minutes against Browser UX runs 41733014469 and 41734413136 before claiming a measured speedup; the latter includes a mobile rerun tracked in #997.
+
+## Extension-owned test projects
+
+See the [extension isolation inventory](extension-test-isolation.md) for source
+movements, retained consumer scenarios, dependency boundaries, lane/shard mapping
+and project/filter handoff to packaging PRs. Run one extension independently, for
+example:
+
+```powershell
+dotnet test --project tests/Agentstration.Extensions.Ollama.Tests --configuration Release --minimum-expected-tests 2
+```
+
+The architecture suite traverses dedicated test project references and rejects a
+direct or transitive dependency on another extension executable. The existing CI
+inventory contract rejects missing or duplicate coverage projects. A shared Ollama
+inference fixture is compiled by its extension tests and the product two-hop tests;
+changes to it retain product validation.
+
+Utilities has an independent 15-case AEP/MCP contract suite in Integration and
+Coverage B. The 13 `McpToolCatalogTests` cases remain in `Agentstration.Api.Tests`
+(44 cases total): they verify product governance, credentials, schema resolution
+and invocation through the product pipeline. Their Utilities host reference is
+still required. These are complementary consumer tests, not duplicated extension
+test sources. The dedicated project builds only Utilities and the required AEP
+SDK projects; it needs no running service, internet access or LLM.
 
 ## Management fixture boundaries and profiling
 

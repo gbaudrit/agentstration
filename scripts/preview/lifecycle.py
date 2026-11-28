@@ -12,6 +12,8 @@ import sys
 import uuid
 
 import contract
+import container_health
+import extensions
 import preview
 
 OWNER = "io.agentstration.preview.owner"
@@ -63,6 +65,7 @@ def locked(root, environment_id):
 
 
 def result(request, state, resources=None, daemon=None, metadata=None):
+    inspected = resources is not None
     resources = resources or {"containers": [], "volumes": [], "networks": []}
     identifiers = {kind: [item["Name"] if kind == "volumes" else item["Id"] for item in values]
                    for kind, values in resources.items()}
@@ -78,6 +81,7 @@ def result(request, state, resources=None, daemon=None, metadata=None):
             "observedImages": {item["Config"]["Labels"].get("com.docker.compose.service", "unknown"): item["Config"]["Image"]
                                for item in resources["containers"]},
             "state": state, "url": url, "expiresAt": expiry,
+            "health": container_health.from_containers(contract.images(request), resources["containers"]) if inspected else {},
             "providerResourceIds": {"dockerDaemon": daemon, "composeProject": "preview-" + request["environmentId"], **identifiers} if daemon else {}}
 
 
@@ -95,15 +99,22 @@ def observed(request, resources):
                             for item in containers) else "unhealthy"
 
 
-def execute(action, request, state_root, bootstrap=None, now=None):
+def execute(action, request, state_root, bootstrap=None, now=None, extension_configuration=None, reset_before_deploy=False):
+    preview.require(type(reset_before_deploy) is bool and (not reset_before_deploy or
+                    action == 'deploy' and request['provider'] == 'azure-vm'),
+                    'Reset-before-deploy requires an Azure deployment.')
+    raw_configuration = os.environ.pop("PREVIEW_EXTENSION_CONFIGURATION", "") or "{}"
     contract.operation(action, request)
+    settings = extensions.configuration(extension_configuration if extension_configuration is not None else raw_configuration,
+                                        request.get("extensions", {})) if action == "deploy" else {}
     if action == "validate":
         return result(request, "validated")
     if request["provider"] == "azure-vm":
         preview.require(state_root is None and bootstrap is None,
                         "Azure uses its private blob/disk state; Docker host state and Bootstrap files are not transferred.")
         import azure
-        return azure.execute(action, request)
+        return azure.execute(action, request, **({"extension_configuration": settings} if settings else {}),
+                             **({'reset_before_deploy': True} if reset_before_deploy else {}))
     preview.require(state_root is not None, "Docker operations require a protected persistent state root.")
     root = Path(state_root).resolve()
     directory = root / request["environmentId"]
@@ -144,7 +155,8 @@ def execute(action, request, state_root, bootstrap=None, now=None):
         if action == "deploy":
             state = preview.prepare(directory, request["deliveries"]["server"], request["deliveries"]["worker"],
                                     request["environmentId"], port=request["target"]["port"], registry=request["registry"],
-                                    bootstrap=bootstrap, database=request["database"], postgres_image=request.get("postgresImage"))
+                                    bootstrap=bootstrap, database=request["database"], postgres_image=request.get("postgresImage"),
+                                    extension_deliveries=request.get("extensions", {}), extension_configuration=settings)
             if metadata is None:
                 created = now or datetime.now(timezone.utc)
                 metadata = {"schemaVersion": 1, "environmentId": request["environmentId"], "dockerDaemon": daemon,
@@ -158,9 +170,18 @@ def execute(action, request, state_root, bootstrap=None, now=None):
             docker("volume", "create", "--label", PROJECT + "=" + project, "--label", OWNER + "=" + metadata["ownerId"],
                    "--label", ENVIRONMENT + "=" + request["environmentId"], project + "-owner")
             owned(inventory(project), metadata["ownerId"])
+            # Remove only inspected owned containers that were explicitly deselected. Retain their volumes/keys.
+            selected_services = set(contract.images(request))
+            for item in resources["containers"]:
+                name = item["Config"]["Labels"].get("com.docker.compose.service", "")
+                if name.startswith("extension-") and name not in selected_services:
+                    preview.require(name[len("extension-"):] in state.get("extensionKeys", {}),
+                                    "Unexpected extension container; inspect ownership before removal.")
+                    docker("stop", "--time", "20", item["Id"])
+                    docker("rm", item["Id"])
             preview.compose(directory, "pull", capture=True)
             preview.compose(directory, "up", "--detach", "--wait", "--wait-timeout", "180", capture=True)
-            if request["testProfile"] == "readiness":
+            if request["testProfile"] == "readiness" or request.get("extensions"):
                 preview.verify(directory)
             resources = inventory(project)
             owned(resources, metadata["ownerId"])
@@ -205,6 +226,8 @@ def main():
             command.add_argument("--state-root", type=Path)
         if action == "deploy":
             command.add_argument("--bootstrap-config", type=Path)
+            command.add_argument("--extension-configuration", type=Path)
+            command.add_argument("--reset-before-deploy", action="store_true")
         command.add_argument("--output", type=Path)
     plan.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -220,7 +243,14 @@ def main():
         with args.request.open(encoding="utf-8") as stream:
             request = contract.loads(stream.read(65537))
         bootstrap = getattr(args, "bootstrap_config", None)
-        value = execute(args.operation, request, getattr(args, "state_root", None), preview.read_json(bootstrap) if bootstrap else None)
+        configuration = getattr(args, "extension_configuration", None)
+        private_settings = None
+        if configuration:
+            preview.require(configuration.is_file(), "Expected a private extension configuration file.")
+            with configuration.open(encoding="utf-8") as stream:
+                private_settings = stream.read(16385)
+        value = execute(args.operation, request, getattr(args, "state_root", None), preview.read_json(bootstrap) if bootstrap else None,
+                        extension_configuration=private_settings, reset_before_deploy=getattr(args, 'reset_before_deploy', False))
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         preview.private_write(args.output, json.dumps(value, indent=2) + "\n")

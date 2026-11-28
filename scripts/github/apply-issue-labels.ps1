@@ -5,7 +5,10 @@ param(
     [string] $Repository,
 
     [Parameter()]
-    [switch] $DryRun
+    [switch] $DryRun,
+
+    [Parameter()]
+    [switch] $PreviewExtensionsOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,7 +47,57 @@ if (-not (Test-Path -LiteralPath $labelsPath -PathType Leaf)) {
     throw "Label definition not found: $labelsPath"
 }
 
-$labels = @(Get-Content -LiteralPath $labelsPath -Raw | ConvertFrom-Json)
+$labels = @()
+if (-not $PreviewExtensionsOnly) {
+    $labels = @(Get-Content -LiteralPath $labelsPath -Raw | ConvertFrom-Json)
+}
+$labels += @(
+    [pscustomobject]@{
+        name = 'preview:auto'
+        color = '0E8A16'
+        description = 'Automatically deploy and update this PR preview, preserving data.'
+    }
+    [pscustomobject]@{
+        name = 'preview:auto:redeploy'
+        color = 'D93F0B'
+        description = 'With preview:auto, reset data and recreate on each requested update.'
+    }
+    [pscustomobject]@{
+        name = 'preview:keep'
+        color = 'FBCA04'
+        description = 'Retain the preview until explicit destroy, including after expiry or PR closure.'
+    }
+    [pscustomobject]@{
+        name = 'preview:status:deployed'
+        color = '1D76DB'
+        description = 'Automation-maintained status: a running preview has verified protected access.'
+    }
+    [pscustomobject]@{
+        name = 'preview:status:pending'
+        color = 'FBCA04'
+        description = 'Automation-maintained status: a preview operation is waiting for prerequisites.'
+    }
+    [pscustomobject]@{
+        name = 'preview:status:error'
+        color = 'B60205'
+        description = 'Automation-maintained status: an operation failed or verified preview health is bad.'
+    }
+)
+# Deployment selection follows the implemented OCI catalogue, independently of
+# extension:* backlog classification. New packaged AEP components need no new list.
+$extensionCatalogue = Join-Path $repositoryRoot 'deploy\images\extensions'
+foreach ($file in Get-ChildItem -LiteralPath $extensionCatalogue -Filter '*.json' | Sort-Object Name) {
+    $entry = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
+    if ($entry.schemaVersion -ne 1 -or $entry.id -notmatch '^[a-z][a-z0-9-]{0,31}$' -or
+        ($entry.kind -and $entry.kind -ne 'aep-extension')) {
+        throw "Invalid preview extension catalogue: $($file.Name)"
+    }
+    $labels += [pscustomobject]@{
+        name = "preview:extension:$($entry.id)"
+        color = '1D76DB'
+        description = "Deploy the packaged $($entry.id) AEP extension on the next /preview deploy."
+    }
+}
 if ($labels.Count -eq 0) {
     throw "Label definition is empty: $labelsPath"
 }
@@ -76,10 +129,21 @@ foreach ($label in $labels) {
 }
 
 if ($DryRun) {
-    Write-Host "Dry run: would create or update $($labels.Count) labels in $Repository from $labelsPath."
+    Write-Host "Dry run: would create or update $($labels.Count) labels in $Repository from label definitions and the OCI catalogue."
     Write-Host 'No label changes were made.'
     $labels | Format-Table -Property name, color, description
     return
+}
+
+# Preserve assignments when migrating the original derived label. Never rename a control label.
+$existingNames = @((
+    Invoke-GitHubCli -Arguments @('label', 'list', '--repo', $Repository, '--limit', '1000', '--json', 'name')
+    | ConvertFrom-Json
+) | ForEach-Object { $_.name })
+if ($existingNames -contains 'preview:deployed' -and $existingNames -notcontains 'preview:status:deployed' -and
+    $PSCmdlet.ShouldProcess($Repository, 'rename preview:deployed to preview:status:deployed')) {
+    Invoke-GitHubCli -Arguments @('label', 'edit', 'preview:deployed', '--repo', $Repository,
+                                 '--name', 'preview:status:deployed') | Out-Null
 }
 
 foreach ($label in $labels) {

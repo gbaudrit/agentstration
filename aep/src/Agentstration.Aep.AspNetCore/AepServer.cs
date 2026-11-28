@@ -44,6 +44,7 @@ public sealed class AepExtensionOptions
     public IList<AepConnectedServiceTypeContribution> ConnectedServiceTypes { get; } = [];
     public IList<AepConnectedServiceOperationTypeContribution> ConnectedServiceOperationTypes { get; } = [];
     public IList<AepStorageTypeContribution> StorageTypes { get; } = [];
+    public bool OperationalConfigurationEnabled { get; set; }
     public IList<AepOptionSetDescriptor> OptionSets { get; } = [];
     public IList<AepValueRequirement> ValueRequirements { get; } = [];
     public AepSourceMaterializationLimits SourceMaterializationLimits { get; set; } = new(
@@ -95,6 +96,22 @@ public static partial class AepServerExtensions
         protocolEndpoints.Add(endpoints.MapGet(AepProtocol.ConfigurationPath, (IOptions<AepExtensionOptions> options, IEnumerable<IAepOptionMigrator> migrators) =>
             Results.Json(CreateConfigurationCatalog(options.Value.OptionSets, migrators), AepProtocol.JsonOptions)));
         protocolEndpoints.Add(endpoints.MapPost(AepProtocol.ConfigurationMigrationPath, MigrateOptionsAsync));
+        if (endpoints.ServiceProvider.GetService<IAepOperationalConfiguration>() is not null
+            && endpoints.ServiceProvider.GetService<AepAuthenticationMarker>() is null)
+        {
+            endpoints.MapGet(AepOperationalConfigurationProtocol.Path, () => Results.Unauthorized());
+            endpoints.MapPut(AepOperationalConfigurationProtocol.Path, () => Results.Unauthorized());
+        }
+        else if (endpoints.ServiceProvider.GetService<IAepOperationalConfiguration>() is not null)
+        {
+            protocolEndpoints.Add(endpoints.MapGet(AepOperationalConfigurationProtocol.Path,
+                (IAepOperationalConfiguration configuration, HttpResponse response) =>
+                {
+                    response.Headers.CacheControl = "no-store";
+                    return Results.Json(PublicOperationalState(configuration.Read()), AepProtocol.JsonOptions);
+                }));
+            protocolEndpoints.Add(endpoints.MapPut(AepOperationalConfigurationProtocol.Path, ApplyOperationalConfigurationAsync));
+        }
         protocolEndpoints.Add(endpoints.MapPost(AepConnectedServiceDiscoveryProtocol.Path, DiscoverConnectedServiceOperationsAsync));
         protocolEndpoints.Add(endpoints.MapPost(AepConnectedServiceAcquisitionProtocol.Path, AcquireConnectedServiceOperationAsync));
         protocolEndpoints.Add(endpoints.MapPost($"{AepProtocol.ModelProvidersPath}/{{providerId}}/chat", ChatAsync));
@@ -215,6 +232,8 @@ public static partial class AepServerExtensions
         if (options.ConnectedServiceOperationTypes.Count > 0)
             capabilities[AepCapabilityNames.ConnectedServiceOperationTypes] = new(
                 AepProtocol.ConnectedServiceOperationTypesCapabilityVersion);
+        if (options.OperationalConfigurationEnabled)
+            capabilities[AepOperationalConfigurationProtocol.Capability] = new(AepOperationalConfigurationProtocol.Version, AepOperationalConfigurationProtocol.Path);
         if (options.OptionSets.Count > 0) capabilities[AepCapabilityNames.Configuration] = new("1.0", AepProtocol.ConfigurationPath);
         if (options.ValueRequirements.Count > 0)
         {

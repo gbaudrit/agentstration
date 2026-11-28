@@ -5,4 +5,5 @@
 <data name="RefreshDraftConflict"><value>Le Paramètre enregistré a changé. Votre brouillon et sa version d’origine sont conservés ; abandonnez le brouillon pour charger la nouvelle valeur enregistrée.</value></data>
 <data name="IdentityMismatch"><value>Le Paramètre reçu ne correspond pas à l’identité demandée.</value></data>
 <data name="YamlExport"><value>Cette vue YAML exporte le Paramètre enregistré. Modifiez sa définition dans le formulaire.</value></data>
+  <data name="ValueType.Array" xml:space="preserve"><value>Liste JSON</value></data>
 </root>

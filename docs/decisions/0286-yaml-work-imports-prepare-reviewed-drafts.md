@@ -2,7 +2,7 @@
 
 - Status: Accepted — implementation for #1363
 - Date: 2026-11-25
-- Related: ADR-0267, ADR-0275, ADR-0284, ADR-0285, #1364
+- Related: ADR-0300, ADR-0275, ADR-0284, ADR-0285, #1364
 
 ## Context
 

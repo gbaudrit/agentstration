@@ -4,6 +4,11 @@ import copy
 from datetime import datetime, timezone
 import hashlib
 import json
+import io
+import os
+from pathlib import Path
+import tempfile
+from contextlib import redirect_stderr
 import unittest
 from unittest.mock import patch
 
@@ -40,6 +45,8 @@ class Metadata:
         self.entries = {name: catalogue(name) for name in ('server', 'maf-worker')}
         self.configs, self.manifests, self.files = {}, {}, {}
         self.versions = []
+        self.ci_components = ['server']
+        self.ci_sha = 'a' * 40
         for component, sha in (('server', 'a' * 40), ('maf-worker', 'c' * 40)):
             entry = self.entries[component]
             image = 'ghcr.io/owner/repo-' + entry['imageName']
@@ -59,6 +66,12 @@ class Metadata:
         self.calls.append(arguments)
         if arguments[:2] == ['gh', 'api']:
             path = arguments[2]
+            if '/actions/' in path:
+                from urllib.parse import parse_qs, urlsplit
+                from test_ci_images import fixture, read
+                query = parse_qs(urlsplit(path).query)
+                self.ci_sha = query.get('head_sha', [self.ci_sha])[0]
+                return json.dumps(read(fixture(self.ci_sha, self.ci_components), path)).encode()
             if path == 'repos/owner/repo':
                 value = {'owner': {'type': 'User'}}
             elif '/commits/' in path:
@@ -74,7 +87,12 @@ class Metadata:
                 name = path.split('/contents/')[1].split('?')[0]
                 value = {'type': 'file', 'encoding': 'base64', 'content': base64.b64encode(self.files[name].encode()).decode()}
             elif '/versions?' in path:
-                value = self.versions
+                if '/repo-server/' in path:
+                    image = 'ghcr.io/owner/repo-server'
+                    value = [{'name': 'sha256:' + hashlib.sha256(self.manifests[image]).hexdigest(),
+                              'metadata': {'container': {'tags': ['sha-' + self.configs[image]['config']['Labels']['org.opencontainers.image.revision']]}}}]
+                else:
+                    value = self.versions
             else:
                 value = {'visibility': 'private' if self.private else 'public'}
             return json.dumps(value).encode()
@@ -88,6 +106,27 @@ class Metadata:
 
 
 class ManualTests(unittest.TestCase):
+    def test_pr_reuses_published_server_and_worker_when_neither_changed(self):
+        metadata = Metadata()
+        metadata.ci_components = []
+        selector = manual.PublishedImages('owner/repo', metadata.run)
+        value = manual.resolve(options(revision='b' * 40, preview_pr=1), VARIABLES, 'owner/repo', selector)
+        self.assertEqual('b' * 40, value['sourceSha'])
+        self.assertEqual(4, value['schemaVersion'])
+        self.assertEqual('a' * 40, value['deliveries']['server']['sourceSha'])
+        self.assertEqual('c' * 40, value['deliveries']['worker']['sourceSha'])
+
+    def test_pr_worker_change_requires_that_pr_worker_and_reuses_the_server(self):
+        metadata = Metadata()
+        metadata.ci_components = ['maf-worker']
+        selector = manual.PublishedImages('owner/repo', metadata.run)
+        with self.assertRaises(manual.SelectionError):
+            manual.resolve(options(revision='b' * 40, preview_pr=1), VARIABLES, 'owner/repo', selector)
+        metadata.configs['ghcr.io/owner/repo-worker-maf']['config']['Labels']['org.opencontainers.image.revision'] = 'b' * 40
+        value = manual.resolve(options(revision='b' * 40, preview_pr=1), VARIABLES, 'owner/repo', selector)
+        self.assertEqual('a' * 40, value['deliveries']['server']['sourceSha'])
+        self.assertEqual('b' * 40, value['deliveries']['worker']['sourceSha'])
+
     def setUp(self):
         self.metadata = Metadata()
         self.selector = manual.PublishedImages('owner/repo', self.metadata.run)
@@ -146,8 +185,9 @@ class ManualTests(unittest.TestCase):
 
     def test_missing_image_never_falls_back_to_another_revision_or_builds(self):
         self.metadata.missing_all_tags = True
-        with self.assertRaisesRegex(ValueError, 'Publish this component'):
+        with self.assertRaisesRegex(manual.SelectionError, 'Publish this component') as failure:
             self.resolve()
+        self.assertEqual({'code': 'image-unavailable', 'component': 'server'}, failure.exception.public)
 
     def test_frozen_index_is_verified_before_config_inspection(self):
         self.metadata.tamper = True
@@ -191,7 +231,7 @@ class ManualTests(unittest.TestCase):
     def test_latest_worker_skips_untagged_manifests_and_refuses_empty_inventory(self):
         self.assertEqual('c' * 40, self.resolve()['deliveries']['worker']['sourceSha'])
         self.metadata.versions = self.metadata.versions[:1]
-        with self.assertRaisesRegex(ValueError, 'No tagged Worker'):
+        with self.assertRaisesRegex(ValueError, 'No tagged component'):
             self.resolve()
 
     def test_invalid_choices_fail_before_any_registry_read(self):
@@ -203,6 +243,28 @@ class ManualTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             manual.resolve(options(), variables, 'owner/repo', self.selector)
         self.assertEqual([], self.metadata.calls)
+
+    def test_registry_api_failure_is_classified_without_copying_remote_output(self):
+        def run(arguments):
+            if '/packages/' in arguments[-1]:
+                raise manual.Unavailable('PRIVATE PROVIDER RESPONSE')
+            return self.metadata.run(arguments)
+        selector = manual.PublishedImages('owner/repo', run)
+        with self.assertRaises(manual.SelectionError) as failure:
+            manual.resolve(options(), VARIABLES, 'owner/repo', selector)
+        self.assertEqual({'code': 'registry-access', 'component': 'server'}, failure.exception.public)
+        self.assertNotIn('PRIVATE', str(failure.exception))
+
+    def test_failed_selector_exports_only_controlled_diagnosis_for_feedback(self):
+        self.metadata.missing_all_tags = True
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'output'
+            variables = {**VARIABLES, 'GITHUB_REPOSITORY': 'owner/repo', 'SELECTION_JSON': json.dumps(options()),
+                         'GITHUB_OUTPUT': str(output)}
+            with patch.dict(os.environ, variables, clear=True), patch.object(manual.PublishedImages, 'api', side_effect=self.selector.api), \
+                    patch.object(manual.PublishedImages, 'raw', side_effect=self.selector.raw), redirect_stderr(io.StringIO()):
+                self.assertEqual(1, manual.main())
+            self.assertEqual({'code': 'image-unavailable', 'component': 'server'}, json.loads(output.read_text().removeprefix('failure=')))
 
 
 class RecordedSelectionTests(unittest.TestCase):
@@ -224,13 +286,27 @@ class RecordedSelectionTests(unittest.TestCase):
         self.assertEqual([], self.cloud.effects)
         saved['dataMode'] = 'reset'
         self.assertEqual([], azure.execute('destroy', saved, self.cloud.factory)['providerResourceIds']['resources'])
-        self.assertEqual('absent', azure.execute('status', self.recorded(), self.cloud.factory)['state'])
+        self.assertEqual('destroyed', azure.execute('status', self.recorded(), self.cloud.factory)['state'])
 
     def test_missing_record_never_reconstructs_or_adopts_resources(self):
         self.cloud.record = None
-        with self.assertRaisesRegex(ValueError, 'No recorded preview'):
+        with self.assertRaisesRegex(ValueError, 'Foreign or unmanaged'):
             self.recorded()
         self.assertEqual([], self.cloud.effects)
+
+    def test_no_record_status_returns_public_absence_without_a_synthetic_image_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output, summary = Path(directory) / 'output', Path(directory) / 'summary'
+            with patch.dict(os.environ, {'SELECTION_JSON': json.dumps(options(operation='status')), 'GITHUB_REPOSITORY': 'owner/repo',
+                    'AZURE_PREVIEW_SUBSCRIPTION_ID': VARIABLES['AZURE_PREVIEW_SUBSCRIPTION_ID'],
+                    'AZURE_PREVIEW_RESOURCE_GROUP': VARIABLES['AZURE_PREVIEW_RESOURCE_GROUP'],
+                    'GITHUB_OUTPUT': str(output), 'GITHUB_STEP_SUMMARY': str(summary), 'RUNNER_TEMP': directory}, clear=True), \
+                    patch.object(azure, 'recorded_request', return_value=None):
+                self.assertEqual(0, manual.main())
+            value = json.loads(output.read_text().removeprefix('result='))
+            self.assertEqual('absent', value['state'])
+            self.assertFalse(value['recorded'])
+            self.assertFalse((Path(directory) / 'manual-request.json').exists())
 
     def test_repository_environment_and_scope_must_match(self):
         for changes in ({'repository': 'other/repo'}, {'environment_id': 'another'}, {'resource_group': 'another'},
@@ -258,7 +334,7 @@ class RecordedSelectionTests(unittest.TestCase):
         client = object.__new__(azure.Azure)
         client.request = self.value
         remaining = self.cloud.items[:1]
-        with patch.object(client, 'az'), patch.object(client, 'resources', side_effect=[[]] * 6 + [remaining, []]), patch('azure.time.sleep') as sleep:
+        with patch.object(client, 'az'), patch.object(client, 'resources', side_effect=[[]] * 7 + [remaining, []]), patch('azure.time.sleep') as sleep:
             client.reset(self.cloud.record)
             sleep.assert_called_once_with(5)
         with patch.object(client, 'az'), patch.object(client, 'resources', return_value=remaining), patch('azure.time.sleep'), \

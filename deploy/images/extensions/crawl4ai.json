@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "crawl4ai",
+  "extensionId": "Agentstration.Extensions.Crawl4AI",
+  "project": "src/extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj",
+  "entrypoint": "Agentstration.Extensions.Crawl4AI.dll",
+  "dockerfile": "Dockerfile.extension",
+  "versionFile": "src/extensions/Agentstration.Extensions.Crawl4AI/version.txt",
+  "testProject": "tests/Agentstration.Extensions.Crawl4AI.Tests/Agentstration.Extensions.Crawl4AI.Tests.csproj",
+  "testFilter": "FullyQualifiedName~Agentstration.Extensions.Crawl4AI.Tests",
+  "imageName": "extension-crawl4ai",
+  "platform": "linux/amd64",
+  "aepVersion": "agentstration.io/v1",
+  "contributionKind": "tools",
+  "contributionId": "crawl4ai.web.fetch",
+  "contributions": {
+    "tools": [
+      "crawl4ai.web.fetch",
+      "crawl4ai.web.crawl",
+      "crawl4ai.content.extract",
+      "crawl4ai.content.read",
+      "crawl4ai.content.delete"
+    ],
+    "dataSourceProfileBundles": [
+      "crawl4ai-web"
+    ]
+  },
+  "smokeEnvironment": {
+    "Crawl4AI__AllowedDomains__0": "fixture.example.test"
+  }
+}

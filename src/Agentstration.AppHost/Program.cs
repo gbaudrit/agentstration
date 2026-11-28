@@ -107,8 +107,6 @@ var openApiAllowedDomains = builder.Configuration.GetSection("OpenApi:AllowedDom
     .Where(value => !string.IsNullOrWhiteSpace(value))
     .Cast<string>()
     .ToArray();
-if (openApiEnabled && openApiAllowedDomains.Length == 0)
-    throw new InvalidOperationException("OpenApi:AllowedDomains must contain at least one domain when OpenAPI is enabled.");
 var openApiAllowedPorts = builder.Configuration.GetSection("OpenApi:AllowedPorts")
     .GetChildren()
     .Select(value => value.Value)

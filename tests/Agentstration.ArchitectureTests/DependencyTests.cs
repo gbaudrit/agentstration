@@ -1,4 +1,6 @@
 extern alias codingworker;
+
+using System.Xml.Linq;
 using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Aep.Client;
@@ -111,6 +113,36 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
+    public void DedicatedExtensionTestsDoNotBuildOtherExtensionExecutables()
+    {
+        var root = FindRepositoryRoot();
+        var extensionsRoot = Path.Combine(root, "src", "extensions") + Path.DirectorySeparatorChar;
+        var testProjects = Directory.EnumerateDirectories(Path.Combine(root, "tests"), "Agentstration.Extensions.*.Tests")
+            .Select(directory => Path.Combine(directory, Path.GetFileName(directory) + ".csproj")).ToArray();
+        Assert.IsNotEmpty(testProjects);
+        foreach (var testProject in testProjects)
+        {
+            var extensionName = Path.GetFileNameWithoutExtension(testProject)[..^".Tests".Length];
+            var expected = Path.Combine(extensionsRoot, extensionName, extensionName + ".csproj");
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var pending = new Stack<string>();
+            pending.Push(testProject);
+            while (pending.TryPop(out var project))
+            {
+                if (!visited.Add(project)) continue;
+                var directory = Path.GetDirectoryName(project)!;
+                foreach (var reference in XDocument.Load(project).Descendants("ProjectReference"))
+                {
+                    pending.Push(Path.GetFullPath(Path.Combine(directory, reference.Attribute("Include")!.Value)));
+                }
+            }
+
+            CollectionAssert.AreEquivalent(new[] { expected }, visited.Where(project =>
+                project.StartsWith(extensionsRoot, StringComparison.OrdinalIgnoreCase)).ToArray(), testProject);
+        }
+    }
+
+    [TestMethod]
     public void PostgreSqlDocumentImplementationRemainsOutsideProductFamilies()
     {
         var sourceRoot = Path.Combine(FindRepositoryRoot(), "src");
@@ -161,7 +193,7 @@ public sealed class DependencyTests
     }
 
     [TestMethod]
-    public void AspireOpenApiRegistrationIsOptInAndForwardsOnlyBoundedProviderPolicy()
+    public void AspireOpenApiRegistrationIsOptInAndAllowsConfigurationAfterEnrollment()
     {
         var root = FindRepositoryRoot();
         var appHost = File.ReadAllText(Path.Combine(root, "src", "Agentstration.AppHost", "Program.cs"));
@@ -170,7 +202,7 @@ public sealed class DependencyTests
         Assert.Contains("OpenApi:Enabled", appHost, StringComparison.Ordinal);
         Assert.Contains("if (openApiEnabled)", appHost, StringComparison.Ordinal);
         Assert.Contains("AddProject<Projects.Agentstration_Extensions_OpenApi>(\"openapi-extension\")", appHost, StringComparison.Ordinal);
-        Assert.Contains("OpenApi:AllowedDomains must contain at least one domain", appHost, StringComparison.Ordinal);
+        Assert.DoesNotContain("openApiEnabled && openApiAllowedDomains.Length == 0", appHost, StringComparison.Ordinal);
         Assert.Contains("OpenApi__AllowedDomains__{index}", appHost, StringComparison.Ordinal);
         Assert.Contains("Agentstration.Extensions.OpenApi\", \"openapi-extension", appHost, StringComparison.Ordinal);
         Assert.Contains("\"OpenApi\"", settings, StringComparison.Ordinal);
@@ -1573,6 +1605,11 @@ public sealed class DependencyTests
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Aep.Tests"
                         or "Agentstration.Management.Aep.Automatic.Tests") continue;
 
+                // The extension deadline and product two-hop scenarios share only this Ollama host fixture.
+                if (include.Replace('\\', '/') == "../OllamaInferenceTestFixture.cs"
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Extensions.Ollama.Tests"
+                        or "Agentstration.ModelProviders.Tests") continue;
+
                 // Declarative fixtures are shared only by these bounded Bootstrap modules.
                 if (include.Replace('\\', '/') == "../BootstrapDeclarativeTestFixture.cs"
                     && Path.GetFileName(projectDirectory) is "Agentstration.Management.Bootstrap.Tests"
@@ -1605,7 +1642,7 @@ public sealed class DependencyTests
                 // The native Git HTTP fixture is owned by the test root and reused
                 // only by its provider and governed transport integration modules.
                 if (include.Replace('\\', '/') == "../fixtures/Git/AuthenticatedGitFixture.cs"
-                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Api.Execution.Tests" or "Agentstration.SourceProviders.Git.Tests") continue;
+                    && Path.GetFileName(projectDirectory) is "Agentstration.Api.Tests" or "Agentstration.Api.Execution.Tests" or "Agentstration.Extensions.Git.Tests") continue;
 
                 // These fixtures belong to the test root and are compiled into
                 // separate processes for the three resource-family test modules.

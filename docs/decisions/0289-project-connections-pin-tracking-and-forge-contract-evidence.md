@@ -6,7 +6,7 @@ Proposed — implementation of #951 after the independent ATC/AFC foundations.
 
 ## Context
 
-ADR-0270 captures authorized Project resource identities at task admission. ATC and
+ADR-0303 captures authorized Project resource identities at task admission. ATC and
 AFC now provide independent functional contracts. Selecting a Tool identity alone
 does not prove its contract, effective operations, configured logical target or
 current AEP/MCP mapping. Tracking may have no repository and may use a different
@@ -21,7 +21,7 @@ required operations. Existing Context, Sharing and current native consumer bindi
 retain their existing meaning; no authority is inferred between connections.
 
 For these explicit connections, Infrastructure extends the identity/access checks
-of ADR-0270 with current AEP discovery and a bounded, governed Describe invocation.
+of ADR-0303 with current AEP discovery and a bounded, governed Describe invocation.
 The caller needs run-read and run-execute permissions, and current Discover/Use
 grants for all mapped resources. Configuration and protected credentials are resolved
 in the caller's context only after those checks. All canonical Tool schemas and AEP

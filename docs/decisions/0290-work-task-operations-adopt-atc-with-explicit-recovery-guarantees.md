@@ -6,7 +6,7 @@ Proposed — implementation for [#955](https://github.com/gbaudrit/agentstration
 
 ## Context
 
-ADR-0272 introduced optional native task operations and durable local receipts.
+ADR-0305 introduced optional native task operations and durable local receipts.
 ADR-0289 now captures independently authorized Tracking connections. Deterministic
 application actions need to consume ATC without importing vendor, MCP or SDK DTOs
 into Work, and without treating every tracker target as a repository. A local durable

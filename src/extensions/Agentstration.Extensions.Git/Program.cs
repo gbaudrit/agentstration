@@ -1,3 +1,4 @@
+using System.Reflection;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.Git;
 using System.Text.Json;
@@ -23,7 +24,7 @@ builder.Services.AddAgentstrationAep(options =>
     options.Extension = new(
         "Agentstration.Extensions.Git",
         "Git Source Provider",
-        "1.0.0",
+        typeof(GitSourceProvider).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0],
         "Bounded public Git distribution for Agentstration Source Channels.");
     options.OptionSets.Add(GitSourceOptionContracts.SourceChannel);
     options.ConnectedServiceTypes.Add(new(GitServiceContract.TypeId, "Git", GitServiceContract.Version, [GitServiceContract.TypeVersion]));

@@ -158,6 +158,7 @@ public sealed class ParameterManagementService(
     {
         var matches = type switch
         {
+            ParameterValueType.Array => value.ValueKind == JsonValueKind.Array && value.GetArrayLength() <= 128,
             ParameterValueType.Text => value.ValueKind == JsonValueKind.String,
             ParameterValueType.WholeNumber => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
             ParameterValueType.DecimalNumber => value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number)

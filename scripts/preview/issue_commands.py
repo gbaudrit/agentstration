@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Issue commands dispatch trusted main tooling; comment text is never executable code."""
+"""Issue and PR commands dispatch trusted main tooling; comment text is never executable code."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -8,8 +9,10 @@ import re
 import tempfile
 
 import contract
+import extensions
 import manual
 import preview
+import preview_feedback as feedback
 
 
 def api(path, method='GET', body=None):
@@ -19,7 +22,21 @@ def api(path, method='GET', body=None):
             file = Path(directory) / 'body.json'
             preview.private_write(file, json.dumps(body))
             arguments += ['--input', str(file)]
-        raw = manual.command(arguments)
+        try:
+            raw = manual.command(arguments)
+        except manual.Unavailable:
+            # Labels and provider/API errors are untrusted. Only name fixed API stages.
+            stage = 'GitHub metadata lookup'
+            permission = 'repository metadata/read access'
+            if method == 'POST' and path.endswith('/comments') or method == 'PATCH' and '/issues/comments/' in path:
+                stage, permission = 'Preview comment publication', 'issues:write for issues and pull-requests:write for PRs'
+            elif path.endswith('/permission'):
+                stage = 'Requester permission verification'
+            elif '/issues/comments/' in path:
+                stage = 'Command or feedback comment lookup'
+            elif path.endswith('/dispatches'):
+                stage, permission = 'Trusted-main workflow dispatch', 'actions:write'
+            raise manual.Unavailable(stage + ' failed; check ' + permission + '. Remote response is withheld.') from None
     return json.loads(raw) if raw else None
 
 
@@ -34,11 +51,68 @@ def positive(value):
     return value
 
 
+def sync_status(repository, environment, result=None, call=api, *, operation='status', outcome=None):
+    """Reconcile derived availability and sticky operation diagnostics without granting permissions."""
+    match = re.fullmatch(r'(?:pr|issue)-([1-9][0-9]{0,9})', environment)
+    if not match:
+        return
+    preview.require(operation in ('deploy', 'destroy', 'status') and outcome in (None, 'pending', 'error', 'success'),
+                    'Invalid preview status transition.')
+    if result is not None:
+        preview.require(result.get('environmentId', environment) == environment, 'Observed preview targets another environment.')
+        preview.require(result.get('state') in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy',
+                                             'provisioning', 'drifted', 'cleanup-pending'), 'Invalid observed preview state.')
+    root = 'repos/' + repository_name(repository) + '/issues/' + match[1] + '/labels'
+    labels = call(root + '?per_page=100')
+    preview.require(isinstance(labels, list) and len(labels) < 100, 'Preview label inventory exceeds its bound.')
+    present = {item['name'] for item in labels}
+    desired = present & {'preview:status:deployed', 'preview:status:pending', 'preview:status:error'}
+    if result is not None:
+        state = result['state']
+        ready = state == 'running' and isinstance(result.get('url'), str) and bool(
+            re.fullmatch(r'https://dev-' + re.escape(environment) + r'\.[a-z0-9.-]+', result['url']))
+        if ready:
+            desired.add('preview:status:deployed')
+        else:
+            desired.discard('preview:status:deployed')
+        if state in ('unhealthy', 'drifted', 'cleanup-pending') or state == 'running' and not ready:
+            desired.add('preview:status:error')
+        if (operation == 'deploy' and outcome == 'success' and ready
+                or state == 'destroyed' and not result.get('providerResourceIds', {}).get('resources')
+                or operation == 'destroy' and state == 'absent'):
+            desired.discard('preview:status:error')
+            desired.discard('preview:status:pending')
+    if outcome == 'pending':
+        desired.add('preview:status:pending')
+    elif outcome == 'error':
+        desired.add('preview:status:error')
+        desired.discard('preview:status:pending')
+    # Add before removing, so partial API failures remain repairable and never replace unrelated labels.
+    added = sorted(desired - present)
+    if added:
+        call(root, 'POST', {'labels': added})
+    removed = (present & {'preview:status:deployed', 'preview:status:pending', 'preview:status:error'}) - desired
+    if 'preview:deployed' in present:
+        removed.add('preview:deployed')
+    for label in sorted(removed):
+        call(root + '/' + label.replace(':', '%3A'), 'DELETE')
+
+
+def try_status(repository, environment, call, **kwargs):
+    # A feedback outage must not suppress an authorized command or claim dispatch failed after it succeeded.
+    try:
+        sync_status(repository, environment, call=call, **kwargs)
+    except (ValueError, RuntimeError, KeyError, TypeError, AttributeError, OSError):
+        print('Preview status labels could not be updated; reconciliation will retry.')
+
+
 def parse(body):
     preview.require(isinstance(body, str) and len(body) <= 512, 'Use one bounded /preview command.')
     text = body.strip()
-    preview.require(re.fullmatch(r'/preview (deploy|status|destroy)(?: [A-Za-z0-9_./:=+-]+)*', text),
-                    'Use /preview deploy [ref=PR_OR_REVISION] [database=sqlite|postgresql], /preview status or /preview destroy.')
+    if text == '/preview':
+        text = '/preview deploy'
+    preview.require(re.fullmatch(r'/preview (deploy|redeploy|status|destroy)(?: [A-Za-z0-9_./:=+-]+)*', text),
+                    'Use /preview, /preview deploy [ref=PR_OR_REVISION] [database=sqlite|postgresql], /preview redeploy, /preview status or /preview destroy.')
     words = text.split()
     values = {}
     for word in words[2:]:
@@ -46,7 +120,8 @@ def parse(body):
         preview.require(separator and key in ('ref', 'database') and key not in values and value,
                         'Only one ref and one database argument are supported.')
         values[key] = value
-    operation = words[1]
+    reset = words[1] == 'redeploy'
+    operation = 'deploy' if reset else words[1]
     preview.require(operation == 'deploy' or not values, 'Status/destroy use the recorded issue environment, without arguments.')
     ref = values.get('ref', '')
     if ref:
@@ -55,7 +130,8 @@ def parse(body):
                         'Use ref=pr:NUMBER, a branch, tag or full SHA.')
     database = values.get('database', 'sqlite')
     preview.require(database in ('sqlite', 'postgresql'), 'Database must be sqlite or postgresql.')
-    return {'operation': operation, 'revision': ref, 'database': database, 'provider': 'azure-vm',
+    return {**({'reset_before_deploy': True} if reset else {}),
+            'operation': operation, 'revision': ref, 'database': database, 'provider': 'azure-vm',
             'vm_size_profile': '1', 'ttl_hours': 2, 'data_mode': 'reset' if operation == 'destroy' else 'preserve',
             'test_profile': 'readiness', 'worker_revision': 'published'}
 
@@ -115,13 +191,56 @@ def reply(repository, issue, body, call):
     return call(f'repos/{repository}/issues/{positive(issue)}/comments', 'POST', {'body': body})
 
 
+def marker(options):
+    # Bind the bot-owned card to the complete admitted selection, including its frozen SHA.
+    selection = {key: value for key, value in options.items() if key != 'tracking_feedback'}
+    digest = hashlib.sha256(json.dumps(selection, sort_keys=True).encode()).hexdigest()
+    return '<!-- agentstration-preview-command:' + digest + ' -->'
+
+
+def managed_comment(options, repository, call):
+    identifier = options.get('tracking_feedback')
+    preview.require(isinstance(identifier, str) and re.fullmatch(r'[1-9][0-9]{0,19}', identifier), 'Invalid feedback identifier.')
+    comment = call(f'repos/{repository}/issues/comments/{identifier}')
+    preview.require(comment.get('id') == int(identifier)
+                    and comment.get('issue_url', '').lower() == f'https://api.github.com/repos/{repository}/issues/{options["tracking_issue"]}'
+                    and comment.get('user', {}).get('type') == 'Bot'
+                    and comment['user'].get('login') == 'github-actions[bot]'
+                    and comment.get('body', '').startswith(marker(options) + '\n'),
+                    'Feedback must be the bot-owned comment for this admitted command.')
+    return identifier
+
+
+def publish(options, repository, body, call):
+    preview.require(len(body) <= 11500, 'Preview feedback exceeds its limit.')
+    if 'tracking_feedback' not in options:
+        return reply(repository, int(options['tracking_issue']), body, call)  # Legacy in-flight commands.
+    identifier = managed_comment(options, repository, call)
+    return call(f'repos/{repository}/issues/comments/{identifier}', 'PATCH', {'body': marker(options) + '\n' + body})
+
+
+def context(options, repository, issue, current, call):
+    kind = options.get('tracking_kind', 'issue')
+    preview.require(kind in ('issue', 'pull_request') and current.get('number') == issue
+                    and ('pull_request' in current) == (kind == 'pull_request'), 'Unexpected issue/PR context.')
+    preview.require(options['operation'] != 'deploy' or current.get('state') == 'open', 'Reopen the issue or PR before deploying its preview.')
+    if kind == 'pull_request' and options['operation'] == 'deploy':
+        pull = call(f'repos/{repository}/pulls/{issue}')
+        preview.require(pull.get('number') == issue and pull.get('state') == 'open'
+                        and (pull.get('base', {}).get('repo') or {}).get('full_name', '').lower() == repository
+                        and (pull.get('head', {}).get('repo') or {}).get('full_name', '').lower() == repository,
+                        'Only open same-repository PRs may deploy; fork PR previews are not enabled.')
+        return pull
+    return None
+
+
 def safe_error(error):
     return str(error) if type(error) is ValueError or isinstance(error, manual.Unavailable) else 'Preview request failed; inspect the trusted workflow run. Remote content is withheld.'
 
 
 def admit(event, repository, call=api, selector=None):
     repository = repository_name(repository)
-    if event.get('action') != 'created' or 'pull_request' in event.get('issue', {}):
+    if event.get('action') != 'created':
         return False
     body = event.get('comment', {}).get('body', '')
     if not isinstance(body, str) or not body.strip().startswith('/preview'):
@@ -133,31 +252,48 @@ def admit(event, repository, call=api, selector=None):
     # No feedback or dispatch on behalf of untrusted users; association labels are not permissions.
     if not authorized(comment, repository, call):
         return False
+    options, admitted = None, False
     try:
         preview.require(comment.get('body') == body and comment.get('user', {}).get('id') == event['comment'].get('user', {}).get('id'),
                         'The command changed after its event; post a new comment.')
         options = parse(body)
         current = call(f'repos/{repository}/issues/{issue}')
-        preview.require(current.get('number') == issue and 'pull_request' not in current, 'Expected an ordinary repository issue.')
-        preview.require(options['operation'] != 'deploy' or current.get('state') == 'open', 'Reopen the issue before deploying its preview.')
-        source = ''
+        options['tracking_kind'] = 'pull_request' if 'pull_request' in event['issue'] else 'issue'
+        pull = context(options, repository, issue, current, call)
         if options['operation'] == 'deploy':
-            source = options['revision'] or linked_ref(repository, issue, call)
-            selector = selector or manual.PublishedImages(repository)
-            # Resolve once. Moving refs cannot change the source after admission.
-            options['revision'] = selector.revision(source)
-        options.update(environment_id='issue-' + str(issue), tracking_issue=str(issue), tracking_comment=str(comment['id']))
+            options['extensions'] = extensions.from_labels(current.get('labels', []))
+            if pull:
+                preview.require(options['revision'] in ('', 'pr:' + str(issue)),
+                                'On a PR, use /preview deploy without ref; it deploys that PR. Use an issue or the manual form for another revision.')
+                # Use the same live PR response for ownership and SHA; no moving-ref second lookup.
+                options['revision'] = pull['head']['sha']
+                preview.require(isinstance(options['revision'], str) and preview.SHA.fullmatch(options['revision']), 'Invalid PR head SHA.')
+            else:
+                source = options['revision'] or linked_ref(repository, issue, call)
+                selector = selector or manual.PublishedImages(repository)
+                options['revision'] = selector.revision(source)
+                if source.startswith('pr:'):
+                    options['preview_pr'] = int(source[3:])
+        prefix = 'pr-' if options['tracking_kind'] == 'pull_request' else 'issue-'
+        options.update(environment_id=prefix + str(issue), tracking_issue=str(issue), tracking_comment=str(comment['id']))
         manual.validate_options(options)
+        admitted = True
+        if options['operation'] in ('deploy', 'destroy'):
+            try_status(repository, options['environment_id'], call, operation=options['operation'], outcome='pending')
+        run_url = 'https://github.com/' + repository + '/actions/workflows/preview-issue-deployment.yml'
+        card = reply(repository, issue, marker(options) + '\n' + feedback.accepted(options, repository, run_url), call)
+        options['tracking_feedback'] = str(positive(card['id']))
         call(f'repos/{repository}/actions/workflows/preview-issue-deployment.yml/dispatches', 'POST',
              {'ref': 'main', 'inputs': {'selection': json.dumps(options)}})
-        selected = ('Source `' + options['revision'] + '`' + (' from `' + source + '`' if source.startswith('pr:') else '')
-                    + '. Published digests will be announced before infrastructure execution.\n\n') if source else ''
-        reply(repository, issue, 'Preview **' + options['operation'] + '** requested for `' + options['environment_id'] + '`.\n\n'
-              + selected + '[Follow Actions](https://github.com/' + repository + '/actions/workflows/preview-issue-deployment.yml).'
-              + ('\n\nDestroy removes all owned infrastructure and application data.' if options['operation'] == 'destroy' else ''), call)
         return True
     except (ValueError, RuntimeError, KeyError, TypeError, AttributeError) as error:
-        reply(repository, issue, safe_error(error), call)
+        if admitted:
+            try_status(repository, options['environment_id'], call, operation=options['operation'], outcome='error')
+        message = '**Command not executed**\n\n' + safe_error(error)
+        if options and options.get('tracking_feedback'):
+            publish(options, repository, message + '\n\nWorkflow dispatch failed. Check Actions permissions and post a new command.', call)
+        else:
+            reply(repository, issue, message, call)
         return False
 
 
@@ -165,40 +301,70 @@ def tracking(options, repository, call=api):
     repository = repository_name(repository)
     expected = {'operation', 'environment_id', 'revision', 'provider', 'database', 'vm_size_profile',
                 'ttl_hours', 'data_mode', 'test_profile', 'worker_revision'}
-    preview.require(isinstance(options, dict) and set(options) in (expected, expected | {'tracking_issue', 'tracking_comment'}),
+    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy', 'preview_pr'}
+    preview.require(isinstance(options, dict) and expected <= set(options) <= expected | optional,
                     'Unexpected form or issue tracking fields.')
+    tracked = {'tracking_issue', 'tracking_comment'} & set(options)
+    preview.require(not tracked or tracked == {'tracking_issue', 'tracking_comment'}, 'Incomplete command tracking.')
+    preview.require(not ({'tracking_kind', 'tracking_feedback'} & set(options)) or tracked, 'Feedback requires command tracking.')
+    preview.require(('tracking_kind' in options) == ('tracking_feedback' in options),
+                    'New command contexts require their admitted feedback card; legacy issue contexts omit both fields.')
     manual.validate_options(options)
     issue, comment_id = options.get('tracking_issue', ''), options.get('tracking_comment', '')
     if issue == '' and comment_id == '':
         return ''
     preview.require(isinstance(issue, str) and re.fullmatch(r'[1-9][0-9]{0,9}', issue)
                     and isinstance(comment_id, str) and re.fullmatch(r'[1-9][0-9]{0,19}', comment_id), 'Invalid issue tracking identifiers.')
-    preview.require(options['environment_id'] == 'issue-' + issue, 'Issue tracking cannot target another environment.')
+    kind = options.get('tracking_kind', 'issue')
+    prefix = 'pr-' if kind == 'pull_request' else 'issue-'
+    preview.require(options['environment_id'] == prefix + issue, 'Issue tracking cannot target another environment.')
     comment = comment_context(repository, int(issue), int(comment_id), call)
     preview.require(authorized(comment, repository, call), 'The command author no longer has repository write access.')
     original = parse(comment.get('body'))
+    preview.require(options.get('reset_before_deploy', False) == original.get('reset_before_deploy', False),
+                    'Reset must match the original /preview redeploy command.')
     preview.require(all(options[key] == original[key] for key in ('operation', 'database', 'provider', 'vm_size_profile',
                         'data_mode', 'test_profile', 'worker_revision')) and str(options['ttl_hours']) == str(original['ttl_hours']),
                     'The dispatched options differ from the issue command.')
     preview.require(options['operation'] != 'deploy' or preview.SHA.fullmatch(options['revision']), 'Issue deployment source must be frozen to a full SHA.')
     current = call(f'repos/{repository}/issues/{issue}')
-    preview.require('pull_request' not in current and current.get('number') == int(issue)
-                    and (options['operation'] != 'deploy' or current.get('state') == 'open'), 'The issue is no longer eligible for deployment.')
+    context(options, repository, int(issue), current, call)
+    if kind == 'pull_request':
+        preview.require(original['revision'] in ('', 'pr:' + issue), 'PR command cannot select another source.')
+    if 'tracking_feedback' in options:
+        managed_comment(options, repository, call)
+    if options["operation"] == "deploy":
+        preview.require(options.get("extensions", []) == extensions.from_labels(current.get("labels", [])),
+                        "Extension labels changed after admission; post a new /preview deploy command.")
     return issue
 
 
-def plan_message(request, operation, run_url):
+def plan_message(request, operation, run_url, repository='gbaudrit/agentstration', reset_before_deploy=False):
     request = contract.loads(json.dumps(request))
     contract.operation(operation, request)
-    lines = ['Preview **' + operation + '** selection for `' + request['environmentId'] + '`.',
-             'Source: `' + request['sourceSha'] + '`; database: `' + request['database'] + '`.',
-             *[name + ': `' + image['reference'] + '`' for name, image in contract.images(request).items()],
-             '[Workflow run](' + run_url + ').']
-    if operation == 'destroy':
-        lines.append('Full reset: all owned infrastructure and application data will be removed.')
-    elif operation == 'deploy':
-        lines.append('TTL is recorded; automatic expiry cleanup is not implemented yet. Use `/preview destroy` after testing.')
-    return '\n\n'.join(lines)
+    return feedback.planned(request, operation, repository, run_url, reset_before_deploy)
+
+
+def failure_stage():
+    stages = contract.parse(os.environ.get('STAGE_RESULTS', '{}'))
+    if isinstance(stages, dict) and all(isinstance(value, dict) for value in stages.values()):
+        stages = {name: value.get('result') for name, value in stages.items()}
+    preview.require(isinstance(stages, dict) and set(stages) <= {'boundary', 'select', 'recorded', 'announce', 'execute'}
+                    and all(value in ('success', 'failure', 'cancelled', 'skipped') for value in stages.values()), 'Invalid workflow stage results.')
+    return next((name for name in ('boundary', 'select', 'recorded', 'announce', 'execute') if stages.get(name) == 'failure'),
+                'cancelled' if 'cancelled' in stages.values() else 'execute')
+
+
+def report_result():
+    # Azure login masks subscription IDs, which can suppress otherwise public job outputs.
+    # The workflow downloads only this run/attempt's existing public result artifact.
+    if os.environ.get('RESULT_FILE'):
+        with open(os.environ['RESULT_FILE'], encoding='utf-8') as file:
+            text = file.read(65537)
+    else:
+        text = os.environ.get('RESULT_JSON', '')
+    preview.require(bool(text), 'Verified lifecycle result is missing; inspect the result artifact.')
+    return contract.parse(text)
 
 
 def main():
@@ -228,38 +394,53 @@ def main():
             run_url = 'https://github.com/' + repository + '/actions/runs/' + str(run_id)
             operation = os.environ['OPERATION']
             preview.require(operation in ('validate', 'deploy', 'status', 'destroy'), 'Invalid feedback operation.')
+            options = contract.parse(os.environ['SELECTION_JSON']) if os.environ.get('SELECTION_JSON') else {'tracking_issue': issue, 'environment_id': 'issue-' + issue, 'operation': operation}
+            preview.require(options.get('tracking_issue') == issue and options.get('operation') == operation, 'Invalid feedback command context.')
+            environment = options['environment_id']
+            preview.require(environment == ('pr-' if options.get('tracking_kind') == 'pull_request' else 'issue-') + issue, 'Invalid feedback environment.')
+            request, result, status_outcome = None, None, None
             if args.mode == 'plan':
-                options = contract.parse(os.environ['SELECTION_JSON'])
                 preview.require(tracking(options, repository, api) == issue and options['operation'] == operation,
                                 'Invalid command authorization before execution.')
                 request = contract.loads(os.environ['REQUEST_JSON'])
-                preview.require(request['environmentId'] == 'issue-' + issue, 'Feedback targets another environment.')
+                preview.require(request['environmentId'] == environment, 'Feedback targets another environment.')
                 preview.require(request['dataMode'] == options['data_mode']
                                 and (operation != 'deploy' or request['sourceSha'] == options['revision']
                                      and request['database'] == options['database']), 'Frozen request differs from the issue command.')
-                message = plan_message(request, operation, run_url)
+                if operation == 'deploy':
+                    preview.require(list(request.get('extensions', {})) == options.get('extensions', []),
+                                    'Frozen extension deliveries differ from the issue labels.')
+                message = plan_message(request, operation, run_url, repository, options.get('reset_before_deploy', False))
+                if operation in ('deploy', 'destroy'):
+                    status_outcome = 'pending'
             elif os.environ['EXECUTION_RESULT'] == 'success':
-                result = contract.parse(os.environ['RESULT_JSON'])
-                preview.require(result['environmentId'] == 'issue-' + issue, 'Result targets another environment.')
+                result = report_result()
+                preview.require(result['environmentId'] == environment, 'Result targets another environment.')
                 state = result['state']
-                preview.require(state in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy', 'provisioning', 'drifted'), 'Invalid preview result state.')
+                preview.require(state in ('running', 'destroyed', 'stopped', 'absent', 'unhealthy', 'provisioning', 'drifted', 'cleanup-pending'), 'Invalid preview result state.')
                 url = result.get('url')
-                preview.require(url is None or isinstance(url, str) and re.fullmatch(r'https://dev-issue-' + issue + r'\.[a-z0-9.-]+', url), 'Invalid protected preview URL.')
+                preview.require(url is None or isinstance(url, str) and re.fullmatch(r'https://dev-' + re.escape(environment) + r'\.[a-z0-9.-]+', url), 'Invalid protected preview URL.')
                 preview.require(not url or state == 'running', 'An inactive preview cannot publish a URL.')
                 if operation == 'destroy':
                     preview.require(state in ('destroyed', 'absent') and not url
                                     and not result.get('providerResourceIds', {}).get('resources'), 'Reset has not confirmed removal of owned resources.')
                 elif operation == 'deploy':
                     preview.require(state == 'running' and url, 'Deployment has no verified protected URL.')
-                message = 'Preview `' + result['environmentId'] + '`: **' + state + '**.\n\n'
-                if url:
-                    message += '[Open protected preview](' + url + ').\n\n'
-                if operation == 'destroy':
-                    message += 'Full reset completed: owned resources and application data removed.\n\n'
-                message += '[Workflow run](' + run_url + ').'
+                if os.environ.get('REQUEST_JSON'):
+                    request = contract.loads(os.environ['REQUEST_JSON'])
+                    preview.require(request['environmentId'] == environment, 'Result request targets another environment.')
+                    # Report only canonical request metadata, not arbitrary provider fields.
+                    preview.require(result.get('sourceSha') == request['sourceSha'] and result.get('database') == request['database']
+                                    and result.get('images') == contract.images(request), 'Result differs from the frozen request.')
+                message = feedback.completed(result, operation, repository, run_url, request, options.get('reset_before_deploy', False))
+                status_outcome = 'success'
             else:
-                message = 'Preview **' + operation + '** did not complete successfully. No verified preview URL is reported. [Inspect the trusted workflow run](' + run_url + ').'
-            reply(repository, int(issue), message, api)
+                failure = contract.parse(os.environ.get('SELECTION_FAILURE') or '{}')
+                message = feedback.failed(operation, repository, run_url, failure_stage(), options, failure)
+                status_outcome = 'pending' if failure.get('code') in ('image-unavailable', 'ci-pending') and operation == 'deploy' else 'error'
+            publish(options, repository, message, api)
+            if operation != 'validate':
+                sync_status(repository, environment, result, api, operation=operation, outcome=status_outcome)
     except (ValueError, RuntimeError, KeyError, TypeError, AttributeError, OSError) as error:
         print(safe_error(error))
         return 1
