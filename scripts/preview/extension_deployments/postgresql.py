@@ -7,6 +7,7 @@ EXTERNAL_LABEL = 'externalDB'
 SERVICE = 'postgres-documents'
 SECRET_FILE = 'postgresql-documents.password'
 EXTERNAL_FILE = 'postgresql-documents.external.json'
+CONNECTION_FILE = 'postgresql-documents.connection.json'
 ENTRYPOINT_FILE = 'postgresql-documents-bootstrap.sh'
 PARAMETERS = 'Agentstration__Bootstrap__Parameters__PostgreSqlDocuments'
 SECRET_VARIABLE = 'Agentstration__Bootstrap__Secrets__PostgreSqlDocumentsPassword'
@@ -115,10 +116,14 @@ def prepare(directory, state, settings, plan, previous):
                                 and not any(ord(c) < 32 for c in external[key]) for key in ('Host', 'Database', 'Username', 'Password')),
                         'Invalid private external document database settings.')
         preview.require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9.-]{0,252}', external['Host']), 'Invalid external document database host.')
+        identity = {key: external[key] for key in ('Host', 'Port', 'Database', 'Username')}
+        recorded = directory / CONNECTION_FILE
         if previous:
             preview.require(file.is_file() and read_external(file) == external and password.is_file()
-                            and not password.is_symlink() and password.read_text() == external['Password'],
+                            and not password.is_symlink() and password.read_text() == external['Password']
+                            and recorded.is_file() and not recorded.is_symlink() and preview.read_json(recorded) == identity,
                             'Changing external document connection settings requires an explicit redeploy/reset.')
+        preview.private_write(recorded, json.dumps(identity))
         preview.private_write(file, json.dumps(external))
         preview.private_write(password, external['Password'])
     password.chmod(0o600)
@@ -158,7 +163,7 @@ def overlay(directory, state, plan):
 
 def reset(directory):
     import preview
-    paths = [directory / name for name in (SECRET_FILE, EXTERNAL_FILE, ENTRYPOINT_FILE)]
+    paths = [directory / name for name in (SECRET_FILE, EXTERNAL_FILE, CONNECTION_FILE, ENTRYPOINT_FILE)]
     preview.require(all(not path.is_symlink() for path in paths), 'Recipe credential paths must not be symbolic links.')
     for path in paths:
         path.unlink(missing_ok=True)

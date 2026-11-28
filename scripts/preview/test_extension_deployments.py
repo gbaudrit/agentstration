@@ -199,8 +199,12 @@ class RecipePreparationTests(unittest.TestCase):
         state = self.prepare(external=True)
         self.assertNotIn('postgres-documents', state['images'])
         self.assertTrue((self.directory / postgresql.SECRET_FILE).read_text() == private['Password'])
+        private['Host'] = 'changed.example.test'
+        preview.private_write(self.directory / postgresql.EXTERNAL_FILE, json.dumps(private))
+        with self.assertRaisesRegex(ValueError, 'explicit redeploy'):
+            self.prepare(external=True)
         recipes.reset(self.directory, state)
-        for name in (postgresql.SECRET_FILE, postgresql.EXTERNAL_FILE, postgresql.ENTRYPOINT_FILE):
+        for name in (postgresql.SECRET_FILE, postgresql.EXTERNAL_FILE, postgresql.CONNECTION_FILE, postgresql.ENTRYPOINT_FILE):
             self.assertFalse((self.directory / name).exists())
         # Reset only touches host credentials. It has no SQL connection or external deletion operation.
         self.assertEqual({}, state['extensionDeploymentHistory'])
