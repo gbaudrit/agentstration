@@ -113,6 +113,7 @@ for (const variant of [
     await pages.distribution.inspectRemoteBootstrapEntry(variant.locale, screenshot);
     await testInfo.attach('Remote bootstrap', { path: screenshot, contentType: 'image/png' });
     await pages.distribution.open(product.consoleUrl, '/settings/resource-scopes', 'resourceScopes');
+    await page.waitForLoadState('load');
   });
 }
 
