@@ -16,6 +16,7 @@
     <ProjectReference Include="../extensions/Agentstration.Extensions.LlamaCpp/Agentstration.Extensions.LlamaCpp.csproj" />
     <ProjectReference Include="../extensions/Agentstration.Extensions.LocalAI/Agentstration.Extensions.LocalAI.csproj" />
     <ProjectReference Include="../extensions/Agentstration.Extensions.Git/Agentstration.Extensions.Git.csproj" />
+    <ProjectReference Include="../extensions/Agentstration.Extensions.GitHub/Agentstration.Extensions.GitHub.csproj" />
     <ProjectReference Include="../extensions/Agentstration.Extensions.Utilities/Agentstration.Extensions.Utilities.csproj" />
     <ProjectReference Include="../Agentstration.Runtime.Worker.MicrosoftAgentFramework/Agentstration.Runtime.Worker.MicrosoftAgentFramework.csproj" />
     <ProjectReference Include="../extensions/Agentstration.Extensions.Crawl4AI/Agentstration.Extensions.Crawl4AI.csproj" />

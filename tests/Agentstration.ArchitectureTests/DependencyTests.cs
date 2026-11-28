@@ -106,7 +106,8 @@ public sealed class DependencyTests
         Assert.DoesNotContain("Agentstration.Work", project); Assert.DoesNotContain("Agentstration.Coding", project); Assert.DoesNotContain("Agentstration.Application", project);
         var sourceProjects = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
             .Where(path => File.ReadAllText(path).Contains("Agentstration.Extensions.GitHub.csproj", StringComparison.Ordinal)).ToArray();
-        Assert.HasCount(0, sourceProjects, "The optional GitHub executable must not be linked into the authoritative server.");
+        CollectionAssert.AreEqual(new[] { Path.Combine(root, "src", "Agentstration.AppHost", "Agentstration.AppHost.csproj") }, sourceProjects,
+            "Only the AppHost may orchestrate the optional GitHub executable; product modules must not link it.");
     }
 
     [TestMethod]

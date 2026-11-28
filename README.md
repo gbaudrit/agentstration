@@ -126,6 +126,23 @@ When `Agentstration.AppHost` is the Visual Studio startup project, select its `h
 
 For occasional access from another machine on your private network, select the AppHost's `https-LAN` profile (`https-LAN-NoBootstrap` without initial bootstrap). It adds HTTPS access to the Console on port `7101` and Workplace on port `7181`. See the [LAN profile setup](docs/getting-started/local-installation.md#optional-aspire-lan-profile) for certificate and firewall configuration.
 
+The AppHost's `appsettings.json` controls Git and GitHub extension startup independently:
+
+```json
+{
+  "Git": { "Enabled": true },
+  "GitHub": { "Enabled": true }
+}
+```
+
+Git remains enabled by default; GitHub is disabled by default. Enabled extensions join the usual AEP
+enrollment and health checks, with journals isolated under the development slot. Set either flag to
+`false` to omit its process and enrollment configuration. AppHost forwards technical `GitSourceProvider`,
+`GitOperations` and `GitHub` policy settings to the corresponding extension. Git writes still require
+`GitOperations:Enabled=true` and explicit `GitOperations:AllowedRepositories`; starting an extension
+does not grant repository access. Account credentials and repository-specific configuration belong
+to the [Connected Services](docs/reference/coding-github.md), supplied during Bootstrap.
+
 Aspire also starts one independent Microsoft Agent Framework Runtime Worker by default. Set
 `Agentstration:RuntimeWorkers:Count` on the AppHost to start between 1 and 16 independently
 identified Worker processes. For direct startup, keep the authoritative server running and launch

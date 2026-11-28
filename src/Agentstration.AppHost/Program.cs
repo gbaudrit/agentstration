@@ -89,6 +89,12 @@ var openApiEnabledSetting = builder.Configuration["OpenApi:Enabled"];
 if (openApiEnabledSetting is not null && !bool.TryParse(openApiEnabledSetting, out _))
     throw new InvalidOperationException("OpenApi:Enabled must be true or false.");
 var openApiEnabled = bool.TryParse(openApiEnabledSetting, out var configuredOpenApiEnabled) && configuredOpenApiEnabled;
+var gitEnabledSetting = builder.Configuration["Git:Enabled"] ?? "true";
+if (!bool.TryParse(gitEnabledSetting, out var gitEnabled))
+    throw new InvalidOperationException("Git:Enabled must be true or false.");
+var gitHubEnabledSetting = builder.Configuration["GitHub:Enabled"] ?? "false";
+if (!bool.TryParse(gitHubEnabledSetting, out var gitHubEnabled))
+    throw new InvalidOperationException("GitHub:Enabled must be true or false.");
 var openDalEnabledSetting = builder.Configuration["OpenDal:Enabled"] ?? "false";
 if (!bool.TryParse(openDalEnabledSetting, out var openDalEnabled))
     throw new InvalidOperationException("OpenDal:Enabled must be true or false.");
@@ -183,10 +189,6 @@ var localAiExtension = builder.AddProject<Projects.Agentstration_Extensions_Loca
     .WithEnvironment("LocalAI__Endpoint", parsedLocalAiEndpoint.AbsoluteUri)
     .WithHttpHealthCheck("/health")
     .WithDynamicHostPorts(dynamicApplicationPorts);
-var gitExtension = builder.AddProject<Projects.Agentstration_Extensions_Git>("git-source-extension")
-    .WithEnvironment("Agentstration__Slot", slot)
-    .WithHttpHealthCheck("/health")
-    .WithDynamicHostPorts(dynamicApplicationPorts);
 var utilitiesExtension = builder.AddProject<Projects.Agentstration_Extensions_Utilities>("utilities-extension")
     .WithEnvironment("Agentstration__Slot", slot)
     .WithHttpHealthCheck("/health")
@@ -196,9 +198,45 @@ var developmentExtensions = new List<DevelopmentAepExtension>
     new DevelopmentAepExtension("Agentstration.Extensions.Ollama", "ollama-extension", ollamaExtension),
     new DevelopmentAepExtension("Agentstration.Extensions.LlamaCpp", "llama-cpp-extension", llamaCppExtension),
     new DevelopmentAepExtension("Agentstration.Extensions.LocalAI", "localai-extension", localAiExtension),
-    new DevelopmentAepExtension("Agentstration.Extensions.Git", "git-source-extension", gitExtension),
     new DevelopmentAepExtension("Agentstration.Extensions.Utilities", "utilities-extension", utilitiesExtension)
 };
+if (gitEnabled)
+{
+    var gitExtension = builder.AddProject<Projects.Agentstration_Extensions_Git>("git-source-extension")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithEnvironment("GitOperations__StateDirectory", Path.Combine(slotDataPath, "git-operations"))
+        .WithHttpHealthCheck("/health")
+        .WithDynamicHostPorts(dynamicApplicationPorts);
+    foreach (var key in new[]
+    {
+        "GitSourceProvider:GitExecutable", "GitSourceProvider:TemporaryDirectory", "GitSourceProvider:AllowLocalRepositories",
+        "GitSourceProvider:MaximumRepositoryBytes", "GitSourceProvider:ResolveTimeoutSeconds",
+        "GitOperations:Enabled", "GitOperations:AllowHttpLoopback", "GitOperations:StateDirectory", "GitOperations:TimeoutSeconds"
+    })
+        if (builder.Configuration[key] is { } value)
+            gitExtension.WithEnvironment(key.Replace(":", "__", StringComparison.Ordinal), value);
+    foreach (var value in builder.Configuration.GetSection("GitOperations:AllowedRepositories").GetChildren())
+        if (value.Value is not null)
+            gitExtension.WithEnvironment($"GitOperations__AllowedRepositories__{value.Key}", value.Value);
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "Agentstration.Extensions.Git", "git-source-extension", gitExtension));
+}
+if (gitHubEnabled)
+{
+    var gitHubExtension = builder.AddProject<Projects.Agentstration_Extensions_GitHub>("github-extension")
+        .WithEnvironment("Agentstration__Slot", slot)
+        .WithEnvironment("GitHub__StateDirectory", Path.Combine(slotDataPath, "github-operations"))
+        .WithHttpHealthCheck("/health")
+        .WithDynamicHostPorts(dynamicApplicationPorts);
+    foreach (var key in new[] { "StateDirectory", "AllowHttpLoopback" })
+        if (builder.Configuration[$"GitHub:{key}"] is { } value)
+            gitHubExtension.WithEnvironment($"GitHub__{key}", value);
+    foreach (var value in builder.Configuration.GetSection("GitHub:AllowedApiOrigins").GetChildren())
+        if (value.Value is not null)
+            gitHubExtension.WithEnvironment($"GitHub__AllowedApiOrigins__{value.Key}", value.Value);
+    developmentExtensions.Add(new DevelopmentAepExtension(
+        "Agentstration.Extensions.GitHub", "github-extension", gitHubExtension));
+}
 if (foundryEnabled)
 {
     var foundryExtension = builder.AddProject<Projects.Agentstration_Extensions_Foundry>("foundry-extension")
