@@ -140,6 +140,16 @@ extension enrollment, through the existing profile application flow. It does
 not enable initial bootstrap, create a login, or select a Tenant/Workspace.
 Automatic GUID profile selection remains #1419.
 
+Secured AEP exports use a separate **internal HTTPS** Kestrel listener on port
+8443, with no host port publication and no additional service. OpenSSL on the
+target generates a per-preview certificate/key pair. Only the public certificate
+is mounted into selected AEP extensions (`SSL_CERT_FILE`); the private key stays
+with the server. System certificate directories remain available. Neither TLS
+identity nor the database password is generated in CI. Preserve both files until
+reset; restore missing recorded credentials rather than silently regenerating
+them. The Azure VM bootstrap installs OpenSSL; portable Docker hosts must provide
+OpenSSL 3. Core-only and legacy previews retain their existing configuration.
+
 Status includes the managed database's container health. Deselection stops the
 dependency but retains its volume and private credentials. Explicit reset and
 existing TTL/closed-PR cleanup remove those owned local resources; external

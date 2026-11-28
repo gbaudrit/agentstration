@@ -43,6 +43,14 @@ the script and secret paths, never the password. The process environment and
 private files remain readable by an authorized host administrator. This is not
 an additional secret store or protection against host root.
 
+Secured AEP exports require an HTTPS callback reachable from the extension.
+Reuse Kestrel on an unpublished internal port rather than weakening the HTTPS
+rule or adding a proxy. A small external helper uses target OpenSSL to generate
+the preview's certificate/key pair. Mount only its public certificate into
+selected extensions as additional runtime trust; mount the private key only into
+the authority. Reuse the identity across updates/deselection and erase it at
+reset. Bootstrap credentials and TLS keys never cross CI or public feedback.
+
 External connection settings can be provisioned directly as a bounded private
 JSON file on the target or supplied through the existing protected extension
 configuration channel. Strip them from extension settings and public results.

@@ -128,6 +128,8 @@ def prepare(directory, state, settings, plan, previous):
     # The secret is read only inside the target container. Compose and Docker Config.Env contain no password.
     script = '#!/bin/sh\nset -eu\nexport ' + SECRET_VARIABLE + '="$(cat /run/secrets/postgresql-documents-password)"\nexec "$@"\n'
     preview.private_write(directory / ENTRYPOINT_FILE, script)
+    import extension_tls
+    extension_tls.prepare(directory, state)
 
 
 def overlay(directory, state, plan):
@@ -182,3 +184,41 @@ def evidence(directory, plan):
         preview.require(re.fullmatch(r'[0-9]{1,20}', cluster), 'The document database cluster identity is unavailable.')
         value['clusterId'] = cluster
     return value
+
+
+def qualify(request, registry, root):
+    """Explicit CI fixture only; never activate privileged Bootstrap during real deployment."""
+    from datetime import datetime, timedelta, timezone
+    import azure_host
+    import lifecycle
+    import preview
+    import preview_smoke
+    from worker_smoke import Api, until
+    preview.require(request['database'] == 'sqlite' and request['extensionDeployments']['postgresql']['database'] == 'internal',
+                    'Document qualification requires disposable SQLite/internal-database fixtures.')
+    directory = root / 'state' / request['environmentId']
+    local = azure_host.local_request(request)
+    bootstrap = {'InitialBootstrapEnabled': True,
+                 'InitialProfiles': ['development', 'preview-postgresql-documents'],
+                 'Secrets': {'AdminPassword': preview_smoke.bootstrap_password()}}
+    try:
+        preview.prepare(directory, request['deliveries']['server'], request['deliveries']['worker'], request['environmentId'],
+            registry=local['registry'], bootstrap=bootstrap, extension_deliveries=request['extensions'],
+            extension_deployments=request['extensionDeployments'])
+        azure_host.run('deploy', request, registry, root)
+        api = Api(preview.server_address(directory))
+        api.call('/api/auth/local/login', {'userName': 'admin', 'password': bootstrap['Secrets']['AdminPassword']}, expected=204)
+        api.opener.addheaders.append(('X-Agentstration-Context', '/instance'))
+        storage = until(lambda: api.call('/api/storages/preview-postgresql-documents?scopeRef=%2Finstance'), 'document bootstrap')
+        collection = storage['definition']['collections'][0]['uid']
+        path = '/api/storages/preview-postgresql-documents/collections/' + collection + '/documents'
+        saved = api.call(path + '?scopeRef=%2Finstance', {'requestId': 'public-disposable-preview-write',
+            'notAfter': (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(), 'id': 'fixture',
+            'value': {'id': 'fixture', 'title': 'Public disposable preview document'}})
+        observed = api.call(path + '/fixture?scopeRef=%2Finstance')
+        preview.require(saved['revision'] == observed['revision'], 'The product did not read back the saved document.')
+        return {'initialProfileApplied': True, 'documentWriteReadThroughProductApi': True, 'securedSecretCallback': True}
+    finally:
+        lifecycle.execute('destroy', {**local, 'dataMode': 'reset'}, root / 'state')
+        preview.require(not any(lifecycle.inventory('preview-' + request['environmentId']).values()),
+                        'The document Bootstrap fixture retained owned resources.')

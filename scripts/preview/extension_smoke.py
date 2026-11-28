@@ -110,12 +110,14 @@ def run(server_path, worker_path, extension_path, output):
             local = azure_host.local_request(selected)
             lifecycle.execute('destroy', {**local, 'dataMode': 'reset'}, root / 'state')
             preview.require(not any(lifecycle.inventory(project).values()), 'Reset retained owned containers, volumes or networks.')
+            bootstrap_evidence = extension_deployments.qualify(selected, registry, root)
             preview.private_write(output, json.dumps({'passed': True, 'extension': identifier,
                 'image': contract.images(local)[name], 'exactDigestGuestTransport': True,
                 'enrolledBeforeManualBootstrap': True, 'anonymousAndWrongKeyRejected': True, 'invalidEnrollmentProofRejected': True,
                 'privateConfigurationIsolated': True, 'configurationUpdatePreservesIdentity': True,
                 'recreationAndReactivationPreserveIdentity': True, 'deselectionRetainsState': True,
                 'deploymentRecipes': recipe_evidence,
+                'bootstrapRecipes': bootstrap_evidence,
                 'expiryPreserved': True, 'fullResetRemovedResources': True}, indent=2) + '\n')
         except Exception:
             directory = root / 'state' / environment

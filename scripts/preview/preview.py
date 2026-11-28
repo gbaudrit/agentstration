@@ -104,6 +104,7 @@ def validate_state(state):
     for identifier, version in state.get("extensionConfigurations", {}).items():
         extensions.validate_ids([identifier])
         uuid.UUID(version)
+    require('aepSecretAccessTls' not in state or state['aepSecretAccessTls'] is True, 'Invalid AEP TLS state.')
     require(state["sourceSha"] == state["images"]["server"]["sourceSha"], "Preview revision differs from its server image.")
     return state
 
@@ -249,6 +250,12 @@ def verify(directory):
             mounts = {mount["Destination"]: mount for mount in container["Mounts"] if mount["Type"] != "tmpfs"}
             version = state.get("extensionConfigurations", {}).get(service[len("extension-"):])
             expected_mounts = {"/run/secrets/aep-key", "/var/lib/aep"} | ({"/app/appsettings.Preview.json"} if version else set())
+            if state.get('aepSecretAccessTls'):
+                import extension_tls
+                expected_mounts.add(extension_tls.CA_TARGET)
+                require(not mounts.get(extension_tls.CA_TARGET, {}).get('RW', True)
+                        and mounts[extension_tls.CA_TARGET]['Source'] == str(directory / extension_tls.CERTIFICATE),
+                        'Extensions may receive only the public authority certificate, never its private key.')
             if version:
                 import extensions
                 require(not mounts.get("/app/appsettings.Preview.json", {}).get("RW", True)

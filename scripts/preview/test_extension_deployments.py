@@ -11,6 +11,7 @@ import contract
 import extension_deployments as recipes
 from extension_deployments import postgresql
 import extensions
+import extension_tls
 import issue_commands
 import preview
 import preview_feedback
@@ -25,6 +26,16 @@ from test_issue_commands import GitHub, REPOSITORY
 
 def selected(**kwargs):
     return request(extension_deliveries={'postgresql': receipt('postgresql')}, **kwargs)
+
+
+def mock_certificate_generation(test):
+    def create(directory):
+        preview.private_write(directory / extension_tls.CERTIFICATE, 'public-disposable-certificate-fixture')
+        preview.private_write(directory / extension_tls.PRIVATE_KEY, 'public-disposable-private-key-fixture')
+    patcher = patch.object(extension_tls, 'create', side_effect=create)
+    generated = patcher.start()
+    test.addCleanup(patcher.stop)
+    return generated
 
 
 class RecipeSelectionTests(unittest.TestCase):
@@ -105,6 +116,7 @@ class RecipePreparationTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix='document-recipe-')
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name) / 'preview'
+        mock_certificate_generation(self)
 
     def prepare(self, external=False, settings=None, selected_extension=True):
         plans = recipes.freeze(['postgresql'], {'postgresql': {'database': 'external'}} if external else {}) if selected_extension else {}
@@ -215,7 +227,9 @@ class RecipePreparationTests(unittest.TestCase):
 
 
 class RecipeLifecycleTests(unittest.TestCase):
-    setUp = test_lifecycle.LifecycleTests.setUp
+    def setUp(self):
+        test_lifecycle.LifecycleTests.setUp(self)
+        mock_certificate_generation(self)
 
     def test_deselection_retains_database_volume_and_credentials_until_explicit_reset(self):
         value = selected()

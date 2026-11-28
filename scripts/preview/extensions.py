@@ -193,8 +193,10 @@ def overlay(directory, state):
         services['server'] = {'secrets': [{'source': 'aep-' + name, 'target': '/run/secrets/aep-' + name}
                                         for name in state.get('extensionKeys', {}) if service(name) in state['images']]}
     import extension_deployments
-    return extension_deployments.merge({'services': services, 'volumes': volumes, 'secrets': keys},
-                                       extension_deployments.overlay(directory, state))
+    import extension_tls
+    result = extension_deployments.merge({'services': services, 'volumes': volumes, 'secrets': keys},
+                                         extension_deployments.overlay(directory, state))
+    return extension_deployments.merge(result, extension_tls.overlay(directory, state))
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

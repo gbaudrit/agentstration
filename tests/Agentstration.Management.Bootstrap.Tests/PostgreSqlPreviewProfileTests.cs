@@ -28,7 +28,7 @@ public sealed partial class DeclarativeBootstrapTests
         Assert.IsEmpty(profile.Bindings, "Connection values come from the target configuration, without interactive bindings.");
         var loaded = await catalog.LoadAsync([profile.Name], default);
         var document = loaded.Single().Resources.Single(value => value.Resource.Kind == "Schema").Resource;
-        var schema = document.Definition.Deserialize<SchemaProperties>(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var schema = document.Definition.Deserialize<SchemaProperties>(JsonSerializerOptions.Web);
         Assert.IsNotNull(schema);
         Assert.IsFalse(string.IsNullOrWhiteSpace(schema.DisplayName));
     }

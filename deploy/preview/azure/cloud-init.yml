@@ -1,6 +1,7 @@
 #cloud-config
 package_update: true
 packages:
+  - openssl
   - docker.io
   - docker-compose-v2
   - skopeo

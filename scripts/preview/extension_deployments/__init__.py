@@ -68,6 +68,10 @@ def evidence(directory, state):
     return {name: RECIPES[name].evidence(directory, plan) for name, plan in state.get('extensionDeployments', {}).items()}
 
 
+def qualify(request, registry, root):
+    return {name: RECIPES[name].qualify(request, registry, root) for name in request.get('extensionDeployments', {})}
+
+
 def prepare(directory, state, settings):
     import copy
     settings = copy.deepcopy(settings)
@@ -102,6 +106,8 @@ def reset(directory, state):
         RECIPES[name].reset(directory)
     if 'extensionDeploymentHistory' in state:
         state['extensionDeploymentHistory'] = {}
+    import extension_tls
+    extension_tls.reset(directory, state)
 
 
 def require_preserving_change(previous, requested):
