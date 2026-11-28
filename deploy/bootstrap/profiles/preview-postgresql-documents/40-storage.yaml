@@ -1,0 +1,52 @@
+apiVersion: agentstration.io/v1
+kind: Storage
+metadata:
+  name: preview-postgresql-documents
+  namespace: default
+definition:
+  displayName: Preview PostgreSQL documents
+  configuration: {}
+  type:
+    extensionContribution:
+      extensionId: agentstration.extensions.postgresql
+      contributionId: postgresql.jsonb
+      version: 1.0.0
+      kind: StorageType
+  connectedService:
+    resourceRef:
+      name: preview-postgresql-documents
+  bindings:
+    - {requirementId: host, exportName: host}
+    - {requirementId: port, exportName: port}
+    - {requirementId: database, exportName: database}
+    - {requirementId: username, exportName: username}
+    - {requirementId: password, exportName: password}
+  envelope:
+    get: true
+    put: true
+    delete: false
+    query: true
+    publish: true
+    maximumDocumentBytes: 65536
+    maximumResultBytes: 196608
+    maximumPageSize: 50
+    queryProfiles: [odata/4.01]
+  collections:
+    - name: documents
+      displayName: Preview documents
+      policy:
+        get: true
+        put: true
+        delete: false
+        query: true
+        publish: true
+        maximumDocumentBytes: 65536
+        maximumResultBytes: 196608
+        maximumPageSize: 50
+        queryProfiles: [odata/4.01]
+      schemaBinding:
+        reference:
+          scopeRef: /instance
+          namespace: default
+          name: preview-document-schema
+          version: 1.0.0

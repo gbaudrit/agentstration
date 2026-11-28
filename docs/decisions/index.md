@@ -347,3 +347,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 271. [ADR-0271 — Opted-in PRs publish server images through main](0271-opted-in-prs-publish-server-images-through-main.md)
 
 272. [ADR-0272 — Preview publication promotes selective CI archives](0272-preview-publication-promotes-selective-ci-archives.md)
+
+273. [ADR-0273 — Preview extension recipes own optional dependencies](0273-preview-extension-recipes-own-optional-dependencies.md)

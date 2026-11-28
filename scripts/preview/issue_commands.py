@@ -262,6 +262,9 @@ def admit(event, repository, call=api, selector=None):
         pull = context(options, repository, issue, current, call)
         if options['operation'] == 'deploy':
             options['extensions'] = extensions.from_labels(current.get('labels', []))
+            modifiers = extensions.options_from_labels(current.get('labels', []))
+            if modifiers:
+                options['extension_options'] = modifiers
             if pull:
                 preview.require(options['revision'] in ('', 'pr:' + str(issue)),
                                 'On a PR, use /preview deploy without ref; it deploys that PR. Use an issue or the manual form for another revision.')
@@ -301,7 +304,7 @@ def tracking(options, repository, call=api):
     repository = repository_name(repository)
     expected = {'operation', 'environment_id', 'revision', 'provider', 'database', 'vm_size_profile',
                 'ttl_hours', 'data_mode', 'test_profile', 'worker_revision'}
-    optional = {'extensions', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy', 'preview_pr'}
+    optional = {'extensions', 'extension_options', 'tracking_issue', 'tracking_comment', 'tracking_kind', 'tracking_feedback', 'reset_before_deploy', 'preview_pr'}
     preview.require(isinstance(options, dict) and expected <= set(options) <= expected | optional,
                     'Unexpected form or issue tracking fields.')
     tracked = {'tracking_issue', 'tracking_comment'} & set(options)
@@ -336,6 +339,8 @@ def tracking(options, repository, call=api):
     if options["operation"] == "deploy":
         preview.require(options.get("extensions", []) == extensions.from_labels(current.get("labels", [])),
                         "Extension labels changed after admission; post a new /preview deploy command.")
+        preview.require(options.get('extension_options', {}) == extensions.options_from_labels(current.get('labels', [])),
+                        'Extension deployment modifiers changed after admission; post a new /preview deploy command.')
     return issue
 
 

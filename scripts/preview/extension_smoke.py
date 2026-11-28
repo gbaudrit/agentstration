@@ -12,6 +12,7 @@ import uuid
 import azure_host
 import contract
 import extensions
+import extension_deployments
 import lifecycle
 import preview
 import preview_smoke
@@ -39,6 +40,7 @@ def run(server_path, worker_path, extension_path, output):
             preview.require(first['state'] == 'running' and first['extensionsVerified'] == [identifier], 'Initial extension deployment failed.')
             directory = root / 'state' / environment
             state = preview.read_json(directory / 'deployment.json')
+            recipe_evidence = extension_deployments.evidence(directory, state)
             original_key = (directory / (name + '.key')).read_bytes()
             instance = preview.compose(directory, 'exec', '-T', name, 'cat', '/var/lib/aep/instance', capture=True).strip()
             uuid.UUID(instance)
@@ -80,7 +82,8 @@ def run(server_path, worker_path, extension_path, output):
                 settings = {identifier: {'PreviewProbe': {'Value': private_value}}}
                 configured = azure_host.run('deploy', selected, registry, root, extension_configuration=settings)
                 mounted = json.loads(preview.compose(directory, 'exec', '-T', name, 'cat', '/app/appsettings.Preview.json', capture=True))
-                preview.require(mounted == settings[identifier], 'The extension did not receive its own private settings file.')
+                preview.require(all(mounted.get(key) == value for key, value in settings[identifier].items()),
+                                'The extension did not receive its own private settings file.')
                 after_config = preview.compose(directory, 'ps', '--quiet', name, capture=True).strip()
                 preview.require(after_config != before_config, 'Changed private configuration did not recreate the extension.')
                 before_config = after_config
@@ -102,6 +105,8 @@ def run(server_path, worker_path, extension_path, output):
                             and preview.compose(directory, 'exec', '-T', name, 'cat', '/var/lib/aep/instance', capture=True).strip() == instance,
                             'Reactivation did not preserve extension identity and enrollment key.')
             preview.require(final['expiresAt'] == first['expiresAt'], 'Redeployment renewed the expiry anchor.')
+            preview.require(recipe_evidence == extension_deployments.evidence(directory, preview.read_json(directory / 'deployment.json')),
+                            'Recreation or reactivation replaced the extension dependency or credential handoff.')
             local = azure_host.local_request(selected)
             lifecycle.execute('destroy', {**local, 'dataMode': 'reset'}, root / 'state')
             preview.require(not any(lifecycle.inventory(project).values()), 'Reset retained owned containers, volumes or networks.')
@@ -110,11 +115,12 @@ def run(server_path, worker_path, extension_path, output):
                 'enrolledBeforeManualBootstrap': True, 'anonymousAndWrongKeyRejected': True, 'invalidEnrollmentProofRejected': True,
                 'privateConfigurationIsolated': True, 'configurationUpdatePreservesIdentity': True,
                 'recreationAndReactivationPreserveIdentity': True, 'deselectionRetainsState': True,
+                'deploymentRecipes': recipe_evidence,
                 'expiryPreserved': True, 'fullResetRemovedResources': True}, indent=2) + '\n')
         except Exception:
             directory = root / 'state' / environment
             if (directory / 'deployment.json').exists():
-                keys = [path.read_text() for path in directory.glob('*.key')]
+                keys = [path.read_text() for pattern in ('*.key', '*.password') for path in directory.glob(pattern)]
                 diagnostic = preview_smoke.failure_diagnostics(directory, keys)
                 # Backend settings can contain credentials; retain exception types only.
                 import re

@@ -137,6 +137,9 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
                             and metadata["dockerDaemon"] == daemon, "Lifecycle state belongs to another environment or Docker daemon.")
             uuid.UUID(metadata["ownerId"])
             previous = contract.validate(metadata["request"])
+            if action == 'deploy' and any(resources.values()):
+                import extension_deployments
+                extension_deployments.require_preserving_change(previous, request)
             state_path = directory / "deployment.json"
             if state_path.exists():
                 preview.require(not state_path.is_symlink() and preview.read_json(state_path).get("deploymentOwnerId") == metadata["ownerId"],
@@ -156,7 +159,8 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
             state = preview.prepare(directory, request["deliveries"]["server"], request["deliveries"]["worker"],
                                     request["environmentId"], port=request["target"]["port"], registry=request["registry"],
                                     bootstrap=bootstrap, database=request["database"], postgres_image=request.get("postgresImage"),
-                                    extension_deliveries=request.get("extensions", {}), extension_configuration=settings)
+                                    extension_deliveries=request.get("extensions", {}), extension_configuration=settings,
+                                    extension_deployments=request.get('extensionDeployments', {}))
             if metadata is None:
                 created = now or datetime.now(timezone.utc)
                 metadata = {"schemaVersion": 1, "environmentId": request["environmentId"], "dockerDaemon": daemon,
@@ -174,8 +178,10 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
             selected_services = set(contract.images(request))
             for item in resources["containers"]:
                 name = item["Config"]["Labels"].get("com.docker.compose.service", "")
-                if name.startswith("extension-") and name not in selected_services:
-                    preview.require(name[len("extension-"):] in state.get("extensionKeys", {}),
+                if name not in selected_services and name not in ('server', 'worker', 'postgres'):
+                    import extension_deployments
+                    historical = extension_deployments.images(state.get('extensionDeploymentHistory', {}))
+                    preview.require(name.startswith('extension-') and name[len("extension-"):] in state.get("extensionKeys", {}) or name in historical,
                                     "Unexpected extension container; inspect ownership before removal.")
                     docker("stop", "--time", "20", item["Id"])
                     docker("rm", item["Id"])
@@ -200,6 +206,12 @@ def execute(action, request, state_root, bootstrap=None, now=None, extension_con
         if request["dataMode"] == "reset":
             for volume in resources["volumes"]:
                 docker("volume", "rm", volume["Name"])
+            state_path = directory / 'deployment.json'
+            if state_path.exists():
+                import extension_deployments
+                state = preview.validate_state(preview.read_json(state_path))
+                extension_deployments.reset(directory, state)
+                preview.private_write(state_path, json.dumps(state, indent=2) + '\n')
         return result(request, "destroyed", inventory(project), daemon, metadata)
 
 

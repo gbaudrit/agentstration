@@ -14,6 +14,7 @@ import cloudflare
 import capacity
 import contract
 import extensions
+import extension_deployments
 import issue_commands as commands
 import manual
 import preview
@@ -136,7 +137,7 @@ def removal_reason(record, github, now):
     return None
 
 
-def eligible_change(record, approval, selected):
+def eligible_change(record, approval, selected, extension_options=None):
     if record is None:
         return True
     previous = record.get('automation')
@@ -147,7 +148,9 @@ def eligible_change(record, approval, selected):
         deleted = (record.get('deletion') or {}).get('completedAt')
         return bool(deleted and datetime.fromisoformat(approval['optInAt']) > datetime.fromisoformat(deleted))
     return (changed_intent or not record['initialized'] or record.get('access') and not record['access']['verified']
-            or list(record['request'].get('extensions', {})) != selected)
+            or list(record['request'].get('extensions', {})) != selected
+            or extension_deployments.intent(record['request'].get('extensionDeployments', {}))
+            != extension_deployments.intent(extension_deployments.freeze(selected, extension_options)))
 
 
 def inventory(variables):
@@ -276,10 +279,11 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
             pull = github.pull(number)
             approval = github.approval(pull)
             selected = extensions.from_labels(pull.get('labels', []))
+            recipe_options = extensions.options_from_labels(pull.get('labels', []))
             previous = current.get(environment)
             if previous and (removal_reason(previous, github, now) or previous.get('deletion', {}).get('completedAt', True) is None):
                 continue
-            if not eligible_change(previous, approval, selected):
+            if not eligible_change(previous, approval, selected, recipe_options):
                 if not apply or previous['destroyed']:
                     continue
                 try:
@@ -298,9 +302,12 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
             old_intent = (previous or {}).get('automation') or {}
             reset = bool(approval.get('redeployEvent') and previous and not previous['destroyed'] and (
                 any(old_intent.get(key) != approval.get(key) for key in ('sourceSha', 'optInEvent', 'redeployEvent'))
-                or list(previous['request'].get('extensions', {})) != selected))
+                or list(previous['request'].get('extensions', {})) != selected
+                or extension_deployments.intent(previous['request'].get('extensionDeployments', {}))
+                != extension_deployments.intent(extension_deployments.freeze(selected, recipe_options))))
             options = {**commands.parse('/preview deploy'), 'environment_id': environment,
-                       'revision': approval['sourceSha'], 'extensions': selected, 'preview_pr': number}
+                       'revision': approval['sourceSha'], 'extensions': selected, 'preview_pr': number,
+                       **({'extension_options': recipe_options} if recipe_options else {})}
             if previous and not previous['destroyed']:
                 options['database'] = previous['request']['database']
                 options['ttl_hours'] = previous['request']['ttlHours']
@@ -317,13 +324,14 @@ def reconcile(github, records, resources, variables, apply=False, execute=azure.
                             'sourceSha': approval['sourceSha'], 'extensions': selected})
             if apply:
                 stage = 'deployment'
-                def guard(latest, expected=approval, ids=selected, old=previous, desired=request):
+                def guard(latest, expected=approval, ids=selected, modifiers=recipe_options, old=previous, desired=request):
                     if old and (latest is None or latest['ownerId'] != old['ownerId']):
                         return False
                     if old is None and latest and (latest['initialized'] or latest['request'] != desired):
                         return False
                     fresh = github.pull(expected['pullRequest'])
-                    return github.approval(fresh) == expected and extensions.from_labels(fresh.get('labels', [])) == ids
+                    return (github.approval(fresh) == expected and extensions.from_labels(fresh.get('labels', [])) == ids
+                            and extensions.options_from_labels(fresh.get('labels', [])) == modifiers)
                 report(environment, feedback.planned(request, 'deploy', github.repository, run_url, reset))
                 value = execute('deploy', request, automation_context=approval, guard=guard,
                                 reset_before_deploy=reset,

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import urllib.request
 import uuid
+import extension_deployments as recipes
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/packaging"))
@@ -84,7 +85,14 @@ def validate_state(state):
     optional = {name for name in state["images"] if name.startswith("extension-")}
     import extensions
     extensions.validate_ids(sorted(name[len("extension-"):] for name in optional))
-    require(set(state["images"]) == expected | optional, "Preview images must match its selected database.")
+    plans = state.get('extensionDeployments', {})
+    if plans:
+        recipes.validate(plans, [name[len('extension-'):] for name in optional])
+    dependencies = recipes.images(plans)
+    require(set(state["images"]) == expected | optional | set(dependencies), "Preview images must match its selected database and recipes.")
+    require(all(state['images'][name] == image for name, image in dependencies.items()), 'Recipe images differ from their frozen references.')
+    for name, plan in state.get('extensionDeploymentHistory', {}).items():
+        recipes.validate({name: plan}, [name])
     if state["database"] == "postgresql":
         postgres = state["images"]["postgres"]
         require(POSTGRES_IMAGE.fullmatch(postgres["reference"]) and postgres["platform"] == "linux/amd64",
@@ -101,13 +109,17 @@ def validate_state(state):
 
 
 def prepare(directory, server_delivery, worker_delivery, environment_id, port=5080, registry="ghcr.io", bootstrap=None,
-            database=None, postgres_image=None, extension_deliveries=None, extension_configuration=None):
+            database=None, postgres_image=None, extension_deliveries=None, extension_configuration=None, extension_deployments=None):
     import extensions
     settings = extensions.configuration(extension_configuration if extension_configuration is not None else {}, extension_deliveries or {})
     require(ENVIRONMENT_ID.fullmatch(environment_id), "Environment ID must use 1–40 lowercase letters, digits or hyphens, starting with a letter.")
     require(bootstrap is None or isinstance(bootstrap, dict), "Bootstrap configuration must be a JSON object.")
     images = {"server": image_record(server_delivery, "server", registry),
               "worker": image_record(worker_delivery, "awp-worker", registry)}
+    plans = recipes.freeze(extension_deliveries or {}) if extension_deployments is None else extension_deployments
+    if plans:
+        recipes.validate(plans, extension_deliveries or {})
+        recipes.compatible(plans, extension_deliveries or {})
     directory = Path(directory).resolve()
     require(not directory.is_relative_to(ROOT) or any(part.startswith(".agentstration") for part in directory.relative_to(ROOT).parts),
             "Keep credential state outside the repository or inside an ignored .agentstration directory.")
@@ -125,7 +137,9 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
                 "Restore the existing preview state; credentials must not be silently regenerated.")
         configuration = read_json(directory / "server-configuration.json")
     else:
-        require(not directory.exists() or not any(directory.iterdir()), "Refusing to overwrite an unrelated nonempty directory.")
+        permitted = recipes.preprovisioned_files(plans)
+        require(not directory.exists() or all(path.name in permitted and path.is_file() and not path.is_symlink()
+                for path in directory.iterdir()), "Refusing to overwrite an unrelated nonempty directory.")
         state = {"schemaVersion": 1, "environmentId": environment_id, "database": database or "sqlite",
                  **{name: str(uuid.uuid4()) for name in ("instanceId", "workerId", "credentialId")}}
         configuration = {"Agentstration": {"Bootstrap": {"InitialBootstrapEnabled": False, "Path": "/app/bootstrap/profiles"}}}
@@ -138,6 +152,9 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
     for identifier, receipt in (extension_deliveries or {}).items():
         import extensions
         images[extensions.service(identifier)] = image_record(receipt, "aep-extension", registry)
+    images.update(recipes.images(plans))
+    if plans or 'extensionDeployments' in state:
+        state['extensionDeployments'] = plans
     state.update(port=port, images=images, sourceSha=images["server"]["sourceSha"])
     validate_state(state)
     if bootstrap is not None:
@@ -153,6 +170,7 @@ def prepare(directory, server_delivery, worker_delivery, environment_id, port=50
             private_write(directory / "postgres.password", secrets.token_urlsafe(48))
     import extensions
     extensions.prepare(directory, state, configuration, extension_deliveries or {})
+    settings = recipes.prepare(directory, state, settings)
     obsolete_settings = extensions.prepare_configuration(directory, state, settings)
     if state["database"] == "postgresql":
         password = (directory / "postgres.password").read_text()
@@ -177,7 +195,7 @@ def compose_command(directory):
     environment["PREVIEW_OWNER_ID"] = state.get("deploymentOwnerId", "unmanaged")
     for name, image in state["images"].items():
         environment["PREVIEW_" + name.upper() + "_IMAGE"] = image["reference"]
-        if name != "postgres":
+        if 'sourceSha' in image:
             environment["PREVIEW_" + name.upper() + "_SHA"] = image["sourceSha"]
     command = ["docker", "compose", "--project-name", "preview-" + state["environmentId"], "--env-file", "/dev/null",
                "--file", str(ROOT / "deploy/preview/compose.yml")]
@@ -215,7 +233,7 @@ def verify(directory):
             require(container.get("HostConfig", {}).get("PortBindings", {}).get("8080/tcp") ==
                     [{"HostIp": "127.0.0.1", "HostPort": str(state["port"])}],
                     "Preview application ports must bind only the requested guest loopback port.")
-        if service != "postgres":
+        if 'sourceSha' in expected:
             image = json.loads(subprocess.check_output(["docker", "image", "inspect", container["Image"]], text=True))[0]
             labels = image["Config"]["Labels"]
             require(labels.get("org.opencontainers.image.revision") == expected["sourceSha"]

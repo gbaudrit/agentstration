@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "modifiers": [
+    {
+      "name": "externalDB",
+      "description": "Use an external document database; do not provision PostgreSQL in this preview."
+    }
+  ],
+  "service": {
+    "platform": "linux/amd64",
+    "restart": "unless-stopped",
+    "environment": {
+      "POSTGRES_DB": "agentstration_documents",
+      "POSTGRES_USER": "agentstration_documents",
+      "POSTGRES_PASSWORD_FILE": "/run/secrets/postgresql-documents-password"
+    },
+    "secrets": [
+      "postgresql-documents-password"
+    ],
+    "volumes": [
+      "postgres-documents:/var/lib/postgresql/data"
+    ],
+    "healthcheck": {
+      "test": [
+        "CMD-SHELL",
+        "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+      ],
+      "interval": "2s",
+      "timeout": "5s",
+      "retries": 60,
+      "start_period": "20s"
+    }
+  }
+}

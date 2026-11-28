@@ -1,0 +1,44 @@
+apiVersion: agentstration.io/v1
+kind: ConnectedService
+metadata:
+  name: preview-postgresql-documents
+  namespace: default
+definition:
+  displayName: Preview PostgreSQL documents
+  options: {}
+  type:
+    extensionContribution:
+      extensionId: agentstration.extensions.postgresql
+      contributionId: postgresql
+      version: 1.0.0
+      kind: ConnectedServiceType
+  bindings:
+    - inputId: host
+      kind: literal
+      literal:
+        valueFrom:
+          configuration: Agentstration:Bootstrap:Parameters:PostgreSqlDocumentsHost
+          type: string
+    - inputId: port
+      kind: literal
+      literal:
+        valueFrom:
+          configuration: Agentstration:Bootstrap:Parameters:PostgreSqlDocumentsPort
+          type: integer
+    - inputId: database
+      kind: literal
+      literal:
+        valueFrom:
+          configuration: Agentstration:Bootstrap:Parameters:PostgreSqlDocumentsDatabase
+          type: string
+    - inputId: username
+      kind: literal
+      literal:
+        valueFrom:
+          configuration: Agentstration:Bootstrap:Parameters:PostgreSqlDocumentsUsername
+          type: string
+    - inputId: password
+      kind: secret
+      secret:
+        resourceRef:
+          name: preview-document-password

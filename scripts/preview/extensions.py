@@ -88,15 +88,22 @@ def entry(identifier):
 
 def from_labels(labels):
     preview.require(isinstance(labels, list) and len(labels) <= 100, 'Invalid issue label inventory.')
-    selected = []
+    names = []
     for label in labels:
         name = label.get('name', '') if isinstance(label, dict) else label
         preview.require(isinstance(name, str), 'Invalid issue label.')
-        if name.startswith(PREFIX):
-            selected.append(name[len(PREFIX):])
+        names.append(name)
+    import extension_deployments
+    selected, _ = extension_deployments.labels(names)
     validate_ids(sorted(selected))
     # Admission freezes intent; the selector verifies the published source catalogue.
     return sorted(selected)
+
+
+def options_from_labels(labels):
+    from_labels(labels)
+    import extension_deployments
+    return extension_deployments.labels([item.get('name', '') if isinstance(item, dict) else item for item in labels])[1]
 
 
 def trusted(receipts):
@@ -185,7 +192,9 @@ def overlay(directory, state):
     if keys:
         services['server'] = {'secrets': [{'source': 'aep-' + name, 'target': '/run/secrets/aep-' + name}
                                         for name in state.get('extensionKeys', {}) if service(name) in state['images']]}
-    return {'services': services, 'volumes': volumes, 'secrets': keys}
+    import extension_deployments
+    return extension_deployments.merge({'services': services, 'volumes': volumes, 'secrets': keys},
+                                       extension_deployments.overlay(directory, state))
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

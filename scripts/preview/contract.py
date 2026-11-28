@@ -5,6 +5,7 @@ import uuid
 
 import preview
 import extensions
+import extension_deployments
 from images import delivery_entry
 
 PROVIDERS = {"docker", "azure-vm", "ssh-docker"}
@@ -28,6 +29,10 @@ def _delivery(receipt):
         keys += ["runtimeKind", "capabilityVersion", "executionMaterialVersions", "awpVersion"]
     if entry["kind"] == "aep-extension":
         keys += ["extensionId", "aepVersion", "contributionKind", "contributionId"]
+        if 'deploymentRecipeVersion' in entry:
+            preview.require(type(entry['deploymentRecipeVersion']) is int and entry['deploymentRecipeVersion'] == 1,
+                            'Unsupported extension deployment recipe version.')
+            keys += ['deploymentRecipeVersion']
     return {"schemaVersion": 1, "component": {key: entry[key] for key in keys},
             **{key: receipt[key] for key in ("repository", "sourceSha", "digest")}}
 
@@ -46,6 +51,7 @@ def images(request):
         selected[extensions.service(identifier)] = preview.image_record(receipt, "aep-extension", request["registry"])
     if request["database"] == "postgresql":
         selected["postgres"] = {"reference": request["postgresImage"], "platform": "linux/amd64"}
+    selected.update(extension_deployments.images(request.get('extensionDeployments', {})))
     return selected
 
 
@@ -74,11 +80,13 @@ def _validate(request):
                 "ttlHours", "dataMode", "testProfile", "target"}
     if request.get("database") == "postgresql":
         expected.add("postgresImage")
-    if request.get("schemaVersion") in (2, 4):
+    if request.get("schemaVersion") in (2, 4, 5):
         expected.add("extensions")
+    if request.get('schemaVersion') == 5:
+        expected.add('extensionDeployments')
     fields(request, expected)
     # Version 3 is reserved by the parallel GUID deployment-profile change (#1422).
-    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2, 4), "Unsupported deployment contract version.")
+    preview.require(type(request["schemaVersion"]) is int and request["schemaVersion"] in (1, 2, 4, 5), "Unsupported deployment contract version.")
     preview.require(isinstance(request["environmentId"], str) and preview.ENVIRONMENT_ID.fullmatch(request["environmentId"]),
                     "Invalid deployment environment ID.")
     preview.require(request["provider"] in PROVIDERS and request["database"] in ("sqlite", "postgresql"),
@@ -90,6 +98,9 @@ def _validate(request):
     optional = request.get("extensions", {})
     preview.require(isinstance(optional, dict) and (request["schemaVersion"] != 2 or bool(optional)), "Version 2 requires selected extensions.")
     extensions.validate_ids(list(optional))
+    if request['schemaVersion'] == 5:
+        extension_deployments.validate(request['extensionDeployments'], optional)
+        extension_deployments.compatible(request['extensionDeployments'], optional)
     identities = []
     for identifier, receipt in optional.items():
         preview.require(receipt["component"]["id"] == identifier, "Extension key differs from delivery ID.")
@@ -140,7 +151,8 @@ def validate(request):
 
 
 def plan(server, worker, environment_id, database="sqlite", provider="docker", target=None, ttl_hours=24,
-         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None, source_sha=None):
+         data_mode="preserve", test_profile="readiness", registry="ghcr.io", postgres_image=None, extension_deliveries=None, source_sha=None,
+         extension_options=None):
     preview.require(target is not None, "A provider-specific target is required.")
     request = {"schemaVersion": 1, "environmentId": environment_id, "provider": provider,
                "sourceSha": server["sourceSha"], "database": database, "registry": registry,
@@ -150,6 +162,9 @@ def plan(server, worker, environment_id, database="sqlite", provider="docker", t
         request.update(schemaVersion=2, extensions={key: delivery(value) for key, value in sorted(extension_deliveries.items())})
     if source_sha is not None and source_sha != server['sourceSha']:
         request.update(schemaVersion=4, sourceSha=source_sha, extensions=request.get('extensions', {}))
+    recipes = extension_deployments.freeze(request.get('extensions', {}), extension_options)
+    if recipes:
+        request.update(schemaVersion=5, extensionDeployments=recipes)
     if database == "postgresql":
         request["postgresImage"] = postgres_image or preview.read_json(preview.ROOT / "deploy/preview/postgresql.json")["reference"]
     else:

@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 import contract
 import extensions
+import extension_deployments
 import github_request
 import preview
 from images import catalogue, DIGEST, valid_version
@@ -200,6 +201,7 @@ class PublishedImages:
 
 def validate_options(options):
     extensions.validate_ids(options.get('extensions', []))
+    extension_deployments.freeze(options.get('extensions', []), options.get('extension_options'))
     preview.require('preview_pr' not in options or type(options['preview_pr']) is int and 1 <= options['preview_pr'] <= 9999999999,
                     'Invalid preview PR identity.')
     preview.require(options['operation'] in contract.OPERATIONS and options['provider'] == 'azure-vm', 'Only the Azure VM provider is available in this form.')
@@ -229,6 +231,7 @@ def resolve(options, variables, repository, selector=None):
     contract.validate_azure_target(target)
     arguments = {'environment_id': options['environment_id'], 'database': options['database'], 'provider': options['provider'],
                  'target': target, 'ttl_hours': ttl_hours, 'data_mode': options['data_mode'], 'test_profile': options['test_profile']}
+    arguments['extension_options'] = options.get('extension_options')
     selector = selector or PublishedImages(repository)
     selected = options.get('extensions', [])
     number = options.get('preview_pr')

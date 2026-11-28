@@ -85,6 +85,69 @@ manual deployment clears the old automatic association.
 
 ## Deployment labels
 
+### PostgreSQL document database
+
+`preview:extension:postgresql` deploys the AEP extension with a separate internal
+PostgreSQL 17 container and owned document volume. Its image is frozen by digest;
+no database port is published. The server still uses SQLite by default. The
+extension image must advertise `deploymentRecipeVersion: 1`; an older publication
+fails admission until a compatible private image is published.
+
+Add **both** `preview:extension:postgresql` and
+`preview:extension:postgresql:externalDB` to use an existing external database.
+The modifier alone is invalid. Commands freeze this choice; `preview:auto`
+rechecks it under the provider lease. Changing mode requires `/preview redeploy`
+(or an explicitly authorized `preview:auto:redeploy` update), which resets the
+whole preview. Ordinary deploy never silently resets existing data.
+
+The internal password is generated **on the VM/Docker host**, stored in
+`postgresql-documents.password` with mode 0600, and reused across updates and
+deselection/reselection. CI never generates or transports it. It is absent from
+public requests, results, Compose environment values and Docker container
+configuration. A mounted startup script reads it locally and exports
+`Agentstration__Bootstrap__Secrets__PostgreSqlDocumentsPassword` for the server
+process. An authorized host administrator can read the file/process environment.
+
+For external mode, provision `postgresql-documents.external.json` privately inside
+the target's environment state directory before deployment. Azure uses
+`/srv/agentstration-preview/state/<environment-id>/`; the portable Docker CLI uses
+its configured state root. The file is limited to 16 KiB, cannot be a symlink,
+and must have exactly these fields:
+
+```json
+{
+  "Host": "your-database.example.com",
+  "Port": 5432,
+  "Database": "your_documents_database",
+  "Username": "your_documents_user",
+  "Password": "<provision privately on the target>"
+}
+```
+
+The existing protected extension configuration channel also accepts this object
+under `postgresql.PreviewDatabase`; that alternative transmits the existing
+external credential through the protected CI/guest channel. It is removed before
+the extension's configuration is mounted. No external password is generated.
+Changed connection settings require reset. TLS remains VerifyFull unless an
+operator explicitly configures an exact allowed hostname. Internal mode alone
+adds `postgres-documents` to `PostgreSqlDocuments:AllowedHostsWithoutTls` and
+enables document schema provisioning.
+
+The recipe supplies Bootstrap connection parameters and the secret configuration
+key. The optional `preview-postgresql-documents` Instance profile in
+`deploy/bootstrap/profiles` creates the resource graph after initialization and
+extension enrollment, through the existing profile application flow. It does
+not enable initial bootstrap, create a login, or select a Tenant/Workspace.
+Automatic GUID profile selection remains #1419.
+
+Status includes the managed database's container health. Deselection stops the
+dependency but retains its volume and private credentials. Explicit reset and
+existing TTL/closed-PR cleanup remove those owned local resources; external
+database data is always outside cleanup. See
+[ADR-0273](../decisions/0273-preview-extension-recipes-own-optional-dependencies.md).
+
+### Lifecycle labels
+
 | Label | Behavior |
 | --- | --- |
 | `preview:auto` | Create one PR preview, then update published new heads or changed extension selection while preserving data |
