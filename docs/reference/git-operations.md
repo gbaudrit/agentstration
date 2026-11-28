@@ -5,6 +5,17 @@
 `git.repository` AEP/MCP Tool resolves, reads, diffs and publishes authenticated Git
 changes. It does not interpret plans, tasks, Bootstrap or usage documents, or tracker APIs.
 
+## Dedicated ToolSet
+
+AEP declares the `tools` ToolSet contribution containing `git.repository`.
+Enrollment projects the draft as `<registration>.tools` at the registration's
+exact scope and namespace, with extension governance and local Tool references.
+A long name receives a deterministic hash suffix. Provisioning does not enable
+the Tool, publish the set, assign consumers or grant access. The group is created during enrollment on a fresh installation, without old-group
+conversion or a compatibility migration. The `git.repository` Tool
+itself supports both reads and publication; this group does not claim to be
+read-only. See [ADR-0307](../decisions/0307-aep-toolsets-project-governed-drafts.md).
+
 ## Configure an optional connection
 
 Launch the existing Git extension with `GitOperations:Enabled=true`, a persistent

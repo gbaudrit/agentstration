@@ -377,3 +377,5 @@ Use **Proposed** when implementation or repository evidence does not establish a
 305. [ADR-0305 — Task providers use Project bindings and durable operation receipts](0305-task-providers-use-project-bindings-and-durable-operation-receipts.md)
 
 Integration note: the Work ADRs originally numbered 0265–0272 on `codex/946-durable-task-trees` were renumbered 0298–0305 when merging main to resolve identifier collisions. Their decisions are unchanged; main retains its existing ADR identifiers.
+
+307. [ADR-0307 — AEP ToolSets project governed drafts without enabling their Tools](0307-aep-toolsets-project-governed-drafts.md)

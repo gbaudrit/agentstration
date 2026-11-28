@@ -40,6 +40,7 @@ Initial registered names are:
 - `aep.tools`
 - `aep.schema-formats`
 - `aep.connected-service-types`
+- `aep.tool-sets`
 - `aep.connected-service-operation-types`
 - `aep.configuration`
 - `aep.value-requirements`
@@ -49,6 +50,27 @@ Initial registered names are:
 Unknown names are preserved. Each capability evolves through its own version and may declare an endpoint and metadata. The manifest is the only input an Inspector needs to decide which explorers to display.
 
 The model-provider capability currently uses `/aep/model-providers`. AEP tool contributions may map to MCP servers; MCP remains authoritative for tool schema and invocation.
+
+### ToolSet contributions
+
+An extension may advertise `aep.tool-sets` version `1.0` and an optional
+`contributions.toolSets` collection. Each ToolSet has `id`, `displayName`, `version`,
+`members` and optional `description`. A member contains `toolId`, `capability` and
+`route` (default `default`). `toolId` must select a Tool advertised by this same
+manifest. It is a contribution id, not a product resource name or UID.
+
+There are at most 32 ToolSets and 128 members per set. Set ids are distinct and
+limited to 64 characters; member/capability/route identifiers are bounded to 128.
+Each set has distinct Tool members and capability/route pairs. Display names are
+limited to 200 characters, versions to 64, and descriptions to 2,000. Unknown Tools,
+invalid identifiers, empty groups, duplicate members/routes and incompatible
+capability versions are rejected.
+
+Agentstration projects these declarations into registration-owned ToolSet drafts
+at the exact enrollment scope. Provisioning is idempotent and does not enable Tools,
+publish a version, assign consumers or write access policies. Local identities and
+membership references are resolved by the product. A group has no separate MCP
+endpoint; MCP remains authoritative for its member schemas and invocations.
 
 ### Connected Service types
 

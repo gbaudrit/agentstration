@@ -41,6 +41,23 @@ builder.Services.AddAgentstrationAep(options =>
         {
             ["agentstration.coding.repository"] = JsonSerializer.SerializeToElement(new { version = "1.0", provider = "github", operations = new[] { "repository.resolve", "pull-request.create", "pull-request.read" } })
         }));
+    options.ToolSets.Add(new("github-read", "GitHub read", "1.0.0",
+        [
+            new("github.tracking.describe", "github.tracking.describe"),
+            new("github.tracking.list", "github.tracking.list"),
+            new("github.tracking.read", "github.tracking.read"),
+            new("github.forge.describe", "github.forge.describe"),
+            new("github.forge.resolve", "github.forge.resolve"),
+            new("github.forge.read", "github.forge.read"),
+            new("github.forge.observe", "github.forge.observe")
+        ], "Read-only Tracking and Forge tools. Enrollment does not activate tools or assign consumer access."));
+    options.ToolSets.Add(new("github-write", "GitHub write", "1.0.0",
+        [
+            new("github.tracking.mutate", "github.tracking.mutate"),
+            new("github.forge.create", "github.forge.create"),
+            new("github.issue", "github.issue"),
+            new("github.coding", "github.coding")
+        ], "Mutating Tracking and Forge tools, including the mixed issue and coding tools. Enrollment does not activate tools or assign consumer access."));
 });
 builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddTransient<GitHubTools>();

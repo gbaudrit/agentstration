@@ -105,7 +105,7 @@ public sealed class ToolSetService(
         var desired = resource with { ScopeRef = scopeRef, Generation = 1, Status = Succeeded() };
         Validate(desired);
         ResourceScopePolicy.EnsureAllowed(desired, scopeRef);
-        await ResolveMembersAsync(desired, scopeRef, cancellationToken);
+        await ResolveMembersAsync(desired, scopeRef, cancellationToken, requireAvailable: desired.Definition.Publish);
         var stored = await scopeOperations.WriteAsync(desired, scopeRef, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scopeRef, desired, null, true, token), cancellationToken);
         await AuditAsync(SecurityAuditActions.ToolSetCreated, scopeRef, cancellationToken);
@@ -123,6 +123,21 @@ public sealed class ToolSetService(
     {
         var existing = await GetAsync(@namespace, name, cancellationToken)
             ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        return await PutCoreAsync(existing, definition, ifMatch, cancellationToken);
+    }
+
+    public async Task<StoredResource<ToolSetResource>> PutExactAsync(ResourceScopeRef scopeRef,
+        ResourceNamespace @namespace, string name, ToolSetProperties definition, string? ifMatch,
+        CancellationToken cancellationToken)
+    {
+        var existing = await GetExactAsync(scopeRef, @namespace, name, cancellationToken)
+            ?? throw new ResourceNotFoundException(new(ToolResourceKinds.ToolSet, name, @namespace));
+        return await PutCoreAsync(existing, definition, ifMatch, cancellationToken);
+    }
+
+    private async Task<StoredResource<ToolSetResource>> PutCoreAsync(StoredResource<ToolSetResource> existing,
+        ToolSetProperties definition, string? ifMatch, CancellationToken cancellationToken)
+    {
         await EnsureManagerAsync(existing.Value, cancellationToken);
         var scopeRef = RequiredScope(existing.Value);
         var desired = existing.Value with
@@ -132,7 +147,7 @@ public sealed class ToolSetService(
             Status = Succeeded()
         };
         Validate(desired);
-        await ResolveMembersAsync(desired, scopeRef, cancellationToken);
+        await ResolveMembersAsync(desired, scopeRef, cancellationToken, requireAvailable: desired.Definition.Publish);
         var stored = await scopeOperations.WriteAsync(existing.Value, scopeRef, AuthorizationPermissions.ResourcesWrite,
             token => store.PutExactAsync(scopeRef, desired, ifMatch, false, token), cancellationToken);
         await AuditAsync(SecurityAuditActions.ToolSetUpdated, scopeRef, cancellationToken);
@@ -308,7 +323,8 @@ public sealed class ToolSetService(
     private async Task<IReadOnlyList<PublishedToolSetMember>> ResolveMembersAsync(
         ToolSetResource resource,
         ResourceScopeRef scopeRef,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool requireAvailable = true)
     {
         var members = new List<PublishedToolSetMember>(resource.Definition.Members.Count);
         foreach (var member in resource.Definition.Members)
@@ -319,7 +335,7 @@ public sealed class ToolSetService(
             var tool = stored.Value;
             var toolScopeRef = tool.ScopeRef
                 ?? throw new ToolSetValidationException("tool_set_member_scope_missing", $"Tool member '{tool.Address}' has no ownership scope.");
-            if (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true)
+            if (requireAvailable && (!tool.Definition.Enabled || tool.Definition.Discovery?.Available != true))
                 throw new ToolSetValidationException("tool_set_member_unavailable", $"Tool member '{tool.Address}' is unavailable.");
             var providerReference = tool.Definition.Provider
                 ?? throw new ToolSetValidationException("tool_set_member_provider_missing", $"Tool member '{tool.Address}' has no provider mapping.");

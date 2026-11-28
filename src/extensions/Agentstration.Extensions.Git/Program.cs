@@ -1,4 +1,5 @@
 using System.Reflection;
+using Agentstration.Aep.Abstractions;
 using Agentstration.Aep.AspNetCore;
 using Agentstration.Extensions.Git;
 using System.Text.Json;
@@ -36,6 +37,9 @@ builder.Services.AddAgentstrationAep(options =>
             [GitOperationProtocol.MetadataKey] = JsonSerializer.SerializeToElement(new
             { version = GitOperationProtocol.Version, operations = new[] { "resolve", "read", "diff", "publish" }, expectedBase = true, exactRevisionReads = true, historyRead = true, idempotentOperations = true, operationRecovery = true })
         }));
+    options.ToolSets.Add(new("tools", "Git tools", "1.0.0",
+        options.Tools.Select(tool => new AepToolSetMember(tool.Id, tool.Id)).ToArray(),
+        "Tools supplied by the Git extension. Enrollment does not activate tools or assign consumer access."));
 }).AddSourceProvider<GitSourceProvider>();
 builder.Services.AddAepEnrollmentAuthentication(builder.Configuration);
 builder.Services.AddMcpServer().WithHttpTransport().WithTools<GitRepositoryTools>();

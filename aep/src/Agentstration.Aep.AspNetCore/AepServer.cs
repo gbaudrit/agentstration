@@ -39,6 +39,7 @@ public sealed class AepExtensionOptions
     public IDictionary<string, AepCapabilityDescriptor> Capabilities { get; } = new Dictionary<string, AepCapabilityDescriptor>(StringComparer.Ordinal);
     public IList<AepMcpServerDescriptor> McpServers { get; } = [];
     public IList<AepToolContribution> Tools { get; } = [];
+    public IList<AepToolSetContribution> ToolSets { get; } = [];
     public IList<AepDataSourceProfileBundleContribution> DataSourceProfileBundles { get; } = [];
     public IList<AepSchemaFormatContribution> SchemaFormats { get; } = [];
     public IList<AepConnectedServiceTypeContribution> ConnectedServiceTypes { get; } = [];
@@ -240,13 +241,14 @@ public static partial class AepServerExtensions
             capabilities[AepCapabilityNames.ValueRequirements] = new(AepProtocol.ValueRequirementsCapabilityVersion);
             capabilities[AepCapabilityNames.BoundValues] = new(AepProtocol.BoundValuesCapabilityVersion);
         }
+        if (options.ToolSets.Count > 0) capabilities[AepToolSetDescriptorValidator.Capability] = new(AepToolSetDescriptorValidator.Version);
         var descriptor = new AepManifest(
             AepProtocol.Version,
             options.Extension,
             capabilities,
             new AepContributions(modelProviders, options.Tools.ToArray(), sources,
                 options.DataSourceProfileBundles.ToArray(), options.SchemaFormats.ToArray(),
-                options.ConnectedServiceTypes.ToArray(), options.ConnectedServiceOperationTypes.ToArray(), options.StorageTypes.ToArray()),
+                options.ConnectedServiceTypes.ToArray(), options.ConnectedServiceOperationTypes.ToArray(), options.StorageTypes.ToArray(), options.ToolSets.Count == 0 ? null : options.ToolSets.ToArray()),
             options.McpServers.Count == 0 ? null : new AepMcpDescriptor(options.McpServers.ToArray()),
             options.ValueRequirements.Count == 0 ? null : options.ValueRequirements.ToArray());
         var errors = AepDescriptorValidator.Validate(descriptor);

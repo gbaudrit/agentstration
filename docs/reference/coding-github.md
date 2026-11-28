@@ -4,6 +4,29 @@ The optional `Agentstration.Extensions.GitHub` executable supplies native reposi
 issue and pull-request operations through existing AEP/MCP discovery. The deterministic
 standalone server remains executable without this provider.
 
+## Dedicated ToolSets
+
+The extension advertises two versioned AEP ToolSet contributions. Enrollment
+projects them as extension-owned drafts at the registration's exact scope and
+namespace. Their local names are `<registration>.github-read` and
+`<registration>.github-write` (long names use a deterministic hash suffix).
+
+| Contribution | Members |
+| --- | --- |
+| `github-read` | `github.tracking.describe`, `github.tracking.list`, `github.tracking.read`, `github.forge.describe`, `github.forge.resolve`, `github.forge.read`, `github.forge.observe` |
+| `github-write` | `github.tracking.mutate`, `github.forge.create`, `github.issue`, `github.coding` |
+
+The issue/coding Tools mix read and mutation operations and are excluded
+from the read group. Classification is explicit; a new advertised Tool requires
+an intentional group assignment.
+
+Projection preserves Tool activation decisions and writes no consumer grants or
+Agent assignments. Draft membership remains inspectable with disabled Tools;
+publication/invocation still require available, enabled members and ordinary
+resource/provider/Connected Service authorization. The access-rule changes in
+#1436 are separate. The groups are created on enrollment of a fresh installation. No old-name aliases,
+resource conversion or compatibility migration are supplied. See [ADR-0307](../decisions/0307-aep-toolsets-project-governed-drafts.md).
+
 ## Named Connected Services over ATC/AFC
 
 The extension also exposes canonical ATC tracking and AFC forge Tools with independent

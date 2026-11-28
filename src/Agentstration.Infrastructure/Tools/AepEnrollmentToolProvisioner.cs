@@ -7,8 +7,9 @@ using Agentstration.Tools;
 
 namespace Agentstration.Infrastructure.Tools;
 
-public sealed class AepEnrollmentToolProvisioner(
+public sealed partial class AepEnrollmentToolProvisioner(
     ToolManagementService tools,
+    ToolSetService toolSets,
     IResourceStore store,
     IResourceGovernanceContext governance) : IAepEnrollmentResourceProvisioner
 {
@@ -17,15 +18,21 @@ public sealed class AepEnrollmentToolProvisioner(
         AepManifest? authenticatedManifest,
         CancellationToken cancellationToken)
     {
+        if (authenticatedManifest is not null)
+        {
+            var errors = AepToolSetDescriptorValidator.Validate(authenticatedManifest);
+            if (errors.Count > 0) throw new ToolResourceValidationException(string.Join(" ", errors));
+        }
         var scopeRef = registration.ScopeRef
             ?? throw new ToolResourceValidationException("The Extension Registration has no ownership scope.");
         var extensionId = authenticatedManifest?.Extension.Id
             ?? registration.Definition.ExpectedExtensionId
             ?? registration.Name;
-        using var governanceScope = governance.Push(ResourceGovernance.Extension(
+        var authority = ResourceGovernance.Extension(
             $"{scopeRef.Value}/{registration.Kind}/{registration.Namespace}/{registration.Name}",
             extensionId,
-            authenticatedManifest?.Extension.Version));
+            authenticatedManifest?.Extension.Version);
+        using var governanceScope = governance.Push(authority);
         var extensionReference = new ResourceReference(registration.Name, scopeRef, registration.Namespace);
         var provider = new ToolProviderResource
         {
@@ -65,7 +72,7 @@ public sealed class AepEnrollmentToolProvisioner(
         var requiredTools = (authenticatedManifest?.Contributions.DataSourceProfileBundles ?? [])
             .SelectMany(value => value.RequiredTools ?? [])
             .ToHashSet(StringComparer.Ordinal);
-        if (requiredTools.Count == 0) return;
+        if (requiredTools.Count == 0 && (authenticatedManifest?.Contributions.ToolSets?.Count ?? 0) == 0) return;
         var materialized = (await store.ListExactAsync<ToolResource>(scopeRef,
                 ToolResourceKinds.Tool, 0, int.MaxValue, cancellationToken))
             .Where(value => value.Value.Namespace == provider.Namespace
@@ -85,6 +92,7 @@ public sealed class AepEnrollmentToolProvisioner(
                 Definition = tool.Value.Definition with { Enabled = true }
             }, tool.ETag, false, cancellationToken);
         }
+        await ProvisionToolSetsAsync(registration, authenticatedManifest, scopeRef, authority, materialized, cancellationToken);
     }
 
     private static bool IsOwnedBy(ToolProviderResource provider, ResourceReference extension) =>
