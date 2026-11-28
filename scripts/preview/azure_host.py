@@ -70,8 +70,8 @@ def run(action, request, registry_image=None, root=GUEST_ROOT, access_config=Non
                          '--label', 'io.agentstration.preview.transfer=' + request['environmentId'],
                          '--publish', '127.0.0.1:5001:5000', registry_image)
         try:
-            for name in contract.images(selected):
-                if name == 'postgres':
+            for name, image in contract.images(selected).items():
+                if 'sourceSha' not in image:
                     continue
                 reference = contract.images(selected)[name]['reference']
                 subprocess.run(['skopeo', 'copy', '--all', '--preserve-digests', '--retry-times', '5',

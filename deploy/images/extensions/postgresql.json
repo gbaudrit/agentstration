@@ -10,6 +10,7 @@
   "testFilter": "FullyQualifiedName~Agentstration.Extensions.PostgreSql.Tests",
   "imageName": "extension-postgresql",
   "platform": "linux/amd64",
+  "deploymentRecipeVersion": 1,
   "aepVersion": "agentstration.io/v1",
   "contributionKind": "storageTypes",
   "contributionId": "postgresql.jsonb",

@@ -489,8 +489,8 @@ def bundle_images(request, directory):
     path = Path(directory) / 'bundle'
     path.mkdir(mode=0o700)
     preview.private_write(path / 'request.json', json.dumps(request) + '\n')
-    for name in contract.images(request):
-        if name == 'postgres':
+    for name, image in contract.images(request).items():
+        if 'sourceSha' not in image:
             continue
         auth = os.environ.get('DOCKER_CONFIG')
         credentials = ['--src-authfile', str(Path(auth) / 'config.json')] if auth else []
@@ -514,6 +514,10 @@ def bundle_images(request, directory):
         for file in sorted((preview.ROOT / 'scripts/preview').glob('*.py')):
             if not file.name.startswith('test_'):
                 archive.add(file, arcname='tooling/scripts/preview/' + file.name)
+        for file in sorted((preview.ROOT / 'scripts/preview/extension_deployments').glob('*.py')):
+            archive.add(file, arcname='tooling/scripts/preview/extension_deployments/' + file.name)
+        for file in sorted((preview.ROOT / 'deploy/preview/extensions').glob('*.json')):
+            archive.add(file, arcname='tooling/deploy/preview/extensions/' + file.name)
     with bundle.open('rb') as stream:
         checksum = hashlib.file_digest(stream, 'sha256').hexdigest()
     return bundle, checksum
@@ -605,6 +609,9 @@ def execute(action, request, client_factory=Azure, now=None, route_factory=acces
                 preview.require(guard is None or guard(record), 'Preview changed after reconciliation; no mutation was authorized.')
                 resources = client.resources(record)
                 if action == 'deploy':
+                    if not reset_before_deploy and not record['destroyed']:
+                        import extension_deployments
+                        extension_deployments.require_preserving_change(record['request'], request)
                     if reset_before_deploy and existing_record and not record['destroyed']:
                         # Keep one provider lease across reset and recreation. Never deploy after a partial reset.
                         routes = route_factory(request, record, client.write, os.environ)

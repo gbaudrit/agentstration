@@ -16,3 +16,11 @@ provisioner or the source-built Development topology.
 The [portable lifecycle guide](../../docs/contributing/preview-lifecycle.md)
 documents managed deploy/status/destroy, ownership, safe result JSON and reusable
 GitHub Actions entrypoints for the first #1282 increment.
+
+Optional AEP dependencies use the trusted recipes in
+`scripts/preview/extension_deployments`; descriptors live in `extensions/`.
+Selecting the PostgreSQL document extension adds its own digest-pinned internal
+database and volume, independently of this directory's core database profile.
+The `preview:extension:postgresql:externalDB` modifier disables that dependency.
+See [preview automation](../../docs/contributing/preview-automation.md#postgresql-document-database)
+for private configuration, target-generated credentials and reset behavior.

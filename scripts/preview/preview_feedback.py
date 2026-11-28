@@ -5,6 +5,7 @@ import re
 import contract
 import container_health
 import preview
+import extension_deployments
 
 OPERATIONS = {'deploy': 'Deployment', 'status': 'Preview status', 'destroy': 'Removal'}
 
@@ -40,6 +41,10 @@ def details(request):
     return '\n'.join([*lines, '', '</details>'])
 
 
+def recipe_details(request):
+    return extension_deployments.describe(request.get('extensionDeployments', {}))
+
+
 def accepted(options, repository, run_url):
     operation = options['operation']
     reset = options.get('reset_before_deploy', False)
@@ -63,6 +68,7 @@ def planned(request, operation, repository, run_url, reset_before_deploy=False):
              'Environment: `' + request['environmentId'] + '`.',
              'Requested revision: ' + revision(repository, request['sourceSha']) + '.',
              'Database: **' + request['database'] + '**. Extensions: ' + extension_names(request.get('extensions', {})) + '.']
+    lines += recipe_details(request)
     if operation == 'deploy':
         target = request['target']
         lines += ['VM: **' + target['vmSize'] + '**, region: **' + target['region'] + '**.',
@@ -81,7 +87,8 @@ def health_table(result, request):
     preview.require(isinstance(values, dict) and set(values) <= set(services), 'Unexpected container health components.')
     lines = ['| Component | Container | Health | Restarts |', '| --- | --- | --- | --- |']
     for name in services:
-        preview.require(isinstance(name, str) and re.fullmatch(r'server|worker|postgres|extension-[a-z][a-z0-9-]{0,31}', name),
+        preview.require(isinstance(name, str) and (name in {'server', 'worker', 'postgres'} | extension_deployments.DEPENDENCY_NAMES
+                        or re.fullmatch(r'extension-[a-z][a-z0-9-]{0,31}', name)),
                         'Invalid health component.')
         row = values.get(name)
         if row is None:
@@ -147,6 +154,7 @@ def completed(result, operation, repository, run_url, request=None, reset_before
         lines.append(actions())
     lines.append('[Execution details](' + run_url + ').')
     if request:
+        lines += recipe_details(request)
         lines.append(details(request))
     return '\n\n'.join(lines)
 

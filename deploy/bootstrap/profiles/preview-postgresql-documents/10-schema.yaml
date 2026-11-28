@@ -1,0 +1,18 @@
+apiVersion: agentstration.io/v1
+kind: Schema
+metadata:
+  name: preview-document-schema
+  namespace: default
+definition:
+  displayName: Preview document schema
+  format: json-schema
+  publishVersion: 1.0.0
+  dialect: https://json-schema.org/draft/2020-12/schema
+  content:
+    $schema: https://json-schema.org/draft/2020-12/schema
+    type: object
+    properties:
+      id: {type: string}
+      title: {type: string}
+    required: [id]
+    additionalProperties: false

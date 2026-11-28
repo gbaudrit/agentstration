@@ -19,7 +19,11 @@ public sealed class PostgreSqlOptions
     public bool AllowPairedClient { get; set; }
     public bool ProvisionSchema { get; set; }
     public bool AllowLoopbackWithoutTls { get; set; }
+    public string[] AllowedHostsWithoutTls { get; set; } = [];
     public bool Enabled { get; set; } = true;
+    public bool AllowsUnencryptedConnection(string host) =>
+        (AllowLoopbackWithoutTls && (host is "localhost" or "127.0.0.1" or "::1"))
+        || AllowedHostsWithoutTls.Contains(host, StringComparer.OrdinalIgnoreCase);
     public bool Authorizes(ClaimsPrincipal? caller) => Enabled && caller?.Identity?.IsAuthenticated == true
         && caller.HasClaim(AepAuthenticationDefaults.PermissionClaim, AepAuthenticationDefaults.InvokePermission)
         && (AllowedClients.Contains(caller.FindFirstValue(ClaimTypes.NameIdentifier), StringComparer.Ordinal)
@@ -57,7 +61,6 @@ public sealed class PostgreSqlBindingFactory(IOptionsMonitor<PostgreSqlOptions> 
         var portBinding = request.Connection.Single(v => v.RequirementId == "port");
         AscValidation.Require(portBinding.InlineValue is { ValueKind: JsonValueKind.Number } portValue && portValue.TryGetInt32(out var port) && port is > 0 and <= 65535,
             "invalid_request", "A typed PostgreSQL port is required.");
-        var local = host is "localhost" or "127.0.0.1" or "::1";
         var connection = new NpgsqlConnectionStringBuilder
         {
             Host = host,
@@ -65,7 +68,7 @@ public sealed class PostgreSqlBindingFactory(IOptionsMonitor<PostgreSqlOptions> 
             Database = database,
             Username = username,
             Password = password,
-            SslMode = local && options.CurrentValue.AllowLoopbackWithoutTls ? SslMode.Disable : SslMode.VerifyFull,
+            SslMode = options.CurrentValue.AllowsUnencryptedConnection(host) ? SslMode.Disable : SslMode.VerifyFull,
             MaxPoolSize = 4,
             MinPoolSize = 0,
             Timeout = 10,
@@ -91,6 +94,9 @@ public static class PostgreSqlHosting
     public static IServiceCollection AddPostgreSqlDocuments(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<PostgreSqlOptions>().BindConfiguration("PostgreSqlDocuments")
+            .Validate(o => o.AllowedHostsWithoutTls is { Length: <= 32 } hosts
+                && hosts.All(host => host is { Length: > 0 and <= 253 }
+                    && Uri.CheckHostName(host) != UriHostNameType.Unknown), "Non-TLS PostgreSQL hosts must be explicit host names or IP addresses.")
             .Validate(o => o.AllowedClients.Length <= 32 && o.AllowedClients.All(c => c.Length is > 0 and <= 128)
                 && (o.AllowedClients.Length > 0 || o.AllowPairedClient), "An explicit PostgreSQL AEP caller is required.")
             .Validate(o => !o.AllowPairedClient || string.Equals(configuration["Aep:EnrollmentMode"], nameof(AepEnrollmentMode.PairingCode), StringComparison.OrdinalIgnoreCase),

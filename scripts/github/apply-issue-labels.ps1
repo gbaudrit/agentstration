@@ -97,6 +97,19 @@ foreach ($file in Get-ChildItem -LiteralPath $extensionCatalogue -Filter '*.json
         color = '1D76DB'
         description = "Deploy the packaged $($entry.id) AEP extension on the next /preview deploy."
     }
+    $recipePath = Join-Path $repositoryRoot "deploy/preview/extensions/$($entry.id).json"
+    if (Test-Path -LiteralPath $recipePath) {
+        $recipe = Get-Content -LiteralPath $recipePath -Raw | ConvertFrom-Json
+        if ($recipe.schemaVersion -ne 1) { throw "Invalid preview recipe metadata: $recipePath" }
+        foreach ($modifier in $recipe.modifiers) {
+            if ($modifier.name -cnotmatch '^[a-z][A-Za-z0-9]{0,31}$') { throw "Invalid preview recipe modifier: $recipePath" }
+            $labels += [pscustomobject]@{
+                name = "preview:extension:$($entry.id):$($modifier.name)"
+                color = '1D76DB'
+                description = $modifier.description
+            }
+        }
+    }
 }
 if ($labels.Count -eq 0) {
     throw "Label definition is empty: $labelsPath"

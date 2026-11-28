@@ -1006,6 +1006,7 @@ Environment variables use .NET's `__` separator:
 | `PostgreSqlDocuments__AllowPairedClient` | Optional paired-client authorization; requires `Aep__EnrollmentMode=PairingCode`. |
 | `PostgreSqlDocuments__ProvisionSchema` | Defaults to `false`; schema creation is an explicit operator action. |
 | `PostgreSqlDocuments__AllowLoopbackWithoutTls` | Defaults to `false`; allows non-TLS only for explicitly loopback-bound local development. |
+| `PostgreSqlDocuments__AllowedHostsWithoutTls__0` (and subsequent indices) | Defaults to an empty list. At most 32 exact DNS/IP hostnames may explicitly bypass TLS for an isolated deployment network; no wildcard, URL or port is accepted. Other hosts retain VerifyFull. |
 | `PostgreSqlDocuments__Enabled` | Defaults to `true`; disabling denies document callers. |
 
 Do not configure a database connection string in the image or catalogue. Host,
@@ -1017,6 +1018,14 @@ needs only its persisted AEP state and read-only key, with permissions restricte
 to its process user. Never mount server SQLite databases into the extension.
 Preserve the existing 100,000-byte HTTP limit, bounded document/payload policies,
 10-second database timeouts, four-connection pools and default VerifyFull TLS.
+
+The trusted preview deployment recipe can manage a separate internal document
+database or use an external one; it does not change the image's default behavior.
+Catalogue metadata `deploymentRecipeVersion: 1` identifies compatibility with the
+internal recipe's exact-host TLS opt-in. Existing images without that metadata
+remain usable for external databases. Publish a newly validated private image
+before selecting internal mode. See
+[preview database configuration](preview-automation.md#postgresql-document-database).
 
 ### PostgreSQL validation and qualification
 

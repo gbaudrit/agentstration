@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - deploy/images/extensions/**
+      - deploy/preview/extensions/**
       - scripts/github/apply-issue-labels.ps1
       - .github/workflows/preview-extension-labels.yml
   workflow_dispatch:

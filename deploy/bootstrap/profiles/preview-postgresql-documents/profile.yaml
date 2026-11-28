@@ -1,0 +1,8 @@
+apiVersion: agentstration.io/v1
+kind: BootstrapProfile
+metadata:
+  name: preview-postgresql-documents
+definition:
+  displayName: Preview PostgreSQL documents
+  description: Example document storage using connection parameters supplied locally by the preview deployment recipe.
+  targetScope: instance
