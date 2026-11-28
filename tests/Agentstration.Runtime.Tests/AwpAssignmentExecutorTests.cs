@@ -744,6 +744,20 @@ public sealed partial class AwpAssignmentExecutorTests
         Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnStarted));
         Assert.AreEqual(2, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.TurnCompleted));
         Assert.AreEqual(4, handler.Events.Count(value => value.Kind == AwpExecutionEventKind.ResponseDelta));
+        foreach (var participant in result.Output!.Value.GetProperty("participants").EnumerateArray())
+        {
+            Assert.AreEqual(12, participant.GetProperty("usage").GetProperty("inputTokens").GetInt32());
+            Assert.AreEqual(4, participant.GetProperty("usage").GetProperty("outputTokens").GetInt32());
+            Assert.AreEqual(16, participant.GetProperty("usage").GetProperty("totalTokens").GetInt32());
+        }
+        foreach (var completed in handler.Events.Where(value => value.Kind == AwpExecutionEventKind.StepCompleted
+            && value.Location.FlowStep?.StepDefinitionId is "researcher" or "reviewer"))
+        {
+            Assert.AreEqual("default-reasoning", completed.Payload?.GetProperty("modelProfileResourceId").GetString());
+            Assert.AreEqual(12, completed.Payload?.GetProperty("usage").GetProperty("inputTokens").GetInt32());
+            Assert.AreEqual(4, completed.Payload?.GetProperty("usage").GetProperty("outputTokens").GetInt32());
+            Assert.AreEqual(16, completed.Payload?.GetProperty("usage").GetProperty("totalTokens").GetInt32());
+        }
         Assert.IsGreaterThan(0, handler.CheckpointRequests.Count);
     }
 
