@@ -27,6 +27,7 @@
 
 @code {
     [Parameter, EditorRequired] public ToolResource Resource { get; set; } = null!;
+    [Parameter] public bool? OperationalEnabled { get; set; }
     [Parameter] public ToolProviderResource? Provider { get; set; }
     [Parameter] public ExtensionInventoryItemResponse? ManagingExtension { get; set; }
     [Parameter] public bool ShowIdentity { get; set; } = true;
@@ -41,7 +42,7 @@
         <Identity Context="entry"><strong class="configuration-key">@entry.Label</strong></Identity><Information Context="entry"><CollectionValue Label="@Shared["Saved"]"><span class="configuration-value">@entry.Value</span></CollectionValue></Information>
     </CollectionView>;
     private sealed record ConfigurationEntry(string Label, string Value);
-    private IReadOnlyList<ConfigurationEntry> SavedConfiguration =>  [new(T("TechnicalProvider"), Resource.Definition.Provider?.ResourceId ?? "—"), new(T("ExternalName"), Resource.Definition.ExternalId ?? "—"), new(T("Enabled"), BooleanLabel(Resource.Definition.Enabled)), new(T("RequiresApproval"), BooleanLabel(Resource.Definition.RequiresApproval)), new(T("AvailableLabel"), Resource.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")];
+    private IReadOnlyList<ConfigurationEntry> SavedConfiguration =>  [new(T("TechnicalProvider"), Resource.Definition.Provider?.ResourceId ?? "—"), new(T("ExternalName"), Resource.Definition.ExternalId ?? "—"), new(T("Enabled"), BooleanLabel(OperationalEnabled ?? Resource.Definition.Enabled)), new(T("RequiresApproval"), BooleanLabel(Resource.Definition.RequiresApproval)), new(T("AvailableLabel"), Resource.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")];
     private RenderFragment OverviewPanels => @<div>@if (Resource is not null) {
             <section class="panel tool-capability" aria-labelledby="tool-capability-heading">
                 <div class="panel-header"><h2 id="tool-capability-heading">@T("Capability")</h2></div>
@@ -69,7 +70,7 @@
                     }
                     <dt>@T("TechnicalProvider")</dt><dd>@if (Provider is not null) { <a href="@ProviderUrl"><code>@Resource.Definition.Provider?.ResourceId</code></a> } else { <code>@Resource.Definition.Provider?.ResourceId</code> }</dd>
                     <dt>@T("ExternalName")</dt><dd><code>@Resource.Definition.ExternalId</code></dd>
-                    <dt>@T("Enabled")</dt><dd>@BooleanLabel(Resource.Definition.Enabled)</dd>
+                    <dt>@T("Enabled")</dt><dd>@BooleanLabel(OperationalEnabled ?? Resource.Definition.Enabled)</dd>
                     <dt>@T("RequiresApproval")</dt><dd>@BooleanLabel(Resource.Definition.RequiresApproval)</dd>
                     <dt>@T("AvailableLabel")</dt><dd>@(Resource.Definition.Discovery is { } observed ? BooleanLabel(observed.Available) : "—")</dd>
                     <dt>@T("FirstSeen")</dt><dd>@Resource.Definition.Discovery?.FirstSeenAt.ToString("g")</dd>

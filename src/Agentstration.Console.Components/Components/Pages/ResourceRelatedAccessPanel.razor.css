@@ -1,0 +1,9 @@
+.related-access-scopes { border: 1px solid var(--border-color, #dbe3f0); border-radius: .5rem; overflow: hidden; margin-block: 1rem; }
+.related-access-row { display: flex; align-items: center; gap: 1rem; padding: .8rem 1rem; border-block-end: 1px solid var(--border-color, #dbe3f0); flex-wrap: wrap; }
+.related-access-row:last-child { border-block-end: 0; }
+.related-scope-name { display: inline-flex; align-items: center; gap: .5rem; flex: 1 1 12rem; overflow-wrap: anywhere; }
+.related-tenant { background: var(--surface-subtle, #f4f7fc); font-weight: 600; }
+.related-workspace { padding-inline-start: 2.5rem; }
+.related-access-details ul { display: grid; gap: .5rem; padding-inline-start: 1rem; }
+.related-access-details li { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .related-access-row { gap: .6rem; padding: .75rem; } .related-workspace { padding-inline-start: 1.5rem; } .related-scope-name { flex-basis: 65%; } }

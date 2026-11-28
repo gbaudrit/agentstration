@@ -23,14 +23,28 @@
     }
     else
     {
-        <section class="panel access-context">
+        <section class="panel access-resource">
+        <h2>@T("AccessToResource")</h2>
+        @if (OwnerScopeRef.Kind != ResourceScopeKind.Workspace)
+        {
+            <div class="access-global" data-testid="resource-access-all-descendants">
+                <div class="panel-header"><div><h3>@T("AllDescendants")</h3><p>@T("AllDescendantsHelp")</p></div>
+                    <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="AllDescendants" ValueChanged="SetAllDescendants" disabled="@(!canManage || saving)" aria-label="@T("AllDescendants")" /></label>
+                </div>
+                @if (allDescendantActions.Length == 1) { <p>@T("PartialAccess")</p> }
+                <small>@T("AllDescendantsOffHelp")</small>
+            </div>
+        }
+        <button type="button" class="text-button access-targeted-toggle" data-testid="resource-access-targeted-toggle" aria-expanded="@targetedExpanded.ToString().ToLowerInvariant()" @onclick="() => targetedExpanded = !targetedExpanded">@T("TargetedAccess")</button>
+        <div class="access-targeted" hidden="@(!targetedExpanded)">
+        <section class="access-context">
             <div><span class="muted">@T("Scope")</span><ResourceScopeBadge ScopeRef="OwnerScopeRef" /><StatusBadge Text="@GovernanceBadge" Status="@(Governance.IsManaged ? UiStatus.Info : UiStatus.Neutral)" /></div>
             <p>@T("DefaultDenyHelp")</p>
             @if (Governance.IsManaged) { <p>@T("ManagedResourceHelp")</p> }
         </section>
         @if (EvaluateSavedAccess)
         {
-            <article class="panel access-evaluation">
+            <article class="access-evaluation">
                 <h2>@T("Evaluation.Title")</h2><p>@T("Evaluation.Help")</p>
                 <FormField Label="@T("TargetScope")"><ClearableSelect TValue="string" Value="@evaluationTarget" ValueChanged="value => { evaluationTarget = value; ClearEvaluation(); }" data-testid="resource-access-evaluation-target"><option value="">@T("SelectTarget")</option>@foreach (var target in EvaluationTargets) { <option value="@target.ScopeRef.Value">@TargetLabel(target)</option> }</ClearableSelect></FormField>
                 <button type="button" class="button-secondary" @onclick="EvaluateAsync" disabled="@(evaluating || string.IsNullOrEmpty(evaluationTarget))" data-testid="resource-access-evaluate">@T("Evaluation.Action")</button>
@@ -46,7 +60,7 @@
             </article>
         }
 
-        <article class="panel access-grants">
+        <article class="access-grants">
             <div class="panel-header">
                 <div><h2>@T("Permissions")</h2><p>@T("PermissionHelp")</p></div>
             </div>
@@ -65,6 +79,8 @@
                             <div class="access-actions" aria-label="@T("AllowedActions")">
                                 <label><FormCheckbox Value="@grant.Discover" disabled="@(!canManage || saving)" ValueChanged="changed => SetAction(grant, ResourceAccessAction.Discover, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("Discover")</label>
                                 <label><FormCheckbox Value="@grant.Use" disabled="@(!canManage || saving)" ValueChanged="changed => SetAction(grant, ResourceAccessAction.Use, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("Use")</label>
+                                <label><FormCheckbox Value="@grant.DenyDiscover" disabled="@(!canManage || saving)" ValueChanged="value => SetDeny(grant, ResourceAccessAction.Discover, value)" />@T("DenyDiscover")</label>
+                                <label><FormCheckbox Value="@grant.DenyUse" disabled="@(!canManage || saving)" ValueChanged="value => SetDeny(grant, ResourceAccessAction.Use, value)" />@T("DenyUse")</label>
                                 <label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@grant.IncludeDescendants" disabled="@(!canManage || saving || grant.TargetScopeRef.Kind == ResourceScopeKind.Workspace)" ValueChanged="changed => SetPropagation(grant, (bool)((new ChangeEventArgs { Value = changed }).Value ?? false))" />@T("IncludeDescendants")</label>
                             </div>
                             @if (canManage) { <CollectionActions ResourceName="@TargetName(grant.TargetScopeRef)"><button class="button-secondary" type="button" disabled="@saving" data-testid="resource-access-remove" @onclick="() => Remove(grant)">@T("Remove")</button></CollectionActions> }
@@ -117,13 +133,16 @@
                     }
                 </section>
             }
-            @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
+
+
+        </article>
+        </div>
             @if (canManage)
             {
                 <FormActions><button class="text-button" type="button" @onclick="Discard" disabled="@(saving || (!dirty && !adding))" data-testid="resource-access-discard">@T("Discard")</button><button class="button-primary" type="button" data-testid="resource-access-save" disabled="@(saving || invalidGrant || (!dirty && !HasPendingGrant))" @onclick="SaveAsync">@(saving ? T("Saving") : T("Save"))</button></FormActions>
             }
-        </article>
-        <details class="panel access-details"><summary>@T("ResourceDetails")</summary>
+            @if (saved) { <p class="access-success" role="status" data-testid="resource-access-saved">@T("Saved")</p> }
+        <details class="access-details"><summary>@T("ResourceDetails")</summary>
         <article class="access-identity">
             <div class="panel-header">
                 <div><h2>@T("ResourceIdentity")</h2><p>@T("ResourceIdentityHelp")</p></div>
@@ -149,6 +168,7 @@
         </article>
 
         </details>
+        </section>
     }
 </section>
 
@@ -173,13 +193,17 @@
     private string? loadedKey;
     private readonly string addId = $"access-add-{Guid.NewGuid():N}";
     private ResourceAccessGrant[] savedGrants = [];
+    private ResourceAccessAction[] allDescendantActions = [], savedAllDescendantActions = [];
+    private bool AllDescendants => allDescendantActions.Contains(ResourceAccessAction.Discover) && allDescendantActions.Contains(ResourceAccessAction.Use);
+    private void SetAllDescendants(bool value) { if (!canManage || saving) return; allDescendantActions = value ? [ResourceAccessAction.Discover, ResourceAccessAction.Use] : []; MarkDirty(); }
+
     private string targetSearch = string.Empty;
     private bool adding, addDiscover = true, addUse = true, addDescendants;
     private string selectedTarget = string.Empty;
     private IReadOnlyList<ResourceScopeTargetResponse> FilteredTargets => AvailableTargets.Where(target => $"{target.DisplayName} {target.ScopeRef.Value}".Contains(targetSearch, StringComparison.CurrentCultureIgnoreCase)).ToArray();
     private bool loading = true, loadError, canManage, dirty, saving, saveError, saved, invalidTarget;
     private bool HasPendingGrant => adding && !string.IsNullOrWhiteSpace(selectedTarget);
-    private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use)
+    private bool invalidGrant => grants.Any(value => !value.Discover && !value.Use && !value.DenyDiscover && !value.DenyUse)
         || HasPendingGrant && !addDiscover && !addUse;
     private string evaluationTarget = string.Empty;
     private bool evaluating, evaluationError;
@@ -192,6 +216,8 @@
             && grants.All(grant => grant.TargetScopeRef != value.ScopeRef))
         .OrderBy(value => ScopeRank(value.Kind)).ThenBy(value => value.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
 
+    [Parameter] public EventCallback PolicySaved { get; set; }
+    private bool targetedExpanded;
     private bool? reportedDraft;
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -239,6 +265,7 @@
             etag = snapshot?.ETag;
             grants.AddRange(snapshot?.Policy.Grants.Select(GrantModel.From) ?? []);
             savedGrants = grants.Select(grant => grant.ToGrant()).ToArray();
+            allDescendantActions = snapshot?.Policy.AllDescendantActions.ToArray() ?? []; savedAllDescendantActions = allDescendantActions.ToArray();
         }
         catch (AgentstrationApiException) { loadError = true; identity = null; }
         finally { loading = false; }
@@ -280,14 +307,23 @@
     {
         if (saving) return;
         grants.Clear(); grants.AddRange(savedGrants.Select(GrantModel.From));
+        allDescendantActions = savedAllDescendantActions.ToArray();
         ResetAddition();
         dirty = saveError = saved = invalidTarget = false;
     }
     private void Remove(GrantModel grant) { grants.Remove(grant); MarkDirty(); }
     private void SetAction(GrantModel grant, ResourceAccessAction action, bool enabled)
     {
-        if (action == ResourceAccessAction.Discover) grant.Discover = enabled; else grant.Use = enabled;
+        if (action == ResourceAccessAction.Discover) { grant.Discover = enabled; if (enabled) grant.DenyDiscover = false; }
+        else { grant.Use = enabled; if (enabled) grant.DenyUse = false; }
+        grant.SourceResourceUid = null;
         MarkDirty();
+    }
+    private void SetDeny(GrantModel grant, ResourceAccessAction action, bool value)
+    {
+        if (action == ResourceAccessAction.Discover) { grant.DenyDiscover = value; if (value) grant.Discover = false; }
+        else { grant.DenyUse = value; if (value) grant.Use = false; }
+        grant.SourceResourceUid = null; MarkDirty();
     }
     private void SetPropagation(GrantModel grant, bool enabled) { grant.IncludeDescendants = enabled; MarkDirty(); }
     private void MarkDirty() { dirty = true; saved = saveError = invalidTarget = false; }
@@ -295,16 +331,17 @@
     private async Task SaveAsync()
     {
         if (!canManage || saving || identity is null || invalidGrant) return;
-        if (HasPendingGrant && !TryAddPendingGrant()) return;
+        if (HasPendingGrant && !TryAddPendingGrant()) { targetedExpanded = true; return; }
         saving = true; saveError = saved = false;
         try
         {
-            var policy = new ResourceAccessPolicy(identity, grants.Select(value => value.ToGrant()).ToArray());
+            var policy = new ResourceAccessPolicy(identity, grants.Select(value => value.ToGrant()).ToArray()) { AllDescendantActions = allDescendantActions };
             var snapshot = await Policies.PutAsync(policy, etag, cancellation.Token);
-            etag = snapshot.ETag; savedGrants = snapshot.Policy.Grants.ToArray(); dirty = false; saved = true; reviewedPolicy = false;
+            etag = snapshot.ETag; savedAllDescendantActions = snapshot.Policy.AllDescendantActions.ToArray(); savedGrants = snapshot.Policy.Grants.ToArray(); dirty = false; saved = true; reviewedPolicy = false;
             ClearEvaluation();
+            await PolicySaved.InvokeAsync();
         }
-        catch (AgentstrationApiException) { saveError = true; }
+        catch (AgentstrationApiException) { saveError = true; targetedExpanded = true; }
         finally { saving = false; }
     }
 
@@ -321,7 +358,7 @@
             ClearEvaluation();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (AgentstrationApiException) { saveError = true; }
+        catch (AgentstrationApiException) { saveError = true; targetedExpanded = true; }
         finally { saving = false; }
     }
 
@@ -347,6 +384,8 @@
     }
     private string DecisionLabel(ResourceAccessDecision decision)
     {
+        if (decision.ReasonCode is "explicit_deny" or "parent_access_denied" or "all_descendants" or "toolset_inherited" or "access_relationship_invalid")
+            return $"{T(decision.Allowed ? "Evaluation.Allowed" : "Evaluation.Denied")} · {T($"Rule.{decision.ReasonCode}")}";
         var key = decision.ReasonCode switch
         {
             "same_scope" => "SameScope", "exact_grant" => "ExactGrant", "propagated_grant" => "PropagatedGrant",
@@ -385,10 +424,16 @@
         public bool Discover { get; set; } = discover;
         public bool Use { get; set; } = use;
         public bool IncludeDescendants { get; set; } = includeDescendants;
+        public bool DenyDiscover { get; set; }
+        public bool DenyUse { get; set; }
+        public Guid? SourceResourceUid { get; set; }
         public ResourceAccessGrant ToGrant() => new(TargetScopeRef,
             new[] { (Discover, ResourceAccessAction.Discover), (Use, ResourceAccessAction.Use) }
-                .Where(value => value.Item1).Select(value => value.Item2).ToArray(), IncludeDescendants);
+                .Where(value => value.Item1).Select(value => value.Item2).ToArray(), IncludeDescendants)
+            { DeniedActions = new[] { (DenyDiscover, ResourceAccessAction.Discover), (DenyUse, ResourceAccessAction.Use) }
+                .Where(value => value.Item1).Select(value => value.Item2).ToArray(), SourceResourceUid = SourceResourceUid };
         public static GrantModel From(ResourceAccessGrant grant) => new(grant.TargetScopeRef,
-            grant.Actions.Contains(ResourceAccessAction.Discover), grant.Actions.Contains(ResourceAccessAction.Use), grant.IncludeDescendants);
+            grant.Actions.Contains(ResourceAccessAction.Discover), grant.Actions.Contains(ResourceAccessAction.Use), grant.IncludeDescendants)
+            { DenyDiscover = grant.DeniedActions.Contains(ResourceAccessAction.Discover), DenyUse = grant.DeniedActions.Contains(ResourceAccessAction.Use), SourceResourceUid = grant.SourceResourceUid };
     }
 }

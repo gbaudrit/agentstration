@@ -27,6 +27,7 @@ public sealed class ToolResourcePreviewTests
         using var context = await ContextAsync(handler);
         var cut = Render(context, Target("tool-a"));
         Assert.AreEqual(1, handler.Reads);
+        Assert.AreEqual(1, handler.ActivationReads);
         Assert.AreEqual($"/api/tools/tool-a?scopeRef={Uri.EscapeDataString(Scope.Value)}", handler.LastPath);
         Assert.HasCount(1, cut.FindComponents<ToolResourceSummary>());
         Assert.HasCount(1, cut.FindComponents<ResourceIdentitySummary>());
@@ -207,10 +208,17 @@ public sealed class ToolResourcePreviewTests
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler
     {
         public int Reads { get; private set; }
+        public int ActivationReads { get; private set; }
         public string? LastPath { get; private set; }
         public CancellationToken LastToken { get; private set; }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/activation", StringComparison.Ordinal))
+            {
+                ActivationReads++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = JsonContent.Create(new ToolOperationalStatus(Guid.Empty, true, "\"activation\"")) });
+            }
             Reads++;
             LastPath = request.RequestUri!.PathAndQuery;
             LastToken = cancellationToken;

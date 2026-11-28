@@ -58,4 +58,14 @@
   <data name="MissingResourceOwner"><value>Le lien de la ressource doit préciser son périmètre propriétaire exact.</value></data>
   <data name="ResourceIdentityMismatch"><value>La ressource retournée ne correspond pas à l’identité demandée.</value></data>
   <data name="ResourceYamlExport"><value>Le YAML présente la définition enregistrée. Utilisez le formulaire pour modifier cette ressource.</value></data>
+  <data name="ToolsWithoutToolSet" xml:space="preserve"><value>Outils sans toolset</value></data>
+  <data name="EnableGroup" xml:space="preserve"><value>Activer le groupe</value></data>
+  <data name="DisableGroup" xml:space="preserve"><value>Désactiver le groupe</value></data>
+  <data name="EnableSelected" xml:space="preserve"><value>Activer la sélection</value></data>
+  <data name="DisableSelected" xml:space="preserve"><value>Désactiver la sélection</value></data>
+  <data name="ManageGroupAccess" xml:space="preserve"><value>Gérer les accès du groupe</value></data>
+  <data name="SelectTool" xml:space="preserve"><value>Sélectionner {0}</value></data>
+  <data name="GroupActivationPartial" xml:space="preserve"><value>Certaines modifications d’activation n’ont pas été appliquées. Actualisez et vérifiez les états.</value></data>
+  <data name="GroupActivationSaved" xml:space="preserve"><value>Activation administrative mise à jour.</value></data>
+  <data name="MembershipUnverified" xml:space="preserve"><value>L’appartenance enregistrée ne correspond plus aux outils matérialisés. Actualisez l’extension avant d’administrer ce groupe.</value></data>
 </root>

@@ -137,6 +137,7 @@ public sealed class ToolCollectionTests
         {
             Value = Enumerable.Range(0, count).Select(index => new ToolResource
             {
+                Uid = Guid.NewGuid(),
                 ApiVersion = ResourceApiVersions.CoreV1,
                 Kind = ToolResourceKinds.Tool,
                 Metadata = new() { Name = $"tool-{index}", Namespace = ResourceNamespace.Parse(index % 3 == 0 ? "team" : "other") },
@@ -163,14 +164,31 @@ public sealed class ToolCollectionTests
     {
         public int Requests { get; private set; }
         public int ProviderRequests { get; private set; }
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+        private readonly Dictionary<string, ToolResource> saved = [];
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (request.RequestUri!.AbsolutePath == "/api/toolproviders")
             {
                 ProviderRequests++;
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { Value = Array.Empty<ToolProviderResource>() }) });
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new { Value = Array.Empty<ToolProviderResource>() }) };
             }
-            return load(++Requests);
+            if (request.RequestUri.AbsolutePath.EndsWith("/activation", StringComparison.Ordinal))
+            {
+                var tool = saved[request.RequestUri.Segments[^2].TrimEnd('/')];
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(new ToolOperationalStatus(tool.Uid, tool.Definition.Enabled, null)) };
+            }
+            var response = await load(++Requests);
+            if (response.IsSuccessStatusCode)
+            {
+                var body = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(await response.Content.ReadAsStringAsync(cancellationToken));
+                foreach (var element in body.GetProperty("value").EnumerateArray())
+                {
+                    var tool = System.Text.Json.JsonSerializer.Deserialize<ToolResource>(element, JsonOptions)!;
+                    saved[tool.Name] = tool;
+                }
+            }
+            return response;
         }
     }
 }

@@ -42,6 +42,45 @@ public sealed partial class ApiClientTests
     }
 
     [TestMethod]
+    public async Task AdministrativeToolReadsUseExactFamilyRoutesAndSeparateOperationalEtag()
+    {
+        var owner = ResourceScopeRef.Instance;
+        var ns = new ResourceNamespace("shared.tools");
+        var uid = Guid.NewGuid();
+        var paths = new List<string>();
+        using var http = new HttpClient(new StubHandler(request =>
+        {
+            paths.Add(request.RequestUri!.PathAndQuery);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = request.RequestUri.AbsolutePath.EndsWith("/activation", StringComparison.Ordinal)
+                    ? JsonContent.Create(new ToolOperationalStatus(uid, true, "\"state\""))
+                    : JsonContent.Create(new ToolProviderAdministration([], []))
+            };
+        })) { BaseAddress = new("http://localhost/") };
+        var client = new ToolsApiClient(http);
+        var state = await client.GetOperationalStateAsync(new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.Tool, Uid = uid,
+            ScopeRef = owner, Metadata = new() { Name = "read", Namespace = ns },
+            Definition = new() { DisplayName = "Read", Enabled = false }
+        }, default);
+        _ = await client.GetProviderAdministrationAsync(new()
+        {
+            ApiVersion = ResourceApiVersions.CoreV1, Kind = ToolResourceKinds.ToolProvider,
+            ScopeRef = owner, Metadata = new() { Name = "github", Namespace = ns },
+            Definition = new() { DisplayName = "GitHub", ProviderType = ToolProviderType.Aep }
+        }, default);
+        Assert.IsTrue(state.Enabled);
+        Assert.AreEqual("\"state\"", state.ETag);
+        CollectionAssert.AreEqual(new[]
+        {
+            "/api/tools/read/activation?namespace=shared.tools&scopeRef=%2Finstance",
+            "/api/toolproviders/github/administration?resourceNamespace=shared.tools&scopeRef=%2Finstance"
+        }, paths);
+    }
+
+    [TestMethod]
     public async Task ToolClientListsDesignerToolsInTheExplicitFlowContext()
     {
         var scope = ResourceScopeRef.Workspace(Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"));

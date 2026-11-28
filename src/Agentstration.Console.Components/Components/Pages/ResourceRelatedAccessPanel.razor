@@ -1,0 +1,128 @@
+@implements IDisposable
+@inject IServiceProvider Services
+@inject Microsoft.Extensions.Localization.IStringLocalizer<ResourceAccessPanelStrings> Localizer
+
+<section class="panel related-access" data-testid="resource-related-access" data-parent-uid="@ParentUid">
+    <div class="panel-header"><div><h2>@T("RelatedTitle")</h2><p>@T("RelatedHelp")</p></div>
+        <button class="button-secondary" type="button" disabled="@busy" @onclick="LoadAsync">@T(failed ? "Retry" : "RelatedRefresh")</button>
+    </div>
+    @if (loading) { <LoadingState Message="@T("Loading")" /> }
+    else if (failed) { <p class="error-panel" role="alert">@T("UnableToLoadMessage")</p> }
+    else if (snapshot is { } savedSnapshot)
+    {
+        <p>@T("RelatedResources", savedSnapshot.Resources.Count)</p>
+        @if (savedSnapshot.Resources.Count == 0) { <p>@T("RelatedNoMembers")</p> }
+        else
+        {
+            <FormField Label="@T("RelatedSearch")"><ClearableText Type="search" Value="@search" ValueChanged="value => search = value" /></FormField>
+            @if (!rows.Any(value => value.Evaluation.Eligible)) { <p>@T("RelatedEmpty")</p> }
+            <div class="related-access-scopes">
+                @foreach (var row in rows.Where(value => value.Evaluation.Eligible && MatchesSearch(value)))
+                {
+                    var direct = savedSnapshot.Resources.Any(value => value.Policy?.Policy.Grants.Any(grant => grant.TargetScopeRef == row.Scope.ScopeRef) == true);
+                    var partial = row.Evaluation.Usable > 0 && row.Evaluation.Usable < row.Evaluation.Total;
+                    <div class="related-access-row @(row.Scope.Kind == ResourceScopeKind.Workspace ? "related-workspace" : "related-tenant")" data-scope-ref="@row.Scope.ScopeRef.Value">
+                        <span class="related-scope-name"><UiIcon Name="@(row.Scope.Kind == ResourceScopeKind.Tenant ? "building" : "folder")" />@row.Scope.DisplayName</span>
+<label class="resource-enabled-toggle"><FormCheckbox role="switch" Value="@(row.Evaluation.Usable > 0)" disabled="@(busy || savedSnapshot.CanManage != true)" aria-label="@row.Scope.DisplayName"
+                            ValueChanged="value => ApplyAsync(row.Scope.ScopeRef, value ? ResourceRelatedAccessMode.Allow : ResourceRelatedAccessMode.Deny)" /></label>
+                        <span>@T(partial ? "PartialAccess" : direct ? row.Scope.Kind == ResourceScopeKind.Workspace ? "RelatedException" : "RelatedTenantRule" : "RelatedInherited")</span>
+                        <small>@T("RelatedUsage", row.Evaluation.Usable, row.Evaluation.Total)</small>
+                        @if (row.Evaluation.Exceptions > 0) { <small>@T("RelatedExceptionCount", row.Evaluation.Exceptions)</small> }
+                        @if (row.Evaluation.Unavailable > 0) { <small>@T("RelatedUnavailable", row.Evaluation.Unavailable)</small> }
+                        @if (direct) { <button class="text-button" type="button" disabled="@(busy || savedSnapshot.CanManage != true)" @onclick="() => ApplyAsync(row.Scope.ScopeRef, ResourceRelatedAccessMode.Inherit)">@T("RelatedRestore")</button> }
+                    </div>
+                }
+            </div>
+            <details class="related-access-details"><summary>@T("RelatedDetails")</summary>
+                <p>@T("RelatedSelectionHelp")</p>
+                <ul>@foreach (var item in savedSnapshot.Resources) { <li>
+                    <FormCheckbox Value="@selected.Contains(item.Resource.Uid)" ValueChanged="value => Select(item.Resource.Uid, value)" disabled="@(busy || savedSnapshot.CanManage != true)" aria-label="@T("SelectResource", item.Name)" />
+                    @if (ResourceLink(item) is { } href) { <a href="@href">@(item.DisplayName ?? item.Name)</a> } else { <span>@(item.DisplayName ?? item.Name)</span> }
+                    <ResourceScopeBadge ScopeRef="item.Resource.OwnerScopeRef" /> <small>@KindLabel(item.Resource.Kind)</small>
+                </li> }</ul>
+            </details>
+        }
+        @if (unapplied > 0) { <p class="form-alert form-alert-warning" role="status">@T("RelatedFailures", unapplied)</p> }
+        @if (saved) { <p role="status">@T("AccessRefreshed")</p> }
+    }
+</section>
+
+@code {
+    private IResourceAccessPolicyClient Policies => Services.GetService<IResourceAccessPolicyClient>() ?? throw new InvalidOperationException("Resource access services are unavailable.");
+    private IResourceScopeInventoryClient Scopes => Services.GetService<IResourceScopeInventoryClient>() ?? throw new InvalidOperationException("Scope inventory services are unavailable.");
+    [Parameter, EditorRequired] public Guid ParentUid { get; set; }
+    private Guid loadedUid;
+    private readonly HashSet<Guid> selected = [];
+    private void Select(Guid uid, bool value) { if (value) selected.Add(uid); else selected.Remove(uid); }
+    private string? ResourceLink(ResourceRelatedAccessItem item) => RelatedResourcePresentation.Href(Services, item.Resource.Kind, item.Name, item.Resource.Namespace, item.Resource.OwnerScopeRef, "access");
+    private string KindLabel(string kind) { var label = Localizer["Kind." + kind]; return label.ResourceNotFound ? kind : label.Value; }
+    private int revision;
+    private readonly CancellationTokenSource cancellation = new();
+    private ResourceRelatedAccessSnapshot? snapshot;
+    private IReadOnlyList<ScopeRow> rows = [];
+    private bool loading, busy, failed, saved;
+    private int unapplied;
+    private string search = string.Empty;
+    private string T(string key, params object[] values) => Localizer[key, values];
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedUid == ParentUid) return;
+        loadedUid = ParentUid;
+        snapshot = null; rows = []; selected.Clear(); saved = false; unapplied = 0;
+        await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        var version = ++revision;
+        var uid = ParentUid;
+        loading = true; failed = false;
+        try
+        {
+            var current = await Policies.GetRelatedAsync(uid, cancellation.Token);
+            var inventory = await Scopes.GetAsync(cancellation.Token);
+            var targets = inventory.Scopes.Where(value => value.ScopeRef != current.Parent.OwnerScopeRef
+                && IsDescendant(value, current.Parent.OwnerScopeRef, inventory)).ToArray();
+            if (targets.Length > 256) throw new InvalidOperationException("The scope inventory exceeds its bounded limit.");
+            var evaluated = await Task.WhenAll(targets.Select(async scope => new ScopeRow(scope,
+                await Policies.EvaluateRelatedAsync(uid, scope.ScopeRef, cancellation.Token))));
+            if (version != revision || uid != ParentUid) return;
+            snapshot = current; rows = evaluated;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        { if (version == revision) { failed = true; snapshot = null; rows = []; } }
+        finally { if (version == revision) loading = false; }
+    }
+    private async Task ApplyAsync(ResourceScopeRef consumer, ResourceRelatedAccessMode mode)
+    {
+        if (busy || snapshot?.CanManage != true) return;
+        var version = revision;
+        busy = true; failed = saved = false; unapplied = 0;
+        try
+        {
+            var result = await Policies.ApplyRelatedAsync(ParentUid, new(consumer, mode, snapshot.MembershipToken,
+                snapshot.Resources.ToDictionary(value => value.Resource.Uid, value => value.Policy?.ETag))
+                { ResourceUids = selected.Count == 0 ? null : selected.ToArray() }, cancellation.Token);
+            if (version != revision) return;
+            unapplied = result.Count(value => !value.Applied); saved = true;
+            await LoadAsync();
+        }
+        catch (AgentstrationApiException) { if (version == revision) failed = true; }
+        finally { busy = false; }
+    }
+    private bool MatchesSearch(ScopeRow row) => string.IsNullOrWhiteSpace(search)
+        || row.Scope.DisplayName.Contains(search, StringComparison.CurrentCultureIgnoreCase)
+        || rows.Any(value => value.Scope.ParentScopeRef == row.Scope.ScopeRef
+            && value.Scope.DisplayName.Contains(search, StringComparison.CurrentCultureIgnoreCase));
+    private static bool IsDescendant(ResourceScopeInventoryNodeResponse scope, ResourceScopeRef owner, ResourceScopeInventoryResponse inventory)
+    {
+        var parent = scope.ParentScopeRef;
+        for (var depth = 0; parent is { } current && depth < 3; depth++)
+        {
+            if (current == owner) return true;
+            parent = inventory.Scopes.SingleOrDefault(value => value.ScopeRef == current)?.ParentScopeRef;
+        }
+        return false;
+    }
+    public void Dispose() { ++revision; cancellation.Cancel(); cancellation.Dispose(); }
+    private sealed record ScopeRow(ResourceScopeInventoryNodeResponse Scope, ResourceRelatedAccessEvaluation Evaluation);
+}

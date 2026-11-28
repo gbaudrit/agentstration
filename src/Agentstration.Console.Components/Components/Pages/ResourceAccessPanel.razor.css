@@ -30,3 +30,12 @@
 
 .access-evaluation { display: grid; gap: var(--space-3); min-width: 0; }
 .access-evaluation .resource-details dd, .access-current-policy li { overflow-wrap: anywhere; }
+
+.access-resource { display: grid; gap: var(--space-4); }
+.access-global { padding-block: var(--space-2); }
+.access-global .panel-header { align-items: center; }
+.access-global h3 { margin: 0; font-size: var(--font-size-base); }
+.access-targeted-toggle { justify-self: start; }
+.access-targeted[hidden] { display: none; }
+.access-targeted .access-grants { margin-block-start: var(--space-4); }
+.access-resource .access-details { padding-block-start: var(--space-3); border-block-start: 1px solid var(--border); }

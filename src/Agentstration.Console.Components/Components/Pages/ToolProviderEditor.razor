@@ -47,6 +47,7 @@ else
         <AdditionalContent Context="path">@Tools</AdditionalContent>
         <Actions>@if (CanMutate) { <button class="button-secondary" type="button" @onclick="TestAsync" disabled="@(busy || refreshing)"><UiIcon Name="activity" />@T("TestConnection")</button><button class="button-primary" type="button" @onclick="RefreshAsync" disabled="@(busy || refreshing)"><UiIcon Name="refresh" />@T("RefreshDiscovery")</button> }</Actions>
         <DraftActions><button type="button" class="button-secondary" disabled="@(busy || refreshing)" @onclick="Discard">@Shared["Discard"]</button><button type="submit" form="tool-provider-resource-form" class="button-primary" disabled="@(busy || refreshing)">@T("SaveProvider")</button></DraftActions>
+    <RelatedAccessContent>@if (provider is not null) { <ResourceRelatedAccessPanel ParentUid="provider.Uid" /> }</RelatedAccessContent>
     </ConsoleResourceDetailsTemplate>
 }
 
@@ -79,15 +80,24 @@ else
 </FormGrid></div></FormSection>;
     private RenderFragment Tools => @<div>    @if (!IsNew) { <section class="panel tool-provider-section" id="tools" data-testid="provider-tools-panel"><div class="panel-header tool-provider-section-header"><div class="tool-provider-section-heading"><span class="tool-provider-section-icon"><UiIcon Name="wrench" /></span><div><p class="eyebrow">@T("ToolsEyebrow")</p><h2>@T("Tools")</h2><p>@T("ToolsDiscovered", ToolCount(tools.Count))</p></div></div></div>
         @if (tools.Count == 0) { <EmptyState Title="@T("NoToolsTitle")" Message="@T("NoToolsMessage")" /> }
-        else { <CollectionView TItem="ToolResource" Items="tools" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
+        else {
+        @if (selectedTools.Count > 0) { <div class="form-actions"><button type="button" class="button-secondary" disabled="@(!CanAdministerTools || busy || refreshing)" @onclick="() => EnableGroupAsync(selectedTools.ToArray(), true)">@T("EnableSelected")</button><button type="button" class="button-secondary" disabled="@(!CanAdministerTools || busy || refreshing)" @onclick="() => EnableGroupAsync(selectedTools.ToArray(), false)">@T("DisableSelected")</button></div> }
+        @foreach (var group in ToolGroups) {
+        <details class="panel toolset-provider-group" open data-toolset-uid="@group.ToolSet?.Uid">
+            <summary>@(group.ToolSet is null ? T("ToolsWithoutToolSet") : group.DisplayName) <small>@ToolCount(group.ToolUids.Count)</small></summary>
+            @if (group.Unverified) { <p class="inline-warning" role="status">@T("MembershipUnverified")</p> }
+            <div class="form-actions"><button type="button" class="button-secondary" disabled="@(!CanAdministerTools || busy || refreshing || group.ToolUids.Count == 0)" @onclick="() => EnableGroupAsync(group.ToolUids, true)">@T("EnableGroup")</button><button type="button" class="button-secondary" disabled="@(!CanAdministerTools || busy || refreshing || group.ToolUids.Count == 0)" @onclick="() => EnableGroupAsync(group.ToolUids, false)">@T("DisableGroup")</button>
+            @if (group.ToolSet is { } set) { <a class="text-button" href="@(ResourceOwnershipContext.Resource(Services, "/tools/sets", group.ToolSetName!, set.Namespace, set.OwnerScopeRef) + "#access")">@T("ManageGroupAccess")</a> }</div>
+        <CollectionView TItem="ToolResource" Items="@(tools.Where(value => group.ToolUids.Contains(value.Uid)).ToArray())" InformationLabels="@(new string[] { T("Enabled") })" IdentityLabel="@T("Name")" StateLabel="@T("Status")">
         <Identity Context="tool">
+<FormCheckbox Value="@selectedTools.Contains(tool.Uid)" ValueChanged="value => SelectTool(tool.Uid, value)" aria-label="@T("SelectTool", tool.Definition.DisplayName)" />
 <CollectionIdentity DisplayName="@tool.Definition.DisplayName" Namespace="@tool.Namespace.Value" Name="@tool.Name" Href="@(ToolUrl(tool) + "#overview")" IconName="wrench"><IconBadges><ResourceScopeBadge ScopeRef="tool.ScopeRef" ShowName IconOnly /><StatusBadge Text="@AvailabilityLabel(tool.Definition.Discovery?.Available == true)" Status="@(tool.Definition.Discovery?.Available == true ? UiStatus.Success : UiStatus.Warning)" IconOnly /><ManagedResourceBadge IsManaged="@tool.Governance.IsManaged" IsReadOnly="@(!ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" IconOnly /></IconBadges></CollectionIdentity></Identity>
         <Information Context="tool">
-            <CollectionValue Label="@T("Enabled")">@BooleanLabel(tool.Definition.Enabled)</CollectionValue>
+            <CollectionValue Label="@T("Enabled")">@BooleanLabel(IsToolEnabled(tool))</CollectionValue>
         </Information>
         <Actions Context="tool">
-<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><ResourceActivationToggle Enabled="tool.Definition.Enabled" EnabledChanged="value => EnableAsync(tool, value)" Disabled="@(!CanMutate || busy || refreshing || tool.Governance.IsManaged || !ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" /><a href="@(ToolUrl(tool) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a><button type="button" data-testid="provider-tool-preview" disabled="@(tool.ScopeRef is null)" @onclick="() => OpenToolPreview(tool)"><UiIcon Name="eye" />@Shared["Preview"]</button></CollectionActions></Actions>
-    </CollectionView> }
+<CollectionActions ResourceName="@($"{tool.Definition.DisplayName} ({tool.Namespace}/{tool.Name}, {tool.ScopeRef})")"><ResourceActivationToggle Enabled="IsToolEnabled(tool)" EnabledChanged="value => EnableAsync(tool, value)" Disabled="@(!CanAdministerTools || busy || refreshing || !ResourceOwnershipContext.CanManage(tool.ScopeRef, Services))" /><a href="@(ToolUrl(tool) + "#overview")"><UiIcon Name="arrow-up-right" />@Shared["OpenItem"]</a><button type="button" data-testid="provider-tool-preview" disabled="@(tool.ScopeRef is null)" @onclick="() => OpenToolPreview(tool)"><UiIcon Name="eye" />@Shared["Preview"]</button></CollectionActions></Actions>
+    </CollectionView></details> } }
     </section> }</div>;
     private RenderFragment Ownership => @<div>        @if (provider?.Definition.Aep?.Extension is { } extension)
         {
@@ -113,6 +123,14 @@ else
     private ToolProviderEditorModel model = new();
     private ToolProviderResource? provider, newerProvider;
     private IReadOnlyList<ToolResource> tools = [];
+    private ToolProviderAdministration administration = new([], []);
+    private readonly HashSet<Guid> selectedTools = [];
+    private bool CanAdministerTools => provider is not null && ResourceOwnershipContext.CanManage(provider.ScopeRef, Services);
+    private IEnumerable<ToolProviderGroup> ToolGroups => administration.Groups.Count > 0 ? administration.Groups : [new(null, string.Empty, tools.Select(value => value.Uid).ToArray())];
+    private bool IsToolEnabled(ToolResource tool) => administration.States.SingleOrDefault(value => value.ToolUid == tool.Uid)?.Enabled ?? tool.Definition.Enabled;
+    private string? ToolStateETag(ToolResource tool) => administration.States.SingleOrDefault(value => value.ToolUid == tool.Uid)?.ETag;
+    private void SelectTool(Guid uid, bool selected) { if (selected) selectedTools.Add(uid); else selectedTools.Remove(uid); }
+
     private string? message, etag, newerEtag, loadedKey;
     private bool loading = true, busy, refreshing, failed, invalidInput, baselinePending;
     private long loadVersion;
@@ -248,6 +266,7 @@ else
     {
         if (value.ScopeRef is not { } owner) throw new InvalidOperationException(T("MissingResourceOwner"));
         var rows = await Client.GetToolsAsync(owner, value.Name, cancellation.Token);
+        administration = await Client.GetProviderAdministrationAsync(value, cancellation.Token);
         return rows.Where(tool => tool.ScopeRef == owner && tool.Namespace == value.Namespace && tool.Definition.Provider is { } reference
             && reference.Name == value.Name && (reference.ScopeRef ?? tool.ScopeRef) == owner && (reference.Namespace ?? tool.Namespace) == value.Namespace).ToArray();
     }
@@ -288,10 +307,27 @@ else
     }
     private async Task EnableAsync(ToolResource tool, bool value)
     {
-        if (!CanMutate || busy || refreshing || tool.Governance.IsManaged || !ResourceOwnershipContext.CanManage(tool.ScopeRef, Services) || provider is null) return;
+        if (!CanAdministerTools || busy || refreshing || !ResourceOwnershipContext.CanManage(tool.ScopeRef, Services) || provider is null) return;
         var version = loadVersion; var current = provider; busy = true;
-        try { await Client.SetEnabledAsync(tool.Namespace, tool.Name, value, null, cancellation.Token); var rows = await LoadToolsAsync(current); if (version == loadVersion) tools = rows; }
+        try { await Client.SetEnabledAsync(tool.ScopeRef!.Value, tool.Namespace, tool.Name, value, ToolStateETag(tool), cancellation.Token); var rows = await LoadToolsAsync(current); if (version == loadVersion) tools = rows; }
         catch (Exception exception) { if (version == loadVersion) { failed = true; message = exception.Message; } } finally { if (version == loadVersion) busy = false; }
+    }
+    private async Task EnableGroupAsync(IReadOnlyList<Guid> uids, bool enabled)
+    {
+        if (!CanAdministerTools || busy || refreshing || provider is null || Services.GetService<IResourceAccessPolicyClient>() is not { } access) return;
+        var version = loadVersion; busy = true;
+        try
+        {
+            var snapshot = await access.GetRelatedAsync(provider.Uid, cancellation.Token);
+            var results = await Client.SetCollectionEnabledAsync(provider.Uid, new(snapshot.MembershipToken, enabled,
+                administration.States.ToDictionary(value => value.ToolUid, value => value.ETag), uids), cancellation.Token);
+            var rows = await LoadToolsAsync(provider);
+            if (version != loadVersion) return;
+            tools = rows; selectedTools.Clear(); failed = results.Any(value => !value.Applied);
+            message = failed ? T("GroupActivationPartial") : T("GroupActivationSaved");
+        }
+        catch (Exception exception) { if (version == loadVersion) { failed = true; message = exception.Message; } }
+        finally { if (version == loadVersion) busy = false; }
     }
     private static UiStatus ProviderStatus(string? status) => status switch { "connected" => UiStatus.Success, "error" => UiStatus.Danger, _ => UiStatus.Neutral };
     public void Dispose() { ++loadVersion; if (editContext is not null) editContext.OnFieldChanged -= FieldChanged; cancellation.Cancel(); cancellation.Dispose(); }
